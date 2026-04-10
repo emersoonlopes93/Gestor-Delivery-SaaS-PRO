@@ -11,6 +11,7 @@ export const TENANT_PERMISSIONS = {
   'orders.cancel': 'Cancel orders',
   'orders.view_timeline': 'View order timeline',
   'orders.manage': 'Full order management',
+  'orders.use_kanban': 'Use operational kanban',
 
   // Catalog module
   'catalog.read': 'View catalog',
@@ -101,7 +102,7 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
   tenant_owner: Object.keys(TENANT_PERMISSIONS) as TenantPermission[],
   tenant_admin: Object.keys(TENANT_PERMISSIONS) as TenantPermission[],
   manager: [
-    'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.cancel', 'orders.view_timeline',
+    'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.cancel', 'orders.view_timeline', 'orders.use_kanban',
     'catalog.read', 'catalog.create', 'catalog.update', 'catalog.publish', 'catalog.manage_complements', 'catalog.manage_combos',
     'kds.use', 'kds.manage',
     'cash.open', 'cash.close', 'cash.manage',
@@ -115,7 +116,7 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
     'dashboard.view',
   ],
   attendant: [
-    'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.view_timeline',
+    'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.view_timeline', 'orders.use_kanban',
     'catalog.read',
     'crm.read',
     'dashboard.view',

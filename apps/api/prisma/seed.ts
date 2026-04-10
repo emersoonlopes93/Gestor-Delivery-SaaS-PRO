@@ -131,13 +131,11 @@ async function seedDemoTenant() {
   try {
     const tenant = await prisma.tenant.upsert({
       where: { slug: TENANT_SLUG },
-      update: {
-        isActive: true,
-      },
+      update: {},
       create: {
         name: 'Pizzaria Demo',
         slug: TENANT_SLUG,
-        status: 'active' as any,
+        status: 'active',
       },
     });
     console.log(`   ✅ Tenant created: ${tenant.id}`);
@@ -145,9 +143,7 @@ async function seedDemoTenant() {
     // Create tenant settings
     await prisma.tenantSettings.upsert({
       where: { tenantId: tenant.id },
-      update: {
-        isActive: true,
-      },
+      update: {},
       create: {
         tenantId: tenant.id,
         timezone: 'America/Sao_Paulo',
@@ -231,9 +227,7 @@ async function seedDemoTenant() {
         where: {
           userId_roleId: { userId: owner.id, roleId: ownerRole.id },
         },
-        update: {
-        isActive: true,
-      },
+        update: {},
         create: { userId: owner.id, roleId: ownerRole.id },
       });
     }
@@ -244,14 +238,11 @@ async function seedDemoTenant() {
     // Create demo category (ProductCategory)
     const category = await prisma.productCategory.upsert({
       where: { tenantId_slug: { tenantId: tenant.id, slug: 'pizzas' } },
-      update: {
-        isActive: true,
-      },
+      update: {},
       create: {
         tenantId: tenant.id,
         name: 'Pizzas',
         slug: 'pizzas',
-        isActive: true,
       },
     });
 
@@ -266,7 +257,6 @@ async function seedDemoTenant() {
         minSelect: 1,
         maxSelect: 1,
         isRequired: true,
-        isActive: true,
       },
     });
 
@@ -280,23 +270,19 @@ async function seedDemoTenant() {
         groupId: group.id,
         name: 'Catupiry',
         additionalPrice: 5.0,
-        isActive: true,
       },
     });
 
     // Create product
     const product = await prisma.product.upsert({
       where: { tenantId_slug: { tenantId: tenant.id, slug: 'pizza-de-calabresa' } },
-      update: {
-        isActive: true,
-      },
+      update: {},
       create: {
         tenantId: tenant.id,
         categoryId: category.id,
         name: 'Pizza de Calabresa',
         slug: 'pizza-de-calabresa',
         basePrice: 45.0,
-        isActive: true,
         isAvailable: true,
         sellableOnline: true,
       },

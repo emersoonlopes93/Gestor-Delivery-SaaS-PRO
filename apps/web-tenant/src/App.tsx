@@ -10,6 +10,8 @@ import { ProductsPage } from './features/catalog/ProductsPage';
 import { ComplementsPage } from './features/catalog/ComplementsPage';
 import { CombosPage } from './features/catalog/CombosPage';
 import { OrdersListPage } from './features/orders/OrdersListPage';
+import { OperationBoardPage } from './features/orders/OperationBoardPage';
+import { KdsPage } from './features/orders/KdsPage';
 
 export function App() {
   return (
@@ -69,6 +71,22 @@ export function App() {
           element={
             <PermissionGate permission="orders.read">
               <OrdersListPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/orders/board"
+          element={
+            <PermissionGate permission="orders.use_kanban">
+              <OperationBoardPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/orders/kds"
+          element={
+            <PermissionGate permission="kds.use">
+              <KdsPage />
             </PermissionGate>
           }
         />

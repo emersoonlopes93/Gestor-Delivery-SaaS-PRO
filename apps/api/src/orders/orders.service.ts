@@ -12,6 +12,8 @@ import type {
   OrderListItemDTO,
   UpdateOrderStatusDTO,
   OrderStatus,
+  OrderBoardItemDTO,
+  OrderKdsItemDTO,
 } from '@gestor/types';
 import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
 
@@ -342,5 +344,96 @@ export class OrdersService {
     });
 
     return this.getOrderDetail(orderId, tenantId);
+  }
+
+  // ----------------------------------------------------------------
+  // OPERATION: Board (Kanban)
+  // ----------------------------------------------------------------
+  async getBoardOrders(
+    tenantId: string,
+    fulfillmentType?: 'delivery' | 'pickup'
+  ): Promise<OrderBoardItemDTO[]> {
+    const where: any = {
+      tenantId,
+      status: { notIn: ['completed', 'cancelled'] } // Operational view excludes finished ones by default
+    };
+    
+    if (fulfillmentType) {
+      where.fulfillmentType = fulfillmentType;
+    }
+
+    const orders = await this.prisma.order.findMany({
+      where,
+      orderBy: { createdAt: 'asc' }, // Oldest first is better for operation
+      include: {
+        items: {
+          select: { quantity: true, snapshotName: true }
+        }
+      }
+    });
+
+    return orders.map(o => {
+      // Create items summary like "1x Pizza, 2x Coca"
+      const itemsSummary = o.items.map(i => `${i.quantity}x ${i.snapshotName}`).join(', ');
+      
+      return {
+        id: o.id,
+        orderNumber: o.orderNumber,
+        status: o.status as OrderStatus,
+        fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+        customerName: o.customerName,
+        total: Number(o.total),
+        itemCount: o.items.reduce((sum, i) => sum + i.quantity, 0),
+        itemsSummary,
+        createdAt: o.createdAt.toISOString(),
+      };
+    });
+  }
+
+  // ----------------------------------------------------------------
+  // OPERATION: KDS (Kitchen Display System)
+  // ----------------------------------------------------------------
+  async getKdsOrders(tenantId: string): Promise<OrderKdsItemDTO[]> {
+    const orders = await this.prisma.order.findMany({
+      where: {
+        tenantId,
+        // Only orders that need kitchen attention
+        status: { in: ['confirmed', 'preparing'] },
+      },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        items: {
+          include: {
+            complements: true,
+            comboSelections: true,
+          }
+        }
+      }
+    });
+
+    return orders.map(o => ({
+      id: o.id,
+      orderNumber: o.orderNumber,
+      status: o.status as OrderStatus,
+      fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+      notes: o.notes,
+      items: o.items.map(i => ({
+        id: i.id,
+        quantity: i.quantity,
+        notes: i.notes,
+        snapshotName: i.snapshotName,
+        snapshotComposition: i.snapshotComposition,
+        complements: i.complements.map(c => ({
+          id: c.id,
+          snapshotName: c.snapshotName,
+        })),
+        comboSelections: i.comboSelections.map(s => ({
+          id: s.id,
+          snapshotBlockName: s.snapshotBlockName,
+          snapshotProductName: s.snapshotProductName,
+        })),
+      })),
+      createdAt: o.createdAt.toISOString(),
+    }));
   }
 }

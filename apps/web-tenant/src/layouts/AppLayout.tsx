@@ -35,6 +35,32 @@ export function AppLayout() {
           >
             📊 Dashboard
           </Link>
+          
+          <div className="pt-4 pb-1">
+            <p className="px-3 text-xs font-black text-gray-400 uppercase tracking-wider">Pedidos</p>
+          </div>
+          <Link
+            to="/orders"
+            className="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+          >
+            📦 Lista de Pedidos
+          </Link>
+          <Link
+            to="/orders/board"
+            className="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+          >
+            📋 Kanban Operacional
+          </Link>
+          <Link
+            to="/orders/kds"
+            className="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+          >
+            👨‍🍳 KDS (Cozinha)
+          </Link>
+
+          <div className="pt-4 pb-1">
+            <p className="px-3 text-xs font-black text-gray-400 uppercase tracking-wider">Sistema</p>
+          </div>
           <Link
             to="/settings"
             className="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"

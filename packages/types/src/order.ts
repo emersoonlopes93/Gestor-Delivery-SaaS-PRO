@@ -67,13 +67,13 @@ export class CreateOrderItemDTO {
   
   @IsArray()
   @IsOptional()
-  @ValidateNested({每一: true })
+  @ValidateNested({ each: true })
   @Type(() => CreateOrderItemComplementDTO)
   complements?: CreateOrderItemComplementDTO[];
 
   @IsArray()
   @IsOptional()
-  @ValidateNested({每一: true })
+  @ValidateNested({ each: true })
   @Type(() => CreateOrderItemComboSelectionDTO)
   comboSelections?: CreateOrderItemComboSelectionDTO[];
 }
@@ -83,7 +83,7 @@ export class CreateOrderDTO {
 
   @IsArray()
   @IsNotEmpty()
-  @ValidateNested({每一: true })
+  @ValidateNested({ each: true })
   @Type(() => CreateOrderItemDTO)
   items!: CreateOrderItemDTO[];
 
@@ -179,4 +179,43 @@ export interface OrderListItemDTO {
 export interface UpdateOrderStatusDTO {
   status: OrderStatus;
   note?: string;
+}
+
+// --- Operation (Phase 5) DTOs ---
+
+export interface OrderBoardItemDTO {
+  id: string;
+  orderNumber: string;
+  status: OrderStatus;
+  fulfillmentType: FulfillmentType;
+  customerName: string;
+  total: number;
+  itemCount: number;
+  itemsSummary: string; // Ex: "1x Pizza Calabresa, 2x Coca Cola"
+  createdAt: string;
+}
+
+export interface OrderKdsItemDTO {
+  id: string;
+  orderNumber: string;
+  status: OrderStatus;
+  fulfillmentType: FulfillmentType;
+  notes?: string | null;
+  items: {
+    id: string;
+    quantity: number;
+    notes?: string | null;
+    snapshotName: string;
+    snapshotComposition?: string | null;
+    complements: {
+      id: string;
+      snapshotName: string;
+    }[];
+    comboSelections: {
+      id: string;
+      snapshotBlockName: string;
+      snapshotProductName: string;
+    }[];
+  }[];
+  createdAt: string;
 }

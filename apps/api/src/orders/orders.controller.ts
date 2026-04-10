@@ -51,6 +51,29 @@ export class OrdersController {
   }
 
   // ----------------------------------------------------------------
+  // TENANT INTERNAL: Operational Board
+  // ----------------------------------------------------------------
+  @Get('operation/board')
+  @RequirePermissions('orders.use_kanban')
+  async getBoardOrders(
+    @Request() req: any,
+    @Query('fulfillmentType') fulfillmentType?: 'delivery' | 'pickup',
+  ) {
+    const tenantId = req.user.tenantId;
+    return this.ordersService.getBoardOrders(tenantId, fulfillmentType);
+  }
+
+  // ----------------------------------------------------------------
+  // TENANT INTERNAL: Kitchen Display System (KDS)
+  // ----------------------------------------------------------------
+  @Get('operation/kds')
+  @RequirePermissions('kds.use')
+  async getKdsOrders(@Request() req: any) {
+    const tenantId = req.user.tenantId;
+    return this.ordersService.getKdsOrders(tenantId);
+  }
+
+  // ----------------------------------------------------------------
   // TENANT INTERNAL: Order detail
   // ----------------------------------------------------------------
   @Get(':id')
