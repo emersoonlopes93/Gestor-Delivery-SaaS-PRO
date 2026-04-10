@@ -3,7 +3,7 @@ import { CreateProductDto as ICreateProductDto } from '@gestor/types';
 
 export class CreateProductDto implements ICreateProductDto {
   @IsString()
-  name: string;
+  name!: string;
 
   @IsString()
   @IsOptional()
@@ -18,7 +18,7 @@ export class CreateProductDto implements ICreateProductDto {
   longDescription?: string;
 
   @IsNumber()
-  basePrice: number;
+  basePrice!: number;
 
   @IsString()
   @IsOptional()

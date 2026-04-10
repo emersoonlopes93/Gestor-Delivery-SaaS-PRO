@@ -3,7 +3,7 @@ import { CreateProductComplementGroupDto as ICreateProductComplementGroupDto } f
 
 export class CreateComplementGroupDto implements ICreateProductComplementGroupDto {
   @IsString()
-  name: string;
+  name!: string;
 
   @IsString()
   @IsOptional()

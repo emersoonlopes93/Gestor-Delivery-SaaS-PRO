@@ -3,7 +3,7 @@ import { CreateCategoryDto as ICreateCategoryDto } from '@gestor/types';
 
 export class CreateCategoryDto implements ICreateCategoryDto {
   @IsString()
-  name: string;
+  name!: string;
 
   @IsString()
   @IsOptional()

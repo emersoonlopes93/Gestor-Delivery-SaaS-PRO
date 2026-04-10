@@ -30,6 +30,8 @@ export class OrdersService {
     const validation = await this.checkoutValidator.validate(slug, dto.items);
     const { tenantId, lines, itemsSubtotal } = validation;
 
+    console.log(`DEBUG createOrder: type=${dto.fulfillmentType}, hasAddress=${!!dto.deliveryAddress}`);
+
     // 2. Check delivery address required for delivery
     if (dto.fulfillmentType === 'delivery' && !dto.deliveryAddress) {
       throw new BadRequestException('Endereço de entrega é obrigatório para pedidos de entrega.');

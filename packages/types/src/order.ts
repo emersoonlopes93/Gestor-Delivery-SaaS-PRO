@@ -32,49 +32,76 @@ export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 };
 
 // --- DTOs de Entrada (Checkout) ---
+import { IsString, IsNotEmpty, IsOptional, IsArray, ValidateNested, IsNumber, IsEnum, IsEmail } from 'class-validator';
+import { Type } from 'class-transformer';
 
-export interface DeliveryAddressDTO {
-  street: string;
-  number: string;
-  complement?: string;
-  neighborhood: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  reference?: string;
-  lat?: number;
-  lng?: number;
+export class DeliveryAddressDTO {
+  @IsString() @IsNotEmpty() street!: string;
+  @IsString() @IsNotEmpty() number!: string;
+  @IsString() @IsOptional() complement?: string;
+  @IsString() @IsNotEmpty() neighborhood!: string;
+  @IsString() @IsNotEmpty() city!: string;
+  @IsString() @IsNotEmpty() state!: string;
+  @IsString() @IsNotEmpty() zipCode!: string;
+  @IsString() @IsOptional() reference?: string;
+  @IsNumber() @IsOptional() lat?: number;
+  @IsNumber() @IsOptional() lng?: number;
 }
 
-export interface CreateOrderItemComplementDTO {
-  groupId: string;
-  itemId: string;
+export class CreateOrderItemComplementDTO {
+  @IsString() @IsNotEmpty() groupId!: string;
+  @IsString() @IsNotEmpty() itemId!: string;
 }
 
-export interface CreateOrderItemComboSelectionDTO {
-  blockId: string;
-  blockItemId: string;
+export class CreateOrderItemComboSelectionDTO {
+  @IsString() @IsNotEmpty() blockId!: string;
+  @IsString() @IsNotEmpty() blockItemId!: string;
 }
 
-export interface CreateOrderItemDTO {
-  lineType: OrderLineType;
-  productId?: string;
-  comboId?: string;
-  quantity: number;
-  notes?: string;
+export class CreateOrderItemDTO {
+  @IsString() @IsNotEmpty() lineType!: OrderLineType;
+  @IsString() @IsOptional() productId?: string;
+  @IsString() @IsOptional() comboId?: string;
+  @IsNumber() @IsNotEmpty() quantity!: number;
+  @IsString() @IsOptional() notes?: string;
+  
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({每一: true })
+  @Type(() => CreateOrderItemComplementDTO)
   complements?: CreateOrderItemComplementDTO[];
+
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({每一: true })
+  @Type(() => CreateOrderItemComboSelectionDTO)
   comboSelections?: CreateOrderItemComboSelectionDTO[];
 }
 
-export interface CreateOrderDTO {
-  idempotencyKey: string;
-  items: CreateOrderItemDTO[];
-  customerName: string;
-  customerPhone: string;
+export class CreateOrderDTO {
+  @IsString() @IsNotEmpty() idempotencyKey!: string;
+
+  @IsArray()
+  @IsNotEmpty()
+  @ValidateNested({每一: true })
+  @Type(() => CreateOrderItemDTO)
+  items!: CreateOrderItemDTO[];
+
+  @IsString() @IsNotEmpty() customerName!: string;
+  @IsString() @IsNotEmpty() customerPhone!: string;
+  
+  @IsEmail()
+  @IsOptional()
   customerEmail?: string;
-  fulfillmentType: FulfillmentType;
+
+  @IsString() @IsNotEmpty() fulfillmentType!: FulfillmentType;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DeliveryAddressDTO)
   deliveryAddress?: DeliveryAddressDTO;
-  notes?: string;
+
+  @IsString() @IsOptional() notes?: string;
 }
 
 // --- DTOs de Saída ---

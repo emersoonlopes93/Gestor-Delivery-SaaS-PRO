@@ -125,112 +125,248 @@ async function seedSuperAdmin() {
 }
 
 async function seedDemoTenant() {
+  const TENANT_SLUG = 'pizzaria-demo';
   console.log('🏪 Seeding demo tenant...');
 
-  // Create tenant
-  const tenant = await prisma.tenant.upsert({
-    where: { slug: 'pizzaria-demo' },
-    update: {},
-    create: {
-      name: 'Pizzaria Demo',
-      slug: 'pizzaria-demo',
-      status: 'active' as any,
-    },
-  });
+  try {
+    const tenant = await prisma.tenant.upsert({
+      where: { slug: TENANT_SLUG },
+      update: {
+        isActive: true,
+      },
+      create: {
+        name: 'Pizzaria Demo',
+        slug: TENANT_SLUG,
+        status: 'active' as any,
+      },
+    });
+    console.log(`   ✅ Tenant created: ${tenant.id}`);
 
-  // Create tenant settings
-  await prisma.tenantSettings.upsert({
-    where: { tenantId: tenant.id },
-    update: {},
-    create: {
-      tenantId: tenant.id,
-      timezone: 'America/Sao_Paulo',
-      currency: 'BRL',
-      language: 'pt-BR',
-      businessPhone: '(11) 99999-0000',
-      businessEmail: 'contato@pizzariademo.com',
-    },
-  });
-
-  // Create tenant roles
-  const roleEntries = Object.values(TenantDefaultRole);
-  for (const roleSlug of roleEntries) {
-    const roleName = roleSlug
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, (l) => l.toUpperCase());
-
-    const role = await prisma.tenantRole.upsert({
-      where: { tenantId_slug: { tenantId: tenant.id, slug: roleSlug } },
-      update: { name: roleName },
+    // Create tenant settings
+    await prisma.tenantSettings.upsert({
+      where: { tenantId: tenant.id },
+      update: {
+        isActive: true,
+      },
       create: {
         tenantId: tenant.id,
-        name: roleName,
-        slug: roleSlug,
-        description: `Default ${roleName} role`,
-        isSystem: true,
+        timezone: 'America/Sao_Paulo',
+        currency: 'BRL',
+        language: 'pt-BR',
+        businessPhone: '(11) 99999-0000',
+        businessEmail: 'contato@pizzariademo.com',
       },
     });
 
-    // Assign permissions
-    const permSlugs = TENANT_ROLE_PERMISSIONS[roleSlug] || [];
-    for (const permSlug of permSlugs) {
-      const permission = await prisma.tenantPermission.findUnique({
-        where: { slug: permSlug },
+    // Create tenant roles
+    const roleEntries = Object.values(TenantDefaultRole);
+    for (const roleSlug of roleEntries) {
+      const roleName = roleSlug
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (l) => l.toUpperCase());
+
+      const role = await prisma.tenantRole.upsert({
+        where: { tenantId_slug: { tenantId: tenant.id, slug: roleSlug } },
+        update: { name: roleName },
+        create: {
+          tenantId: tenant.id,
+          name: roleName,
+          slug: roleSlug,
+          description: `Default ${roleName} role`,
+          isSystem: true,
+        },
       });
-      if (permission) {
-        await prisma.tenantRolePermission.upsert({
-          where: {
-            roleId_permissionId: {
+
+      // Assign permissions
+      const permSlugs = TENANT_ROLE_PERMISSIONS[roleSlug] || [];
+      for (const permSlug of permSlugs) {
+        const permission = await prisma.tenantPermission.findUnique({
+          where: { slug: permSlug },
+        });
+        if (permission) {
+          await prisma.tenantRolePermission.upsert({
+            where: {
+              roleId_permissionId: {
+                roleId: role.id,
+                permissionId: permission.id,
+              },
+            },
+            update: {},
+            create: {
               roleId: role.id,
               permissionId: permission.id,
             },
-          },
-          update: {},
-          create: {
-            roleId: role.id,
-            permissionId: permission.id,
-          },
-        });
+          });
+        }
       }
     }
-  }
 
-  // Create tenant owner user
-  const ownerEmail = 'owner@pizzariademo.com';
-  const ownerPassword = await bcrypt.hash('Owner@123', 12);
+    // Create tenant owner user
+    const ownerEmail = 'owner@pizzariademo.com';
+    const ownerPassword = await bcrypt.hash('Owner@123', 12);
 
-  const owner = await prisma.tenantUser.upsert({
-    where: {
-      tenantId_email: { tenantId: tenant.id, email: ownerEmail },
-    },
-    update: {},
-    create: {
-      tenantId: tenant.id,
-      email: ownerEmail,
-      name: 'Dono da Pizzaria',
-      passwordHash: ownerPassword,
-      isActive: true,
-    },
-  });
-
-  // Assign tenant_owner role
-  const ownerRole = await prisma.tenantRole.findUnique({
-    where: { tenantId_slug: { tenantId: tenant.id, slug: 'tenant_owner' } },
-  });
-
-  if (ownerRole) {
-    await prisma.tenantUserRole.upsert({
+    const owner = await prisma.tenantUser.upsert({
       where: {
-        userId_roleId: { userId: owner.id, roleId: ownerRole.id },
+        tenantId_email: { tenantId: tenant.id, email: ownerEmail },
+      },
+      update: {
+        isActive: true,
+      },
+      create: {
+        tenantId: tenant.id,
+        email: ownerEmail,
+        name: 'Dono da Pizzaria',
+        passwordHash: ownerPassword,
+        isActive: true,
+      },
+    });
+
+    // Assign tenant_owner role
+    const ownerRole = await prisma.tenantRole.findUnique({
+      where: { tenantId_slug: { tenantId: tenant.id, slug: 'tenant_owner' } },
+    });
+
+    if (ownerRole) {
+      await prisma.tenantUserRole.upsert({
+        where: {
+          userId_roleId: { userId: owner.id, roleId: ownerRole.id },
+        },
+        update: {
+        isActive: true,
+      },
+        create: { userId: owner.id, roleId: ownerRole.id },
+      });
+    }
+
+    console.log(`   ✅ Demo tenant created: ${tenant.name}`);
+    console.log(`   ✅ Tenant owner: ${ownerEmail}`);
+
+    // Create demo category (ProductCategory)
+    const category = await prisma.productCategory.upsert({
+      where: { tenantId_slug: { tenantId: tenant.id, slug: 'pizzas' } },
+      update: {
+        isActive: true,
+      },
+      create: {
+        tenantId: tenant.id,
+        name: 'Pizzas',
+        slug: 'pizzas',
+        isActive: true,
+      },
+    });
+
+    // Create complement group (ProductComplementGroup)
+    const group = await prisma.productComplementGroup.upsert({
+      where: { id: 'demo-group-id' },
+      update: {},
+      create: {
+        id: 'demo-group-id',
+        tenantId: tenant.id,
+        name: 'Escolha a Borda',
+        minSelect: 1,
+        maxSelect: 1,
+        isRequired: true,
+        isActive: true,
+      },
+    });
+
+    // Create complement items (ProductComplementItem)
+    await prisma.productComplementItem.upsert({
+      where: { id: 'demo-item-catupiry' },
+      update: {},
+      create: {
+        id: 'demo-item-catupiry',
+        tenantId: tenant.id,
+        groupId: group.id,
+        name: 'Catupiry',
+        additionalPrice: 5.0,
+        isActive: true,
+      },
+    });
+
+    // Create product
+    const product = await prisma.product.upsert({
+      where: { tenantId_slug: { tenantId: tenant.id, slug: 'pizza-de-calabresa' } },
+      update: {
+        isActive: true,
+      },
+      create: {
+        tenantId: tenant.id,
+        categoryId: category.id,
+        name: 'Pizza de Calabresa',
+        slug: 'pizza-de-calabresa',
+        basePrice: 45.0,
+        isActive: true,
+        isAvailable: true,
+        sellableOnline: true,
+      },
+    });
+
+    // Link product to complement group (ProductComplementGroupLink)
+    await prisma.productComplementGroupLink.upsert({
+      where: {
+        productId_complementGroupId: {
+          productId: product.id,
+          complementGroupId: group.id,
+        },
       },
       update: {},
-      create: { userId: owner.id, roleId: ownerRole.id },
+      create: {
+        tenantId: tenant.id,
+        productId: product.id,
+        complementGroupId: group.id,
+        order: 0,
+      },
     });
-  }
 
-  console.log(`   ✅ Demo tenant created: ${tenant.name}`);
-  console.log(`   ✅ Tenant owner: ${ownerEmail}`);
+    // Create combo (ProductCombo)
+    const combo = await prisma.productCombo.upsert({
+      where: { tenantId_slug: { tenantId: tenant.id, slug: 'combo-casal' } },
+      update: {},
+      create: {
+        tenantId: tenant.id,
+        name: 'Combo Casal',
+        slug: 'combo-casal',
+        basePrice: 85.0,
+        isActive: true,
+      },
+    });
+
+    // Create combo block (ProductComboBlock)
+    const block = await prisma.productComboBlock.upsert({
+      where: { id: 'demo-block-id' },
+      update: {},
+      create: {
+        id: 'demo-block-id',
+        tenantId: tenant.id,
+        comboId: combo.id,
+        name: 'Escolha seu sabor',
+        minSelect: 1,
+        maxSelect: 1,
+        order: 0,
+      },
+    });
+
+    // Link product to combo block (ProductComboBlockItem)
+    await prisma.productComboBlockItem.upsert({
+      where: { blockId_productId: { blockId: block.id, productId: product.id } },
+      update: {},
+      create: {
+        tenantId: tenant.id,
+        blockId: block.id,
+        productId: product.id,
+        additionalPrice: 0,
+        order: 0,
+      },
+    });
+
+    console.log(`   ✅ Catalog data seeded for ${TENANT_SLUG}`);
+  } catch (err) {
+    console.error('❌ Error inside seedDemoTenant:', err);
+    throw err;
+  }
 }
+
 
 async function main() {
   console.log('🌱 Starting seed...\n');

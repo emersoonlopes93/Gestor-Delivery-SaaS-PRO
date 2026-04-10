@@ -3,14 +3,14 @@ import { CreateProductComboDto as ICreateProductComboDto } from '@gestor/types';
 
 export class CreateComboDto implements ICreateProductComboDto {
   @IsString()
-  name: string;
+  name!: string;
 
   @IsString()
   @IsOptional()
   description?: string;
 
   @IsNumber()
-  basePrice: number;
+  basePrice!: number;
 
   @IsString()
   @IsOptional()
