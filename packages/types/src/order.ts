@@ -216,6 +216,23 @@ export interface OrderKdsItemDTO {
       snapshotBlockName: string;
       snapshotProductName: string;
     }[];
-  }[];
+  }[]
   createdAt: string;
+}
+
+export interface OrderDispatchItemDTO {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  fulfillmentType: FulfillmentType;
+  status: OrderStatus;
+  
+  customerPhone?: string;
+  deliveryAddress?: DeliveryAddressDTO;
+  
+  deliveryDriverId?: string;
+  deliveryDriverName?: string;
+  
+  total: number;
+  createdAt?: string;
 }

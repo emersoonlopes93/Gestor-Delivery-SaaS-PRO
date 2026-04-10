@@ -12,6 +12,8 @@ import { CombosPage } from './features/catalog/CombosPage';
 import { OrdersListPage } from './features/orders/OrdersListPage';
 import { OperationBoardPage } from './features/orders/OperationBoardPage';
 import { KdsPage } from './features/orders/KdsPage';
+import { DriversListPage } from './features/delivery/DriversListPage';
+import { DispatchPage } from './features/delivery/DispatchPage';
 
 export function App() {
   return (
@@ -87,6 +89,24 @@ export function App() {
           element={
             <PermissionGate permission="kds.use">
               <KdsPage />
+            </PermissionGate>
+          }
+        />
+
+        {/* Logistics module (Phase 6) */}
+        <Route
+          path="/delivery/dispatch"
+          element={
+            <PermissionGate permission="delivery.read">
+              <DispatchPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/delivery/drivers"
+          element={
+            <PermissionGate permission="delivery.manage_drivers">
+              <DriversListPage />
             </PermissionGate>
           }
         />

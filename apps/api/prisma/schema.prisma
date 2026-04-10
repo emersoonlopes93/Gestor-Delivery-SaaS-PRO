@@ -43,6 +43,7 @@ model Tenant {
   orderItemComboSelections OrderItemComboSelection[]
   orderDeliveryAddresses OrderDeliveryAddress[]
   orderTimelines         OrderTimeline[]
+  deliveryDrivers        DeliveryDriver[]
 
   @@map("tenants")
 }
@@ -492,6 +493,8 @@ model Order {
   items           OrderItem[]
   deliveryAddress OrderDeliveryAddress?
   timeline        OrderTimeline[]
+  deliveryDriverId String?              @map("delivery_driver_id")
+  deliveryDriver   DeliveryDriver?      @relation(fields: [deliveryDriverId], references: [id])
 
   @@unique([tenantId, idempotencyKey])
   @@unique([tenantId, orderNumber])
@@ -594,6 +597,8 @@ model OrderTimeline {
   tenantId  String      @map("tenant_id")
   status    OrderStatus
   note      String?     @db.Text
+  actorId   String?     @map("actor_id")
+  actorType String?     @default("tenant_user") @map("actor_type")
   createdAt DateTime    @default(now()) @map("created_at")
 
   // Relations
@@ -603,4 +608,40 @@ model OrderTimeline {
   @@index([orderId])
   @@index([tenantId])
   @@map("order_timelines")
+}
+
+// ============================================================
+// LOGISTICS / DELIVERY — Phase 6
+// ============================================================
+
+model DeliveryDriver {
+  id           String             @id @default(uuid())
+  tenantId     String             @map("tenant_id")
+  name         String             @db.VarChar(150)
+  phone        String             @db.VarChar(30)
+  isActive     Boolean            @default(true) @map("is_active")
+  status       DriverStatus       @default(offline)
+  vehicleType  DriverVehicleType  @default(motorcycle) @map("vehicle_type")
+  notes        String?            @db.Text
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@index([tenantId])
+  @@map("delivery_drivers")
+}
+
+enum DriverStatus {
+  available
+  busy
+  offline
+}
+
+enum DriverVehicleType {
+  motorcycle
+  bicycle
+  car
 }

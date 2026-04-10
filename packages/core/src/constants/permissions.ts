@@ -10,8 +10,8 @@ export const TENANT_PERMISSIONS = {
   'orders.update_status': 'Update order status',
   'orders.cancel': 'Cancel orders',
   'orders.view_timeline': 'View order timeline',
-  'orders.manage': 'Full order management',
   'orders.use_kanban': 'Use operational kanban',
+  'orders.use_kds': 'Use kitchen display system',
 
   // Catalog module
   'catalog.read': 'View catalog',
@@ -41,6 +41,7 @@ export const TENANT_PERMISSIONS = {
 
   // Delivery module
   'delivery.read': 'View delivery info',
+  'delivery.manage_drivers': 'Manage delivery drivers',
   'delivery.dispatch': 'Dispatch deliveries',
   'delivery.manage': 'Manage delivery settings',
 
@@ -102,13 +103,13 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
   tenant_owner: Object.keys(TENANT_PERMISSIONS) as TenantPermission[],
   tenant_admin: Object.keys(TENANT_PERMISSIONS) as TenantPermission[],
   manager: [
-    'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.cancel', 'orders.view_timeline', 'orders.use_kanban',
+    'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.cancel', 'orders.view_timeline', 'orders.use_kanban', 'orders.use_kds',
     'catalog.read', 'catalog.create', 'catalog.update', 'catalog.publish', 'catalog.manage_complements', 'catalog.manage_combos',
     'kds.use', 'kds.manage',
     'cash.open', 'cash.close', 'cash.manage',
     'reports.view', 'reports.export',
     'crm.read', 'crm.manage',
-    'delivery.read', 'delivery.dispatch', 'delivery.manage',
+    'delivery.read', 'delivery.manage_drivers', 'delivery.dispatch', 'delivery.manage',
     'stock.read', 'stock.manage',
     'finance.read',
     'settings.read',
@@ -130,6 +131,7 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
   kitchen: [
     'orders.read',
     'kds.use',
+    'orders.use_kds',
   ],
   dispatcher: [
     'orders.read',

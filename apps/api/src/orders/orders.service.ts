@@ -14,6 +14,7 @@ import type {
   OrderStatus,
   OrderBoardItemDTO,
   OrderKdsItemDTO,
+  OrderDispatchItemDTO,
 } from '@gestor/types';
 import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
 
@@ -435,5 +436,103 @@ export class OrdersService {
       })),
       createdAt: o.createdAt.toISOString(),
     }));
+  }
+
+  // ----------------------------------------------------------------
+  // OPERATION: Dispatch (Phase 6)
+  // ----------------------------------------------------------------
+  async getDispatchOrders(tenantId: string): Promise<OrderDispatchItemDTO[]> {
+    const orders = await this.prisma.order.findMany({
+      where: {
+        tenantId,
+        fulfillmentType: 'delivery',
+        // Show preparing (warning), ready_for_delivery, out_for_delivery
+        status: { in: ['preparing', 'ready_for_delivery', 'out_for_delivery'] },
+      },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        deliveryAddress: true,
+        deliveryDriver: true,
+      },
+    });
+
+    return orders.map(o => ({
+      id: o.id,
+      orderNumber: o.orderNumber,
+      customerName: o.customerName,
+      customerPhone: o.customerPhone,
+      fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+      status: o.status as OrderStatus,
+      total: Number(o.total),
+      deliveryAddress: o.deliveryAddress ? {
+        street: o.deliveryAddress.street,
+        number: o.deliveryAddress.number,
+        complement: o.deliveryAddress.complement || undefined,
+        neighborhood: o.deliveryAddress.neighborhood,
+        city: o.deliveryAddress.city,
+        state: o.deliveryAddress.state,
+        zipCode: o.deliveryAddress.zipCode,
+        reference: o.deliveryAddress.reference || undefined,
+        lat: o.deliveryAddress.lat || undefined,
+        lng: o.deliveryAddress.lng || undefined,
+      } : undefined,
+      deliveryDriverId: o.deliveryDriverId || undefined,
+      deliveryDriverName: o.deliveryDriver?.name,
+      createdAt: o.createdAt.toISOString(),
+    }));
+  }
+
+  async assignDriver(
+    tenantId: string,
+    orderId: string,
+    driverId: string | null,
+    actorId?: string
+  ): Promise<OrderResponseDTO> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId, tenantId },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Pedido não encontrado.');
+    }
+
+    if (order.fulfillmentType !== 'delivery') {
+      throw new BadRequestException('Este pedido não é do tipo delivery.');
+    }
+
+    const currentStatus = order.status as OrderStatus;
+    // Driver can be assigned during preparing, ready_for_delivery, or even out_for_delivery (re-assign)
+    if (!['preparing', 'ready_for_delivery', 'out_for_delivery'].includes(currentStatus)) {
+      throw new ConflictException('Status do pedido não permite atribuição de entregador no momento.');
+    }
+
+    if (driverId) {
+      const driver = await this.prisma.deliveryDriver.findUnique({
+        where: { id: driverId, tenantId },
+      });
+      if (!driver) {
+        throw new NotFoundException('Entregador não encontrado.');
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: orderId },
+        data: { deliveryDriverId: driverId },
+      });
+
+      await tx.orderTimeline.create({
+        data: {
+          orderId,
+          tenantId,
+          status: currentStatus, // Doesn't change status automatically
+          note: driverId ? 'Entregador atribuído ao pedido' : 'Entregador removido do pedido',
+          actorId: actorId || null,
+          actorType: 'tenant_user',
+        },
+      });
+    });
+
+    return this.getOrderDetail(orderId, tenantId);
   }
 }

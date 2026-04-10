@@ -12,6 +12,7 @@ import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 import { CatalogModule } from './catalog/catalog.module';
 import { StorefrontModule } from './storefront/storefront.module';
 import { OrdersModule } from './orders/orders.module';
+import { DeliveryModule } from './delivery/delivery.module';
 
 @Module({
   imports: [
@@ -50,6 +51,9 @@ import { OrdersModule } from './orders/orders.module';
 
     // Orders & Checkout (Phase 4)
     OrdersModule,
+
+    // Logistics & Delivery (Phase 6)
+    DeliveryModule,
   ],
   providers: [
     {

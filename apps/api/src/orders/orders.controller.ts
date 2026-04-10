@@ -99,4 +99,26 @@ export class OrdersController {
     const tenantId = req.user.tenantId;
     return this.ordersService.updateOrderStatus(id, tenantId, dto);
   }
+
+  // ----------------------------------------------------------------
+  // TENANT INTERNAL: Dispatch (Phase 6)
+  // ----------------------------------------------------------------
+  @Get('operation/dispatch')
+  @RequirePermissions('delivery.read')
+  async getDispatchOrders(@Request() req: any) {
+    const tenantId = req.user.tenantId;
+    return this.ordersService.getDispatchOrders(tenantId);
+  }
+
+  @Post(':id/assign-driver')
+  @RequirePermissions('delivery.dispatch')
+  async assignDriver(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body() dto: { driverId: string | null },
+  ) {
+    const tenantId = req.user.tenantId;
+    const actorId = req.user.sub; // User performing the action
+    return this.ordersService.assignDriver(tenantId, id, dto.driverId, actorId);
+  }
 }
