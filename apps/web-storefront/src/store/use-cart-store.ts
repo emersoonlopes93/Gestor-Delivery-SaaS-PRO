@@ -1,0 +1,149 @@
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import type { 
+  CartLineItem, 
+  StorefrontProductPayload, 
+  StorefrontComboPayload,
+  CartSelectedComplement,
+  CartSelectedComboItem,
+  CartSnapshot 
+} from '@gestor/types';
+
+interface CartState {
+  tenantId: string | null;
+  items: CartLineItem[];
+  subtotal: number;
+  
+  // Actions
+  setTenantId: (id: string) => void;
+  addItem: (product: StorefrontProductPayload, quantity: number, options: CartSelectedComplement[], notes?: string) => void;
+  addCombo: (combo: StorefrontComboPayload, quantity: number, selectedItems: CartSelectedComboItem[], notes?: string) => void;
+  removeItem: (cartLineId: string) => void;
+  updateQuantity: (cartLineId: string, quantity: number) => void;
+  clearCart: () => void;
+}
+
+export const useCartStore = create<CartState>()(
+  persist(
+    (set, get) => ({
+      tenantId: null,
+      items: [],
+      subtotal: 0,
+
+      setTenantId: (id) => {
+        if (get().tenantId !== id) {
+          set({ tenantId: id, items: [], subtotal: 0 });
+        }
+      },
+
+      addItem: (product, quantity, options, notes) => {
+        const extrasPrice = options.reduce((sum, opt) => sum + opt.price, 0);
+        const lineSubtotal = (product.basePrice + extrasPrice) * quantity;
+        
+        const extrasDescription = options.map(o => o.name).join(', ');
+
+        const snapshot: CartSnapshot = {
+          productName: product.name,
+          productImage: product.image,
+          basePrice: product.basePrice,
+          lineSubtotal,
+          extrasDescription,
+        };
+
+        const newItem: CartLineItem = {
+          cartLineId: crypto.randomUUID(),
+          productId: product.id,
+          quantity,
+          notes,
+          selectedOptions: options,
+          snapshot,
+        };
+
+        const newItems = [...get().items, newItem];
+        set({ 
+          items: newItems,
+          subtotal: newItems.reduce((sum, item) => sum + item.snapshot.lineSubtotal, 0)
+        });
+      },
+
+      addCombo: (combo, quantity, selectedItems, notes) => {
+        const extrasPrice = selectedItems.reduce((sum, item) => sum + item.price, 0);
+        const lineSubtotal = (combo.basePrice + extrasPrice) * quantity;
+        
+        const extrasDescription = selectedItems.map(i => i.productName).join(', ');
+
+        const snapshot: CartSnapshot = {
+          productName: combo.name,
+          productImage: combo.image,
+          basePrice: combo.basePrice,
+          lineSubtotal,
+          extrasDescription,
+        };
+
+        const newItem: CartLineItem = {
+          cartLineId: crypto.randomUUID(),
+          comboId: combo.id,
+          quantity,
+          notes,
+          selectedComboItems: selectedItems,
+          snapshot,
+        };
+
+        const newItems = [...get().items, newItem];
+        set({ 
+          items: newItems,
+          subtotal: newItems.reduce((sum, item) => sum + item.snapshot.lineSubtotal, 0)
+        });
+      },
+
+      removeItem: (cartLineId) => {
+        const newItems = get().items.filter(item => item.cartLineId !== cartLineId);
+        set({ 
+          items: newItems,
+          subtotal: newItems.reduce((sum, item) => sum + item.snapshot.lineSubtotal, 0)
+        });
+      },
+
+      updateQuantity: (cartLineId, quantity) => {
+        if (quantity <= 0) {
+          get().removeItem(cartLineId);
+          return;
+        }
+
+        const newItems = get().items.map(item => {
+          if (item.cartLineId === cartLineId) {
+            const unitPrice = item.snapshot.basePrice + 
+              (item.selectedOptions?.reduce((s, o) => s + o.price, 0) || 0) +
+              (item.selectedComboItems?.reduce((s, i) => s + i.price, 0) || 0);
+
+            const lineSubtotal = unitPrice * quantity;
+            return {
+              ...item,
+              quantity,
+              snapshot: { ...item.snapshot, lineSubtotal }
+            };
+          }
+          return item;
+        });
+
+        set({ 
+          items: newItems,
+          subtotal: newItems.reduce((sum, item) => sum + item.snapshot.lineSubtotal, 0)
+        });
+      },
+
+      clearCart: () => set({ items: [], subtotal: 0 }),
+    }),
+    {
+      name: 'gestor_cart_temp',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({ items: state.items, subtotal: state.subtotal }),
+    }
+  )
+);
+
+
+// Helper to rehydrate/switch storage if needed or just use tenantId in separate logic
+// In a real multi-tenant app, you might want to instantiate the store per-route-context 
+// or use a different persistence strategy. 
+// For now, we use a single store but we clear it if tenantId changes.
