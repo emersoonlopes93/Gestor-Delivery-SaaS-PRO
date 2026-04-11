@@ -4,20 +4,7 @@ import { IsNumber, IsOptional, IsString, IsEnum, Min } from 'class-validator';
 // CASH SESSION ENUMS
 // ============================================================
 
-export enum CashSessionStatus {
-  open = 'open',
-  closed = 'closed',
-}
-
-export enum CashMovementType {
-  opening = 'opening',
-  sale = 'sale',
-  withdrawal = 'withdrawal',
-  supply = 'supply',
-  refund = 'refund',
-  adjustment = 'adjustment',
-  closing = 'closing',
-}
+import { CashSessionStatus, CashMovementType } from './enums';
 
 // ============================================================
 // CASH DTOs — Input

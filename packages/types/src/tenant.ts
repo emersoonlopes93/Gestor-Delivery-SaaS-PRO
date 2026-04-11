@@ -2,7 +2,7 @@
 // Tenant Types — Shared between frontend and backend
 // ============================================================
 
-export type TenantStatus = 'active' | 'inactive' | 'suspended' | 'trial';
+import { TenantStatus } from './enums';
 
 export interface Tenant {
   id: string;

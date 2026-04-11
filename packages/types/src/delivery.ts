@@ -1,16 +1,6 @@
 import { IsBoolean, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 
-export enum DriverStatus {
-  available = 'available',
-  busy = 'busy',
-  offline = 'offline',
-}
-
-export enum DriverVehicleType {
-  motorcycle = 'motorcycle',
-  bicycle = 'bicycle',
-  car = 'car',
-}
+import { DriverStatus, DriverVehicleType } from './enums';
 
 export class CreateDriverDTO {
   @IsString()

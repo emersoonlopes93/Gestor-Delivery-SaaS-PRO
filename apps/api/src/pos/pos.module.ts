@@ -8,9 +8,10 @@ import { CashModule } from '../cash/cash.module';
 import { OrdersModule } from '../orders/orders.module';
 import { CrmModule } from '../crm/crm.module';
 import { PromotionsModule } from '../promotions/promotions.module';
+import { InventoryModule } from '../inventory/inventory.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, RbacModule, CashModule, OrdersModule, CrmModule, PromotionsModule],
+  imports: [DatabaseModule, AuthModule, RbacModule, CashModule, OrdersModule, CrmModule, PromotionsModule, InventoryModule],
   controllers: [PosController],
   providers: [PosService],
 })

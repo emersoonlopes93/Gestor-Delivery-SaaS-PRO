@@ -1,5 +1,4 @@
-import { UnitType, StockMovementType } from '@gestor/core';
-export { UnitType, StockMovementType };
+import { UnitType, StockMovementType } from './enums';
 
 export interface IngredientDTO {
   id: string;

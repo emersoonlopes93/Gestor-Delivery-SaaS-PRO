@@ -1,6 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Package, Clock, ChevronRight, RefreshCw } from 'lucide-react';
-import type { OrderListItemDTO, OrderStatus } from '@gestor/types';
+import { Package, Clock, ChevronRight, RefreshCw, ChevronLeft } from 'lucide-react';
+import { 
+  ORDER_STATUS_TRANSITIONS 
+} from '@gestor/types';
+import type { 
+  OrderListItemDTO, 
+  OrderStatus, 
+  OrderResponseDTO, 
+  UpdateOrderStatusDTO 
+} from '@gestor/types';
 
 const API_BASE = '/api/v1';
 
@@ -160,8 +168,7 @@ export function OrdersListPage() {
 // ORDER DETAIL PANEL (inline for now)
 // ----------------------------------------------------------------
 
-import type { OrderResponseDTO, UpdateOrderStatusDTO } from '@gestor/types';
-import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
+
 
 function OrderDetailPanel({ orderId, onBack }: { orderId: string; onBack: () => void }) {
   const [order, setOrder] = useState<OrderResponseDTO | null>(null);

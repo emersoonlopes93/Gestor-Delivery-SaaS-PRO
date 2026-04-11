@@ -1,44 +1,43 @@
 import { Controller, Get, Post, Put, Body, Param, UseGuards } from '@nestjs/common';
+import { CurrentTenant, RequirePermissions } from '../common/decorators';
+import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { IngredientsService } from './ingredients.service';
 import { CreateIngredientDTO, UpdateIngredientDTO, IngredientDTO } from '@gestor/types';
-import { TenantId } from '../common/decorators/tenant-id.decorator';
-import { Roles } from '../rbac/decorators/roles.decorator';
-import { PermissionGate } from '../rbac/guards/permission-gate.guard';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('inventory/ingredients')
-@UseGuards(JwtAuthGuard, PermissionGate)
+@UseGuards(TenantAuthGuard, PermissionsGuard)
 export class IngredientsController {
   constructor(private readonly ingredientsService: IngredientsService) {}
 
   @Get()
-  @Roles('inventory.read')
-  async findAll(@TenantId() tenantId: string): Promise<IngredientDTO[]> {
+  @RequirePermissions('inventory.read')
+  async findAll(@CurrentTenant() tenantId: string): Promise<IngredientDTO[]> {
     return this.ingredientsService.findAll(tenantId);
   }
 
   @Get(':id')
-  @Roles('inventory.read')
+  @RequirePermissions('inventory.read')
   async findOne(
-    @TenantId() tenantId: string,
+    @CurrentTenant() tenantId: string,
     @Param('id') id: string
   ): Promise<IngredientDTO> {
     return this.ingredientsService.findOne(tenantId, id);
   }
 
   @Post()
-  @Roles('inventory.create')
+  @RequirePermissions('inventory.create')
   async create(
-    @TenantId() tenantId: string,
+    @CurrentTenant() tenantId: string,
     @Body() dto: CreateIngredientDTO
   ): Promise<IngredientDTO> {
     return this.ingredientsService.create(tenantId, dto);
   }
 
   @Put(':id')
-  @Roles('inventory.update')
+  @RequirePermissions('inventory.update')
   async update(
-    @TenantId() tenantId: string,
+    @CurrentTenant() tenantId: string,
     @Param('id') id: string,
     @Body() dto: UpdateIngredientDTO
   ): Promise<IngredientDTO> {

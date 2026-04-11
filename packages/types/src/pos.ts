@@ -16,13 +16,7 @@ import { CreateOrderItemDTO } from './order';
 // POS ENUMS
 // ============================================================
 
-export enum PaymentMethod {
-  cash = 'cash',
-  pix = 'pix',
-  credit_card = 'credit_card',
-  debit_card = 'debit_card',
-  other = 'other',
-}
+import { PaymentMethod } from './enums';
 
 export type PosFulfillmentType = 'dine_in' | 'pickup' | 'delivery';
 

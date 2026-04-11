@@ -2,8 +2,7 @@
 // Auth Types — Shared between frontend and backend
 // ============================================================
 
-/** Distinguishes between tenant users and SaaS admin users */
-export type ActorType = 'tenant' | 'admin';
+import { ActorType } from './enums';
 
 /** JWT payload for tenant users */
 export interface TenantJwtPayload {
