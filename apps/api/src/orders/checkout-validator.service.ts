@@ -79,7 +79,38 @@ export class CheckoutValidatorService {
 
     for (const item of items) {
       if (item.lineType === 'product') {
-        const line = await this.validateProductLine(tenantId, item);
+        const line = await this.validateProductLine(tenantId, item, true);
+        validatedLines.push(line);
+      } else if (item.lineType === 'combo') {
+        const line = await this.validateComboLine(tenantId, item);
+        validatedLines.push(line);
+      } else {
+        throw new BadRequestException('Tipo de linha inválido.');
+      }
+    }
+
+    const itemsSubtotal = validatedLines.reduce((sum, l) => sum + l.lineTotal, 0);
+
+    return { tenantId, lines: validatedLines, itemsSubtotal };
+  }
+
+  /**
+   * Validate items by direct tenantId (for POS sales).
+   * Skips slug resolution and sellableOnline check.
+   */
+  async validateByTenantId(
+    tenantId: string,
+    items: CreateOrderItemDTO[],
+  ): Promise<CheckoutValidationResult> {
+    if (items.length === 0) {
+      throw new BadRequestException('A venda deve conter pelo menos 1 item.');
+    }
+
+    const validatedLines: ValidatedLine[] = [];
+
+    for (const item of items) {
+      if (item.lineType === 'product') {
+        const line = await this.validateProductLine(tenantId, item, false);
         validatedLines.push(line);
       } else if (item.lineType === 'combo') {
         const line = await this.validateComboLine(tenantId, item);
@@ -97,6 +128,7 @@ export class CheckoutValidatorService {
   private async validateProductLine(
     tenantId: string,
     item: CreateOrderItemDTO,
+    checkSellableOnline: boolean = true,
   ): Promise<ValidatedProductLine> {
     if (!item.productId) {
       throw new BadRequestException('productId é obrigatório para linhas do tipo product.');
@@ -127,7 +159,7 @@ export class CheckoutValidatorService {
     if (!(product['isAvailable'] as boolean)) {
       throw new BadRequestException(`O produto "${product['name']}" não está disponível no momento.`);
     }
-    if (!(product['sellableOnline'] as boolean)) {
+    if (checkSellableOnline && !(product['sellableOnline'] as boolean)) {
       throw new BadRequestException(`O produto "${product['name']}" não está disponível para venda online.`);
     }
 

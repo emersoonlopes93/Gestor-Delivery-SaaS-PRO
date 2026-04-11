@@ -44,6 +44,8 @@ model Tenant {
   orderDeliveryAddresses OrderDeliveryAddress[]
   orderTimelines         OrderTimeline[]
   deliveryDrivers        DeliveryDriver[]
+  cashSessions           CashSession[]
+  cashMovements          CashMovement[]
 
   @@map("tenants")
 }
@@ -96,6 +98,7 @@ model TenantUser {
   // Relations
   tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userRoles TenantUserRole[]
+  cashSessions CashSession[]
 
   // Unique email per tenant
   @@unique([tenantId, email])
@@ -454,6 +457,7 @@ enum OrderStatus {
 enum FulfillmentType {
   delivery
   pickup
+  dine_in
 }
 
 enum OrderLineType {
@@ -484,6 +488,8 @@ model Order {
   sourceChannel  String  @default("storefront") @map("source_channel") @db.VarChar(30)
   idempotencyKey String  @map("idempotency_key") @db.VarChar(100)
   notes          String? @db.Text
+  paymentMethod  PaymentMethod? @map("payment_method")
+  cashSessionId  String?        @map("cash_session_id")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -495,6 +501,8 @@ model Order {
   timeline        OrderTimeline[]
   deliveryDriverId String?              @map("delivery_driver_id")
   deliveryDriver   DeliveryDriver?      @relation(fields: [deliveryDriverId], references: [id])
+  cashSession      CashSession?         @relation(fields: [cashSessionId], references: [id])
+  cashMovements    CashMovement[]
 
   @@unique([tenantId, idempotencyKey])
   @@unique([tenantId, orderNumber])
@@ -644,4 +652,78 @@ enum DriverVehicleType {
   motorcycle
   bicycle
   car
+}
+
+// ============================================================
+// PDV + CASH REGISTER — Phase 7
+// ============================================================
+
+enum PaymentMethod {
+  cash
+  pix
+  credit_card
+  debit_card
+  other
+}
+
+enum CashSessionStatus {
+  open
+  closed
+}
+
+enum CashMovementType {
+  opening
+  sale
+  withdrawal
+  supply
+  refund
+  adjustment
+  closing
+}
+
+model CashSession {
+  id                      String            @id @default(uuid())
+  tenantId                String            @map("tenant_id")
+  operatorId              String            @map("operator_id")
+  status                  CashSessionStatus @default(open)
+  openingAmount           Decimal           @map("opening_amount") @db.Decimal(10, 2)
+  closingAmountDeclared   Decimal?          @map("closing_amount_declared") @db.Decimal(10, 2)
+  closingAmountCalculated Decimal?          @map("closing_amount_calculated") @db.Decimal(10, 2)
+  closingDifference       Decimal?          @map("closing_difference") @db.Decimal(10, 2)
+  notes                   String?           @db.Text
+  openedAt                DateTime          @default(now()) @map("opened_at")
+  closedAt                DateTime?         @map("closed_at")
+  createdAt               DateTime          @default(now()) @map("created_at")
+  updatedAt               DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  operator  TenantUser     @relation(fields: [operatorId], references: [id])
+  movements CashMovement[]
+  orders    Order[]
+
+  @@index([tenantId])
+  @@index([operatorId])
+  @@map("cash_sessions")
+}
+
+model CashMovement {
+  id            String           @id @default(uuid())
+  tenantId      String           @map("tenant_id")
+  cashSessionId String           @map("cash_session_id")
+  type          CashMovementType
+  amount        Decimal          @db.Decimal(10, 2)
+  paymentMethod PaymentMethod?   @map("payment_method")
+  orderId       String?          @map("order_id")
+  description   String?          @db.Text
+  createdAt     DateTime         @default(now()) @map("created_at")
+
+  // Relations
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  cashSession CashSession @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
+  order       Order?      @relation(fields: [orderId], references: [id])
+
+  @@index([cashSessionId])
+  @@index([tenantId])
+  @@map("cash_movements")
 }

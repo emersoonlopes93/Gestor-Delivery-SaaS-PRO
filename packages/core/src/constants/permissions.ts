@@ -27,9 +27,17 @@ export const TENANT_PERMISSIONS = {
   'kds.manage': 'Manage KDS settings',
 
   // Cash module
+  'cash.read': 'View cash sessions and movements',
   'cash.open': 'Open cash register',
   'cash.close': 'Close cash register',
-  'cash.manage': 'Manage cash operations',
+  'cash.add_supply': 'Add cash supply',
+  'cash.add_withdrawal': 'Add cash withdrawal',
+  'cash.manage': 'Manage all cash operations',
+
+  // POS module
+  'pos.read': 'View POS sales',
+  'pos.create_sale': 'Create POS sale',
+  'pos.apply_discount': 'Apply manual discount on POS',
 
   // Reports module
   'reports.view': 'View reports',
@@ -106,7 +114,8 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
     'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.cancel', 'orders.view_timeline', 'orders.use_kanban', 'orders.use_kds',
     'catalog.read', 'catalog.create', 'catalog.update', 'catalog.publish', 'catalog.manage_complements', 'catalog.manage_combos',
     'kds.use', 'kds.manage',
-    'cash.open', 'cash.close', 'cash.manage',
+    'cash.read', 'cash.open', 'cash.close', 'cash.add_supply', 'cash.add_withdrawal', 'cash.manage',
+    'pos.read', 'pos.create_sale', 'pos.apply_discount',
     'reports.view', 'reports.export',
     'crm.read', 'crm.manage',
     'delivery.read', 'delivery.manage_drivers', 'delivery.dispatch', 'delivery.manage',
@@ -119,12 +128,15 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
   attendant: [
     'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.view_timeline', 'orders.use_kanban',
     'catalog.read',
+    'pos.read', 'pos.create_sale',
+    'cash.read',
     'crm.read',
     'dashboard.view',
   ],
   cashier: [
     'orders.read', 'orders.create',
-    'cash.open', 'cash.close', 'cash.manage',
+    'cash.read', 'cash.open', 'cash.close', 'cash.add_supply', 'cash.add_withdrawal',
+    'pos.read', 'pos.create_sale',
     'catalog.read',
     'dashboard.view',
   ],

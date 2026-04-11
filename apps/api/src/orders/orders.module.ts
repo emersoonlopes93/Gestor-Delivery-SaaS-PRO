@@ -10,6 +10,6 @@ import { RbacModule } from '../rbac/rbac.module';
   imports: [DatabaseModule, AuthModule, RbacModule],
   controllers: [OrdersController],
   providers: [OrdersService, CheckoutValidatorService],
-  exports: [OrdersService],
+  exports: [OrdersService, CheckoutValidatorService],
 })
 export class OrdersModule {}

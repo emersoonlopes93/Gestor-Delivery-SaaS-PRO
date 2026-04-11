@@ -1,0 +1,84 @@
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsArray,
+  ValidateNested,
+  IsNumber,
+  IsEnum,
+  Min,
+  Max,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { CreateOrderItemDTO } from './order';
+
+// ============================================================
+// POS ENUMS
+// ============================================================
+
+export enum PaymentMethod {
+  cash = 'cash',
+  pix = 'pix',
+  credit_card = 'credit_card',
+  debit_card = 'debit_card',
+  other = 'other',
+}
+
+export type PosFulfillmentType = 'dine_in' | 'pickup' | 'delivery';
+
+// ============================================================
+// POS DTOs — Input
+// ============================================================
+
+export class CreatePosOrderDTO {
+  @IsString()
+  @IsNotEmpty()
+  idempotencyKey!: string;
+
+  @IsArray()
+  @IsNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => CreateOrderItemDTO)
+  items!: CreateOrderItemDTO[];
+
+  @IsString()
+  @IsOptional()
+  customerName?: string;
+
+  @IsString()
+  @IsOptional()
+  customerPhone?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  fulfillmentType!: PosFulfillmentType;
+
+  @IsEnum(PaymentMethod)
+  paymentMethod!: PaymentMethod;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  discountTotal?: number;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
+}
+
+// ============================================================
+// POS DTOs — Output
+// ============================================================
+
+export interface PosOrderListItemDTO {
+  id: string;
+  orderNumber: string;
+  status: string;
+  fulfillmentType: string;
+  customerName: string;
+  paymentMethod: string;
+  total: number;
+  discountTotal: number;
+  sourceChannel: string;
+  createdAt: string;
+}

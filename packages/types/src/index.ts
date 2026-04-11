@@ -6,3 +6,5 @@ export * from './catalog';
 export * from './storefront';
 export * from './order';
 export * from './delivery';
+export * from './cash';
+export * from './pos';

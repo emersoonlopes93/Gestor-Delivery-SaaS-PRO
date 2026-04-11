@@ -13,6 +13,8 @@ import { CatalogModule } from './catalog/catalog.module';
 import { StorefrontModule } from './storefront/storefront.module';
 import { OrdersModule } from './orders/orders.module';
 import { DeliveryModule } from './delivery/delivery.module';
+import { CashModule } from './cash/cash.module';
+import { PosModule } from './pos/pos.module';
 
 @Module({
   imports: [
@@ -54,6 +56,12 @@ import { DeliveryModule } from './delivery/delivery.module';
 
     // Logistics & Delivery (Phase 6)
     DeliveryModule,
+
+    // Cash Register (Phase 7)
+    CashModule,
+
+    // Point of Sale (Phase 7)
+    PosModule,
   ],
   providers: [
     {

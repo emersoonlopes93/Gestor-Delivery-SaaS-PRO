@@ -14,6 +14,8 @@ import { OperationBoardPage } from './features/orders/OperationBoardPage';
 import { KdsPage } from './features/orders/KdsPage';
 import { DriversListPage } from './features/delivery/DriversListPage';
 import { DispatchPage } from './features/delivery/DispatchPage';
+import CashPage from './features/cash/CashPage';
+import PosPage from './features/pos/PosPage';
 
 export function App() {
   return (
@@ -107,6 +109,26 @@ export function App() {
           element={
             <PermissionGate permission="delivery.manage_drivers">
               <DriversListPage />
+            </PermissionGate>
+          }
+        />
+
+        {/* Cash Register (Phase 7) */}
+        <Route
+          path="/cash"
+          element={
+            <PermissionGate permission="cash.read">
+              <CashPage />
+            </PermissionGate>
+          }
+        />
+
+        {/* Point of Sale (Phase 7) */}
+        <Route
+          path="/pos"
+          element={
+            <PermissionGate permission="pos.read">
+              <PosPage />
             </PermissionGate>
           }
         />
