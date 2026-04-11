@@ -6,9 +6,11 @@ import { AuthModule } from '../auth/auth.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { CashModule } from '../cash/cash.module';
 import { OrdersModule } from '../orders/orders.module';
+import { CrmModule } from '../crm/crm.module';
+import { PromotionsModule } from '../promotions/promotions.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, RbacModule, CashModule, OrdersModule],
+  imports: [DatabaseModule, AuthModule, RbacModule, CashModule, OrdersModule, CrmModule, PromotionsModule],
   controllers: [PosController],
   providers: [PosService],
 })

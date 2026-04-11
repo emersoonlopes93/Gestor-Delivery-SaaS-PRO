@@ -17,6 +17,12 @@ import { DispatchPage } from './features/delivery/DispatchPage';
 import CashPage from './features/cash/CashPage';
 import PosPage from './features/pos/PosPage';
 
+// CRM & Promotions
+import { CustomersListPage } from './features/crm/CustomersListPage';
+// import { CustomerProfilePage } from './features/crm/CustomerProfilePage'; // Optional next
+import { PromotionsPage } from './features/promotions/PromotionsPage';
+import { InventoryPage } from './features/inventory/InventoryPage';
+
 export function App() {
   return (
     <Routes>
@@ -129,6 +135,36 @@ export function App() {
           element={
             <PermissionGate permission="pos.read">
               <PosPage />
+            </PermissionGate>
+          }
+        />
+
+        {/* CRM (Phase 8) */}
+        <Route
+          path="/customers"
+          element={
+            <PermissionGate permission="crm.read">
+              <CustomersListPage />
+            </PermissionGate>
+          }
+        />
+
+        {/* Promotions (Phase 8) */}
+        <Route
+          path="/promotions"
+          element={
+            <PermissionGate permission="crm.manage_coupons">
+              <PromotionsPage />
+            </PermissionGate>
+          }
+        />
+
+        {/* Inventory & Recipes (Phase 9) */}
+        <Route
+          path="/inventory"
+          element={
+            <PermissionGate permission="inventory.read">
+              <InventoryPage />
             </PermissionGate>
           }
         />

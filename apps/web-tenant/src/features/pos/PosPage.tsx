@@ -52,8 +52,12 @@ export default function PosPage() {
   const [fulfillmentType, setFulfillmentType] = useState<PosCreateSalePayload['fulfillmentType']>('dine_in');
   const [discountTotal, setDiscountTotal] = useState(0);
   const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [saleNotes, setSaleNotes] = useState('');
   const [saleCompleted, setSaleCompleted] = useState(false);
+  
+  const [couponCode, setCouponCode] = useState('');
+  const [useCashbackAmount, setUseCashbackAmount] = useState(0);
 
   // Fetch products for the catalog
   const { data: products } = useQuery<CatalogProduct[]>({
@@ -122,9 +126,12 @@ export default function PosPage() {
         notes: item.notes || undefined,
       })),
       customerName: customerName || undefined,
+      customerPhone: customerPhone || undefined,
       fulfillmentType,
       paymentMethod,
       discountTotal: discountTotal > 0 ? discountTotal : undefined,
+      couponCode: couponCode || undefined,
+      useCashbackAmount: useCashbackAmount > 0 ? useCashbackAmount : undefined,
       notes: saleNotes || undefined,
     };
 
@@ -133,6 +140,9 @@ export default function PosPage() {
         setCart([]);
         setDiscountTotal(0);
         setCustomerName('');
+        setCustomerPhone('');
+        setCouponCode('');
+        setUseCashbackAmount(0);
         setSaleNotes('');
         setSaleCompleted(true);
       },
@@ -253,13 +263,22 @@ export default function PosPage() {
         {/* Order config & totals */}
         <div className="border-t border-gray-700 p-4 space-y-3 bg-gray-850">
           {/* Customer */}
-          <input
-            type="text"
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-            placeholder="Nome do cliente (opcional)"
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
+              placeholder="Nome do cliente (opcional)"
+            />
+            <input
+              type="text"
+              value={customerPhone}
+              onChange={(e) => setCustomerPhone(e.target.value)}
+              className="w-1/3 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
+              placeholder="Telefone"
+            />
+          </div>
 
           {/* Fulfillment & Payment */}
           <div className="flex gap-2">
@@ -283,18 +302,42 @@ export default function PosPage() {
             </select>
           </div>
 
-          {/* Discount */}
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-400 whitespace-nowrap">Desconto R$</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={discountTotal || ''}
-              onChange={(e) => setDiscountTotal(parseFloat(e.target.value) || 0)}
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none"
-              placeholder="0.00"
-            />
+          {/* Commercial & Discount */}
+          <div className="gap-2 grid grid-cols-2">
+            <div className="flex flex-col">
+              <label className="text-xs text-gray-400 mb-1">Cupom Aval.</label>
+              <input
+                type="text"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none"
+                placeholder="Código"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-xs text-gray-400 mb-1">Usar Cashback R$</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={useCashbackAmount || ''}
+                onChange={(e) => setUseCashbackAmount(parseFloat(e.target.value) || 0)}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none"
+                placeholder="0.00"
+              />
+            </div>
+            <div className="flex flex-col col-span-2">
+              <label className="text-xs text-gray-400 mb-1">Desconto Manual PDV R$</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={discountTotal || ''}
+                onChange={(e) => setDiscountTotal(parseFloat(e.target.value) || 0)}
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none"
+                placeholder="0.00"
+              />
+            </div>
           </div>
 
           {/* Notes */}
@@ -314,7 +357,7 @@ export default function PosPage() {
             </div>
             {discountTotal > 0 && (
               <div className="flex justify-between text-yellow-400">
-                <span>Desconto</span>
+                <span>Desc. Manual</span>
                 <span>-{formatCurrency(discountTotal)}</span>
               </div>
             )}

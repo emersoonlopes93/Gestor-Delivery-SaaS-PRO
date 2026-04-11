@@ -9,6 +9,22 @@ export enum TenantStatus {
   TRIAL = 'trial',
 }
 
+export enum UnitType {
+  UN = 'un',
+  G = 'g',
+  KG = 'kg',
+  ML = 'ml',
+  L = 'l',
+}
+
+export enum StockMovementType {
+  IN = 'in',
+  OUT = 'out',
+  ADJUST = 'adjust',
+  WASTE = 'waste',
+  THEORETICAL_DEPLETION = 'theoretical_depletion',
+}
+
 // ============================================================
 // Auth Enums
 // ============================================================

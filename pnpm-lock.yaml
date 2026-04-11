@@ -125,6 +125,12 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.60.0
         version: 5.97.0(react@18.3.1)
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.0
+        version: 0.14.4
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -134,6 +140,9 @@ importers:
       react-router-dom:
         specifier: ^6.28.0
         version: 6.30.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      reflect-metadata:
+        specifier: ^0.2.0
+        version: 0.2.2
       zod:
         specifier: ^3.23.0
         version: 3.25.76
@@ -247,6 +256,12 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.60.0
         version: 5.97.0(react@18.3.1)
+      class-transformer:
+        specifier: ^0.5.1
+        version: 0.5.1
+      class-validator:
+        specifier: ^0.14.0
+        version: 0.14.4
       lucide-react:
         specifier: ^0.454.0
         version: 0.454.0(react@18.3.1)
@@ -259,6 +274,9 @@ importers:
       react-router-dom:
         specifier: ^6.28.0
         version: 6.30.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      reflect-metadata:
+        specifier: ^0.2.0
+        version: 0.2.2
       zod:
         specifier: ^3.23.0
         version: 3.25.76

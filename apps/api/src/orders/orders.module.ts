@@ -5,9 +5,11 @@ import { OrdersService } from './orders.service';
 import { CheckoutValidatorService } from './checkout-validator.service';
 import { AuthModule } from '../auth/auth.module';
 import { RbacModule } from '../rbac/rbac.module';
+import { PromotionsModule } from '../promotions/promotions.module';
+import { CrmModule } from '../crm/crm.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, RbacModule],
+  imports: [DatabaseModule, AuthModule, RbacModule, PromotionsModule, CrmModule],
   controllers: [OrdersController],
   providers: [OrdersService, CheckoutValidatorService],
   exports: [OrdersService, CheckoutValidatorService],

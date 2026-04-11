@@ -1,13 +1,14 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
+import { CustomerController } from './customer.controller';
+import { CustomerService } from './customer.service';
 import { AuthModule } from '../auth/auth.module';
 import { RbacModule } from '../rbac/rbac.module';
-import { DriversController } from './drivers.controller';
-import { DriversService } from './drivers.service';
 
 @Module({
   imports: [DatabaseModule, AuthModule, RbacModule],
-  controllers: [DriversController],
-  providers: [DriversService],
+  controllers: [CustomerController],
+  providers: [CustomerService],
+  exports: [CustomerService],
 })
-export class DeliveryModule {}
+export class CrmModule {}

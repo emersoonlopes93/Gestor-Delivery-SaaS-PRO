@@ -6,6 +6,9 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CheckoutValidatorService, ValidatedLine } from './checkout-validator.service';
+import { CustomerService } from '../crm/customer.service';
+import { CashbackService } from '../promotions/cashback.service';
+import { TheoreticalStockService } from '../inventory/theoretical-stock.service';
 import type {
   CreateOrderDTO,
   OrderResponseDTO,
@@ -23,15 +26,37 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly checkoutValidator: CheckoutValidatorService,
+    private readonly customerService: CustomerService,
+    private readonly cashbackService: CashbackService,
+    private readonly theoreticalStockService: TheoreticalStockService,
   ) {}
 
   // ----------------------------------------------------------------
   // CREATE ORDER (Public checkout)
   // ----------------------------------------------------------------
   async createOrder(slug: string, dto: CreateOrderDTO): Promise<OrderResponseDTO> {
+    // Pre-resolve tenant manually to sync customer before validation
+    const tenant = await this.prisma.tenant.findUnique({ where: { slug } });
+    if (!tenant) throw new NotFoundException('Loja não encontrada');
+
+    let customerId: string | null = null;
+    if (dto.customerPhone) {
+      const cust = await this.customerService.syncCustomerOnOrderUpsert(
+        tenant.id,
+        dto.customerPhone,
+        dto.customerName,
+        dto.customerEmail
+      );
+      if (cust) customerId = cust.id;
+    }
+
     // 1. Validate everything server-side
-    const validation = await this.checkoutValidator.validate(slug, dto.items);
-    const { tenantId, lines, itemsSubtotal } = validation;
+    const validation = await this.checkoutValidator.validate(slug, dto.items, {
+      customerId,
+      couponCode: dto.couponCode,
+      useCashbackAmount: dto.useCashbackAmount,
+    });
+    const { tenantId, lines, itemsSubtotal, discountTotal, total, couponId, cashbackUsed } = validation;
 
     console.log(`DEBUG createOrder: type=${dto.fulfillmentType}, hasAddress=${!!dto.deliveryAddress}`);
 
@@ -53,7 +78,7 @@ export class OrdersService {
     }
 
     // 4. Transactional order creation with atomic orderNumber
-    const total = itemsSubtotal; // Phase 4: discount/fees are 0
+    const finalTotal = total; // Phase 4/5 had this as itemsSubtotal, Phase 8 handles exact math with discounts
 
     const order = await this.prisma.$transaction(async (tx) => {
       // Atomic increment of order sequence
@@ -76,13 +101,16 @@ export class OrdersService {
           customerPhone: dto.customerPhone,
           customerEmail: dto.customerEmail || null,
           itemsSubtotal,
-          discountTotal: 0,
+          discountTotal: discountTotal || 0,
           deliveryFee: 0,
           serviceFee: 0,
-          total,
+          total: finalTotal,
           sourceChannel: 'storefront',
           idempotencyKey: dto.idempotencyKey,
           notes: dto.notes || null,
+          customerId,
+          couponId,
+          cashbackUsed,
         },
       });
 
@@ -171,6 +199,25 @@ export class OrdersService {
 
       return newOrder;
     });
+
+    // 5. Update Cashback Ledger & Coupon Usage out of the main transaction (but wait for it to succeed)
+    if (cashbackUsed && customerId) {
+      await this.cashbackService.createTransaction({
+        tenantId,
+        customerId: customerId,
+        type: 'redeemed',
+        amount: cashbackUsed,
+        orderId: order.id,
+        description: `Usado no pedido ${order.orderNumber}`
+      });
+    }
+
+    if (couponId) {
+      await this.prisma.coupon.update({
+        where: { id: couponId },
+        data: { usedCount: { increment: 1 } }
+      });
+    }
 
     return this.getOrderDetail(order.id, tenantId);
   }
@@ -343,6 +390,17 @@ export class OrdersService {
         },
       });
     });
+
+    // 6. Trigger theoretical stock depletion / reversal
+    if (dto.status === 'confirmed') {
+      await this.theoreticalStockService.processOrderDepletion(tenantId, orderId);
+    } else if (dto.status === 'cancelled') {
+        // We reverse if the order was already reaching some inventory-impacting status
+        // Usually if it's not pending, it likely had a depletion (confirmed, preparing, etc)
+        if (order.status !== 'pending') {
+            await this.theoreticalStockService.reverseOrderDepletion(tenantId, orderId);
+        }
+    }
 
     return this.getOrderDetail(orderId, tenantId);
   }

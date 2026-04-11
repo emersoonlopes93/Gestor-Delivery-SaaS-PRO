@@ -43,9 +43,12 @@ export const TENANT_PERMISSIONS = {
   'reports.view': 'View reports',
   'reports.export': 'Export reports',
 
-  // CRM module
-  'crm.read': 'View CRM data',
-  'crm.manage': 'Manage CRM data',
+  // CRM & Promotions module
+  'crm.read': 'View CRM and Customer data',
+  'crm.manage_customers': 'Manage customers',
+  'crm.manage_coupons': 'Manage coupons',
+  'crm.manage_loyalty_cashback': 'Manage loyalty and cashback config',
+  'crm.apply_benefits': 'Apply coupons or cashback at POS',
 
   // Delivery module
   'delivery.read': 'View delivery info',
@@ -53,9 +56,14 @@ export const TENANT_PERMISSIONS = {
   'delivery.dispatch': 'Dispatch deliveries',
   'delivery.manage': 'Manage delivery settings',
 
-  // Stock module
-  'stock.read': 'View stock',
-  'stock.manage': 'Manage stock',
+  // Inventory & Stock module
+  'inventory.read': 'View inventory and stock',
+  'inventory.create': 'Create inventory items',
+  'inventory.update': 'Update inventory items',
+  'inventory.adjust': 'Manual stock adjustments',
+  'inventory.manage_recipe': 'Manage product technical datasheets',
+  'inventory.view_costs': 'View ingredient and recipe costs',
+  'inventory.view_margin': 'View product profit margins',
 
   // Finance module
   'finance.read': 'View financial data',
@@ -117,9 +125,9 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
     'cash.read', 'cash.open', 'cash.close', 'cash.add_supply', 'cash.add_withdrawal', 'cash.manage',
     'pos.read', 'pos.create_sale', 'pos.apply_discount',
     'reports.view', 'reports.export',
-    'crm.read', 'crm.manage',
+    'crm.read', 'crm.manage_customers', 'crm.manage_coupons', 'crm.manage_loyalty_cashback', 'crm.apply_benefits',
     'delivery.read', 'delivery.manage_drivers', 'delivery.dispatch', 'delivery.manage',
-    'stock.read', 'stock.manage',
+    'inventory.read', 'inventory.create', 'inventory.update', 'inventory.adjust', 'inventory.manage_recipe', 'inventory.view_costs', 'inventory.view_margin',
     'finance.read',
     'settings.read',
     'users.read',
@@ -130,13 +138,14 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
     'catalog.read',
     'pos.read', 'pos.create_sale',
     'cash.read',
-    'crm.read',
+    'crm.read', 'crm.apply_benefits',
     'dashboard.view',
   ],
   cashier: [
     'orders.read', 'orders.create',
     'cash.read', 'cash.open', 'cash.close', 'cash.add_supply', 'cash.add_withdrawal',
     'pos.read', 'pos.create_sale',
+    'crm.read', 'crm.apply_benefits',
     'catalog.read',
     'dashboard.view',
   ],
@@ -162,7 +171,7 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
     'dashboard.view',
   ],
   marketing: [
-    'crm.read', 'crm.manage',
+    'crm.read', 'crm.manage_customers', 'crm.manage_coupons', 'crm.manage_loyalty_cashback',
     'reports.view',
     'catalog.read',
     'dashboard.view',

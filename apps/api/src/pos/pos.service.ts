@@ -7,6 +7,9 @@ import {
 import { PrismaService } from '../database/prisma.service';
 import { CheckoutValidatorService, ValidatedLine } from '../orders/checkout-validator.service';
 import { CashService } from '../cash/cash.service';
+import { CustomerService } from '../crm/customer.service';
+import { CashbackService } from '../promotions/cashback.service';
+import { TheoreticalStockService } from '../inventory/theoretical-stock.service';
 import type {
   CreatePosOrderDTO,
   OrderResponseDTO,
@@ -20,6 +23,9 @@ export class PosService {
     private readonly prisma: PrismaService,
     private readonly checkoutValidator: CheckoutValidatorService,
     private readonly cashService: CashService,
+    private readonly customerService: CustomerService,
+    private readonly cashbackService: CashbackService,
+    private readonly theoreticalStockService: TheoreticalStockService,
   ) {}
 
   // ----------------------------------------------------------------
@@ -61,15 +67,34 @@ export class PosService {
       return this.getOrderDetail(existingOrder.id, tenantId);
     }
 
-    // 4. Validate items server-side (reuse checkout validator, skip sellableOnline)
-    const validation = await this.checkoutValidator.validateByTenantId(tenantId, dto.items);
-    const { lines, itemsSubtotal } = validation;
-
-    // 5. Apply discount (server validated)
-    if (discountTotal > itemsSubtotal) {
-      throw new BadRequestException('Desconto não pode exceder o subtotal dos itens.');
+    let customerId: string | null = null;
+    if (dto.customerPhone) {
+      const cust = await this.customerService.syncCustomerOnOrderUpsert(
+        tenantId,
+        dto.customerPhone,
+        dto.customerName || 'Consumidor',
+        undefined
+      );
+      if (cust) customerId = cust.id;
     }
-    const total = Math.round((itemsSubtotal - discountTotal) * 100) / 100;
+
+    // 4. Validate items server-side (reuse checkout validator, skip sellableOnline)
+    const validation = await this.checkoutValidator.validateByTenantId(tenantId, dto.items, {
+      customerId,
+      couponCode: dto.couponCode,
+      useCashbackAmount: dto.useCashbackAmount,
+    });
+    const { lines, itemsSubtotal, discountTotal: commercialDiscountTotal, couponId, cashbackUsed } = validation;
+
+    // 5. Apply discount (server validated commercial + manual POS)
+    const manualDiscountTotal = discountTotal; // renamed from destructuring
+    const finalItemsTotal = Math.round((itemsSubtotal - (commercialDiscountTotal || 0)) * 100) / 100;
+    
+    if (manualDiscountTotal > finalItemsTotal) {
+      throw new BadRequestException('Desconto manual não pode exceder o subtotal após abatimentos comerciais.');
+    }
+    const finalTotal = Math.round((finalItemsTotal - manualDiscountTotal) * 100) / 100;
+    const combinedDiscountTotal = (commercialDiscountTotal || 0) + manualDiscountTotal;
 
     // 6. Transactional order creation
     const order = await this.prisma.$transaction(async (tx) => {
@@ -92,15 +117,18 @@ export class PosService {
           customerName: dto.customerName || 'Consumidor',
           customerPhone: dto.customerPhone || '',
           itemsSubtotal,
-          discountTotal,
+          discountTotal: combinedDiscountTotal,
           deliveryFee: 0,
           serviceFee: 0,
-          total,
+          total: finalTotal,
           sourceChannel: 'pos',
           idempotencyKey: dto.idempotencyKey,
           notes: dto.notes || null,
           paymentMethod: dto.paymentMethod,
           cashSessionId: activeSession.id,
+          customerId,
+          couponId,
+          cashbackUsed,
         },
       });
 
@@ -177,9 +205,31 @@ export class PosService {
       tenantId,
       activeSession.id,
       order.id,
-      total,
+      finalTotal,
       dto.paymentMethod,
     );
+
+    // 8. Update Cashback Ledger & Coupon Usage
+    if (cashbackUsed && customerId) {
+      await this.cashbackService.createTransaction({
+        tenantId,
+        customerId: customerId,
+        type: 'redeemed',
+        amount: cashbackUsed,
+        orderId: order.id,
+        description: `Usado no PDV, pedido ${order.orderNumber}`
+      });
+    }
+
+    if (couponId) {
+      await this.prisma.coupon.update({
+        where: { id: couponId },
+        data: { usedCount: { increment: 1 } }
+      });
+    }
+
+    // 9. Trigger theoretical stock depletion
+    await this.theoreticalStockService.processOrderDepletion(tenantId, order.id);
 
     return this.getOrderDetail(order.id, tenantId);
   }
@@ -267,6 +317,9 @@ export class PosService {
         Number(order.total),
       );
     }
+
+    // Register stock reversal
+    await this.theoreticalStockService.reverseOrderDepletion(tenantId, orderId);
 
     return this.getOrderDetail(orderId, tenantId);
   }

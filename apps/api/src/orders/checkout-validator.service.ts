@@ -5,6 +5,8 @@ import type {
   CreateOrderItemComplementDTO,
   CreateOrderItemComboSelectionDTO,
 } from '@gestor/types';
+import { CouponsService } from '../promotions/coupons.service';
+import { CashbackService } from '../promotions/cashback.service';
 
 interface ValidatedProductLine {
   lineType: 'product';
@@ -51,15 +53,24 @@ export interface CheckoutValidationResult {
   tenantId: string;
   lines: ValidatedLine[];
   itemsSubtotal: number;
+  discountTotal: number;
+  total: number; // Subtotal - discount
+  couponId?: string | null;
+  cashbackUsed?: number | null;
 }
 
 @Injectable()
 export class CheckoutValidatorService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly couponsService: CouponsService,
+    private readonly cashbackService: CashbackService,
+  ) {}
 
   async validate(
     slug: string,
     items: CreateOrderItemDTO[],
+    options?: { customerId?: string | null; couponCode?: string; useCashbackAmount?: number },
   ): Promise<CheckoutValidationResult> {
     // 1. Resolve tenant
     const tenant = await this.prisma.tenant.findUnique({
@@ -91,7 +102,35 @@ export class CheckoutValidatorService {
 
     const itemsSubtotal = validatedLines.reduce((sum, l) => sum + l.lineTotal, 0);
 
-    return { tenantId, lines: validatedLines, itemsSubtotal };
+    let discountTotal = 0;
+    let couponId: string | null = null;
+    let cashbackUsed: number | null = null;
+
+    if (options?.couponCode) {
+      const couponVal = await this.couponsService.validateCouponForTotal(
+        tenantId,
+        options.couponCode,
+        itemsSubtotal,
+      );
+      discountTotal += couponVal.discountAmount;
+      couponId = couponVal.couponId;
+    }
+
+    if (options?.useCashbackAmount && options.useCashbackAmount > 0 && options.customerId) {
+      const balance = await this.cashbackService.getCashbackBalance(tenantId, options.customerId);
+      if (balance < options.useCashbackAmount) {
+        throw new BadRequestException('Saldo de cashback insuficiente.');
+      }
+      // Cashback also cannot exceed the subtotal minus coupon discount
+      const remainingTotal = itemsSubtotal - discountTotal;
+      const appliedCashback = Math.min(options.useCashbackAmount, remainingTotal);
+      discountTotal += appliedCashback;
+      cashbackUsed = appliedCashback;
+    }
+
+    const total = itemsSubtotal - discountTotal;
+
+    return { tenantId, lines: validatedLines, itemsSubtotal, discountTotal, total, couponId, cashbackUsed };
   }
 
   /**
@@ -101,6 +140,7 @@ export class CheckoutValidatorService {
   async validateByTenantId(
     tenantId: string,
     items: CreateOrderItemDTO[],
+    options?: { customerId?: string | null; couponCode?: string; useCashbackAmount?: number },
   ): Promise<CheckoutValidationResult> {
     if (items.length === 0) {
       throw new BadRequestException('A venda deve conter pelo menos 1 item.');
@@ -122,7 +162,35 @@ export class CheckoutValidatorService {
 
     const itemsSubtotal = validatedLines.reduce((sum, l) => sum + l.lineTotal, 0);
 
-    return { tenantId, lines: validatedLines, itemsSubtotal };
+    let discountTotal = 0;
+    let couponId: string | null = null;
+    let cashbackUsed: number | null = null;
+
+    if (options?.couponCode) {
+      const couponVal = await this.couponsService.validateCouponForTotal(
+        tenantId,
+        options.couponCode,
+        itemsSubtotal,
+      );
+      discountTotal += couponVal.discountAmount;
+      couponId = couponVal.couponId;
+    }
+
+    if (options?.useCashbackAmount && options.useCashbackAmount > 0 && options.customerId) {
+      const balance = await this.cashbackService.getCashbackBalance(tenantId, options.customerId);
+      if (balance < options.useCashbackAmount) {
+        throw new BadRequestException('Saldo de cashback insuficiente.');
+      }
+      // Cashback also cannot exceed the subtotal minus coupon discount
+      const remainingTotal = itemsSubtotal - discountTotal;
+      const appliedCashback = Math.min(options.useCashbackAmount, remainingTotal);
+      discountTotal += appliedCashback;
+      cashbackUsed = appliedCashback;
+    }
+
+    const total = itemsSubtotal - discountTotal;
+
+    return { tenantId, lines: validatedLines, itemsSubtotal, discountTotal, total, couponId, cashbackUsed };
   }
 
   private async validateProductLine(

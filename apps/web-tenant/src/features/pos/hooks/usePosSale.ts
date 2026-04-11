@@ -19,6 +19,8 @@ export interface PosCreateSalePayload {
   paymentMethod: 'cash' | 'pix' | 'credit_card' | 'debit_card' | 'other';
   discountTotal?: number;
   notes?: string;
+  couponCode?: string;
+  useCashbackAmount?: number;
 }
 
 export function useCreatePosSale() {

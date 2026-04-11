@@ -15,6 +15,9 @@ import { OrdersModule } from './orders/orders.module';
 import { DeliveryModule } from './delivery/delivery.module';
 import { CashModule } from './cash/cash.module';
 import { PosModule } from './pos/pos.module';
+import { CrmModule } from './crm/crm.module';
+import { PromotionsModule } from './promotions/promotions.module';
+import { InventoryModule } from './inventory/inventory.module';
 
 @Module({
   imports: [
@@ -62,6 +65,15 @@ import { PosModule } from './pos/pos.module';
 
     // Point of Sale (Phase 7)
     PosModule,
+
+    // CRM (Phase 8)
+    CrmModule,
+
+    // Promotions & Cashback (Phase 8)
+    PromotionsModule,
+
+    // Inventory & Recipe (Phase 9)
+    InventoryModule,
   ],
   providers: [
     {

@@ -102,6 +102,9 @@ export class CreateOrderDTO {
   deliveryAddress?: DeliveryAddressDTO;
 
   @IsString() @IsOptional() notes?: string;
+  
+  @IsString() @IsOptional() couponCode?: string;
+  @IsNumber() @IsOptional() useCashbackAmount?: number;
 }
 
 // --- DTOs de Saída ---
@@ -160,6 +163,11 @@ export interface OrderResponseDTO {
   items: OrderItemResponseDTO[];
   deliveryAddress?: DeliveryAddressDTO | null;
   timeline: OrderTimelineEntryDTO[];
+  
+  customerId?: string | null;
+  couponId?: string | null;
+  cashbackUsed?: number | null;
+
   createdAt: string;
   updatedAt: string;
 }

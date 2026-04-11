@@ -64,6 +64,15 @@ export class CreatePosOrderDTO {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @IsString()
+  @IsOptional()
+  couponCode?: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  useCashbackAmount?: number;
 }
 
 // ============================================================

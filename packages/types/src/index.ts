@@ -8,3 +8,6 @@ export * from './order';
 export * from './delivery';
 export * from './cash';
 export * from './pos';
+export * from './customer';
+export * from './promotions';
+export * from './inventory';
