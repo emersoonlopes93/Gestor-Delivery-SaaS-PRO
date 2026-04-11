@@ -21,6 +21,15 @@ export interface TenantCapabilities {
     canUseWebhooks: boolean;
     canUseCustomDomain: boolean;
   };
+  reports: {
+    canViewCosts: boolean;
+    canViewMargin: boolean;
+    canExportReports: boolean;
+  };
+  goals: {
+    maxActiveGoals: number;
+    canUseSubGoals: boolean;
+  };
 }
 
 /**
@@ -45,6 +54,15 @@ export const DEFAULT_CAPABILITIES: TenantCapabilities = {
     canUseWebhooks: false,
     canUseCustomDomain: false,
   },
+  reports: {
+    canViewCosts: false,
+    canViewMargin: false,
+    canExportReports: false,
+  },
+  goals: {
+    maxActiveGoals: 3,
+    canUseSubGoals: false,
+  },
 };
 
 /**
@@ -68,5 +86,14 @@ export const PRO_CAPABILITIES: TenantCapabilities = {
   integrations: {
     canUseWebhooks: true,
     canUseCustomDomain: true,
+  },
+  reports: {
+    canViewCosts: true,
+    canViewMargin: true,
+    canExportReports: true,
+  },
+  goals: {
+    maxActiveGoals: 50,
+    canUseSubGoals: true,
   },
 };

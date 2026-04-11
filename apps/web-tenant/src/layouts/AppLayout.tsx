@@ -107,6 +107,22 @@ export function AppLayout() {
           </Link>
 
           <div className="pt-4 pb-1">
+            <p className="px-3 text-xs font-black text-gray-400 uppercase tracking-wider">Gestão & Performance</p>
+          </div>
+          <Link
+            to="/analytics/reports"
+            className="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+          >
+            📈 Relatórios Gerenciais
+          </Link>
+          <Link
+            to="/analytics/goals"
+            className="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+          >
+            🎯 Metas e Desempenho
+          </Link>
+
+          <div className="pt-4 pb-1">
             <p className="px-3 text-xs font-black text-gray-400 uppercase tracking-wider">Sistema</p>
           </div>
           <Link

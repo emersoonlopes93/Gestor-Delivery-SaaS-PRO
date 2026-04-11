@@ -111,3 +111,32 @@ export enum PaymentMethod {
   debit_card = 'debit_card',
   other = 'other',
 }
+
+// ============================================================
+// Analytics & Goals Enums (Phase 10)
+// ============================================================
+
+export enum GoalType {
+  REVENUE = 'revenue',
+  ORDERS = 'orders',
+  AVG_TICKET = 'avg_ticket',
+  PREPARATION_TIME = 'preparation_time',
+  DELIVERY_TIME = 'delivery_time',
+  ORDERS_BY_CHANNEL = 'orders_by_channel',
+  ORDERS_BY_CATEGORY = 'orders_by_category',
+  GROSS_MARGIN = 'gross_margin',
+}
+
+export enum GoalStatus {
+  DRAFT = 'draft',
+  ACTIVE = 'active',
+  PAUSED = 'paused',
+  ACHIEVED = 'achieved',
+  MISSED = 'missed',
+}
+
+export enum GoalTrendStatus {
+  ON_TRACK = 'on_track',
+  AT_RISK = 'at_risk',
+  BEHIND = 'behind',
+}

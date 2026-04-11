@@ -56,6 +56,7 @@ model Tenant {
   productRecipeIngredients   ProductRecipeIngredient[]
   complementRecipeIngredients ComplementRecipeIngredient[]
   comboRecipeIngredients     ComboRecipeIngredient[]
+  goals                      Goal[]
 
   @@map("tenants")
 }
@@ -953,4 +954,57 @@ model ComboRecipeIngredient {
   @@unique([comboId, ingredientId])
   @@index([tenantId])
   @@map("combo_recipe_ingredients")
+}
+
+// ============================================================
+// ANALYTICS & GOALS — Phase 10
+// ============================================================
+
+enum GoalType {
+  revenue
+  orders
+  avg_ticket
+  preparation_time
+  delivery_time
+  orders_by_channel
+  orders_by_category
+  gross_margin
+}
+
+enum GoalStatus {
+  draft
+  active
+  paused
+  achieved
+  missed
+}
+
+model Goal {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  type        GoalType
+  targetValue Decimal  @map("target_value") @db.Decimal(10, 2)
+  startDate   DateTime @map("start_date")
+  endDate     DateTime @map("end_date")
+  status      GoalStatus @default(active)
+  
+  // Desdobramentos (Subgoals)
+  parentId    String?  @map("parent_id")
+  parent      Goal?    @relation("SubGoals", fields: [parentId], references: [id])
+  subGoals    Goal[]   @relation("SubGoals")
+
+  // For specific targets (channel, category, product)
+  targetId    String?  @map("target_id") @db.VarChar(100)
+  
+  responsibleId String? @map("responsible_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("goals")
 }

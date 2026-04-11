@@ -22,6 +22,7 @@ import { CustomersListPage } from './features/crm/CustomersListPage';
 // import { CustomerProfilePage } from './features/crm/CustomerProfilePage'; // Optional next
 import { PromotionsPage } from './features/promotions/PromotionsPage';
 import { InventoryPage } from './features/inventory/InventoryPage';
+import { ReportsPage, GoalsPage } from './features/analytics';
 
 export function App() {
   return (
@@ -165,6 +166,24 @@ export function App() {
           element={
             <PermissionGate permission="inventory.read">
               <InventoryPage />
+            </PermissionGate>
+          }
+        />
+
+        {/* Analytics & Performance (Phase 10) */}
+        <Route
+          path="/analytics/reports"
+          element={
+            <PermissionGate permission="reports.read">
+              <ReportsPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/analytics/goals"
+          element={
+            <PermissionGate permission="goals.read">
+              <GoalsPage />
             </PermissionGate>
           }
         />

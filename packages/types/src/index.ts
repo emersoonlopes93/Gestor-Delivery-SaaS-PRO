@@ -8,6 +8,8 @@ export type * from './storefront';
 export type * from './customer';
 export type * from './promotions';
 export type * from './inventory';
+export type * from './analytics';
+export type * from './goals';
 
 // Modules with classes or constants (explicit values)
 export type * from './order';

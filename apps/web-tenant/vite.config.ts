@@ -18,4 +18,12 @@ export default defineConfig({
       },
     },
   },
+  optimizeDeps: {
+    include: ['recharts', 'lucide-react', 'react-router-dom'],
+  },
+  build: {
+    commonjsOptions: {
+      include: [/node_modules/],
+    },
+  },
 });

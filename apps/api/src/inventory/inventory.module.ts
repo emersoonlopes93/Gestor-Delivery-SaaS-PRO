@@ -1,4 +1,6 @@
-import { Module } from '@nestjs/common';
+import { 
+  Module 
+} from '@nestjs/common';
 import { IngredientsController } from './ingredients.controller';
 import { IngredientsService } from './ingredients.service';
 import { StockMovementService } from './stock-movement.service';
@@ -17,3 +19,4 @@ import { RbacModule } from '../rbac/rbac.module';
   exports: [IngredientsService, StockMovementService, RecipesService, TheoreticalStockService],
 })
 export class InventoryModule {}
+// Final environmental stabilization check

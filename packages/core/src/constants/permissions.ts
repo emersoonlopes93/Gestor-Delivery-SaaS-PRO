@@ -40,8 +40,16 @@ export const TENANT_PERMISSIONS = {
   'pos.apply_discount': 'Apply manual discount on POS',
 
   // Reports module
-  'reports.view': 'View reports',
+  'reports.read': 'View all reports',
+  'reports.view_costs': 'View ingredient and product costs',
+  'reports.view_margin': 'View product profit margins',
   'reports.export': 'Export reports',
+
+  // Goals & Performance module
+  'goals.read': 'View goals and performance metrics',
+  'goals.create': 'Create new goals',
+  'goals.update': 'Update existing goals',
+  'goals.delete': 'Delete goals',
 
   // CRM & Promotions module
   'crm.read': 'View CRM and Customer data',
@@ -124,7 +132,8 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
     'kds.use', 'kds.manage',
     'cash.read', 'cash.open', 'cash.close', 'cash.add_supply', 'cash.add_withdrawal', 'cash.manage',
     'pos.read', 'pos.create_sale', 'pos.apply_discount',
-    'reports.view', 'reports.export',
+    'reports.read', 'reports.view_costs', 'reports.view_margin', 'reports.export',
+    'goals.read', 'goals.create', 'goals.update', 'goals.delete',
     'crm.read', 'crm.manage_customers', 'crm.manage_coupons', 'crm.manage_loyalty_cashback', 'crm.apply_benefits',
     'delivery.read', 'delivery.manage_drivers', 'delivery.dispatch', 'delivery.manage',
     'inventory.read', 'inventory.create', 'inventory.update', 'inventory.adjust', 'inventory.manage_recipe', 'inventory.view_costs', 'inventory.view_margin',
@@ -165,14 +174,14 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
   ],
   finance: [
     'orders.read',
-    'reports.view', 'reports.export',
+    'reports.read', 'reports.view_costs', 'reports.view_margin', 'reports.export',
     'finance.read', 'finance.manage',
     'cash.close',
     'dashboard.view',
   ],
   marketing: [
     'crm.read', 'crm.manage_customers', 'crm.manage_coupons', 'crm.manage_loyalty_cashback',
-    'reports.view',
+    'reports.read', 'goals.read',
     'catalog.read',
     'dashboard.view',
   ],

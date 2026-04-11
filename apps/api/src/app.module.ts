@@ -18,6 +18,8 @@ import { PosModule } from './pos/pos.module';
 import { CrmModule } from './crm/crm.module';
 import { PromotionsModule } from './promotions/promotions.module';
 import { InventoryModule } from './inventory/inventory.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { GoalsModule } from './goals/goals.module';
 
 @Module({
   imports: [
@@ -74,6 +76,12 @@ import { InventoryModule } from './inventory/inventory.module';
 
     // Inventory & Recipe (Phase 9)
     InventoryModule,
+
+    // Analytics & Reports (Phase 10)
+    AnalyticsModule,
+
+    // Goals & Performance (Phase 10)
+    GoalsModule,
   ],
   providers: [
     {
