@@ -57,6 +57,12 @@ export class ComplementsController {
     return this.complementsService.findAllItems();
   }
 
+  @Get('groups/items')
+  @RequirePermissions('catalog.read')
+  findAllItemsFromGroups() {
+    return this.complementsService.findAllItems();
+  }
+
   @Get('items/:id')
   @RequirePermissions('catalog.read')
   findOneItem(@Param('id') id: string) {
