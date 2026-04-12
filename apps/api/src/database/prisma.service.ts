@@ -27,8 +27,15 @@ export class PrismaService
   }
 
   async onModuleInit() {
-    await this.$connect();
-    this.logger.log('Database connection established');
+    try {
+      await this.$connect();
+      this.logger.log('Database connection established');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(
+        `Database connection failed on startup (app will continue running). ${message}`,
+      );
+    }
   }
 
   async onModuleDestroy() {

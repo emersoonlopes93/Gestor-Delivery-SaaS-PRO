@@ -7,7 +7,6 @@ import {
   IsNumber,
   IsEnum,
   Min,
-  Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateOrderItemDTO } from './order';

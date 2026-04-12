@@ -4,9 +4,11 @@ import type {
   CreateOrderItemDTO,
   CreateOrderItemComplementDTO,
   CreateOrderItemComboSelectionDTO,
+  DeliveryAddressDTO,
 } from '@gestor/types';
 import { CouponsService } from '../promotions/coupons.service';
 import { CashbackService } from '../promotions/cashback.service';
+import { DeliveryRateService } from '../delivery/delivery-rate.service';
 
 interface ValidatedProductLine {
   lineType: 'product';
@@ -54,7 +56,8 @@ export interface CheckoutValidationResult {
   lines: ValidatedLine[];
   itemsSubtotal: number;
   discountTotal: number;
-  total: number; // Subtotal - discount
+  deliveryFee: number;
+  total: number; // Subtotal - discount + deliveryFee
   couponId?: string | null;
   cashbackUsed?: number | null;
 }
@@ -65,12 +68,18 @@ export class CheckoutValidatorService {
     private readonly prisma: PrismaService,
     private readonly couponsService: CouponsService,
     private readonly cashbackService: CashbackService,
+    private readonly deliveryRateService: DeliveryRateService,
   ) {}
 
   async validate(
     slug: string,
     items: CreateOrderItemDTO[],
-    options?: { customerId?: string | null; couponCode?: string; useCashbackAmount?: number },
+    options?: { 
+      customerId?: string | null; 
+      couponCode?: string; 
+      useCashbackAmount?: number;
+      deliveryAddress?: DeliveryAddressDTO | null;
+    },
   ): Promise<CheckoutValidationResult> {
     // 1. Resolve tenant
     const tenant = await this.prisma.tenant.findUnique({
@@ -130,7 +139,25 @@ export class CheckoutValidatorService {
 
     const total = itemsSubtotal - discountTotal;
 
-    return { tenantId, lines: validatedLines, itemsSubtotal, discountTotal, total, couponId, cashbackUsed };
+    // 5. Calcular taxa de entrega
+    const deliveryFeeCalculation = await this.deliveryRateService.calculateDeliveryFee(
+      tenantId,
+      options?.deliveryAddress,
+    );
+    const deliveryFee = deliveryFeeCalculation.fee;
+
+    const finalTotal = total + deliveryFee;
+
+    return { 
+      tenantId, 
+      lines: validatedLines, 
+      itemsSubtotal, 
+      discountTotal, 
+      deliveryFee,
+      total: finalTotal, 
+      couponId, 
+      cashbackUsed 
+    };
   }
 
   /**
@@ -190,7 +217,20 @@ export class CheckoutValidatorService {
 
     const total = itemsSubtotal - discountTotal;
 
-    return { tenantId, lines: validatedLines, itemsSubtotal, discountTotal, total, couponId, cashbackUsed };
+    // Para POS, taxa de entrega é zero (venda local)
+    const deliveryFee = 0;
+    const finalTotal = total;
+
+    return { 
+      tenantId, 
+      lines: validatedLines, 
+      itemsSubtotal, 
+      discountTotal, 
+      deliveryFee,
+      total: finalTotal, 
+      couponId, 
+      cashbackUsed 
+    };
   }
 
   private async validateProductLine(

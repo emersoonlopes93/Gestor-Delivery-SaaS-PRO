@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { StockMovementType } from '@gestor/core';
+import { StockMovementType } from '@gestor/types';
 
 @Injectable()
 export class TheoreticalStockService {

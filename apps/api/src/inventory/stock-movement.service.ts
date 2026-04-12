@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { CreateStockMovementDTO, StockMovementDTO } from '@gestor/types';
-import { StockMovementType } from '@gestor/core';
+import { CreateStockMovementDTO, StockMovementDTO, StockMovementType } from '@gestor/types';
 
 @Injectable()
 export class StockMovementService {

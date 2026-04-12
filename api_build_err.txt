@@ -1,0 +1,50 @@
+﻿
+> @gestor/api@0.1.0 build C:\Users\emers\Documents\GitHub\Gestor Delivery SaaS PRO\apps\api
+> nest build
+
+node.exe : [96msrc/catalog/
+complements/dto/create-compl
+ement-item.dto.ts[0m:[93m5
+[0m:[93m3[0m - 
+[91merror[0m[90m TS2564: 
+[0mProperty 'groupId' has 
+no initializer and is not 
+definitely assigned in the 
+constructor.
+No C:\Users\emers\AppData\Ro
+aming\npm\pnpm.ps1:24 
+caractere:5
++     & "node$exe"  "$basedi
+r/node_modules/pnpm/bin/pnpm
+.cjs" $args
++     ~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~
+    + CategoryInfo          
+    : NotSpecified: ([96m  
+  src/catalo...he constru   
+ ctor.:String) [], Remot    
+eException
+    + FullyQualifiedErrorId 
+    : NativeCommandError
+ 
+
+[7m5[0m   groupId: string;
+[7m [0m [91m  ~~~~~~~[0m
+[96msrc/catalog/complements
+/dto/create-complement-item.
+dto.ts[0m:[93m8[0m:[93m3
+[0m - [91merror[0m[90m 
+TS2564: [0mProperty 'name' 
+has no initializer and is 
+not definitely assigned in 
+the constructor.
+
+[7m8[0m   name: string;
+[7m [0m [91m  ~~~~[0m
+
+Found 2 error(s).
+
+C:\Users\emers\Documents\GitHub\Gestor Delivery SaaS PRO\apps\api:
+ÔÇëERR_PNPM_RECURSIVE_RUN_FIRST_FAILÔÇë @gestor/api@0.1.0 build: `nest build`
+Exit status 1

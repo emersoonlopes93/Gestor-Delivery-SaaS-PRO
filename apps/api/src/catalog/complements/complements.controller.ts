@@ -2,6 +2,8 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@n
 import { ComplementsService } from './complements.service';
 import { CreateComplementGroupDto } from './dto/create-complement-group.dto';
 import { UpdateComplementGroupDto } from './dto/update-complement-group.dto';
+import { CreateComplementItemDto } from './dto/create-complement-item.dto';
+import { UpdateComplementItemDto } from './dto/update-complement-item.dto';
 import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { RequirePermissions } from '../../common/decorators';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
@@ -39,5 +41,37 @@ export class ComplementsController {
   @RequirePermissions('catalog.manage_complements')
   remove(@Param('id') id: string) {
     return this.complementsService.removeGroup(id);
+  }
+
+  // --- Complement Items ---
+
+  @Post('items')
+  @RequirePermissions('catalog.manage_complements')
+  createItem(@Body() dto: CreateComplementItemDto) {
+    return this.complementsService.createItem(dto);
+  }
+
+  @Get('items')
+  @RequirePermissions('catalog.read')
+  findAllItems() {
+    return this.complementsService.findAllItems();
+  }
+
+  @Get('items/:id')
+  @RequirePermissions('catalog.read')
+  findOneItem(@Param('id') id: string) {
+    return this.complementsService.findOneItem(id);
+  }
+
+  @Patch('items/:id')
+  @RequirePermissions('catalog.manage_complements')
+  updateItem(@Param('id') id: string, @Body() dto: UpdateComplementItemDto) {
+    return this.complementsService.updateItem(id, dto);
+  }
+
+  @Delete('items/:id')
+  @RequirePermissions('catalog.manage_complements')
+  removeItem(@Param('id') id: string) {
+    return this.complementsService.removeItem(id);
   }
 }

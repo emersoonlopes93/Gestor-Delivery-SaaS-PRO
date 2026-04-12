@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { TenantStatus } from '@gestor/core';
+import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 
 @Injectable()
 export class TenantService {
@@ -55,7 +56,21 @@ export class TenantService {
       tenantId: tenant.id,
       tenantSlug: tenant.slug,
       tenantName: tenant.name,
-      tenantStatus: tenant.status.toLowerCase(),
+      tenantStatus: (tenant.status as string).toLowerCase(),
     };
+  }
+
+  /**
+   * Update tenant settings.
+   */
+  async updateSettings(tenantId: string, dto: UpdateTenantSettingsDto) {
+    return this.prisma.tenantSettings.upsert({
+      where: { tenantId },
+      create: {
+        ...dto,
+        tenantId,
+      },
+      update: dto,
+    });
   }
 }

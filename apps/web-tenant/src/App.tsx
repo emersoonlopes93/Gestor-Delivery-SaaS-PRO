@@ -14,8 +14,10 @@ import { OperationBoardPage } from './features/orders/OperationBoardPage';
 import { KdsPage } from './features/orders/KdsPage';
 import { DriversListPage } from './features/delivery/DriversListPage';
 import { DispatchPage } from './features/delivery/DispatchPage';
+import { DeliveryRatesPage } from './features/delivery/DeliveryRatesPage';
 import CashPage from './features/cash/CashPage';
 import PosPage from './features/pos/PosPage';
+import { SettingsPage } from './features/settings/SettingsPage';
 
 // CRM & Promotions
 import { CustomersListPage } from './features/crm/CustomersListPage';
@@ -119,6 +121,14 @@ export function App() {
             </PermissionGate>
           }
         />
+        <Route
+          path="/delivery/rates"
+          element={
+            <PermissionGate permission="delivery.manage">
+              <DeliveryRatesPage />
+            </PermissionGate>
+          }
+        />
 
         {/* Cash Register (Phase 7) */}
         <Route
@@ -192,11 +202,8 @@ export function App() {
         <Route
           path="/settings"
           element={
-            <PermissionGate permission="settings.read">
-              <div className="p-6">
-                <h1 className="text-2xl font-bold">Configurações</h1>
-                <p className="text-gray-500 mt-2">Área de configurações da loja — será expandida em fases futuras.</p>
-              </div>
+            <PermissionGate permission="settings.manage">
+              <SettingsPage />
             </PermissionGate>
           }
         />

@@ -32,7 +32,7 @@ export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 };
 
 // --- DTOs de Entrada (Checkout) ---
-import { IsString, IsNotEmpty, IsOptional, IsArray, ValidateNested, IsNumber, IsEnum, IsEmail } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsArray, ValidateNested, IsNumber, IsEmail } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class DeliveryAddressDTO {

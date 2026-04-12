@@ -27,25 +27,45 @@ const KANBAN_BOARD_COLUMNS = [
 export function OperationBoardPage() {
   const [orders, setOrders] = useState<OrderBoardItemDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const token = localStorage.getItem('accessToken');
 
   const fetchBoard = useCallback(async () => {
     try {
+      if (!token) {
+        throw new Error('Token de autenticação não encontrado');
+      }
+
+      console.log('[OperationBoardPage] Buscando board...');
+
       const res = await fetch(`${API_BASE}/orders/operation/board`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
-        const json = await res.json();
-        setOrders(json || []);
+
+      if (!res.ok) {
+        throw new Error(`Erro ${res.status}: ${res.statusText}`);
       }
-    } catch {
-      // Ignore
+
+      const json = await res.json();
+      console.log('[OperationBoardPage] Resposta da API:', json);
+
+      // Validar estrutura da resposta
+      if (!json || typeof json !== 'object') {
+        throw new Error('Resposta inválida da API');
+      }
+
+      setOrders(Array.isArray(json) ? json : []);
+      setError(null);
+    } catch (err) {
+      console.error('[OperationBoardPage] Erro ao buscar board:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao carregar quadro de pedidos');
+      setOrders([]);
     } finally {
-      if (loading) setLoading(false);
+      setLoading(false);
     }
-  }, [token, loading]);
+  }, [token]);
 
   // Initial load & Polling (cada 15s)
   useEffect(() => {
@@ -105,14 +125,46 @@ export function OperationBoardPage() {
           <h1 className="text-2xl font-bold text-gray-900">Kanban Operacional</h1>
           <p className="text-sm text-gray-500 mt-1">Atualizado a cada 15s</p>
         </div>
-        <button onClick={fetchBoard} className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors" title="Atualizar">
-          <RefreshCw className="w-5 h-5 text-gray-600" />
+        <button 
+          onClick={fetchBoard} 
+          disabled={loading}
+          className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+          title="Atualizar"
+        >
+          <RefreshCw className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </header>
 
-      {loading ? (
-        <div className="text-center py-12 text-gray-400">Carregando painel operacional...</div>
-      ) : (
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <span className="text-red-400 text-xl">!</span>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Erro ao carregar quadro de pedidos</h3>
+              <div className="mt-2 text-sm text-red-700">{error}</div>
+              <div className="mt-3">
+                <button
+                  onClick={fetchBoard}
+                  className="text-sm font-medium text-red-600 hover:text-red-500 underline"
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading && (
+        <div className="flex-1 flex flex-col items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+          <p className="mt-4 text-gray-500">Carregando quadro de pedidos...</p>
+        </div>
+      )}
+
+      {!loading && !error && (
         <div className="flex gap-4 overflow-x-auto pb-4 grow items-start">
           {KANBAN_BOARD_COLUMNS.map(column => {
             const colOrders = getOrdersForColumn(column.statuses);

@@ -55,8 +55,9 @@ export class OrdersService {
       customerId,
       couponCode: dto.couponCode,
       useCashbackAmount: dto.useCashbackAmount,
+      deliveryAddress: dto.deliveryAddress,
     });
-    const { tenantId, lines, itemsSubtotal, discountTotal, total, couponId, cashbackUsed } = validation;
+    const { tenantId, lines, itemsSubtotal, discountTotal, deliveryFee, total, couponId, cashbackUsed } = validation;
 
     console.log(`DEBUG createOrder: type=${dto.fulfillmentType}, hasAddress=${!!dto.deliveryAddress}`);
 
@@ -102,7 +103,7 @@ export class OrdersService {
           customerEmail: dto.customerEmail || null,
           itemsSubtotal,
           discountTotal: discountTotal || 0,
-          deliveryFee: 0,
+          deliveryFee,
           serviceFee: 0,
           total: finalTotal,
           sourceChannel: 'storefront',

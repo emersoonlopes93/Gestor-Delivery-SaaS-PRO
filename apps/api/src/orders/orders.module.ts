@@ -8,9 +8,10 @@ import { RbacModule } from '../rbac/rbac.module';
 import { PromotionsModule } from '../promotions/promotions.module';
 import { CrmModule } from '../crm/crm.module';
 import { InventoryModule } from '../inventory/inventory.module';
+import { DeliveryModule } from '../delivery/delivery.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, RbacModule, PromotionsModule, CrmModule, InventoryModule],
+  imports: [DatabaseModule, AuthModule, RbacModule, PromotionsModule, CrmModule, InventoryModule, DeliveryModule],
   controllers: [OrdersController],
   providers: [OrdersService, CheckoutValidatorService],
   exports: [OrdersService, CheckoutValidatorService],

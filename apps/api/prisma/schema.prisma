@@ -57,6 +57,8 @@ model Tenant {
   complementRecipeIngredients ComplementRecipeIngredient[]
   comboRecipeIngredients     ComboRecipeIngredient[]
   goals                      Goal[]
+  deliveryRateRules          DeliveryRateRule[]
+  moduleAccess              TenantModuleAccess[]
 
   @@map("tenants")
 }
@@ -954,6 +956,63 @@ model ComboRecipeIngredient {
   @@unique([comboId, ingredientId])
   @@index([tenantId])
   @@map("combo_recipe_ingredients")
+}
+
+// ============================================================
+// DELIVERY RATES - Phase 4 (hardening)
+// ============================================================
+
+enum RateType {
+  neighborhood
+  distance
+  fixed
+}
+
+model DeliveryRateRule {
+  id          String    @id @default(uuid())
+  tenantId    String    @map("tenant_id")
+  type        RateType
+  isActive    Boolean   @default(true) @map("is_active")
+
+  // Para bairro
+  neighborhood String?   @db.VarChar(100)
+  rate         Decimal?  @map("rate") @db.Decimal(10, 2)
+
+  // Para distância
+  minKm        Decimal?  @map("min_km") @db.Decimal(5, 2)
+  maxKm        Decimal?  @map("max_km") @db.Decimal(5, 2)
+  ratePerKm    Decimal?  @map("rate_per_km") @db.Decimal(10, 2)
+
+  // Para taxa fixa (fallback)
+  fixedRate    Decimal?  @map("fixed_rate") @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, neighborhood])
+  @@index([tenantId])
+  @@map("delivery_rate_rules")
+}
+
+// ============================================================
+// TENANT MODULE ACCESS - Phase 4 (hardening)
+// ============================================================
+
+model TenantModuleAccess {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  module    String   @db.VarChar(50)
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, module])
+  @@index([tenantId])
+  @@map("tenant_module_access")
 }
 
 // ============================================================

@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { PrismaClient, TenantStatus } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import {
@@ -232,8 +233,35 @@ async function seedDemoTenant() {
       });
     }
 
-    console.log(`   ✅ Demo tenant created: ${tenant.name}`);
-    console.log(`   ✅ Tenant owner: ${ownerEmail}`);
+    console.log(`   ? Demo tenant created: ${tenant.name}`);
+    console.log(`   ? Tenant owner: ${ownerEmail}`);
+
+    // Create delivery rate rules
+    await (prisma as any).deliveryRateRule.create({
+      data: {
+        tenantId: tenant.id,
+        type: 'neighborhood',
+        neighborhood: 'centro',
+        rate: 8.0,
+      },
+    });
+
+    await (prisma as any).deliveryRateRule.create({
+      data: {
+        tenantId: tenant.id,
+        type: 'neighborhood',
+        neighborhood: 'jardins',
+        rate: 12.0,
+      },
+    });
+
+    await (prisma as any).deliveryRateRule.create({
+      data: {
+        tenantId: tenant.id,
+        type: 'fixed',
+        fixedRate: 10.0,
+      },
+    });
 
     // Create demo category (ProductCategory)
     const category = await prisma.productCategory.upsert({

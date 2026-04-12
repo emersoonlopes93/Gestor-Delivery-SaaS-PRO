@@ -1,0 +1,101 @@
+﻿Tentando carregar dist/main.js...
+node : ERRO AO 
+CARREGAR:
+No linha:1 caractere:1
++ node 
+/tmp/check_load.js > 
+load_err.txt 2>&1; 
+Get-Content 
+load_err.txt
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (ERRO AO CARRE   
+ GAR::String) [], R    
+emoteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+Error: Cannot find 
+module 'C:\apps\api\dis
+t\main.js'
+Require stack:
+- C:\tmp\check_load.js
+    at Module._resolveF
+ilename (node:internal/
+modules/cjs/loader:1421
+:15)
+    at 
+defaultResolveImpl (nod
+e:internal/modules/cjs/
+loader:1059:19)
+    at 
+resolveForCJSWithHooks 
+(node:internal/modules/
+cjs/loader:1064:22)
+    at Module._load (no
+de:internal/modules/cjs
+/loader:1227:37)
+    at TracingChannel.t
+raceSync (node:diagnost
+ics_channel:328:14)
+    at wrapModuleLoad (
+node:internal/modules/c
+js/loader:245:24)
+    at Module.require (
+node:internal/modules/c
+js/loader:1504:12)
+    at require (node:in
+ternal/modules/helpers:
+152:16)
+    at 
+Object.<anonymous> (C:\
+tmp\check_load.js:4:3)
+    at Module._compile 
+(node:internal/modules/
+cjs/loader:1761:14) {
+  code: 
+'MODULE_NOT_FOUND',
+  requireStack: [ 'C:\\
+tmp\\check_load.js' ]
+}
+Error: Cannot find 
+module 'C:\apps\api\dis
+t\main.js'
+Require stack:
+- C:\tmp\check_load.js
+    at Module._resolveF
+ilename (node:internal/
+modules/cjs/loader:1421
+:15)
+    at 
+defaultResolveImpl (nod
+e:internal/modules/cjs/
+loader:1059:19)
+    at 
+resolveForCJSWithHooks 
+(node:internal/modules/
+cjs/loader:1064:22)
+    at Module._load (no
+de:internal/modules/cjs
+/loader:1227:37)
+    at TracingChannel.t
+raceSync (node:diagnost
+ics_channel:328:14)
+    at wrapModuleLoad (
+node:internal/modules/c
+js/loader:245:24)
+    at Module.require (
+node:internal/modules/c
+js/loader:1504:12)
+    at require (node:in
+ternal/modules/helpers:
+152:16)
+    at 
+Object.<anonymous> (C:\
+tmp\check_load.js:4:3)
+    at Module._compile 
+(node:internal/modules/
+cjs/loader:1761:14)

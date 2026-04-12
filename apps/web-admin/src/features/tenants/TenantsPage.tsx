@@ -13,6 +13,18 @@ export function TenantsPage() {
   const [tenants, setTenants] = useState<TenantListItem[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const handleStatusChange = async (tenantId: string, newStatus: string) => {
+    try {
+      await api.patch(`/admin/tenants/${tenantId}/status`, { status: newStatus });
+      setTenants(prev => 
+        prev.map(t => t.id === tenantId ? { ...t, status: newStatus as any } : t)
+      );
+    } catch (error) {
+      console.error('Erro ao atualizar status:', error);
+      alert('Erro ao atualizar status do tenant');
+    }
+  };
+
   useEffect(() => {
     api
       .get<PaginatedResponse<TenantListItem>>('/admin/tenants')
@@ -46,12 +58,13 @@ export function TenantsPage() {
               <th className="text-left px-6 py-3 font-semibold text-gray-700">Slug</th>
               <th className="text-left px-6 py-3 font-semibold text-gray-700">Status</th>
               <th className="text-left px-6 py-3 font-semibold text-gray-700">Criado em</th>
+              <th className="text-left px-6 py-3 font-semibold text-gray-700">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {tenants.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-6 py-8 text-center text-gray-400">
+                <td colSpan={5} className="px-6 py-8 text-center text-gray-400">
                   Nenhum tenant encontrado
                 </td>
               </tr>
@@ -77,6 +90,26 @@ export function TenantsPage() {
                   </td>
                   <td className="px-6 py-4 text-gray-500">
                     {new Date(tenant.createdAt).toLocaleDateString('pt-BR')}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => window.location.href = `/tenants/${tenant.id}/modules`}
+                        className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
+                      >
+                        Módulos
+                      </button>
+                      <select
+                        value={tenant.status}
+                        onChange={(e) => handleStatusChange(tenant.id, e.target.value)}
+                        className="text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                      >
+                        <option value="active">Ativo</option>
+                        <option value="trial">Trial</option>
+                        <option value="suspended">Suspenso</option>
+                        <option value="inactive">Inativo</option>
+                      </select>
+                    </div>
                   </td>
                 </tr>
               ))

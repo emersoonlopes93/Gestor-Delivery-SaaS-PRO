@@ -48,4 +48,51 @@ export class AdminTenantsService {
       },
     });
   }
+
+  /**
+   * Update tenant status (activate/suspend).
+   */
+  async updateStatus(id: string, status: 'active' | 'inactive' | 'suspended' | 'trial') {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id },
+    });
+
+    if (!tenant) {
+      throw new Error('Tenant não encontrado');
+    }
+
+    return this.prisma.tenant.update({
+      where: { id },
+      data: { status },
+    });
+  }
+
+  /**
+   * Update tenant basic info.
+   */
+  async update(id: string, data: { name?: string; slug?: string }) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id },
+    });
+
+    if (!tenant) {
+      throw new Error('Tenant não encontrado');
+    }
+
+    // Se mudar slug, verificar unicidade
+    if (data.slug && data.slug !== tenant.slug) {
+      const existing = await this.prisma.tenant.findUnique({
+        where: { slug: data.slug },
+      });
+
+      if (existing) {
+        throw new Error('Slug já está em uso');
+      }
+    }
+
+    return this.prisma.tenant.update({
+      where: { id },
+      data,
+    });
+  }
 }

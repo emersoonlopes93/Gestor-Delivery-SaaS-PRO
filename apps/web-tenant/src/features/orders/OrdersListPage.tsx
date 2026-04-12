@@ -40,24 +40,48 @@ export function OrdersListPage() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<OrderStatus | ''>('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
   const token = localStorage.getItem('accessToken');
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
+    setError(null);
+    
     try {
+      if (!token) {
+        throw new Error('Token de autenticação não encontrado');
+      }
+
       const params = new URLSearchParams({ page: String(page), limit: '20' });
       if (statusFilter) params.set('status', statusFilter);
+
+      console.log('[OrdersListPage] Buscando pedidos...', { page, statusFilter });
 
       const res = await fetch(`${API_BASE}/orders?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+
+      if (!res.ok) {
+        throw new Error(`Erro ${res.status}: ${res.statusText}`);
+      }
+
       const json = await res.json();
-      setOrders(json.data || []);
-      setTotal(json.total || 0);
-    } catch {
-      // Silently handle
+      console.log('[OrdersListPage] Resposta da API:', json);
+
+      // Validar estrutura da resposta
+      if (!json || typeof json !== 'object') {
+        throw new Error('Resposta inválida da API');
+      }
+
+      setOrders(Array.isArray(json.data) ? json.data : []);
+      setTotal(typeof json.total === 'number' ? json.total : 0);
+    } catch (err) {
+      console.error('[OrdersListPage] Erro ao buscar pedidos:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao carregar pedidos');
+      setOrders([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
@@ -79,16 +103,45 @@ export function OrdersListPage() {
           <h1 className="text-2xl font-bold text-gray-900">Pedidos</h1>
           <p className="text-sm text-gray-500 mt-1">{total} pedidos encontrados</p>
         </div>
-        <button onClick={fetchOrders} className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors" title="Atualizar">
-          <RefreshCw className="w-5 h-5 text-gray-600" />
+        <button 
+          onClick={fetchOrders} 
+          disabled={loading}
+          className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+          title="Atualizar"
+        >
+          <RefreshCw className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </header>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <span className="text-red-400 text-xl">!</span>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Erro ao carregar pedidos</h3>
+              <div className="mt-2 text-sm text-red-700">{error}</div>
+              <div className="mt-3">
+                <button
+                  onClick={fetchOrders}
+                  className="text-sm font-medium text-red-600 hover:text-red-500 underline"
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Status Filter */}
       <div className="flex gap-2 overflow-x-auto pb-4 mb-4">
         <button
           onClick={() => { setStatusFilter(''); setPage(1); }}
-          className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border ${
+          disabled={loading}
+          className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border disabled:opacity-50 ${
             statusFilter === '' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
           }`}
         >
@@ -98,7 +151,8 @@ export function OrdersListPage() {
           <button
             key={status}
             onClick={() => { setStatusFilter(status); setPage(1); }}
-            className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border ${
+            disabled={loading}
+            className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border disabled:opacity-50 ${
               statusFilter === status ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
             }`}
           >
@@ -107,49 +161,57 @@ export function OrdersListPage() {
         ))}
       </div>
 
-      {/* Orders Table */}
-      {loading ? (
-        <div className="text-center py-12 text-gray-400">Carregando...</div>
-      ) : orders.length === 0 ? (
-        <div className="text-center py-12">
-          <Package className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-          <p className="text-gray-500">Nenhum pedido encontrado.</p>
+      {/* Loading State */}
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <p className="mt-2 text-sm text-gray-500">Carregando pedidos...</p>
         </div>
-      ) : (
-        <div className="space-y-3">
-          {orders.map(order => (
-            <button
-              key={order.id}
-              onClick={() => setSelectedOrderId(order.id)}
-              className="w-full bg-white rounded-xl p-4 border border-gray-100 hover:border-gray-200 transition-all flex items-center justify-between text-left group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center">
-                  <span className="text-sm font-black text-gray-700">{order.orderNumber}</span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900 text-sm">{order.customerName}</h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${STATUS_COLORS[order.status]}`}>
-                      {STATUS_LABELS[order.status]}
-                    </span>
-                    <span className="text-[10px] text-gray-400">{order.fulfillmentType === 'delivery' ? '📦' : '🏪'}</span>
-                    <span className="text-[10px] text-gray-400 flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> {fmtDate(order.createdAt)}
-                    </span>
+      )}
+
+      {/* Orders Table */}
+      {!loading && !error && (
+        orders.length === 0 ? (
+          <div className="text-center py-12">
+            <Package className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+            <p className="text-gray-500">Nenhum pedido encontrado.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {orders.map(order => (
+              <button
+                key={order.id}
+                onClick={() => setSelectedOrderId(order.id)}
+                className="w-full bg-white rounded-xl p-4 border border-gray-100 hover:border-gray-200 transition-all flex items-center justify-between text-left group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center">
+                    <span className="text-sm font-black text-gray-700">{order.orderNumber}</span>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-sm">{order.customerName}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${STATUS_COLORS[order.status]}`}>
+                        {STATUS_LABELS[order.status]}
+                      </span>
+                      <span className="text-[10px] text-gray-400">{order.fulfillmentType === 'delivery' ? '📦' : '🏪'}</span>
+                      <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> {fmtDate(order.createdAt)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <span className="font-black text-gray-900">{fmt(order.total)}</span>
+                      <p className="text-[10px] text-gray-400">{order.itemCount} {order.itemCount === 1 ? 'item' : 'itens'}</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="text-right">
-                  <span className="font-black text-gray-900">{fmt(order.total)}</span>
-                  <p className="text-[10px] text-gray-400">{order.itemCount} {order.itemCount === 1 ? 'item' : 'itens'}</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
-              </div>
-            </button>
-          ))}
-        </div>
+              </button>
+            ))}
+          </div>
+        )
       )}
 
       {/* Pagination */}

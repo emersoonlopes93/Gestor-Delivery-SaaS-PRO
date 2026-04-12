@@ -2,8 +2,6 @@
 // Auth Types — Shared between frontend and backend
 // ============================================================
 
-import { ActorType } from './enums';
-
 /** JWT payload for tenant users */
 export interface TenantJwtPayload {
   sub: string;        // userId
@@ -60,6 +58,12 @@ export interface TenantUserSession {
   name: string;
   roles: string[];
   permissions: string[];
+  tenant?: {
+    id: string;
+    name: string;
+    slug: string;
+    status: string;
+  };
 }
 
 /** Current authenticated admin user context */

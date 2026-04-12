@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateComplementGroupDto } from './dto/create-complement-group.dto';
 import { UpdateComplementGroupDto } from './dto/update-complement-group.dto';
+import { CreateComplementItemDto } from './dto/create-complement-item.dto';
+import { UpdateComplementItemDto } from './dto/update-complement-item.dto';
 
 @Injectable()
 export class ComplementsService {
@@ -44,9 +46,44 @@ export class ComplementsService {
 
   async removeGroup(id: string) {
     await this.findOneGroup(id);
-
-    // Hard delete for groups as they might not be part of orders explicitly, or a soft delete strategy can be adopted later
     return this.prisma.tenantClient.productComplementGroup.delete({
+      where: { id },
+    });
+  }
+
+  // ITEM METHODS
+
+  async createItem(dto: CreateComplementItemDto) {
+    return this.prisma.tenantClient.productComplementItem.create({
+      data: dto,
+    });
+  }
+
+  async findAllItems() {
+    return this.prisma.tenantClient.productComplementItem.findMany({
+      orderBy: { order: 'asc' },
+    });
+  }
+
+  async findOneItem(id: string) {
+    const item = await this.prisma.tenantClient.productComplementItem.findUnique({
+      where: { id },
+    });
+    if (!item) throw new NotFoundException('Complemento não encontrado.');
+    return item;
+  }
+
+  async updateItem(id: string, dto: UpdateComplementItemDto) {
+    await this.findOneItem(id);
+    return this.prisma.tenantClient.productComplementItem.update({
+      where: { id },
+      data: dto,
+    });
+  }
+
+  async removeItem(id: string) {
+    await this.findOneItem(id);
+    return this.prisma.tenantClient.productComplementItem.delete({
       where: { id },
     });
   }

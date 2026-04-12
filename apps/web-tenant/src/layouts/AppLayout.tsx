@@ -28,14 +28,45 @@ export function AppLayout() {
           </p>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          <div className="pb-1">
+            <p className="px-3 text-xs font-black text-gray-400 uppercase tracking-wider">Dashboard</p>
+          </div>
           <Link
             to="/dashboard"
             className="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
           >
-            📊 Dashboard
+            📊 Visão Geral
           </Link>
-          
+
+          <div className="pt-4 pb-1">
+            <p className="px-3 text-xs font-black text-gray-400 uppercase tracking-wider">Cardápio</p>
+          </div>
+          <Link
+            to="/catalog/categories"
+            className="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+          >
+            📁 Categorias
+          </Link>
+          <Link
+            to="/catalog/products"
+            className="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+          >
+            🍔 Produtos
+          </Link>
+          <Link
+            to="/catalog/complements"
+            className="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+          >
+            ➕ Complementos
+          </Link>
+          <Link
+            to="/catalog/combos"
+            className="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+          >
+            🍱 Combos & Ofertas
+          </Link>
+
           <div className="pt-4 pb-1">
             <p className="px-3 text-xs font-black text-gray-400 uppercase tracking-wider">Pedidos</p>
           </div>
@@ -72,6 +103,12 @@ export function AppLayout() {
             className="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
           >
             🛵 Entregadores
+          </Link>
+          <Link
+            to="/delivery/rates"
+            className="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+          >
+            🚚 Taxas de Entrega
           </Link>
 
           <div className="pt-4 pb-1">
