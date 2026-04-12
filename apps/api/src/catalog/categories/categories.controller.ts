@@ -6,7 +6,7 @@ import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { RequirePermissions } from '../../common/decorators';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 
-@Controller('tenant/catalog/categories')
+@Controller('catalog/categories')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}

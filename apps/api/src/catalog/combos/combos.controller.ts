@@ -6,7 +6,7 @@ import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { RequirePermissions } from '../../common/decorators';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 
-@Controller('tenant/catalog/combos')
+@Controller('catalog/combos')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class CombosController {
   constructor(private readonly combosService: CombosService) {}

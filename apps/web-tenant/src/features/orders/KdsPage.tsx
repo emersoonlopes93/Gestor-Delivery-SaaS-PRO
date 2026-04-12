@@ -18,7 +18,7 @@ export function KdsPage() {
       });
       if (res.ok) {
         const json = await res.json();
-        setOrders(json || []);
+        setOrders(Array.isArray(json) ? json : []);
       }
     } catch {
       // Ignore

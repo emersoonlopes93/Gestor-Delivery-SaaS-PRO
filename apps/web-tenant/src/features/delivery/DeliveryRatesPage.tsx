@@ -116,11 +116,11 @@ export function DeliveryRatesPage() {
   const formatRuleDescription = (rule: DeliveryRateRule) => {
     switch (rule.type) {
       case 'neighborhood':
-        return `${rule.neighborhood} - R$ ${rule.rate?.toFixed(2)}`;
+        return `${rule.neighborhood} - R$ ${Number(rule.rate || 0).toFixed(2)}`;
       case 'distance':
-        return `${rule.minKm}-${rule.maxKm}km - R$ ${rule.ratePerKm?.toFixed(2)}/km`;
+        return `${rule.minKm}-${rule.maxKm}km - R$ ${Number(rule.ratePerKm || 0).toFixed(2)}/km`;
       case 'fixed':
-        return `Taxa fixa - R$ ${rule.fixedRate?.toFixed(2)}`;
+        return `Taxa fixa - R$ ${Number(rule.fixedRate || 0).toFixed(2)}`;
       default:
         return '';
     }
@@ -285,11 +285,11 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
       setFormData({
         type: rule.type,
         neighborhood: rule.neighborhood || '',
-        rate: rule.rate || 0,
-        minKm: rule.minKm || 0,
-        maxKm: rule.maxKm || 0,
-        ratePerKm: rule.ratePerKm || 0,
-        fixedRate: rule.fixedRate || 0,
+        rate: Number(rule.rate || 0),
+        minKm: Number(rule.minKm || 0),
+        maxKm: Number(rule.maxKm || 0),
+        ratePerKm: Number(rule.ratePerKm || 0),
+        fixedRate: Number(rule.fixedRate || 0),
         isActive: rule.isActive,
       });
     }

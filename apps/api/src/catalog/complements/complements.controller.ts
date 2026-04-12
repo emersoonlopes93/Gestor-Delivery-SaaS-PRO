@@ -8,7 +8,7 @@ import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { RequirePermissions } from '../../common/decorators';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 
-@Controller('tenant/catalog/complements/groups')
+@Controller('catalog/complements/groups')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class ComplementsController {
   constructor(private readonly complementsService: ComplementsService) {}
