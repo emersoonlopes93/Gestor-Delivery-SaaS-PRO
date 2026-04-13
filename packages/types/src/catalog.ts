@@ -157,3 +157,23 @@ export interface CreateProductComboDto {
 }
 
 export interface UpdateProductComboDto extends Partial<CreateProductComboDto> {}
+
+export interface CreateProductComboBlockDto {
+  comboId: string;
+  name: string;
+  description?: string;
+  minSelect?: number;
+  maxSelect?: number;
+  order?: number;
+}
+
+export interface UpdateProductComboBlockDto extends Partial<CreateProductComboBlockDto> {}
+
+export interface CreateProductComboBlockItemDto {
+  blockId: string;
+  productId: string;
+  additionalPrice?: number;
+  order?: number;
+}
+
+export interface UpdateProductComboBlockItemDto extends Partial<CreateProductComboBlockItemDto> {}

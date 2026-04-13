@@ -23,10 +23,22 @@ export class CategoriesController {
     return this.categoriesService.findAll();
   }
 
+  @Get('with-product-count')
+  @RequirePermissions('catalog.read')
+  findAllWithProductCount() {
+    return this.categoriesService.findAllWithProductCount();
+  }
+
   @Get(':id')
   @RequirePermissions('catalog.read')
   findOne(@Param('id') id: string) {
     return this.categoriesService.findOne(id);
+  }
+
+  @Get(':id/products')
+  @RequirePermissions('catalog.read')
+  listProducts(@Param('id') id: string) {
+    return this.categoriesService.listProductsByCategory(id);
   }
 
   @Patch(':id')

@@ -2,12 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
 import { ProductCategory, CreateCategoryDto } from '@gestor/types';
 import { Modal } from '../../components/Modal';
+import { useNavigate } from 'react-router-dom';
+
+type CategoryWithCount = ProductCategory & { productCount: number };
 
 export function CategoriesPage() {
-  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [categories, setCategories] = useState<CategoryWithCount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ProductCategory | null>(null);
+  const navigate = useNavigate();
   const [formData, setFormData] = useState<CreateCategoryDto>({
     name: '',
     description: '',
@@ -23,7 +27,7 @@ export function CategoriesPage() {
   const loadCategories = async () => {
     setIsLoading(true);
     try {
-      const response = await api.get<ProductCategory[]>('/catalog/categories');
+      const response = await api.get<CategoryWithCount[]>('/catalog/categories/with-product-count');
       if (response.success) {
         setCategories(response.data);
       }
@@ -108,6 +112,7 @@ export function CategoriesPage() {
             <thead className="bg-gray-50/50 border-b border-gray-100">
               <tr>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Nome</th>
+                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Produtos</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Ordem</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
@@ -119,6 +124,9 @@ export function CategoriesPage() {
                   <td className="px-6 py-4">
                     <div className="font-bold text-gray-900">{category.name}</div>
                     <div className="text-xs text-gray-500 truncate max-w-xs">{category.description || 'Sem descrição'}</div>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600 font-bold">
+                    {category.productCount ?? 0}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600 font-medium">
                     {category.order}
@@ -135,6 +143,13 @@ export function CategoriesPage() {
                   </td>
                   <td className="px-6 py-4 text-sm text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => navigate(`/catalog/products?categoryId=${encodeURIComponent(category.id)}`)}
+                        className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
+                        title="Ver produtos"
+                      >
+                        👁️
+                      </button>
                       <button
                         onClick={() => handleOpenModal(category)}
                         className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
@@ -155,7 +170,7 @@ export function CategoriesPage() {
               ))}
               {categories.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-gray-400 font-medium italic">
+                  <td colSpan={5} className="px-6 py-12 text-center text-gray-400 font-medium italic">
                     Nenhuma categoria cadastrada ainda.
                   </td>
                 </tr>

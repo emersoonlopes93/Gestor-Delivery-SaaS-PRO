@@ -10,6 +10,8 @@ import { StructuredLoggerService } from './common/logging/structured-logger.serv
 import { requestIdMiddleware } from './common/middlewares/request-id.middleware';
 import helmet from 'helmet';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import express from 'express';
+import { join } from 'path';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -27,6 +29,10 @@ async function bootstrap() {
 
   // Global prefix
   app.setGlobalPrefix(prefix);
+
+  // Static files (uploads)
+  // Exposed under the global prefix, e.g. /api/v1/static/<tenantId>/<file>
+  app.use(`${prefix}/static`, express.static(join(process.cwd(), 'uploads')));
 
   // Basic hardening
   app.getHttpAdapter().getInstance().disable('x-powered-by');

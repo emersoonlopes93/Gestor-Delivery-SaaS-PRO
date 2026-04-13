@@ -68,7 +68,7 @@ importers:
         specifier: ^7.1.0
         version: 7.2.0
       multer:
-        specifier: ^1.4.5-lts.1
+        specifier: 1.4.5-lts.2
         version: 1.4.5-lts.2
       passport:
         specifier: ^0.7.0
@@ -102,7 +102,7 @@ importers:
         specifier: ^4.17.21
         version: 4.17.25
       '@types/multer':
-        specifier: ^1.4.12
+        specifier: ^1.4.13
         version: 1.4.13
       '@types/node':
         specifier: ^22.0.0

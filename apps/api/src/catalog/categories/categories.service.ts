@@ -45,6 +45,34 @@ export class CategoriesService {
     });
   }
 
+  async findAllWithProductCount() {
+    const categories = await this.prisma.tenantClient.productCategory.findMany({
+      where: { deletedAt: null },
+      orderBy: { order: 'asc' },
+    });
+
+    const counts = await this.prisma.tenantClient.product.groupBy({
+      by: ['categoryId'],
+      where: {
+        deletedAt: null,
+        categoryId: { not: null },
+      },
+      _count: { _all: true },
+    });
+
+    const countMap = new Map<string, number>();
+    for (const row of counts) {
+      if (row.categoryId) {
+        countMap.set(row.categoryId, row._count._all);
+      }
+    }
+
+    return categories.map((c) => ({
+      ...c,
+      productCount: countMap.get(c.id) ?? 0,
+    }));
+  }
+
   async findOne(id: string) {
     const category = await this.prisma.tenantClient.productCategory.findFirst({
       where: { id, deletedAt: null },
@@ -55,6 +83,19 @@ export class CategoriesService {
     }
 
     return category;
+  }
+
+  async listProductsByCategory(categoryId: string) {
+    await this.findOne(categoryId);
+
+    return this.prisma.tenantClient.product.findMany({
+      where: {
+        categoryId,
+        deletedAt: null,
+      },
+      orderBy: { order: 'asc' },
+      include: { category: true },
+    });
   }
 
   async update(id: string, updateCategoryDto: UpdateCategoryDto) {

@@ -28,3 +28,43 @@ export class CreateComboDto implements ICreateProductComboDto {
   @IsOptional()
   order?: number;
 }
+
+export class CreateComboBlockDto {
+  @IsString()
+  comboId!: string;
+
+  @IsString()
+  name!: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @IsNumber()
+  @IsOptional()
+  minSelect?: number;
+
+  @IsNumber()
+  @IsOptional()
+  maxSelect?: number;
+
+  @IsNumber()
+  @IsOptional()
+  order?: number;
+}
+
+export class CreateComboBlockItemDto {
+  @IsString()
+  blockId!: string;
+
+  @IsString()
+  productId!: string;
+
+  @IsNumber()
+  @IsOptional()
+  additionalPrice?: number;
+
+  @IsNumber()
+  @IsOptional()
+  order?: number;
+}

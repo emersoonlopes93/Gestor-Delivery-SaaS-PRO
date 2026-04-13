@@ -23,6 +23,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { GoalsModule } from './goals/goals.module';
 import { validateEnv } from './config/env.validation';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -105,6 +106,9 @@ import { validateEnv } from './config/env.validation';
 
     // Goals & Performance (Phase 10)
     GoalsModule,
+
+    // Upload (Images)
+    UploadModule,
   ],
   providers: [
     {
