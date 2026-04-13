@@ -42,7 +42,6 @@ export class CashService {
           status: 'open',
           openingAmount,
         },
-        include: { operator: { select: { name: true } } },
       });
 
       // Create opening movement
@@ -56,7 +55,21 @@ export class CashService {
         },
       });
 
-      return newSession;
+      // Buscar sessão com operador incluído
+      const sessionWithOperator = await tx.cashSession.findUnique({
+        where: { id: newSession.id },
+        include: { 
+          operator: { 
+            select: { name: true } 
+          } 
+        },
+      });
+
+      if (!sessionWithOperator) {
+        throw new Error('Falha ao criar sessão de caixa');
+      }
+      
+      return sessionWithOperator;
     });
 
     return this.mapSessionToDTO(session);

@@ -131,8 +131,8 @@ export function ReportsPage() {
           <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
             <DollarSign size={20} className="text-primary-600" /> Vendas por Canal
           </h2>
-          <div className="h-[300px] min-h-[300px]">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={channelData}
@@ -200,8 +200,8 @@ export function ReportsPage() {
         {/* Peak Hours */}
         <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
           <h2 className="text-lg font-bold mb-6">Horários de Pico</h2>
-          <div className="h-[250px] min-h-[250px]">
-             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+          <div className="h-[250px] w-full">
+             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={stats.operational.peakHours}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="hour" tickFormatter={(h) => `${h}h`} />

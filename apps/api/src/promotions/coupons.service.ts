@@ -36,8 +36,11 @@ export class CouponsService {
 
   async createCoupon(tenantId: string, data: CreateCouponDTO) {
     // Validate uniqueness of code
-    const existing = await this.db.coupon.findUnique({
-      where: { tenantId_code: { tenantId, code: data.code } },
+    const existing = await this.db.coupon.findFirst({
+      where: { 
+        tenantId, 
+        code: data.code.toUpperCase() 
+      },
     });
     if (existing) {
       throw new BadRequestException('Coupon code already exists');
@@ -96,8 +99,11 @@ export class CouponsService {
   }
 
   async validateCouponForTotal(tenantId: string, code: string, currentTotal: number) {
-    const coupon = await this.db.coupon.findUnique({
-      where: { tenantId_code: { tenantId, code: code.toUpperCase() } },
+    const coupon = await this.db.coupon.findFirst({
+      where: { 
+        tenantId, 
+        code: code.toUpperCase() 
+      },
     });
 
     if (!coupon) throw new BadRequestException('Coupon not found');

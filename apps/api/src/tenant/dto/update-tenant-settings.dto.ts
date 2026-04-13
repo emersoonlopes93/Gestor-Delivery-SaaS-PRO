@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEmail, MaxLength } from 'class-validator';
+import { IsString, IsOptional, IsEmail, MaxLength, IsUrl } from 'class-validator';
 
 export class UpdateTenantSettingsDto {
   @IsOptional()
@@ -31,7 +31,7 @@ export class UpdateTenantSettingsDto {
   address?: string;
 
   @IsOptional()
-  @IsString()
+  @IsUrl()
   @MaxLength(500)
   logoUrl?: string;
 }

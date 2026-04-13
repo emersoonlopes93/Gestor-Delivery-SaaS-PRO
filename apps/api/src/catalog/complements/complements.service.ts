@@ -22,9 +22,7 @@ export class ComplementsService {
     return tenantId;
   }
 
-  async createGroup(createGroupDto: CreateComplementGroupDto) {
-    const tenantId = this.getRequiredTenantId();
-
+  async createGroup(tenantId: string, createGroupDto: CreateComplementGroupDto) {
     return this.prisma.tenantClient.productComplementGroup.create({
       data: {
         tenantId,
@@ -39,16 +37,17 @@ export class ComplementsService {
     });
   }
 
-  async findAllGroups() {
+  async findAllGroups(tenantId: string) {
     return this.prisma.tenantClient.productComplementGroup.findMany({
+      where: { tenantId },
       orderBy: { order: 'asc' },
       include: { items: true },
     });
   }
 
-  async findOneGroup(id: string) {
-    const group = await this.prisma.tenantClient.productComplementGroup.findUnique({
-      where: { id },
+  async findOneGroup(tenantId: string, id: string) {
+    const group = await this.prisma.tenantClient.productComplementGroup.findFirst({
+      where: { id, tenantId },
       include: { items: true },
     });
 
@@ -59,8 +58,8 @@ export class ComplementsService {
     return group;
   }
 
-  async updateGroup(id: string, updateGroupDto: UpdateComplementGroupDto) {
-    await this.findOneGroup(id);
+  async updateGroup(tenantId: string, id: string, updateGroupDto: UpdateComplementGroupDto) {
+    await this.findOneGroup(tenantId, id);
 
     return this.prisma.tenantClient.productComplementGroup.update({
       where: { id },
@@ -71,8 +70,8 @@ export class ComplementsService {
     });
   }
 
-  async removeGroup(id: string) {
-    await this.findOneGroup(id);
+  async removeGroup(tenantId: string, id: string) {
+    await this.findOneGroup(tenantId, id);
     return this.prisma.tenantClient.productComplementGroup.delete({
       where: { id },
     });
@@ -80,9 +79,7 @@ export class ComplementsService {
 
   // ITEM METHODS
 
-  async createItem(dto: CreateComplementItemDto) {
-    const tenantId = this.getRequiredTenantId();
-
+  async createItem(tenantId: string, dto: CreateComplementItemDto) {
     return this.prisma.tenantClient.productComplementItem.create({
       data: {
         tenantId,
@@ -97,22 +94,23 @@ export class ComplementsService {
     });
   }
 
-  async findAllItems() {
+  async findAllItems(tenantId: string) {
     return this.prisma.tenantClient.productComplementItem.findMany({
+      where: { tenantId },
       orderBy: { order: 'asc' },
     });
   }
 
-  async findOneItem(id: string) {
-    const item = await this.prisma.tenantClient.productComplementItem.findUnique({
-      where: { id },
+  async findOneItem(tenantId: string, id: string) {
+    const item = await this.prisma.tenantClient.productComplementItem.findFirst({
+      where: { id, tenantId },
     });
     if (!item) throw new NotFoundException('Complemento não encontrado.');
     return item;
   }
 
-  async updateItem(id: string, dto: UpdateComplementItemDto) {
-    await this.findOneItem(id);
+  async updateItem(tenantId: string, id: string, dto: UpdateComplementItemDto) {
+    await this.findOneItem(tenantId, id);
     return this.prisma.tenantClient.productComplementItem.update({
       where: { id },
       data: {
@@ -122,8 +120,8 @@ export class ComplementsService {
     });
   }
 
-  async removeItem(id: string) {
-    await this.findOneItem(id);
+  async removeItem(tenantId: string, id: string) {
+    await this.findOneItem(tenantId, id);
     return this.prisma.tenantClient.productComplementItem.delete({
       where: { id },
     });
