@@ -192,14 +192,19 @@ export class TenantAuthService {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    const roles = user.userRoles.map((ur: any) => ur.role.slug);
-    const permissions = [
-      ...new Set(
-        user.userRoles.flatMap((ur: any) =>
-          ur.role.rolePermissions.map((rp: any) => rp.permission.slug),
+    const roles = user.userRoles
+      .map((ur) => ur.role?.slug)
+      .filter((slug): slug is string => typeof slug === 'string');
+
+    const permissions = Array.from(
+      new Set(
+        user.userRoles.flatMap((ur) =>
+          ur.role
+            ? ur.role.rolePermissions.map((rp) => rp.permission.slug)
+            : [],
         ),
       ),
-    ];
+    );
 
     return {
       userId: user.id,

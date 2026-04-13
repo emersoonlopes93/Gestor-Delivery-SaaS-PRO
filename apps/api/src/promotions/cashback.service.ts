@@ -12,7 +12,7 @@ export class CashbackService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return transactions.map((t: any) => ({
+    return transactions.map((t: CashbackTransaction) => ({
       ...t,
       amount: Number(t.amount),
     }));

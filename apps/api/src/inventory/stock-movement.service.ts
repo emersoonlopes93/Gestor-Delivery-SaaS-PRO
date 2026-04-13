@@ -1,10 +1,27 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateStockMovementDTO, StockMovementDTO, StockMovementType } from '@gestor/types';
+import type { StockMovement } from '@prisma/client';
+import { StockMovementType as PrismaStockMovementType } from '@prisma/client';
 
 @Injectable()
 export class StockMovementService {
   constructor(private prisma: PrismaService) {}
+
+  private mapType(type: PrismaStockMovementType): StockMovementType {
+    switch (type) {
+      case PrismaStockMovementType.in:
+        return StockMovementType.IN;
+      case PrismaStockMovementType.out:
+        return StockMovementType.OUT;
+      case PrismaStockMovementType.adjust:
+        return StockMovementType.ADJUST;
+      case PrismaStockMovementType.waste:
+        return StockMovementType.WASTE;
+      case PrismaStockMovementType.theoretical_depletion:
+        return StockMovementType.THEORETICAL_DEPLETION;
+    }
+  }
 
   async createManual(tenantId: string, userId: string, dto: CreateStockMovementDTO): Promise<StockMovementDTO> {
     const ingredient = await this.prisma.ingredient.findFirst({
@@ -62,9 +79,13 @@ export class StockMovementService {
     return movements.map(m => this.mapToDTO(m));
   }
 
-  private mapToDTO(m: any): StockMovementDTO {
+  private mapToDTO(m: StockMovement): StockMovementDTO {
     return {
       ...m,
+      type: this.mapType(m.type),
+      orderId: m.orderId ?? undefined,
+      userId: m.userId ?? undefined,
+      notes: m.notes ?? undefined,
       quantity: Number(m.quantity),
       unitCost: m.unitCost ? Number(m.unitCost) : undefined,
     };

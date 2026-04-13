@@ -1,20 +1,39 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { TenantContextService } from '../../common/context/tenant-context.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { slugify } from '@gestor/utils';
 
 @Injectable()
 export class CategoriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
+
+  private getRequiredTenantId(): string {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) {
+      throw new NotFoundException('Tenant context não encontrado');
+    }
+    return tenantId;
+  }
 
   async create(createCategoryDto: CreateCategoryDto) {
+    const tenantId = this.getRequiredTenantId();
     const slug = slugify(createCategoryDto.name);
 
     return this.prisma.tenantClient.productCategory.create({
       data: {
-        ...createCategoryDto,
+        tenantId,
         slug,
+        name: createCategoryDto.name,
+        description: createCategoryDto.description ?? null,
+        image: createCategoryDto.image ?? null,
+        isActive: createCategoryDto.isActive ?? true,
+        isFeatured: createCategoryDto.isFeatured ?? false,
+        order: createCategoryDto.order ?? 0,
       },
     });
   }
@@ -42,16 +61,18 @@ export class CategoriesService {
     // Check if exists
     await this.findOne(id);
 
-    let slug: string | undefined;
-    if ((updateCategoryDto as any).name) {
-      slug = slugify((updateCategoryDto as any).name);
-    }
+    const slug = updateCategoryDto.name ? slugify(updateCategoryDto.name) : undefined;
 
     return this.prisma.tenantClient.productCategory.update({
       where: { id },
       data: {
-        ...updateCategoryDto,
-        ...(slug && { slug }),
+        name: updateCategoryDto.name,
+        description: updateCategoryDto.description ?? undefined,
+        image: updateCategoryDto.image ?? undefined,
+        isActive: updateCategoryDto.isActive,
+        isFeatured: updateCategoryDto.isFeatured,
+        order: updateCategoryDto.order,
+        ...(slug ? { slug } : {}),
       },
     });
   }

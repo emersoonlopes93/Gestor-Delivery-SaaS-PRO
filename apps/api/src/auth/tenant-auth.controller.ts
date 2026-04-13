@@ -3,6 +3,7 @@ import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { TenantAuthService } from './tenant-auth.service';
 import { CurrentUser, Public } from '../common/decorators';
 import { TenantAuthGuard } from './guards/tenant-auth.guard';
+import { Throttle } from '@nestjs/throttler';
 
 class LoginDto {
   @IsEmail()
@@ -29,12 +30,14 @@ export class TenantAuthController {
 
   @Public()
   @Post('login')
+  @Throttle({ auth: { limit: 10, ttl: 60 } })
   async login(@Body() dto: LoginDto) {
     return this.authService.login(dto.email, dto.password, dto.tenantSlug);
   }
 
   @Public()
   @Post('refresh')
+  @Throttle({ auth: { limit: 10, ttl: 60 } })
   async refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refreshToken(dto.refreshToken);
   }

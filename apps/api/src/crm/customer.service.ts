@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { UpdateCustomerDTO } from '@gestor/types';
-import { Customer } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
 @Injectable()
 export class CustomerService {
@@ -27,8 +27,25 @@ export class CustomerService {
       },
     });
     
+    type CustomerListRow = Prisma.CustomerGetPayload<{
+      select: {
+        id: true;
+        tenantId: true;
+        name: true;
+        phone: true;
+        email: true;
+        totalOrders: true;
+        totalSpent: true;
+        lastOrderDate: true;
+        loyaltyPoints: true;
+        cashbackBalance: true;
+        createdAt: true;
+        updatedAt: true;
+      };
+    }>;
+
     // We parse Decimal to number
-    return customers.map((c: any) => ({
+    return (customers as CustomerListRow[]).map((c) => ({
       ...c,
       totalSpent: Number(c.totalSpent),
       cashbackBalance: Number(c.cashbackBalance),

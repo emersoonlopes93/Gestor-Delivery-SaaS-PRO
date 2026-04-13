@@ -7,6 +7,12 @@ interface ModuleAccess {
   enabled: boolean;
 }
 
+type ModuleAccessRow = {
+  id: string;
+  module: string;
+  enabled: boolean;
+};
+
 @Injectable()
 export class AdminModulesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -31,17 +37,18 @@ export class AdminModulesService {
    * Obtém configuração de módulos de um tenant.
    */
   async getTenantModules(tenantId: string) {
-    // Usar any temporariamente devido ao Prisma Client desatualizado
-    const access: ModuleAccess[] = await (this.prisma as any).tenantModuleAccess.findMany({
-      where: { tenantId },
-    });
+    const access = await this.prisma.$queryRaw<ModuleAccessRow[]>`
+      SELECT id, module, enabled
+      FROM tenant_module_access
+      WHERE tenant_id = ${tenantId}
+    `;
 
     const available = this.getAvailableModules();
     
-    return available.map(module => ({
+    return available.map((module) => ({
       ...module,
-      enabled: access.find((a: ModuleAccess) => a.module === module.key)?.enabled ?? false,
-      accessId: access.find((a: ModuleAccess) => a.module === module.key)?.id,
+      enabled: access.find((a) => a.module === module.key)?.enabled ?? false,
+      accessId: access.find((a) => a.module === module.key)?.id,
     }));
   }
 
@@ -49,25 +56,20 @@ export class AdminModulesService {
    * Atualiza configuração de módulos de um tenant.
    */
   async updateTenantModules(tenantId: string, modules: { module: string; enabled: boolean }[]) {
-    const result = [];
-    const prismaAny = this.prisma as any;
+    const result: Array<{ id: string; tenantId: string; module: string; enabled: boolean }> = [];
 
     for (const { module, enabled } of modules) {
-      const existing = await prismaAny.tenantModuleAccess.findUnique({
-        where: { tenantId_module: { tenantId, module } },
-      });
+      const rows = await this.prisma.$queryRaw<ModuleAccessRow[]>`
+        INSERT INTO tenant_module_access (tenant_id, module, enabled, created_at, updated_at)
+        VALUES (${tenantId}, ${module}, ${enabled}, NOW(), NOW())
+        ON CONFLICT (tenant_id, module)
+        DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = NOW()
+        RETURNING id, module, enabled
+      `;
 
-      if (existing) {
-        const updated = await prismaAny.tenantModuleAccess.update({
-          where: { id: existing.id },
-          data: { enabled },
-        });
-        result.push(updated);
-      } else {
-        const created = await prismaAny.tenantModuleAccess.create({
-          data: { tenantId, module, enabled },
-        });
-        result.push(created);
+      const row = rows[0];
+      if (row) {
+        result.push({ id: row.id, tenantId, module: row.module, enabled: row.enabled });
       }
     }
 
@@ -78,10 +80,14 @@ export class AdminModulesService {
    * Verifica se um tenant tem acesso a um módulo.
    */
   async hasModuleAccess(tenantId: string, module: string): Promise<boolean> {
-    const prismaAny = this.prisma as any;
-    const access = await prismaAny.tenantModuleAccess.findUnique({
-      where: { tenantId_module: { tenantId, module } },
-    });
+    const rows = await this.prisma.$queryRaw<Pick<ModuleAccess, 'enabled'>[]>`
+      SELECT enabled
+      FROM tenant_module_access
+      WHERE tenant_id = ${tenantId} AND module = ${module}
+      LIMIT 1
+    `;
+
+    const access = rows[0];
 
     // Se não houver configuração, assume que o módulo está desabilitado
     return access?.enabled ?? false;

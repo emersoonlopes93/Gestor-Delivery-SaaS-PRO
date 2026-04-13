@@ -13,11 +13,11 @@ export class CouponsService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return coupons.map((c: any) => ({
+    return coupons.map((c: Coupon) => ({
       ...c,
       value: Number(c.value),
-      minOrderValue: c.minOrderValue ? Number(c.minOrderValue) : null,
-      maxDiscountValue: c.maxDiscountValue ? Number(c.maxDiscountValue) : null,
+      minOrderValue: c.minOrderValue != null ? Number(c.minOrderValue) : null,
+      maxDiscountValue: c.maxDiscountValue != null ? Number(c.maxDiscountValue) : null,
     }));
   }
 

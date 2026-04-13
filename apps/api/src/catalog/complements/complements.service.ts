@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { TenantContextService } from '../../common/context/tenant-context.service';
+import type { Prisma } from '@prisma/client';
 import { CreateComplementGroupDto } from './dto/create-complement-group.dto';
 import { UpdateComplementGroupDto } from './dto/update-complement-group.dto';
 import { CreateComplementItemDto } from './dto/create-complement-item.dto';
@@ -7,11 +9,33 @@ import { UpdateComplementItemDto } from './dto/update-complement-item.dto';
 
 @Injectable()
 export class ComplementsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
+
+  private getRequiredTenantId(): string {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) {
+      throw new NotFoundException('Tenant context não encontrado');
+    }
+    return tenantId;
+  }
 
   async createGroup(createGroupDto: CreateComplementGroupDto) {
+    const tenantId = this.getRequiredTenantId();
+
     return this.prisma.tenantClient.productComplementGroup.create({
-      data: createGroupDto,
+      data: {
+        tenantId,
+        name: createGroupDto.name,
+        description: createGroupDto.description ?? null,
+        minSelect: createGroupDto.minSelect ?? 0,
+        maxSelect: createGroupDto.maxSelect ?? 1,
+        isRequired: createGroupDto.isRequired ?? false,
+        isActive: createGroupDto.isActive ?? true,
+        order: createGroupDto.order ?? 0,
+      } satisfies Prisma.ProductComplementGroupUncheckedCreateInput,
     });
   }
 
@@ -40,7 +64,10 @@ export class ComplementsService {
 
     return this.prisma.tenantClient.productComplementGroup.update({
       where: { id },
-      data: updateGroupDto,
+      data: {
+        ...updateGroupDto,
+        description: updateGroupDto.description ?? undefined,
+      },
     });
   }
 
@@ -54,8 +81,19 @@ export class ComplementsService {
   // ITEM METHODS
 
   async createItem(dto: CreateComplementItemDto) {
+    const tenantId = this.getRequiredTenantId();
+
     return this.prisma.tenantClient.productComplementItem.create({
-      data: dto,
+      data: {
+        tenantId,
+        groupId: dto.groupId,
+        name: dto.name,
+        description: dto.description ?? null,
+        additionalPrice: dto.additionalPrice ?? 0,
+        sku: dto.sku ?? null,
+        isActive: dto.isActive ?? true,
+        order: dto.order ?? 0,
+      } satisfies Prisma.ProductComplementItemUncheckedCreateInput,
     });
   }
 
@@ -77,7 +115,10 @@ export class ComplementsService {
     await this.findOneItem(id);
     return this.prisma.tenantClient.productComplementItem.update({
       where: { id },
-      data: dto,
+      data: {
+        ...dto,
+        description: dto.description ?? undefined,
+      },
     });
   }
 

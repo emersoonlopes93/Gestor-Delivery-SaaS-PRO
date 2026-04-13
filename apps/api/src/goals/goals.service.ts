@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
+import type { Prisma } from '@prisma/client';
 import { 
   GoalDTO, 
   CreateGoalDTO, 
@@ -17,72 +18,128 @@ export class GoalsService {
     private readonly analytics: AnalyticsService
   ) {}
 
+  private mapEntityToBaseDTO(goal: Prisma.GoalGetPayload<{ include: { subGoals: true } }>): Omit<GoalDTO, 'currentValue' | 'progressPercentage' | 'trend'> {
+    return {
+      id: goal.id,
+      tenantId: goal.tenantId,
+      name: goal.name,
+      description: goal.description ?? undefined,
+      type: goal.type as unknown as GoalType,
+      targetValue: Number(goal.targetValue),
+      startDate: goal.startDate.toISOString(),
+      endDate: goal.endDate.toISOString(),
+      status: goal.status as GoalStatus,
+      parentId: goal.parentId ?? undefined,
+      targetId: goal.targetId ?? undefined,
+      responsibleId: goal.responsibleId ?? undefined,
+      createdAt: goal.createdAt.toISOString(),
+      updatedAt: goal.updatedAt.toISOString(),
+      subGoals: undefined,
+    };
+  }
+
   async create(tenantId: string, data: CreateGoalDTO): Promise<GoalDTO> {
-    const goal = await (this.prisma.tenantClient as any).goal.create({
+    const goal = await this.prisma.tenantClient.goal.create({
       data: {
-        ...data,
+        tenantId,
+        name: data.name,
+        description: data.description ?? null,
+        type: data.type,
         targetValue: data.targetValue,
         startDate: new Date(data.startDate),
         endDate: new Date(data.endDate),
-        status: 'active' as GoalStatus,
+        status: 'active',
+        parentId: data.parentId ?? null,
+        targetId: data.targetId ?? null,
+        responsibleId: data.responsibleId ?? null,
       },
-    });
-
-    return this.enrichGoalWithProgress(tenantId, goal as any);
-  }
-
-  async findAll(tenantId: string): Promise<GoalDTO[]> {
-    const goals = await (this.prisma.tenantClient as any).goal.findMany({
-      where: { parentId: null },
       include: { subGoals: true },
     });
 
-    return Promise.all(goals.map((g: any) => this.enrichGoalWithProgress(tenantId, g as any)));
+    return this.enrichGoalWithProgress(tenantId, goal);
+  }
+
+  async findAll(tenantId: string): Promise<GoalDTO[]> {
+    const goals = await this.prisma.tenantClient.goal.findMany({
+      where: { tenantId, parentId: null },
+      include: { subGoals: true },
+    });
+
+    return Promise.all(goals.map((g) => this.enrichGoalWithProgress(tenantId, g)));
   }
 
   async findOne(tenantId: string, id: string): Promise<GoalDTO> {
-    const goal = await (this.prisma.tenantClient as any).goal.findFirst({
-      where: { id },
+    const goal = await this.prisma.tenantClient.goal.findFirst({
+      where: { tenantId, id },
       include: { subGoals: true },
     });
 
     if (!goal) throw new NotFoundException('Goal not found');
 
-    return this.enrichGoalWithProgress(tenantId, goal as any);
+    return this.enrichGoalWithProgress(tenantId, goal);
   }
 
   async update(tenantId: string, id: string, data: UpdateGoalDTO): Promise<GoalDTO> {
-    const goal = await (this.prisma.tenantClient as any).goal.update({
-      where: { id },
+    const updateResult = await this.prisma.tenantClient.goal.updateMany({
+      where: { tenantId, id },
       data: {
         ...data,
+        description: data.description ?? undefined,
         targetValue: data.targetValue,
         endDate: data.endDate ? new Date(data.endDate) : undefined,
       },
     });
 
-    return this.enrichGoalWithProgress(tenantId, goal as any);
+    if (updateResult.count === 0) {
+      throw new NotFoundException('Goal not found');
+    }
+
+    const goal = await this.prisma.tenantClient.goal.findFirst({
+      where: { tenantId, id },
+      include: { subGoals: true },
+    });
+
+    if (!goal) throw new NotFoundException('Goal not found');
+
+    return this.enrichGoalWithProgress(tenantId, goal);
   }
 
   async remove(tenantId: string, id: string): Promise<void> {
-    await (this.prisma.tenantClient as any).goal.delete({
-      where: { id },
+    const deleteResult = await this.prisma.tenantClient.goal.deleteMany({
+      where: { tenantId, id },
     });
+
+    if (deleteResult.count === 0) {
+      throw new NotFoundException('Goal not found');
+    }
   }
 
-  private async enrichGoalWithProgress(tenantId: string, goal: GoalDTO): Promise<GoalDTO> {
-    const currentValue = await this.calculateCurrentValue(tenantId, goal);
-    const progressPercentage = goal.targetValue > 0 ? (currentValue / goal.targetValue) * 100 : 0;
-    
-    // Trend calculation (simplified: if progress > 50% through 50% of time)
-    const trend = this.calculateTrend(goal, progressPercentage);
+  private async enrichGoalWithProgress(
+    tenantId: string,
+    goal: Prisma.GoalGetPayload<{ include: { subGoals: true } }>,
+  ): Promise<GoalDTO> {
+    const base = this.mapEntityToBaseDTO(goal);
+    const currentValue = await this.calculateCurrentValue(tenantId, {
+      ...base,
+      currentValue: 0,
+      progressPercentage: 0,
+      trend: GoalTrendStatus.ON_TRACK,
+    });
+    const progressPercentage = base.targetValue > 0 ? (currentValue / base.targetValue) * 100 : 0;
+
+    // Trend calculation (simplified)
+    const trend = this.calculateTrend(base, progressPercentage);
+
+    const subGoals = goal.subGoals.length
+      ? await Promise.all(goal.subGoals.map((sg) => this.enrichGoalWithProgress(tenantId, { ...sg, subGoals: [] })))
+      : [];
 
     return {
-      ...goal,
+      ...base,
       currentValue,
       progressPercentage,
       trend,
-      subGoals: goal.subGoals ? await Promise.all(goal.subGoals.map((sg: any) => this.enrichGoalWithProgress(tenantId, sg))) : [],
+      subGoals,
     };
   }
 
@@ -122,7 +179,10 @@ export class GoalsService {
     }
   }
 
-  private calculateTrend(goal: GoalDTO, progress: number): GoalTrendStatus {
+  private calculateTrend(
+    goal: Pick<GoalDTO, 'startDate' | 'endDate'>,
+    progress: number,
+  ): GoalTrendStatus {
     const now = new Date();
     const start = new Date(goal.startDate);
     const end = new Date(goal.endDate);

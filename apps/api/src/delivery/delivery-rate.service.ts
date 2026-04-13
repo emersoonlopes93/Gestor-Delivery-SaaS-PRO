@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import type { DeliveryAddressDTO } from '@gestor/types';
+import type { Prisma } from '@prisma/client';
 
 export interface DeliveryFeeCalculation {
   fee: number;
@@ -132,7 +133,7 @@ export class DeliveryRateService {
       isActive?: boolean;
     },
   ) {
-    const ruleData: any = {
+    const ruleData: Prisma.DeliveryRateRuleUncheckedCreateInput = {
       tenantId,
       type: data.type,
       isActive: data.isActive ?? true,

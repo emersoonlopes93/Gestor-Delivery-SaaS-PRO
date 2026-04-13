@@ -1,0 +1,35 @@
+import { z } from 'zod';
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
+  API_PORT: z.coerce.number().int().positive().default(3333),
+  API_PREFIX: z.string().min(1).default('/api/v1'),
+  DATABASE_URL: z.string().min(1),
+  JWT_SECRET: z.string().min(16),
+  JWT_REFRESH_SECRET: z.string().min(16),
+  JWT_EXPIRES_IN: z.string().min(1).default('15m'),
+  JWT_REFRESH_EXPIRES_IN: z.string().min(1).default('7d'),
+  CORS_ORIGINS: z.string().default(''),
+  RATE_LIMIT_TTL_SECONDS: z.coerce.number().int().positive().default(60),
+  RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(120),
+  RATE_LIMIT_AUTH_TTL_SECONDS: z.coerce.number().int().positive().default(60),
+  RATE_LIMIT_AUTH_MAX_REQUESTS: z.coerce.number().int().positive().default(10),
+  RATE_LIMIT_PUBLIC_TTL_SECONDS: z.coerce.number().int().positive().default(60),
+  RATE_LIMIT_PUBLIC_MAX_REQUESTS: z.coerce.number().int().positive().default(60),
+  SWAGGER_ENABLED: z.enum(['true', 'false']).default('false'),
+  SWAGGER_PATH: z.string().min(1).default('/docs'),
+});
+
+export type Env = z.infer<typeof envSchema>;
+
+export function validateEnv(config: Record<string, unknown>): Env {
+  const parsed = envSchema.safeParse(config);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map((i) => ({
+      path: i.path.join('.'),
+      message: i.message,
+    }));
+    throw new Error(`Invalid environment variables: ${JSON.stringify(issues)}`);
+  }
+  return parsed.data;
+}

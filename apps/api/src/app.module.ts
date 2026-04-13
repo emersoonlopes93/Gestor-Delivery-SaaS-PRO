@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
@@ -20,6 +22,7 @@ import { PromotionsModule } from './promotions/promotions.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { GoalsModule } from './goals/goals.module';
+import { validateEnv } from './config/env.validation';
 
 @Module({
   imports: [
@@ -27,7 +30,27 @@ import { GoalsModule } from './goals/goals.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', '../../.env'],
+      validate: validateEnv,
     }),
+
+    // Rate limiting (global)
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: Number(process.env.RATE_LIMIT_TTL_SECONDS ?? 60),
+        limit: Number(process.env.RATE_LIMIT_MAX_REQUESTS ?? 120),
+      },
+      {
+        name: 'auth',
+        ttl: Number(process.env.RATE_LIMIT_AUTH_TTL_SECONDS ?? 60),
+        limit: Number(process.env.RATE_LIMIT_AUTH_MAX_REQUESTS ?? 10),
+      },
+      {
+        name: 'public',
+        ttl: Number(process.env.RATE_LIMIT_PUBLIC_TTL_SECONDS ?? 60),
+        limit: Number(process.env.RATE_LIMIT_PUBLIC_MAX_REQUESTS ?? 60),
+      },
+    ]),
 
     // Database (Prisma)
     DatabaseModule,
@@ -84,6 +107,10 @@ import { GoalsModule } from './goals/goals.module';
     GoalsModule,
   ],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: TenantInterceptor,

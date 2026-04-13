@@ -3,8 +3,10 @@ import {
   BadRequestException,
   NotFoundException,
   ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import type { Prisma } from '@prisma/client';
 import { CheckoutValidatorService, ValidatedLine } from './checkout-validator.service';
 import { CustomerService } from '../crm/customer.service';
 import { CashbackService } from '../promotions/cashback.service';
@@ -23,6 +25,8 @@ import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger('OrdersService');
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly checkoutValidator: CheckoutValidatorService,
@@ -59,7 +63,9 @@ export class OrdersService {
     });
     const { tenantId, lines, itemsSubtotal, discountTotal, deliveryFee, total, couponId, cashbackUsed } = validation;
 
-    console.log(`DEBUG createOrder: type=${dto.fulfillmentType}, hasAddress=${!!dto.deliveryAddress}`);
+    this.logger.debug(
+      `createOrder: fulfillmentType=${dto.fulfillmentType} hasAddress=${!!dto.deliveryAddress}`,
+    );
 
     // 2. Check delivery address required for delivery
     if (dto.fulfillmentType === 'delivery' && !dto.deliveryAddress) {
@@ -81,7 +87,8 @@ export class OrdersService {
     // 4. Transactional order creation with atomic orderNumber
     const finalTotal = total; // Phase 4/5 had this as itemsSubtotal, Phase 8 handles exact math with discounts
 
-    const order = await this.prisma.$transaction(async (tx) => {
+    const order = await this.prisma.$transaction(
+      async (tx) => {
       // Atomic increment of order sequence
       const updatedTenant = await tx.tenant.update({
         where: { id: tenantId },
@@ -199,7 +206,12 @@ export class OrdersService {
       });
 
       return newOrder;
-    });
+      },
+      {
+        timeout: 20_000,
+        maxWait: 5_000,
+      },
+    );
 
     // 5. Update Cashback Ledger & Coupon Usage out of the main transaction (but wait for it to succeed)
     if (cashbackUsed && customerId) {
@@ -413,14 +425,11 @@ export class OrdersService {
     tenantId: string,
     fulfillmentType?: 'delivery' | 'pickup'
   ): Promise<OrderBoardItemDTO[]> {
-    const where: any = {
+    const where: Prisma.OrderWhereInput = {
       tenantId,
-      status: { notIn: ['completed', 'cancelled'] } // Operational view excludes finished ones by default
+      status: { notIn: ['completed', 'cancelled'] }, // Operational view excludes finished ones by default
+      ...(fulfillmentType ? { fulfillmentType } : {}),
     };
-    
-    if (fulfillmentType) {
-      where.fulfillmentType = fulfillmentType;
-    }
 
     const orders = await this.prisma.order.findMany({
       where,

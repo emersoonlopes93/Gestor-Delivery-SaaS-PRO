@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { StorefrontPayload, StorefrontCategoryPayload, StorefrontComboPayload, StorefrontProductPayload } from '@gestor/types';
-import { TenantStatus } from '@prisma/client';
+import { TenantStatus, Prisma } from '@prisma/client';
 
 @Injectable()
 export class StorefrontService {
@@ -9,8 +9,8 @@ export class StorefrontService {
 
   async getStorefrontPayload(slug: string): Promise<StorefrontPayload> {
     // 1. Resolve Tenant
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { slug, status: "active" as any }, // only active tenants
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { slug, status: TenantStatus.active }, // only active tenants
       include: { settings: true },
     });
 
@@ -28,9 +28,7 @@ export class StorefrontService {
     };
 
     // 2. Fetch Active Categories with their Active Products
-    const prismaClient = this.prisma as any;
-    
-    const categoriesDb = await prismaClient.productCategory.findMany({
+    const categoriesDb = await this.prisma.productCategory.findMany({
       where: {
         tenantId: tenant.id,
         isActive: true,
@@ -60,31 +58,43 @@ export class StorefrontService {
       },
     });
 
-    const categories: StorefrontCategoryPayload[] = categoriesDb.map((cat: any) => ({
+    type CategoryWithProducts = Prisma.ProductCategoryGetPayload<{
+      include: {
+        products: {
+          include: {
+            complementGroups: {
+              include: { group: { include: { items: true } } };
+            };
+          };
+        };
+      };
+    }>;
+
+    const categories: StorefrontCategoryPayload[] = (categoriesDb as CategoryWithProducts[]).map((cat) => ({
       id: cat.id,
       name: cat.name,
       slug: cat.slug,
-      products: cat.products.map((p: any) => ({
+      products: cat.products.map((p) => ({
         id: p.id,
         name: p.name,
         slug: p.slug,
         shortDescription: p.shortDescription,
         longDescription: p.longDescription,
-        basePrice: typeof p.basePrice === 'number' ? p.basePrice : Number(p.basePrice),
+        basePrice: Number(p.basePrice),
         image: p.image,
         isAvailable: p.isAvailable, // Layer 3 logic
-        complements: p.complementGroups.map((link: any) => ({
+        complements: p.complementGroups.map((link) => ({
           id: link.group.id,
           name: link.group.name,
           description: link.group.description,
           minSelect: link.group.minSelect,
           maxSelect: link.group.maxSelect,
           isRequired: link.group.isRequired,
-          items: link.group.items.map((item: any) => ({
+          items: link.group.items.map((item) => ({
             id: item.id,
             name: item.name,
             description: item.description,
-            additionalPrice: typeof item.additionalPrice === 'number' ? item.additionalPrice : Number(item.additionalPrice),
+            additionalPrice: Number(item.additionalPrice),
             isAvailable: item.isActive, // Simplified
           })),
         })),
@@ -92,7 +102,7 @@ export class StorefrontService {
     }));
 
     // 3. Fetch Active Combos
-    const combosDb = await prismaClient.productCombo.findMany({
+    const combosDb = await this.prisma.productCombo.findMany({
       where: {
         tenantId: tenant.id,
         isActive: true,
@@ -114,25 +124,31 @@ export class StorefrontService {
       },
     });
 
-    const combos: StorefrontComboPayload[] = combosDb.map((combo: any) => ({
+    type ComboWithBlocks = Prisma.ProductComboGetPayload<{
+      include: { blocks: { include: { items: { include: { product: true } } } } };
+    }>;
+
+    const combos: StorefrontComboPayload[] = (combosDb as ComboWithBlocks[]).map((combo) => ({
       id: combo.id,
       name: combo.name,
       slug: combo.slug,
       description: combo.description,
-      basePrice: typeof combo.basePrice === 'number' ? combo.basePrice : Number(combo.basePrice),
+      basePrice: Number(combo.basePrice),
       image: combo.image,
       isAvailable: true, // Always available basically, unless logic dictates otherwise
-      blocks: combo.blocks.map((b: any) => ({
+      blocks: combo.blocks.map((b) => ({
         id: b.id,
         name: b.name,
         description: b.description,
         minSelect: b.minSelect,
         maxSelect: b.maxSelect,
-        items: b.items.filter((item: any) => item.product.isActive && item.product.deletedAt === null).map((item: any) => ({
+        items: b.items
+          .filter((item) => item.product.isActive && item.product.deletedAt === null)
+          .map((item) => ({
           id: item.id,
           productId: item.productId,
           productName: item.product.name,
-          additionalPrice: typeof item.additionalPrice === 'number' ? item.additionalPrice : Number(item.additionalPrice),
+          additionalPrice: Number(item.additionalPrice),
         })),
       })),
     }));

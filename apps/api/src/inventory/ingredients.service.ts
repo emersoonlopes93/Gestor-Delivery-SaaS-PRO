@@ -1,10 +1,27 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { CreateIngredientDTO, UpdateIngredientDTO, IngredientDTO } from '@gestor/types';
+import { CreateIngredientDTO, UpdateIngredientDTO, IngredientDTO, UnitType } from '@gestor/types';
+import type { Ingredient } from '@prisma/client';
+import { UnitType as PrismaUnitType } from '@prisma/client';
 
 @Injectable()
 export class IngredientsService {
   constructor(private prisma: PrismaService) {}
+
+  private mapUnit(unit: PrismaUnitType): UnitType {
+    switch (unit) {
+      case PrismaUnitType.un:
+        return UnitType.UN;
+      case PrismaUnitType.g:
+        return UnitType.G;
+      case PrismaUnitType.kg:
+        return UnitType.KG;
+      case PrismaUnitType.ml:
+        return UnitType.ML;
+      case PrismaUnitType.l:
+        return UnitType.L;
+    }
+  }
 
   async findAll(tenantId: string): Promise<IngredientDTO[]> {
     const ingredients = await this.prisma.ingredient.findMany({
@@ -68,9 +85,12 @@ export class IngredientsService {
     return this.mapToDTO(updated);
   }
 
-  private mapToDTO(ing: any): IngredientDTO {
+  private mapToDTO(ing: Ingredient): IngredientDTO {
     return {
       ...ing,
+      sku: ing.sku ?? undefined,
+      description: ing.description ?? undefined,
+      unit: this.mapUnit(ing.unit),
       currentCost: Number(ing.currentCost),
       currentStock: Number(ing.currentStock),
       minStock: ing.minStock ? Number(ing.minStock) : undefined,

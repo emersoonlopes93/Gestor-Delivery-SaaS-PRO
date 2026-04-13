@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { StockMovementType } from '@gestor/types';
+import type { Prisma } from '@prisma/client';
 
 @Injectable()
 export class TheoreticalStockService {
@@ -98,7 +99,7 @@ export class TheoreticalStockService {
     id: string,
     quantityMultiplier: number
   ) {
-    let recipeItems: { ingredientId: string; quantity: any }[] = [];
+    let recipeItems: Array<{ ingredientId: string; quantity: Prisma.Decimal }> = [];
 
     if (type === 'product') {
       recipeItems = await this.prisma.productRecipeIngredient.findMany({ where: { productId: id, tenantId } });

@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+
+jobs:
+  build-and-smoke:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gestor_delivery
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres" 
+          --health-interval=10s 
+          --health-timeout=5s 
+          --health-retries=10
+
+    env:
+      NODE_ENV: test
+      API_PORT: 3333
+      API_PREFIX: /api/v1
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5433/gestor_delivery?schema=public
+      JWT_SECRET: test-jwt-secret-change-me-please
+      JWT_REFRESH_SECRET: test-refresh-secret-change-me-please
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      CORS_ORIGINS: http://localhost:5173,http://localhost:5174,http://localhost:5175
+      SWAGGER_ENABLED: "false"
+      RATE_LIMIT_TTL_SECONDS: "60"
+      RATE_LIMIT_MAX_REQUESTS: "9999"
+      RATE_LIMIT_AUTH_TTL_SECONDS: "60"
+      RATE_LIMIT_AUTH_MAX_REQUESTS: "9999"
+      RATE_LIMIT_PUBLIC_TTL_SECONDS: "60"
+      RATE_LIMIT_PUBLIC_MAX_REQUESTS: "9999"
+      SMOKE_API_BASE_URL: http://localhost:3333/api/v1
+      SMOKE_TENANT_SLUG: pizzaria-demo
+      SMOKE_TENANT_EMAIL: owner@pizzariademo.com
+      SMOKE_TENANT_PASSWORD: Owner@123
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install
+        run: pnpm -w install --frozen-lockfile
+
+      - name: Build
+        run: pnpm -w build
+
+      - name: Migrate DB
+        run: pnpm --filter @gestor/api prisma:migrate
+
+      - name: Seed DB
+        run: pnpm --filter @gestor/api prisma:seed
+
+      - name: Start API
+        run: pnpm --filter @gestor/api start:prod &
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3333/api/v1/health || true)
+            if [ "$code" = "200" ]; then
+              echo "API healthy"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API failed health check"
+          exit 1
+
+      - name: Smoke tests
+        run: pnpm --filter @gestor/api smoke:all

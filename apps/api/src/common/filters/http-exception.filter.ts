@@ -7,6 +7,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import type { TenantJwtPayload } from '@gestor/types';
+import type { RequestWithRequestId } from '../middlewares/request-id.middleware';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -15,7 +17,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+    const request = ctx.getRequest<RequestWithRequestId & Request & { user?: TenantJwtPayload }>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
@@ -40,11 +42,30 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
     } else if (exception instanceof Error) {
       message = exception.message;
+
+      const tenantId = request.user?.type === 'tenant' ? request.user.tenantId : undefined;
+      const userId = request.user?.type === 'tenant' ? request.user.sub : undefined;
+      const requestId = request.requestId;
+
       this.logger.error(
-        `Unhandled error: ${exception.message}`,
-        exception.stack,
+        {
+          message: 'unhandled_error',
+          errorMessage: exception.message,
+          stack: exception.stack,
+          method: request.method,
+          path: request.url,
+          ...(requestId ? { requestId } : {}),
+          ...(tenantId ? { tenantId } : {}),
+          ...(userId ? { userId } : {}),
+        },
+        undefined,
+        'HttpExceptionFilter',
       );
     }
+
+    const tenantId = request.user?.type === 'tenant' ? request.user.tenantId : undefined;
+    const userId = request.user?.type === 'tenant' ? request.user.sub : undefined;
+    const requestId = request.requestId;
 
     const errorBody = {
       success: false,
@@ -56,7 +77,34 @@ export class HttpExceptionFilter implements ExceptionFilter {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
+      ...(requestId ? { requestId } : {}),
     };
+
+    if (status >= 500) {
+      this.logger.error({
+        message: 'http_exception',
+        statusCode: status,
+        code,
+        errorMessage: message,
+        method: request.method,
+        path: request.url,
+        ...(requestId ? { requestId } : {}),
+        ...(tenantId ? { tenantId } : {}),
+        ...(userId ? { userId } : {}),
+      });
+    } else {
+      this.logger.warn({
+        message: 'http_exception',
+        statusCode: status,
+        code,
+        errorMessage: message,
+        method: request.method,
+        path: request.url,
+        ...(requestId ? { requestId } : {}),
+        ...(tenantId ? { tenantId } : {}),
+        ...(userId ? { userId } : {}),
+      });
+    }
 
     response.status(status).json(errorBody);
   }

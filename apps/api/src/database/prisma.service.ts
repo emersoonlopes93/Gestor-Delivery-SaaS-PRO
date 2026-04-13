@@ -13,17 +13,92 @@ export class PrismaService
    * Accessible as this.prisma.tenantClient
    * Automatically isolates data based on current context.
    */
-  public readonly tenantClient: any;
+  public readonly tenantClient: PrismaClient;
 
   constructor(private readonly tenantContext: TenantContextService) {
-    super({
+    const options: Prisma.PrismaClientOptions = {
       log: [
         { level: 'error', emit: 'stdout' },
         { level: 'warn', emit: 'stdout' },
       ],
+    };
+
+    super(options);
+
+    this.$use(async (params, next) => {
+      const tenantId = this.tenantContext.getTenantId();
+
+      // Only apply isolation if we have a tenant context
+      // Models like AdminUser, Tenant, AdminRole, AdminPermission are NOT isolated by tenantId
+      const excludedModels = [
+        'Tenant',
+        'AdminUser',
+        'AdminRole',
+        'AdminPermission',
+        'AdminRolePermission',
+        'AdminUserRole',
+      ];
+
+      const model = params.model ?? '';
+      const isTenantScoped = tenantId != null && tenantId !== '' && !excludedModels.includes(model);
+
+      if (!isTenantScoped) {
+        return next(params);
+      }
+
+      const isRecord = (value: unknown): value is Record<string, unknown> =>
+        typeof value === 'object' && value !== null;
+
+      const ensureRecord = (value: unknown): Record<string, unknown> => (isRecord(value) ? value : {});
+
+      const argsRecord = ensureRecord(params.args);
+
+      // Read operations
+      if (
+        [
+          'findMany',
+          'findFirst',
+          'findUnique',
+          'count',
+          'aggregate',
+          'groupBy',
+        ].includes(params.action)
+      ) {
+        const where = ensureRecord(argsRecord.where);
+        argsRecord.where = { ...where, tenantId };
+
+        // findUnique cannot accept non-unique fields; convert to findFirst
+        if (params.action === 'findUnique') {
+          params.action = 'findFirst';
+        }
+      }
+
+      // Write operations (where-based)
+      else if (['update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(params.action)) {
+        const where = ensureRecord(argsRecord.where);
+        argsRecord.where = { ...where, tenantId };
+      }
+
+      // Creation
+      else if (params.action === 'create') {
+        const data = ensureRecord(argsRecord.data);
+        argsRecord.data = { ...data, tenantId };
+      }
+
+      else if (params.action === 'createMany') {
+        if (Array.isArray(argsRecord.data)) {
+          argsRecord.data = argsRecord.data.map((item) => ({ ...ensureRecord(item), tenantId }));
+        } else {
+          const data = ensureRecord(argsRecord.data);
+          argsRecord.data = { ...data, tenantId };
+        }
+      }
+
+      params.args = argsRecord;
+      return next(params);
     });
 
-    this.tenantClient = this.extendClient();
+    this.tenantClient = this;
   }
 
   async onModuleInit() {
@@ -55,58 +130,5 @@ export class PrismaService
     }
   }
 
-  private extendClient() {
-    const tenantContext = this.tenantContext;
-    return this.$extends({
-      query: {
-        $allModels: {
-          async $allOperations({ model, operation, args, query }) {
-            const tenantId = tenantContext.getTenantId();
-
-            // Only apply isolation if we have a tenant context
-            // Models like AdminUser, Tenant, AdminRole, AdminPermission are NOT isolated by tenantId
-            const excludedModels = ['Tenant', 'AdminUser', 'AdminRole', 'AdminPermission', 'AdminRolePermission', 'AdminUserRole'];
-            const isTenantScoped = !excludedModels.includes(model);
-
-            if (tenantId && isTenantScoped) {
-              const op = operation as string;
-              const a = args as any;
-
-              // Read operations
-              if (['findMany', 'findFirst', 'findUnique', 'count', 'aggregate', 'groupBy'].includes(op)) {
-                // Change findUnique to findFirst to allow combined where with tenantId
-                const finalOp = op === 'findUnique' ? 'findFirst' : op;
-                a.where = { ...a.where, tenantId };
-                
-                // If it was findUnique, we MUST use findFirst because findUnique only accepts unique fields
-                if (op === 'findUnique') {
-                   return query(a);
-                }
-              }
-              
-              // Write operations (where-based)
-              else if (['update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(op)) {
-                a.where = { ...a.where, tenantId };
-              }
-              
-              // Creation
-              else if (op === 'create') {
-                a.data = { ...a.data, tenantId };
-              }
-              
-              else if (op === 'createMany') {
-                if (Array.isArray(a.data)) {
-                  a.data = a.data.map((item: any) => ({ ...item, tenantId }));
-                } else {
-                  a.data = { ...a.data, tenantId };
-                }
-              }
-            }
-
-            return query(args);
-          },
-        },
-      },
-    });
-  }
+  // Tenant isolation is implemented via Prisma middleware ($use) to preserve PrismaClient typing.
 }

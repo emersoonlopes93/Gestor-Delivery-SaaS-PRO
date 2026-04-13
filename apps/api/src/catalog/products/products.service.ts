@@ -1,20 +1,46 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { TenantContextService } from '../../common/context/tenant-context.service';
+import type { Prisma } from '@prisma/client';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { slugify } from '@gestor/utils';
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tenantContext: TenantContextService,
+  ) {}
+
+  private getRequiredTenantId(): string {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) {
+      throw new NotFoundException('Tenant context não encontrado');
+    }
+    return tenantId;
+  }
 
   async create(createProductDto: CreateProductDto) {
+    const tenantId = this.getRequiredTenantId();
     const slug = slugify(createProductDto.name);
 
     return this.prisma.tenantClient.product.create({
       data: {
-        ...createProductDto,
+        tenantId,
         slug,
+        name: createProductDto.name,
+        categoryId: createProductDto.categoryId ?? null,
+        shortDescription: createProductDto.shortDescription ?? null,
+        longDescription: createProductDto.longDescription ?? null,
+        basePrice: createProductDto.basePrice,
+        image: createProductDto.image ?? null,
+        isActive: createProductDto.isActive ?? true,
+        isFeatured: createProductDto.isFeatured ?? false,
+        isAvailable: createProductDto.isAvailable ?? true,
+        sellableOnline: createProductDto.sellableOnline ?? true,
+        sku: createProductDto.sku ?? null,
+        order: createProductDto.order ?? 0,
       },
     });
   }
@@ -44,16 +70,24 @@ export class ProductsService {
     // Check if exists
     await this.findOne(id);
 
-    let slug: string | undefined;
-    if ((updateProductDto as any).name) {
-      slug = slugify((updateProductDto as any).name);
-    }
+    const slug = updateProductDto.name ? slugify(updateProductDto.name) : undefined;
 
     return this.prisma.tenantClient.product.update({
       where: { id },
       data: {
-        ...updateProductDto,
-        ...(slug && { slug }),
+        name: updateProductDto.name,
+        categoryId: updateProductDto.categoryId ?? undefined,
+        shortDescription: updateProductDto.shortDescription ?? undefined,
+        longDescription: updateProductDto.longDescription ?? undefined,
+        basePrice: updateProductDto.basePrice,
+        image: updateProductDto.image ?? undefined,
+        isActive: updateProductDto.isActive,
+        isFeatured: updateProductDto.isFeatured,
+        isAvailable: updateProductDto.isAvailable,
+        sellableOnline: updateProductDto.sellableOnline,
+        sku: updateProductDto.sku ?? undefined,
+        order: updateProductDto.order,
+        ...(slug ? { slug } : {}),
       },
     });
   }

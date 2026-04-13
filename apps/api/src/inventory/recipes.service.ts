@@ -1,10 +1,26 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { UpsertRecipeDTO, RecipeIngredientDTO } from '@gestor/types';
+import { UpsertRecipeDTO, RecipeIngredientDTO, UnitType } from '@gestor/types';
+import { UnitType as PrismaUnitType } from '@prisma/client';
 
 @Injectable()
 export class RecipesService {
   constructor(private prisma: PrismaService) {}
+
+  private mapUnit(unit: PrismaUnitType): UnitType {
+    switch (unit) {
+      case PrismaUnitType.un:
+        return UnitType.UN;
+      case PrismaUnitType.g:
+        return UnitType.G;
+      case PrismaUnitType.kg:
+        return UnitType.KG;
+      case PrismaUnitType.ml:
+        return UnitType.ML;
+      case PrismaUnitType.l:
+        return UnitType.L;
+    }
+  }
 
   /**
    * PRODUCTS
@@ -19,7 +35,7 @@ export class RecipesService {
       id: item.id,
       ingredientId: item.ingredientId,
       ingredientName: item.ingredient.name,
-      ingredientUnit: item.ingredient.unit as any,
+      ingredientUnit: this.mapUnit(item.ingredient.unit),
       quantity: Number(item.quantity),
       estimatedCost: Number(item.quantity) * Number(item.ingredient.currentCost),
     }));
@@ -59,7 +75,7 @@ export class RecipesService {
       id: item.id,
       ingredientId: item.ingredientId,
       ingredientName: item.ingredient.name,
-      ingredientUnit: item.ingredient.unit as any,
+      ingredientUnit: this.mapUnit(item.ingredient.unit),
       quantity: Number(item.quantity),
       estimatedCost: Number(item.quantity) * Number(item.ingredient.currentCost),
     }));
@@ -97,7 +113,7 @@ export class RecipesService {
       id: item.id,
       ingredientId: item.ingredientId,
       ingredientName: item.ingredient.name,
-      ingredientUnit: item.ingredient.unit as any,
+      ingredientUnit: this.mapUnit(item.ingredient.unit),
       quantity: Number(item.quantity),
       estimatedCost: Number(item.quantity) * Number(item.ingredient.currentCost),
     }));

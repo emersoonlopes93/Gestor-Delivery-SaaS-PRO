@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { TenantStatus } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
@@ -9,7 +10,7 @@ async function main() {
     create: { 
       name: 'Test', 
       slug: 'test-slug', 
-      status: 'active' as any 
+      status: TenantStatus.active,
     }
   });
   console.log('Tenant:', tenant.id, tenant.name, tenant.slug);

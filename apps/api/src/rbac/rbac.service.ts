@@ -45,7 +45,9 @@ export class RbacService {
       include: { role: true },
     });
 
-    return userRoles.map((ur: any) => ur.role.slug);
+    return userRoles
+      .map((ur) => ur.role?.slug)
+      .filter((slug): slug is string => typeof slug === 'string');
   }
 
   /**

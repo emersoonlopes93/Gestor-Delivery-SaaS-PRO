@@ -1,5 +1,3 @@
-import fetch from 'node-fetch';
-
 const API = 'http://localhost:3333/api/v1';
 const TENANT_SLUG = 'pizzaria-demo';
 
@@ -13,11 +11,17 @@ async function api(method: string, path: string, body?: unknown, token?: string)
     body: body ? JSON.stringify(body) : undefined,
   });
   
-  const rawData = await res.json().catch(() => ({}));
+  const rawData: unknown = await res.json().catch(() => ({}));
   if (res.status >= 400) {
     console.log(`DEBUG ERROR: ${method} ${path} -> Status ${res.status}`, JSON.stringify(rawData, null, 2));
   }
-  const data = rawData.success !== undefined && rawData.data !== undefined ? rawData.data : rawData;
+  const data =
+    typeof rawData === 'object' &&
+    rawData !== null &&
+    'success' in rawData &&
+    'data' in rawData
+      ? (rawData as { data: unknown }).data
+      : rawData;
   return { status: res.status, data };
 }
 
