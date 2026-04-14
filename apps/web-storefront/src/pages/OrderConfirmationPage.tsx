@@ -23,6 +23,16 @@ export function OrderConfirmationPage() {
     );
   }
 
+  if (order.publicTrackingToken) {
+    sessionStorage.setItem(`tracking:token:${order.id}`, order.publicTrackingToken);
+    if (order.deliveryAddress?.lat != null && order.deliveryAddress?.lng != null) {
+      sessionStorage.setItem(
+        `tracking:dest:${order.id}`,
+        JSON.stringify({ lat: order.deliveryAddress.lat, lng: order.deliveryAddress.lng }),
+      );
+    }
+  }
+
   const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
   return (
@@ -103,7 +113,7 @@ export function OrderConfirmationPage() {
 
       {order.publicTrackingToken ? (
         <button
-          onClick={() => navigate(`/${tenantSlug}/tracking/${order.publicTrackingToken}`)}
+          onClick={() => navigate(`/${tenantSlug}/order/${order.id}/tracking`)}
           className="w-full h-14 bg-primary-600 text-white rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-primary-700 transition-colors mb-4"
         >
           Acompanhar entrega em tempo real

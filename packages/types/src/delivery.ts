@@ -57,6 +57,9 @@ export interface DriverDTO {
   status: DriverStatus;
   vehicleType: DriverVehicleType;
   notes?: string | null;
+  currentLat?: number | null;
+  currentLng?: number | null;
+  lastLocationAt?: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
 }

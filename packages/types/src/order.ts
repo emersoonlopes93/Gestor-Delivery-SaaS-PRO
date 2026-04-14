@@ -238,6 +238,8 @@ export interface OrderDispatchItemDTO {
   
   customerPhone?: string;
   deliveryAddress?: DeliveryAddressDTO;
+  deliveryLat?: number | null;
+  deliveryLng?: number | null;
   
   deliveryDriverId?: string;
   deliveryDriverName?: string;

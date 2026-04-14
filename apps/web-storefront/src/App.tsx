@@ -3,6 +3,7 @@ import { StorefrontPage } from './pages/StorefrontPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { OrderConfirmationPage } from './pages/OrderConfirmationPage';
 import { PublicTrackingPage } from './pages/PublicTrackingPage';
+import { OrderTrackingPage } from './pages/OrderTrackingPage';
 import { StorefrontLayout } from './layouts/StorefrontLayout';
 
 export function App() {
@@ -17,6 +18,9 @@ export function App() {
 
         {/* Order confirmation */}
         <Route path="/:tenantSlug/order/:orderId" element={<OrderConfirmationPage />} />
+
+        {/* Tracking by order id (UX premium) */}
+        <Route path="/:tenantSlug/order/:orderId/tracking" element={<OrderTrackingPage />} />
 
         {/* Public tracking */}
         <Route path="/:tenantSlug/tracking/:token" element={<PublicTrackingPage />} />
