@@ -15,6 +15,7 @@ import { KdsPage } from './features/orders/KdsPage';
 import { DriversListPage } from './features/delivery/DriversListPage';
 import { DispatchPage } from './features/delivery/DispatchPage';
 import { DeliveryRatesPage } from './features/delivery/DeliveryRatesPage';
+import { DeliveryZonesPage } from './features/delivery/DeliveryZonesPage';
 import { DeliveryMapPage } from './features/delivery/DeliveryMapPage';
 import CashPage from './features/cash/CashPage';
 import PosPage from './features/pos/PosPage';
@@ -132,6 +133,15 @@ export function App() {
         />
         <Route
           path="/delivery/rates"
+          element={
+            <PermissionGate permission="delivery.manage">
+              <DeliveryZonesPage />
+            </PermissionGate>
+          }
+        />
+
+        <Route
+          path="/delivery/rates/legacy"
           element={
             <PermissionGate permission="delivery.manage">
               <DeliveryRatesPage />

@@ -88,7 +88,15 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
       { id: 'delivery-dispatch', label: 'Despacho Em Tempo Real', to: '/delivery/dispatch', icon: Truck, permission: 'delivery.read' },
       { id: 'delivery-map', label: 'Mapa (Tempo Real)', to: '/delivery/map', icon: MapPin, permission: 'delivery.read' },
       { id: 'delivery-drivers', label: 'Entregadores', to: '/delivery/drivers', icon: Users, permission: 'delivery.manage_drivers' },
-      { id: 'delivery-rates', label: 'Taxas de Entrega', to: '/delivery/rates', icon: SlidersHorizontal, permission: 'delivery.manage' },
+      { id: 'delivery-zones', label: 'Zonas de Entrega', to: '/delivery/rates', icon: SlidersHorizontal, permission: 'delivery.manage' },
+      {
+        id: 'delivery-rates-legacy',
+        label: 'Taxas (Legado)',
+        to: '/delivery/rates/legacy',
+        icon: CornerDownRight,
+        permission: 'delivery.manage',
+        match: (p) => p === '/delivery/rates/legacy',
+      },
     ],
   },
   {

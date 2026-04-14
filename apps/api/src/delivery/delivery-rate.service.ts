@@ -623,6 +623,15 @@ export class DeliveryRateService {
       maxDistanceKm?: number;
       geoJson?: Prisma.InputJsonValue;
       polygonCoordinates?: Prisma.InputJsonValue;
+
+      // Campos evoluídos para engine híbrida (zonas)
+      name?: string;
+      color?: string;
+      zoneKind?: 'blocked_zone' | 'custom_zone';
+      pricingMode?: 'fixed' | 'distance' | 'free';
+      blocksDelivery?: boolean;
+      fixedFee?: number;
+      pricePerKm?: number;
     },
   ) {
     const ruleData: Prisma.DeliveryRateRuleUncheckedCreateInput = {
@@ -632,6 +641,15 @@ export class DeliveryRateService {
       priority: data.priority ?? 1000,
       isFallback: data.isFallback ?? false,
     };
+
+    // Campos opcionais (válidos para qualquer type, mas usados principalmente por polygon/híbrido)
+    if (data.name != null) ruleData.name = data.name;
+    if (data.color != null) ruleData.color = data.color;
+    if (data.zoneKind != null) ruleData.zoneKind = data.zoneKind;
+    if (data.pricingMode != null) ruleData.pricingMode = data.pricingMode;
+    if (typeof data.blocksDelivery === 'boolean') ruleData.blocksDelivery = data.blocksDelivery;
+    if (data.fixedFee != null) ruleData.fixedFee = data.fixedFee;
+    if (data.pricePerKm != null) ruleData.pricePerKm = data.pricePerKm;
 
     if (data.type === 'neighborhood') {
       if (!data.neighborhood || data.rate == null) {
@@ -684,6 +702,16 @@ export class DeliveryRateService {
         ruleData.fixedRate = data.fixedRate;
       } else if (data.rate != null) {
         ruleData.fixedRate = data.rate;
+      }
+
+      // Compatibilidade adicional: se fixedFee vier preenchido (novo), refletir também em fixedRate.
+      if (data.fixedFee != null && ruleData.fixedRate == null) {
+        ruleData.fixedRate = data.fixedFee;
+      }
+
+      // Compatibilidade adicional: se pricePerKm vier preenchido (novo), refletir também em ratePerKm.
+      if (data.pricePerKm != null && ruleData.ratePerKm == null) {
+        ruleData.ratePerKm = data.pricePerKm;
       }
     }
 

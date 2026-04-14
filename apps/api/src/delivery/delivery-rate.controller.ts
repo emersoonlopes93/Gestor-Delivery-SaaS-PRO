@@ -24,6 +24,36 @@ class CreateDeliveryRateRuleDto {
   @IsEnum(['neighborhood', 'distance', 'fixed', 'polygon'])
   type!: 'neighborhood' | 'distance' | 'fixed' | 'polygon';
 
+  // Campos evoluídos para zonas (engine híbrida)
+  // Mantemos opcionais para preservar compatibilidade.
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  color?: string;
+
+  @IsOptional()
+  @IsEnum(['blocked_zone', 'custom_zone'])
+  zoneKind?: 'blocked_zone' | 'custom_zone';
+
+  @IsOptional()
+  @IsEnum(['fixed', 'distance', 'free'])
+  pricingMode?: 'fixed' | 'distance' | 'free';
+
+  @IsOptional()
+  @IsBoolean()
+  blocksDelivery?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  fixedFee?: number;
+
+  @IsOptional()
+  @IsNumber()
+  pricePerKm?: number;
+
   @IsOptional()
   @IsNumber()
   priority?: number;
