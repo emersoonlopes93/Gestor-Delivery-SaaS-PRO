@@ -22,6 +22,7 @@ import type {
   OrderDispatchItemDTO,
 } from '@gestor/types';
 import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
+import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
 
 @Injectable()
 export class OrdersService {
@@ -119,6 +120,7 @@ export class OrdersService {
           customerId,
           couponId,
           cashbackUsed,
+          publicTrackingToken: generatePublicTrackingToken(),
         },
       });
 
@@ -314,6 +316,7 @@ export class OrdersService {
       total: Number(order.total),
       sourceChannel: order.sourceChannel,
       notes: order.notes,
+      publicTrackingToken: order.publicTrackingToken,
       items: order.items.map((item) => ({
         id: item.id,
         lineType: item.lineType as 'product' | 'combo',

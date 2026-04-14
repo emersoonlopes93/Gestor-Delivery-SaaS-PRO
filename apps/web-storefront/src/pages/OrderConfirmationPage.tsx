@@ -101,6 +101,15 @@ export function OrderConfirmationPage() {
         </div>
       </section>
 
+      {order.publicTrackingToken ? (
+        <button
+          onClick={() => navigate(`/${tenantSlug}/tracking/${order.publicTrackingToken}`)}
+          className="w-full h-14 bg-primary-600 text-white rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-primary-700 transition-colors mb-4"
+        >
+          Acompanhar entrega em tempo real
+        </button>
+      ) : null}
+
       {/* Back to menu */}
       <button
         onClick={() => navigate(`/${tenantSlug}`)}

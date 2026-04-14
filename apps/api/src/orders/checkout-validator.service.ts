@@ -140,10 +140,11 @@ export class CheckoutValidatorService {
     const total = itemsSubtotal - discountTotal;
 
     // 5. Calcular taxa de entrega
-    const deliveryFeeCalculation = await this.deliveryRateService.calculateDeliveryFee(
+    const deliveryFeeCalculation = await this.deliveryRateService.calculateRate({
       tenantId,
-      options?.deliveryAddress,
-    );
+      address: options?.deliveryAddress,
+      distanceKm: null,
+    });
     const deliveryFee = deliveryFeeCalculation.fee;
 
     const finalTotal = total + deliveryFee;

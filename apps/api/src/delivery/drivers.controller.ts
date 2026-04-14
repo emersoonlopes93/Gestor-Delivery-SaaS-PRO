@@ -4,6 +4,7 @@ import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
 import { CreateDriverDTO, UpdateDriverDTO } from '@gestor/types';
 import { DriversService } from './drivers.service';
+import { UpdateDriverLocationDTO } from './dto/update-driver-location.dto';
 
 @Controller('delivery/drivers')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -42,6 +43,16 @@ export class DriversController {
     @Body() data: UpdateDriverDTO,
   ) {
     return this.driversService.updateDriver(req.user.tenantId, id, data);
+  }
+
+  @Post(':id/location')
+  @RequirePermissions('delivery.dispatch', 'delivery.manage_drivers')
+  async updateLocation(
+    @Request() req: { user: { tenantId: string } },
+    @Param('id') id: string,
+    @Body() data: UpdateDriverLocationDTO,
+  ) {
+    return this.driversService.updateDriverLocation(req.user.tenantId, id, data);
   }
 
   @Delete(':id')

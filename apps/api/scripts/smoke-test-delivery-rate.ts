@@ -1,3 +1,10 @@
+declare const process: {
+  env: Record<string, string | undefined>;
+  stdout: { write: (value: string) => void };
+  stderr: { write: (value: string) => void };
+  exitCode: number;
+};
+
 const API = process.env.SMOKE_API_BASE_URL ?? 'http://localhost:3333/api/v1';
 const TENANT_SLUG = process.env.SMOKE_TENANT_SLUG ?? 'pizzaria-demo';
 const TENANT_EMAIL = process.env.SMOKE_TENANT_EMAIL ?? 'owner@pizzariademo.com';
@@ -75,29 +82,77 @@ async function main() {
   assert('login status 200/201', auth.status === 200 || auth.status === 201, `Status=${auth.status}`, auth.loginRaw);
   assert('login returns token', typeof auth.accessToken === 'string' && auth.accessToken.length > 10, 'missing token', auth.loginRaw);
 
-  if (!auth.accessToken) process.exit(1);
+  if (!auth.accessToken) {
+    process.exitCode = 1;
+    return;
+  }
+  const accessToken = auth.accessToken;
 
-  const tenantId = await getTenantId(auth.accessToken);
+  const tenantId = await getTenantId(accessToken);
   assert('me returns tenantId', typeof tenantId === 'string' && tenantId.length > 0, 'missing tenantId');
-  if (!tenantId) process.exit(1);
+  if (!tenantId) {
+    process.exitCode = 1;
+    return;
+  }
+  const resolvedTenantId = tenantId;
 
-  const beforeList = await api('GET', '/delivery/rates', undefined, auth.accessToken);
+  const beforeList = await api('GET', '/delivery/rates', undefined, accessToken);
   assert('list rules status 200', beforeList.status === 200, `Status=${beforeList.status}`, beforeList.raw);
 
-  const createFixed = await api(
+  // Create rules: fallback fixed + neighborhood with higher priority
+  const createFixedFallback = await api(
     'POST',
     '/delivery/rates',
-    { type: 'fixed', fixedRate: 9.9, isActive: true },
-    auth.accessToken,
+    { type: 'fixed', fixedRate: 9.9, isActive: true, isFallback: true, priority: 999 },
+    accessToken,
   );
-  assert('create fixed rule 200/201', createFixed.status === 200 || createFixed.status === 201, `Status=${createFixed.status}`, createFixed.raw);
+  assert(
+    'create fixed fallback rule 200/201',
+    createFixedFallback.status === 200 || createFixedFallback.status === 201,
+    `Status=${createFixedFallback.status}`,
+    createFixedFallback.raw,
+  );
+  const fixedFallback = asRecord(createFixedFallback.data);
+  const fixedFallbackId = fixedFallback ? pickString(fixedFallback, 'id') : null;
+  assert(
+    'created fixed fallback has id',
+    typeof fixedFallbackId === 'string' && fixedFallbackId.length > 0,
+    'missing id',
+    createFixedFallback.data,
+  );
 
-  const created = asRecord(createFixed.data);
-  const ruleId = created ? pickString(created, 'id') : null;
-  assert('created rule has id', typeof ruleId === 'string' && ruleId.length > 0, 'missing id', createFixed.data);
+  const createNeighborhood = await api(
+    'POST',
+    '/delivery/rates',
+    { type: 'neighborhood', neighborhood: 'Centro', rate: 4.5, isActive: true, priority: 10 },
+    accessToken,
+  );
+  assert(
+    'create neighborhood rule 200/201',
+    createNeighborhood.status === 200 || createNeighborhood.status === 201,
+    `Status=${createNeighborhood.status}`,
+    createNeighborhood.raw,
+  );
+  const neighborhoodRule = asRecord(createNeighborhood.data);
+  const neighborhoodRuleId = neighborhoodRule ? pickString(neighborhoodRule, 'id') : null;
 
-  const calc = await api('POST', '/delivery/rates/calculate', {
-    tenantId,
+  // Create distance rule
+  const createDistance = await api(
+    'POST',
+    '/delivery/rates',
+    { type: 'distance', minDistanceKm: 0, maxDistanceKm: 10, ratePerKm: 2, isActive: true, priority: 50 },
+    accessToken,
+  );
+  assert(
+    'create distance rule 200/201',
+    createDistance.status === 200 || createDistance.status === 201,
+    `Status=${createDistance.status}`,
+    createDistance.raw,
+  );
+
+  // 1) Neighborhood should win (priority + order)
+  const calcNeighborhood = await api('POST', '/delivery/rates/calculate', {
+    tenantId: resolvedTenantId,
     address: {
       street: 'Rua A',
       number: '10',
@@ -106,25 +161,50 @@ async function main() {
       state: 'SP',
       zipCode: '01001000',
     },
+    distanceKm: 5,
   });
 
-  assert('calculate delivery fee 200/201', calc.status === 200 || calc.status === 201, `Status=${calc.status}`, calc.raw);
+  assert(
+    'calculate neighborhood status 200/201',
+    calcNeighborhood.status === 200 || calcNeighborhood.status === 201,
+    `Status=${calcNeighborhood.status}`,
+    calcNeighborhood.raw,
+  );
+  const calcNeighborhoodData = asRecord(calcNeighborhood.data);
+  const feeNeighborhood = calcNeighborhoodData ? calcNeighborhoodData.fee : null;
+  assert('neighborhood fee=4.5', feeNeighborhood === 4.5, `fee=${String(feeNeighborhood)}`, calcNeighborhood.data);
 
-  const calcData = asRecord(calc.data);
-  const fee = calcData ? calcData.fee : null;
-  assert('calculate returns fee number', typeof fee === 'number', 'fee not number', calc.data);
+  // 2) Distance should apply when no neighborhood match
+  const calcDistance = await api('POST', '/delivery/rates/calculate', {
+    tenantId: resolvedTenantId,
+    address: {
+      street: 'Rua B',
+      number: '20',
+      neighborhood: 'Outro',
+      city: 'São Paulo',
+      state: 'SP',
+      zipCode: '01001000',
+    },
+    distanceKm: 5,
+  });
+  assert(
+    'calculate distance status 200/201',
+    calcDistance.status === 200 || calcDistance.status === 201,
+    `Status=${calcDistance.status}`,
+    calcDistance.raw,
+  );
+  const calcDistanceData = asRecord(calcDistance.data);
+  const feeDistance = calcDistanceData ? calcDistanceData.fee : null;
+  assert('distance fee=10', feeDistance === 10, `fee=${String(feeDistance)}`, calcDistance.data);
 
-  if (ruleId) {
-    const update = await api(
-      'PUT',
-      `/delivery/rates/${ruleId}`,
-      { type: 'fixed', fixedRate: 7.5, isActive: true },
-      auth.accessToken,
-    );
-    assert('update fixed rule status 200', update.status === 200, `Status=${update.status}`, update.raw);
-
-    const del = await api('DELETE', `/delivery/rates/${ruleId}`, undefined, auth.accessToken);
-    assert('delete rule status 200/201', del.status === 200 || del.status === 201, `Status=${del.status}`, del.raw);
+  // Cleanup
+  if (neighborhoodRuleId) {
+    const del = await api('DELETE', `/delivery/rates/${neighborhoodRuleId}`, undefined, accessToken);
+    assert('delete neighborhood rule status 200/201', del.status === 200 || del.status === 201, `Status=${del.status}`, del.raw);
+  }
+  if (fixedFallbackId) {
+    const del = await api('DELETE', `/delivery/rates/${fixedFallbackId}`, undefined, accessToken);
+    assert('delete fixed fallback rule status 200/201', del.status === 200 || del.status === 201, `Status=${del.status}`, del.raw);
   }
 
   const failed = results.filter((r) => !r.passed);
@@ -139,3 +219,5 @@ main().catch((err: unknown) => {
   process.stderr.write(`SMOKE DELIVERY RATE crashed: ${String(err)}\n`);
   process.exitCode = 1;
 });
+
+export {};

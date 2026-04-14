@@ -16,6 +16,7 @@ import type {
   PosOrderListItemDTO,
   OrderStatus,
 } from '@gestor/types';
+import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
 
 @Injectable()
 export class PosService {
@@ -129,6 +130,7 @@ export class PosService {
           customerId,
           couponId,
           cashbackUsed,
+          publicTrackingToken: generatePublicTrackingToken(),
         },
       });
 

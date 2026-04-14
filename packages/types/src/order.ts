@@ -153,6 +153,7 @@ export interface OrderResponseDTO {
   customerName: string;
   customerPhone: string;
   customerEmail?: string | null;
+  publicTrackingToken?: string;
   itemsSubtotal: number;
   discountTotal: number;
   deliveryFee: number;

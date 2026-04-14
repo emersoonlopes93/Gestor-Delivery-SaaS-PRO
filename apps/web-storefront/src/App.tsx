@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { StorefrontPage } from './pages/StorefrontPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { OrderConfirmationPage } from './pages/OrderConfirmationPage';
+import { PublicTrackingPage } from './pages/PublicTrackingPage';
 import { StorefrontLayout } from './layouts/StorefrontLayout';
 
 export function App() {
@@ -16,6 +17,9 @@ export function App() {
 
         {/* Order confirmation */}
         <Route path="/:tenantSlug/order/:orderId" element={<OrderConfirmationPage />} />
+
+        {/* Public tracking */}
+        <Route path="/:tenantSlug/tracking/:token" element={<PublicTrackingPage />} />
       </Route>
 
       {/* Root redirect */}

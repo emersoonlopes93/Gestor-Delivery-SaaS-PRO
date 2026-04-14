@@ -1,3 +1,10 @@
+declare const process: {
+  env: Record<string, string | undefined>;
+  stdout: { write: (value: string) => void };
+  stderr: { write: (value: string) => void };
+  exitCode: number;
+};
+
 const API = process.env.SMOKE_API_BASE_URL ?? 'http://localhost:3333/api/v1';
 const TENANT_SLUG = process.env.SMOKE_TENANT_SLUG ?? 'pizzaria-demo';
 const TENANT_EMAIL = process.env.SMOKE_TENANT_EMAIL ?? 'owner@pizzariademo.com';
@@ -108,3 +115,5 @@ main().catch((err: unknown) => {
   process.stderr.write(`SMOKE AUTH crashed: ${String(err)}\n`);
   process.exitCode = 1;
 });
+
+export {};

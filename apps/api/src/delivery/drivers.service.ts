@@ -1,16 +1,72 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateDriverDTO, UpdateDriverDTO } from '@gestor/types';
+import { UpdateDriverLocationDTO } from './dto/update-driver-location.dto';
 
 @Injectable()
 export class DriversService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private asRecord(value: unknown): Record<string, unknown> | null {
+    return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
+  }
+
+  private pickDate(value: unknown): Date | null {
+    return value instanceof Date ? value : null;
+  }
+
+  private shouldWriteLocationHistory(now: Date, last: Date | null): boolean {
+    if (!last) return true;
+    const deltaMs = now.getTime() - last.getTime();
+    return deltaMs >= 10_000;
+  }
 
   async listDrivers(tenantId: string) {
     return this.prisma.deliveryDriver.findMany({
       where: { tenantId },
       orderBy: { name: 'asc' },
     });
+  }
+
+  async updateDriverLocation(tenantId: string, id: string, data: UpdateDriverLocationDTO) {
+    const driver = await this.getDriver(tenantId, id);
+
+    const driverRec = this.asRecord(driver);
+    const lastLocationAt = driverRec ? this.pickDate(driverRec.lastLocationAt) : null;
+
+    const now = new Date();
+    const shouldWriteHistory = this.shouldWriteLocationHistory(now, lastLocationAt);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.deliveryDriver.update({
+        where: { id: driver.id },
+        data: {
+          currentLat: data.lat,
+          currentLng: data.lng,
+          lastLocationAt: now,
+        },
+      });
+
+      if (shouldWriteHistory) {
+        await tx.deliveryDriverLocation.create({
+          data: {
+            tenantId,
+            driverId: driver.id,
+            lat: data.lat,
+            lng: data.lng,
+          },
+        });
+      }
+    });
+
+    return {
+      success: true,
+      sampled: shouldWriteHistory,
+      driverId: driver.id,
+      currentLat: data.lat,
+      currentLng: data.lng,
+      lastLocationAt: now.toISOString(),
+    };
   }
 
   async getDriver(tenantId: string, id: string) {

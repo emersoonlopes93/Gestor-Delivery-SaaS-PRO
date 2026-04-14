@@ -10,6 +10,7 @@ import {
   ClipboardList,
   Goal,
   LayoutGrid,
+  MapPin,
   Menu,
   Package,
   Percent,
@@ -85,6 +86,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     label: 'Logística',
     items: [
       { id: 'delivery-dispatch', label: 'Despacho Em Tempo Real', to: '/delivery/dispatch', icon: Truck, permission: 'delivery.read' },
+      { id: 'delivery-map', label: 'Mapa (Tempo Real)', to: '/delivery/map', icon: MapPin, permission: 'delivery.read' },
       { id: 'delivery-drivers', label: 'Entregadores', to: '/delivery/drivers', icon: Users, permission: 'delivery.manage_drivers' },
       { id: 'delivery-rates', label: 'Taxas de Entrega', to: '/delivery/rates', icon: SlidersHorizontal, permission: 'delivery.manage' },
     ],

@@ -44,6 +44,7 @@ model Tenant {
   orderDeliveryAddresses OrderDeliveryAddress[]
   orderTimelines         OrderTimeline[]
   deliveryDrivers        DeliveryDriver[]
+  deliveryDriverLocations DeliveryDriverLocation[]
   cashSessions           CashSession[]
   cashMovements          CashMovement[]
 
@@ -507,6 +508,13 @@ model Order {
   paymentMethod  PaymentMethod? @map("payment_method")
   cashSessionId  String?        @map("cash_session_id")
 
+  // Delivery snapshot (optional)
+  deliveryLat Float? @map("delivery_lat")
+  deliveryLng Float? @map("delivery_lng")
+
+  // Public tracking token (non-enumerable, shareable)
+  publicTrackingToken String @unique @map("public_tracking_token")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -654,15 +662,36 @@ model DeliveryDriver {
   status       DriverStatus       @default(offline)
   vehicleType  DriverVehicleType  @default(motorcycle) @map("vehicle_type")
   notes        String?            @db.Text
+  currentLat   Float?             @map("current_lat")
+  currentLng   Float?             @map("current_lng")
+  lastLocationAt DateTime?        @map("last_location_at")
   createdAt    DateTime           @default(now()) @map("created_at")
   updatedAt    DateTime           @updatedAt @map("updated_at")
 
   // Relations
   tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orders Order[]
+  locations DeliveryDriverLocation[]
 
   @@index([tenantId])
   @@map("delivery_drivers")
+}
+
+model DeliveryDriverLocation {
+  id        String   @id @default(uuid())
+  driverId  String   @map("driver_id")
+  tenantId  String   @map("tenant_id")
+  lat       Float
+  lng       Float
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  driver DeliveryDriver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, driverId, createdAt])
+  @@map("delivery_driver_locations")
 }
 
 enum DriverStatus {
@@ -966,6 +995,7 @@ enum RateType {
   neighborhood
   distance
   fixed
+  polygon
 }
 
 model DeliveryRateRule {
@@ -973,6 +1003,9 @@ model DeliveryRateRule {
   tenantId    String    @map("tenant_id")
   type        RateType
   isActive    Boolean   @default(true) @map("is_active")
+
+  priority    Int       @default(1000) @map("priority")
+  isFallback  Boolean   @default(false) @map("is_fallback")
 
   // Para bairro
   neighborhood String?   @db.VarChar(100)
@@ -983,16 +1016,25 @@ model DeliveryRateRule {
   maxKm        Decimal?  @map("max_km") @db.Decimal(5, 2)
   ratePerKm    Decimal?  @map("rate_per_km") @db.Decimal(10, 2)
 
+  minDistanceKm Decimal? @map("min_distance_km") @db.Decimal(5, 2)
+  maxDistanceKm Decimal? @map("max_distance_km") @db.Decimal(5, 2)
+
   // Para taxa fixa (fallback)
   fixedRate    Decimal?  @map("fixed_rate") @db.Decimal(10, 2)
+
+  // Preparação para área/polígono (não implementado ainda)
+  geoJson             Json? @map("geo_json")
+  polygonCoordinates  Json? @map("polygon_coordinates")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, neighborhood])
   @@index([tenantId])
+  @@index([tenantId, type])
+  @@index([tenantId, priority])
+  @@index([tenantId, type, neighborhood])
   @@map("delivery_rate_rules")
 }
 
