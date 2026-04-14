@@ -1,8 +1,30 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Circle, MapContainer, Marker, Polygon, TileLayer, useMap } from 'react-leaflet';
+import { Circle, MapContainer, Marker, Polygon, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet-draw';
-import { Check, ChevronDown, ChevronUp, Crosshair, Loader2, LocateFixed, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import {
+  AlertCircle,
+  Ban,
+  Check,
+  CheckCircle,
+  ChevronDown,
+  ChevronUp,
+  Crosshair,
+  DollarSign,
+  Edit2,
+  Gift,
+  Loader2,
+  LocateFixed,
+  MapPin,
+  Pencil,
+  Plus,
+  Ruler,
+  Target,
+  Save,
+  TrendingUp,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { api, ApiError } from '@/lib/api-client';
 import type { LatLngExpression } from 'leaflet';
 
@@ -80,6 +102,15 @@ type ZoneForm = {
   fixedFee: number | null;
   pricePerKm: number | null;
   polygonCoordinates: PolygonCoordinates | null;
+};
+
+type DeliveryDecisionResponse = {
+  canDeliver: boolean;
+  matchedStrategy: string;
+  matchedZoneId: string | null;
+  fee: number;
+  distanceKm: number | null;
+  reason: string;
 };
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -171,6 +202,78 @@ const MapImperative = memo(function MapImperative(props: {
 
   return null;
 });
+
+const MapRefSync = memo(function MapRefSync(props: {
+  mapRef: React.MutableRefObject<L.Map | null>;
+}) {
+  const { mapRef } = props;
+  const map = useMap();
+
+  useEffect(() => {
+    mapRef.current = map;
+    return () => {
+      if (mapRef.current === map) mapRef.current = null;
+    };
+  }, [map, mapRef]);
+
+  return null;
+});
+
+const SimulationClickLayer = memo(function SimulationClickLayer(props: {
+  enabled: boolean;
+  onPick: (pos: { lat: number; lng: number }) => void;
+}) {
+  const map = useMap();
+  useMapEvents({
+    click: (e) => {
+      if (!props.enabled) return;
+      props.onPick({ lat: e.latlng.lat, lng: e.latlng.lng });
+    },
+  });
+
+  // Microfeedback visual no clique (ripple/escala leve)
+  useEffect(() => {
+    if (!props.enabled) return;
+    const el = map.getContainer();
+    el.style.cursor = 'crosshair';
+    return () => {
+      el.style.cursor = '';
+    };
+  }, [props.enabled, map]);
+
+  return null;
+});
+
+function haversineDistanceKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lat2 = (b.lat * Math.PI) / 180;
+  const sin1 = Math.sin(dLat / 2);
+  const sin2 = Math.sin(dLng / 2);
+  const h = sin1 * sin1 + Math.cos(lat1) * Math.cos(lat2) * sin2 * sin2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+function strategyLabel(v: string): string {
+  if (v === 'base_radius') return 'Cobertura padrão';
+  if (v === 'custom_zone_free') return 'Zona personalizada';
+  if (v === 'custom_zone_fixed') return 'Zona personalizada';
+  if (v === 'custom_zone_distance') return 'Zona personalizada';
+  if (v === 'blocked_zone') return 'Área bloqueada';
+  if (v === 'out_of_coverage') return 'Fora da área de entrega';
+  if (v === 'delivery_disabled') return 'Entrega desativada';
+  if (v === 'legacy_rules') return 'Regras legadas';
+  return 'Regra aplicada';
+}
+
+function zoneNameById(zones: DeliveryRateRule[], id: string | null): string | null {
+  if (!id) return null;
+  const zone = zones.find((z) => z.id === id);
+  if (!zone) return null;
+  return zone.name && zone.name.trim() !== '' ? zone.name : null;
+}
 
 type DrawMode = 'idle' | 'drawing';
 
@@ -386,6 +489,26 @@ export function DeliveryZonesPage() {
 
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
+  const [hoveredZoneId, setHoveredZoneId] = useState<string | null>(null);
+  const [highlightZoneId, setHighlightZoneId] = useState<string | null>(null);
+
+  const [simulationOn, setSimulationOn] = useState(false);
+  const [simulationPoint, setSimulationPoint] = useState<{ lat: number; lng: number } | null>(null);
+  const [simulationLoading, setSimulationLoading] = useState(false);
+  const [simulationError, setSimulationError] = useState<string | null>(null);
+  const [simulationDecision, setSimulationDecision] = useState<DeliveryDecisionResponse | null>(null);
+
+  const clearSimulation = useCallback(() => {
+    setSimulationPoint(null);
+    setSimulationDecision(null);
+    setSimulationError(null);
+    setSimulationLoading(false);
+    setHighlightZoneId(null);
+  }, []);
+
+  const mapRef = useRef<L.Map | null>(null);
+  const [showMapMobile, setShowMapMobile] = useState(false);
+
   const [fitToStoreSeq, setFitToStoreSeq] = useState(0);
 
   const storePosition = useMemo<LatLngExpression>(() => {
@@ -478,6 +601,12 @@ export function DeliveryZonesPage() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
+  useEffect(() => {
+    if (!highlightZoneId) return;
+    const t = window.setTimeout(() => setHighlightZoneId(null), 900);
+    return () => window.clearTimeout(t);
+  }, [highlightZoneId]);
+
   const handleSaveCoverage = useCallback(async () => {
     setSavingCoverage(true);
     setError(null);
@@ -505,13 +634,88 @@ export function DeliveryZonesPage() {
     }
   }, [coverageDraft]);
 
+  const handleUseCurrentLocation = useCallback(async () => {
+    setError(null);
+    if (!('geolocation' in navigator)) {
+      setError('Seu navegador não suporta geolocalização.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setCoverageDraft((d) => ({ ...d, storeLat: lat, storeLng: lng }));
+        setToast('Localização atual aplicada');
+        setFitToStoreSeq((v) => v + 1);
+      },
+      () => {
+        setError('Não foi possível obter sua localização. Verifique as permissões do navegador.');
+      },
+      { enableHighAccuracy: true, maximumAge: 10_000, timeout: 12_000 },
+    );
+  }, []);
+
+  type ZonePreset = 'blocked' | 'free' | 'fixed' | 'distance';
+  const [presetPickerOpen, setPresetPickerOpen] = useState(false);
+
+  const openNewZoneWithPreset = useCallback(
+    (preset: ZonePreset) => {
+      resetZoneForm();
+
+      const next =
+        preset === 'blocked'
+          ? ({
+              zoneKind: 'blocked_zone' as const,
+              pricingMode: 'fixed' as const,
+              blocksDelivery: true,
+              fixedFee: null,
+              pricePerKm: null,
+              color: zoneColorPreset('blocked_zone', 'fixed'),
+            })
+          : preset === 'free'
+            ? ({
+                zoneKind: 'custom_zone' as const,
+                pricingMode: 'free' as const,
+                blocksDelivery: false,
+                fixedFee: null,
+                pricePerKm: null,
+                color: zoneColorPreset('custom_zone', 'free'),
+              })
+            : preset === 'distance'
+              ? ({
+                  zoneKind: 'custom_zone' as const,
+                  pricingMode: 'distance' as const,
+                  blocksDelivery: false,
+                  fixedFee: null,
+                  pricePerKm: 2.5,
+                  color: zoneColorPreset('custom_zone', 'distance'),
+                })
+              : ({
+                  zoneKind: 'custom_zone' as const,
+                  pricingMode: 'fixed' as const,
+                  blocksDelivery: false,
+                  fixedFee: 10,
+                  pricePerKm: null,
+                  color: zoneColorPreset('custom_zone', 'fixed'),
+                });
+
+      setZoneForm((z) => ({
+        ...z,
+        ...next,
+      }));
+
+      setPresetPickerOpen(false);
+      setEditorOpen(true);
+      setDrawMode('drawing');
+      setShowMapMobile(true);
+    },
+    [resetZoneForm],
+  );
+
   const openNewZone = useCallback(() => {
-    resetZoneForm();
-    const color = zoneColorPreset('custom_zone', 'fixed');
-    setZoneForm((z) => ({ ...z, color }));
-    setEditorOpen(true);
-    setDrawMode('drawing');
-  }, [resetZoneForm]);
+    setPresetPickerOpen(true);
+  }, []);
 
   const openEditZone = useCallback((z: DeliveryRateRule) => {
     const coords = normalizePolygonCoordinates(z.polygonCoordinates);
@@ -531,6 +735,7 @@ export function DeliveryZonesPage() {
     setSelectedZoneId(z.id);
     setEditorOpen(true);
     setDrawMode('idle');
+    setShowMapMobile(true);
   }, []);
 
   const closeEditor = useCallback(() => {
@@ -636,6 +841,7 @@ export function DeliveryZonesPage() {
       if (zoneForm.id) {
         await api.put(`/delivery/rates/${zoneForm.id}`, payload);
         setToast('Zona atualizada');
+        setHighlightZoneId(zoneForm.id);
       } else {
         await api.post('/delivery/rates', payload);
         setToast('Zona criada');
@@ -651,6 +857,27 @@ export function DeliveryZonesPage() {
       setSavingZone(false);
     }
   }, [fetchAll, zoneForm]);
+
+  const fitSelectedZone = useCallback((zoneId: string | null) => {
+    if (!zoneId) return;
+    if (!mapRef.current) return;
+    const z = zones.find((x) => x.id === zoneId);
+    if (!z) return;
+    const coords = normalizePolygonCoordinates(z.polygonCoordinates);
+    if (!coords || coords.length < 3) return;
+
+    const latLngs = coords.map(([lng, lat]) => L.latLng(lat, lng));
+    const bounds = L.latLngBounds(latLngs);
+    mapRef.current.fitBounds(bounds, {
+      padding: [42, 42],
+      animate: true,
+      duration: 0.35,
+    });
+  }, [zones]);
+
+  useEffect(() => {
+    fitSelectedZone(selectedZoneId);
+  }, [fitSelectedZone, selectedZoneId]);
 
   // Keep conditional UX: auto adjust when changing kind/pricing
   useEffect(() => {
@@ -699,6 +926,76 @@ export function DeliveryZonesPage() {
     return storePosition;
   }, [selectedZone, storePosition]);
 
+  const runSimulationAt = useCallback(
+    async (pos: { lat: number; lng: number }) => {
+      if (!coverage?.tenantId) {
+        setSimulationError('Não foi possível simular: tenant não identificado.');
+        return;
+      }
+
+      setSimulationPoint(pos);
+      setSimulationError(null);
+      setSimulationLoading(true);
+      setSimulationDecision(null);
+
+      const address = {
+        street: 'Simulação',
+        number: '0',
+        neighborhood: 'Simulação',
+        city: 'Simulação',
+        state: 'XX',
+        zipCode: '00000-000',
+        lat: pos.lat,
+        lng: pos.lng,
+      };
+
+      try {
+        const res = await api.post<DeliveryDecisionResponse>('/delivery/rates/calculate-decision', {
+          tenantId: coverage.tenantId,
+          address,
+          distanceKm: haversineDistanceKm({ lat: coverage.storeLat, lng: coverage.storeLng }, pos),
+        });
+        if (!res.success) {
+          setSimulationError('Falha ao simular entrega.');
+          return;
+        }
+        setSimulationDecision(res.data);
+        setHighlightZoneId(res.data.matchedZoneId ?? null);
+
+        // Auto-pan para garantir que o tooltip não fique cortado
+        if (mapRef.current) {
+          const map = mapRef.current;
+          const point = L.latLng(pos.lat, pos.lng);
+          const pixelPoint = map.latLngToContainerPoint(point);
+          const mapSize = map.getSize();
+          const tooltipWidth = 260;
+          const tooltipHeight = 180;
+          const offset = { x: 0, y: -14 };
+          const tooltipLeft = pixelPoint.x + offset.x;
+          const tooltipTop = pixelPoint.y + offset.y;
+          const tooltipRight = tooltipLeft + tooltipWidth;
+          const tooltipBottom = tooltipTop + tooltipHeight;
+          const padding = 80;
+          let panX = 0;
+          let panY = 0;
+          if (tooltipLeft < padding) panX = padding - tooltipLeft;
+          if (tooltipRight > mapSize.x - padding) panX = tooltipRight - (mapSize.x - padding);
+          if (tooltipTop < padding) panY = padding - tooltipTop;
+          if (tooltipBottom > mapSize.y - padding) panY = tooltipBottom - (mapSize.y - padding);
+          if (panX !== 0 || panY !== 0) {
+            map.panBy([panX, panY], { animate: true, duration: 0.35 });
+          }
+        }
+      } catch (e) {
+        const msg = e instanceof ApiError ? e.message : 'Erro ao simular entrega';
+        setSimulationError(msg);
+      } finally {
+        setSimulationLoading(false);
+      }
+    },
+    [coverage?.storeLat, coverage?.storeLng, coverage?.tenantId],
+  );
+
   if (loading) {
     return (
       <div className="p-6">
@@ -714,38 +1011,53 @@ export function DeliveryZonesPage() {
     <div className="h-[calc(100vh-64px)] min-h-[720px]">
       <div className="h-full grid grid-cols-1 lg:grid-cols-[420px_1fr]">
         {/* LEFT PANEL */}
-        <div className="h-full border-r border-gray-100 bg-white overflow-auto">
+        <div
+          className={
+            'h-full border-r border-gray-100 bg-white overflow-auto ' +
+            (showMapMobile ? 'hidden lg:block' : 'block')
+          }
+        >
           <div className="p-6 space-y-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h1 className="text-2xl font-black text-gray-900">Zonas de Entrega</h1>
                 <p className="text-sm text-gray-500 mt-1">Defina sua cobertura base e desenhe zonas no mapa.</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setFitToStoreSeq((v) => v + 1)}
-                className="h-10 px-3 rounded-lg bg-white border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                title="Centralizar loja"
-              >
-                <LocateFixed className="h-4 w-4" />
-              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSimulationOn((v) => {
+                      const next = !v;
+                      if (!next) clearSimulation();
+                      return next;
+                    });
+                  }}
+                  className={
+                    'h-10 px-3 rounded-lg border text-sm font-black transition-all duration-200 inline-flex items-center gap-2 ' +
+                    (simulationOn
+                      ? 'bg-gray-900 text-white border-gray-900 hover:bg-black'
+                      : 'bg-white text-gray-800 border-gray-200 hover:bg-gray-50')
+                  }
+                  title="Clique no mapa para simular"
+                >
+                  <Target className="h-4 w-4" />
+                  Simular entrega
+                </button>
+
+                {simulationOn && (simulationPoint || simulationDecision || simulationError) ? (
+                  <button
+                    type="button"
+                    onClick={clearSimulation}
+                    className="h-10 px-3 rounded-lg bg-white border border-gray-200 text-sm font-black text-gray-700 hover:bg-gray-50 transition-all duration-200"
+                  >
+                    Limpar
+                  </button>
+                ) : null}
+              </div>
             </div>
-
-            {error ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                {error}
-              </div>
-            ) : null}
-
-            {toast ? (
-              <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800 flex items-center gap-2">
-                <Check className="h-4 w-4" />
-                {toast}
-              </div>
-            ) : null}
-
-            {/* Section A — Quick setup */}
-            <section className="rounded-xl border border-gray-100 shadow-sm">
+            <section className="rounded-2xl border border-gray-100 shadow-md bg-white p-6 mt-6">
               <div className="p-4 border-b border-gray-100">
                 <SectionHeader
                   title="Configuração rápida"
@@ -776,8 +1088,8 @@ export function DeliveryZonesPage() {
                 />
               </div>
 
-              <div className="p-4 space-y-4">
-                <div className="grid grid-cols-2 gap-3">
+              <div className="p-5 space-y-5">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-black text-gray-500 uppercase tracking-wider">Latitude da loja</label>
                     <input
@@ -785,7 +1097,7 @@ export function DeliveryZonesPage() {
                       step="0.000001"
                       value={coverageDraft.storeLat}
                       onChange={(e) => setCoverageDraft((d) => ({ ...d, storeLat: Number(e.target.value) }))}
-                      className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="mt-2 w-full h-10 px-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all duration-200"
                     />
                   </div>
                   <div>
@@ -795,12 +1107,31 @@ export function DeliveryZonesPage() {
                       step="0.000001"
                       value={coverageDraft.storeLng}
                       onChange={(e) => setCoverageDraft((d) => ({ ...d, storeLng: Number(e.target.value) }))}
-                      className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="mt-2 w-full h-10 px-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all duration-200"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFitToStoreSeq((v) => v + 1)}
+                    className="h-10 px-4 rounded-lg bg-white border border-gray-200 text-sm font-black text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 shadow-md"
+                  >
+                    <Crosshair className="h-4 w-4" />
+                    Centralizar
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleUseCurrentLocation}
+                    className="h-10 px-4 rounded-lg bg-white border border-gray-200 text-sm font-black text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 shadow-md"
+                  >
+                    Usar localização atual
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-black text-gray-500 uppercase tracking-wider">Raio máximo (km)</label>
                     <input
@@ -809,9 +1140,9 @@ export function DeliveryZonesPage() {
                       step={0.1}
                       value={coverageDraft.maxRadiusKm}
                       onChange={(e) => setCoverageDraft((d) => ({ ...d, maxRadiusKm: Number(e.target.value) }))}
-                      className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="mt-2 w-full h-10 px-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all duration-200"
                     />
-                    <div className="mt-1 text-[11px] text-gray-500">Até onde você entrega na cobertura base.</div>
+                    <div className="mt-2 text-[11px] text-gray-500">Até onde você entrega na cobertura base.</div>
                   </div>
 
                   <div>
@@ -824,9 +1155,9 @@ export function DeliveryZonesPage() {
                       onChange={(e) =>
                         setCoverageDraft((d) => ({ ...d, defaultPricePerKm: Number(e.target.value) }))
                       }
-                      className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      className="mt-2 w-full h-10 px-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all duration-200"
                     />
-                    <div className="mt-1 text-[11px] text-gray-500">Valor padrão aplicado dentro do raio.</div>
+                    <div className="mt-2 text-[11px] text-gray-500">Valor padrão aplicado dentro do raio.</div>
                   </div>
                 </div>
 
@@ -885,17 +1216,17 @@ export function DeliveryZonesPage() {
               </div>
             </section>
 
-            {/* Section B — Zones */}
-            <section className="rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            {/* Section B — Zonas */}
+            <section className="rounded-xl border border-gray-200 shadow-sm bg-white">
               <div className="p-4 border-b border-gray-100">
                 <SectionHeader
                   title="Zonas personalizadas"
-                  subtitle="Desenhe áreas no mapa para bloquear ou cobrar diferente."
+                  subtitle="Desenhe áreas com regras específicas (ex: entrega grátis, bloqueio, taxa fixa)."
                   right={
                     <button
                       type="button"
                       onClick={openNewZone}
-                      className="h-10 px-3 rounded-lg bg-primary-600 text-white text-sm font-black hover:bg-primary-700 inline-flex items-center gap-2"
+                      className="h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-black hover:bg-primary-700 transition-all duration-200 shadow-sm inline-flex items-center gap-2"
                     >
                       <Plus className="h-4 w-4" />
                       Nova zona
@@ -904,106 +1235,116 @@ export function DeliveryZonesPage() {
                 />
               </div>
 
-              <div className="p-4">
-                {zones.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-gray-200 p-4">
-                    <div className="text-sm font-semibold text-gray-900">Sem zonas ainda</div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      Crie uma zona para bloquear regiões ou oferecer entrega grátis.
+              <div className="p-5">
+                {visibleZones.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                      <MapPin className="h-8 w-8 text-gray-400" />
+                    </div>
+                    <div className="text-sm font-semibold text-gray-900 mb-2">Nenhuma zona personalizada ainda</div>
+                    <div className="text-xs text-gray-500 mb-6 max-w-sm mx-auto">
+                      Sua cobertura padrão (raio base) já está funcionando. Zonas são úteis para criar exceções como
+                      entrega grátis em bairros próximos ou bloquear áreas muito distantes.
                     </div>
                     <button
                       type="button"
                       onClick={openNewZone}
-                      className="mt-3 h-10 px-3 rounded-lg bg-gray-900 text-white text-sm font-black hover:bg-black inline-flex items-center gap-2"
+                      className="h-10 px-5 rounded-lg bg-primary-600 text-white text-sm font-black hover:bg-primary-700 transition-all duration-200 shadow-sm inline-flex items-center gap-2"
                     >
-                      <Pencil className="h-4 w-4" />
+                      <Plus className="h-4 w-4" />
                       Desenhar primeira zona
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {zones.map((z) => {
-                      const selected = selectedZoneId === z.id;
-                      const color = z.color ?? z.geoJson?.properties?.color ?? defaultZoneColor();
-                      const zoneKind = z.zoneKind ?? (z.blocksDelivery ? 'blocked_zone' : 'custom_zone');
-                      const pricingMode = z.pricingMode ?? 'fixed';
-
+                  <div className="space-y-3">
+                    {visibleZones.map((z) => {
+                      const isSelected = selectedZoneId === z.id;
+                      const isHovered = hoveredZoneId === z.id;
                       return (
-                        <button
+                        <div
                           key={z.id}
-                          type="button"
-                          onClick={() => setSelectedZoneId(z.id)}
-                          className={
-                            'w-full text-left rounded-xl border px-3 py-3 transition-colors ' +
-                            (selected
-                              ? 'border-primary-300 bg-primary-50'
-                              : 'border-gray-100 hover:bg-gray-50')
-                          }
+                          className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 ${
+                            isSelected
+                              ? 'border-primary-500 bg-primary-50/50 shadow-sm border-l-4 border-l-primary-500'
+                              : isHovered
+                              ? 'border-gray-300 bg-gray-50'
+                              : 'border-gray-200 bg-white'
+                          }`}
+                          onClick={() => {
+                            setSelectedZoneId(z.id);
+                            setShowMapMobile(true);
+                          }}
+                          onMouseEnter={() => setHoveredZoneId(z.id)}
+                          onMouseLeave={() => setHoveredZoneId(null)}
                         >
                           <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className="inline-block w-3 h-3 rounded-full"
-                                  style={{ backgroundColor: color }}
-                                  aria-hidden
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <div
+                                  className="w-3 h-3 rounded-full border border-white shadow-sm"
+                                  style={{ backgroundColor: z.color ?? defaultZoneColor() }}
                                 />
-                                <div className="font-black text-gray-900 truncate">{zoneLabel(z)}</div>
-                                {!z.isActive ? <Badge tone="gray" label="Inativa" /> : null}
+                                <span className="text-sm font-semibold text-gray-900 truncate">
+                                  {z.name || `Zona ${visibleZones.indexOf(z) + 1}`}
+                                </span>
+                                {isSelected && (
+                                  <Badge tone="blue" label="Ativo" />
+                                )}
                               </div>
-                              <div className="mt-1 flex flex-wrap gap-2">
-                                <Badge
-                                  tone={zoneKind === 'blocked_zone' ? 'red' : 'blue'}
-                                  label={kindLabel(zoneKind)}
-                                />
-                                <Badge
-                                  tone={pricingMode === 'free' ? 'green' : pricingMode === 'distance' ? 'amber' : 'gray'}
-                                  label={pricingLabel(pricingMode)}
-                                />
-                                <Badge tone="gray" label={`Prioridade ${z.priority}`} />
+                              <div className="text-xs text-gray-500 space-y-1">
+                                <div>
+                                  {z.zoneKind === 'blocked_zone' && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <Ban className="h-3 w-3" />
+                                      Entrega bloqueada
+                                    </span>
+                                  )}
+                                  {z.zoneKind === 'custom_zone' && z.pricingMode === 'free' && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <CheckCircle className="h-3 w-3" />
+                                      Entrega grátis
+                                    </span>
+                                  )}
+                                  {z.zoneKind === 'custom_zone' && z.pricingMode === 'fixed' && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <DollarSign className="h-3 w-3" />
+                                      Taxa fixa: {fmtMoney(z.fixedFee != null ? Number(z.fixedFee) : null)}
+                                    </span>
+                                  )}
+                                  {z.zoneKind === 'custom_zone' && z.pricingMode === 'distance' && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <TrendingUp className="h-3 w-3" />
+                                      {fmtMoney(z.pricePerKm != null ? Number(z.pricePerKm) : null)}/km
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-
-                            <div className="flex items-center gap-1 shrink-0">
+                            <div className="flex items-center gap-1">
                               <button
                                 type="button"
                                 onClick={(e) => {
-                                  e.preventDefault();
                                   e.stopPropagation();
-                                  openEditZone(z);
+                                  setSelectedZoneId(z.id);
+                                  setEditorOpen(true);
                                 }}
-                                className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-white"
-                                title="Editar"
+                                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
                               >
-                                <Pencil className="h-4 w-4" />
+                                <Edit2 className="h-4 w-4 text-gray-500" />
                               </button>
                               <button
                                 type="button"
                                 onClick={(e) => {
-                                  e.preventDefault();
                                   e.stopPropagation();
-                                  handleDuplicate(z);
+                                  handleDeleteZone(z);
                                 }}
-                                className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-white"
-                                title="Duplicar"
+                                className="p-1.5 rounded-lg hover:bg-red-50 transition-colors"
                               >
-                                <Plus className="h-4 w-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  void handleDeleteZone(z);
-                                }}
-                                className="p-2 rounded-lg text-gray-500 hover:text-red-600 hover:bg-white"
-                                title="Excluir"
-                              >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-4 w-4 text-red-500" />
                               </button>
                             </div>
                           </div>
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -1054,46 +1395,189 @@ export function DeliveryZonesPage() {
         </div>
 
         {/* RIGHT MAP */}
-        <div className="h-full bg-gray-50 relative">
+        <div className={
+          'h-full bg-gray-50 relative ' +
+          (showMapMobile ? 'block' : 'hidden lg:block')
+        }>
           <div className="absolute inset-0">
-            <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }}>
+            <MapContainer
+              center={mapCenter}
+              zoom={14}
+              className={"h-full w-full " + (simulationOn ? 'cursor-crosshair' : '')}
+            >
               <MapImperative storePosition={storePosition} fitToStoreSeq={fitToStoreSeq} />
+
+              <MapRefSync mapRef={mapRef} />
+
+              <SimulationClickLayer enabled={simulationOn} onPick={runSimulationAt} />
 
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
 
-              <Marker position={storePosition} />
-
-              <Circle
-                center={storePosition}
-                radius={Math.max(0, coverageDraft.maxRadiusKm) * 1000}
-                pathOptions={{
-                  color: '#2563eb',
-                  fillColor: '#2563eb',
-                  fillOpacity: 0.06,
-                  weight: 2,
-                  dashArray: '6 6',
+              <Marker
+                position={storePosition}
+                draggable
+                eventHandlers={{
+                  dragend: (e) => {
+                    const target = e.target;
+                    if (!(target instanceof L.Marker)) return;
+                    const pos = target.getLatLng();
+                    setCoverageDraft((d) => ({ ...d, storeLat: pos.lat, storeLng: pos.lng }));
+                  },
                 }}
               />
+
+              {coverage && (
+                <Circle
+                  center={[coverage.storeLat, coverage.storeLng]}
+                  radius={Number(coverage.maxRadiusKm) * 1000}
+                  pathOptions={{
+                    color: '#3b82f6',
+                    weight:
+                      simulationDecision?.matchedStrategy === 'base_radius'
+                        ? 3
+                        : 2,
+                    opacity: 0.9,
+                    fillColor: '#3b82f6',
+                    fillOpacity:
+                      simulationDecision?.matchedStrategy === 'base_radius'
+                        ? 0.12
+                        : 0.08,
+                    dashArray: '8, 6',
+                    lineJoin: 'round',
+                  }}
+                />
+              )}
+
+              {simulationPoint ? (
+                <Marker
+                  position={[simulationPoint.lat, simulationPoint.lng]}
+                  icon={
+                    new L.DivIcon({
+                      className: 'delivery-sim-marker',
+                      html:
+                        '<div class="w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 flex items-center justify-center">' +
+                        '<div class="w-3 h-3 rounded-full bg-gray-900"></div>' +
+                        '</div>',
+                      iconSize: [36, 36],
+                      iconAnchor: [18, 18],
+                    })
+                  }
+                >
+                  <Tooltip
+                    direction="top"
+                    offset={[0, -14]}
+                    opacity={1}
+                    permanent
+                    className="!bg-transparent !border-0 !shadow-none"
+                  >
+                    <div
+                      className={
+                        'w-[260px] rounded-xl border p-3 shadow-md backdrop-blur-md ' +
+                        (simulationDecision
+                          ? simulationDecision.canDeliver
+                            ? 'bg-green-50/90 border-green-300'
+                            : 'bg-red-50/90 border-red-300'
+                          : 'bg-white/85 border-gray-200')
+                      }
+                    >
+                      {simulationLoading ? (
+                        <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Calculando entrega...
+                        </div>
+                      ) : simulationError ? (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-sm font-black text-red-700">
+                            <AlertCircle className="h-5 w-5" />
+                            Entrega indisponível
+                          </div>
+                          <div className="text-xs text-gray-600">{simulationError}</div>
+                        </div>
+                      ) : simulationDecision ? (
+                        <div className="space-y-2">
+                          <div
+                            className={
+                              'flex items-center gap-2 text-base font-black ' +
+                              (simulationDecision.canDeliver ? 'text-green-700' : 'text-red-700')
+                            }
+                          >
+                            {simulationDecision.canDeliver ? (
+                              <CheckCircle className="h-5 w-5" />
+                            ) : (
+                              <AlertCircle className="h-5 w-5" />
+                            )}
+                            {simulationDecision.canDeliver ? 'Entrega disponível' : 'Entrega indisponível'}
+                          </div>
+                          <div className="text-sm font-semibold text-gray-900">
+                            Taxa de entrega: {fmtMoney(simulationDecision.fee)}
+                          </div>
+                          {(() => {
+                            const zoneName = zoneNameById(zones, simulationDecision.matchedZoneId);
+                            return zoneName ? (
+                              <div className="text-xs text-gray-700">
+                                <span className="font-semibold">Zona aplicada:</span> {zoneName}
+                              </div>
+                            ) : null;
+                          })()}
+                          <div className="text-xs text-gray-700">
+                            <span className="font-semibold">Regra aplicada:</span> {strategyLabel(simulationDecision.matchedStrategy)}
+                          </div>
+                          {typeof simulationDecision.distanceKm === 'number' ? (
+                            <div className="text-xs text-gray-700">
+                              <span className="font-semibold">Distância:</span> {simulationDecision.distanceKm.toFixed(2)} km
+                            </div>
+                          ) : null}
+                          <div className="text-[11px] text-gray-500 pt-1">{simulationDecision.reason}</div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="text-sm font-black text-gray-900">Clique no mapa</div>
+                          <div className="text-xs text-gray-600 mt-1">
+                            Selecione um ponto para simular a entrega.
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </Tooltip>
+                </Marker>
+              ) : null}
 
               {visibleZones.map((z) => {
                 const coords = normalizePolygonCoordinates(z.polygonCoordinates);
                 if (!coords || coords.length < 3) return null;
                 const color = z.color ?? z.geoJson?.properties?.color ?? defaultZoneColor();
+                const isSelected = selectedZoneId === z.id;
+                const isHovered = hoveredZoneId === z.id;
+                const isHighlighted = highlightZoneId === z.id;
                 return (
                   <Polygon
                     key={`zone-${z.id}`}
                     positions={coordsToLatLngs(coords)}
                     pathOptions={{
-                      color,
+                      color: isSelected || isHighlighted ? '#1e40af' : isHovered ? '#1e40af' : color,
+                      weight: isSelected ? 4 : isHighlighted ? 5 : isHovered ? 3 : 2,
+                      opacity: 0.9,
                       fillColor: color,
-                      fillOpacity: selectedZoneId === z.id ? 0.22 : 0.12,
-                      weight: selectedZoneId === z.id ? 4 : 3,
+                      fillOpacity: isSelected ? 0.35 : isHighlighted ? 0.38 : isHovered ? 0.32 : 0.28,
+                      lineJoin: 'round',
+                      className:
+                        'transition-all duration-200 ' +
+                        (isSelected || isHighlighted
+                          ? 'drop-shadow-[0_0_8px_rgba(37,99,235,0.35)]'
+                          : isHovered
+                            ? 'drop-shadow-[0_0_6px_rgba(15,23,42,0.18)]'
+                            : ''),
                     }}
                     eventHandlers={{
-                      click: () => setSelectedZoneId(z.id),
+                      click: () => {
+                        setSelectedZoneId(z.id);
+                        setShowMapMobile(true);
+                      },
+                      mouseover: () => setHoveredZoneId(z.id),
+                      mouseout: () => setHoveredZoneId(null),
                     }}
                   />
                 );
@@ -1109,6 +1593,29 @@ export function DeliveryZonesPage() {
             </MapContainer>
           </div>
 
+          {/* Map legend (glass) */}
+          <div className="absolute bottom-4 right-4 z-[1000] pointer-events-none">
+            <div className="bg-white/70 backdrop-blur-md border border-gray-200 rounded-xl shadow-md p-3 space-y-2">
+              <div className="text-xs font-semibold text-gray-700 mb-1">Legenda</div>
+              <div className="flex items-center gap-2 text-xs text-gray-600">
+                <div className="w-3 h-3 rounded-full bg-blue-500 border border-blue-600" />
+                <span>Cobertura padrão</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-600">
+                <div className="w-3 h-3 rounded-full bg-green-500 border border-green-600" />
+                <span>Entrega grátis</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-600">
+                <div className="w-3 h-3 rounded-full bg-yellow-500 border border-yellow-600" />
+                <span>Zona personalizada</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-600">
+                <div className="w-3 h-3 rounded-full bg-red-500 border border-red-600" />
+                <span>Área bloqueada</span>
+              </div>
+            </div>
+          </div>
+
           {/* Map actions */}
           <div className="absolute top-4 left-4 flex items-center gap-2">
             <button
@@ -1120,14 +1627,24 @@ export function DeliveryZonesPage() {
               Centralizar loja
             </button>
 
+            <button
+              type="button"
+              onClick={() => setShowMapMobile(false)}
+              className="lg:hidden h-10 px-3 rounded-lg bg-gray-900 text-white text-sm font-black hover:bg-black shadow-sm"
+            >
+              Voltar
+            </button>
+
             {drawMode === 'drawing' ? (
               <Badge tone="blue" label="Modo desenho ativo" />
             ) : null}
           </div>
 
+          {/* (Legenda movida para fora do MapContainer) */}
+
           {/* Editor panel (contextual drawer) */}
           {editorOpen ? (
-            <div className="absolute top-4 right-4 w-[380px] max-w-[calc(100vw-32px)] bg-white border border-gray-100 rounded-2xl shadow-xl overflow-hidden">
+            <div className="absolute top-4 right-4 w-[380px] max-w-[calc(100vw-32px)] bg-white border border-gray-100 rounded-2xl shadow-xl overflow-hidden transition-all duration-200">
               <div className="p-4 border-b border-gray-100 flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-sm font-black text-gray-900">
