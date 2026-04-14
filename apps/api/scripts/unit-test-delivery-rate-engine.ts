@@ -32,6 +32,14 @@ function makeRule(
     priority: partial.priority ?? 1000,
     isFallback: partial.isFallback ?? false,
 
+    name: partial.name ?? null,
+    color: partial.color ?? null,
+    zoneKind: partial.zoneKind ?? null,
+    pricingMode: partial.pricingMode ?? null,
+    fixedFee: partial.fixedFee ?? null,
+    pricePerKm: partial.pricePerKm ?? null,
+    blocksDelivery: partial.blocksDelivery ?? false,
+
     neighborhood: partial.neighborhood ?? null,
     rate: partial.rate ?? null,
 
@@ -55,6 +63,36 @@ async function main() {
   const tenantId = 't1';
 
   const rules: DeliveryRateRule[] = [
+    makeRule({
+      id: 'poly-outside-first',
+      tenantId,
+      type: 'polygon',
+      fixedRate: new Prisma.Decimal(1.23),
+      polygonCoordinates: [
+        [-46.70, -23.60],
+        [-46.69, -23.60],
+        [-46.69, -23.59],
+        [-46.70, -23.59],
+      ] as unknown as Prisma.JsonValue,
+      priority: 1,
+      createdAt: new Date('2024-01-01T00:00:00Z'),
+      updatedAt: new Date('2024-01-01T00:00:00Z'),
+    }),
+    makeRule({
+      id: 'poly-inside-second',
+      tenantId,
+      type: 'polygon',
+      fixedRate: new Prisma.Decimal(7.77),
+      polygonCoordinates: [
+        [-46.64, -23.56],
+        [-46.62, -23.56],
+        [-46.62, -23.54],
+        [-46.64, -23.54],
+      ] as unknown as Prisma.JsonValue,
+      priority: 2,
+      createdAt: new Date('2024-01-01T00:00:01Z'),
+      updatedAt: new Date('2024-01-01T00:00:01Z'),
+    }),
     makeRule({
       id: 'fixed-fallback',
       tenantId,
@@ -126,7 +164,35 @@ async function main() {
     },
   };
 
-  const svc = new DeliveryRateService(prismaMock);
+  const coverageRepoMock = {
+    findUnique: async () => null,
+  };
+
+  const svc = new DeliveryRateService(prismaMock.deliveryRateRule, coverageRepoMock);
+
+  const byPolygonInside = await svc.calculateRate({
+    tenantId,
+    address: { neighborhood: 'Qualquer', lat: -23.55, lng: -46.63 },
+    distanceKm: 5,
+  });
+  assert(
+    'polígono (dentro) vence regras antigas',
+    byPolygonInside.fee === 7.77 && byPolygonInside.rule.type === 'POLYGON',
+    `fee=${byPolygonInside.fee} type=${byPolygonInside.rule.type}`,
+    byPolygonInside,
+  );
+
+  const byPolygonOutsideFallsBack = await svc.calculateRate({
+    tenantId,
+    address: { neighborhood: 'Centro', lat: -23.50, lng: -46.50 },
+    distanceKm: 5,
+  });
+  assert(
+    'polígono (fora) cai para bairro quando casa',
+    byPolygonOutsideFallsBack.fee === 4.5 && byPolygonOutsideFallsBack.rule.type === 'NEIGHBORHOOD',
+    `fee=${byPolygonOutsideFallsBack.fee} type=${byPolygonOutsideFallsBack.rule.type}`,
+    byPolygonOutsideFallsBack,
+  );
 
   const byNeighborhood = await svc.calculateRate({
     tenantId,
@@ -166,7 +232,7 @@ async function main() {
       },
     },
   };
-  const svcNoFallback = new DeliveryRateService(prismaNoFallback);
+  const svcNoFallback = new DeliveryRateService(prismaNoFallback.deliveryRateRule, coverageRepoMock);
 
   let thrown = false;
   try {

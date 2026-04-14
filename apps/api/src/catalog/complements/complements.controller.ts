@@ -65,12 +65,7 @@ export class ComplementsController {
     return this.complementsService.findAllItems(req.user.tenantId);
   }
 
-  @Get('groups/items')
-  @RequirePermissions('catalog.read')
-  findAllItemsFromGroups(@Request() req: TenantRequest) {
-    return this.complementsService.findAllItems(req.user.tenantId);
-  }
-
+  
   @Get('items/:id')
   @RequirePermissions('catalog.read')
   findOneItem(@Request() req: TenantRequest, @Param('id') id: string) {

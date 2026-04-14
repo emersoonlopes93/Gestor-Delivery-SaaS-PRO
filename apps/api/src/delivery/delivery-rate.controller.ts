@@ -8,8 +8,10 @@ import {
   Param,
   Request,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
-import { IsEnum, IsString, IsNumber, IsOptional, IsBoolean, IsObject } from 'class-validator';
+import { IsEnum, IsString, IsNumber, IsOptional, IsBoolean, IsObject, IsArray } from 'class-validator';
 import { DeliveryRateService } from './delivery-rate.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
@@ -71,8 +73,8 @@ class CreateDeliveryRateRuleDto {
   geoJson?: Record<string, unknown>;
 
   @IsOptional()
-  @IsObject()
-  polygonCoordinates?: Record<string, unknown>;
+  @IsArray()
+  polygonCoordinates?: unknown[];
 }
 
 @Controller('delivery/rates')
@@ -162,12 +164,27 @@ export class DeliveryRateController {
   // Endpoint público para cálculo (usado no checkout)
   @Post('calculate')
   @Public()
+  @HttpCode(HttpStatus.OK)
   async calculate(
     @Body() body: { tenantId: string; address?: DeliveryAddressDTO | null; distanceKm?: number | null },
   ) {
     // Este endpoint será público mas validado por tenantId
     // Futuramente podemos adicionar chave de API ou validar por slug
     return this.deliveryRateService.calculateRate({
+      tenantId: body.tenantId,
+      address: body.address,
+      distanceKm: body.distanceKm ?? null,
+    });
+  }
+
+  // Endpoint para o novo engine híbrido
+  @Post('calculate-decision')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async calculateDecision(
+    @Body() body: { tenantId: string; address?: DeliveryAddressDTO | null; distanceKm?: number | null },
+  ) {
+    return this.deliveryRateService.calculateDeliveryDecision({
       tenantId: body.tenantId,
       address: body.address,
       distanceKm: body.distanceKm ?? null,

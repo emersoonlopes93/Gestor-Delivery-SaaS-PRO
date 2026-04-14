@@ -81,7 +81,7 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
     setRecipeItems(updated);
   };
 
-  const totalCost = recipeItems.reduce((acc, item) => {
+  const totalCost = (recipeItems || []).reduce((acc, item) => {
     const ing = ingredients.find(i => i.id === item.ingredientId);
     return acc + (Number(item.quantity) * (ing?.currentCost || 0));
   }, 0);
@@ -89,7 +89,7 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const items: UpsertRecipeDTO[] = recipeItems.map(item => ({
+      const items: UpsertRecipeDTO[] = (recipeItems || []).map(item => ({
         ingredientId: item.ingredientId,
         quantity: Number(item.quantity)
       }));

@@ -1,16 +1,40 @@
-import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, MapPin, Route, DollarSign } from 'lucide-react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
+import { Plus, Edit2, Trash2, MapPin, Route, DollarSign, Layers, ChevronUp, ChevronDown } from 'lucide-react';
 import { api } from '../../lib/api-client';
+import { MapContainer, TileLayer, FeatureGroup, Polygon, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet-draw';
+import type { LatLngExpression } from 'leaflet';
+
+type PolygonCoordinates = Array<[number, number]>; // [[lng,lat],...]
+
+type DeliveryRateRuleType = 'neighborhood' | 'distance' | 'fixed' | 'polygon';
+
+type DeliveryRuleGeoJson = {
+  type: string;
+  properties?: {
+    name?: string;
+    color?: string;
+  };
+  geometry?: {
+    type: string;
+    coordinates: unknown;
+  };
+};
 
 interface DeliveryRateRule {
   id: string;
-  type: 'neighborhood' | 'distance' | 'fixed';
+  type: DeliveryRateRuleType;
+  priority?: number;
+  isFallback?: boolean;
   neighborhood?: string;
   rate?: number;
   minKm?: number;
   maxKm?: number;
   ratePerKm?: number;
   fixedRate?: number;
+  geoJson?: DeliveryRuleGeoJson | null;
+  polygonCoordinates?: unknown[] | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -22,12 +46,190 @@ const TYPE_LABELS = {
   neighborhood: 'Por Bairro',
   distance: 'Por Distância',
   fixed: 'Taxa Fixa',
+  polygon: 'Por Zona (Polígono)',
 };
 
 const TYPE_ICONS = {
   neighborhood: MapPin,
   distance: Route,
   fixed: DollarSign,
+  polygon: Layers,
+};
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null;
+}
+
+function pickString(obj: Record<string, unknown>, key: string): string | null {
+  const v = obj[key];
+  return typeof v === 'string' ? v : null;
+}
+
+function pickNumber(obj: Record<string, unknown>, key: string): number | null {
+  const v = obj[key];
+  return typeof v === 'number' ? v : null;
+}
+
+function pickBoolean(obj: Record<string, unknown>, key: string): boolean | null {
+  const v = obj[key];
+  return typeof v === 'boolean' ? v : null;
+}
+
+function normalizePolygonCoordinates(value: unknown): PolygonCoordinates | null {
+  if (!Array.isArray(value)) return null;
+  const out: PolygonCoordinates = [];
+  for (const item of value) {
+    if (!Array.isArray(item) || item.length < 2) return null;
+    const lng = item[0];
+    const lat = item[1];
+    if (typeof lng !== 'number' || typeof lat !== 'number') return null;
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+    out.push([lng, lat]);
+  }
+  return out;
+}
+
+function coordsToLatLngs(coords: PolygonCoordinates): LatLngExpression[] {
+  return coords.map(([lng, lat]) => [lat, lng] as LatLngExpression);
+}
+
+function latLngsToCoords(latLngs: L.LatLng[]): PolygonCoordinates {
+  return latLngs.map((p) => [p.lng, p.lat]);
+}
+
+function defaultZoneColor(): string {
+  return '#2563eb';
+}
+
+function getZoneMeta(rule: DeliveryRateRule): { name: string | null; color: string } {
+  const gj = rule.geoJson;
+  const name = gj && typeof gj.properties?.name === 'string' ? gj.properties.name : null;
+  const color = gj && typeof gj.properties?.color === 'string' ? gj.properties.color : defaultZoneColor();
+  return { name, color };
+}
+
+function ensureRingClosed(points: PolygonCoordinates): PolygonCoordinates {
+  if (points.length === 0) return points;
+  const [flng, flat] = points[0];
+  const [llng, llat] = points[points.length - 1];
+  if (flng === llng && flat === llat) return points;
+  return [...points, [flng, flat]];
+}
+
+const PolygonDrawControl = function PolygonDrawControl(props: {
+  zoneColor: string;
+  polygonCoords: PolygonCoordinates | null;
+  onChange: (coords: PolygonCoordinates | null) => void;
+}) {
+  const { zoneColor, polygonCoords, onChange } = props;
+  const map = useMap();
+
+  useEffect(() => {
+    const fg = new L.FeatureGroup();
+    map.addLayer(fg);
+
+    const drawControl = new L.Control.Draw({
+      position: 'topright',
+      edit: {
+        featureGroup: fg,
+        edit: {
+          selectedPathOptions: {
+            color: zoneColor,
+            fillColor: zoneColor,
+            fillOpacity: 0.18,
+            weight: 3,
+          },
+        },
+        remove: true,
+      },
+      draw: {
+        polyline: false,
+        rectangle: false,
+        circle: false,
+        circlemarker: false,
+        marker: false,
+        polygon: {
+          allowIntersection: false,
+          showArea: true,
+          shapeOptions: {
+            color: zoneColor,
+            fillColor: zoneColor,
+            fillOpacity: 0.12,
+            weight: 3,
+          },
+        },
+      },
+    });
+
+    map.addControl(drawControl);
+
+    const syncFromLayer = (layer: L.Layer) => {
+      if (layer instanceof L.Polygon) {
+        const latLngs = layer.getLatLngs();
+        if (!Array.isArray(latLngs) || latLngs.length === 0) return;
+        const first = latLngs[0];
+        if (!Array.isArray(first)) return;
+        const ring = first;
+        if (ring.every((p) => p instanceof L.LatLng)) {
+          onChange(latLngsToCoords(ring));
+        }
+      }
+    };
+
+    const onCreated = (e: L.LeafletEvent) => {
+      if (!isRecord(e)) return;
+      const layer = e['layer'];
+      if (layer instanceof L.Layer) {
+        fg.clearLayers();
+        fg.addLayer(layer);
+        syncFromLayer(layer);
+      }
+    };
+
+    const onEdited = (e: L.LeafletEvent) => {
+      if (!isRecord(e)) return;
+      const layers = e['layers'];
+      if (layers instanceof L.LayerGroup) {
+        const list = layers.getLayers();
+        for (const layer of list) {
+          syncFromLayer(layer);
+          return;
+        }
+      }
+    };
+
+    const onDeleted = () => {
+      fg.clearLayers();
+      onChange(null);
+    };
+
+    map.on(L.Draw.Event.CREATED, onCreated);
+    map.on(L.Draw.Event.EDITED, onEdited);
+    map.on(L.Draw.Event.DELETED, onDeleted);
+
+    // Seed existing polygon when editing
+    if (polygonCoords && polygonCoords.length >= 3) {
+      const seeded = ensureRingClosed(polygonCoords);
+      const seededLatLngs = coordsToLatLngs(seeded);
+      const poly = new L.Polygon(seededLatLngs as L.LatLngExpression[], {
+        color: zoneColor,
+        fillColor: zoneColor,
+        fillOpacity: 0.12,
+        weight: 3,
+      });
+      fg.addLayer(poly);
+    }
+
+    return () => {
+      map.off(L.Draw.Event.CREATED, onCreated);
+      map.off(L.Draw.Event.EDITED, onEdited);
+      map.off(L.Draw.Event.DELETED, onDeleted);
+      map.removeControl(drawControl);
+      map.removeLayer(fg);
+    };
+  }, [map, onChange, polygonCoords, zoneColor]);
+
+  return null;
 };
 
 export function DeliveryRatesPage() {
@@ -113,6 +315,54 @@ export function DeliveryRatesPage() {
     }
   };
 
+  const handleMoveUp = async (rule: DeliveryRateRule) => {
+    const sortedRules = [...rules].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
+    const currentIndex = sortedRules.findIndex(r => r.id === rule.id);
+    
+    if (currentIndex <= 0) return; // Já está no topo
+    
+    const previousRule = sortedRules[currentIndex - 1];
+    const currentPriority = rule.priority ?? currentIndex;
+    const previousPriority = previousRule.priority ?? (currentIndex - 1);
+    
+    try {
+      // Trocar prioridades
+      await Promise.all([
+        api.put(`/delivery/rates/${rule.id}`, { ...rule, priority: previousPriority }),
+        api.put(`/delivery/rates/${previousRule.id}`, { ...previousRule, priority: currentPriority })
+      ]);
+      
+      await fetchRules();
+    } catch (err) {
+      console.error('Erro ao mover regra para cima:', err);
+      alert('Erro ao mover regra');
+    }
+  };
+
+  const handleMoveDown = async (rule: DeliveryRateRule) => {
+    const sortedRules = [...rules].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
+    const currentIndex = sortedRules.findIndex(r => r.id === rule.id);
+    
+    if (currentIndex >= sortedRules.length - 1) return; // Já está no final
+    
+    const nextRule = sortedRules[currentIndex + 1];
+    const currentPriority = rule.priority ?? currentIndex;
+    const nextPriority = nextRule.priority ?? (currentIndex + 1);
+    
+    try {
+      // Trocar prioridades
+      await Promise.all([
+        api.put(`/delivery/rates/${rule.id}`, { ...rule, priority: nextPriority }),
+        api.put(`/delivery/rates/${nextRule.id}`, { ...nextRule, priority: currentPriority })
+      ]);
+      
+      await fetchRules();
+    } catch (err) {
+      console.error('Erro ao mover regra para baixo:', err);
+      alert('Erro ao mover regra');
+    }
+  };
+
   const formatRuleDescription = (rule: DeliveryRateRule) => {
     switch (rule.type) {
       case 'neighborhood':
@@ -121,6 +371,11 @@ export function DeliveryRatesPage() {
         return `${rule.minKm}-${rule.maxKm}km - R$ ${Number(rule.ratePerKm || 0).toFixed(2)}/km`;
       case 'fixed':
         return `Taxa fixa - R$ ${Number(rule.fixedRate || 0).toFixed(2)}`;
+      case 'polygon': {
+        const meta = getZoneMeta(rule);
+        const title = meta.name ? meta.name : 'Zona sem nome';
+        return `${title} - R$ ${Number(rule.fixedRate || rule.rate || 0).toFixed(2)}`;
+      }
       default:
         return '';
     }
@@ -180,8 +435,12 @@ export function DeliveryRatesPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {rules.map((rule) => {
+          {[...rules].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0)).map((rule, index, sortedRules) => {
             const Icon = TYPE_ICONS[rule.type];
+            const meta = rule.type === 'polygon' ? getZoneMeta(rule) : null;
+            const canMoveUp = index > 0;
+            const canMoveDown = index < sortedRules.length - 1;
+            
             return (
               <div
                 key={rule.id}
@@ -201,6 +460,14 @@ export function DeliveryRatesPage() {
                         <span className="font-medium text-gray-900">
                           {TYPE_LABELS[rule.type]}
                         </span>
+                        {rule.type === 'polygon' ? (
+                          <span
+                            className="px-2 py-0.5 text-xs font-black rounded-full border"
+                            style={{ borderColor: meta?.color ?? defaultZoneColor(), color: meta?.color ?? defaultZoneColor() }}
+                          >
+                            Polygon
+                          </span>
+                        ) : null}
                         <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                           rule.isActive
                             ? 'bg-green-100 text-green-800'
@@ -208,13 +475,50 @@ export function DeliveryRatesPage() {
                         }`}>
                           {rule.isActive ? 'Ativa' : 'Inativa'}
                         </span>
+                        {rule.isFallback ? (
+                          <span className="px-2 py-0.5 text-xs font-black rounded-full bg-amber-100 text-amber-800">
+                            Fallback
+                          </span>
+                        ) : null}
+                        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                          #{index + 1}
+                        </span>
                       </div>
                       <p className="text-sm text-gray-600 mt-1">
                         {formatRuleDescription(rule)}
                       </p>
+                      {typeof rule.priority === 'number' ? (
+                        <p className="text-xs text-gray-400 mt-1">Prioridade: {rule.priority}</p>
+                      ) : null}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-1">
+                      <button
+                        onClick={() => handleMoveUp(rule)}
+                        disabled={!canMoveUp}
+                        className={`p-1 rounded transition-colors ${
+                          canMoveUp
+                            ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                            : 'text-gray-200 cursor-not-allowed'
+                        }`}
+                        title="Mover para cima"
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleMoveDown(rule)}
+                        disabled={!canMoveDown}
+                        className={`p-1 rounded transition-colors ${
+                          canMoveDown
+                            ? 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
+                            : 'text-gray-200 cursor-not-allowed'
+                        }`}
+                        title="Mover para baixo"
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                    </div>
                     <button
                       onClick={() => handleToggleActive(rule)}
                       className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
@@ -277,8 +581,16 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
     maxKm: 0,
     ratePerKm: 0,
     fixedRate: 0,
+    priority: 1000,
+    isFallback: false,
+    geoJson: null,
+    polygonCoordinates: null,
     isActive: true,
   }));
+
+  const [zoneName, setZoneName] = useState('');
+  const [zoneColor, setZoneColor] = useState(defaultZoneColor());
+  const [polygonCoords, setPolygonCoords] = useState<PolygonCoordinates | null>(null);
 
   useEffect(() => {
     if (rule) {
@@ -290,10 +602,37 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
         maxKm: Number(rule.maxKm || 0),
         ratePerKm: Number(rule.ratePerKm || 0),
         fixedRate: Number(rule.fixedRate || 0),
+        priority: typeof rule.priority === 'number' ? rule.priority : 1000,
+        isFallback: !!rule.isFallback,
+        geoJson: rule.geoJson ?? null,
+        polygonCoordinates: rule.polygonCoordinates ?? null,
         isActive: rule.isActive,
       });
+
+      const meta = getZoneMeta(rule);
+      setZoneName(meta.name ?? '');
+      setZoneColor(meta.color);
+
+      const normalized = normalizePolygonCoordinates(rule.polygonCoordinates);
+      setPolygonCoords(normalized);
     }
   }, [rule]);
+
+  useEffect(() => {
+    if (!rule) {
+      setZoneName('');
+      setZoneColor(defaultZoneColor());
+      setPolygonCoords(null);
+    }
+  }, [rule]);
+
+  const mapCenter: LatLngExpression = useMemo(() => {
+    if (polygonCoords && polygonCoords.length > 0) {
+      const [lng, lat] = polygonCoords[0];
+      return [lat, lng];
+    }
+    return [-23.55052, -46.633308];
+  }, [polygonCoords]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -311,6 +650,32 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
     
     if (formData.type === 'fixed' && (formData.fixedRate ?? 0) <= 0) {
       alert('Preencha o valor da taxa fixa');
+      return;
+    }
+
+    if (formData.type === 'polygon') {
+      if (!polygonCoords || polygonCoords.length < 3) {
+        alert('Desenhe uma zona (polígono) com no mínimo 3 pontos');
+        return;
+      }
+
+      const gj: DeliveryRuleGeoJson = {
+        type: 'Feature',
+        properties: {
+          name: zoneName.trim() !== '' ? zoneName.trim() : undefined,
+          color: zoneColor,
+        },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [polygonCoords],
+        },
+      };
+
+      onSubmit({
+        ...formData,
+        geoJson: gj,
+        polygonCoordinates: polygonCoords,
+      });
       return;
     }
     
@@ -331,14 +696,44 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
             </label>
             <select
               value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === 'neighborhood' || v === 'distance' || v === 'fixed' || v === 'polygon') {
+                  setFormData({ ...formData, type: v });
+                }
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               disabled={!!rule}
             >
               <option value="neighborhood">Por Bairro</option>
               <option value="distance">Por Distância</option>
               <option value="fixed">Taxa Fixa</option>
+              <option value="polygon">Por Zona (Polígono)</option>
             </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Prioridade</label>
+              <input
+                type="number"
+                min="0"
+                value={formData.priority ?? 1000}
+                onChange={(e) => setFormData({ ...formData, priority: Number(e.target.value) })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={!!formData.isFallback}
+                  onChange={(e) => setFormData({ ...formData, isFallback: e.target.checked })}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                />
+                Usar como fallback
+              </label>
+            </div>
           </div>
 
           {formData.type === 'neighborhood' && (
@@ -440,6 +835,61 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                 required
               />
             </div>
+          )}
+
+          {formData.type === 'polygon' && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nome da zona</label>
+                  <input
+                    type="text"
+                    value={zoneName}
+                    onChange={(e) => setZoneName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="Ex: Zona Centro"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cor</label>
+                  <input
+                    type="color"
+                    value={zoneColor}
+                    onChange={(e) => setZoneColor(e.target.value)}
+                    className="w-full h-[42px] px-2 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-lg overflow-hidden border border-gray-200">
+                <div className="px-3 py-2 bg-gray-50 text-xs text-gray-600 flex items-center justify-between">
+                  <span>Desenhe a zona no mapa (polígono)</span>
+                  <span className="text-gray-500">Arraste os pontos para editar • Lixeira para remover</span>
+                </div>
+                <div className="h-[320px]">
+                  <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }}>
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    <FeatureGroup>
+                      <PolygonDrawControl
+                        zoneColor={zoneColor}
+                        polygonCoords={polygonCoords}
+                        onChange={setPolygonCoords}
+                      />
+
+                      {polygonCoords ? (
+                        <Polygon
+                          positions={coordsToLatLngs(polygonCoords)}
+                          pathOptions={{ color: zoneColor, fillColor: zoneColor, fillOpacity: 0.12, weight: 3 }}
+                        />
+                      ) : null}
+                    </FeatureGroup>
+                  </MapContainer>
+                </div>
+              </div>
+            </>
           )}
 
           <div className="flex items-center">

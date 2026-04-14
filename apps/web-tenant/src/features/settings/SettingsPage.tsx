@@ -41,7 +41,18 @@ export function SettingsPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const response = await api.patch('/tenant/settings', settings);
+      // Limpar dados vazios antes de enviar para validação
+      const cleanedSettings = {
+        timezone: settings.timezone || undefined,
+        currency: settings.currency || undefined,
+        language: settings.language || undefined,
+        businessPhone: settings.businessPhone?.trim() || undefined,
+        businessEmail: settings.businessEmail?.trim() || undefined,
+        address: settings.address?.trim() || undefined,
+        logoUrl: settings.logoUrl?.trim() || undefined,
+      };
+      
+      const response = await api.patch('/tenant/settings', cleanedSettings);
       if (response.success) {
         alert('Configurações salvas com sucesso!');
       }

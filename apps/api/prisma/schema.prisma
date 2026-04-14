@@ -59,6 +59,7 @@ model Tenant {
   comboRecipeIngredients     ComboRecipeIngredient[]
   goals                      Goal[]
   deliveryRateRules          DeliveryRateRule[]
+  deliveryCoverageConfig     DeliveryCoverageConfig?
   moduleAccess              TenantModuleAccess[]
 
   @@map("tenants")
@@ -998,6 +999,37 @@ enum RateType {
   polygon
 }
 
+ enum DeliveryZoneKind {
+   blocked_zone
+   custom_zone
+ }
+
+ enum DeliveryPricingMode {
+   fixed
+   distance
+   free
+ }
+
+ model DeliveryCoverageConfig {
+   id                String   @id @default(uuid())
+   tenantId           String   @unique @map("tenant_id")
+   storeLat           Float    @map("store_lat")
+   storeLng           Float    @map("store_lng")
+   maxRadiusKm        Decimal  @map("max_radius_km") @db.Decimal(6, 2)
+   defaultPricePerKm  Decimal  @map("default_price_per_km") @db.Decimal(10, 2)
+   minimumFee         Decimal? @map("minimum_fee") @db.Decimal(10, 2)
+   maximumFee         Decimal? @map("maximum_fee") @db.Decimal(10, 2)
+   isDeliveryEnabled  Boolean  @default(true) @map("is_delivery_enabled")
+
+   createdAt DateTime @default(now()) @map("created_at")
+   updatedAt DateTime @updatedAt @map("updated_at")
+
+   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+   @@index([tenantId])
+   @@map("delivery_coverage_configs")
+ }
+
 model DeliveryRateRule {
   id          String    @id @default(uuid())
   tenantId    String    @map("tenant_id")
@@ -1025,6 +1057,15 @@ model DeliveryRateRule {
   // Preparação para área/polígono (não implementado ainda)
   geoJson             Json? @map("geo_json")
   polygonCoordinates  Json? @map("polygon_coordinates")
+
+   // Zonas desenhadas (uso principal quando type=polygon)
+   name          String?           @db.VarChar(120)
+   color         String?           @db.VarChar(16)
+   zoneKind      DeliveryZoneKind? @map("zone_kind")
+   pricingMode   DeliveryPricingMode? @map("pricing_mode")
+   fixedFee      Decimal?          @map("fixed_fee") @db.Decimal(10, 2)
+   pricePerKm    Decimal?          @map("price_per_km") @db.Decimal(10, 2)
+   blocksDelivery Boolean          @default(false) @map("blocks_delivery")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

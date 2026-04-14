@@ -4,13 +4,30 @@ import { AuthModule } from '../auth/auth.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { DriversController } from './drivers.controller';
 import { DriversService } from './drivers.service';
+import { DeliveryCoverageController } from './delivery-coverage.controller';
+import { DeliveryCoverageService } from './delivery-coverage.service';
 import { DeliveryRateController } from './delivery-rate.controller';
-import { DeliveryRateService } from './delivery-rate.service';
+import { DeliveryRateService, DELIVERY_COVERAGE_REPO, DELIVERY_RATE_RULE_REPO } from './delivery-rate.service';
+import { PrismaService } from '../database/prisma.service';
 
 @Module({
   imports: [DatabaseModule, AuthModule, RbacModule],
-  controllers: [DriversController, DeliveryRateController],
-  providers: [DriversService, DeliveryRateService],
+  controllers: [DriversController, DeliveryRateController, DeliveryCoverageController],
+  providers: [
+    DriversService,
+    DeliveryCoverageService,
+    {
+      provide: DELIVERY_RATE_RULE_REPO,
+      inject: [PrismaService],
+      useFactory: (prisma: PrismaService) => prisma.deliveryRateRule,
+    },
+    {
+      provide: DELIVERY_COVERAGE_REPO,
+      inject: [PrismaService],
+      useFactory: (prisma: PrismaService) => prisma.deliveryCoverageConfig,
+    },
+    DeliveryRateService,
+  ],
   exports: [DeliveryRateService],
 })
 export class DeliveryModule {}

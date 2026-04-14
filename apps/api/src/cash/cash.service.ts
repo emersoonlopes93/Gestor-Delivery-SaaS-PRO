@@ -24,7 +24,7 @@ export class CashService {
     openingAmount: number,
   ): Promise<CashSessionDTO> {
     // Enforce: only one open session per operator per tenant
-    const existing = await this.prisma.cashSession.findFirst({
+    const existing = await this.prisma.tenantClient.cashSession.findFirst({
       where: { tenantId, operatorId, status: 'open' },
     });
 
@@ -34,7 +34,7 @@ export class CashService {
       );
     }
 
-    const session = await this.prisma.$transaction(async (tx) => {
+    const session = await this.prisma.tenantClient.$transaction(async (tx) => {
       const newSession = await tx.cashSession.create({
         data: {
           tenantId,

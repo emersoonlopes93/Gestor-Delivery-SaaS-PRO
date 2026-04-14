@@ -140,11 +140,27 @@ export class CheckoutValidatorService {
     const total = itemsSubtotal - discountTotal;
 
     // 5. Calcular taxa de entrega
-    const deliveryFeeCalculation = await this.deliveryRateService.calculateRate({
-      tenantId,
-      address: options?.deliveryAddress,
-      distanceKm: null,
-    });
+    const hasCoverage = await this.deliveryRateService.hasCoverageConfig(tenantId);
+    const decision = hasCoverage
+      ? await this.deliveryRateService.calculateDeliveryDecision({
+          tenantId,
+          address: options?.deliveryAddress,
+          distanceKm: null,
+        })
+      : null;
+
+    if (decision && !decision.canDeliver) {
+      throw new BadRequestException(decision.reason || 'Não entregamos nesta região.');
+    }
+
+    const deliveryFeeCalculation = decision
+      ? { fee: decision.fee }
+      : await this.deliveryRateService.calculateRate({
+          tenantId,
+          address: options?.deliveryAddress,
+          distanceKm: null,
+        });
+
     const deliveryFee = deliveryFeeCalculation.fee;
 
     const finalTotal = total + deliveryFee;

@@ -7,6 +7,7 @@ import { App } from './App';
 import { queryClient } from './lib/query-client';
 import { ErrorBoundary } from './components/error-boundary';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet-draw/dist/leaflet.draw.css';
 import './lib/leaflet-icon';
 import './index.css';
 

@@ -55,6 +55,11 @@ function pickString(obj: Record<string, unknown>, key: string): string | null {
   return typeof v === 'string' ? v : null;
 }
 
+function pickNumber(obj: Record<string, unknown>, key: string): number | null {
+  const v = obj[key];
+  return typeof v === 'number' ? v : null;
+}
+
 async function getTenantToken() {
   const login = await api('POST', '/auth/tenant/login', {
     email: TENANT_EMAIL,
@@ -150,6 +155,39 @@ async function main() {
     createDistance.raw,
   );
 
+  // Create polygon rule (should win when point is inside)
+  const createPolygon = await api(
+    'POST',
+    '/delivery/rates',
+    {
+      type: 'polygon',
+      fixedRate: 7.77,
+      isActive: true,
+      priority: 1,
+      polygonCoordinates: [
+        [-46.64, -23.56],
+        [-46.62, -23.56],
+        [-46.62, -23.54],
+        [-46.64, -23.54],
+      ],
+    },
+    accessToken,
+  );
+  assert(
+    'create polygon rule 200/201',
+    createPolygon.status === 200 || createPolygon.status === 201,
+    `Status=${createPolygon.status}`,
+    createPolygon.raw,
+  );
+  const polygonRule = asRecord(createPolygon.data);
+  const polygonRuleId = polygonRule ? pickString(polygonRule, 'id') : null;
+  assert(
+    'created polygon has id',
+    typeof polygonRuleId === 'string' && polygonRuleId.length > 0,
+    'missing id',
+    createPolygon.data,
+  );
+
   // 1) Neighborhood should win (priority + order)
   const calcNeighborhood = await api('POST', '/delivery/rates/calculate', {
     tenantId: resolvedTenantId,
@@ -173,6 +211,31 @@ async function main() {
   const calcNeighborhoodData = asRecord(calcNeighborhood.data);
   const feeNeighborhood = calcNeighborhoodData ? calcNeighborhoodData.fee : null;
   assert('neighborhood fee=4.5', feeNeighborhood === 4.5, `fee=${String(feeNeighborhood)}`, calcNeighborhood.data);
+
+  // 1b) Polygon should win when point is inside polygon
+  const calcPolygonInside = await api('POST', '/delivery/rates/calculate', {
+    tenantId: resolvedTenantId,
+    address: {
+      street: 'Rua P',
+      number: '77',
+      neighborhood: 'Centro',
+      city: 'São Paulo',
+      state: 'SP',
+      zipCode: '01001000',
+      lat: -23.55,
+      lng: -46.63,
+    },
+    distanceKm: 5,
+  });
+  assert(
+    'calculate polygon inside status 200/201',
+    calcPolygonInside.status === 200 || calcPolygonInside.status === 201,
+    `Status=${calcPolygonInside.status}`,
+    calcPolygonInside.raw,
+  );
+  const calcPolygonInsideData = asRecord(calcPolygonInside.data);
+  const feePolygonInside = calcPolygonInsideData ? pickNumber(calcPolygonInsideData, 'fee') : null;
+  assert('polygon inside fee=7.77', feePolygonInside === 7.77, `fee=${String(feePolygonInside)}`, calcPolygonInside.data);
 
   // 2) Distance should apply when no neighborhood match
   const calcDistance = await api('POST', '/delivery/rates/calculate', {
@@ -198,6 +261,10 @@ async function main() {
   assert('distance fee=10', feeDistance === 10, `fee=${String(feeDistance)}`, calcDistance.data);
 
   // Cleanup
+  if (polygonRuleId) {
+    const del = await api('DELETE', `/delivery/rates/${polygonRuleId}`, undefined, accessToken);
+    assert('delete polygon rule status 200/201', del.status === 200 || del.status === 201, `Status=${del.status}`, del.raw);
+  }
   if (neighborhoodRuleId) {
     const del = await api('DELETE', `/delivery/rates/${neighborhoodRuleId}`, undefined, accessToken);
     assert('delete neighborhood rule status 200/201', del.status === 200 || del.status === 201, `Status=${del.status}`, del.raw);
