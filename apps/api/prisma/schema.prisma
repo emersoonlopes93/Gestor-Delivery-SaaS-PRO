@@ -62,6 +62,14 @@ model Tenant {
   deliveryCoverageConfig     DeliveryCoverageConfig?
   moduleAccess              TenantModuleAccess[]
 
+  optionGroups             OptionGroup[]
+  optionItems              OptionItem[]
+  productOptionGroupLinks  ProductOptionGroupLink[]
+  catalogPublications      CatalogPublication[]
+  catalogAvailabilityRules CatalogAvailabilityRule[]
+  comboSlots               ComboSlot[]
+  comboSlotAllowedItems    ComboSlotAllowedItem[]
+
   @@map("tenants")
 }
 
@@ -70,6 +78,214 @@ enum TenantStatus {
   inactive
   suspended
   trial
+}
+
+enum CatalogProductType {
+  simple
+  configurable
+  combo
+}
+
+enum OptionSelectionType {
+  single
+  multiple
+  quantity
+}
+
+enum PriceImpactType {
+  none
+  fixed
+  replace
+  percentage
+}
+
+enum PricingAxis {
+  primary
+  secondary
+}
+
+enum CatalogPublicationStatus {
+  draft
+  published
+}
+
+enum CatalogOperationalStatus {
+  active
+  inactive
+  hidden
+  sold_out_manual
+}
+
+enum CatalogSalesChannel {
+  storefront_delivery
+  storefront_pickup
+  pos
+}
+
+model OptionGroup {
+  id            String              @id @default(uuid())
+  tenantId      String              @map("tenant_id")
+  name          String
+  description   String?
+  selectionType OptionSelectionType @map("selection_type")
+  isRequired    Boolean             @default(false) @map("is_required")
+  minSelect     Int                 @default(0) @map("min_select")
+  maxSelect     Int                 @default(1) @map("max_select")
+  isActive      Boolean             @default(true) @map("is_active")
+  order         Int                 @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items       OptionItem[]
+  productLinks ProductOptionGroupLink[]
+
+  @@index([tenantId])
+  @@map("option_groups")
+}
+
+model OptionItem {
+  id               String          @id @default(uuid())
+  tenantId         String          @map("tenant_id")
+  optionGroupId    String          @map("option_group_id")
+  name             String
+  description      String?
+  sku              String?
+  isActive         Boolean         @default(true) @map("is_active")
+  order            Int             @default(0)
+
+  priceImpactType  PriceImpactType @default(none) @map("price_impact_type")
+  priceImpactValue Decimal         @default(0) @map("price_impact_value") @db.Decimal(10, 2)
+
+  allowQuantity Boolean @default(false) @map("allow_quantity")
+  minQty        Int?    @map("min_qty")
+  maxQty        Int?    @map("max_qty")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  optionGroup OptionGroup @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([optionGroupId])
+  @@map("option_items")
+}
+
+model ProductOptionGroupLink {
+  id            String @id @default(uuid())
+  tenantId      String @map("tenant_id")
+  productId     String @map("product_id")
+  optionGroupId String @map("option_group_id")
+  order         Int    @default(0)
+
+  // Overrides (optional)
+  overrideName        String? @map("override_name")
+  overrideDescription String? @map("override_description")
+  overrideIsRequired  Boolean? @map("override_is_required")
+  overrideMinSelect   Int?    @map("override_min_select")
+  overrideMaxSelect   Int?    @map("override_max_select")
+
+  // Pricing axis for replace conflict prevention
+  pricingAxis PricingAxis @default(secondary) @map("pricing_axis")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  optionGroup OptionGroup @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, optionGroupId])
+  @@index([tenantId])
+  @@index([productId])
+  @@map("product_option_group_links")
+}
+
+model CatalogPublication {
+  id                String                  @id @default(uuid())
+  tenantId          String                  @map("tenant_id")
+  productId         String                  @unique @map("product_id")
+  publicationStatus CatalogPublicationStatus @default(draft) @map("publication_status")
+  operationalStatus CatalogOperationalStatus @default(active) @map("operational_status")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rules   CatalogAvailabilityRule[]
+
+  @@index([tenantId])
+  @@index([tenantId, publicationStatus])
+  @@index([tenantId, operationalStatus])
+  @@map("catalog_publications")
+}
+
+model CatalogAvailabilityRule {
+  id              String             @id @default(uuid())
+  tenantId        String             @map("tenant_id")
+  publicationId   String             @map("publication_id")
+  channel         CatalogSalesChannel
+  daysOfWeek      Int[]              @map("days_of_week")
+  startTime       String             @map("start_time") @db.VarChar(5)
+  endTime         String             @map("end_time") @db.VarChar(5)
+  isActive        Boolean            @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  publication CatalogPublication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([publicationId])
+  @@map("catalog_availability_rules")
+}
+
+model ComboSlot {
+  id          String  @id @default(uuid())
+  tenantId    String  @map("tenant_id")
+  comboProductId String @map("combo_product_id")
+  name        String
+  description String?
+  isRequired  Boolean @default(true) @map("is_required")
+  minSelect   Int     @default(1) @map("min_select")
+  maxSelect   Int     @default(1) @map("max_select")
+  order       Int     @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  comboProduct Product @relation(fields: [comboProductId], references: [id], onDelete: Cascade)
+  allowedItems ComboSlotAllowedItem[]
+
+  @@index([tenantId])
+  @@index([comboProductId])
+  @@map("combo_slots")
+}
+
+model ComboSlotAllowedItem {
+  id            String  @id @default(uuid())
+  tenantId      String  @map("tenant_id")
+  comboSlotId   String  @map("combo_slot_id")
+  productId     String  @map("product_id")
+  additionalPrice Decimal @default(0) @map("additional_price") @db.Decimal(10, 2)
+  order         Int     @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  slot     ComboSlot @relation(fields: [comboSlotId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([comboSlotId, productId])
+  @@index([tenantId])
+  @@index([productId])
+  @@map("combo_slot_allowed_items")
 }
 
 // ============================================================
@@ -321,6 +537,11 @@ model Product {
   complementGroups ProductComplementGroupLink[]
   comboBlockItems  ProductComboBlockItem[]
   recipeIngredients ProductRecipeIngredient[]
+
+  optionGroupLinks ProductOptionGroupLink[]
+  publication      CatalogPublication?
+  comboSlots       ComboSlot[]
+  allowedInComboSlots ComboSlotAllowedItem[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])

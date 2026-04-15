@@ -18,6 +18,10 @@ export {
   DeliveryAddressDTO, 
   CreateOrderItemComplementDTO, 
   CreateOrderItemComboSelectionDTO, 
+  CreateOrderItemSelectionItemDTO,
+  CreateOrderItemSelectionGroupDTO,
+  CreateOrderItemComboSlotSelectionItemDTO,
+  CreateOrderItemComboSlotSelectionDTO,
   CreateOrderItemDTO, 
   CreateOrderDTO 
 } from './order';

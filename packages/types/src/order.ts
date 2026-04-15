@@ -58,6 +58,36 @@ export class CreateOrderItemComboSelectionDTO {
   @IsString() @IsNotEmpty() blockItemId!: string;
 }
 
+export class CreateOrderItemSelectionItemDTO {
+  @IsString() @IsNotEmpty() optionItemId!: string;
+  @IsNumber() @IsOptional() qty?: number;
+}
+
+export class CreateOrderItemSelectionGroupDTO {
+  @IsString() @IsNotEmpty() optionGroupId!: string;
+
+  @IsArray()
+  @IsNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => CreateOrderItemSelectionItemDTO)
+  items!: CreateOrderItemSelectionItemDTO[];
+}
+
+export class CreateOrderItemComboSlotSelectionItemDTO {
+  @IsString() @IsNotEmpty() productId!: string;
+  @IsNumber() @IsOptional() qty?: number;
+}
+
+export class CreateOrderItemComboSlotSelectionDTO {
+  @IsString() @IsNotEmpty() comboSlotId!: string;
+
+  @IsArray()
+  @IsNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => CreateOrderItemComboSlotSelectionItemDTO)
+  items!: CreateOrderItemComboSlotSelectionItemDTO[];
+}
+
 export class CreateOrderItemDTO {
   @IsString() @IsNotEmpty() lineType!: OrderLineType;
   @IsString() @IsOptional() productId?: string;
@@ -74,8 +104,20 @@ export class CreateOrderItemDTO {
   @IsArray()
   @IsOptional()
   @ValidateNested({ each: true })
+  @Type(() => CreateOrderItemSelectionGroupDTO)
+  selections?: CreateOrderItemSelectionGroupDTO[];
+
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
   @Type(() => CreateOrderItemComboSelectionDTO)
   comboSelections?: CreateOrderItemComboSelectionDTO[];
+
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => CreateOrderItemComboSlotSelectionDTO)
+  slots?: CreateOrderItemComboSlotSelectionDTO[];
 }
 
 export class CreateOrderDTO {
