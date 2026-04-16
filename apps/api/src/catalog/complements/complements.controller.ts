@@ -16,10 +16,16 @@ interface TenantRequest {
   };
 }
 
+/**
+ * @deprecated Este controlador faz parte do sistema legado de complementos.
+ * Favor utilizar OptionGroups e o fluxo de Catálogo V2.
+ */
 @Controller('catalog/complements/groups')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class ComplementsController {
-  constructor(private readonly complementsService: ComplementsService) {}
+  constructor(private readonly complementsService: ComplementsService) {
+    console.warn('[LEGACY] ComplementsController is deprecated and will be removed in future versions.');
+  }
 
   @Post()
   @RequirePermissions('catalog.manage_complements')

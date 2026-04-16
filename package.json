@@ -7,6 +7,8 @@
     "dev:api": "pnpm --filter @gestor/api dev",
     "dev:web-tenant": "pnpm --filter @gestor/web-tenant dev",
     "dev:web-admin": "pnpm --filter @gestor/web-admin dev",
+    "dev:web-storefront": "pnpm --filter @gestor/web-storefront dev",
+    "dev:all": "pnpm -r --parallel --filter @gestor/api --filter @gestor/web-tenant --filter @gestor/web-admin --filter @gestor/web-storefront run dev",
     "build": "pnpm -r run build",
     "build:api": "pnpm --filter @gestor/api build",
     "build:web-tenant": "pnpm --filter @gestor/web-tenant build",

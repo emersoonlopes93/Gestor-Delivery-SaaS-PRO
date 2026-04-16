@@ -13,7 +13,6 @@ import {
   MapPin,
   Menu,
   Package,
-  Percent,
   Search,
   Settings,
   ShoppingCart,
@@ -36,6 +35,7 @@ type SidebarItem = {
   to: string;
   icon: LucideIcon;
   permission?: string;
+  isExternal?: boolean;
   match?: (pathname: string) => boolean;
 };
 
@@ -48,6 +48,19 @@ type SidebarGroup = {
 const SIDEBAR_STORAGE_KEY = 'tenant_sidebar_state_v1';
 
 const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
+  {
+    id: 'public',
+    label: 'Canais de Venda',
+    items: [
+      { 
+        id: 'public-menu', 
+        label: 'Ver Loja Online', 
+        to: '/public-menu', // Will be handled as external or via a helper
+        icon: ShoppingCart,
+        isExternal: true
+      },
+    ],
+  },
   {
     id: 'dashboard',
     label: 'Dashboard',
@@ -68,9 +81,8 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     items: [
       { id: 'catalog-categories', label: 'Categorias', to: '/catalog/categories', icon: BookOpen, permission: 'catalog.read' },
       { id: 'catalog-products', label: 'Produtos', to: '/catalog/products', icon: Box, permission: 'catalog.read' },
-      { id: 'catalog-option-groups', label: 'Grupos de Opções (V2)', to: '/catalog/option-groups', icon: SlidersHorizontal, permission: 'catalog.manage_option_groups' },
-      { id: 'catalog-complements', label: 'Complementos', to: '/catalog/complements', icon: Percent, permission: 'catalog.manage_complements' },
-      { id: 'catalog-combos', label: 'Combos & Ofertas', to: '/catalog/combos', icon: Package, permission: 'catalog.manage_combos' },
+      { id: 'catalog-complements', label: 'Complementos', to: '/catalog/complements', icon: SlidersHorizontal, permission: 'catalog.manage_option_groups' },
+      { id: 'catalog-combos', label: 'Combos', to: '/catalog/combos', icon: Package, permission: 'catalog.manage_combos' },
     ],
   },
   {
@@ -214,31 +226,52 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
         }`}
       >
         <div className="mt-1 space-y-1">
-          {group.items.map((item) => (
-            <NavLink
-              key={item.id}
-              to={item.to}
-              title={collapsed ? item.label : undefined}
-              className={({ isActive }) => {
-                const active = isActive;
-                return `group relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  active
-                    ? 'bg-primary-100 text-primary-800'
-                    : 'text-gray-700 hover:bg-primary-50 hover:text-primary-700'
-                }`;
-              }}
-            >
-              <span className="w-6 flex items-center justify-center" aria-hidden>
-                <item.icon className="h-4 w-4" aria-hidden />
-              </span>
-              {!collapsed ? <span className="truncate">{item.label}</span> : null}
-              {collapsed ? (
-                <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100">
-                  {item.label}
+          {group.items.map((item) => {
+            if (item.isExternal) {
+              return (
+                <a
+                  key={item.id}
+                  href={item.to}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-gray-700 hover:bg-primary-50 hover:text-primary-700"
+                >
+                  <span className="w-6 flex items-center justify-center" aria-hidden>
+                    <item.icon className="h-4 w-4" aria-hidden />
+                  </span>
+                  {!collapsed ? <span className="truncate">{item.label}</span> : null}
+                  <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                    <LayoutGrid className="w-3 h-3 text-gray-400 rotate-45" />
+                  </span>
+                </a>
+              );
+            }
+            return (
+              <NavLink
+                key={item.id}
+                to={item.to}
+                title={collapsed ? item.label : undefined}
+                className={({ isActive }) => {
+                  const active = isActive;
+                  return `group relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    active
+                      ? 'bg-primary-100 text-primary-800'
+                      : 'text-gray-700 hover:bg-primary-50 hover:text-primary-700'
+                  }`;
+                }}
+              >
+                <span className="w-6 flex items-center justify-center" aria-hidden>
+                  <item.icon className="h-4 w-4" aria-hidden />
                 </span>
-              ) : null}
-            </NavLink>
-          ))}
+                {!collapsed ? <span className="truncate">{item.label}</span> : null}
+                {collapsed ? (
+                  <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100">
+                    {item.label}
+                  </span>
+                ) : null}
+              </NavLink>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -276,12 +309,24 @@ export function AppLayout() {
 
   const groups = useMemo(() => {
     const filtered: SidebarGroup[] = [];
+    const tenantSlug = user?.tenant?.slug;
+
     for (const g of SIDEBAR_GROUPS) {
-      const items = g.items.filter((it) => (it.permission ? hasPermission(userPermissions, it.permission) : true));
-      if (items.length) filtered.push({ ...g, items });
+      const items = g.items
+        .filter((it) => (it.permission ? hasPermission(userPermissions, it.permission) : true))
+        .map((it) => {
+          if (it.id === 'public-menu' && it.isExternal && tenantSlug) {
+            // For development we assume it might be on another port or same domain
+            // In production this would lead to the public menu
+            return { ...it, to: `/${tenantSlug}` };
+          }
+          return it;
+        });
+
+      if (items.length) filtered.push({ ...g, items: items as any });
     }
     return filtered;
-  }, [userPermissions]);
+  }, [userPermissions, user?.tenant?.slug]);
 
   const activeGroupId = useMemo(() => {
     return firstActiveGroupId(groups, location.pathname);

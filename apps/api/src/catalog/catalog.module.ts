@@ -15,13 +15,30 @@ import { ComboSlotsController } from './combo-slots/combo-slots.controller';
 import { ComboSlotsService } from './combo-slots/combo-slots.service';
 import { PublicationController } from './publication/publication.controller';
 import { PublicationService } from './publication/publication.service';
+import { CatalogMigrationV2Service } from './migration-v2.service';
+import { PizzaEngineService } from './pizza-engine.service';
+import { CatalogTemplatesService } from './catalog-templates.service';
 import { DatabaseModule } from '../database/database.module';
 import { RbacModule } from '../rbac/rbac.module';
+import { PizzaController } from './pizza.controller';
 
 @Module({
   imports: [DatabaseModule, RbacModule],
-  controllers: [CategoriesController, ProductsController, ComplementsController, CombosController, OptionGroupsController, ProductOptionGroupsController, ComboSlotsController, PublicationController],
-  providers: [CategoriesService, ProductsService, ComplementsService, CombosService, OptionGroupsService, ProductOptionGroupsService, ComboSlotsService, PublicationService],
+  controllers: [CategoriesController, ProductsController, ComplementsController, CombosController, OptionGroupsController, ProductOptionGroupsController, ComboSlotsController, PublicationController, PizzaController],
+  providers: [
+    CategoriesService,
+    ProductsService,
+    ComplementsService,
+    CombosService,
+    OptionGroupsService,
+    ProductOptionGroupsService,
+    ComboSlotsService,
+    PublicationService,
+    CatalogMigrationV2Service,
+    PizzaEngineService,
+    CatalogTemplatesService,
+  ],
+  exports: [PizzaEngineService, CatalogTemplatesService],
 })
 export class CatalogModule {}
 

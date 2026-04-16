@@ -51,4 +51,7 @@ export class CreateProductDto implements ICreateProductDto {
   @IsNumber()
   @IsOptional()
   order?: number;
+
+  @IsOptional()
+  optionItemPrices?: { optionItemId: string, price: number }[];
 }

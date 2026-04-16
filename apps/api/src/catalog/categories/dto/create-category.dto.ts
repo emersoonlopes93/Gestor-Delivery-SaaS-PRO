@@ -24,4 +24,11 @@ export class CreateCategoryDto implements ICreateCategoryDto {
   @IsInt()
   @IsOptional()
   order?: number;
+
+  @IsOptional()
+  @IsString()
+  templateType?: 'none' | 'pizza';
+
+  @IsOptional()
+  templateConfig?: any;
 }

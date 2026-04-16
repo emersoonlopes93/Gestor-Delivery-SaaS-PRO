@@ -5,12 +5,14 @@ import type { Prisma } from '@prisma/client';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { slugify } from '@gestor/utils';
+import { CatalogTemplatesService } from '../catalog-templates.service';
 
 @Injectable()
 export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
+    private readonly catalogTemplates: CatalogTemplatesService,
   ) {}
 
   private getRequiredTenantId(): string {
@@ -25,7 +27,7 @@ export class ProductsService {
     const tenantId = this.getRequiredTenantId();
     const slug = slugify(createProductDto.name);
 
-    return this.prisma.tenantClient.product.create({
+    const product = await this.prisma.tenantClient.product.create({
       data: {
         tenantId,
         slug,
@@ -43,7 +45,15 @@ export class ProductsService {
         sku: createProductDto.sku ?? null,
         order: createProductDto.order ?? 0,
       },
+      include: { category: true }
     });
+
+    // Auto-config for specialized templates
+    if (product.category?.templateType === 'pizza') {
+      await this.catalogTemplates.configureProductAsFlavor(tenantId, product.id);
+    }
+
+    return product;
   }
 
   async findAll() {
@@ -63,6 +73,7 @@ export class ProductsService {
         optionGroupLinks: { include: { optionGroup: { include: { items: { orderBy: { order: 'asc' } } } } }, orderBy: { order: 'asc' } },
         comboSlots: { include: { allowedItems: { include: { product: true }, orderBy: { order: 'asc' } } }, orderBy: { order: 'asc' } },
         publication: { include: { rules: { orderBy: { createdAt: 'asc' } } } },
+        optionItemPrices: true,
       }
     });
 
@@ -79,7 +90,7 @@ export class ProductsService {
 
     const slug = updateProductDto.name ? slugify(updateProductDto.name) : undefined;
 
-    return this.prisma.tenantClient.product.update({
+    const product = await this.prisma.tenantClient.product.update({
       where: { id },
       data: {
         name: updateProductDto.name,
@@ -98,6 +109,35 @@ export class ProductsService {
         ...(slug ? { slug } : {}),
       },
     });
+
+    // Bulk update option item prices (size prices for pizza flavors)
+    const itemPrices = updateProductDto.optionItemPrices;
+    if (itemPrices && itemPrices.length > 0) {
+      const tenantId = this.getRequiredTenantId();
+      await Promise.all(
+        itemPrices.map((p) =>
+          this.prisma.tenantClient.productOptionItemPrice.upsert({
+            where: {
+              productId_optionItemId: {
+                productId: id,
+                optionItemId: p.optionItemId,
+              },
+            },
+            create: {
+              tenantId,
+              productId: id,
+              optionItemId: p.optionItemId,
+              price: p.price,
+            },
+            update: {
+              price: p.price,
+            },
+          }),
+        ),
+      );
+    }
+
+    return product;
   }
 
   async remove(id: string) {

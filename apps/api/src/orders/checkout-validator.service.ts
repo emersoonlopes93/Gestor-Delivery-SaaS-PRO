@@ -12,6 +12,7 @@ import { CouponsService } from '../promotions/coupons.service';
 import { CashbackService } from '../promotions/cashback.service';
 import { DeliveryRateService } from '../delivery/delivery-rate.service';
 import { AvailabilityService } from './availability.service';
+import { PizzaEngineService } from '../catalog/pizza-engine.service';
 
 interface ValidatedProductLine {
   lineType: 'product';
@@ -79,6 +80,7 @@ export class CheckoutValidatorService {
     private readonly cashbackService: CashbackService,
     private readonly deliveryRateService: DeliveryRateService,
     private readonly availabilityService: AvailabilityService,
+    private readonly pizzaEngine: PizzaEngineService,
   ) {}
 
   async validate(
@@ -298,8 +300,11 @@ export class CheckoutValidatorService {
           },
           orderBy: { order: 'asc' },
         },
+        category: {
+          select: { id: true, templateType: true, templateConfig: true }
+        }
       },
-    }) as Record<string, unknown> | null;
+    }) as Record<string, any> | null;
 
     if (!product) {
       throw new BadRequestException(`Produto não encontrado ou não pertence a esta loja.`);
@@ -344,6 +349,25 @@ export class CheckoutValidatorService {
       unitPrice = pricing.unitPrice;
       composition = pricing.composition;
 
+      const category = product['category'];
+      const isPizzaTemplate = category?.templateType === 'pizza';
+
+      if (isPizzaTemplate && item.pizzaComposition) {
+        // SPECIAL PIZZA LOGIC
+        const res = await this.pizzaEngine.calculatePrice(
+          category.id,
+          item.pizzaComposition.sizeId,
+          item.pizzaComposition.flavors
+        );
+
+        effectiveBasePrice = res.calculatedPrice;
+        unitPrice = effectiveBasePrice + extrasTotal;
+        composition = `Tamanho: ${res.sizeName}; Sabores: ${res.flavors.map(f => `${f.name} (${(f.fraction * 100).toFixed(0)}%)`).join(', ')}`;
+        
+        // Update composition with options if any
+        if (pricing.composition) composition += `; ${pricing.composition}`;
+      }
+
       snapshotCatalogV2Json = {
         version: 'catalog_v2_snapshot_v1',
         channel,
@@ -353,6 +377,7 @@ export class CheckoutValidatorService {
           id: item.productId,
           name: product['name'],
           type: product['type'],
+          templateType: category?.templateType,
         },
         quantity: item.quantity,
         notes: item.notes ?? null,
@@ -363,6 +388,15 @@ export class CheckoutValidatorService {
           unitPrice,
         },
         selections: pricing.selectionsSnapshot,
+        pizzaComposition: item.pizzaComposition ? {
+          ...item.pizzaComposition,
+          // We could store the full engine result here for UI
+          fullEngineResult: await this.pizzaEngine.calculatePrice(
+            category.id,
+            item.pizzaComposition.sizeId,
+            item.pizzaComposition.flavors
+          )
+        } : null,
         slots: [],
       };
 

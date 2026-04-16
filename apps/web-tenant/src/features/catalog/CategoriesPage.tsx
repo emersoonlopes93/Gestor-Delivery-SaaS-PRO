@@ -12,12 +12,15 @@ export function CategoriesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ProductCategory | null>(null);
   const navigate = useNavigate();
-  const [formData, setFormData] = useState<CreateCategoryDto>({
+
+  const [formData, setFormData] = useState<any>({
     name: '',
     description: '',
     isActive: true,
     isFeatured: false,
     order: 0,
+    templateType: 'none' as any,
+    templateConfig: {} as any,
   });
 
   useEffect(() => {
@@ -47,6 +50,8 @@ export function CategoriesPage() {
         isActive: category.isActive,
         isFeatured: category.isFeatured,
         order: category.order,
+        templateType: (category as any).templateType || 'none',
+        templateConfig: (category as any).templateConfig || {},
       });
     } else {
       setEditingCategory(null);
@@ -56,6 +61,11 @@ export function CategoriesPage() {
         isActive: true,
         isFeatured: false,
         order: 0,
+        templateType: 'none',
+        templateConfig: {
+          pricingStrategy: 'highest',
+          allowHalfHalf: true
+        },
       });
     }
     setIsModalOpen(true);
@@ -221,6 +231,7 @@ export function CategoriesPage() {
               placeholder="Breve descrição da categoria..."
             />
           </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Ordem de Exibição</label>
@@ -251,6 +262,54 @@ export function CategoriesPage() {
                 <span className="text-sm font-bold text-gray-700 group-hover:text-gray-900 transition-colors">Destaque</span>
               </label>
             </div>
+          </div>
+
+          <div className="pt-4 border-t border-gray-100">
+            <label className="block text-[10px] font-black text-primary-600 uppercase tracking-widest mb-3">Template da Categoria</label>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Tipo de Template</label>
+                <select
+                  value={formData.templateType}
+                  onChange={(e) => setFormData({ 
+                    ...formData, 
+                    templateType: e.target.value,
+                    templateConfig: e.target.value === 'pizza' ? { pricingStrategy: 'highest', allowHalfHalf: true } : {}
+                  })}
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none text-sm font-bold"
+                >
+                  <option value="none">Nenhum (Padrão)</option>
+                  <option value="pizza">🍕 Pizza (Meio a Meio / Tamanhos)</option>
+                </select>
+              </div>
+
+              {formData.templateType === 'pizza' && (
+                <div>
+                  <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Regra de Preço (Meio a Meio)</label>
+                  <select
+                    value={formData.templateConfig?.pricingStrategy || 'highest'}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      templateConfig: { ...formData.templateConfig, pricingStrategy: e.target.value }
+                    })}
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none text-sm font-bold"
+                  >
+                    <option value="highest">Maior Valor</option>
+                    <option value="average">Média de Valores</option>
+                    <option value="lowest">Menor Valor</option>
+                    <option value="sum_halves">Soma das Metades</option>
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {formData.templateType === 'pizza' && (
+              <div className="mt-4 p-4 bg-primary-50 rounded-xl border border-primary-100">
+                <p className="text-xs text-primary-700 leading-relaxed font-medium">
+                  <strong>💡 Template Pizza Ativado:</strong> Novos produtos nesta categoria serão configurados automaticamente como Sabores e vinculados aos grupos de Tamanhos e Montagem.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </Modal>

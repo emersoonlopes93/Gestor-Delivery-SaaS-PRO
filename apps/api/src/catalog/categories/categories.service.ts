@@ -34,6 +34,8 @@ export class CategoriesService {
         isActive: createCategoryDto.isActive ?? true,
         isFeatured: createCategoryDto.isFeatured ?? false,
         order: createCategoryDto.order ?? 0,
+        templateType: createCategoryDto.templateType ?? 'none',
+        templateConfig: createCategoryDto.templateConfig ?? null,
       },
     });
   }
@@ -113,6 +115,8 @@ export class CategoriesService {
         isActive: updateCategoryDto.isActive,
         isFeatured: updateCategoryDto.isFeatured,
         order: updateCategoryDto.order,
+        templateType: updateCategoryDto.templateType,
+        templateConfig: updateCategoryDto.templateConfig,
         ...(slug ? { slug } : {}),
       },
     });

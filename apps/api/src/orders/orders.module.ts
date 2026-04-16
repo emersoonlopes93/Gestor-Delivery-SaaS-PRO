@@ -11,9 +11,10 @@ import { PromotionsModule } from '../promotions/promotions.module';
 import { CrmModule } from '../crm/crm.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { DeliveryModule } from '../delivery/delivery.module';
+import { CatalogModule } from '../catalog/catalog.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, RbacModule, PromotionsModule, CrmModule, InventoryModule, DeliveryModule],
+  imports: [DatabaseModule, AuthModule, RbacModule, PromotionsModule, CrmModule, InventoryModule, DeliveryModule, CatalogModule],
   controllers: [OrdersController, PublicOrdersController],
   providers: [OrdersService, CheckoutValidatorService, AvailabilityService],
   exports: [OrdersService, CheckoutValidatorService],

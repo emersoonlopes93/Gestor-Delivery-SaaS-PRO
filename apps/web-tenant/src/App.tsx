@@ -8,9 +8,9 @@ import { PermissionGate } from './components/PermissionGate';
 import { CategoriesPage } from './features/catalog/CategoriesPage';
 import { ProductsPage } from './features/catalog/ProductsPage';
 import { ProductV2EditorPage } from './features/catalog/ProductV2EditorPage';
-import { ComplementsPage } from './features/catalog/ComplementsPage';
-import { CombosPage } from './features/catalog/CombosPage';
 import { OptionGroupsPage } from './features/catalog/OptionGroupsPage';
+import { CombosV2Page } from './features/catalog/CombosV2Page';
+import { OrderSimulationPage } from './features/catalog/OrderSimulationPage';
 import { OrdersListPage } from './features/orders/OrdersListPage';
 import { OperationBoardPage } from './features/orders/OperationBoardPage';
 import { KdsPage } from './features/orders/KdsPage';
@@ -69,12 +69,20 @@ export function App() {
           path="/catalog/products/:id/v2"
           element={
             <PermissionGate permission="catalog.manage_products">
-              <ProductV2EditorPage />
+              <ProductV2EditorPage mode="product" />
             </PermissionGate>
           }
         />
         <Route
-          path="/catalog/option-groups"
+          path="/catalog/products/new/v2"
+          element={
+            <PermissionGate permission="catalog.manage_products">
+              <ProductV2EditorPage mode="product" />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/catalog/complements"
           element={
             <PermissionGate permission="catalog.manage_option_groups">
               <OptionGroupsPage />
@@ -82,22 +90,29 @@ export function App() {
           }
         />
         <Route
-          path="/catalog/complements"
+          path="/catalog/combos"
           element={
-            <PermissionGate permission="catalog.manage_complements">
-              <ComplementsPage />
+            <PermissionGate permission="catalog.manage_combos">
+              <CombosV2Page />
             </PermissionGate>
           }
         />
         <Route
-          path="/catalog/combos"
+          path="/catalog/combos/:id/v2"
           element={
             <PermissionGate permission="catalog.manage_combos">
-              <CombosPage />
+              <ProductV2EditorPage mode="combo" />
             </PermissionGate>
           }
         />
-
+        <Route
+          path="/catalog/simulation"
+          element={
+            <PermissionGate permission="catalog.read">
+              <OrderSimulationPage />
+            </PermissionGate>
+          }
+        />
         {/* Orders module Routes (Phase 4) */}
         <Route
           path="/orders"
@@ -254,4 +269,3 @@ export function App() {
     </Routes>
   );
 }
-

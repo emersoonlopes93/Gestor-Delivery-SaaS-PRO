@@ -69,6 +69,7 @@ model Tenant {
   catalogAvailabilityRules CatalogAvailabilityRule[]
   comboSlots               ComboSlot[]
   comboSlotAllowedItems    ComboSlotAllowedItem[]
+  productOptionItemPrices  ProductOptionItemPrice[]
 
   @@map("tenants")
 }
@@ -78,6 +79,11 @@ enum TenantStatus {
   inactive
   suspended
   trial
+}
+
+enum CategoryTemplateType {
+  none
+  pizza
 }
 
 enum CatalogProductType {
@@ -167,10 +173,30 @@ model OptionItem {
 
   tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   optionGroup OptionGroup @relation(fields: [optionGroupId], references: [id], onDelete: Cascade)
+  productPrices ProductOptionItemPrice[]
 
   @@index([tenantId])
   @@index([optionGroupId])
   @@map("option_items")
+}
+
+model ProductOptionItemPrice {
+  id            String  @id @default(uuid())
+  tenantId      String  @map("tenant_id")
+  productId     String  @map("product_id")
+  optionItemId  String  @map("option_item_id")
+  price         Decimal @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product     Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  optionItem  OptionItem @relation(fields: [optionItemId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, optionItemId])
+  @@index([tenantId])
+  @@map("product_option_item_prices")
 }
 
 model ProductOptionGroupLink {
@@ -498,6 +524,9 @@ model ProductCategory {
   isFeatured  Boolean @default(false) @map("is_featured")
   order       Int     @default(0)
 
+  templateType   CategoryTemplateType @default(none) @map("template_type")
+  templateConfig Json?                @map("template_config")
+
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
@@ -543,6 +572,7 @@ model Product {
   publication      CatalogPublication?
   comboSlots       ComboSlot[]
   allowedInComboSlots ComboSlotAllowedItem[]
+  optionItemPrices ProductOptionItemPrice[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])

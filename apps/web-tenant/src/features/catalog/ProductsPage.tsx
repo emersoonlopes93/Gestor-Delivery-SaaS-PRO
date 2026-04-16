@@ -10,7 +10,7 @@ import { Eye, Pencil, Trash2, FileText, Search, ChevronDown, Layers, Send, EyeOf
 type ProductsViewMode = 'all' | 'grouped';
 
 type ProductStatusFilter = 'all' | 'active' | 'inactive';
-type ProductTypeFilter = 'all' | 'simple' | 'configurable' | 'combo';
+type ProductTypeFilter = 'all' | 'simple' | 'configurable';
 type PublicationFilter = 'all' | 'draft' | 'published';
 type OperationalFilter = 'all' | 'active' | 'hidden' | 'sold_out_manual' | 'inactive';
 
@@ -36,19 +36,9 @@ export function ProductsPage() {
   const tableScrollRef = React.useRef<HTMLDivElement | null>(null);
   const [tableScrollTop, setTableScrollTop] = useState(0);
   
-  // CRUD State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [formData, setFormData] = useState<CreateProductDto>({
-    name: '',
-    categoryId: '',
-    shortDescription: '',
-    basePrice: 0,
-    isActive: true,
-    isAvailable: true,
-    sellableOnline: true,
-    order: 0,
-  });
+  // CRUD State (Unused since V2 consolidation, using redirection to EditorV2 instead)
+  // const [isModalOpen, setIsModalOpen] = useState(false);
+  // const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     loadData();
@@ -67,7 +57,7 @@ export function ProductsPage() {
   }, [categories]);
 
   const filteredProducts = useMemo(() => {
-    let list = products;
+    let list = products.filter((p) => (p.type ?? 'simple') !== 'combo');
 
     if (selectedCategoryId === '__uncategorized__') {
       list = list.filter((p) => !p.categoryId);
@@ -170,84 +160,11 @@ export function ProductsPage() {
     }
   };
 
-  const handleOpenModal = (product?: Product) => {
-    if (product) {
-      setEditingProduct(product);
-      setFormData({
-        name: product.name,
-        categoryId: product.categoryId || '',
-        shortDescription: product.shortDescription || '',
-        basePrice: Number(product.basePrice),
-        isActive: product.isActive,
-        isAvailable: product.isAvailable,
-        sellableOnline: product.sellableOnline,
-        order: product.order,
-        sku: product.sku || '',
-        image: product.image || '',
-      });
-      setImageFile(null);
-      setImagePreviewUrl(product.image || null);
-    } else {
-      setEditingProduct(null);
-      setFormData({
-        name: '',
-        categoryId: categories[0]?.id || '',
-        shortDescription: '',
-        basePrice: 0,
-        isActive: true,
-        isAvailable: true,
-        sellableOnline: true,
-        order: 0,
-      });
-      setImageFile(null);
-      setImagePreviewUrl(null);
-    }
-    setIsModalOpen(true);
-  };
-
-  const handleSelectImageFile = (file: File | null) => {
-    setImageFile(file);
-    if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(imagePreviewUrl);
-    }
-    if (file) {
-      setImagePreviewUrl(URL.createObjectURL(file));
-    } else {
-      setImagePreviewUrl(formData.image || null);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!formData.name || !formData.basePrice) return;
-
-    try {
-      let finalImageUrl: string | undefined = formData.image;
-
-      if (imageFile) {
-        const fd = new FormData();
-        fd.append('file', imageFile);
-        const uploadRes = await api.upload<{ url: string }>('/upload/image', fd);
-        if (uploadRes.success) {
-          finalImageUrl = uploadRes.data.url;
-        }
-      }
-
-      const payload: CreateProductDto = {
-        ...formData,
-        image: finalImageUrl,
-      };
-
-      if (editingProduct) {
-        await api.patch(`/catalog/products/${editingProduct.id}`, payload);
-      } else {
-        await api.post('/catalog/products', payload);
-      }
-      setIsModalOpen(false);
-      loadData();
-    } catch (error) {
-      console.error('Erro ao salvar produto:', error);
-    }
-  };
+  // CRUD operations now occur in ProductV2EditorPage
+  /*
+  const handleOpenModal = (product?: Product) => { ... }
+  const handleSave = async () => { ... }
+  */
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Excluir este produto? (Ficará inativo no sistema)')) return;
@@ -306,7 +223,12 @@ export function ProductsPage() {
   const renderRows = (list: ProductWithPublication[]) => {
     return list.map((product) => {
       const categoryName = product.categoryId ? (categoriesById.get(product.categoryId)?.name ?? 'Sem Categoria') : 'Sem Categoria';
-      const typeLabel = product.type ?? 'simple';
+      const typeMap: Record<string, string> = {
+        simple: 'Individual',
+        configurable: 'Personalizado',
+        combo: 'Combo'
+      };
+      const typeLabel = typeMap[product.type ?? 'simple'] || 'Produto';
       const pub = (product as ProductWithPublication).publication;
       const pubLabel = pub ? pub.publicationStatus : null;
       const opLabel = pub ? pub.operationalStatus : null;
@@ -328,7 +250,7 @@ export function ProductsPage() {
                 <div className="font-bold text-gray-900 truncate">{product.name}</div>
                 <div className="text-xs text-gray-500 truncate hidden sm:block">{product.shortDescription || 'Sem descrição'}</div>
                 <div className="mt-1 flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-700 border border-gray-200">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-gray-100 text-gray-700 border-gray-200'}`}>
                     {typeLabel}
                   </span>
                   {pubLabel ? (
@@ -371,21 +293,14 @@ export function ProductsPage() {
                 <FileText size={16} />
               </button>
               <button
-                onClick={() => handleOpenModal(product)}
+                onClick={() => navigate(`/catalog/products/${product.id}/v2`)}
                 className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
                 title="Editar"
                 type="button"
               >
                 <Pencil size={16} />
               </button>
-              <button
-                onClick={() => navigate(`/catalog/products/${product.id}/v2`)}
-                className="p-2 text-gray-400 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all"
-                title="Editor V2"
-                type="button"
-              >
-                <Layers size={16} />
-              </button>
+              {/* Botão Editor V2 removido pois agora é o botão principal de editar */}
               <PermissionGate permission="catalog.publish" fallback={null}>
                 <button
                   onClick={() => handleTogglePublication(product)}
@@ -475,23 +390,23 @@ export function ProductsPage() {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Produtos</h1>
-          <p className="text-gray-500 mt-1">Gerencie seu cardápio e fichas técnicas.</p>
+          <p className="text-gray-500 mt-1">Gerencie itens vendáveis. Combos têm fluxo próprio no módulo de Combos.</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
             <button
               onClick={() => setViewMode('all')}
-              className={`px-3 py-1.5 text-xs font-black uppercase tracking-wider rounded-lg transition-colors ${viewMode === 'all' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+              className={`px-3 py-1.5 text-xs font-black uppercase tracking-wider rounded-lg transition-colors ${viewMode === 'all' ? 'bg-primary-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}
               type="button"
             >
-              Lista geral
+              Lista Completa
             </button>
             <button
               onClick={() => setViewMode('grouped')}
-              className={`px-3 py-1.5 text-xs font-black uppercase tracking-wider rounded-lg transition-colors ${viewMode === 'grouped' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+              className={`px-3 py-1.5 text-xs font-black uppercase tracking-wider rounded-lg transition-colors ${viewMode === 'grouped' ? 'bg-primary-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}
               type="button"
             >
-              Por categoria
+              Visualizar por Categoria
             </button>
           </div>
 
@@ -508,15 +423,39 @@ export function ProductsPage() {
             ))}
             <option value="__uncategorized__">Sem categoria</option>
           </select>
-
+          
           <button
-            onClick={() => handleOpenModal()}
-            className="bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2"
+            onClick={() => navigate('/catalog/simulation')}
+            className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-5 py-2.5 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2"
+            type="button"
+          >
+            <span>🍕</span> Simulador
+          </button>
+          
+          <button
+            onClick={() => navigate('/catalog/products/new/v2')}
+            className="bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-primary-200 transition-all flex items-center gap-2"
             type="button"
           >
             <span>🍔</span> Novo Produto
           </button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-6">
+        {[
+          { id: 'all', label: 'Todos' },
+          { id: 'simple', label: 'Individuais' },
+          { id: 'configurable', label: 'Personalizados' }
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTypeFilter(t.id as ProductTypeFilter)}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${typeFilter === t.id ? 'bg-white border-primary-600 text-primary-600 shadow-sm ring-1 ring-primary-600' : 'bg-gray-100 border-transparent text-gray-500 hover:bg-gray-200'}`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
@@ -526,13 +465,26 @@ export function ProductsPage() {
             <input
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-medium"
-              placeholder="Buscar por produto, descrição ou categoria..."
+              className="w-full pl-9 pr-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-medium transition-all focus:bg-white"
+              placeholder="Buscar por nome, ingrediente ou categoria..."
               type="text"
             />
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              value={selectedCategoryId ?? ''}
+              onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : null)}
+              className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 focus:bg-white outline-none"
+            >
+              <option value="">Todas as categorias</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+              <option value="__uncategorized__">Sem categoria</option>
+            </select>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as ProductStatusFilter)}
@@ -542,16 +494,7 @@ export function ProductsPage() {
               <option value="active">Ativos</option>
               <option value="inactive">Inativos</option>
             </select>
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value as ProductTypeFilter)}
-              className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700"
-            >
-              <option value="all">Todos os tipos</option>
-              <option value="simple">Simple</option>
-              <option value="configurable">Configurable</option>
-              <option value="combo">Combo</option>
-            </select>
+            {/* Filtro de tipo removido daqui e movido para pills acima */}
             <select
               value={publicationFilter}
               onChange={(e) => setPublicationFilter(e.target.value as PublicationFilter)}
@@ -658,21 +601,14 @@ export function ProductsPage() {
                           Ficha
                         </button>
                         <button
-                          onClick={() => handleOpenModal(product)}
+                          onClick={() => navigate(`/catalog/products/${product.id}/v2`)}
                           className="px-3 py-2 text-xs font-black text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-xl border border-primary-200"
                           title="Editar"
                           type="button"
                         >
                           Editar
                         </button>
-                        <button
-                          onClick={() => navigate(`/catalog/products/${product.id}/v2`)}
-                          className="px-3 py-2 text-xs font-black text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl border border-blue-200"
-                          title="Editor V2"
-                          type="button"
-                        >
-                          Editor V2
-                        </button>
+                        {/* Botão Editor V2 removido pois agora é o botão principal de editar */}
                         <button
                           onClick={() => handleToggleActive(product)}
                           className="px-3 py-2 text-xs font-black text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200"
@@ -822,137 +758,7 @@ export function ProductsPage() {
       )}
 
       {/* Modal CRUD */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={editingProduct ? 'Editar Produto' : 'Novo Produto'}
-        footer={
-          <>
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-sm"
-            >
-              Salvar Produto
-            </button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Nome do Produto</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                placeholder="Ex: Burger Clássico"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Categoria</label>
-              <select
-                value={formData.categoryId}
-                onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-              >
-                <option value="">Selecione...</option>
-                {categories.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Preço Base (R$)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.basePrice}
-                onChange={(e) => setFormData({ ...formData, basePrice: parseFloat(e.target.value) || 0 })}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-bold"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Descrição Curta</label>
-            <textarea
-              value={formData.shortDescription}
-              onChange={(e) => setFormData({ ...formData, shortDescription: e.target.value })}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none h-20 resize-none"
-              placeholder="Ex: Pão brioche, carne 180g, queijo cheddar..."
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">URL da Imagem</label>
-            <input
-              type="text"
-              value={formData.image || ''}
-              onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-              placeholder="https://exemplo.com/imagem.png"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Upload de Imagem</label>
-            <div className="space-y-3">
-              {imagePreviewUrl ? (
-                <div className="w-full h-44 bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
-                  <img src={imagePreviewUrl} alt="Preview" className="w-full h-full object-cover" />
-                </div>
-              ) : (
-                <div className="w-full h-44 bg-gray-50 border border-dashed border-gray-300 rounded-xl flex items-center justify-center text-gray-400 text-xs font-black uppercase tracking-widest">
-                  Sem imagem
-                </div>
-              )}
-
-              <div className="flex items-center gap-3">
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={(e) => handleSelectImageFile(e.target.files?.[0] ?? null)}
-                  className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
-                />
-                <button
-                  type="button"
-                  onClick={() => handleSelectImageFile(null)}
-                  className="px-3 py-2 text-xs font-black uppercase tracking-wider text-gray-600 hover:bg-gray-100 rounded-xl"
-                >
-                  Remover
-                </button>
-              </div>
-              <p className="text-xs text-gray-500 font-medium">
-                Upload é o modo principal. A URL acima funciona como fallback.
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-6 pt-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.isActive}
-                onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                className="w-4 h-4 text-primary-600"
-              />
-              <span className="text-sm font-bold text-gray-700">Ativo</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={formData.sellableOnline}
-                onChange={(e) => setFormData({ ...formData, sellableOnline: e.target.checked })}
-                className="w-4 h-4 text-primary-600"
-              />
-              <span className="text-sm font-bold text-gray-700">Cardápio Online</span>
-            </label>
-          </div>
-        </div>
-      </Modal>
+      {/* Modal CRUD Legado Removido */}
 
       {recipeTarget && (
         <RecipeModal

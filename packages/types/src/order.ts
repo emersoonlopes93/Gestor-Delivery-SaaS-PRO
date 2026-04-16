@@ -88,13 +88,33 @@ export class CreateOrderItemComboSlotSelectionDTO {
   items!: CreateOrderItemComboSlotSelectionItemDTO[];
 }
 
+export class PizzaCompositionFlavorDTO {
+  @IsString() @IsNotEmpty() productId!: string;
+  @IsNumber() @IsNotEmpty() fraction!: number;
+}
+
+export class PizzaCompositionDTO {
+  @IsString() @IsNotEmpty() sizeId!: string;
+
+  @IsArray()
+  @IsNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => PizzaCompositionFlavorDTO)
+  flavors!: PizzaCompositionFlavorDTO[];
+}
+
 export class CreateOrderItemDTO {
   @IsString() @IsNotEmpty() lineType!: OrderLineType;
   @IsString() @IsOptional() productId?: string;
   @IsString() @IsOptional() comboId?: string;
   @IsNumber() @IsNotEmpty() quantity!: number;
   @IsString() @IsOptional() notes?: string;
-  
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PizzaCompositionDTO)
+  pizzaComposition?: PizzaCompositionDTO;
+
   @IsArray()
   @IsOptional()
   @ValidateNested({ each: true })

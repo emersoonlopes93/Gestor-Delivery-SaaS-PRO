@@ -6,10 +6,16 @@ import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { RequirePermissions } from '../../common/decorators';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 
+/**
+ * @deprecated Este controlador faz parte do sistema legado de combos.
+ * Favor utilizar ComboSlots e o fluxo de Catálogo V2.
+ */
 @Controller('catalog/combos')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class CombosController {
-  constructor(private readonly combosService: CombosService) {}
+  constructor(private readonly combosService: CombosService) {
+    console.warn('[LEGACY] CombosController is deprecated and will be removed in future versions.');
+  }
 
   @Post()
   @RequirePermissions('catalog.manage_combos')

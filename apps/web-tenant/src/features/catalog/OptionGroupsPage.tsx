@@ -184,15 +184,15 @@ export function OptionGroupsPage() {
     <div className="p-6 max-w-7xl mx-auto text-left">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Grupos de Opções (V2)</h1>
-          <p className="text-gray-500 mt-1">Gerencie personalização do produto (Option Groups / Items).</p>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Complementos</h1>
+          <p className="text-gray-500 mt-1">Biblioteca reutilizável de complementos para vincular aos produtos.</p>
         </div>
         <button
           onClick={() => openGroupModal()}
           className="bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2"
           type="button"
         >
-          Novo Grupo
+          Novo Complemento
         </button>
       </div>
 
@@ -210,7 +210,7 @@ export function OptionGroupsPage() {
                   <div className="min-w-0">
                     <div className="font-black text-gray-900 uppercase tracking-wider text-sm truncate">{g.name}</div>
                     <div className="text-xs text-gray-500 font-bold mt-1">
-                      Tipo: {g.selectionType} | {g.isRequired ? 'Obrigatório' : 'Opcional'} | Min {g.minSelect} / Max {g.maxSelect}
+                      Seleção: {g.selectionType} | {g.isRequired ? 'Obrigatório' : 'Opcional'} | Min {g.minSelect} / Max {g.maxSelect}
                     </div>
                   </div>
                   <div className="flex gap-2 shrink-0">
@@ -219,7 +219,7 @@ export function OptionGroupsPage() {
                       className="text-xs font-bold text-primary-600 hover:bg-primary-50 px-3 py-1.5 rounded-lg transition-colors"
                       type="button"
                     >
-                      Add Item
+                      Novo item
                     </button>
                     <button
                       onClick={() => openGroupModal(g)}
@@ -303,7 +303,7 @@ export function OptionGroupsPage() {
                       {items.length === 0 && (
                         <tr>
                           <td colSpan={4} className="px-6 py-10 text-center text-gray-400 text-sm italic">
-                            Nenhum item neste grupo.
+                            Nenhum item neste complemento.
                           </td>
                         </tr>
                       )}
@@ -315,7 +315,7 @@ export function OptionGroupsPage() {
           })}
 
           {groupsSorted.length === 0 && (
-            <div className="py-16 text-center text-gray-400 font-bold italic">Nenhum grupo criado ainda.</div>
+            <div className="py-16 text-center text-gray-400 font-bold italic">Nenhum complemento criado ainda.</div>
           )}
         </div>
       )}
@@ -323,7 +323,7 @@ export function OptionGroupsPage() {
       <Modal
         isOpen={isGroupModalOpen}
         onClose={() => setIsGroupModalOpen(false)}
-        title={editingGroup ? 'Editar Grupo (V2)' : 'Novo Grupo (V2)'}
+        title={editingGroup ? 'Editar complemento' : 'Novo complemento'}
         footer={
           <>
             <button
@@ -420,7 +420,7 @@ export function OptionGroupsPage() {
       <Modal
         isOpen={isItemModalOpen}
         onClose={() => setIsItemModalOpen(false)}
-        title={editingItem ? 'Editar Item (V2)' : 'Novo Item (V2)'}
+        title={editingItem ? 'Editar item do complemento' : 'Novo item do complemento'}
         footer={
           <>
             <button
