@@ -11,6 +11,7 @@ import type {
 import { CouponsService } from '../promotions/coupons.service';
 import { CashbackService } from '../promotions/cashback.service';
 import { DeliveryRateService } from '../delivery/delivery-rate.service';
+import { AvailabilityService } from './availability.service';
 
 interface ValidatedProductLine {
   lineType: 'product';
@@ -18,6 +19,7 @@ interface ValidatedProductLine {
   name: string;
   image: string | null;
   basePrice: number;
+  effectiveBasePrice: number;
   extrasTotal: number;
   unitPrice: number;
   lineTotal: number;
@@ -29,6 +31,8 @@ interface ValidatedProductLine {
     snapshotName: string;
     snapshotPrice: number;
   }>;
+
+  snapshotCatalogV2Json?: unknown;
 }
 
 interface ValidatedComboLine {
@@ -37,6 +41,7 @@ interface ValidatedComboLine {
   name: string;
   image: string | null;
   basePrice: number;
+  effectiveBasePrice: number;
   extrasTotal: number;
   unitPrice: number;
   lineTotal: number;
@@ -49,6 +54,8 @@ interface ValidatedComboLine {
     snapshotProductName: string;
     snapshotAdditionalPrice: number;
   }>;
+
+  snapshotCatalogV2Json?: unknown;
 }
 
 export type ValidatedLine = ValidatedProductLine | ValidatedComboLine;
@@ -71,6 +78,7 @@ export class CheckoutValidatorService {
     private readonly couponsService: CouponsService,
     private readonly cashbackService: CashbackService,
     private readonly deliveryRateService: DeliveryRateService,
+    private readonly availabilityService: AvailabilityService,
   ) {}
 
   async validate(
@@ -81,6 +89,7 @@ export class CheckoutValidatorService {
       couponCode?: string; 
       useCashbackAmount?: number;
       deliveryAddress?: DeliveryAddressDTO | null;
+      channel?: 'storefront_delivery' | 'storefront_pickup';
     },
   ): Promise<CheckoutValidationResult> {
     // 1. Resolve tenant
@@ -99,12 +108,14 @@ export class CheckoutValidatorService {
     const tenantId = tenant.id;
     const validatedLines: ValidatedLine[] = [];
 
+    const channel = options?.channel ?? 'storefront_delivery';
+
     for (const item of items) {
       if (item.lineType === 'product') {
-        const line = await this.validateProductLine(tenantId, item, true);
+        const line = await this.validateProductLine(tenantId, item, true, channel);
         validatedLines.push(line);
       } else if (item.lineType === 'combo') {
-        const line = await this.validateComboLine(tenantId, item);
+        const line = await this.validateComboLine(tenantId, item, channel);
         validatedLines.push(line);
       } else {
         throw new BadRequestException('Tipo de linha inválido.');
@@ -196,10 +207,10 @@ export class CheckoutValidatorService {
 
     for (const item of items) {
       if (item.lineType === 'product') {
-        const line = await this.validateProductLine(tenantId, item, false);
+        const line = await this.validateProductLine(tenantId, item, false, 'pos');
         validatedLines.push(line);
       } else if (item.lineType === 'combo') {
-        const line = await this.validateComboLine(tenantId, item);
+        const line = await this.validateComboLine(tenantId, item, 'pos');
         validatedLines.push(line);
       } else {
         throw new BadRequestException('Tipo de linha inválido.');
@@ -256,6 +267,7 @@ export class CheckoutValidatorService {
     tenantId: string,
     item: CreateOrderItemDTO,
     checkSellableOnline: boolean = true,
+    channel: 'storefront_delivery' | 'storefront_pickup' | 'pos' = 'storefront_delivery',
   ): Promise<ValidatedProductLine> {
     if (!item.productId) {
       throw new BadRequestException('productId é obrigatório para linhas do tipo product.');
@@ -292,6 +304,14 @@ export class CheckoutValidatorService {
     if (!product) {
       throw new BadRequestException(`Produto não encontrado ou não pertence a esta loja.`);
     }
+
+    if (hasNewSelections) {
+      await this.availabilityService.assertCanSell({
+        tenantId,
+        productId: item.productId,
+        channel,
+      });
+    }
     if (!(product['isActive'] as boolean)) {
       throw new BadRequestException(`O produto "${product['name']}" não está ativo.`);
     }
@@ -304,10 +324,12 @@ export class CheckoutValidatorService {
 
     const basePrice = Number(product['basePrice']);
 
+    let effectiveBasePrice = basePrice;
     let extrasTotal = 0;
     let unitPrice = 0;
     let composition = '';
     let validatedComplements: Array<{ complementItemId: string; snapshotName: string; snapshotPrice: number }> = [];
+    let snapshotCatalogV2Json: unknown | undefined;
 
     if (hasNewSelections) {
       const pricing = this.validateAndPriceOptionSelections(
@@ -317,12 +339,36 @@ export class CheckoutValidatorService {
         basePrice,
       );
 
+      effectiveBasePrice = pricing.effectiveBasePrice;
       extrasTotal = pricing.extrasTotal;
       unitPrice = pricing.unitPrice;
       composition = pricing.composition;
-      // Snapshot compatibility: keep complements empty until a dedicated snapshot table exists.
+
+      snapshotCatalogV2Json = {
+        version: 'catalog_v2_snapshot_v1',
+        channel,
+        lineType: 'product',
+        capturedAt: new Date().toISOString(),
+        product: {
+          id: item.productId,
+          name: product['name'],
+          type: product['type'],
+        },
+        quantity: item.quantity,
+        notes: item.notes ?? null,
+        pricing: {
+          basePrice,
+          effectiveBasePrice,
+          extrasTotal,
+          unitPrice,
+        },
+        selections: pricing.selectionsSnapshot,
+        slots: [],
+      };
+
       validatedComplements = [];
     } else {
+      // LEGACY FALLBACK
       const complements = item.complements || [];
       const complementGroups = product['complementGroups'] as Array<Record<string, unknown>>;
 
@@ -345,6 +391,7 @@ export class CheckoutValidatorService {
       name: product['name'] as string,
       image: (product['image'] as string | null) || null,
       basePrice,
+      effectiveBasePrice,
       extrasTotal,
       unitPrice,
       lineTotal,
@@ -352,6 +399,7 @@ export class CheckoutValidatorService {
       notes: item.notes,
       composition,
       complements: validatedComplements,
+      snapshotCatalogV2Json,
     };
   }
 
@@ -360,7 +408,30 @@ export class CheckoutValidatorService {
     optionGroupLinks: Array<Record<string, unknown>>,
     productName: string,
     basePrice: number,
-  ): { unitPrice: number; extrasTotal: number; composition: string } {
+  ): {
+    effectiveBasePrice: number;
+    unitPrice: number;
+    extrasTotal: number;
+    composition: string;
+    selectionsSnapshot: Array<{
+      groupId: string;
+      groupName: string;
+      selectionType: string;
+      pricingAxis: string;
+      isRequired: boolean;
+      minSelect: number;
+      maxSelect: number;
+      allowQuantity: boolean;
+      items: Array<{
+        itemId: string;
+        name: string;
+        qty: number;
+        priceImpactType: string;
+        priceImpactValue: number;
+        appliedAmount: number;
+      }>;
+    }>;
+  } {
     // Build lookup of groups available to this product (respect active group)
     const groupLinkMap = new Map<string, Record<string, unknown>>();
     for (const link of optionGroupLinks) {
@@ -411,6 +482,24 @@ export class CheckoutValidatorService {
     let hasReplace = false;
 
     const compositionParts: string[] = [];
+    const selectionsSnapshot: Array<{
+      groupId: string;
+      groupName: string;
+      selectionType: string;
+      pricingAxis: string;
+      isRequired: boolean;
+      minSelect: number;
+      maxSelect: number;
+      allowQuantity: boolean;
+      items: Array<{
+        itemId: string;
+        name: string;
+        qty: number;
+        priceImpactType: string;
+        priceImpactValue: number;
+        appliedAmount: number;
+      }>;
+    }> = [];
 
     for (const selGroup of selections) {
       const link = groupLinkMap.get(selGroup.optionGroupId);
@@ -420,8 +509,22 @@ export class CheckoutValidatorService {
         (link['overrideName'] as string | null | undefined) ?? (group['name'] as string);
       const pricingAxis = (link['pricingAxis'] as 'primary' | 'secondary') || 'secondary';
 
+      const selectionType = group['selectionType'] as string;
+      const isRequired = ((link['overrideIsRequired'] as boolean | null | undefined) ?? (group['isRequired'] as boolean)) || false;
+      const minSelect = Number(((link['overrideMinSelect'] as number | null | undefined) ?? (group['minSelect'] as number)) ?? 0);
+      const maxSelect = Number(((link['overrideMaxSelect'] as number | null | undefined) ?? (group['maxSelect'] as number)) ?? 0);
+
       const groupItems = group['items'] as Array<Record<string, unknown>>;
       const chosenNames: string[] = [];
+      let groupAllowQuantity = false;
+      const groupSnapshotItems: Array<{
+        itemId: string;
+        name: string;
+        qty: number;
+        priceImpactType: string;
+        priceImpactValue: number;
+        appliedAmount: number;
+      }> = [];
 
       for (const chosen of selGroup.items) {
         const itemRecord = groupItems.find((i) => (i['id'] as string) === chosen.optionItemId);
@@ -432,11 +535,16 @@ export class CheckoutValidatorService {
           throw new BadRequestException(`A opção "${itemRecord['name']}" não está disponível.`);
         }
 
-        const allowQuantity = !!itemRecord['allowQuantity'];
+        const allowQuantity = (itemRecord['allowQuantity'] as boolean) || false;
+        if (allowQuantity) {
+          groupAllowQuantity = true;
+        }
         const qty = allowQuantity ? Math.max(1, Number(chosen.qty ?? 1)) : 1;
 
         const impactType = itemRecord['priceImpactType'] as 'none' | 'fixed' | 'replace' | 'percentage';
         const impactValue = Number(itemRecord['priceImpactValue']);
+
+        let appliedAmount = 0;
 
         if (impactType === 'replace') {
           if (pricingAxis !== 'primary') {
@@ -451,11 +559,23 @@ export class CheckoutValidatorService {
           }
           hasReplace = true;
           effectiveBasePrice = impactValue;
+          appliedAmount = 0;
         } else if (impactType === 'fixed') {
-          fixedTotal += impactValue * qty;
+          appliedAmount = impactValue * qty;
+          fixedTotal += appliedAmount;
         } else if (impactType === 'percentage') {
-          percentageTotal += effectiveBasePrice * (impactValue / 100) * qty;
+          appliedAmount = effectiveBasePrice * (impactValue / 100) * qty;
+          percentageTotal += appliedAmount;
         }
+
+        groupSnapshotItems.push({
+          itemId: chosen.optionItemId,
+          name: itemRecord['name'] as string,
+          qty,
+          priceImpactType: impactType,
+          priceImpactValue: impactValue,
+          appliedAmount,
+        });
 
         chosenNames.push(allowQuantity && qty > 1 ? `${itemRecord['name']} x${qty}` : (itemRecord['name'] as string));
       }
@@ -463,12 +583,26 @@ export class CheckoutValidatorService {
       if (chosenNames.length > 0) {
         compositionParts.push(`${groupName}: ${chosenNames.join(', ')}`);
       }
+
+      if (groupSnapshotItems.length > 0) {
+        selectionsSnapshot.push({
+          groupId: selGroup.optionGroupId,
+          groupName,
+          selectionType,
+          pricingAxis,
+          isRequired,
+          minSelect,
+          maxSelect,
+          allowQuantity: groupAllowQuantity,
+          items: groupSnapshotItems,
+        });
+      }
     }
 
     const unitPrice = effectiveBasePrice + fixedTotal + percentageTotal;
     const extrasTotal = unitPrice - basePrice;
     const composition = compositionParts.join('; ');
-    return { unitPrice, extrasTotal, composition };
+    return { effectiveBasePrice, unitPrice, extrasTotal, composition, selectionsSnapshot };
   }
 
   private validateComplements(
@@ -536,6 +670,7 @@ export class CheckoutValidatorService {
   private async validateComboLine(
     tenantId: string,
     item: CreateOrderItemDTO,
+    channel: 'storefront_delivery' | 'storefront_pickup' | 'pos' = 'storefront_delivery',
   ): Promise<ValidatedComboLine> {
     const hasNewSlots = Array.isArray(item.slots) && item.slots.length > 0;
 
@@ -561,23 +696,31 @@ export class CheckoutValidatorService {
       if (!comboProduct) {
         throw new BadRequestException('Combo não encontrado ou não pertence a esta loja.');
       }
+
+      await this.availabilityService.assertCanSell({
+        tenantId,
+        productId: item.productId,
+        channel,
+      });
       if (!(comboProduct['isActive'] as boolean)) {
         throw new BadRequestException(`O combo "${comboProduct['name']}" não está ativo.`);
       }
 
       const basePrice = Number(comboProduct['basePrice']);
-      const validatedSelections = this.validateComboSlots(
+      const validatedSlots = this.validateComboSlots(
         item.slots || [],
         comboProduct['comboSlots'] as Array<Record<string, unknown>>,
         comboProduct['name'] as string,
       );
 
-      const extrasTotal = validatedSelections.reduce((s, c) => s + c.snapshotAdditionalPrice, 0);
+      const extrasTotal = validatedSlots.reduce((s, c) => s + c.additionalPrice, 0);
       const unitPrice = basePrice + extrasTotal;
       const lineTotal = unitPrice * item.quantity;
-      const composition = validatedSelections
-        .map((s) => `${s.snapshotBlockName}: ${s.snapshotProductName}`)
+      const composition = validatedSlots
+        .map((s) => `${s.slotName}: ${s.productName}`)
         .join('; ');
+
+      const slotsSnapshot = this.buildSlotsSnapshotFromValidated(validatedSlots);
 
       return {
         lineType: 'combo',
@@ -585,6 +728,7 @@ export class CheckoutValidatorService {
         name: comboProduct['name'] as string,
         image: (comboProduct['image'] as string | null) || null,
         basePrice,
+        effectiveBasePrice: basePrice,
         extrasTotal,
         unitPrice,
         lineTotal,
@@ -592,6 +736,27 @@ export class CheckoutValidatorService {
         notes: item.notes,
         composition,
         comboSelections: [],
+        snapshotCatalogV2Json: {
+          version: 'catalog_v2_snapshot_v1',
+          channel,
+          lineType: 'combo',
+          capturedAt: new Date().toISOString(),
+          product: {
+            id: item.productId,
+            name: comboProduct['name'],
+            type: comboProduct['type'],
+          },
+          quantity: item.quantity,
+          notes: item.notes ?? null,
+          pricing: {
+            basePrice,
+            effectiveBasePrice: basePrice,
+            extrasTotal,
+            unitPrice,
+          },
+          selections: [],
+          slots: slotsSnapshot,
+        },
       };
     }
 
@@ -599,6 +764,7 @@ export class CheckoutValidatorService {
       throw new BadRequestException('comboId é obrigatório para linhas do tipo combo.');
     }
 
+    // LEGACY FALLBACK
     const combo = await (this.prisma as unknown as Record<string, { findFirst: (...args: unknown[]) => Promise<Record<string, unknown> | null> }>)['productCombo'].findFirst({
       where: { id: item.comboId, tenantId, deletedAt: null },
       include: {
@@ -640,6 +806,7 @@ export class CheckoutValidatorService {
       name: combo['name'] as string,
       image: (combo['image'] as string | null) || null,
       basePrice,
+      effectiveBasePrice: basePrice,
       extrasTotal,
       unitPrice,
       lineTotal,
@@ -650,21 +817,81 @@ export class CheckoutValidatorService {
     };
   }
 
+  private buildSlotsSnapshotFromValidated(
+    validatedSelections: Array<{
+      slotId: string;
+      slotName: string;
+      isRequired: boolean;
+      minSelect: number;
+      maxSelect: number;
+      productId: string;
+      productName: string;
+      qty: number;
+      additionalPrice: number;
+    }>,
+  ) {
+    const map = new Map<
+      string,
+      {
+        slotName: string;
+        isRequired: boolean;
+        minSelect: number;
+        maxSelect: number;
+        items: Array<{ productId: string; name: string; qty: number; additionalPrice: number }>;
+      }
+    >();
+    for (const sel of validatedSelections) {
+      if (!map.has(sel.slotId)) {
+        map.set(sel.slotId, {
+          slotName: sel.slotName,
+          isRequired: sel.isRequired,
+          minSelect: sel.minSelect,
+          maxSelect: sel.maxSelect,
+          items: [],
+        });
+      }
+      map.get(sel.slotId)!.items.push({
+        productId: sel.productId,
+        name: sel.productName,
+        qty: sel.qty,
+        additionalPrice: sel.additionalPrice,
+      });
+    }
+    return Array.from(map.entries()).map(([slotId, v]) => ({
+      slotId,
+      slotName: v.slotName,
+      isRequired: v.isRequired,
+      minSelect: v.minSelect,
+      maxSelect: v.maxSelect,
+      items: v.items,
+    }));
+  }
+
   private validateComboSlots(
     selected: CreateOrderItemComboSlotSelectionDTO[],
     slots: Array<Record<string, unknown>>,
     comboName: string,
   ): Array<{
-    comboBlockItemId: string;
-    snapshotBlockName: string;
-    snapshotProductName: string;
-    snapshotAdditionalPrice: number;
+    slotId: string;
+    slotName: string;
+    isRequired: boolean;
+    minSelect: number;
+    maxSelect: number;
+    productId: string;
+    productName: string;
+    qty: number;
+    additionalPrice: number;
   }> {
     const result: Array<{
-      comboBlockItemId: string;
-      snapshotBlockName: string;
-      snapshotProductName: string;
-      snapshotAdditionalPrice: number;
+      slotId: string;
+      slotName: string;
+      isRequired: boolean;
+      minSelect: number;
+      maxSelect: number;
+      productId: string;
+      productName: string;
+      qty: number;
+      additionalPrice: number;
     }> = [];
 
     const slotMap = new Map<string, Record<string, unknown>>();
@@ -681,19 +908,28 @@ export class CheckoutValidatorService {
     for (const [slotId, slot] of slotMap.entries()) {
       const selectedForSlot = selected.find((s) => s.comboSlotId === slotId);
       const items = selectedForSlot ? selectedForSlot.items : [];
-      const minSelect = slot['minSelect'] as number;
-      const maxSelect = slot['maxSelect'] as number;
-      const isRequired = slot['isRequired'] as boolean;
+
+      const minSelect = Number(slot['minSelect'] as number);
+      const maxSelect = Number(slot['maxSelect'] as number);
+      const isRequired = Boolean(slot['isRequired'] as boolean);
       const slotName = slot['name'] as string;
 
       const effectiveMin = isRequired ? Math.max(1, minSelect) : minSelect;
 
-      if (items.length < effectiveMin) {
+      const normalizedItems = new Map<string, number>();
+      for (const chosen of items) {
+        const qty = Math.max(1, Number(chosen.qty ?? 1));
+        normalizedItems.set(chosen.productId, (normalizedItems.get(chosen.productId) ?? 0) + qty);
+      }
+
+      const totalQty = Array.from(normalizedItems.values()).reduce((s, v) => s + v, 0);
+
+      if (totalQty < effectiveMin) {
         throw new BadRequestException(
           `Selecione pelo menos ${effectiveMin} itens em "${slotName}" no combo "${comboName}".`,
         );
       }
-      if (items.length > maxSelect) {
+      if (totalQty > maxSelect) {
         throw new BadRequestException(
           `Máximo de ${maxSelect} itens em "${slotName}" no combo "${comboName}".`,
         );
@@ -701,9 +937,9 @@ export class CheckoutValidatorService {
 
       const allowedItems = slot['allowedItems'] as Array<Record<string, unknown>>;
 
-      for (const chosen of items) {
+      for (const [productId, qty] of normalizedItems.entries()) {
         const allowed = allowedItems.find(
-          (a) => (a['productId'] as string) === chosen.productId,
+          (a) => (a['productId'] as string) === productId,
         );
         if (!allowed) {
           throw new BadRequestException(`Item não permitido no slot "${slotName}".`);
@@ -714,11 +950,23 @@ export class CheckoutValidatorService {
             `O produto "${product['name']}" do slot "${slotName}" não está disponível.`,
           );
         }
+
+        if (qty > maxSelect) {
+          throw new BadRequestException(
+            `Quantidade inválida em "${slotName}" no combo "${comboName}".`,
+          );
+        }
+
         result.push({
-          comboBlockItemId: allowed['id'] as string,
-          snapshotBlockName: slotName,
-          snapshotProductName: product['name'] as string,
-          snapshotAdditionalPrice: Number(allowed['additionalPrice']),
+          slotId,
+          slotName,
+          isRequired,
+          minSelect: effectiveMin,
+          maxSelect,
+          productId,
+          productName: product['name'] as string,
+          qty,
+          additionalPrice: Number(allowed['additionalPrice']) * qty,
         });
       }
     }

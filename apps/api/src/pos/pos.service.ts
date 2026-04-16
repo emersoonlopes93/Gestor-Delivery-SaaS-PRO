@@ -5,18 +5,20 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { CheckoutValidatorService, ValidatedLine } from '../orders/checkout-validator.service';
+import { Prisma } from '@prisma/client';
 import { CashService } from '../cash/cash.service';
 import { CustomerService } from '../crm/customer.service';
 import { CashbackService } from '../promotions/cashback.service';
 import { TheoreticalStockService } from '../inventory/theoretical-stock.service';
+import { CheckoutValidatorService, ValidatedLine } from '../orders/checkout-validator.service';
+import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
+
 import type {
   CreatePosOrderDTO,
   OrderResponseDTO,
   PosOrderListItemDTO,
   OrderStatus,
 } from '@gestor/types';
-import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
 
 @Injectable()
 export class PosService {
@@ -136,6 +138,9 @@ export class PosService {
 
       // Create order items (same as storefront)
       for (const line of lines) {
+        const snapshotCatalogV2Json = (line as ValidatedLine & { snapshotCatalogV2Json?: unknown })
+          .snapshotCatalogV2Json as Prisma.InputJsonValue | undefined;
+
         const orderItem = await tx.orderItem.create({
           data: {
             orderId: newOrder.id,
@@ -152,37 +157,41 @@ export class PosService {
             snapshotBasePrice: line.basePrice,
             snapshotExtrasTotal: line.extrasTotal,
             snapshotComposition: line.composition || null,
+            snapshotCatalogV2Json,
           },
         });
 
-        // Complement snapshots
-        if (line.lineType === 'product' && 'complements' in line) {
-          for (const comp of line.complements) {
-            await tx.orderItemComplement.create({
-              data: {
-                orderItemId: orderItem.id,
-                tenantId,
-                complementItemId: comp.complementItemId,
-                snapshotName: comp.snapshotName,
-                snapshotPrice: comp.snapshotPrice,
-              },
-            });
-          }
-        }
+        const hasV2Snapshot = !!(line as ValidatedLine & { snapshotCatalogV2Json?: unknown }).snapshotCatalogV2Json;
 
-        // Combo selection snapshots
-        if (line.lineType === 'combo' && 'comboSelections' in line) {
-          for (const sel of line.comboSelections) {
-            await tx.orderItemComboSelection.create({
-              data: {
-                orderItemId: orderItem.id,
-                tenantId,
-                comboBlockItemId: sel.comboBlockItemId,
-                snapshotBlockName: sel.snapshotBlockName,
-                snapshotProductName: sel.snapshotProductName,
-                snapshotAdditionalPrice: sel.snapshotAdditionalPrice,
-              },
-            });
+        if (!hasV2Snapshot) {
+          // LEGACY FALLBACK
+          if (line.lineType === 'product' && 'complements' in line) {
+            for (const comp of line.complements) {
+              await tx.orderItemComplement.create({
+                data: {
+                  orderItemId: orderItem.id,
+                  tenantId,
+                  complementItemId: comp.complementItemId,
+                  snapshotName: comp.snapshotName,
+                  snapshotPrice: comp.snapshotPrice,
+                },
+              });
+            }
+          }
+
+          if (line.lineType === 'combo' && 'comboSelections' in line) {
+            for (const sel of line.comboSelections) {
+              await tx.orderItemComboSelection.create({
+                data: {
+                  orderItemId: orderItem.id,
+                  tenantId,
+                  comboBlockItemId: sel.comboBlockItemId,
+                  snapshotBlockName: sel.snapshotBlockName,
+                  snapshotProductName: sel.snapshotProductName,
+                  snapshotAdditionalPrice: sel.snapshotAdditionalPrice,
+                },
+              });
+            }
           }
         }
       }

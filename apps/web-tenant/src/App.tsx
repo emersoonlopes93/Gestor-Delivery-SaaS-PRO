@@ -7,8 +7,10 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { PermissionGate } from './components/PermissionGate';
 import { CategoriesPage } from './features/catalog/CategoriesPage';
 import { ProductsPage } from './features/catalog/ProductsPage';
+import { ProductV2EditorPage } from './features/catalog/ProductV2EditorPage';
 import { ComplementsPage } from './features/catalog/ComplementsPage';
 import { CombosPage } from './features/catalog/CombosPage';
+import { OptionGroupsPage } from './features/catalog/OptionGroupsPage';
 import { OrdersListPage } from './features/orders/OrdersListPage';
 import { OperationBoardPage } from './features/orders/OperationBoardPage';
 import { KdsPage } from './features/orders/KdsPage';
@@ -60,6 +62,22 @@ export function App() {
           element={
             <PermissionGate permission="catalog.read">
               <ProductsPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/catalog/products/:id/v2"
+          element={
+            <PermissionGate permission="catalog.manage_products">
+              <ProductV2EditorPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/catalog/option-groups"
+          element={
+            <PermissionGate permission="catalog.manage_option_groups">
+              <OptionGroupsPage />
             </PermissionGate>
           }
         />

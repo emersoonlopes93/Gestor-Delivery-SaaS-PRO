@@ -30,6 +30,7 @@ export class ProductsService {
         tenantId,
         slug,
         name: createProductDto.name,
+        type: (createProductDto as unknown as { type?: 'simple' | 'configurable' | 'combo' }).type ?? 'simple',
         categoryId: createProductDto.categoryId ?? null,
         shortDescription: createProductDto.shortDescription ?? null,
         longDescription: createProductDto.longDescription ?? null,
@@ -49,14 +50,20 @@ export class ProductsService {
     return this.prisma.tenantClient.product.findMany({
       where: { deletedAt: null },
       orderBy: { order: 'asc' },
-      include: { category: true }
+      include: { category: true, publication: true }
     });
   }
 
   async findOne(id: string) {
     const product = await this.prisma.tenantClient.product.findFirst({
       where: { id, deletedAt: null },
-      include: { category: true, complementGroups: { include: { group: true } } }
+      include: {
+        category: true,
+        complementGroups: { include: { group: true } },
+        optionGroupLinks: { include: { optionGroup: { include: { items: { orderBy: { order: 'asc' } } } } }, orderBy: { order: 'asc' } },
+        comboSlots: { include: { allowedItems: { include: { product: true }, orderBy: { order: 'asc' } } }, orderBy: { order: 'asc' } },
+        publication: { include: { rules: { orderBy: { createdAt: 'asc' } } } },
+      }
     });
 
     if (!product) {
@@ -76,6 +83,7 @@ export class ProductsService {
       where: { id },
       data: {
         name: updateProductDto.name,
+        type: (updateProductDto as unknown as { type?: 'simple' | 'configurable' | 'combo' }).type,
         categoryId: updateProductDto.categoryId ?? undefined,
         shortDescription: updateProductDto.shortDescription ?? undefined,
         longDescription: updateProductDto.longDescription ?? undefined,

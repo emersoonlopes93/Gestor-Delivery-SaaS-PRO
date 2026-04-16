@@ -514,6 +514,7 @@ model Product {
   id               String  @id @default(uuid())
   tenantId         String  @map("tenant_id")
   categoryId       String? @map("category_id")
+  type             CatalogProductType @default(simple) @map("type")
   name             String
   slug             String
   shortDescription String? @map("short_description")
@@ -782,6 +783,8 @@ model OrderItem {
   snapshotBasePrice  Decimal @map("snapshot_base_price") @db.Decimal(10, 2)
   snapshotExtrasTotal Decimal @map("snapshot_extras_total") @db.Decimal(10, 2)
   snapshotComposition String? @map("snapshot_composition") @db.Text
+
+  snapshotCatalogV2Json Json? @map("snapshot_catalog_v2_json")
 
   createdAt DateTime @default(now()) @map("created_at")
 

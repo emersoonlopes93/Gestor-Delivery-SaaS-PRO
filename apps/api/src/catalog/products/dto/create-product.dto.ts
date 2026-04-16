@@ -9,6 +9,10 @@ export class CreateProductDto implements ICreateProductDto {
   @IsOptional()
   categoryId?: string;
 
+  @IsOptional()
+  @IsString()
+  type?: 'simple' | 'configurable' | 'combo';
+
   @IsString()
   @IsOptional()
   shortDescription?: string;

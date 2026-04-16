@@ -120,14 +120,18 @@ export class TenantAuthService {
       accessToken,
       refreshToken,
       user: {
-        id: user.id,
+        userId: user.id,
         email: user.email,
         name: user.name,
         tenantId: user.tenantId,
-        tenantSlug: user.tenant.slug,
-        tenantName: user.tenant.name,
         roles,
         permissions,
+        tenant: {
+          id: user.tenant.id,
+          name: user.tenant.name,
+          slug: user.tenant.slug,
+          status: user.tenant.status,
+        },
       },
     };
   }

@@ -19,6 +19,9 @@ export const TENANT_PERMISSIONS = {
   'catalog.update': 'Update catalog items',
   'catalog.delete': 'Delete catalog items',
   'catalog.publish': 'Publish catalog items',
+  'catalog.manage_products': 'Manage catalog products',
+  'catalog.manage_option_groups': 'Manage catalog option groups',
+  'catalog.bulk_edit': 'Bulk edit catalog',
   'catalog.manage_complements': 'Manage catalog complements',
   'catalog.manage_combos': 'Manage catalog combos',
 
@@ -128,7 +131,7 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
   tenant_admin: Object.keys(TENANT_PERMISSIONS) as TenantPermission[],
   manager: [
     'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.cancel', 'orders.view_timeline', 'orders.use_kanban', 'orders.use_kds',
-    'catalog.read', 'catalog.create', 'catalog.update', 'catalog.publish', 'catalog.manage_complements', 'catalog.manage_combos',
+    'catalog.read', 'catalog.create', 'catalog.update', 'catalog.publish', 'catalog.manage_products', 'catalog.manage_option_groups', 'catalog.bulk_edit', 'catalog.manage_complements', 'catalog.manage_combos',
     'kds.use', 'kds.manage',
     'cash.read', 'cash.open', 'cash.close', 'cash.add_supply', 'cash.add_withdrawal', 'cash.manage',
     'pos.read', 'pos.create_sale', 'pos.apply_discount',

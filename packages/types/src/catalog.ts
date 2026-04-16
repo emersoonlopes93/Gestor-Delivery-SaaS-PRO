@@ -17,6 +17,7 @@ export interface Product {
   id: string;
   tenantId: string;
   categoryId?: string | null;
+  type?: CatalogProductType;
   name: string;
   slug: string;
   shortDescription?: string | null;
@@ -177,3 +178,193 @@ export interface CreateProductComboBlockItemDto {
 }
 
 export interface UpdateProductComboBlockItemDto extends Partial<CreateProductComboBlockItemDto> {}
+
+export type CatalogProductType = 'simple' | 'configurable' | 'combo';
+
+export type OptionSelectionType = 'single' | 'multiple' | 'quantity';
+
+export type PriceImpactType = 'none' | 'fixed' | 'replace' | 'percentage';
+
+export type PricingAxis = 'primary' | 'secondary';
+
+export type CatalogPublicationStatus = 'draft' | 'published';
+
+export type CatalogOperationalStatus = 'active' | 'inactive' | 'hidden' | 'sold_out_manual';
+
+export type CatalogSalesChannel = 'storefront_delivery' | 'storefront_pickup' | 'pos';
+
+export interface OptionGroup {
+  id: string;
+  tenantId: string;
+  name: string;
+  description?: string | null;
+  selectionType: OptionSelectionType;
+  isRequired: boolean;
+  minSelect: number;
+  maxSelect: number;
+  isActive: boolean;
+  order: number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface OptionItem {
+  id: string;
+  tenantId: string;
+  optionGroupId: string;
+  name: string;
+  description?: string | null;
+  sku?: string | null;
+  isActive: boolean;
+  order: number;
+  priceImpactType: PriceImpactType;
+  priceImpactValue: number | string;
+  allowQuantity: boolean;
+  minQty?: number | null;
+  maxQty?: number | null;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface ProductOptionGroupLink {
+  id: string;
+  tenantId: string;
+  productId: string;
+  optionGroupId: string;
+  order: number;
+  overrideName?: string | null;
+  overrideDescription?: string | null;
+  overrideIsRequired?: boolean | null;
+  overrideMinSelect?: number | null;
+  overrideMaxSelect?: number | null;
+  pricingAxis: PricingAxis;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface CatalogPublication {
+  id: string;
+  tenantId: string;
+  productId: string;
+  publicationStatus: CatalogPublicationStatus;
+  operationalStatus: CatalogOperationalStatus;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface CatalogAvailabilityRule {
+  id: string;
+  tenantId: string;
+  publicationId: string;
+  channel: CatalogSalesChannel;
+  daysOfWeek: number[];
+  startTime: string;
+  endTime: string;
+  isActive: boolean;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface ComboSlot {
+  id: string;
+  tenantId: string;
+  comboProductId: string;
+  name: string;
+  description?: string | null;
+  isRequired: boolean;
+  minSelect: number;
+  maxSelect: number;
+  order: number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface ComboSlotAllowedItem {
+  id: string;
+  tenantId: string;
+  comboSlotId: string;
+  productId: string;
+  additionalPrice: number | string;
+  order: number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface CreateOptionGroupDto {
+  name: string;
+  description?: string;
+  selectionType: OptionSelectionType;
+  isRequired?: boolean;
+  minSelect?: number;
+  maxSelect?: number;
+  isActive?: boolean;
+  order?: number;
+}
+
+export interface UpdateOptionGroupDto extends Partial<CreateOptionGroupDto> {}
+
+export interface CreateOptionItemDto {
+  optionGroupId: string;
+  name: string;
+  description?: string;
+  sku?: string;
+  isActive?: boolean;
+  order?: number;
+  priceImpactType?: PriceImpactType;
+  priceImpactValue?: number;
+  allowQuantity?: boolean;
+  minQty?: number;
+  maxQty?: number;
+}
+
+export interface UpdateOptionItemDto extends Partial<CreateOptionItemDto> {}
+
+export interface CreateProductOptionGroupLinkDto {
+  productId: string;
+  optionGroupId: string;
+  order?: number;
+  overrideName?: string;
+  overrideDescription?: string;
+  overrideIsRequired?: boolean;
+  overrideMinSelect?: number;
+  overrideMaxSelect?: number;
+  pricingAxis?: PricingAxis;
+}
+
+export interface UpdateProductOptionGroupLinkDto extends Partial<CreateProductOptionGroupLinkDto> {}
+
+export interface UpsertPublicationDto {
+  publicationStatus?: CatalogPublicationStatus;
+  operationalStatus?: CatalogOperationalStatus;
+}
+
+export interface CreateAvailabilityRuleDto {
+  channel: CatalogSalesChannel;
+  daysOfWeek: number[];
+  startTime: string;
+  endTime: string;
+  isActive?: boolean;
+}
+
+export interface UpdateAvailabilityRuleDto extends Partial<CreateAvailabilityRuleDto> {}
+
+export interface CreateComboSlotDto {
+  comboProductId: string;
+  name: string;
+  description?: string;
+  isRequired?: boolean;
+  minSelect?: number;
+  maxSelect?: number;
+  order?: number;
+}
+
+export interface UpdateComboSlotDto extends Partial<CreateComboSlotDto> {}
+
+export interface CreateComboSlotAllowedItemDto {
+  comboSlotId: string;
+  productId: string;
+  additionalPrice?: number;
+  order?: number;
+}
+
+export interface UpdateComboSlotAllowedItemDto extends Partial<CreateComboSlotAllowedItemDto> {}

@@ -126,6 +126,9 @@ export class OrdersService {
 
       // Create order items
       for (const line of lines) {
+        const snapshotCatalogV2Json = (line as ValidatedLine & { snapshotCatalogV2Json?: unknown })
+          .snapshotCatalogV2Json as Prisma.InputJsonValue | undefined;
+
         const orderItem = await tx.orderItem.create({
           data: {
             orderId: newOrder.id,
@@ -142,37 +145,41 @@ export class OrdersService {
             snapshotBasePrice: line.basePrice,
             snapshotExtrasTotal: line.extrasTotal,
             snapshotComposition: line.composition || null,
+            snapshotCatalogV2Json,
           },
         });
 
-        // Create complement snapshots
-        if (line.lineType === 'product' && 'complements' in line) {
-          for (const comp of line.complements) {
-            await tx.orderItemComplement.create({
-              data: {
-                orderItemId: orderItem.id,
-                tenantId,
-                complementItemId: comp.complementItemId,
-                snapshotName: comp.snapshotName,
-                snapshotPrice: comp.snapshotPrice,
-              },
-            });
-          }
-        }
+        const hasV2Snapshot = !!(line as ValidatedLine & { snapshotCatalogV2Json?: unknown }).snapshotCatalogV2Json;
 
-        // Create combo selection snapshots
-        if (line.lineType === 'combo' && 'comboSelections' in line) {
-          for (const sel of line.comboSelections) {
-            await tx.orderItemComboSelection.create({
-              data: {
-                orderItemId: orderItem.id,
-                tenantId,
-                comboBlockItemId: sel.comboBlockItemId,
-                snapshotBlockName: sel.snapshotBlockName,
-                snapshotProductName: sel.snapshotProductName,
-                snapshotAdditionalPrice: sel.snapshotAdditionalPrice,
-              },
-            });
+        if (!hasV2Snapshot) {
+          // LEGACY FALLBACK
+          if (line.lineType === 'product' && 'complements' in line) {
+            for (const comp of line.complements) {
+              await tx.orderItemComplement.create({
+                data: {
+                  orderItemId: orderItem.id,
+                  tenantId,
+                  complementItemId: comp.complementItemId,
+                  snapshotName: comp.snapshotName,
+                  snapshotPrice: comp.snapshotPrice,
+                },
+              });
+            }
+          }
+
+          if (line.lineType === 'combo' && 'comboSelections' in line) {
+            for (const sel of line.comboSelections) {
+              await tx.orderItemComboSelection.create({
+                data: {
+                  orderItemId: orderItem.id,
+                  tenantId,
+                  comboBlockItemId: sel.comboBlockItemId,
+                  snapshotBlockName: sel.snapshotBlockName,
+                  snapshotProductName: sel.snapshotProductName,
+                  snapshotAdditionalPrice: sel.snapshotAdditionalPrice,
+                },
+              });
+            }
           }
         }
       }

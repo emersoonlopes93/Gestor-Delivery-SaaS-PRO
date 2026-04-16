@@ -1,17 +1,23 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
-import { Product, ProductCategory, CreateProductDto } from '@gestor/types';
+import { CatalogPublication, Product, ProductCategory, CreateProductDto } from '@gestor/types';
 import { RecipeModal } from '../inventory/RecipeModal';
 import { Modal } from '../../components/Modal';
+import { PermissionGate } from '../../components/PermissionGate';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Eye, Pencil, Trash2, FileText, Search, ChevronDown } from 'lucide-react';
+import { Eye, Pencil, Trash2, FileText, Search, ChevronDown, Layers, Send, EyeOff, HelpCircle, X } from 'lucide-react';
 
 type ProductsViewMode = 'all' | 'grouped';
 
 type ProductStatusFilter = 'all' | 'active' | 'inactive';
+type ProductTypeFilter = 'all' | 'simple' | 'configurable' | 'combo';
+type PublicationFilter = 'all' | 'draft' | 'published';
+type OperationalFilter = 'all' | 'active' | 'hidden' | 'sold_out_manual' | 'inactive';
 
 export function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
+  type ProductWithPublication = Product & { publication?: CatalogPublication | null };
+
+  const [products, setProducts] = useState<ProductWithPublication[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [recipeTarget, setRecipeTarget] = useState<{ id: string, name: string } | null>(null);
@@ -22,7 +28,11 @@ export function ProductsPage() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProductStatusFilter>('all');
+  const [typeFilter, setTypeFilter] = useState<ProductTypeFilter>('all');
+  const [publicationFilter, setPublicationFilter] = useState<PublicationFilter>('all');
+  const [operationalFilter, setOperationalFilter] = useState<OperationalFilter>('all');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [showStatusHelp, setShowStatusHelp] = useState(false);
   const tableScrollRef = React.useRef<HTMLDivElement | null>(null);
   const [tableScrollTop, setTableScrollTop] = useState(0);
   
@@ -82,13 +92,25 @@ export function ProductsPage() {
       list = list.filter((p) => Boolean(p.isActive) === mustBeActive);
     }
 
+    if (typeFilter !== 'all') {
+      list = list.filter((p) => (p.type ?? 'simple') === typeFilter);
+    }
+
+    if (publicationFilter !== 'all') {
+      list = list.filter((p) => (p as any)?.publication?.publicationStatus === publicationFilter);
+    }
+
+    if (operationalFilter !== 'all') {
+      list = list.filter((p) => (p as any)?.publication?.operationalStatus === operationalFilter);
+    }
+
     return [...list].sort((a, b) => {
       const aOrder = a.order ?? 0;
       const bOrder = b.order ?? 0;
       if (aOrder !== bOrder) return aOrder - bOrder;
       return String(a.name ?? '').localeCompare(String(b.name ?? ''), 'pt-BR');
     });
-  }, [products, selectedCategoryId, searchTerm, statusFilter, categoriesById]);
+  }, [products, selectedCategoryId, searchTerm, statusFilter, typeFilter, publicationFilter, operationalFilter, categoriesById]);
 
   const productsGroupedByCategory = useMemo(() => {
     const categoryOrder = new Map<string, number>();
@@ -135,7 +157,7 @@ export function ProductsPage() {
     setIsLoading(true);
     try {
       const [prodRes, catRes] = await Promise.all([
-        api.get<Product[]>('/catalog/products'),
+        api.get<ProductWithPublication[]>('/catalog/products'),
         api.get<ProductCategory[]>('/catalog/categories')
       ]);
       
@@ -237,6 +259,26 @@ export function ProductsPage() {
     }
   };
 
+  const handleTogglePublication = async (product: ProductWithPublication) => {
+    try {
+      const nextStatus = product.publication?.publicationStatus === 'published' ? 'draft' : 'published';
+      await api.patch(`/catalog/products/${product.id}/publication`, { publicationStatus: nextStatus });
+      loadData();
+    } catch (error) {
+      console.error('Erro ao alterar publicação:', error);
+    }
+  };
+
+  const handleToggleOperational = async (product: ProductWithPublication) => {
+    try {
+      const nextStatus = product.publication?.operationalStatus === 'active' ? 'inactive' : 'active';
+      await api.patch(`/catalog/products/${product.id}/publication`, { operationalStatus: nextStatus });
+      loadData();
+    } catch (error) {
+      console.error('Erro ao alterar status operacional:', error);
+    }
+  };
+
   const handleToggleActive = async (product: Product) => {
     try {
       const next = !product.isActive;
@@ -261,9 +303,13 @@ export function ProductsPage() {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value ?? 0));
   };
 
-  const renderRows = (list: Product[]) => {
+  const renderRows = (list: ProductWithPublication[]) => {
     return list.map((product) => {
       const categoryName = product.categoryId ? (categoriesById.get(product.categoryId)?.name ?? 'Sem Categoria') : 'Sem Categoria';
+      const typeLabel = product.type ?? 'simple';
+      const pub = (product as ProductWithPublication).publication;
+      const pubLabel = pub ? pub.publicationStatus : null;
+      const opLabel = pub ? pub.operationalStatus : null;
       return (
         <tr key={product.id} className="hover:bg-gray-50/60 transition-colors group" style={{ height: 64 }}>
           <td className="px-6 py-2">
@@ -281,6 +327,21 @@ export function ProductsPage() {
               <div className="min-w-0">
                 <div className="font-bold text-gray-900 truncate">{product.name}</div>
                 <div className="text-xs text-gray-500 truncate hidden sm:block">{product.shortDescription || 'Sem descrição'}</div>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-700 border border-gray-200">
+                    {typeLabel}
+                  </span>
+                  {pubLabel ? (
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}>
+                      {pubLabel}
+                    </span>
+                  ) : null}
+                  {opLabel ? (
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${opLabel === 'active' ? 'bg-green-100 text-green-700 border border-green-200' : opLabel === 'inactive' ? 'bg-gray-200 text-gray-700 border border-gray-300' : opLabel === 'hidden' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
+                      {opLabel}
+                    </span>
+                  ) : null}
+                </div>
               </div>
             </div>
           </td>
@@ -317,6 +378,34 @@ export function ProductsPage() {
               >
                 <Pencil size={16} />
               </button>
+              <button
+                onClick={() => navigate(`/catalog/products/${product.id}/v2`)}
+                className="p-2 text-gray-400 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-all"
+                title="Editor V2"
+                type="button"
+              >
+                <Layers size={16} />
+              </button>
+              <PermissionGate permission="catalog.publish" fallback={null}>
+                <button
+                  onClick={() => handleTogglePublication(product)}
+                  className={`p-2 rounded-lg transition-all ${product.publication?.publicationStatus === 'published' ? 'text-green-600 hover:text-green-700 hover:bg-green-50' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'}`}
+                  title={product.publication?.publicationStatus === 'published' ? 'Despublicar' : 'Publicar'}
+                  type="button"
+                >
+                  {product.publication?.publicationStatus === 'published' ? <Send size={16} /> : <EyeOff size={16} />}
+                </button>
+              </PermissionGate>
+              <PermissionGate permission="catalog.publish" fallback={null}>
+                <button
+                  onClick={() => handleToggleOperational(product)}
+                  className={`p-2 rounded-lg transition-all ${product.publication?.operationalStatus === 'active' ? 'text-green-600 hover:text-green-700 hover:bg-green-50' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'}`}
+                  title={product.publication?.operationalStatus === 'active' ? 'Ocultar' : 'Exibir'}
+                  type="button"
+                >
+                  {product.publication?.operationalStatus === 'active' ? <Eye size={16} /> : <EyeOff size={16} />}
+                </button>
+              </PermissionGate>
               <button
                 onClick={() => handleToggleActive(product)}
                 className={`p-2 rounded-lg transition-all ${product.isActive ? 'text-gray-400 hover:text-amber-700 hover:bg-amber-50' : 'text-gray-400 hover:text-green-700 hover:bg-green-50'}`}
@@ -453,6 +542,44 @@ export function ProductsPage() {
               <option value="active">Ativos</option>
               <option value="inactive">Inativos</option>
             </select>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as ProductTypeFilter)}
+              className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700"
+            >
+              <option value="all">Todos os tipos</option>
+              <option value="simple">Simple</option>
+              <option value="configurable">Configurable</option>
+              <option value="combo">Combo</option>
+            </select>
+            <select
+              value={publicationFilter}
+              onChange={(e) => setPublicationFilter(e.target.value as PublicationFilter)}
+              className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700"
+            >
+              <option value="all">Todas publicações</option>
+              <option value="draft">Draft</option>
+              <option value="published">Publicado</option>
+            </select>
+            <select
+              value={operationalFilter}
+              onChange={(e) => setOperationalFilter(e.target.value as OperationalFilter)}
+              className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700"
+            >
+              <option value="all">Todas operações</option>
+              <option value="active">Active</option>
+              <option value="hidden">Hidden</option>
+              <option value="sold_out_manual">Sold out</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => setShowStatusHelp(true)}
+              className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+              title="Ajuda sobre status"
+            >
+              <HelpCircle size={16} />
+            </button>
           </div>
         </div>
 
@@ -460,8 +587,16 @@ export function ProductsPage() {
           <div>
             {filteredProducts.length} produto(s)
           </div>
-          <div className="hidden md:block">
-            Ações ficam visíveis ao passar o mouse
+          <div className="hidden md:flex items-center gap-2">
+            <span>Ações ficam visíveis ao passar o mouse</span>
+            <button
+              type="button"
+              onClick={() => setShowStatusHelp(true)}
+              className="text-gray-400 hover:text-primary-600 transition-colors"
+              title="Ajuda sobre status"
+            >
+              <HelpCircle size={14} />
+            </button>
           </div>
         </div>
       </div>
@@ -473,53 +608,161 @@ export function ProductsPage() {
       ) : (
         <>
           {viewMode === 'all' ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-              <div ref={tableScrollRef} className="max-h-[70vh] overflow-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-gray-50/50 border-b border-gray-100 sticky top-0 z-10">
-                    <tr>
-                      <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Produto</th>
-                      <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider hidden lg:table-cell">Categoria</th>
-                      <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Preço</th>
-                      <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredProducts.length > 0 && virtualAll.topSpacer > 0 && (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          style={{ height: virtualAll.topSpacer }}
-                          className="p-0 border-0"
-                        />
-                      </tr>
-                    )}
+            <>
+              <div className="space-y-3 md:hidden">
+                {filteredProducts.map((product) => {
+                  const categoryName = product.categoryId ? (categoriesById.get(product.categoryId)?.name ?? 'Sem Categoria') : 'Sem Categoria';
+                  const typeLabel = product.type ?? 'simple';
+                  const pub = (product as ProductWithPublication).publication;
+                  const pubLabel = pub ? pub.publicationStatus : null;
+                  const opLabel = pub ? pub.operationalStatus : null;
+                  return (
+                    <div key={product.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-black text-gray-900 truncate">{product.name}</div>
+                          <div className="text-xs text-gray-500 font-bold mt-1 truncate">{categoryName}</div>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-700 border border-gray-200">
+                              {typeLabel}
+                            </span>
+                            {pubLabel ? (
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}
+                              >
+                                {pubLabel}
+                              </span>
+                            ) : null}
+                            {opLabel ? (
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${opLabel === 'active' ? 'bg-green-100 text-green-700 border border-green-200' : opLabel === 'inactive' ? 'bg-gray-200 text-gray-700 border border-gray-300' : opLabel === 'hidden' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-red-100 text-red-700 border border-red-200'}`}
+                              >
+                                {opLabel}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-xs text-gray-500 font-bold">Preço</div>
+                          <div className="text-sm font-black text-gray-900">{formatMoney(product.basePrice)}</div>
+                        </div>
+                      </div>
 
-                    {renderRows(filteredProducts.slice(virtualAll.startIndex, virtualAll.endExclusive))}
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
+                          className="px-3 py-2 text-xs font-black text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200"
+                          title="Ficha técnica"
+                          type="button"
+                        >
+                          Ficha
+                        </button>
+                        <button
+                          onClick={() => handleOpenModal(product)}
+                          className="px-3 py-2 text-xs font-black text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-xl border border-primary-200"
+                          title="Editar"
+                          type="button"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => navigate(`/catalog/products/${product.id}/v2`)}
+                          className="px-3 py-2 text-xs font-black text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl border border-blue-200"
+                          title="Editor V2"
+                          type="button"
+                        >
+                          Editor V2
+                        </button>
+                        <button
+                          onClick={() => handleToggleActive(product)}
+                          className="px-3 py-2 text-xs font-black text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200"
+                          title={product.isActive ? 'Desativar' : 'Ativar'}
+                          type="button"
+                        >
+                          {product.isActive ? 'Desativar' : 'Ativar'}
+                        </button>
+                        <PermissionGate permission="catalog.publish" fallback={null}>
+                          <button
+                            onClick={() => handleTogglePublication(product)}
+                            className="px-3 py-2 text-xs font-black text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200"
+                            title={product.publication?.publicationStatus === 'published' ? 'Despublicar' : 'Publicar'}
+                            type="button"
+                          >
+                            {product.publication?.publicationStatus === 'published' ? 'Despublicar' : 'Publicar'}
+                          </button>
+                        </PermissionGate>
+                        <PermissionGate permission="catalog.publish" fallback={null}>
+                          <button
+                            onClick={() => handleToggleOperational(product)}
+                            className="px-3 py-2 text-xs font-black text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200"
+                            title={product.publication?.operationalStatus === 'active' ? 'Ocultar' : 'Exibir'}
+                            type="button"
+                          >
+                            {product.publication?.operationalStatus === 'active' ? 'Ocultar' : 'Exibir'}
+                          </button>
+                        </PermissionGate>
+                        <button
+                          onClick={() => handleDelete(product.id)}
+                          className="col-span-2 px-3 py-2 text-xs font-black text-red-700 bg-red-50 hover:bg-red-100 rounded-xl border border-red-200"
+                          title="Excluir"
+                          type="button"
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
 
-                    {filteredProducts.length > 0 && virtualAll.bottomSpacer > 0 && (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          style={{ height: virtualAll.bottomSpacer }}
-                          className="p-0 border-0"
-                        />
-                      </tr>
-                    )}
-                    {filteredProducts.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center text-gray-400 font-medium italic">
-                          {searchTerm.trim().length > 0 || statusFilter !== 'all' || Boolean(selectedCategoryId)
-                            ? 'Nenhum resultado para os filtros atuais.'
-                            : 'Nenhum produto cadastrado ainda no cardápio.'}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                {filteredProducts.length === 0 ? (
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center text-gray-400 font-medium italic">
+                    {searchTerm.trim().length > 0 || statusFilter !== 'all' || typeFilter !== 'all' || publicationFilter !== 'all' || operationalFilter !== 'all' || Boolean(selectedCategoryId)
+                      ? 'Nenhum resultado para os filtros atuais.'
+                      : 'Nenhum produto cadastrado ainda no cardápio.'}
+                  </div>
+                ) : null}
               </div>
-            </div>
+
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hidden md:block">
+                <div ref={tableScrollRef} className="max-h-[70vh] overflow-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-gray-50/50 border-b border-gray-100 sticky top-0 z-10">
+                      <tr>
+                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Produto</th>
+                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider hidden lg:table-cell">Categoria</th>
+                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Preço</th>
+                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredProducts.length > 0 && virtualAll.topSpacer > 0 && (
+                        <tr>
+                          <td colSpan={5} style={{ height: virtualAll.topSpacer }} className="p-0 border-0" />
+                        </tr>
+                      )}
+
+                      {renderRows(filteredProducts.slice(virtualAll.startIndex, virtualAll.endExclusive))}
+
+                      {filteredProducts.length > 0 && virtualAll.bottomSpacer > 0 && (
+                        <tr>
+                          <td colSpan={5} style={{ height: virtualAll.bottomSpacer }} className="p-0 border-0" />
+                        </tr>
+                      )}
+                      {filteredProducts.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-12 text-center text-gray-400 font-medium italic">
+                            {searchTerm.trim().length > 0 || statusFilter !== 'all' || typeFilter !== 'all' || publicationFilter !== 'all' || operationalFilter !== 'all' || Boolean(selectedCategoryId)
+                              ? 'Nenhum resultado para os filtros atuais.'
+                              : 'Nenhum produto cadastrado ainda no cardápio.'}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
           ) : (
             <div className="space-y-4">
               {productsGroupedByCategory.map((group) => {
@@ -554,7 +797,7 @@ export function ProductsPage() {
                               <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Produto</th>
                               <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider hidden lg:table-cell">Categoria</th>
                               <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Preço</th>
-                              <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Status</th>
+                              <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Tipo/Status</th>
                               <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
                             </tr>
                           </thead>
@@ -720,6 +963,61 @@ export function ProductsPage() {
           entityName={recipeTarget.name}
         />
       )}
+
+      {/* Modal de ajuda sobre status */}
+      <Modal
+        isOpen={showStatusHelp}
+        onClose={() => setShowStatusHelp(false)}
+        title="Status dos produtos"
+        footer={
+          <button
+            type="button"
+            onClick={() => setShowStatusHelp(false)}
+            className="px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg"
+          >
+            Entendido
+          </button>
+        }
+      >
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-sm font-black text-gray-900 mb-2">Publicação (publicationStatus)</h3>
+            <p className="text-xs text-gray-600 mb-2">Controla a visibilidade externa do produto (storefront, PDV, etc.).</p>
+            <ul className="text-xs text-gray-500 space-y-1">
+              <li><span className="font-bold text-gray-700">Draft:</span> rascunho, não visível publicamente.</li>
+              <li><span className="font-bold text-gray-700">Publicado:</span> visível em catálogos públicos.</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-black text-gray-900 mb-2">Operação (operationalStatus)</h3>
+            <p className="text-xs text-gray-600 mb-2">Define se o produto pode ser vendido no momento, mesmo estando publicado.</p>
+            <ul className="text-xs text-gray-500 space-y-1">
+              <li><span className="font-bold text-gray-700">Active:</span> disponível para venda.</li>
+              <li><span className="font-bold text-gray-700">Hidden:</span> visível mas não vendável (indisponível).</li>
+              <li><span className="font-bold text-gray-700">Sold out:</span> esgotado manualmente.</li>
+              <li><span className="font-bold text-gray-700">Inactive:</span> oculto e não vendável.</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-black text-gray-900 mb-2">Status Geral (isActive)</h3>
+            <p className="text-xs text-gray-600 mb-2">Controle de baixo nível (soft-delete). Geralmente não alterado no dia a dia.</p>
+            <ul className="text-xs text-gray-500 space-y-1">
+              <li><span className="font-bold text-gray-700">Ativo:</span> produto existe no sistema.</li>
+              <li><span className="font-bold text-gray-700">Inativo:</span> produto desativado (soft delete).</li>
+            </ul>
+          </div>
+
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
+            <p className="text-xs text-gray-600">
+              <span className="font-black">Dica:</span> Use <span className="font-bold">Publicado + Active</span> para vender normalmente.
+              Use <span className="font-bold">Hidden</span> para manter visível mas indisponível.
+              Use <span className="font-bold">Draft</span> para produtos em criação/aprovação.
+            </p>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
