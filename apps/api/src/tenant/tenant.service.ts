@@ -73,4 +73,56 @@ export class TenantService {
       update: dto,
     });
   }
+
+  /**
+   * Get operating hours for a tenant.
+   */
+  async getOperatingHours(tenantId: string) {
+    return this.prisma.tenantOperatingHours.findMany({
+      where: { tenantId },
+      orderBy: { dayOfWeek: 'asc' },
+    });
+  }
+
+  /**
+   * Update operating hours in batch.
+   */
+  async updateOperatingHours(tenantId: string, hours: any[]) {
+    // Basic validation: openTime < closeTime
+    for (const h of hours) {
+      if (h.isOpen && h.openTime && h.closeTime) {
+        if (h.openTime >= h.closeTime) {
+          throw new BadRequestException(`Erro no dia ${h.dayOfWeek}: Horário de abertura deve ser menor que o fechamento.`);
+        }
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Delete existing
+      await tx.tenantOperatingHours.deleteMany({
+        where: { tenantId },
+      });
+
+      // Create new
+      return tx.tenantOperatingHours.createMany({
+        data: hours.map((h) => ({
+          ...h,
+          tenantId,
+        })),
+      });
+    });
+  }
+
+  /**
+   * Toggle or update store pause status.
+   */
+  async updateStorePause(tenantId: string, isStorePaused: boolean, storePauseReason?: string) {
+    return this.prisma.tenantSettings.update({
+      where: { tenantId },
+      data: {
+        isStorePaused,
+        storePauseReason,
+      },
+    });
+  }
 }

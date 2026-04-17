@@ -1,10 +1,10 @@
 export * from './enums';
 export type * from './auth';
-export type * from './tenant';
+export * from './tenant';
 export type * from './rbac';
 export type * from './api';
 export type * from './catalog';
-export type * from './storefront';
+export * from './storefront';
 export type * from './customer';
 export type * from './promotions';
 export type * from './inventory';

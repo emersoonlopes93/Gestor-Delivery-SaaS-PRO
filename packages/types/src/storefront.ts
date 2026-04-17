@@ -5,7 +5,9 @@ export interface StorefrontTenantInfo {
   description?: string | null;
   logo?: string | null;
   banner?: string | null;
-  isOpen: boolean; // Layer 1: Is the store manually opened?
+  isOpen: boolean; 
+  statusMessage?: string | null;
+  nextOpenAt?: string | null;
 }
 
 // Layer 2: Published entity, Layer 3: Currently available to sell

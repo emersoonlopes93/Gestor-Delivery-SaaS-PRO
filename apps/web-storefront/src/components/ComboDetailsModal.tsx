@@ -12,10 +12,11 @@ function cn(...inputs: ClassValue[]) {
 
 interface ComboDetailsModalProps {
   combo: StorefrontComboPayload;
+  isStoreClosed?: boolean;
   onClose: () => void;
 }
 
-export function ComboDetailsModal({ combo, onClose }: ComboDetailsModalProps) {
+export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetailsModalProps) {
   const addCombo = useCartStore(s => s.addCombo);
   const isBundle = (combo.comboMode ?? 'bundle') === 'bundle';
   const [quantity, setQuantity] = useState(1);
@@ -213,15 +214,15 @@ export function ComboDetailsModal({ combo, onClose }: ComboDetailsModalProps) {
 
             <button
               onClick={handleAddToCart}
-              disabled={!!validationError}
+              disabled={!!validationError || isStoreClosed}
               className={cn(
                 "flex-1 h-12 rounded-2xl flex items-center justify-between px-6 font-bold transition-all active:scale-[0.98]",
-                validationError 
+                (validationError || isStoreClosed)
                   ? "bg-gray-200 text-gray-400 cursor-not-allowed" 
                   : "bg-orange-600 text-white shadow-lg shadow-orange-100 hover:bg-orange-700"
               )}
             >
-              <span>Adicionar Combo</span>
+              <span>{isStoreClosed ? 'Loja Fechada' : 'Adicionar Combo'}</span>
               <span className="text-lg">
                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentPrice)}
               </span>

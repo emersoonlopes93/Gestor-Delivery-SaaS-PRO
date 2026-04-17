@@ -61,6 +61,7 @@ model Tenant {
   deliveryRateRules          DeliveryRateRule[]
   deliveryCoverageConfig     DeliveryCoverageConfig?
   moduleAccess              TenantModuleAccess[]
+  operatingHours            TenantOperatingHours[]
 
   optionGroups             OptionGroup[]
   optionItems              OptionItem[]
@@ -340,6 +341,9 @@ model TenantSettings {
   businessEmail String? @map("business_email") @db.VarChar(255)
   address       String? @db.Text
   logoUrl       String? @map("logo_url") @db.VarChar(500)
+  
+  isStorePaused    Boolean @default(false) @map("is_store_paused")
+  storePauseReason String? @map("store_pause_reason") @db.Text
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -348,6 +352,23 @@ model TenantSettings {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_settings")
+}
+
+model TenantOperatingHours {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  dayOfWeek Int      @map("day_of_week") // 0-6 (Sunday-Saturday)
+  isOpen    Boolean  @default(true) @map("is_open")
+  openTime  String?  @map("open_time") @db.VarChar(5) // HH:mm
+  closeTime String?  @map("close_time") @db.VarChar(5) // HH:mm
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dayOfWeek])
+  @@map("tenant_operating_hours")
 }
 
 // ============================================================

@@ -4,7 +4,7 @@ import { api } from '../lib/api-client';
 import type { StorefrontPayload, StorefrontProductPayload, StorefrontComboPayload } from '@gestor/types';
 import { useCartStore } from '../store/use-cart-store';
 import { useEffect, useState } from 'react';
-import { Loader2, Store, ShoppingBag, Box, Truck } from 'lucide-react';
+import { Loader2, Store, ShoppingBag, Box, Truck, AlertCircle } from 'lucide-react';
 import { ProductDetailsModal } from '../components/ProductDetailsModal';
 import { CartDrawer } from '../components/CartDrawer';
 import { ComboDetailsModal } from '../components/ComboDetailsModal';
@@ -72,9 +72,9 @@ export function StorefrontPage() {
         <div>
           <h1 className="text-2xl font-black text-gray-900 leading-tight">{tenant.name}</h1>
           <div className="flex items-center gap-2 mt-1">
-            <span className={`w-2 h-2 rounded-full ${tenant.isOpen ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className={`w-2 h-2 rounded-full ${data.tenant.isOpen ? 'bg-green-500' : 'bg-red-500'}`} />
             <span className="text-sm text-gray-500 font-medium">
-              {tenant.isOpen ? `Aberto para ${fulfillmentType === 'delivery' ? 'entrega' : 'retirada'}` : `Fechado para ${fulfillmentType === 'delivery' ? 'entrega' : 'retirada'}`}
+              {data.tenant.statusMessage || (data.tenant.isOpen ? 'Aberto agora' : 'Fechado no momento')}
             </span>
           </div>
         </div>
@@ -105,9 +105,10 @@ export function StorefrontPage() {
         </button>
       </div>
 
-      {!tenant.isOpen ? (
-        <div className="mb-6 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm font-medium">
-          Este canal está fora do horário/configuração de disponibilidade no momento. Tente novamente mais tarde.
+      {!data.tenant.isOpen ? (
+        <div className="mb-6 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm font-bold flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          {data.tenant.statusMessage || 'Loja fechada no momento.'}
         </div>
       ) : null}
 
@@ -135,9 +136,8 @@ export function StorefrontPage() {
               {combos.map((combo) => (
                 <button
                   key={combo.id}
-                  disabled={!tenant.isOpen}
                   onClick={() => setSelectedCombo(combo)}
-                  className="flex bg-orange-50/50 rounded-xl p-3 border border-orange-100/50 hover:border-orange-200 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex bg-orange-50/50 rounded-xl p-3 border border-orange-100/50 hover:border-orange-200 transition-all text-left group"
                 >
                   <div className="flex-1 pr-3">
                     <div className="flex items-center gap-2 mb-1">
@@ -174,9 +174,8 @@ export function StorefrontPage() {
               {category.products.map((product) => (
                 <button
                   key={product.id}
-                  disabled={!tenant.isOpen}
                   onClick={() => setSelectedProduct(product)}
-                  className="flex bg-white rounded-xl p-3 shadow-sm border border-gray-100 hover:border-primary-200 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex bg-white rounded-xl p-3 shadow-sm border border-gray-100 hover:border-primary-200 transition-all text-left group"
                 >
                   <div className="flex-1 pr-3">
                     <h3 className="font-bold text-gray-900 group-hover:text-primary-600 transition-colors uppercase text-sm tracking-wide">
@@ -211,6 +210,7 @@ export function StorefrontPage() {
       {selectedProduct && (
         <ProductDetailsModal 
           product={selectedProduct} 
+          isStoreClosed={!data.tenant.isOpen}
           onClose={() => setSelectedProduct(null)} 
         />
       )}
@@ -219,6 +219,7 @@ export function StorefrontPage() {
       {selectedCombo && (
         <ComboDetailsModal 
           combo={selectedCombo}
+          isStoreClosed={!data.tenant.isOpen}
           onClose={() => setSelectedCombo(null)}
         />
       )}

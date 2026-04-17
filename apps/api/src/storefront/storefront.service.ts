@@ -221,12 +221,15 @@ export class StorefrontService {
             : undefined,
       }));
 
+    const storeStatus = await this.availabilityService.getStoreStatus(tenant.id);
+
     const tenantInfo = {
       id: tenant.id,
       name: tenant.name,
       slug: tenant.slug,
       logo: tenant.settings?.logoUrl || null,
-      isOpen: categories.length > 0 || combos.length > 0,
+      isOpen: storeStatus.isOpen,
+      statusMessage: storeStatus.message,
     };
 
     return {

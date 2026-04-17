@@ -12,10 +12,11 @@ function cn(...inputs: ClassValue[]) {
 
 interface ProductDetailsModalProps {
   product: StorefrontProductPayload;
+  isStoreClosed?: boolean;
   onClose: () => void;
 }
 
-export function ProductDetailsModal({ product, onClose }: ProductDetailsModalProps) {
+export function ProductDetailsModal({ product, isStoreClosed, onClose }: ProductDetailsModalProps) {
   const addItem = useCartStore(s => s.addItem);
   const [quantity, setQuantity] = useState(1);
   const [selectedOptions, setSelectedOptions] = useState<CartSelectedComplement[]>([]);
@@ -198,15 +199,15 @@ export function ProductDetailsModal({ product, onClose }: ProductDetailsModalPro
 
             <button
               onClick={handleAddToCart}
-              disabled={!!validationError}
+              disabled={!!validationError || isStoreClosed}
               className={cn(
                 "flex-1 h-12 rounded-2xl flex items-center justify-between px-6 font-bold transition-all active:scale-[0.98]",
-                validationError 
+                (validationError || isStoreClosed)
                   ? "bg-gray-200 text-gray-400 cursor-not-allowed" 
                   : "bg-primary-600 text-white shadow-lg shadow-primary-100 hover:bg-primary-700"
               )}
             >
-              <span>Adicionar</span>
+              <span>{isStoreClosed ? 'Loja Fechada' : 'Adicionar'}</span>
               <span className="text-lg">
                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentPrice)}
               </span>

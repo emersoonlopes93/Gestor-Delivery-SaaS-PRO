@@ -23,6 +23,26 @@ export interface TenantSettings {
   businessEmail?: string;
   address?: string;
   logoUrl?: string;
+  isStorePaused: boolean;
+  storePauseReason?: string;
+}
+
+export interface TenantOperatingHours {
+  id: string;
+  tenantId: string;
+  dayOfWeek: number;
+  isOpen: boolean;
+  openTime: string | null;
+  closeTime: string | null;
+}
+
+export interface UpdateOperatingHoursRequest {
+  hours: Omit<TenantOperatingHours, 'id' | 'tenantId'>[];
+}
+
+export interface UpdateStorePauseRequest {
+  isStorePaused: boolean;
+  storePauseReason?: string;
 }
 
 export interface CreateTenantRequest {

@@ -13,6 +13,55 @@ export interface AvailabilityDecision {
 export class AvailabilityService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getStoreStatus(tenantId: string, now?: Date): Promise<{ isOpen: boolean; message: string; reason: string }> {
+    const d = now ?? new Date();
+
+    const settings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+      select: { isStorePaused: true, storePauseReason: true, timezone: true },
+    });
+
+    if (settings?.isStorePaused) {
+      return {
+        isOpen: false,
+        message: settings.storePauseReason || 'Loja temporariamente pausada.',
+        reason: 'PAUSED',
+      };
+    }
+
+    const timezone = settings?.timezone || 'America/Sao_Paulo';
+    const { dayOfWeek, timeHHmm } = this.getTenantLocalDayAndTime(d, timezone);
+
+    const operatingHours = await this.prisma.tenantOperatingHours.findMany({
+      where: { tenantId },
+    });
+
+    // Fallback: Store open if no configuration exists
+    if (operatingHours.length === 0) {
+      return { isOpen: true, message: 'Aberto agora', reason: 'NO_CONFIG' };
+    }
+
+    const todayRule = operatingHours.find((h) => h.dayOfWeek === dayOfWeek);
+
+    if (!todayRule || !todayRule.isOpen) {
+      return { isOpen: false, message: 'Fechado no momento.', reason: 'CLOSED' };
+    }
+
+    if (todayRule.openTime && todayRule.closeTime) {
+      const isCurrentlyOpen = this.isTimeInRange(timeHHmm, todayRule.openTime, todayRule.closeTime);
+      if (isCurrentlyOpen) {
+        return { isOpen: true, message: 'Aberto agora', reason: 'OPEN' };
+      }
+      return {
+        isOpen: false,
+        message: `Fechado no momento. Abrimos às ${todayRule.openTime}`,
+        reason: 'CLOSED',
+      };
+    }
+
+    return { isOpen: true, message: 'Aberto agora', reason: 'OPEN' };
+  }
+
   async decide(input: {
     tenantId: string;
     productId: string;
@@ -21,6 +70,17 @@ export class AvailabilityService {
   }): Promise<AvailabilityDecision> {
     const now = input.now ?? new Date();
 
+    // 1. Check Global Store Status
+    const storeStatus = await this.getStoreStatus(input.tenantId, now);
+    if (!storeStatus.isOpen) {
+      return { 
+        canSell: false, 
+        reason: `STORE_${storeStatus.reason}`, 
+        effectiveStatus: storeStatus.message 
+      };
+    }
+
+    // 2. Check Product existence
     const product = await this.prisma.product.findFirst({
       where: { id: input.productId, tenantId: input.tenantId, deletedAt: null },
       select: { id: true },
@@ -30,13 +90,7 @@ export class AvailabilityService {
       return { canSell: false, reason: 'NOT_FOUND', effectiveStatus: null };
     }
 
-    const tenantSettings = await this.prisma.tenantSettings.findUnique({
-      where: { tenantId: input.tenantId },
-      select: { timezone: true },
-    });
-
-    const timezone = tenantSettings?.timezone || 'America/Sao_Paulo';
-
+    // 3. Product Rules (Publication and Availability Rules)
     const publication = await this.prisma.catalogPublication.findFirst({
       where: { tenantId: input.tenantId, productId: input.productId },
       select: { id: true, tenantId: true, productId: true, publicationStatus: true, operationalStatus: true },
@@ -64,6 +118,14 @@ export class AvailabilityService {
       return { canSell: false, reason: 'HIDDEN', effectiveStatus: publication.operationalStatus };
     }
 
+    // Re-check timezone and time for product rules
+    const tenantSettings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId: input.tenantId },
+      select: { timezone: true },
+    });
+    const timezone = tenantSettings?.timezone || 'America/Sao_Paulo';
+    const { dayOfWeek, timeHHmm } = this.getTenantLocalDayAndTime(now, timezone);
+
     const rules = await this.prisma.catalogAvailabilityRule.findMany({
       where: { tenantId: input.tenantId, publicationId: publication.id, isActive: true, channel: input.channel },
       select: { daysOfWeek: true, startTime: true, endTime: true },
@@ -72,8 +134,6 @@ export class AvailabilityService {
     if (!rules || rules.length === 0) {
       return { canSell: true, reason: null, effectiveStatus: publication.operationalStatus };
     }
-
-    const { dayOfWeek, timeHHmm } = this.getTenantLocalDayAndTime(now, timezone);
 
     const matchesAny = rules.some((r) => {
       const days = (r.daysOfWeek || []) as number[];

@@ -30,4 +30,37 @@ export class TenantController {
   ) {
     return this.tenantService.updateSettings(tenantId, dto);
   }
+
+  /**
+   * Get operating hours.
+   */
+  @Get('operating-hours')
+  @RequirePermissions('settings.manage')
+  async getOperatingHours(@CurrentTenant() tenantId: string) {
+    return this.tenantService.getOperatingHours(tenantId);
+  }
+
+  /**
+   * Update operating hours in batch.
+   */
+  @Patch('operating-hours')
+  @RequirePermissions('settings.manage')
+  async updateOperatingHours(
+    @CurrentTenant() tenantId: string,
+    @Body() body: { hours: any[] },
+  ) {
+    return this.tenantService.updateOperatingHours(tenantId, body.hours);
+  }
+
+  /**
+   * Update store pause status.
+   */
+  @Patch('store-pause')
+  @RequirePermissions('settings.manage')
+  async updateStorePause(
+    @CurrentTenant() tenantId: string,
+    @Body() body: { isStorePaused: boolean; storePauseReason?: string },
+  ) {
+    return this.tenantService.updateStorePause(tenantId, body.isStorePaused, body.storePauseReason);
+  }
 }
