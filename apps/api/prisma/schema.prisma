@@ -69,6 +69,7 @@ model Tenant {
   catalogAvailabilityRules CatalogAvailabilityRule[]
   comboSlots               ComboSlot[]
   comboSlotAllowedItems    ComboSlotAllowedItem[]
+  comboBundleItems         ComboBundleItem[]
   productOptionItemPrices  ProductOptionItemPrice[]
 
   @@map("tenants")
@@ -90,6 +91,17 @@ enum CatalogProductType {
   simple
   configurable
   combo
+}
+
+enum ComboMode {
+  bundle
+  slot
+}
+
+enum ComboPricingType {
+  fixed_price
+  discount_percent
+  discount_amount
 }
 
 enum OptionSelectionType {
@@ -544,6 +556,9 @@ model Product {
   tenantId         String  @map("tenant_id")
   categoryId       String? @map("category_id")
   type             CatalogProductType @default(simple) @map("type")
+  comboMode        ComboMode? @map("combo_mode")
+  comboPricingType ComboPricingType? @map("combo_pricing_type")
+  comboPricingValue Decimal? @map("combo_pricing_value") @db.Decimal(10, 2)
   name             String
   slug             String
   shortDescription String? @map("short_description")
@@ -571,6 +586,8 @@ model Product {
   optionGroupLinks ProductOptionGroupLink[]
   publication      CatalogPublication?
   comboSlots       ComboSlot[]
+  comboBundleItems ComboBundleItem[] @relation("ComboBundleProduct")
+  usedInComboBundles ComboBundleItem[] @relation("ComboBundleLinkedProduct")
   allowedInComboSlots ComboSlotAllowedItem[]
   optionItemPrices ProductOptionItemPrice[]
 
@@ -578,6 +595,27 @@ model Product {
   @@index([tenantId])
   @@index([categoryId])
   @@map("products")
+}
+
+model ComboBundleItem {
+  id             String @id @default(uuid())
+  tenantId       String @map("tenant_id")
+  comboProductId String @map("combo_product_id")
+  productId      String @map("product_id")
+  qty            Int    @default(1)
+  sortOrder      Int    @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant       Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  comboProduct Product @relation("ComboBundleProduct", fields: [comboProductId], references: [id], onDelete: Cascade)
+  product      Product @relation("ComboBundleLinkedProduct", fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([comboProductId, productId])
+  @@index([tenantId])
+  @@index([productId])
+  @@map("combo_bundle_items")
 }
 
 model ProductComplementGroup {

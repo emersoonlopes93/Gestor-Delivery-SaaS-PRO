@@ -3,8 +3,7 @@ import { api } from '../../lib/api-client';
 import { 
   IngredientDTO, 
   RecipeIngredientDTO, 
-  UpsertRecipeDTO,
-  UnitType 
+  UpsertRecipeDTO
 } from '@gestor/types';
 
 interface RecipeModalProps {
@@ -25,18 +24,18 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
     if (isOpen) {
       loadData();
     }
-  }, [isOpen, entityId]);
+  }, [isOpen, entityType, entityId]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
       const [ingRes, recipeRes] = await Promise.all([
         api.get<IngredientDTO[]>('/inventory/ingredients'),
-        api.get<{ ingredients: RecipeIngredientDTO[] }>(`/inventory/recipes/${entityType}/${entityId}`)
+        api.get<RecipeIngredientDTO[]>(`/inventory/recipes/${entityType}/${entityId}`)
       ]);
 
       if (ingRes.success) setIngredients(ingRes.data);
-      if (recipeRes.success) setRecipeItems(recipeRes.data.ingredients);
+      if (recipeRes.success) setRecipeItems(recipeRes.data);
     } catch (error) {
       console.error('Erro ao carregar ficha técnica:', error);
     } finally {
@@ -94,7 +93,7 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
         quantity: Number(item.quantity)
       }));
 
-      await api.post(`/inventory/recipes/${entityType}/${entityId}`, { items });
+      await api.post(`/inventory/recipes/${entityType}/${entityId}`, items);
       onClose();
     } catch (error) {
       console.error('Erro ao salvar ficha técnica:', error);

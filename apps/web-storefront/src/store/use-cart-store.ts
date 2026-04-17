@@ -4,6 +4,7 @@ import type {
   CartLineItem, 
   StorefrontProductPayload, 
   StorefrontComboPayload,
+  CartBundleItemSnapshot,
   CartSelectedComplement,
   CartSelectedComboItem,
   CartSnapshot 
@@ -17,7 +18,7 @@ interface CartState {
   // Actions
   setTenantId: (id: string) => void;
   addItem: (product: StorefrontProductPayload, quantity: number, options: CartSelectedComplement[], notes?: string) => void;
-  addCombo: (combo: StorefrontComboPayload, quantity: number, selectedItems: CartSelectedComboItem[], notes?: string) => void;
+  addCombo: (combo: StorefrontComboPayload, quantity: number, selectedItems: CartSelectedComboItem[], bundleItems: CartBundleItemSnapshot[], notes?: string) => void;
   removeItem: (cartLineId: string) => void;
   updateQuantity: (cartLineId: string, quantity: number) => void;
   clearCart: () => void;
@@ -66,11 +67,14 @@ export const useCartStore = create<CartState>()(
         });
       },
 
-      addCombo: (combo, quantity, selectedItems, notes) => {
+      addCombo: (combo, quantity, selectedItems, bundleItems, notes) => {
         const extrasPrice = selectedItems.reduce((sum, item) => sum + item.price, 0);
         const lineSubtotal = (combo.basePrice + extrasPrice) * quantity;
         
-        const extrasDescription = selectedItems.map(i => i.productName).join(', ');
+        const extrasDescription =
+          bundleItems.length > 0
+            ? bundleItems.map(i => `${i.productName} x${i.qty}`).join(', ')
+            : selectedItems.map(i => i.productName).join(', ');
 
         const snapshot: CartSnapshot = {
           productName: combo.name,
@@ -86,6 +90,7 @@ export const useCartStore = create<CartState>()(
           quantity,
           notes,
           selectedComboItems: selectedItems,
+          bundleItems,
           snapshot,
         };
 

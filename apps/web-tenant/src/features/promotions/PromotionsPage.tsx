@@ -66,7 +66,7 @@ export function PromotionsPage() {
   const turnOffCoupon = async (id: string) => {
     if (!confirm('Desativar este cupom?')) return;
     try {
-      await api.patch(`/promotions/coupons/${id}/status`, { isActive: false });
+      await api.patch(`/promotions/coupons/${id}`, { isActive: false });
       loadCoupons();
     } catch (err) {
       console.error(err);

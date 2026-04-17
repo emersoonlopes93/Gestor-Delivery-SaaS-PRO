@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { X, Minus, Plus, AlertCircle, Box, Check } from 'lucide-react';
-import type { StorefrontComboPayload, CartSelectedComboItem } from '@gestor/types';
+import type { StorefrontComboPayload, CartSelectedComboItem, CartBundleItemSnapshot } from '@gestor/types';
 import { CartValidator } from '@gestor/core';
 import { useCartStore } from '../store/use-cart-store';
 import { clsx, type ClassValue } from 'clsx';
@@ -17,8 +17,10 @@ interface ComboDetailsModalProps {
 
 export function ComboDetailsModal({ combo, onClose }: ComboDetailsModalProps) {
   const addCombo = useCartStore(s => s.addCombo);
+  const isBundle = (combo.comboMode ?? 'bundle') === 'bundle';
   const [quantity, setQuantity] = useState(1);
   const [selectedItems, setSelectedItems] = useState<CartSelectedComboItem[]>([]);
+  const [bundleItems] = useState<CartBundleItemSnapshot[]>(combo.bundleItems ?? []);
   const [notes, setNotes] = useState('');
 
   // Calculate current subtotal for the modal view
@@ -29,6 +31,7 @@ export function ComboDetailsModal({ combo, onClose }: ComboDetailsModalProps) {
 
   // Validation Logic
   const validationError = useMemo(() => {
+    if (isBundle) return null;
     try {
       CartValidator.validateComboItems(combo, selectedItems);
       return null;
@@ -61,7 +64,7 @@ export function ComboDetailsModal({ combo, onClose }: ComboDetailsModalProps) {
 
   const handleAddToCart = () => {
     if (validationError) return;
-    addCombo(combo, quantity, selectedItems, notes);
+    addCombo(combo, quantity, selectedItems, bundleItems, notes);
     onClose();
   };
 
@@ -97,7 +100,26 @@ export function ComboDetailsModal({ combo, onClose }: ComboDetailsModalProps) {
           </header>
 
           <div className="space-y-8">
-            {combo.blocks.map((block) => (
+            {isBundle ? (
+              <div className="bg-orange-50/30 rounded-2xl p-4 border border-orange-100/50">
+                <h3 className="font-bold text-gray-900 text-sm uppercase tracking-wider mb-3">Itens do Combo</h3>
+                <div className="space-y-2">
+                  {(combo.bundleItems ?? []).map((item) => (
+                    <div key={item.id} className="w-full flex items-center justify-between p-3 rounded-xl border bg-white border-gray-100">
+                      <span className="text-sm font-bold text-gray-700">{item.productName}</span>
+                      <span className="text-xs font-black text-orange-600">
+                        {item.qty}x {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unitPrice)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 p-3 rounded-xl bg-white border border-orange-100 text-xs text-gray-600">
+                  <div className="flex justify-between"><span>Subtotal dos itens</span><span className="font-bold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(combo.itemsSubtotal ?? 0)}</span></div>
+                  <div className="flex justify-between"><span>Desconto do combo</span><span className="font-bold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(combo.discountTotal ?? 0)}</span></div>
+                  <div className="flex justify-between text-sm text-gray-900 mt-1"><span className="font-bold">Preço final</span><span className="font-black">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(combo.basePrice)}</span></div>
+                </div>
+              </div>
+            ) : (combo.blocks ?? []).map((block) => (
               <div key={block.id} className="bg-orange-50/30 rounded-2xl p-4 border border-orange-100/50">
                 <div className="flex justify-between items-start mb-4">
                   <div>
@@ -210,4 +232,3 @@ export function ComboDetailsModal({ combo, onClose }: ComboDetailsModalProps) {
     </div>
   );
 }
-

@@ -56,6 +56,7 @@ export function CheckoutPage() {
           return {
             lineType: 'combo' as const,
             comboId: item.comboId,
+          productId: item.comboId,
             quantity: item.quantity,
             notes: item.notes,
             comboSelections: item.selectedComboItems?.map(s => ({
@@ -96,7 +97,7 @@ export function CheckoutPage() {
       };
 
       const res = await api.post<OrderResponseDTO>(
-        `/public/storefront/${tenantSlug}/checkout`,
+        `/orders/public-checkout/${tenantSlug}`,
         payload,
       );
 

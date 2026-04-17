@@ -707,6 +707,7 @@ export class CheckoutValidatorService {
     channel: 'storefront_delivery' | 'storefront_pickup' | 'pos' = 'storefront_delivery',
   ): Promise<ValidatedComboLine> {
     const hasNewSlots = Array.isArray(item.slots) && item.slots.length > 0;
+    const comboProductId = item.productId || item.comboId;
 
     if (hasNewSlots) {
       if (!item.productId) {
@@ -794,11 +795,124 @@ export class CheckoutValidatorService {
       };
     }
 
-    if (!item.comboId) {
-      throw new BadRequestException('comboId é obrigatório para linhas do tipo combo.');
+    if (comboProductId) {
+      const comboProduct = await (this.prisma as unknown as Record<string, { findFirst: (...args: unknown[]) => Promise<Record<string, unknown> | null> }>)['product'].findFirst({
+        where: { id: comboProductId, tenantId, deletedAt: null, type: 'combo' },
+        include: {
+          comboBundleItems: {
+            include: { product: true },
+            orderBy: { sortOrder: 'asc' },
+          },
+        },
+      }) as Record<string, unknown> | null;
+
+      if (comboProduct) {
+        await this.availabilityService.assertCanSell({
+          tenantId,
+          productId: comboProductId,
+          channel,
+        });
+
+        if (!(comboProduct['isActive'] as boolean)) {
+          throw new BadRequestException(`O combo "${comboProduct['name']}" não está ativo.`);
+        }
+
+        const comboMode = (comboProduct['comboMode'] as 'bundle' | 'slot' | null) ?? 'bundle';
+        if (comboMode === 'bundle') {
+          const bundleItems = (comboProduct['comboBundleItems'] as Array<Record<string, unknown>>) ?? [];
+          const subtotal = bundleItems.reduce((sum, bundleItem) => {
+            const product = bundleItem['product'] as Record<string, unknown> | undefined;
+            if (!product || !(product['isActive'] as boolean) || product['deletedAt'] != null) return sum;
+            return sum + Number(product['basePrice']) * Math.max(1, Number(bundleItem['qty'] ?? 1));
+          }, 0);
+
+          const pricingType = ((comboProduct['comboPricingType'] as string | null) ?? 'fixed_price') as 'fixed_price' | 'discount_percent' | 'discount_amount';
+          const pricingValue = Number(comboProduct['comboPricingValue'] ?? 0);
+          let finalPrice = subtotal;
+
+          if (pricingType === 'fixed_price') {
+            finalPrice = pricingValue;
+          } else if (pricingType === 'discount_percent') {
+            finalPrice = subtotal * (1 - Math.min(100, Math.max(0, pricingValue)) / 100);
+          } else if (pricingType === 'discount_amount') {
+            finalPrice = subtotal - Math.max(0, pricingValue);
+          }
+
+          finalPrice = Math.max(0, Number(finalPrice.toFixed(2)));
+          const discountTotal = Math.max(0, Number((subtotal - finalPrice).toFixed(2)));
+          const basePrice = Number(comboProduct['basePrice']);
+          const unitPrice = finalPrice;
+          const lineTotal = unitPrice * item.quantity;
+          const composition = bundleItems
+            .map((bundleItem) => {
+              const product = bundleItem['product'] as Record<string, unknown> | undefined;
+              const qty = Math.max(1, Number(bundleItem['qty'] ?? 1));
+              return `${product?.['name'] ?? 'Item'} x${qty}`;
+            })
+            .join('; ');
+
+          return {
+            lineType: 'combo',
+            comboId: comboProductId,
+            name: comboProduct['name'] as string,
+            image: (comboProduct['image'] as string | null) || null,
+            basePrice,
+            effectiveBasePrice: basePrice,
+            extrasTotal: 0,
+            unitPrice,
+            lineTotal,
+            quantity: item.quantity,
+            notes: item.notes,
+            composition,
+            comboSelections: [],
+            snapshotCatalogV2Json: {
+              version: 'catalog_v2_snapshot_v1',
+              channel,
+              lineType: 'combo',
+              capturedAt: new Date().toISOString(),
+              product: {
+                id: comboProductId,
+                name: comboProduct['name'],
+                type: comboProduct['type'],
+                comboMode: 'bundle',
+              },
+              quantity: item.quantity,
+              notes: item.notes ?? null,
+              pricing: {
+                basePrice,
+                effectiveBasePrice: basePrice,
+                extrasTotal: 0,
+                unitPrice,
+                pricingType,
+                pricingValue,
+                itemsSubtotal: Number(subtotal.toFixed(2)),
+                discountTotal,
+                finalPrice: unitPrice,
+              },
+              selections: [],
+              slots: [],
+              bundleItems: bundleItems.map((bundleItem) => {
+                const product = bundleItem['product'] as Record<string, unknown> | undefined;
+                const qty = Math.max(1, Number(bundleItem['qty'] ?? 1));
+                const unit = Number(product?.['basePrice'] ?? 0);
+                return {
+                  productId: bundleItem['productId'],
+                  name: product?.['name'] ?? 'Item',
+                  qty,
+                  unitPrice: unit,
+                  subtotal: Number((unit * qty).toFixed(2)),
+                };
+              }),
+            },
+          };
+        }
+      }
     }
 
     // LEGACY FALLBACK
+    if (!item.comboId) {
+      throw new BadRequestException('comboId é obrigatório para combos legados sem bundle.');
+    }
     const combo = await (this.prisma as unknown as Record<string, { findFirst: (...args: unknown[]) => Promise<Record<string, unknown> | null> }>)['productCombo'].findFirst({
       where: { id: item.comboId, tenantId, deletedAt: null },
       include: {

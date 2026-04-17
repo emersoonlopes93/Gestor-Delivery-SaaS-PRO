@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api-client';
-import { CatalogPublication, ComboSlot, ComboSlotAllowedItem, Product } from '@gestor/types';
+import { ComboSlot, ComboSlotAllowedItem, Product } from '@gestor/types';
 
 type ComboListItem = Product & {
-  publication?: CatalogPublication | null;
+  publication?: {
+    publicationStatus?: string;
+    operationalStatus?: string;
+  } | null;
 };
 
 type SlotWithAllowed = ComboSlot & {
@@ -28,18 +31,7 @@ export function CombosV2Page() {
       if (!productsRes.success) return;
 
       const comboProducts = productsRes.data.filter((p) => (p.type ?? 'simple') === 'combo');
-      const withPublication = await Promise.all(
-        comboProducts.map(async (combo) => {
-          try {
-            const pubRes = await api.get<CatalogPublication>(`/catalog/products/${combo.id}/publication`);
-            return { ...combo, publication: pubRes.success ? pubRes.data : null };
-          } catch {
-            return { ...combo, publication: null };
-          }
-        }),
-      );
-
-      setCombos(withPublication);
+      setCombos(comboProducts);
     } finally {
       setIsLoading(false);
     }
@@ -58,24 +50,7 @@ export function CombosV2Page() {
   }, [combos]);
 
   const handleCreateCombo = async () => {
-    setBusy('create', true);
-    try {
-      const now = new Date();
-      const suggestedName = `Novo Combo ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-      const res = await api.post<Product>('/catalog/products', {
-        name: suggestedName,
-        type: 'combo',
-        basePrice: 1,
-        shortDescription: 'Combo em montagem',
-        isActive: true,
-        isAvailable: true,
-        sellableOnline: true,
-      });
-      if (!res.success) return;
-      navigate(`/catalog/combos/${res.data.id}/v2`);
-    } finally {
-      setBusy('create', false);
-    }
+    navigate('/catalog/combos/new/v2');
   };
 
   const handleTogglePublication = async (combo: ComboListItem) => {
@@ -203,6 +178,7 @@ export function CombosV2Page() {
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-50/50 border-b border-gray-100">
               <tr>
+                <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Imagem</th>
                 <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Combo</th>
                 <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Preço Base</th>
                 <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Publicação</th>
@@ -214,6 +190,15 @@ export function CombosV2Page() {
               {sortedCombos.map((combo) => (
                 <tr key={combo.id} className="hover:bg-gray-50/40 transition-colors group">
                   <td className="px-6 py-4">
+                    {combo.image ? (
+                      <img src={combo.image} alt={combo.name} className="w-12 h-12 rounded-xl object-cover border border-gray-200" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-[10px] font-black text-gray-400">
+                        SEM IMG
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
                     <div className="font-bold text-gray-900">{combo.name}</div>
                     <div className="text-xs text-gray-500 font-medium">{combo.shortDescription || 'Sem descrição'}</div>
                   </td>
@@ -222,12 +207,12 @@ export function CombosV2Page() {
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${combo.publication?.publicationStatus === 'published' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
-                      {combo.publication?.publicationStatus ?? 'draft'}
+                      {combo.publication?.publicationStatus === 'published' ? 'Publicado' : 'Rascunho'}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${combo.publication?.operationalStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                      {combo.publication?.operationalStatus ?? 'inactive'}
+                      {combo.publication?.operationalStatus === 'active' ? 'Ativo' : (combo.publication?.operationalStatus === 'hidden' ? 'Oculto' : (combo.publication?.operationalStatus === 'sold_out_manual' ? 'Esgotado' : 'Inativo'))}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
@@ -277,7 +262,7 @@ export function CombosV2Page() {
               ))}
               {sortedCombos.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-400 font-medium italic">
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-400 font-medium italic">
                     Nenhum combo cadastrado ainda.
                   </td>
                 </tr>

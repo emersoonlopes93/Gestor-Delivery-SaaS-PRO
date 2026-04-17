@@ -18,6 +18,9 @@ export interface Product {
   tenantId: string;
   categoryId?: string | null;
   type?: CatalogProductType;
+  comboMode?: ComboMode | null;
+  comboPricingType?: ComboPricingType | null;
+  comboPricingValue?: number | string | null;
   name: string;
   slug: string;
   shortDescription?: string | null;
@@ -121,6 +124,10 @@ export interface UpdateCategoryDto extends Partial<CreateCategoryDto> {}
 export interface CreateProductDto {
   name: string;
   categoryId?: string;
+  type?: CatalogProductType;
+  comboMode?: ComboMode;
+  comboPricingType?: ComboPricingType;
+  comboPricingValue?: number;
   shortDescription?: string;
   longDescription?: string;
   basePrice: number;
@@ -180,6 +187,8 @@ export interface CreateProductComboBlockItemDto {
 export interface UpdateProductComboBlockItemDto extends Partial<CreateProductComboBlockItemDto> {}
 
 export type CatalogProductType = 'simple' | 'configurable' | 'combo';
+export type ComboMode = 'bundle' | 'slot';
+export type ComboPricingType = 'fixed_price' | 'discount_percent' | 'discount_amount';
 
 export type OptionSelectionType = 'single' | 'multiple' | 'quantity';
 
@@ -289,6 +298,26 @@ export interface ComboSlotAllowedItem {
   createdAt: Date | string;
   updatedAt: Date | string;
 }
+
+export interface ComboBundleItem {
+  id: string;
+  tenantId: string;
+  comboProductId: string;
+  productId: string;
+  qty: number;
+  sortOrder: number;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface CreateComboBundleItemDto {
+  comboProductId: string;
+  productId: string;
+  qty?: number;
+  sortOrder?: number;
+}
+
+export interface UpdateComboBundleItemDto extends Partial<CreateComboBundleItemDto> {}
 
 export interface CreateOptionGroupDto {
   name: string;

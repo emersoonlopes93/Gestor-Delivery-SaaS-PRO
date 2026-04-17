@@ -25,6 +25,8 @@ import {
   UserCircle,
   ChevronRight,
   CornerDownRight,
+  Copy,
+  ExternalLink,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
@@ -49,19 +51,6 @@ const SIDEBAR_STORAGE_KEY = 'tenant_sidebar_state_v1';
 
 const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
   {
-    id: 'public',
-    label: 'Canais de Venda',
-    items: [
-      { 
-        id: 'public-menu', 
-        label: 'Ver Loja Online', 
-        to: '/public-menu', // Will be handled as external or via a helper
-        icon: ShoppingCart,
-        isExternal: true
-      },
-    ],
-  },
-  {
     id: 'dashboard',
     label: 'Dashboard',
     items: [
@@ -83,6 +72,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
       { id: 'catalog-products', label: 'Produtos', to: '/catalog/products', icon: Box, permission: 'catalog.read' },
       { id: 'catalog-complements', label: 'Complementos', to: '/catalog/complements', icon: SlidersHorizontal, permission: 'catalog.manage_option_groups' },
       { id: 'catalog-combos', label: 'Combos', to: '/catalog/combos', icon: Package, permission: 'catalog.manage_combos' },
+      { id: 'catalog-inventory', label: 'Inventory / Estoque', to: '/inventory', icon: ClipboardList, permission: 'inventory.read' },
     ],
   },
   {
@@ -102,14 +92,6 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
       { id: 'delivery-map', label: 'Mapa (Tempo Real)', to: '/delivery/map', icon: MapPin, permission: 'delivery.read' },
       { id: 'delivery-drivers', label: 'Entregadores', to: '/delivery/drivers', icon: Users, permission: 'delivery.manage_drivers' },
       { id: 'delivery-zones', label: 'Zonas de Entrega', to: '/delivery/rates', icon: SlidersHorizontal, permission: 'delivery.manage' },
-      {
-        id: 'delivery-rates-legacy',
-        label: 'Taxas (Legado)',
-        to: '/delivery/rates/legacy',
-        icon: CornerDownRight,
-        permission: 'delivery.manage',
-        match: (p) => p === '/delivery/rates/legacy',
-      },
     ],
   },
   {
@@ -288,6 +270,8 @@ export function AppLayout() {
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [desktopSearch, setDesktopSearch] = useState('');
+  const [copiedPublicLink, setCopiedPublicLink] = useState(false);
+  const [storefrontBaseUrl, setStorefrontBaseUrl] = useState('');
 
   const initialSidebarState = useMemo(() => {
     const saved = safeParseSidebarState(localStorage.getItem(SIDEBAR_STORAGE_KEY));
@@ -306,27 +290,65 @@ export function AppLayout() {
   }, [collapsed, openGroups]);
 
   const userPermissions = user?.permissions ?? [];
+  const tenantSlug = user?.tenant?.slug;
+  const publicMenuUrl = tenantSlug && storefrontBaseUrl ? `${storefrontBaseUrl}/${tenantSlug}` : '';
+
+  useEffect(() => {
+    const envBase = (import.meta.env.VITE_STOREFRONT_BASE_URL as string | undefined)?.trim();
+    if (envBase) {
+      setStorefrontBaseUrl(envBase.replace(/\/+$/, ''));
+      return;
+    }
+
+    const { protocol, hostname, origin, port } = window.location;
+
+    // Production fallback: same origin. Dev fallback: probe common storefront ports.
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      setStorefrontBaseUrl(origin);
+      return;
+    }
+
+    const candidatePorts = ['3000', '3001', '3002'].filter((p) => p !== port);
+    const candidateBases = candidatePorts.map((p) => `${protocol}//${hostname}:${p}`);
+    let cancelled = false;
+
+    const probe = async () => {
+      for (const base of candidateBases) {
+        try {
+          const controller = new AbortController();
+          const timeout = window.setTimeout(() => controller.abort(), 1600);
+          await fetch(`${base}/pizzaria-demo`, {
+            method: 'GET',
+            mode: 'cors',
+            signal: controller.signal,
+          });
+          window.clearTimeout(timeout);
+          if (!cancelled) setStorefrontBaseUrl(base);
+          return;
+        } catch {
+          // Keep probing next candidate
+        }
+      }
+      if (!cancelled) setStorefrontBaseUrl(`${protocol}//${hostname}:3000`);
+    };
+
+    void probe();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const groups = useMemo(() => {
     const filtered: SidebarGroup[] = [];
-    const tenantSlug = user?.tenant?.slug;
-
     for (const g of SIDEBAR_GROUPS) {
       const items = g.items
         .filter((it) => (it.permission ? hasPermission(userPermissions, it.permission) : true))
-        .map((it) => {
-          if (it.id === 'public-menu' && it.isExternal && tenantSlug) {
-            // For development we assume it might be on another port or same domain
-            // In production this would lead to the public menu
-            return { ...it, to: `/${tenantSlug}` };
-          }
-          return it;
-        });
+        .map((it) => it);
 
       if (items.length) filtered.push({ ...g, items: items as any });
     }
     return filtered;
-  }, [userPermissions, user?.tenant?.slug]);
+  }, [userPermissions]);
 
   const activeGroupId = useMemo(() => {
     return firstActiveGroupId(groups, location.pathname);
@@ -384,6 +406,13 @@ export function AppLayout() {
     navigate('/login');
   };
 
+  const handleCopyPublicUrl = useCallback(async () => {
+    if (!publicMenuUrl) return;
+    await navigator.clipboard.writeText(publicMenuUrl);
+    setCopiedPublicLink(true);
+    window.setTimeout(() => setCopiedPublicLink(false), 1500);
+  }, [publicMenuUrl]);
+
   return (
     <div className="min-h-screen flex bg-gray-50">
       {isMobileOpen ? (
@@ -419,6 +448,34 @@ export function AppLayout() {
             {collapsed ? '»' : '«'}
           </button>
         </div>
+
+        {tenantSlug ? (
+          <div className="px-3 py-3 border-b border-gray-200 bg-gray-50">
+            <div className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+              Cardápio Público
+            </div>
+            <div className="text-xs text-gray-700 font-medium truncate">/{tenantSlug}</div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <a
+                href={publicMenuUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Ver
+              </a>
+              <button
+                type="button"
+                onClick={handleCopyPublicUrl}
+                className="inline-flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                {copiedPublicLink ? 'Copiado' : 'Copiar'}
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
           {groups.map((group) => {

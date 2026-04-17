@@ -13,6 +13,18 @@ export class CreateProductDto implements ICreateProductDto {
   @IsString()
   type?: 'simple' | 'configurable' | 'combo';
 
+  @IsOptional()
+  @IsString()
+  comboMode?: 'bundle' | 'slot';
+
+  @IsOptional()
+  @IsString()
+  comboPricingType?: 'fixed_price' | 'discount_percent' | 'discount_amount';
+
+  @IsOptional()
+  @IsNumber()
+  comboPricingValue?: number;
+
   @IsString()
   @IsOptional()
   shortDescription?: string;

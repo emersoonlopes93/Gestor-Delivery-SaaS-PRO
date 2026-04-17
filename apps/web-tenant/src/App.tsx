@@ -106,6 +106,14 @@ export function App() {
           }
         />
         <Route
+          path="/catalog/combos/new/v2"
+          element={
+            <PermissionGate permission="catalog.manage_combos">
+              <ProductV2EditorPage mode="combo" />
+            </PermissionGate>
+          }
+        />
+        <Route
           path="/catalog/simulation"
           element={
             <PermissionGate permission="catalog.read">

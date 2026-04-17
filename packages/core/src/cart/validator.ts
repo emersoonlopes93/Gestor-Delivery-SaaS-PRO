@@ -63,7 +63,11 @@ export class CartValidator {
       throw new Error(`O combo ${combo.name} não está disponível no momento.`);
     }
 
-    const { blocks } = combo;
+    if ((combo.comboMode ?? 'bundle') === 'bundle') {
+      return;
+    }
+
+    const blocks = combo.blocks ?? [];
 
     // 1. Block checks
     for (const block of blocks) {

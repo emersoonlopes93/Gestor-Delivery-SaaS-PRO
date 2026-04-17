@@ -8,6 +8,7 @@ import {
   ComboSlot,
   ComboSlotAllowedItem,
   CreateAvailabilityRuleDto,
+  CreateComboBundleItemDto,
   CreateComboSlotAllowedItemDto,
   CreateComboSlotDto,
   CreateProductOptionGroupLinkDto,
@@ -15,6 +16,7 @@ import {
   Product,
   ProductOptionGroupLink,
   UpdateAvailabilityRuleDto,
+  UpdateComboBundleItemDto,
   UpdateComboSlotAllowedItemDto,
   UpdateComboSlotDto,
   UpdateProductOptionGroupLinkDto,
@@ -38,10 +40,46 @@ type SlotWithAllowed = ComboSlot & {
   allowedItems?: Array<ComboSlotAllowedItem & { product?: Product }>;
 };
 
+type BundleItemWithProduct = {
+  id: string;
+  comboProductId: string;
+  productId: string;
+  qty: number;
+  sortOrder: number;
+  product?: Product;
+};
+
+type ComboPricingType = 'fixed_price' | 'discount_percent' | 'discount_amount';
+
 type ProductV2EditorMode = 'product' | 'combo';
 
 type ProductV2EditorPageProps = {
   mode?: ProductV2EditorMode;
+};
+
+const COMBO_WIZARD_TABS: TabKey[] = ['geral', 'combo', 'publicacao'];
+
+const CHANNEL_LABELS: Record<string, string> = {
+  storefront_delivery: 'Delivery',
+  storefront_pickup: 'Retirada',
+  pos: 'Balcao / PDV',
+};
+
+const DAY_OPTIONS = [
+  { value: 1, label: 'Segunda-feira' },
+  { value: 2, label: 'Terca-feira' },
+  { value: 3, label: 'Quarta-feira' },
+  { value: 4, label: 'Quinta-feira' },
+  { value: 5, label: 'Sexta-feira' },
+  { value: 6, label: 'Sabado' },
+  { value: 0, label: 'Domingo' },
+];
+
+const formatChannelLabel = (channel?: string | null) => CHANNEL_LABELS[channel ?? ''] ?? String(channel ?? '-');
+
+const formatDaysLabel = (days: number[] = []) => {
+  const set = new Set(days);
+  return DAY_OPTIONS.filter((d) => set.has(d.value)).map((d) => d.label).join(', ');
 };
 
 export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPageProps) {
@@ -58,6 +96,20 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
 
   const isNew = id === 'new' || !id;
   const productId = isNew ? '' : id;
+  const isComboWizard = isComboMode && isNew;
+  const comboWizardIndex = COMBO_WIZARD_TABS.indexOf(tab);
+
+  const goNextWizardStep = () => {
+    if (!isComboWizard) return;
+    const nextIndex = Math.min(comboWizardIndex + 1, COMBO_WIZARD_TABS.length - 1);
+    setTab(COMBO_WIZARD_TABS[nextIndex]);
+  };
+
+  const goPrevWizardStep = () => {
+    if (!isComboWizard) return;
+    const prevIndex = Math.max(comboWizardIndex - 1, 0);
+    setTab(COMBO_WIZARD_TABS[prevIndex]);
+  };
 
   const [productForm, setProductForm] = useState<any>({
     name: '',
@@ -102,6 +154,17 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
 
   // Combo
   const [slots, setSlots] = useState<SlotWithAllowed[]>([]);
+  const [bundleItems, setBundleItems] = useState<BundleItemWithProduct[]>([]);
+  const [bundleSummary, setBundleSummary] = useState<{
+    subtotal: number;
+    discountTotal: number;
+    finalPrice: number;
+    pricingType: ComboPricingType;
+    pricingValue: number;
+  } | null>(null);
+  const [comboPricingType, setComboPricingType] = useState<ComboPricingType>('fixed_price');
+  const [comboPricingValue, setComboPricingValue] = useState(0);
+  const [comboModeState, setComboModeState] = useState<'bundle' | 'slot'>('bundle');
   const [products, setProducts] = useState<Product[]>([]);
 
   const [isSlotModalOpen, setIsSlotModalOpen] = useState(false);
@@ -125,6 +188,14 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     additionalPrice: 0,
     order: 0,
   });
+  const [isBundleItemModalOpen, setIsBundleItemModalOpen] = useState(false);
+  const [editingBundleItem, setEditingBundleItem] = useState<BundleItemWithProduct | null>(null);
+  const [bundleItemForm, setBundleItemForm] = useState<CreateComboBundleItemDto>({
+    comboProductId: productId,
+    productId: '',
+    qty: 1,
+    sortOrder: 0,
+  });
 
   // Publicação/Disponibilidade
   const [publication, setPublication] = useState<CatalogPublication | null>(null);
@@ -139,6 +210,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     endTime: '23:59',
     isActive: true,
   });
+  const [ruleChannels, setRuleChannels] = useState<Array<'storefront_delivery' | 'storefront_pickup' | 'pos'>>(['storefront_delivery']);
 
   const loadAll = async () => {
     setIsLoading(true);
@@ -162,6 +234,9 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
 
       if (prodRes.success) {
         setProduct(prodRes.data);
+        setComboModeState(((prodRes.data.comboMode as 'bundle' | 'slot' | null) ?? 'bundle'));
+        setComboPricingType((prodRes.data.comboPricingType as ComboPricingType) ?? 'fixed_price');
+        setComboPricingValue(Number(prodRes.data.comboPricingValue ?? prodRes.data.basePrice ?? 0));
         if (prodRes.data.optionItemPrices) {
           const pricesMap: Record<string, number> = {};
           prodRes.data.optionItemPrices.forEach((p: any) => {
@@ -194,6 +269,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
 
       // Carregar combo-slots apenas se o produto for do tipo combo
       if (prodRes.success && (isComboMode || prodRes.data.type === 'combo')) {
+        const isBundleCombo = ((prodRes.data.comboMode as 'bundle' | 'slot' | null) ?? 'bundle') === 'bundle';
         try {
           const slotsRes = await api.get<SlotWithAllowed[]>(`/catalog/products/${productId}/combo-slots`);
           if (slotsRes.success) setSlots(slotsRes.data);
@@ -201,8 +277,43 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           console.warn('Não foi possível carregar combo-slots:', error);
           setSlots([]);
         }
+        if (isBundleCombo) {
+          try {
+            const [bundleRes, summaryRes] = await Promise.all([
+              api.get<BundleItemWithProduct[]>(`/catalog/products/${productId}/bundle-items`),
+              api.get<any>(`/catalog/products/${productId}/bundle-items/summary`),
+            ]);
+            if (bundleRes.success) setBundleItems(bundleRes.data);
+            if (summaryRes.success) {
+              setBundleSummary({
+                subtotal: Number(summaryRes.data.subtotal ?? 0),
+                discountTotal: Number(summaryRes.data.discountTotal ?? 0),
+                finalPrice: Number(summaryRes.data.finalPrice ?? 0),
+                pricingType: (summaryRes.data.pricingType ?? 'fixed_price') as ComboPricingType,
+                pricingValue: Number(summaryRes.data.pricingValue ?? 0),
+              });
+              setComboPricingType((summaryRes.data.pricingType ?? 'fixed_price') as ComboPricingType);
+              setComboPricingValue(Number(summaryRes.data.pricingValue ?? 0));
+            }
+          } catch (error) {
+            console.warn('Não foi possível carregar itens do bundle:', error);
+            setBundleItems([]);
+            setBundleSummary(null);
+          }
+        } else {
+          setBundleItems([]);
+          setBundleSummary({
+            subtotal: 0,
+            discountTotal: 0,
+            finalPrice: Number(prodRes.data.basePrice ?? 0),
+            pricingType: 'fixed_price',
+            pricingValue: Number(prodRes.data.basePrice ?? 0),
+          });
+        }
       } else {
         setSlots([]);
+        setBundleItems([]);
+        setBundleSummary(null);
       }
 
       if (pubRes.success) {
@@ -236,8 +347,8 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   };
 
   const handleSaveProduct = async () => {
-    if (!productForm.name || !productForm.basePrice) {
-      alert('Nome e Preço são obrigatórios.');
+    if (!productForm.name || (!isComboMode && !productForm.basePrice)) {
+      alert(isComboMode ? 'Nome é obrigatório.' : 'Nome e preço são obrigatórios.');
       return;
     }
     setSavingStates((p) => ({ ...p, saveProduct: true }));
@@ -255,6 +366,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
 
       const payload = {
         ...productForm,
+        categoryId: productForm.categoryId ? productForm.categoryId : null,
         type: isComboMode ? 'combo' : productForm.type,
         image: finalImageUrl,
         optionItemPrices: Object.entries(pizzaPrices).map(([optionItemId, price]) => ({
@@ -266,14 +378,18 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
       if (isNew) {
         const res = await api.post<Product>('/catalog/products', payload);
         if (res.success) {
-          navigate(`/catalog/products/${res.data.id}/v2`, { replace: true });
+          navigate(isComboMode ? '/catalog/combos' : `/catalog/products/${res.data.id}/v2`, { replace: true });
         }
       } else {
         const res = await api.patch<Product>(`/catalog/products/${productId}`, payload);
         if (res.success) {
           setProduct(res.data as ProductDetails);
-          alert('Produto salvo com sucesso!');
-          loadAll();
+          if (isComboMode) {
+            navigate('/catalog/combos');
+          } else {
+            alert('Produto salvo com sucesso!');
+            loadAll();
+          }
         }
       }
     } catch (error) {
@@ -298,6 +414,9 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   const allowedProducts = useMemo(() => {
     return products.filter((p) => (p.type ?? 'simple') !== 'combo');
   }, [products]);
+  const selectableBundleProducts = useMemo(() => {
+    return allowedProducts.filter((p) => p.isActive);
+  }, [allowedProducts]);
 
   // -------------------- Personalização handlers --------------------
 
@@ -599,13 +718,106 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     await reorderAllowed(slot.id, swapped.map((a) => a.id));
   };
 
+  const openBundleItemModal = async (item?: BundleItemWithProduct) => {
+    await loadProductsIfNeeded();
+    if (item) {
+      setEditingBundleItem(item);
+      setBundleItemForm({
+        comboProductId: productId,
+        productId: item.productId,
+        qty: Math.max(1, item.qty),
+        sortOrder: item.sortOrder,
+      });
+    } else {
+      setEditingBundleItem(null);
+      setBundleItemForm({
+        comboProductId: productId,
+        productId: selectableBundleProducts[0]?.id ?? '',
+        qty: 1,
+        sortOrder: bundleItems.length,
+      });
+    }
+    setIsBundleItemModalOpen(true);
+  };
+
+  const saveBundleItem = async () => {
+    if (!productId) return;
+    setSavingStates((p) => ({ ...p, saveBundleItem: true }));
+    try {
+      const payload: Omit<CreateComboBundleItemDto, 'comboProductId'> = {
+        productId: bundleItemForm.productId,
+        qty: Math.max(1, Number(bundleItemForm.qty ?? 1)),
+        sortOrder: Number(bundleItemForm.sortOrder ?? 0),
+      };
+      if (editingBundleItem) {
+        const upd: UpdateComboBundleItemDto = {
+          qty: payload.qty,
+          sortOrder: payload.sortOrder,
+        };
+        await api.patch(`/catalog/products/${productId}/bundle-items/${editingBundleItem.id}`, upd);
+      } else {
+        await api.post(`/catalog/products/${productId}/bundle-items`, payload);
+      }
+      setIsBundleItemModalOpen(false);
+      await loadAll();
+    } catch (error: any) {
+      const msg = error?.message ?? 'Não foi possível salvar item do combo.';
+      alert(msg);
+    } finally {
+      setSavingStates((p) => ({ ...p, saveBundleItem: false }));
+    }
+  };
+
+  const deleteBundleItem = async (idToDelete: string) => {
+    if (!window.confirm('Remover este item do combo?')) return;
+    setSavingStates((p) => ({ ...p, [`delete-bundle-${idToDelete}`]: true }));
+    try {
+      await api.delete(`/catalog/products/${productId}/bundle-items/${idToDelete}`);
+      await loadAll();
+    } finally {
+      setSavingStates((p) => ({ ...p, [`delete-bundle-${idToDelete}`]: false }));
+    }
+  };
+
+  const updateComboPricing = async () => {
+    if (!productId) return;
+    setSavingStates((p) => ({ ...p, updateComboPricing: true }));
+    try {
+      await api.patch(`/catalog/products/${productId}`, {
+        comboPricingType,
+        comboPricingValue,
+      });
+      await loadAll();
+    } finally {
+      setSavingStates((p) => ({ ...p, updateComboPricing: false }));
+    }
+  };
+
+  const convertComboToBundle = async () => {
+    if (!productId) return;
+    setSavingStates((p) => ({ ...p, convertBundle: true }));
+    try {
+      await api.patch(`/catalog/products/${productId}`, {
+        comboMode: 'bundle',
+        comboPricingType: comboPricingType ?? 'fixed_price',
+        comboPricingValue: Number(comboPricingValue || productForm.basePrice || 0),
+      });
+      await loadAll();
+      alert('Combo convertido para modo bundle com sucesso.');
+    } finally {
+      setSavingStates((p) => ({ ...p, convertBundle: false }));
+    }
+  };
+
   // -------------------- Publicação handlers --------------------
 
   const patchPublication = async (payload: UpsertPublicationDto) => {
     setSavingStates((p) => ({ ...p, patchPublication: true }));
     try {
-      await api.patch(`/catalog/products/${productId}/publication`, payload);
-      await loadAll();
+      const res = await api.patch<CatalogPublication>(`/catalog/products/${productId}/publication`, payload);
+      if (res.success) {
+        setPublication(res.data);
+      }
     } finally {
       setSavingStates((p) => ({ ...p, patchPublication: false }));
     }
@@ -614,6 +826,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   const openRuleModal = (rule?: CatalogAvailabilityRule) => {
     if (rule) {
       setEditingRule(rule);
+      setRuleChannels([rule.channel as 'storefront_delivery' | 'storefront_pickup' | 'pos']);
       setRuleForm({
         channel: rule.channel,
         daysOfWeek: rule.daysOfWeek,
@@ -623,6 +836,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
       });
     } else {
       setEditingRule(null);
+      setRuleChannels(['storefront_delivery']);
       setRuleForm({
         channel: 'storefront_delivery',
         daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
@@ -641,8 +855,16 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
         const upd: UpdateAvailabilityRuleDto = ruleForm as UpdateAvailabilityRuleDto;
         await api.patch(`/catalog/products/${productId}/publication/rules/${editingRule.id}`, upd);
       } else {
-        const create: CreateAvailabilityRuleDto = ruleForm;
-        await api.post(`/catalog/products/${productId}/publication/rules`, create);
+        const channelsToCreate = ruleChannels.length > 0 ? ruleChannels : ['storefront_delivery'];
+        await Promise.all(
+          channelsToCreate.map((channel) => {
+            const create: CreateAvailabilityRuleDto = {
+              ...ruleForm,
+              channel: channel as CreateAvailabilityRuleDto['channel'],
+            };
+            return api.post(`/catalog/products/${productId}/publication/rules`, create);
+          }),
+        );
       }
       setIsRuleModalOpen(false);
       await loadAll();
@@ -702,7 +924,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           onClick={() => setTab('geral')}
           className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'geral' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50'}`}
         >
-          Informações Gerais
+          {isComboWizard ? '1. Informações Gerais' : 'Informações Gerais'}
         </button>
         {!isComboMode && (
           <button
@@ -718,19 +940,19 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           <button
             type="button"
             onClick={() => setTab('combo')}
-            disabled={isNew}
+            disabled={isComboWizard && comboWizardIndex < 1}
             className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'combo' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
           >
-            Montagem do Combo
+            {isComboWizard ? '2. Itens do Combo' : 'Itens do Combo'}
           </button>
         )}
         <button
           type="button"
           onClick={() => setTab('publicacao')}
-          disabled={isNew}
+          disabled={isComboWizard && comboWizardIndex < 2}
           className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'publicacao' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
         >
-          Venda e Disponibilidade
+          {isComboWizard ? '3. Venda e Disponibilidade' : 'Venda e Disponibilidade'}
         </button>
       </div>
 
@@ -758,16 +980,30 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Preço Base *</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={productForm.basePrice}
-                      onChange={(e) => setProductForm({ ...productForm, basePrice: Number(e.target.value) })}
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
-                    />
-                  </div>
+                  {!isComboMode ? (
+                    <div>
+                      <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Preço Base *</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={productForm.basePrice}
+                        onChange={(e) => setProductForm({ ...productForm, basePrice: Number(e.target.value) })}
+                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Preço Final do Combo</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={Number(bundleSummary?.finalPrice ?? productForm.basePrice ?? 0)}
+                        disabled
+                        className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl outline-none text-sm font-bold text-gray-700"
+                      />
+                      <p className="text-[10px] text-gray-500 mt-1 font-bold">Preço derivado automaticamente pelos itens + estratégia de preço.</p>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">SKU / Cód. Interno</label>
                     <input
@@ -960,15 +1196,25 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             })()}
 
             <div className="mt-8 flex justify-end">
-              <button
-                type="button"
-                onClick={handleSaveProduct}
-                disabled={savingStates.saveProduct}
-                className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-xl shadow-lg shadow-primary-200 transition-all disabled:opacity-50 flex items-center gap-3"
-              >
-                {savingStates.saveProduct && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                {isNew ? (isComboMode ? 'CRIAR COMBO' : 'CRIAR PRODUTO') : 'SALVAR ALTERAÇÕES'}
-              </button>
+              {isComboWizard ? (
+                <button
+                  type="button"
+                  onClick={goNextWizardStep}
+                  className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-xl shadow-lg shadow-primary-200 transition-all"
+                >
+                  Próximo
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSaveProduct}
+                  disabled={savingStates.saveProduct}
+                  className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-xl shadow-lg shadow-primary-200 transition-all disabled:opacity-50 flex items-center gap-3"
+                >
+                  {savingStates.saveProduct && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                  {isNew ? 'CRIAR PRODUTO' : 'SALVAR ALTERAÇÕES'}
+                </button>
+              )}
             </div>
           </div>
         </section>
@@ -1176,20 +1422,156 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                   <div>
                     <div className="text-lg font-black text-gray-900 uppercase tracking-tight">Montagem do Combo</div>
                     <p className="text-sm text-gray-500 font-medium mt-1">
-                      Configure os slots (etapas) e os produtos permitidos em cada um.
+                      Vincule itens já cadastrados do cardápio e defina a estratégia de preço do combo.
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => openSlotModal()}
+                    onClick={() => openBundleItemModal()}
                     className="px-6 py-2.5 text-sm font-black text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-lg shadow-primary-100 transition-all flex items-center gap-2 whitespace-nowrap"
                   >
-                    <span>➕</span> Adicionar Slot
+                    <span>➕</span> Adicionar item do cardápio
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-4">
+              {comboModeState !== 'bundle' ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                  <div className="font-black text-amber-900">Este combo está em modo legado (slot)</div>
+                  <p className="text-sm text-amber-800 mt-1">
+                    Para usar "Itens do Combo" e estratégia de preço, converta este combo para modo bundle.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={convertComboToBundle}
+                    disabled={savingStates.convertBundle}
+                    className="mt-3 px-4 py-2 text-sm font-black text-white bg-amber-600 hover:bg-amber-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {savingStates.convertBundle && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                    Converter para bundle
+                  </button>
+                </div>
+              ) : null}
+
+              <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+                <div className="text-sm font-black text-gray-900 mb-3">Estratégia de preço</div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <select
+                    value={comboPricingType}
+                    onChange={(e) => setComboPricingType(e.target.value as ComboPricingType)}
+                    className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm font-bold"
+                  >
+                    <option value="fixed_price">Preço fixo</option>
+                    <option value="discount_percent">Desconto %</option>
+                    <option value="discount_amount">Desconto em R$</option>
+                  </select>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={comboPricingValue}
+                    onChange={(e) => setComboPricingValue(Number(e.target.value || 0))}
+                    className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none text-sm font-bold"
+                    placeholder="Valor da estratégia"
+                  />
+                  <button
+                    type="button"
+                    onClick={updateComboPricing}
+                    disabled={savingStates.updateComboPricing || comboModeState !== 'bundle'}
+                    className="px-4 py-2.5 text-sm font-black text-white bg-primary-600 hover:bg-primary-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {savingStates.updateComboPricing && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                    Aplicar estratégia
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                <div className="overflow-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-gray-50/50 border-b border-gray-100">
+                      <tr>
+                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Produto</th>
+                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Qtd</th>
+                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Preço unit.</th>
+                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Subtotal</th>
+                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {bundleItems.map((item) => {
+                        const unit = Number(item.product?.basePrice ?? 0);
+                        const subtotal = unit * Math.max(1, item.qty);
+                        return (
+                          <tr key={item.id} className="hover:bg-gray-50/30">
+                            <td className="px-6 py-4">
+                              <div className="font-bold text-gray-900">{item.product?.name ?? item.productId}</div>
+                            </td>
+                            <td className="px-6 py-4 text-sm font-bold text-gray-700">{Math.max(1, item.qty)}</td>
+                            <td className="px-6 py-4 text-sm font-bold text-gray-700">
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(unit)}
+                            </td>
+                            <td className="px-6 py-4 text-sm font-black text-gray-900">
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => openBundleItemModal(item)}
+                                  className="px-3 py-1 text-xs font-bold text-gray-700 hover:bg-gray-100 rounded"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteBundleItem(item.id)}
+                                  disabled={savingStates[`delete-bundle-${item.id}`]}
+                                  className="px-3 py-1 text-xs font-bold text-red-600 hover:bg-red-50 rounded disabled:opacity-50"
+                                >
+                                  Excluir
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {bundleItems.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-10 text-center text-gray-400 text-sm italic">
+                            Nenhum item vinculado no combo.
+                          </td>
+                        </tr>
+                      ) : null}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+                <div className="text-sm font-black text-gray-900 mb-3">Resumo do combo</div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                  <div className="rounded-xl bg-gray-50 border border-gray-100 p-3">
+                    <div className="text-gray-500 font-bold">Subtotal dos itens</div>
+                    <div className="text-lg font-black text-gray-900 mt-1">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(bundleSummary?.subtotal ?? 0))}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-gray-50 border border-gray-100 p-3">
+                    <div className="text-gray-500 font-bold">Desconto aplicado</div>
+                    <div className="text-lg font-black text-gray-900 mt-1">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(bundleSummary?.discountTotal ?? 0))}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-primary-50 border border-primary-100 p-3">
+                    <div className="text-primary-700 font-bold">Preço final do combo</div>
+                    <div className="text-lg font-black text-primary-900 mt-1">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(bundleSummary?.finalPrice ?? productForm.basePrice ?? 0))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 hidden">
               {[...slots].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((s) => (
               <div key={s.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
                 <div className="px-4 sm:px-6 py-4 bg-gray-50/50 border-b border-gray-100 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -1385,6 +1767,24 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                 </div>
               )}
                 </div>
+                {isComboWizard ? (
+                  <div className="mt-4 flex justify-between">
+                    <button
+                      type="button"
+                      onClick={goPrevWizardStep}
+                      className="px-6 py-2.5 text-sm font-black text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl"
+                    >
+                      Voltar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={goNextWizardStep}
+                      className="px-6 py-2.5 text-sm font-black text-white bg-primary-600 hover:bg-primary-700 rounded-xl"
+                    >
+                      Próximo
+                    </button>
+                  </div>
+                ) : null}
               </>
             )}
         </section>
@@ -1396,7 +1796,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
                 <div className="text-lg font-black text-gray-900 uppercase tracking-tight">Status de Venda</div>
-                <p className="text-sm text-gray-500 font-medium mt-1">Controle onde e como os clientes veem este item.</p>
+                <p className="text-sm text-gray-500 font-medium mt-1">Defina como e quando este combo aparece para o cliente.</p>
               </div>
               <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
                 <button
@@ -1406,7 +1806,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                   className="px-3 py-2 text-sm font-bold text-gray-700 hover:bg-gray-100 rounded-xl border border-gray-200 bg-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-gray-700 border-t-transparent rounded-full animate-spin" />}
-                  Draft
+                  Rascunho
                 </button>
                 <button
                   type="button"
@@ -1424,7 +1824,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                   className="px-3 py-2 text-sm font-bold text-white bg-green-600 hover:bg-green-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                  Active
+                  Ativo
                 </button>
                 <button
                   type="button"
@@ -1433,7 +1833,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                   className="px-3 py-2 text-sm font-bold text-amber-700 hover:bg-amber-50 rounded-xl border border-amber-200 bg-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-amber-700 border-t-transparent rounded-full animate-spin" />}
-                  Hidden
+                  Oculto
                 </button>
                 <button
                   type="button"
@@ -1442,7 +1842,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                   className="px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-50 rounded-xl border border-red-200 bg-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-red-700 border-t-transparent rounded-full animate-spin" />}
-                  Sold out
+                  Esgotado
                 </button>
                 <button
                   type="button"
@@ -1451,14 +1851,14 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                   className="px-3 py-2 text-sm font-bold text-gray-700 hover:bg-gray-100 rounded-xl border border-gray-200 bg-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-gray-700 border-t-transparent rounded-full animate-spin" />}
-                  Inactive
+                  Inativo
                 </button>
               </div>
             </div>
 
             <div className="mt-4 text-sm font-bold text-gray-700">
-              Status atual: <span className="font-black">{(publication as any)?.publicationStatus ?? 'draft'}</span>
-              {' | '}Operação: <span className="font-black">{(publication as any)?.operationalStatus ?? 'active'}</span>
+              Status atual: <span className="font-black">{(publication as any)?.publicationStatus === 'published' ? 'Publicado' : 'Rascunho'}</span>
+              {' | '}Operação: <span className="font-black">{(publication as any)?.operationalStatus === 'active' ? 'Ativo' : ((publication as any)?.operationalStatus === 'inactive' ? 'Inativo' : ((publication as any)?.operationalStatus === 'sold_out_manual' ? 'Esgotado' : 'Oculto'))}</span>
             </div>
           </div>
 
@@ -1481,8 +1881,8 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           <div className="space-y-3 md:hidden">
             {rules.map((r) => (
               <div key={r.id} className="bg-white border border-gray-200 rounded-2xl p-4">
-                <div className="font-black text-gray-900 truncate">{r.channel}</div>
-                <div className="mt-1 text-xs text-gray-600 font-bold">Dias: {(r.daysOfWeek ?? []).join(', ')}</div>
+                <div className="font-black text-gray-900 truncate">{formatChannelLabel(r.channel)}</div>
+                <div className="mt-1 text-xs text-gray-600 font-bold">Dias: {formatDaysLabel(r.daysOfWeek ?? [])}</div>
                 <div className="mt-1 text-xs text-gray-600 font-bold">Horário: {r.startTime} - {r.endTime}</div>
                 <div className="mt-3">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${r.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
@@ -1530,8 +1930,8 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               <tbody className="divide-y divide-gray-100">
                 {rules.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50/30 transition-colors group">
-                    <td className="px-6 py-4 font-bold text-gray-900">{r.channel}</td>
-                    <td className="px-6 py-4 text-sm font-bold text-gray-700">{(r.daysOfWeek ?? []).join(', ')}</td>
+                    <td className="px-6 py-4 font-bold text-gray-900">{formatChannelLabel(r.channel)}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-gray-700">{formatDaysLabel(r.daysOfWeek ?? [])}</td>
                     <td className="px-6 py-4 text-sm font-black text-gray-900">
                       {r.startTime} - {r.endTime}
                     </td>
@@ -1572,6 +1972,26 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               </tbody>
             </table>
           </div>
+          {isComboWizard ? (
+            <div className="flex justify-between">
+              <button
+                type="button"
+                onClick={goPrevWizardStep}
+                className="px-6 py-2.5 text-sm font-black text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl"
+              >
+                Voltar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveProduct}
+                disabled={savingStates.saveProduct}
+                className="px-6 py-2.5 text-sm font-black text-white bg-primary-600 hover:bg-primary-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {savingStates.saveProduct && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                Salvar alterações
+              </button>
+            </div>
+          ) : null}
         </section>
       )}
 
@@ -1701,6 +2121,74 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             />
             <span className="text-sm font-bold text-gray-700">Obrigatório</span>
           </label>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isBundleItemModalOpen}
+        onClose={() => setIsBundleItemModalOpen(false)}
+        title={editingBundleItem ? 'Editar item do combo' : 'Adicionar item do cardápio'}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setIsBundleItemModalOpen(false)}
+              className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={saveBundleItem}
+              disabled={savingStates.saveBundleItem || !bundleItemForm.productId || selectableBundleProducts.length === 0 || comboModeState !== 'bundle'}
+              className="px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {savingStates.saveBundleItem && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+              Salvar item
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Produto do cardápio</label>
+            <select
+              value={bundleItemForm.productId}
+              onChange={(e) => setBundleItemForm((p) => ({ ...p, productId: e.target.value }))}
+              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+            >
+              {selectableBundleProducts.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            {selectableBundleProducts.length === 0 ? (
+              <p className="text-xs text-amber-700 mt-2 font-bold">Não há produtos ativos disponíveis para vínculo.</p>
+            ) : null}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Quantidade</label>
+              <input
+                type="number"
+                min={1}
+                value={Number(bundleItemForm.qty ?? 1)}
+                onChange={(e) => setBundleItemForm((p) => ({ ...p, qty: Math.max(1, Number(e.target.value || 1)) }))}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Ordem</label>
+              <input
+                type="number"
+                min={0}
+                value={Number(bundleItemForm.sortOrder ?? 0)}
+                onChange={(e) => setBundleItemForm((p) => ({ ...p, sortOrder: Math.max(0, Number(e.target.value || 0)) }))}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+              />
+            </div>
+          </div>
         </div>
       </Modal>
 
@@ -1939,33 +2427,67 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Canal</label>
-            <select
-              value={ruleForm.channel}
-              onChange={(e) => setRuleForm((p) => ({ ...p, channel: e.target.value as any }))}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
-            >
-              <option value="storefront_delivery">storefront_delivery</option>
-              <option value="storefront_pickup">storefront_pickup</option>
-              <option value="pos">pos</option>
-            </select>
+            {editingRule ? (
+              <select
+                value={ruleForm.channel}
+                onChange={(e) => setRuleForm((p) => ({ ...p, channel: e.target.value as any }))}
+                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+              >
+                <option value="storefront_delivery">Delivery</option>
+                <option value="storefront_pickup">Retirada</option>
+                <option value="pos">Balcao / PDV</option>
+              </select>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {(Object.entries(CHANNEL_LABELS) as Array<[string, string]>).map(([value, label]) => {
+                  const checked = ruleChannels.includes(value as 'storefront_delivery' | 'storefront_pickup' | 'pos');
+                  return (
+                    <label key={value} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          const current = new Set(ruleChannels);
+                          if (e.target.checked) current.add(value as 'storefront_delivery' | 'storefront_pickup' | 'pos');
+                          else current.delete(value as 'storefront_delivery' | 'storefront_pickup' | 'pos');
+                          setRuleChannels(Array.from(current));
+                        }}
+                        className="w-4 h-4 text-primary-600"
+                      />
+                      <span className="text-xs font-bold text-gray-700">{label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Dias (0-6)</label>
-            <input
-              value={(ruleForm.daysOfWeek ?? []).join(',')}
-              onChange={(e) => {
-                const parts = e.target.value
-                  .split(',')
-                  .map((x) => x.trim())
-                  .filter(Boolean)
-                  .map((x) => Number(x))
-                  .filter((n) => !Number.isNaN(n));
-                setRuleForm((p) => ({ ...p, daysOfWeek: parts }));
-              }}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
-              placeholder="0,1,2,3,4,5,6"
-            />
+            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-2">Dias da semana</label>
+            <div className="grid grid-cols-2 gap-2">
+              {DAY_OPTIONS.map((day) => {
+                const isChecked = (ruleForm.daysOfWeek ?? []).includes(day.value);
+                return (
+                  <label key={day.value} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(e) => {
+                        const current = new Set(ruleForm.daysOfWeek ?? []);
+                        if (e.target.checked) {
+                          current.add(day.value);
+                        } else {
+                          current.delete(day.value);
+                        }
+                        setRuleForm((p) => ({ ...p, daysOfWeek: Array.from(current) }));
+                      }}
+                      className="w-4 h-4 text-primary-600"
+                    />
+                    <span className="text-xs font-bold text-gray-700">{day.label}</span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

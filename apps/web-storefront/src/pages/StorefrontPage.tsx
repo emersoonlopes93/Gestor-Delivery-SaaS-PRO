@@ -4,7 +4,7 @@ import { api } from '../lib/api-client';
 import type { StorefrontPayload, StorefrontProductPayload, StorefrontComboPayload } from '@gestor/types';
 import { useCartStore } from '../store/use-cart-store';
 import { useEffect, useState } from 'react';
-import { Loader2, Store, ShoppingBag, Box } from 'lucide-react';
+import { Loader2, Store, ShoppingBag, Box, Truck } from 'lucide-react';
 import { ProductDetailsModal } from '../components/ProductDetailsModal';
 import { CartDrawer } from '../components/CartDrawer';
 import { ComboDetailsModal } from '../components/ComboDetailsModal';
@@ -18,11 +18,14 @@ export function StorefrontPage() {
   const [selectedProduct, setSelectedProduct] = useState<StorefrontProductPayload | null>(null);
   const [selectedCombo, setSelectedCombo] = useState<StorefrontComboPayload | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [fulfillmentType, setFulfillmentType] = useState<'delivery' | 'pickup'>('delivery');
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['storefront', tenantSlug],
+    queryKey: ['storefront', tenantSlug, fulfillmentType],
     queryFn: async () => {
-      const res = await api.get<StorefrontPayload>(`/public/storefront/${tenantSlug}`);
+      const res = await api.get<StorefrontPayload>(
+        `/public/storefront/${tenantSlug}?fulfillmentType=${fulfillmentType}`,
+      );
       return res.data;
     },
     enabled: !!tenantSlug,
@@ -70,10 +73,43 @@ export function StorefrontPage() {
           <h1 className="text-2xl font-black text-gray-900 leading-tight">{tenant.name}</h1>
           <div className="flex items-center gap-2 mt-1">
             <span className={`w-2 h-2 rounded-full ${tenant.isOpen ? 'bg-green-500' : 'bg-red-500'}`} />
-            <span className="text-sm text-gray-500 font-medium">{tenant.isOpen ? 'Aberto agora' : 'Fechado'}</span>
+            <span className="text-sm text-gray-500 font-medium">
+              {tenant.isOpen ? `Aberto para ${fulfillmentType === 'delivery' ? 'entrega' : 'retirada'}` : `Fechado para ${fulfillmentType === 'delivery' ? 'entrega' : 'retirada'}`}
+            </span>
           </div>
         </div>
       </header>
+
+      <div className="mb-5 grid grid-cols-2 gap-2">
+        <button
+          onClick={() => setFulfillmentType('delivery')}
+          className={`rounded-xl px-3 py-2.5 text-sm font-bold border transition-colors flex items-center justify-center gap-2 ${
+            fulfillmentType === 'delivery'
+              ? 'bg-primary-600 text-white border-primary-600'
+              : 'bg-white text-gray-700 border-gray-200 hover:border-primary-200'
+          }`}
+        >
+          <Truck className="w-4 h-4" />
+          Entrega
+        </button>
+        <button
+          onClick={() => setFulfillmentType('pickup')}
+          className={`rounded-xl px-3 py-2.5 text-sm font-bold border transition-colors flex items-center justify-center gap-2 ${
+            fulfillmentType === 'pickup'
+              ? 'bg-primary-600 text-white border-primary-600'
+              : 'bg-white text-gray-700 border-gray-200 hover:border-primary-200'
+          }`}
+        >
+          <Store className="w-4 h-4" />
+          Retirada
+        </button>
+      </div>
+
+      {!tenant.isOpen ? (
+        <div className="mb-6 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm font-medium">
+          Este canal está fora do horário/configuração de disponibilidade no momento. Tente novamente mais tarde.
+        </div>
+      ) : null}
 
       {/* Categories / Anchor Links (Simple) */}
       <nav className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide sticky top-0 bg-gray-50/80 backdrop-blur-md z-30 pt-2 -mx-4 px-4 overflow-y-hidden">
@@ -99,8 +135,9 @@ export function StorefrontPage() {
               {combos.map((combo) => (
                 <button
                   key={combo.id}
+                  disabled={!tenant.isOpen}
                   onClick={() => setSelectedCombo(combo)}
-                  className="flex bg-orange-50/50 rounded-xl p-3 border border-orange-100/50 hover:border-orange-200 transition-all text-left group"
+                  className="flex bg-orange-50/50 rounded-xl p-3 border border-orange-100/50 hover:border-orange-200 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex-1 pr-3">
                     <div className="flex items-center gap-2 mb-1">
@@ -137,8 +174,9 @@ export function StorefrontPage() {
               {category.products.map((product) => (
                 <button
                   key={product.id}
+                  disabled={!tenant.isOpen}
                   onClick={() => setSelectedProduct(product)}
-                  className="flex bg-white rounded-xl p-3 shadow-sm border border-gray-100 hover:border-primary-200 transition-all text-left group"
+                  className="flex bg-white rounded-xl p-3 shadow-sm border border-gray-100 hover:border-primary-200 transition-all text-left group disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex-1 pr-3">
                     <h3 className="font-bold text-gray-900 group-hover:text-primary-600 transition-colors uppercase text-sm tracking-wide">
@@ -159,6 +197,14 @@ export function StorefrontPage() {
             </div>
           </section>
         ))}
+
+        {combos.length === 0 && categories.length === 0 && (
+          <section className="bg-white border border-gray-200 rounded-xl p-6 text-center">
+            <p className="text-sm text-gray-600 font-medium">
+              Nenhum item disponível para este canal no momento.
+            </p>
+          </section>
+        )}
       </div>
 
       {/* Modals & Drawer */}
@@ -182,7 +228,7 @@ export function StorefrontPage() {
       )}
 
       {/* Floating Cart Button */}
-      {cartItemsCount > 0 && !isCartOpen && (
+      {cartItemsCount > 0 && !isCartOpen && tenant.isOpen && (
         <div className="fixed bottom-6 left-0 right-0 px-4 pointer-events-none z-40">
           <button 
             onClick={() => setIsCartOpen(true)}

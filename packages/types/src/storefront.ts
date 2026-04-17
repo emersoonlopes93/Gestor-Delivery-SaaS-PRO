@@ -70,7 +70,20 @@ export interface StorefrontComboPayload {
   basePrice: number;
   image?: string | null;
   isAvailable: boolean; // Layer 3
-  blocks: StorefrontComboBlockPayload[];
+  comboMode?: 'bundle' | 'slot';
+  pricingType?: 'fixed_price' | 'discount_percent' | 'discount_amount';
+  pricingValue?: number;
+  itemsSubtotal?: number;
+  discountTotal?: number;
+  blocks?: StorefrontComboBlockPayload[];
+  bundleItems?: Array<{
+    id: string;
+    productId: string;
+    productName: string;
+    qty: number;
+    unitPrice: number;
+    subtotal: number;
+  }>;
 }
 
 export interface StorefrontPayload {
@@ -106,6 +119,14 @@ export interface CartSelectedComboItem {
   price: number;
 }
 
+export interface CartBundleItemSnapshot {
+  productId: string;
+  productName: string;
+  qty: number;
+  unitPrice: number;
+  subtotal: number;
+}
+
 export interface CartLineItem {
   cartLineId: string; // UUID unique per line
   productId?: string; // either product
@@ -118,6 +139,7 @@ export interface CartLineItem {
   
   // Options for combos
   selectedComboItems?: CartSelectedComboItem[];
+  bundleItems?: CartBundleItemSnapshot[];
 
   snapshot: CartSnapshot; // Commercial snapshot frozen at add time
 }
