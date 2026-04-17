@@ -103,21 +103,39 @@ export class CheckoutValidatorService {
       throw new NotFoundException('Loja não encontrada ou inativa.');
     }
 
+    const tenantId = tenant.id;
+
+    // 1.5 Fetch Store Status Context once for performance and global check
+    const [settings, operatingHours] = await Promise.all([
+      this.prisma.tenantSettings.findUnique({
+        where: { tenantId },
+        select: { isStorePaused: true, storePauseReason: true, timezone: true },
+      }),
+      this.prisma.tenantOperatingHours.findMany({
+        where: { tenantId },
+      }),
+    ]);
+
+    const availabilityContext = { settings, operatingHours };
+    const storeStatus = await this.availabilityService.getStoreStatus(tenantId, new Date(), availabilityContext);
+
+    if (!storeStatus.isOpen) {
+      throw new BadRequestException(storeStatus.message || 'A loja está fechada no momento.');
+    }
+
     if (items.length === 0) {
       throw new BadRequestException('O pedido deve conter pelo menos 1 item.');
     }
 
-    const tenantId = tenant.id;
     const validatedLines: ValidatedLine[] = [];
-
     const channel = options?.channel ?? 'storefront_delivery';
 
     for (const item of items) {
       if (item.lineType === 'product') {
-        const line = await this.validateProductLine(tenantId, item, true, channel);
+        const line = await this.validateProductLine(tenantId, item, true, channel, availabilityContext);
         validatedLines.push(line);
       } else if (item.lineType === 'combo') {
-        const line = await this.validateComboLine(tenantId, item, channel);
+        const line = await this.validateComboLine(tenantId, item, channel, availabilityContext);
         validatedLines.push(line);
       } else {
         throw new BadRequestException('Tipo de linha inválido.');
@@ -270,6 +288,7 @@ export class CheckoutValidatorService {
     item: CreateOrderItemDTO,
     checkSellableOnline: boolean = true,
     channel: 'storefront_delivery' | 'storefront_pickup' | 'pos' = 'storefront_delivery',
+    context?: { settings?: any; operatingHours?: any[] },
   ): Promise<ValidatedProductLine> {
     if (!item.productId) {
       throw new BadRequestException('productId é obrigatório para linhas do tipo product.');
@@ -315,6 +334,7 @@ export class CheckoutValidatorService {
         tenantId,
         productId: item.productId,
         channel,
+        context,
       });
     }
     if (!(product['isActive'] as boolean)) {
@@ -705,6 +725,7 @@ export class CheckoutValidatorService {
     tenantId: string,
     item: CreateOrderItemDTO,
     channel: 'storefront_delivery' | 'storefront_pickup' | 'pos' = 'storefront_delivery',
+    context?: { settings?: any; operatingHours?: any[] },
   ): Promise<ValidatedComboLine> {
     const hasNewSlots = Array.isArray(item.slots) && item.slots.length > 0;
     const comboProductId = item.productId || item.comboId;
@@ -736,6 +757,7 @@ export class CheckoutValidatorService {
         tenantId,
         productId: item.productId,
         channel,
+        context,
       });
       if (!(comboProduct['isActive'] as boolean)) {
         throw new BadRequestException(`O combo "${comboProduct['name']}" não está ativo.`);

@@ -13,10 +13,14 @@ export interface AvailabilityDecision {
 export class AvailabilityService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getStoreStatus(tenantId: string, now?: Date): Promise<{ isOpen: boolean; message: string; reason: string }> {
+  async getStoreStatus(
+    tenantId: string, 
+    now?: Date,
+    context?: { settings?: any; operatingHours?: any[] }
+  ): Promise<{ isOpen: boolean; message: string; reason: string; nextOpenAt?: string | null }> {
     const d = now ?? new Date();
 
-    const settings = await this.prisma.tenantSettings.findUnique({
+    const settings = context?.settings || await this.prisma.tenantSettings.findUnique({
       where: { tenantId },
       select: { isStorePaused: true, storePauseReason: true, timezone: true },
     });
@@ -26,40 +30,69 @@ export class AvailabilityService {
         isOpen: false,
         message: settings.storePauseReason || 'Loja temporariamente pausada.',
         reason: 'PAUSED',
+        nextOpenAt: null,
       };
     }
 
     const timezone = settings?.timezone || 'America/Sao_Paulo';
-    const { dayOfWeek, timeHHmm } = this.getTenantLocalDayAndTime(d, timezone);
+    const localInfo = this.getTenantLocalDayAndTime(d, timezone);
+    const { dayOfWeek, timeHHmm } = localInfo;
+    const currentMinutes = this.timeToMinutes(timeHHmm);
 
-    const operatingHours = await this.prisma.tenantOperatingHours.findMany({
+    const operatingHours = context?.operatingHours || await this.prisma.tenantOperatingHours.findMany({
       where: { tenantId },
     });
 
-    // Fallback: Store open if no configuration exists
     if (operatingHours.length === 0) {
       return { isOpen: true, message: 'Aberto agora', reason: 'NO_CONFIG' };
     }
 
-    const todayRule = operatingHours.find((h) => h.dayOfWeek === dayOfWeek);
+    // Sort to make searching for next open easy (0=sun to 6=sat)
+    const sortedRules = [...operatingHours].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+    const todayRule = sortedRules.find((h) => h.dayOfWeek === dayOfWeek);
 
-    if (!todayRule || !todayRule.isOpen) {
-      return { isOpen: false, message: 'Fechado no momento.', reason: 'CLOSED' };
-    }
+    // 1. Is it open right now?
+    if (todayRule?.isOpen && todayRule.openTime && todayRule.closeTime) {
+      const openMinutes = this.timeToMinutes(todayRule.openTime);
+      const closeMinutes = this.timeToMinutes(todayRule.closeTime);
 
-    if (todayRule.openTime && todayRule.closeTime) {
-      const isCurrentlyOpen = this.isTimeInRange(timeHHmm, todayRule.openTime, todayRule.closeTime);
-      if (isCurrentlyOpen) {
+      if (currentMinutes >= openMinutes && currentMinutes <= closeMinutes) {
         return { isOpen: true, message: 'Aberto agora', reason: 'OPEN' };
       }
-      return {
-        isOpen: false,
-        message: `Fechado no momento. Abrimos às ${todayRule.openTime}`,
-        reason: 'CLOSED',
-      };
+
+      // If it's today but haven't reached openTime yet
+      if (currentMinutes < openMinutes) {
+        return {
+          isOpen: false,
+          message: `Fechado. Abrimos hoje às ${todayRule.openTime}`,
+          reason: 'CLOSED',
+          nextOpenAt: todayRule.openTime,
+        };
+      }
     }
 
-    return { isOpen: true, message: 'Aberto agora', reason: 'OPEN' };
+    // 2. Find next opening time (searching up to 7 days ahead)
+    for (let i = 1; i <= 7; i++) {
+        const nextDay = (dayOfWeek + i) % 7;
+        const nextRule = sortedRules.find(r => r.dayOfWeek === nextDay);
+        
+        if (nextRule?.isOpen && nextRule.openTime) {
+            const dayLabel = i === 1 ? 'amanhã' : this.dayOfWeekToName(nextDay);
+            return {
+                isOpen: false,
+                message: `Fechado. Abrimos ${dayLabel} às ${nextRule.openTime}`,
+                reason: 'CLOSED',
+                nextOpenAt: nextRule.openTime,
+            };
+        }
+    }
+
+    return { isOpen: false, message: 'Fechado no momento.', reason: 'CLOSED' };
+  }
+
+  private dayOfWeekToName(day: number): string {
+    const names = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+    return names[day];
   }
 
   async decide(input: {
@@ -67,11 +100,12 @@ export class AvailabilityService {
     productId: string;
     channel: SalesChannel;
     now?: Date;
+    context?: { settings?: any; operatingHours?: any[] };
   }): Promise<AvailabilityDecision> {
     const now = input.now ?? new Date();
 
     // 1. Check Global Store Status
-    const storeStatus = await this.getStoreStatus(input.tenantId, now);
+    const storeStatus = await this.getStoreStatus(input.tenantId, now, input.context);
     if (!storeStatus.isOpen) {
       return { 
         canSell: false, 
@@ -119,11 +153,11 @@ export class AvailabilityService {
     }
 
     // Re-check timezone and time for product rules
-    const tenantSettings = await this.prisma.tenantSettings.findUnique({
+    const settings = input.context?.settings || await this.prisma.tenantSettings.findUnique({
       where: { tenantId: input.tenantId },
       select: { timezone: true },
     });
-    const timezone = tenantSettings?.timezone || 'America/Sao_Paulo';
+    const timezone = settings?.timezone || 'America/Sao_Paulo';
     const { dayOfWeek, timeHHmm } = this.getTenantLocalDayAndTime(now, timezone);
 
     const rules = await this.prisma.catalogAvailabilityRule.findMany({
@@ -153,6 +187,7 @@ export class AvailabilityService {
     productId: string;
     channel: SalesChannel;
     now?: Date;
+    context?: { settings?: any; operatingHours?: any[] };
   }): Promise<void> {
     const decision = await this.decide(input);
     if (!decision.canSell) {

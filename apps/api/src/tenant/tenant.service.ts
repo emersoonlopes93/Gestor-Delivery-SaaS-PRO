@@ -106,7 +106,10 @@ export class TenantService {
       // Create new
       return tx.tenantOperatingHours.createMany({
         data: hours.map((h) => ({
-          ...h,
+          dayOfWeek: h.dayOfWeek,
+          isOpen: h.isOpen,
+          openTime: h.openTime,
+          closeTime: h.closeTime,
           tenantId,
         })),
       });

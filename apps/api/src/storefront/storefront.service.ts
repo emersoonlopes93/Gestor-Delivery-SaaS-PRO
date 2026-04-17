@@ -230,6 +230,7 @@ export class StorefrontService {
       logo: tenant.settings?.logoUrl || null,
       isOpen: storeStatus.isOpen,
       statusMessage: storeStatus.message,
+      nextOpenAt: storeStatus.nextOpenAt,
     };
 
     return {

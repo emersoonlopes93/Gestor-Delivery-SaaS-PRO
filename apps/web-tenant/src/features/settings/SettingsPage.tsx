@@ -24,6 +24,7 @@ export function SettingsPage() {
   });
 
   const [hours, setHours] = useState<any[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -100,7 +101,7 @@ export function SettingsPage() {
     try {
       const res = await api.patch('/tenant/store-pause', {
         isStorePaused: newStatus,
-        storePauseReason: settings.storePauseReason,
+        storePauseReason: settings.storePauseReason || '',
       });
       if (res.success) {
         setSettings({ ...settings, isStorePaused: newStatus });
@@ -108,6 +109,33 @@ export function SettingsPage() {
       }
     } catch (error) {
       alert('Erro ao alterar status da loja.');
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate size (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('A imagem deve ter menos de 5MB.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await api.upload<{ url: string }>('/upload/image', formData);
+      if (response.success) {
+        setSettings({ ...settings, logoUrl: response.data.url });
+      }
+    } catch (error: any) {
+      console.error('Erro no upload:', error);
+      alert(error.message || 'Erro ao fazer upload da imagem.');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -207,14 +235,37 @@ export function SettingsPage() {
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">URL do Logotipo</label>
-                  <input
-                    type="text"
-                    value={settings.logoUrl || ''}
-                    onChange={e => setSettings({...settings, logoUrl: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
-                    placeholder="https://suaimagem.com/logo.png"
-                  />
+                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Logotipo da Loja</label>
+                  <div className="flex items-center gap-6 p-4 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/50">
+                    <div className="relative w-24 h-24 bg-white border border-gray-100 rounded-xl flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                      {settings.logoUrl ? (
+                        <img src={settings.logoUrl} alt="Logo preview" className="w-full h-full object-contain" />
+                      ) : (
+                        <span className="text-gray-300 text-2xl">🖼️</span>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2 text-left">
+                      <div className="flex items-center gap-2">
+                        <label className="cursor-pointer bg-white hover:bg-gray-50 text-gray-700 font-bold py-2 px-4 border border-gray-200 rounded-lg text-sm shadow-sm transition-all active:scale-95">
+                          <span>{uploading ? 'Enviando...' : 'Selecionar Imagem'}</span>
+                          <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} disabled={uploading} />
+                        </label>
+                        {settings.logoUrl && (
+                          <button 
+                            type="button"
+                            onClick={() => setSettings({...settings, logoUrl: ''})}
+                            className="text-red-500 hover:text-red-600 font-medium text-xs px-2 py-1"
+                          >
+                            Remover
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-400 font-medium leading-tight">
+                        Formatos aceitos: JPG, PNG ou WEBP. <br />
+                        Tamanho recomendado: 512x512 pixels.
+                      </p>
+                    </div>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Telefone Comercial</label>
