@@ -9,12 +9,13 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "class-validator": "^0.14.0",
     "class-transformer": "^0.5.1",
-    "reflect-metadata": "^0.2.0"
+    "class-validator": "^0.14.0",
+    "reflect-metadata": "^0.2.0",
+    "zod": "^3.23.0"
   },
   "devDependencies": {
-    "typescript": "^5.5.0",
-    "rimraf": "^5.0.0"
+    "rimraf": "^5.0.0",
+    "typescript": "^5.5.0"
   }
 }

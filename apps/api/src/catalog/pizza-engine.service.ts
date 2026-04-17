@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { PizzaTemplateConfigSchema } from '@gestor/types';
 
 export interface PizzaCompositionFlavor {
   productId: string;
@@ -33,8 +34,15 @@ export class PizzaEngineService {
       throw new BadRequestException('Esta categoria não utiliza o template de Pizza.');
     }
 
-    const config = category.templateConfig as any;
-    const strategy = config?.pricingStrategy || 'highest';
+    const configData = category.templateConfig;
+    const validation = PizzaTemplateConfigSchema.safeParse(configData);
+    
+    if (!validation.success) {
+      console.warn('Invalid pizza template config, using defaults', validation.error);
+    }
+    
+    const config = validation.success ? validation.data : { pricingStrategy: 'highest' as const };
+    const strategy = config.pricingStrategy;
 
     // Validate fractions
     const totalFraction = flavorSelections.reduce((sum, f) => sum + f.fraction, 0);

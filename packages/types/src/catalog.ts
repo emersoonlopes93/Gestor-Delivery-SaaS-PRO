@@ -1,3 +1,7 @@
+import { z } from 'zod';
+
+export type CategoryTemplateType = 'none' | 'pizza';
+
 export interface ProductCategory {
   id: string;
   tenantId: string;
@@ -5,6 +9,8 @@ export interface ProductCategory {
   slug: string;
   description?: string | null;
   image?: string | null;
+  templateType: CategoryTemplateType;
+  templateConfig?: any | null;
   isActive: boolean;
   isFeatured: boolean;
   order: number;
@@ -397,3 +403,27 @@ export interface CreateComboSlotAllowedItemDto {
 }
 
 export interface UpdateComboSlotAllowedItemDto extends Partial<CreateComboSlotAllowedItemDto> {}
+
+// ============================================
+// ZOD SCHEMAS FOR TEMPLATE CONFIGS
+// ============================================
+
+export const PizzaTemplateConfigSchema = z.object({
+  pricingStrategy: z.enum(['highest', 'lowest', 'average', 'sum_halves']).default('highest'),
+});
+
+export type PizzaTemplateConfig = z.infer<typeof PizzaTemplateConfigSchema>;
+
+export const CategoryTemplateConfigSchema = z.record(z.any()).optional();
+
+// ============================================
+// SHARED TYPES FOR CATALOG V2
+// ============================================
+
+export interface ProductDetails extends Product {
+  category?: ProductCategory | null;
+  optionGroupLinks?: Array<ProductOptionGroupLink & { optionGroup: OptionGroup & { items?: OptionItem[] } }>;
+  comboSlots?: Array<ComboSlot & { allowedItems?: Array<ComboSlotAllowedItem & { product?: Product }> }>;
+  publication?: (CatalogPublication & { rules?: CatalogAvailabilityRule[] }) | null;
+  optionItemPrices?: Array<{ id: string; optionItemId: string; price: number | string }>;
+}
