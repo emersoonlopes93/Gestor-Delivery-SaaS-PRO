@@ -62,6 +62,10 @@ model Tenant {
   deliveryCoverageConfig     DeliveryCoverageConfig?
   moduleAccess              TenantModuleAccess[]
   operatingHours            TenantOperatingHours[]
+  
+  upsells                   Upsell[]
+  upsellItems               UpsellItem[]
+  productUpsells            ProductUpsell[]
 
   optionGroups             OptionGroup[]
   optionItems              OptionItem[]
@@ -611,6 +615,9 @@ model Product {
   usedInComboBundles ComboBundleItem[] @relation("ComboBundleLinkedProduct")
   allowedInComboSlots ComboSlotAllowedItem[]
   optionItemPrices ProductOptionItemPrice[]
+  
+  upsellLinks      ProductUpsell[]
+  upsellItemEntries UpsellItem[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
@@ -769,6 +776,83 @@ model ProductComboBlockItem {
 }
 
 // ============================================================
+// UPSELLS (Phase 11 - Catalog V2 Enhancement)
+// ============================================================
+
+enum UpsellType {
+  product_list
+  category_based
+}
+
+enum UpsellPricingType {
+  normal
+  discount_percent
+  discount_amount
+  fixed_price
+}
+
+enum UpsellDisplayType {
+  inline
+  cart
+  both
+}
+
+model Upsell {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?  @db.Text
+  imageUrl    String?  @map("image_url") @db.VarChar(500)
+  
+  upsellType  UpsellType @default(product_list) @map("upsell_type")
+  pricingType UpsellPricingType @default(normal) @map("pricing_type")
+  pricingValue Decimal @default(0) @map("pricing_value") @db.Decimal(10, 2)
+  displayType UpsellDisplayType @default(both) @map("display_type")
+  
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items       UpsellItem[]
+  productLinks ProductUpsell[]
+  orderItemEntries OrderItem[]
+
+  @@index([tenantId])
+  @@map("upsells")
+}
+
+model UpsellItem {
+  id        String @id @default(uuid())
+  tenantId  String @map("tenant_id")
+  upsellId  String @map("upsell_id")
+  productId String @map("product_id")
+  sortOrder Int    @default(0) @map("sort_order")
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  upsell    Upsell @relation(fields: [upsellId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([upsellId])
+  @@index([productId])
+  @@map("upsell_items")
+}
+
+model ProductUpsell {
+  id        String @id @default(uuid())
+  tenantId  String @map("tenant_id")
+  productId String @map("product_id")
+  upsellId  String @map("upsell_id")
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  upsell    Upsell  @relation(fields: [upsellId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, upsellId])
+  @@map("product_upsells")
+}
+
+// ============================================================
 // ORDERS (PHASE 4)
 // ============================================================
 
@@ -818,6 +902,7 @@ model Order {
   idempotencyKey String  @map("idempotency_key") @db.VarChar(100)
   notes          String? @db.Text
   paymentMethod  PaymentMethod? @map("payment_method")
+  changeFor      Decimal?       @map("change_for") @db.Decimal(10, 2)
   cashSessionId  String?        @map("cash_session_id")
 
   // Delivery snapshot (optional)
@@ -875,11 +960,14 @@ model OrderItem {
 
   snapshotCatalogV2Json Json? @map("snapshot_catalog_v2_json")
 
+  sourceUpsellId String? @map("source_upsell_id")
+
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
   tenant          Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   order           Order                     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sourceUpsell    Upsell?                   @relation(fields: [sourceUpsellId], references: [id], onDelete: SetNull)
   complements     OrderItemComplement[]
   comboSelections OrderItemComboSelection[]
 
@@ -1029,6 +1117,7 @@ enum PaymentMethod {
   pix
   credit_card
   debit_card
+  card_on_delivery
   other
 }
 

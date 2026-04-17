@@ -1,9 +1,16 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useMemo } from 'react';
-import { ArrowLeft, MapPin, User, FileText, Loader2, AlertCircle, Truck, Store } from 'lucide-react';
+import { ArrowLeft, MapPin, User, FileText, Loader2, AlertCircle, Truck, Store, CreditCard, Banknote, QrCode } from 'lucide-react';
 import { useCartStore } from '../store/use-cart-store';
 import { api } from '../lib/api-client';
-import type { CreateOrderDTO, CreateOrderItemDTO, OrderResponseDTO, FulfillmentType } from '@gestor/types';
+import { 
+  CreateOrderDTO, 
+  CreateOrderItemDTO, 
+  OrderResponseDTO, 
+  FulfillmentType,
+  PaymentInput,
+  PaymentMethod
+} from '@gestor/types';
 
 export function CheckoutPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -30,19 +37,36 @@ export function CheckoutPage() {
   const [zipCode, setZipCode] = useState('');
   const [reference, setReference] = useState('');
 
+  // Payment state
+  const [payment, setPayment] = useState<PaymentInput>({
+    method: PaymentMethod.pix,
+  });
+
+  // Financial placeholders (calculated server-side, but shown here for UI flow)
+  const deliveryFee = 0; // Placeholder
+  const discount = 0; // Placeholder
+  const total = subtotal + deliveryFee - discount;
+
   // Idempotency key — generated once per checkout session
   const idempotencyKey = useMemo(() => crypto.randomUUID(), []);
 
   const isFormValid = useMemo(() => {
     if (!customerName.trim() || !customerPhone.trim()) return false;
     if (items.length === 0) return false;
+    
     if (fulfillmentType === 'delivery') {
       if (!street.trim() || !number.trim() || !neighborhood.trim() || !city.trim() || !state.trim() || !zipCode.trim()) {
         return false;
       }
     }
+
+    if (!payment.method) return false;
+    if (payment.method === 'cash') {
+      if (!payment.changeFor || payment.changeFor < total) return false;
+    }
+
     return true;
-  }, [customerName, customerPhone, items, fulfillmentType, street, number, neighborhood, city, state, zipCode]);
+  }, [customerName, customerPhone, items, fulfillmentType, street, number, neighborhood, city, state, zipCode, payment, total]);
 
   const handleSubmit = async () => {
     if (!isFormValid || isSubmitting) return;
@@ -94,6 +118,10 @@ export function CheckoutPage() {
           zipCode: zipCode.trim(),
           reference: reference.trim() || undefined,
         } : undefined,
+        payment: {
+          method: payment.method,
+          changeFor: payment.method === 'cash' ? payment.changeFor : undefined,
+        },
       };
 
       const res = await api.post<OrderResponseDTO>(
@@ -158,9 +186,27 @@ export function CheckoutPage() {
             </div>
           ))}
         </div>
-        <div className="border-t mt-4 pt-3 flex justify-between font-black text-gray-900">
-          <span>Subtotal</span>
-          <span>{fmt(subtotal)}</span>
+        <div className="border-t mt-4 pt-3 space-y-2">
+          <div className="flex justify-between text-sm text-gray-600">
+            <span>Subtotal</span>
+            <span>{fmt(subtotal)}</span>
+          </div>
+          {deliveryFee > 0 && (
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>Entrega</span>
+              <span>{fmt(deliveryFee)}</span>
+            </div>
+          )}
+          {discount > 0 && (
+            <div className="flex justify-between text-sm text-green-600">
+              <span>Desconto</span>
+              <span>-{fmt(discount)}</span>
+            </div>
+          )}
+          <div className="flex justify-between font-black text-lg text-gray-900 pt-1">
+            <span>Total</span>
+            <span>{fmt(total)}</span>
+          </div>
         </div>
       </section>
 
@@ -247,7 +293,52 @@ export function CheckoutPage() {
         </section>
       )}
 
-      {/* Notes */}
+      {/* Payment Method */}
+      <section className="mb-6">
+        <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+          <Banknote className="w-4 h-4" /> Forma de Pagamento
+        </h2>
+        <div className="grid grid-cols-1 gap-2">
+          {[
+            { id: PaymentMethod.pix, label: 'PIX', icon: QrCode },
+            { id: PaymentMethod.card_on_delivery, label: 'Cartão na Entrega', icon: CreditCard },
+            { id: PaymentMethod.cash, label: 'Dinheiro', icon: Banknote },
+          ].map(method => (
+            <button
+              key={method.id}
+              onClick={() => setPayment({ method: method.id })}
+              className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
+                payment.method === method.id
+                  ? 'border-primary-500 bg-primary-50 text-primary-700'
+                  : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'
+              }`}
+            >
+              <method.icon className="w-5 h-5" />
+              <span className="font-bold text-sm uppercase tracking-wide">{method.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {payment.method === PaymentMethod.cash && (
+          <div className="mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Troco para quanto?</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">R$</span>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0,00"
+                value={payment.changeFor || ''}
+                onChange={e => setPayment({ ...payment, changeFor: parseFloat(e.target.value) || 0 })}
+                className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+              />
+            </div>
+            {payment.changeFor && payment.changeFor < total && (
+              <p className="text-[10px] text-red-500 mt-1 font-bold">O troco deve ser maior que o total {fmt(total)}</p>
+            )}
+          </div>
+        )}
+      </section>
       <section className="mb-8">
         <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
           <FileText className="w-4 h-4" /> Observações
@@ -285,7 +376,7 @@ export function CheckoutPage() {
           </>
         ) : (
           <>
-            Confirmar Pedido — {fmt(subtotal)}
+            Confirmar Pedido — {fmt(total)}
           </>
         )}
       </button>

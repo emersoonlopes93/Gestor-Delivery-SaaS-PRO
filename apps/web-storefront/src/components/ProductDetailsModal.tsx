@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { X, Minus, Plus, ChevronRight, AlertCircle } from 'lucide-react';
-import { StorefrontProductPayload, CartSelectedComplement } from '@gestor/types';
+import { X, Minus, Plus, ChevronRight, AlertCircle, Sparkles } from 'lucide-react';
+import { StorefrontProductPayload, CartSelectedComplement, StorefrontUpsellPayload, StorefrontUpsellItemPayload } from '@gestor/types';
 import { CartValidator } from '@gestor/core';
 import { useCartStore } from '../store/use-cart-store';
 import { clsx, type ClassValue } from 'clsx';
@@ -65,6 +65,18 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
     if (validationError) return;
     addItem(product, quantity, selectedOptions, notes);
     onClose();
+  };
+
+  const addUpsellItem = (upsell: StorefrontUpsellPayload, item: StorefrontUpsellItemPayload) => {
+    // Treat upsell as a simple product for the cart
+    const virtualProduct: any = {
+      id: item.productId,
+      name: item.name,
+      basePrice: item.finalPrice,
+      image: item.image,
+      complements: [],
+    };
+    addItem(virtualProduct, 1, [], `Oferta: ${upsell.name}`, upsell.id);
   };
 
   return (
@@ -158,6 +170,47 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
               </div>
             ))}
           </div>
+
+          {product.upsells && product.upsells.length > 0 && (
+            <div className="mt-8 space-y-4 pt-8 border-t border-gray-100">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-primary-600" />
+                <h3 className="font-black text-gray-900 text-sm uppercase tracking-tight">E que tal acompanhar com?</h3>
+              </div>
+              
+              <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-2 px-2">
+                {product.upsells.flatMap(u => u.items.map(item => (
+                  <div 
+                    key={`${u.id}-${item.productId}`} 
+                    className="flex-shrink-0 w-36 bg-white border border-gray-100 rounded-2xl p-2.5 shadow-sm hover:shadow-md transition-all group"
+                  >
+                    <div className="relative h-20 mb-2 rounded-xl overflow-hidden bg-gray-50">
+                      {item.image && <img src={item.image} className="w-full h-full object-cover" />}
+                      <div className="absolute top-1 right-1 bg-primary-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase">
+                        Oferta
+                      </div>
+                    </div>
+                    <h4 className="text-[10px] font-bold text-gray-900 line-clamp-1">{item.name}</h4>
+                    <div className="flex items-center justify-between mt-1.5">
+                      <div className="flex flex-col">
+                        <span className="text-[9px] text-gray-400 line-through">R${item.originalPrice.toFixed(2)}</span>
+                        <span className="text-[11px] font-black text-primary-600">R${item.finalPrice.toFixed(2)}</span>
+                      </div>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addUpsellItem(u, item);
+                        }}
+                        className="w-6 h-6 bg-primary-50 text-primary-600 border border-primary-100 rounded-full flex items-center justify-center hover:bg-primary-600 hover:text-white transition-all shadow-sm"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )))}
+              </div>
+            </div>
+          )}
 
           {/* Observations */}
           <div className="mt-8">

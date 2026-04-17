@@ -3,12 +3,14 @@ import { PrismaService } from '../database/prisma.service';
 import { StorefrontPayload, StorefrontCategoryPayload, StorefrontComboPayload, StorefrontProductPayload } from '@gestor/types';
 import { TenantStatus, Prisma } from '@prisma/client';
 import { AvailabilityService, SalesChannel } from '../orders/availability.service';
+import { UpsellsService } from '../catalog/upsells.service';
 
 @Injectable()
 export class StorefrontService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly availabilityService: AvailabilityService,
+    private readonly upsellsService: UpsellsService,
   ) {}
 
   async getStorefrontPayload(
@@ -54,6 +56,13 @@ export class StorefrontService {
                 },
               },
             },
+            upsellLinks: {
+              include: {
+                upsell: {
+                  include: { items: { include: { product: true }, orderBy: { sortOrder: 'asc' } } },
+                },
+              },
+            },
           },
         },
       },
@@ -65,6 +74,13 @@ export class StorefrontService {
           include: {
             complementGroups: {
               include: { group: { include: { items: true } } };
+            };
+            upsellLinks: {
+              include: {
+                upsell: {
+                  include: { items: { include: { product: true } } };
+                };
+              };
             };
           };
         };
@@ -156,6 +172,32 @@ export class StorefrontService {
                 isAvailable: item.isActive,
               })),
             })),
+            upsells: p.upsellLinks
+              .filter((link) => link.upsell.displayType !== 'cart')
+              .map((link) => ({
+                id: link.upsell.id,
+                name: link.upsell.name,
+                description: link.upsell.description,
+                displayType: link.upsell.displayType as any,
+                items: link.upsell.items
+                  .filter((i) => i.product.isActive && i.product.deletedAt === null)
+                  .map((i) => {
+                    const originalPrice = Number(i.product.basePrice);
+                    const finalPrice = this.upsellsService.calculateUpsellPrice(
+                      originalPrice,
+                      link.upsell.pricingType,
+                      Number(link.upsell.pricingValue),
+                    );
+                    return {
+                      productId: i.productId,
+                      name: i.product.name,
+                      image: i.product.image,
+                      originalPrice,
+                      finalPrice,
+                      discountApplied: originalPrice - finalPrice,
+                    };
+                  }),
+              })),
           })) as StorefrontProductPayload[],
       }))
       .filter((cat) => cat.products.length > 0);
@@ -233,10 +275,50 @@ export class StorefrontService {
       nextOpenAt: storeStatus.nextOpenAt,
     };
 
+    const globalUpsellRows = await this.prisma.upsell.findMany({
+      where: {
+        tenantId: tenant.id,
+        isActive: true,
+        displayType: { in: ['cart', 'both'] },
+      },
+      include: {
+        items: {
+          include: { product: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+    });
+
+    const globalUpsells = globalUpsellRows.map((u) => ({
+      id: u.id,
+      name: u.name,
+      description: u.description,
+      displayType: u.displayType as any,
+      items: u.items
+        .filter((i) => i.product.isActive && i.product.deletedAt === null)
+        .map((i) => {
+          const originalPrice = Number(i.product.basePrice);
+          const finalPrice = this.upsellsService.calculateUpsellPrice(
+            originalPrice,
+            u.pricingType,
+            Number(u.pricingValue),
+          );
+          return {
+            productId: i.productId,
+            name: i.product.name,
+            image: i.product.image,
+            originalPrice,
+            finalPrice,
+            discountApplied: originalPrice - finalPrice,
+          };
+        }),
+    }));
+
     return {
       tenant: tenantInfo,
       categories,
       combos,
+      upsells: globalUpsells,
     };
   }
 }

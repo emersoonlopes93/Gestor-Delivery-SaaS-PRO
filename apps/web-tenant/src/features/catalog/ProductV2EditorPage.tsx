@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { Sparkles, Plus } from 'lucide-react';
 import { api } from '../../lib/api-client';
 import { Modal } from '../../components/Modal'; // Assuming Modal is here
 import { ProductBasicInfo } from './SubComponents/ProductBasicInfo';
@@ -25,9 +26,10 @@ import {
   UpdateComboSlotDto,
   UpdateProductOptionGroupLinkDto,
   UpsertPublicationDto,
+  Upsell,
 } from '@gestor/types';
 
-type TabKey = 'geral' | 'personalizacao' | 'combo' | 'publicacao';
+type TabKey = 'geral' | 'personalizacao' | 'combo' | 'publicacao' | 'vendas';
 
 type ProductDetails = Product & {
   optionGroupLinks?: Array<ProductOptionGroupLink & { optionGroup: OptionGroup & { items?: any[] } }>;
@@ -201,6 +203,10 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     sortOrder: 0,
   });
 
+  // Upsells
+  const [allUpsells, setAllUpsells] = useState<Upsell[]>([]);
+  const [productUpsells, setProductUpsells] = useState<string[]>([]);
+
   // Publicação/Disponibilidade
   const [publication, setPublication] = useState<CatalogPublication | null>(null);
   const [rules, setRules] = useState<CatalogAvailabilityRule[]>([]);
@@ -325,6 +331,13 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
         setPublication(pub);
       }
       if (rulesRes.success) setRules(rulesRes.data);
+
+      const [allUpsellsRes, prodUpsellsRes] = await Promise.all([
+        api.get('/upsells'),
+        id && id !== 'new' ? api.get(`/catalog/products/${id}/upsells`) : Promise.resolve({ success: true, data: [] }),
+      ]);
+      if (allUpsellsRes.success) setAllUpsells(allUpsellsRes.data as Upsell[]);
+      if (prodUpsellsRes.success) setProductUpsells((prodUpsellsRes.data as any[]).map((u: any) => u.id));
     } finally {
       setIsLoading(false);
     }
@@ -888,6 +901,21 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     }
   };
 
+  const toggleProductUpsell = async (upsellId: string) => {
+    if (isNew) return;
+    const isLinked = productUpsells.includes(upsellId);
+    try {
+      if (isLinked) {
+        await api.delete(`/upsells/${upsellId}/link/${productId}`);
+      } else {
+        await api.post(`/upsells/${upsellId}/link/${productId}`);
+      }
+      setProductUpsells(prev => isLinked ? prev.filter(id => id !== upsellId) : [...prev, upsellId]);
+    } catch (error) {
+      console.error('Error toggling upsell:', error);
+    }
+  };
+
   if (!productId && !isNew) {
     return (
       <div className="p-6 max-w-4xl mx-auto">
@@ -952,11 +980,19 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
         )}
         <button
           type="button"
+          onClick={() => setTab('vendas')}
+          disabled={isNew}
+          className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'vendas' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
+        >
+          {isComboWizard ? '3. Upsells' : 'Upsells / Ofertas'}
+        </button>
+        <button
+          type="button"
           onClick={() => setTab('publicacao')}
           disabled={isComboWizard && comboWizardIndex < 2}
           className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'publicacao' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
         >
-          {isComboWizard ? '3. Venda e Disponibilidade' : 'Venda e Disponibilidade'}
+          {isComboWizard ? '4. Venda e Disponibilidade' : 'Venda e Disponibilidade'}
         </button>
       </div>
 
@@ -1027,6 +1063,63 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               deleteAllowed={deleteAllowed}
               savingStates={savingStates}
             />
+          )}
+
+          {tab === 'vendas' && (
+            <div className="space-y-6">
+              <div className="bg-white border border-gray-200 rounded-2xl p-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="h-5 w-5 text-primary-600" />
+                  <h3 className="text-lg font-black text-gray-900">Vincular Upsells</h3>
+                </div>
+                <p className="text-sm text-gray-500 mb-6 font-medium">
+                  Selecione quais ofertas de Upsell devem aparecer quando este produto for selecionado ou estiver no carrinho. 
+                  Configure as ofertas na página de <span className="text-primary-600 font-bold underline cursor-pointer" onClick={() => navigate('/catalog/upsells')}>Upsells</span>.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {allUpsells.length === 0 ? (
+                    <div className="col-span-full py-12 text-center text-gray-400 border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center gap-2">
+                      <Sparkles className="h-8 w-8 text-gray-200" />
+                      <span className="font-bold">Nenhuma oferta cadastrada.</span>
+                    </div>
+                  ) : (
+                    allUpsells.map(u => {
+                      const isSelected = productUpsells.includes(u.id);
+                      return (
+                        <div 
+                          key={u.id}
+                          onClick={() => toggleProductUpsell(u.id)}
+                          className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                            isSelected 
+                              ? 'border-primary-500 bg-primary-50 shadow-sm' 
+                              : 'border-gray-100 hover:border-gray-300 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                               u.pricingType === 'fixed_price' ? 'bg-orange-100 text-orange-700' :
+                               u.pricingType.startsWith('discount') ? 'bg-green-100 text-green-700' :
+                               'bg-gray-100 text-gray-700'
+                             }`}>
+                               {u.pricingType === 'normal' ? 'Preço Normal' : 
+                                u.pricingType === 'fixed_price' ? 'Fixo' :
+                                u.pricingType === 'discount_percent' ? `${u.pricingValue}% Desc.` :
+                                `R$${u.pricingValue} Desc.`}
+                             </span>
+                             {isSelected && <div className="h-4 w-4 bg-primary-600 rounded-full flex items-center justify-center">
+                               <Plus className="h-3 w-3 text-white rotate-45" />
+                             </div>}
+                          </div>
+                          <div className="font-bold text-gray-900">{u.name}</div>
+                          <div className="text-xs text-gray-400 mt-1 line-clamp-1">{u.description}</div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
           )}
 
           {tab === 'publicacao' && (

@@ -23,10 +23,12 @@ import { CatalogTemplatesService } from './catalog-templates.service';
 import { DatabaseModule } from '../database/database.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { PizzaController } from './pizza.controller';
+import { UpsellsController } from './upsells.controller';
+import { UpsellsService } from './upsells.service';
 
 @Module({
   imports: [DatabaseModule, RbacModule],
-  controllers: [CategoriesController, ProductsController, ComplementsController, CombosController, OptionGroupsController, ProductOptionGroupsController, ComboSlotsController, ComboBundleItemsController, PublicationController, PizzaController],
+  controllers: [CategoriesController, ProductsController, ComplementsController, CombosController, OptionGroupsController, ProductOptionGroupsController, ComboSlotsController, ComboBundleItemsController, PublicationController, PizzaController, UpsellsController],
   providers: [
     CategoriesService,
     ProductsService,
@@ -40,8 +42,9 @@ import { PizzaController } from './pizza.controller';
     CatalogMigrationV2Service,
     PizzaEngineService,
     CatalogTemplatesService,
+    UpsellsService,
   ],
-  exports: [PizzaEngineService, CatalogTemplatesService],
+  exports: [PizzaEngineService, CatalogTemplatesService, UpsellsService],
 })
 export class CatalogModule {}
 

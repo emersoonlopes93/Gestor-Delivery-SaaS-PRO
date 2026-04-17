@@ -18,6 +18,8 @@ import type {
   OrderResponseDTO,
   PosOrderListItemDTO,
   OrderStatus,
+  FulfillmentType,
+  PaymentMethod,
 } from '@gestor/types';
 
 @Injectable()
@@ -372,6 +374,11 @@ export class PosService {
       total: Number(order.total),
       sourceChannel: order.sourceChannel,
       notes: order.notes,
+      paymentMethod: order.paymentMethod as PaymentMethod,
+      changeFor: order.changeFor ? Number(order.changeFor) : null,
+      customerId: order.customerId,
+      couponId: order.couponId,
+      cashbackUsed: order.cashbackUsed ? Number(order.cashbackUsed) : null,
       items: order.items.map((item) => ({
         id: item.id,
         lineType: item.lineType as 'product' | 'combo',

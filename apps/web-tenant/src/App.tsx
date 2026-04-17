@@ -11,6 +11,7 @@ import { ProductV2EditorPage } from './features/catalog/ProductV2EditorPage';
 import { OptionGroupsPage } from './features/catalog/OptionGroupsPage';
 import { CombosV2Page } from './features/catalog/CombosV2Page';
 import { OrderSimulationPage } from './features/catalog/OrderSimulationPage';
+import { UpsellsPage } from './features/catalog/UpsellsPage';
 import { OrdersListPage } from './features/orders/OrdersListPage';
 import { OperationBoardPage } from './features/orders/OperationBoardPage';
 import { KdsPage } from './features/orders/KdsPage';
@@ -94,6 +95,14 @@ export function App() {
           element={
             <PermissionGate permission="catalog.manage_combos">
               <CombosV2Page />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/catalog/upsells"
+          element={
+            <PermissionGate permission="catalog.read">
+              <UpsellsPage />
             </PermissionGate>
           }
         />

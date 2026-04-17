@@ -1,0 +1,5 @@
+﻿src/features/catalog/UpsellsPage.tsx(14,21): error TS2307: Cannot find module '../../lib/api' or its corresponding type declarations.
+src/features/catalog/UpsellsPage.tsx(26,11): error TS2339: Property 'tenantId' does not exist on type 'AuthState'.
+src/features/catalog/UpsellsPage.tsx(381,9): error TS2322: Type '{ children: Element; isOpen: boolean; onClose: () => void; title: string; maxWidth: string; }' is not assignable to type 'IntrinsicAttributes & ModalProps'.
+  Property 'maxWidth' does not exist on type 'IntrinsicAttributes & ModalProps'.
+src/features/catalog/UpsellsPage.tsx(391,44): error TS2367: This comparison appears to be unintentional because the types 'CatalogProductType | undefined' and '"product"' have no overlap.

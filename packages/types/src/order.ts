@@ -2,7 +2,9 @@
 // ORDER DOMAIN TYPES — Phase 4
 // ============================================================
 
-// --- Enums (mirroring Prisma) ---
+import { IsString, IsNotEmpty, IsOptional, IsArray, ValidateNested, IsNumber, IsEmail } from 'class-validator';
+import { Type } from 'class-transformer';
+import { PaymentMethod } from './enums';
 
 export type OrderStatus =
   | 'pending'
@@ -18,6 +20,11 @@ export type FulfillmentType = 'delivery' | 'pickup';
 
 export type OrderLineType = 'product' | 'combo';
 
+export class PaymentInput {
+  @IsString() @IsNotEmpty() method!: PaymentMethod;
+  @IsNumber() @IsOptional() changeFor?: number | null;
+}
+
 // --- Valid status transitions ---
 
 export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
@@ -32,8 +39,6 @@ export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 };
 
 // --- DTOs de Entrada (Checkout) ---
-import { IsString, IsNotEmpty, IsOptional, IsArray, ValidateNested, IsNumber, IsEmail } from 'class-validator';
-import { Type } from 'class-transformer';
 
 export class DeliveryAddressDTO {
   @IsString() @IsNotEmpty() street!: string;
@@ -95,9 +100,8 @@ export class PizzaCompositionFlavorDTO {
 
 export class PizzaCompositionDTO {
   @IsString() @IsNotEmpty() sizeId!: string;
-
+  
   @IsArray()
-  @IsNotEmpty()
   @ValidateNested({ each: true })
   @Type(() => PizzaCompositionFlavorDTO)
   flavors!: PizzaCompositionFlavorDTO[];
@@ -105,39 +109,50 @@ export class PizzaCompositionDTO {
 
 export class CreateOrderItemDTO {
   @IsString() @IsNotEmpty() lineType!: OrderLineType;
+  
   @IsString() @IsOptional() productId?: string;
-  @IsString() @IsOptional() comboId?: string;
+  @IsString() @IsOptional() comboId?: string; // Legacy field
+
   @IsNumber() @IsNotEmpty() quantity!: number;
   @IsString() @IsOptional() notes?: string;
 
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => PizzaCompositionDTO)
-  pizzaComposition?: PizzaCompositionDTO;
-
+  // For Legacy Complements
   @IsArray()
   @IsOptional()
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemComplementDTO)
   complements?: CreateOrderItemComplementDTO[];
 
-  @IsArray()
-  @IsOptional()
-  @ValidateNested({ each: true })
-  @Type(() => CreateOrderItemSelectionGroupDTO)
-  selections?: CreateOrderItemSelectionGroupDTO[];
-
+  // For Legacy Combo Blocks
   @IsArray()
   @IsOptional()
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemComboSelectionDTO)
   comboSelections?: CreateOrderItemComboSelectionDTO[];
 
+  // For Catalog V2 Product Options
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => CreateOrderItemSelectionGroupDTO)
+  selections?: CreateOrderItemSelectionGroupDTO[];
+
+  // For Pizza Engine
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PizzaCompositionDTO)
+  pizzaComposition?: PizzaCompositionDTO;
+
+  // For Catalog V2 Combo Slots
   @IsArray()
   @IsOptional()
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemComboSlotSelectionDTO)
   slots?: CreateOrderItemComboSlotSelectionDTO[];
+
+  @IsString()
+  @IsOptional()
+  sourceUpsellId?: string;
 }
 
 export class CreateOrderDTO {
@@ -167,6 +182,11 @@ export class CreateOrderDTO {
   
   @IsString() @IsOptional() couponCode?: string;
   @IsNumber() @IsOptional() useCashbackAmount?: number;
+
+  @ValidateNested()
+  @Type(() => PaymentInput)
+  @IsNotEmpty()
+  payment!: PaymentInput;
 }
 
 // --- DTOs de Saída ---
@@ -226,6 +246,9 @@ export interface OrderResponseDTO {
   items: OrderItemResponseDTO[];
   deliveryAddress?: DeliveryAddressDTO | null;
   timeline: OrderTimelineEntryDTO[];
+
+  paymentMethod: PaymentMethod;
+  changeFor?: number | null;
   
   customerId?: string | null;
   couponId?: string | null;
@@ -244,6 +267,7 @@ export interface OrderListItemDTO {
   customerPhone: string;
   total: number;
   itemCount: number;
+  paymentMethod: PaymentMethod;
   createdAt: string;
 }
 

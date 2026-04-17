@@ -109,6 +109,7 @@ export enum PaymentMethod {
   pix = 'pix',
   credit_card = 'credit_card',
   debit_card = 'debit_card',
+  card_on_delivery = 'card_on_delivery',
   other = 'other',
 }
 

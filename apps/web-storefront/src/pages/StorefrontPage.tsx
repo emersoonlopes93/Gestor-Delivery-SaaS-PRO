@@ -225,7 +225,10 @@ export function StorefrontPage() {
       )}
 
       {isCartOpen && (
-        <CartDrawer onClose={() => setIsCartOpen(false)} />
+        <CartDrawer 
+          onClose={() => setIsCartOpen(false)} 
+          upsells={data?.upsells} 
+        />
       )}
 
       {/* Floating Cart Button */}

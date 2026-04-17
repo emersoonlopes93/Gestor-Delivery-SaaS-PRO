@@ -21,6 +21,7 @@ export interface StorefrontProductPayload {
   image?: string | null;
   isAvailable: boolean; // Layer 3 
   complements: StorefrontComplementGroup[];
+  upsells: StorefrontUpsellPayload[];
 }
 
 export interface StorefrontCategoryPayload {
@@ -92,6 +93,24 @@ export interface StorefrontPayload {
   tenant: StorefrontTenantInfo;
   categories: StorefrontCategoryPayload[];
   combos: StorefrontComboPayload[];
+  upsells: StorefrontUpsellPayload[];
+}
+
+export interface StorefrontUpsellItemPayload {
+  productId: string;
+  name: string;
+  image?: string | null;
+  originalPrice: number;
+  finalPrice: number;
+  discountApplied: number;
+}
+
+export interface StorefrontUpsellPayload {
+  id: string;
+  name: string;
+  description?: string | null;
+  displayType: 'inline' | 'cart' | 'both';
+  items: StorefrontUpsellItemPayload[];
 }
 
 // -------------------------------------------------------------
@@ -142,6 +161,8 @@ export interface CartLineItem {
   // Options for combos
   selectedComboItems?: CartSelectedComboItem[];
   bundleItems?: CartBundleItemSnapshot[];
+
+  sourceUpsellId?: string; // If this item was added via an upsell offer
 
   snapshot: CartSnapshot; // Commercial snapshot frozen at add time
 }

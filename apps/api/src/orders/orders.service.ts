@@ -20,6 +20,7 @@ import type {
   OrderBoardItemDTO,
   OrderKdsItemDTO,
   OrderDispatchItemDTO,
+  PaymentMethod,
 } from '@gestor/types';
 import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
@@ -61,6 +62,7 @@ export class OrdersService {
       couponCode: dto.couponCode,
       useCashbackAmount: dto.useCashbackAmount,
       deliveryAddress: dto.deliveryAddress,
+      payment: dto.payment,
     });
     const { tenantId, lines, itemsSubtotal, discountTotal, deliveryFee, total, couponId, cashbackUsed } = validation;
 
@@ -120,6 +122,8 @@ export class OrdersService {
           customerId,
           couponId,
           cashbackUsed,
+          paymentMethod: dto.payment.method as any, // Cast to avoid Prisma enum mismatch
+          changeFor: dto.payment.changeFor || null,
           publicTrackingToken: generatePublicTrackingToken(),
         },
       });
@@ -146,6 +150,7 @@ export class OrdersService {
             snapshotExtrasTotal: line.extrasTotal,
             snapshotComposition: line.composition || null,
             snapshotCatalogV2Json,
+            sourceUpsellId: (line as any).sourceUpsellId || null,
           },
         });
 
@@ -278,6 +283,7 @@ export class OrdersService {
       customerPhone: o.customerPhone,
       total: Number(o.total),
       itemCount: o._count.items,
+      paymentMethod: o.paymentMethod as PaymentMethod,
       createdAt: o.createdAt.toISOString(),
     }));
 
@@ -324,6 +330,8 @@ export class OrdersService {
       sourceChannel: order.sourceChannel,
       notes: order.notes,
       publicTrackingToken: order.publicTrackingToken,
+      paymentMethod: order.paymentMethod as PaymentMethod,
+      changeFor: order.changeFor ? Number(order.changeFor) : null,
       items: order.items.map((item) => ({
         id: item.id,
         lineType: item.lineType as 'product' | 'combo',

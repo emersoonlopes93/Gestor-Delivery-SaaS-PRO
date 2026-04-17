@@ -17,7 +17,7 @@ interface CartState {
   
   // Actions
   setTenantId: (id: string) => void;
-  addItem: (product: StorefrontProductPayload, quantity: number, options: CartSelectedComplement[], notes?: string) => void;
+  addItem: (product: StorefrontProductPayload, quantity: number, options: CartSelectedComplement[], notes?: string, sourceUpsellId?: string) => void;
   addCombo: (combo: StorefrontComboPayload, quantity: number, selectedItems: CartSelectedComboItem[], bundleItems: CartBundleItemSnapshot[], notes?: string) => void;
   removeItem: (cartLineId: string) => void;
   updateQuantity: (cartLineId: string, quantity: number) => void;
@@ -37,7 +37,7 @@ export const useCartStore = create<CartState>()(
         }
       },
 
-      addItem: (product, quantity, options, notes) => {
+      addItem: (product, quantity, options, notes, sourceUpsellId) => {
         const extrasPrice = options.reduce((sum, opt) => sum + opt.price, 0);
         const lineSubtotal = (product.basePrice + extrasPrice) * quantity;
         
@@ -57,6 +57,7 @@ export const useCartStore = create<CartState>()(
           quantity,
           notes,
           selectedOptions: options,
+          sourceUpsellId,
           snapshot,
         };
 

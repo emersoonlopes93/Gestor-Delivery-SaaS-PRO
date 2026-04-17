@@ -7,11 +7,13 @@ import type {
   CreateOrderItemSelectionGroupDTO,
   CreateOrderItemComboSlotSelectionDTO,
   DeliveryAddressDTO,
+  PaymentInput,
 } from '@gestor/types';
 import { CouponsService } from '../promotions/coupons.service';
 import { CashbackService } from '../promotions/cashback.service';
 import { DeliveryRateService } from '../delivery/delivery-rate.service';
 import { AvailabilityService } from './availability.service';
+import { UpsellsService } from '../catalog/upsells.service';
 import { PizzaEngineService } from '../catalog/pizza-engine.service';
 
 interface ValidatedProductLine {
@@ -27,6 +29,7 @@ interface ValidatedProductLine {
   quantity: number;
   notes?: string;
   composition: string;
+  sourceUpsellId?: string;
   complements: Array<{
     complementItemId: string;
     snapshotName: string;
@@ -81,6 +84,7 @@ export class CheckoutValidatorService {
     private readonly deliveryRateService: DeliveryRateService,
     private readonly availabilityService: AvailabilityService,
     private readonly pizzaEngine: PizzaEngineService,
+    private readonly upsellsService: UpsellsService,
   ) {}
 
   async validate(
@@ -92,6 +96,7 @@ export class CheckoutValidatorService {
       useCashbackAmount?: number;
       deliveryAddress?: DeliveryAddressDTO | null;
       channel?: 'storefront_delivery' | 'storefront_pickup';
+      payment?: PaymentInput;
     },
   ): Promise<CheckoutValidationResult> {
     // 1. Resolve tenant
@@ -197,6 +202,9 @@ export class CheckoutValidatorService {
     const deliveryFee = deliveryFeeCalculation.fee;
 
     const finalTotal = total + deliveryFee;
+
+    // 6. Validar pagamento
+    this.validatePayment(options?.payment, finalTotal);
 
     return { 
       tenantId, 
@@ -350,6 +358,25 @@ export class CheckoutValidatorService {
     const basePrice = Number(product['basePrice']);
 
     let effectiveBasePrice = basePrice;
+
+    // Apply Upsell Discount if applicable
+    if (item.sourceUpsellId) {
+      const upsell = await (this.prisma as any).upsell.findFirst({
+        where: { id: item.sourceUpsellId, tenantId, isActive: true },
+        include: { items: true },
+      });
+      if (upsell) {
+        const upsellItem = (upsell.items as any[]).find((i) => i.productId === item.productId);
+        if (upsellItem) {
+          effectiveBasePrice = this.upsellsService.calculateUpsellPrice(
+            basePrice,
+            upsell.pricingType,
+            Number(upsell.pricingValue),
+          );
+        }
+      }
+    }
+
     let extrasTotal = 0;
     let unitPrice = 0;
     let composition = '';
@@ -452,6 +479,7 @@ export class CheckoutValidatorService {
       quantity: item.quantity,
       notes: item.notes,
       composition,
+      sourceUpsellId: item.sourceUpsellId,
       complements: validatedComplements,
       snapshotCatalogV2Json,
     };
@@ -1213,5 +1241,22 @@ export class CheckoutValidatorService {
     }
 
     return result;
+  }
+
+  private validatePayment(payment: PaymentInput | undefined, total: number) {
+    if (!payment || !payment.method) {
+      throw new BadRequestException('Forma de pagamento é obrigatória.');
+    }
+
+    if (payment.method === 'cash') {
+      if (!payment.changeFor) {
+        throw new BadRequestException('Para pagamento em dinheiro, informe o troco.');
+      }
+      if (payment.changeFor < total) {
+        throw new BadRequestException(
+          `O valor para troco (${payment.changeFor}) deve ser maior ou igual ao total do pedido (${total}).`,
+        );
+      }
+    }
   }
 }

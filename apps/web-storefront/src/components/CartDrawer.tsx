@@ -1,9 +1,10 @@
-import { X, Trash2, ShoppingBag, Plus, Minus, MapPin, Store, ChevronRight } from 'lucide-react';
+import { X, Trash2, ShoppingBag, Plus, Minus, MapPin, Store, ChevronRight, Sparkles } from 'lucide-react';
 import { useCartStore } from '../store/use-cart-store';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { StorefrontUpsellPayload, StorefrontUpsellItemPayload } from '@gestor/types';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -11,10 +12,11 @@ function cn(...inputs: ClassValue[]) {
 
 interface CartDrawerProps {
   onClose: () => void;
+  upsells?: StorefrontUpsellPayload[];
 }
 
-export function CartDrawer({ onClose }: CartDrawerProps) {
-  const { items, subtotal, removeItem, updateQuantity } = useCartStore();
+export function CartDrawer({ onClose, upsells }: CartDrawerProps) {
+  const { items, subtotal, addItem, removeItem, updateQuantity } = useCartStore();
   const [fulfillment, setFulfillment] = useState<'delivery' | 'pickup'>('delivery');
   const navigate = useNavigate();
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -22,6 +24,17 @@ export function CartDrawer({ onClose }: CartDrawerProps) {
   const handleCheckout = () => {
     onClose();
     navigate(`/${tenantSlug}/checkout`);
+  };
+
+  const addUpsellItem = (upsell: StorefrontUpsellPayload, item: StorefrontUpsellItemPayload) => {
+    const virtualProduct: any = {
+      id: item.productId,
+      name: item.name,
+      basePrice: item.finalPrice,
+      image: item.image,
+      complements: [],
+    };
+    addItem(virtualProduct, 1, [], `Oferta: ${upsell.name}`, upsell.id);
   };
 
   if (items.length === 0) {
@@ -149,6 +162,42 @@ export function CartDrawer({ onClose }: CartDrawerProps) {
             </div>
           ))}
         </div>
+
+        {/* Global Upsells */}
+        {upsells && upsells.length > 0 && (
+          <div className="px-6 py-4 bg-primary-50/30 border-t border-primary-100 flex-shrink-0">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="w-4 h-4 text-primary-600" />
+              <h3 className="text-[10px] font-black text-primary-900 uppercase tracking-widest">Complete seu pedido</h3>
+            </div>
+            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide -mx-2 px-2">
+               {upsells.flatMap(u => u.items.map(item => {
+                 const isInCart = items.some(i => i.productId === item.productId);
+                 if (isInCart) return null;
+
+                 return (
+                   <div key={`${u.id}-${item.productId}`} className="flex-shrink-0 w-44 bg-white border border-primary-100 rounded-2xl p-2.5 shadow-sm flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-lg bg-gray-50 overflow-hidden flex-shrink-0 border border-gray-100">
+                        {item.image && <img src={item.image} className="w-full h-full object-cover" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold text-gray-900 truncate leading-none mb-1">{item.name}</p>
+                        <div className="flex items-center justify-between">
+                           <span className="text-[11px] font-black text-primary-600">R${item.finalPrice.toFixed(2)}</span>
+                           <button 
+                             onClick={() => addUpsellItem(u, item)}
+                             className="w-5 h-5 bg-primary-600 text-white rounded-full flex items-center justify-center hover:scale-110 transition-transform"
+                           >
+                             <Plus className="w-3 h-3" />
+                           </button>
+                        </div>
+                      </div>
+                   </div>
+                 );
+               }))}
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="p-6 border-t bg-white shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">

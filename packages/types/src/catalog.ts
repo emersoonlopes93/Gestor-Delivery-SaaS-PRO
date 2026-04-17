@@ -426,4 +426,60 @@ export interface ProductDetails extends Product {
   comboSlots?: Array<ComboSlot & { allowedItems?: Array<ComboSlotAllowedItem & { product?: Product }> }>;
   publication?: (CatalogPublication & { rules?: CatalogAvailabilityRule[] }) | null;
   optionItemPrices?: Array<{ id: string; optionItemId: string; price: number | string }>;
+  upsellLinks?: Array<ProductUpsell & { upsell: Upsell & { items: Array<UpsellItem & { product: Product }> } }>;
+}
+
+// ============================================
+// UPSELLS (Phase 11)
+// ============================================
+
+export type UpsellType = 'product_list' | 'category_based';
+export type UpsellPricingType = 'normal' | 'discount_percent' | 'discount_amount' | 'fixed_price';
+export type UpsellDisplayType = 'inline' | 'cart' | 'both';
+
+export interface Upsell {
+  id: string;
+  tenantId: string;
+  name: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  upsellType: UpsellType;
+  pricingType: UpsellPricingType;
+  pricingValue: number | string;
+  displayType: UpsellDisplayType;
+  isActive: boolean;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface UpsellItem {
+  id: string;
+  tenantId: string;
+  upsellId: string;
+  productId: string;
+  sortOrder: number;
+}
+
+export interface ProductUpsell {
+  id: string;
+  tenantId: string;
+  productId: string;
+  upsellId: string;
+}
+
+export interface CreateUpsellDto {
+  name: string;
+  description?: string;
+  imageUrl?: string;
+  upsellType?: UpsellType;
+  pricingType?: UpsellPricingType;
+  pricingValue?: number;
+  displayType?: UpsellDisplayType;
+  isActive?: boolean;
+}
+
+export interface UpdateUpsellDto extends Partial<CreateUpsellDto> {}
+
+export interface UpsellWithItems extends Upsell {
+  items: Array<UpsellItem & { product: Product }>;
 }
