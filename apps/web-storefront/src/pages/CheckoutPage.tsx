@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { ArrowLeft, MapPin, User, FileText, Loader2, AlertCircle, Truck, Store, CreditCard, Banknote, QrCode } from 'lucide-react';
 import { useCartStore } from '../store/use-cart-store';
 import { api } from '../lib/api-client';
@@ -9,8 +9,13 @@ import {
   OrderResponseDTO, 
   FulfillmentType,
   PaymentInput,
-  PaymentMethod
+  PaymentMethod,
+  DeliveryAddressDTO,
+  CheckoutValidationResult
 } from '@gestor/types';
+import { AddressAutocomplete } from '../components/AddressAutocomplete';
+import { StructuredAddress } from '../lib/maps-service';
+import { useDebounce } from '../hooks/use-debounce';
 
 export function CheckoutPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -36,26 +41,119 @@ export function CheckoutPage() {
   const [state, setState] = useState('');
   const [zipCode, setZipCode] = useState('');
   const [reference, setReference] = useState('');
+  const [lat, setLat] = useState<number | undefined>();
+  const [lng, setLng] = useState<number | undefined>();
 
   // Payment state
   const [payment, setPayment] = useState<PaymentInput>({
     method: PaymentMethod.pix,
   });
 
-  // Financial placeholders (calculated server-side, but shown here for UI flow)
-  const deliveryFee = 0; // Placeholder
-  const discount = 0; // Placeholder
-  const total = subtotal + deliveryFee - discount;
+  // Financial state (calculated server-side)
+  const [deliveryFee, setDeliveryFee] = useState(0);
+  const [isValidating, setIsValidating] = useState(false);
 
   // Idempotency key — generated once per checkout session
   const idempotencyKey = useMemo(() => crypto.randomUUID(), []);
+
+  // Real-time server-side validation for delivery fee and address availability
+  const debouncedAddress = useDebounce({ street, number, neighborhood, city, state, zipCode, lat, lng }, 800);
+
+  useEffect(() => {
+    async function validate() {
+      if (items.length === 0 || !tenantSlug) return;
+      
+      const isDelivery = fulfillmentType === 'delivery';
+      if (isDelivery && (!lat || !lng)) {
+        setDeliveryFee(0);
+        return;
+      }
+
+      setIsValidating(true);
+      try {
+        const orderItems: CreateOrderItemDTO[] = items.map(item => {
+          if (item.comboId) {
+            return {
+              lineType: 'combo' as const,
+              comboId: item.comboId,
+              productId: item.comboId,
+              quantity: item.quantity,
+              notes: item.notes,
+              comboSelections: item.selectedComboItems?.map(s => ({
+                blockId: (s as any).blockId,
+                blockItemId: (s as any).blockItemId,
+              })) || [],
+            };
+          }
+          return {
+            lineType: 'product' as const,
+            productId: item.productId,
+            quantity: item.quantity,
+            notes: item.notes,
+            complements: item.selectedOptions?.map(o => ({
+              groupId: o.groupId,
+              itemId: o.itemId,
+            })) || [],
+          };
+        });
+
+        const address: DeliveryAddressDTO | null = isDelivery ? {
+          street,
+          number,
+          complement: complement || undefined,
+          neighborhood,
+          city,
+          state,
+          zipCode,
+          reference: reference || undefined,
+          lat,
+          lng,
+        } : null;
+
+        const { data: result } = await api.post<CheckoutValidationResult>(`/orders/public-checkout/${tenantSlug}/validate`, {
+          items: orderItems,
+          fulfillmentType,
+          deliveryAddress: address,
+          payment: { ...payment, changeFor: payment.changeFor || undefined },
+          customerName: customerName || 'Simulação',
+          customerPhone: customerPhone || '0000000000',
+          idempotencyKey: 'validation-only',
+        });
+
+        setDeliveryFee(result.deliveryFee || 0);
+        if (isDelivery) setSubmitError(null);
+      } catch (err: any) {
+        console.error('Validation error:', err);
+        const msg = err.response?.data?.message || 'Erro ao validar entrega nesta região.';
+        if (isDelivery) setSubmitError(msg);
+        setDeliveryFee(0);
+      } finally {
+        setIsValidating(false);
+      }
+    }
+
+    validate();
+  }, [debouncedAddress, fulfillmentType, items, tenantSlug, payment]);
+
+  const total = subtotal + deliveryFee;
+
+  const handleAddressSelected = (addr: StructuredAddress) => {
+    setStreet(addr.street);
+    setNumber(addr.number || '');
+    setNeighborhood(addr.neighborhood);
+    setCity(addr.city);
+    setState(addr.state);
+    setZipCode(addr.zipCode);
+    setLat(addr.lat);
+    setLng(addr.lng);
+  };
 
   const isFormValid = useMemo(() => {
     if (!customerName.trim() || !customerPhone.trim()) return false;
     if (items.length === 0) return false;
     
     if (fulfillmentType === 'delivery') {
-      if (!street.trim() || !number.trim() || !neighborhood.trim() || !city.trim() || !state.trim() || !zipCode.trim()) {
+      if (!street.trim() || !number.trim() || !neighborhood.trim() || !city.trim() || !state.trim() || !zipCode.trim() || !lat || !lng) {
         return false;
       }
     }
@@ -66,7 +164,7 @@ export function CheckoutPage() {
     }
 
     return true;
-  }, [customerName, customerPhone, items, fulfillmentType, street, number, neighborhood, city, state, zipCode, payment, total]);
+  }, [customerName, customerPhone, items, fulfillmentType, street, number, neighborhood, city, state, zipCode, lat, lng, payment, total]);
 
   const handleSubmit = async () => {
     if (!isFormValid || isSubmitting) return;
@@ -74,23 +172,22 @@ export function CheckoutPage() {
     setSubmitError(null);
 
     try {
-      // Map cart lines to CreateOrderItemDTO[]
       const orderItems: CreateOrderItemDTO[] = items.map(item => {
         if (item.comboId) {
           return {
-            lineType: 'combo' as const,
+            lineType: 'combo',
             comboId: item.comboId,
-          productId: item.comboId,
+            productId: item.comboId,
             quantity: item.quantity,
             notes: item.notes,
             comboSelections: item.selectedComboItems?.map(s => ({
-              blockId: s.blockId,
-              blockItemId: s.blockItemId,
+              blockId: (s as any).blockId,
+              blockItemId: (s as any).blockItemId,
             })) || [],
           };
         }
         return {
-          lineType: 'product' as const,
+          lineType: 'product',
           productId: item.productId,
           quantity: item.quantity,
           notes: item.notes,
@@ -99,69 +196,45 @@ export function CheckoutPage() {
             itemId: o.itemId,
           })) || [],
         };
-      });
+      }) as any;
 
       const payload: CreateOrderDTO = {
-        idempotencyKey,
-        items: orderItems,
-        customerName: customerName.trim(),
-        customerPhone: customerPhone.trim(),
+        customerName,
+        customerPhone,
+        customerEmail: '',
         fulfillmentType,
-        notes: notes.trim() || undefined,
+        items: orderItems,
+        idempotencyKey,
+        notes,
+        payment,
         deliveryAddress: fulfillmentType === 'delivery' ? {
-          street: street.trim(),
-          number: number.trim(),
-          complement: complement.trim() || undefined,
-          neighborhood: neighborhood.trim(),
-          city: city.trim(),
-          state: state.trim(),
-          zipCode: zipCode.trim(),
-          reference: reference.trim() || undefined,
+          street,
+          number,
+          complement: complement || undefined,
+          neighborhood,
+          city,
+          state,
+          zipCode,
+          reference: reference || undefined,
+          lat,
+          lng,
         } : undefined,
-        payment: {
-          method: payment.method,
-          changeFor: payment.method === 'cash' ? payment.changeFor : undefined,
-        },
       };
 
-      const res = await api.post<OrderResponseDTO>(
-        `/orders/public-checkout/${tenantSlug}`,
-        payload,
-      );
-
+      const res = await api.post<OrderResponseDTO>(`/orders/public-checkout/${tenantSlug}`, payload);
+      
       clearCart();
       navigate(`/${tenantSlug}/order/${res.data.id}`, { state: { order: res.data } });
-    } catch (err: unknown) {
-      const message = (err instanceof Error) ? err.message : 'Erro ao criar pedido.';
-      // Try to extract API error message
-      const apiErr = err as { response?: { data?: { message?: string } } };
-      setSubmitError(apiErr?.response?.data?.message || message);
+    } catch (err: any) {
+      console.error('Checkout error:', err);
+      setSubmitError(err.response?.data?.message || 'Erro ao processar pedido. Tente novamente.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (items.length === 0) {
-    return (
-      <div className="px-4 py-12 text-center">
-        <Store className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-        <h2 className="text-xl font-bold text-gray-800 mb-2">Carrinho vazio</h2>
-        <p className="text-gray-500 mb-6">Adicione itens ao carrinho antes de finalizar.</p>
-        <button
-          onClick={() => navigate(`/${tenantSlug}`)}
-          className="bg-primary-600 text-white px-6 py-3 rounded-xl font-bold uppercase text-sm tracking-wider"
-        >
-          Voltar ao cardápio
-        </button>
-      </div>
-    );
-  }
-
-  const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
-
   return (
-    <div className="px-4 py-6 max-w-lg mx-auto">
-      {/* Header */}
+    <div className="px-4 py-6 max-w-lg mx-auto pb-32">
       <header className="flex items-center gap-3 mb-8">
         <button onClick={() => navigate(-1)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
           <ArrowLeft className="w-5 h-5 text-gray-700" />
@@ -169,217 +242,179 @@ export function CheckoutPage() {
         <h1 className="text-xl font-black text-gray-900 uppercase tracking-tight">Finalizar Pedido</h1>
       </header>
 
-      {/* Cart Summary */}
       <section className="bg-gray-50 rounded-2xl p-4 mb-6 border border-gray-100">
         <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3">Resumo</h2>
         <div className="space-y-2">
-          {items.map(item => (
-            <div key={item.cartLineId} className="flex justify-between items-start text-sm">
-              <div className="flex-1">
-                <span className="font-bold text-gray-800">{item.quantity}x</span>{' '}
-                <span className="text-gray-700">{item.snapshot.productName}</span>
-                {item.snapshot.extrasDescription && (
-                  <p className="text-[11px] text-gray-400 mt-0.5 italic">{item.snapshot.extrasDescription}</p>
-                )}
-              </div>
-              <span className="font-bold text-gray-800 ml-4">{fmt(item.snapshot.lineSubtotal)}</span>
+          {items.map((item, idx) => (
+            <div key={idx} className="flex justify-between text-sm">
+              <span className="text-gray-600">{item.quantity}x {item.snapshot.productName}</span>
+              <span className="font-medium text-gray-900">
+                {item.snapshot.lineSubtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </span>
             </div>
           ))}
-        </div>
-        <div className="border-t mt-4 pt-3 space-y-2">
-          <div className="flex justify-between text-sm text-gray-600">
-            <span>Subtotal</span>
-            <span>{fmt(subtotal)}</span>
-          </div>
-          {deliveryFee > 0 && (
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>Entrega</span>
-              <span>{fmt(deliveryFee)}</span>
+          <div className="pt-3 border-t border-gray-200 mt-2 space-y-1">
+            <div className="flex justify-between text-xs text-gray-500">
+              <span>Subtotal</span>
+              <span>{subtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
             </div>
-          )}
-          {discount > 0 && (
-            <div className="flex justify-between text-sm text-green-600">
-              <span>Desconto</span>
-              <span>-{fmt(discount)}</span>
+            {fulfillmentType === 'delivery' && (
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>Taxa de entrega</span>
+                <span className={deliveryFee === 0 && !isValidating ? 'text-green-600 font-bold' : ''}>
+                  {isValidating ? 'Calculando...' : deliveryFee === 0 ? 'Grátis' : deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between text-lg font-black text-gray-900 pt-1">
+              <span>Total</span>
+              <span>{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
             </div>
-          )}
-          <div className="flex justify-between font-black text-lg text-gray-900 pt-1">
-            <span>Total</span>
-            <span>{fmt(total)}</span>
           </div>
         </div>
       </section>
 
-      {/* Customer Data */}
       <section className="mb-6">
         <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
           <User className="w-4 h-4" /> Seus Dados
         </h2>
         <div className="space-y-3">
-          <input
-            type="text"
-            placeholder="Nome completo"
-            value={customerName}
-            onChange={e => setCustomerName(e.target.value)}
-            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-          />
-          <input
-            type="tel"
-            placeholder="Telefone / WhatsApp"
-            value={customerPhone}
-            onChange={e => setCustomerPhone(e.target.value)}
-            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-          />
+          <input type="text" placeholder="Seu nome completo" value={customerName} onChange={e => setCustomerName(e.target.value)}
+            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" />
+          <input type="tel" placeholder="Seu WhatsApp (apenas números)" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" />
         </div>
       </section>
 
-      {/* Fulfillment Type */}
       <section className="mb-6">
         <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3">Como deseja receber?</h2>
         <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => setFulfillmentType('delivery')}
-            className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-              fulfillmentType === 'delivery'
-                ? 'border-primary-500 bg-primary-50 text-primary-700'
-                : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'
-            }`}
-          >
+          <button onClick={() => setFulfillmentType('delivery')}
+            className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${fulfillmentType === 'delivery' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-500'}`}>
             <Truck className="w-6 h-6" />
-            <span className="font-bold text-xs uppercase tracking-wider">Entrega</span>
+            <span className="text-xs font-bold uppercase">Entrega</span>
           </button>
-          <button
-            onClick={() => setFulfillmentType('pickup')}
-            className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-              fulfillmentType === 'pickup'
-                ? 'border-primary-500 bg-primary-50 text-primary-700'
-                : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'
-            }`}
-          >
+          <button onClick={() => setFulfillmentType('pickup')}
+            className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${fulfillmentType === 'pickup' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-500'}`}>
             <Store className="w-6 h-6" />
-            <span className="font-bold text-xs uppercase tracking-wider">Retirada</span>
+            <span className="text-xs font-bold uppercase">Retirada</span>
           </button>
         </div>
       </section>
 
-      {/* Delivery Address */}
       {fulfillmentType === 'delivery' && (
         <section className="mb-6">
           <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
             <MapPin className="w-4 h-4" /> Endereço de Entrega
           </h2>
-          <div className="space-y-3">
-            <input type="text" placeholder="Rua / Avenida" value={street} onChange={e => setStreet(e.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" />
-            <div className="grid grid-cols-3 gap-3">
-              <input type="text" placeholder="Nº" value={number} onChange={e => setNumber(e.target.value)}
-                className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" />
-              <input type="text" placeholder="Complemento" value={complement} onChange={e => setComplement(e.target.value)}
-                className="col-span-2 bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" />
+          
+          <AddressAutocomplete 
+            onAddressSelected={handleAddressSelected}
+            placeholder="Comece digitando sua rua e número..."
+            className="mb-4"
+          />
+
+          <div className="space-y-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+            <div className="grid grid-cols-4 gap-3">
+              <div className="col-span-3">
+                <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 ml-1 tracking-wider">Rua</label>
+                <input type="text" placeholder="Rua" value={street} onChange={e => setStreet(e.target.value)}
+                  className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
+              </div>
+              <div className="col-span-1">
+                <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 ml-1 tracking-wider">Nº</label>
+                <input type="text" placeholder="Nº" value={number} onChange={e => setNumber(e.target.value)}
+                  className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
+              </div>
             </div>
+            
             <input type="text" placeholder="Bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" />
-            <div className="grid grid-cols-5 gap-3">
-              <input type="text" placeholder="Cidade" value={city} onChange={e => setCity(e.target.value)}
-                className="col-span-2 bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" />
-              <input type="text" placeholder="UF" value={state} onChange={e => setState(e.target.value)} maxLength={2}
-                className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none uppercase" />
-              <input type="text" placeholder="CEP" value={zipCode} onChange={e => setZipCode(e.target.value)}
-                className="col-span-2 bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" />
+              className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
+            
+            <div className="grid grid-cols-2 gap-3">
+              <input type="text" placeholder="Complemento" value={complement} onChange={e => setComplement(e.target.value)}
+                className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
+              <input type="text" placeholder="Referência" value={reference} onChange={e => setReference(e.target.value)}
+                className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
             </div>
-            <input type="text" placeholder="Referência (opcional)" value={reference} onChange={e => setReference(e.target.value)}
-              className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" />
+            
+            {isValidating && (
+              <div className="flex items-center gap-2 text-[10px] text-primary-500 font-bold uppercase tracking-wider animate-pulse pt-1">
+                <Loader2 className="w-3 h-3 animate-spin" /> Verificando região de entrega...
+              </div>
+            )}
           </div>
         </section>
       )}
 
-      {/* Payment Method */}
       <section className="mb-6">
         <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-          <Banknote className="w-4 h-4" /> Forma de Pagamento
+          <CreditCard className="w-4 h-4" /> Forma de Pagamento
         </h2>
-        <div className="grid grid-cols-1 gap-2">
-          {[
-            { id: PaymentMethod.pix, label: 'PIX', icon: QrCode },
-            { id: PaymentMethod.card_on_delivery, label: 'Cartão na Entrega', icon: CreditCard },
-            { id: PaymentMethod.cash, label: 'Dinheiro', icon: Banknote },
-          ].map(method => (
-            <button
-              key={method.id}
-              onClick={() => setPayment({ method: method.id })}
-              className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
-                payment.method === method.id
-                  ? 'border-primary-500 bg-primary-50 text-primary-700'
-                  : 'border-gray-100 bg-white text-gray-500 hover:border-gray-200'
-              }`}
-            >
-              <method.icon className="w-5 h-5" />
-              <span className="font-bold text-sm uppercase tracking-wide">{method.label}</span>
-            </button>
-          ))}
+        <div className="grid grid-cols-3 gap-2">
+          <button onClick={() => setPayment({ method: PaymentMethod.pix })}
+            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'pix' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
+            <QrCode className="w-5 h-5" />
+            <span className="text-[10px] font-bold uppercase">PIX</span>
+          </button>
+          <button onClick={() => setPayment({ method: PaymentMethod.card_on_delivery })}
+            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'card_on_delivery' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
+            <CreditCard className="w-5 h-5" />
+            <span className="text-[10px] font-bold uppercase tracking-tight text-center leading-none">Cartão na Entrega</span>
+          </button>
+          <button onClick={() => setPayment({ method: PaymentMethod.cash, changeFor: null })}
+            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'cash' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
+            <Banknote className="w-5 h-5" />
+            <span className="text-[10px] font-bold uppercase">Dinheiro</span>
+          </button>
         </div>
 
-        {payment.method === PaymentMethod.cash && (
-          <div className="mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Troco para quanto?</label>
+        {payment.method === 'cash' && (
+          <div className="mt-4 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+            <label className="block text-xs font-semibold text-gray-700 mb-2">Troco para quanto?</label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">R$</span>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="0,00"
-                value={payment.changeFor || ''}
-                onChange={e => setPayment({ ...payment, changeFor: parseFloat(e.target.value) || 0 })}
-                className="w-full bg-white border border-gray-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-              />
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">R$</span>
+              <input type="number" placeholder="0,00" value={payment.changeFor || ''} 
+                onChange={e => setPayment({ ...payment, changeFor: Number(e.target.value) })}
+                className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-medium" />
             </div>
-            {payment.changeFor && payment.changeFor < total && (
-              <p className="text-[10px] text-red-500 mt-1 font-bold">O troco deve ser maior que o total {fmt(total)}</p>
+            {payment.changeFor !== null && payment.changeFor < total && (
+              <p className="mt-2 text-[10px] text-red-500 font-bold uppercase tracking-wider flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" /> O troco deve ser maior que o total
+              </p>
             )}
           </div>
         )}
       </section>
+
       <section className="mb-8">
         <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
           <FileText className="w-4 h-4" /> Observações
         </h2>
-        <textarea
-          placeholder="Alguma observação para o pedido?"
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none min-h-[80px]"
-        />
+        <textarea placeholder="Ex: Tirar cebola, campainha estragada..." value={notes} onChange={e => setNotes(e.target.value)}
+          className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none min-h-[100px] resize-none" />
       </section>
 
-      {/* Error */}
       {submitError && (
-        <div className="mb-4 bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-2 text-red-700 text-xs font-medium">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          {submitError}
+        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 text-red-600 animate-in shake duration-500">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <p className="text-sm font-medium leading-tight">{submitError}</p>
         </div>
       )}
 
-      {/* Submit */}
-      <button
-        onClick={handleSubmit}
-        disabled={!isFormValid || isSubmitting}
-        className={`w-full h-14 rounded-2xl flex items-center justify-center gap-3 font-bold uppercase tracking-widest text-sm transition-all active:scale-[0.98] ${
-          isFormValid && !isSubmitting
-            ? 'bg-primary-600 text-white shadow-lg shadow-primary-200 hover:bg-primary-700'
-            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-        }`}
-      >
-        {isSubmitting ? (
-          <>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            Processando...
-          </>
-        ) : (
-          <>
-            Confirmar Pedido — {fmt(total)}
-          </>
-        )}
-      </button>
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-gray-100 max-w-lg mx-auto z-20">
+        <button onClick={handleSubmit} disabled={!isFormValid || isSubmitting || isValidating}
+          className="w-full bg-primary-600 hover:bg-primary-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-black py-4 rounded-2xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 uppercase tracking-widest text-sm">
+          {isSubmitting ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Processando...
+            </>
+          ) : (
+            <>Enviar Pedido</>
+          )}
+        </button>
+      </div>
     </div>
   );
 }

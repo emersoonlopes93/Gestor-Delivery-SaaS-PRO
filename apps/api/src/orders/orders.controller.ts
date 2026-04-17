@@ -30,7 +30,7 @@ export class OrdersController {
   // ----------------------------------------------------------------
   // PUBLIC: Checkout (no auth required)
   // ----------------------------------------------------------------
-  @Post('public-checkout/:slug') // Changed to avoid conflict with 'orders' prefix if needed, but actually I use @Controller('orders')
+  @Post('public-checkout/:slug')
   @Public()
   @Throttle({ public: { limit: 60, ttl: 60 } })
   async checkout(
@@ -38,6 +38,16 @@ export class OrdersController {
     @Body() dto: CreateOrderDTO,
   ) {
     return this.ordersService.createOrder(slug, dto);
+  }
+
+  @Post('public-checkout/:slug/validate')
+  @Public()
+  @Throttle({ public: { limit: 60, ttl: 60 } })
+  async validateCheckout(
+    @Param('slug') slug: string,
+    @Body() dto: CreateOrderDTO,
+  ) {
+    return this.ordersService.validateCheckout(slug, dto);
   }
 
   // ----------------------------------------------------------------

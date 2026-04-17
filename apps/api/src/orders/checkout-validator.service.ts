@@ -8,6 +8,10 @@ import type {
   CreateOrderItemComboSlotSelectionDTO,
   DeliveryAddressDTO,
   PaymentInput,
+  ValidatedLine,
+  ValidatedProductLine,
+  ValidatedComboLine,
+  CheckoutValidationResult,
 } from '@gestor/types';
 import { CouponsService } from '../promotions/coupons.service';
 import { CashbackService } from '../promotions/cashback.service';
@@ -15,65 +19,6 @@ import { DeliveryRateService } from '../delivery/delivery-rate.service';
 import { AvailabilityService } from './availability.service';
 import { UpsellsService } from '../catalog/upsells.service';
 import { PizzaEngineService } from '../catalog/pizza-engine.service';
-
-interface ValidatedProductLine {
-  lineType: 'product';
-  productId: string;
-  name: string;
-  image: string | null;
-  basePrice: number;
-  effectiveBasePrice: number;
-  extrasTotal: number;
-  unitPrice: number;
-  lineTotal: number;
-  quantity: number;
-  notes?: string;
-  composition: string;
-  sourceUpsellId?: string;
-  complements: Array<{
-    complementItemId: string;
-    snapshotName: string;
-    snapshotPrice: number;
-  }>;
-
-  snapshotCatalogV2Json?: unknown;
-}
-
-interface ValidatedComboLine {
-  lineType: 'combo';
-  comboId: string;
-  name: string;
-  image: string | null;
-  basePrice: number;
-  effectiveBasePrice: number;
-  extrasTotal: number;
-  unitPrice: number;
-  lineTotal: number;
-  quantity: number;
-  notes?: string;
-  composition: string;
-  comboSelections: Array<{
-    comboBlockItemId: string;
-    snapshotBlockName: string;
-    snapshotProductName: string;
-    snapshotAdditionalPrice: number;
-  }>;
-
-  snapshotCatalogV2Json?: unknown;
-}
-
-export type ValidatedLine = ValidatedProductLine | ValidatedComboLine;
-
-export interface CheckoutValidationResult {
-  tenantId: string;
-  lines: ValidatedLine[];
-  itemsSubtotal: number;
-  discountTotal: number;
-  deliveryFee: number;
-  total: number; // Subtotal - discount + deliveryFee
-  couponId?: string | null;
-  cashbackUsed?: number | null;
-}
 
 @Injectable()
 export class CheckoutValidatorService {
@@ -177,29 +122,38 @@ export class CheckoutValidatorService {
 
     const total = itemsSubtotal - discountTotal;
 
-    // 5. Calcular taxa de entrega
-    const hasCoverage = await this.deliveryRateService.hasCoverageConfig(tenantId);
-    const decision = hasCoverage
-      ? await this.deliveryRateService.calculateDeliveryDecision({
-          tenantId,
-          address: options?.deliveryAddress,
-          distanceKm: null,
-        })
-      : null;
+    // 5. Calcular taxa de entrega apenas se for delivery
+    const isDelivery = options?.channel === 'storefront_delivery';
+    let deliveryFee = 0;
 
-    if (decision && !decision.canDeliver) {
-      throw new BadRequestException(decision.reason || 'Não entregamos nesta região.');
+    if (isDelivery) {
+      if (!options?.deliveryAddress?.lat || !options?.deliveryAddress?.lng) {
+        throw new BadRequestException('Localização (latitude/longitude) é obrigatória para entrega.');
+      }
+
+      const hasCoverage = await this.deliveryRateService.hasCoverageConfig(tenantId);
+      const decision = hasCoverage
+        ? await this.deliveryRateService.calculateDeliveryDecision({
+            tenantId,
+            address: options?.deliveryAddress,
+            distanceKm: null,
+          })
+        : null;
+
+      if (decision && !decision.canDeliver) {
+        throw new BadRequestException(decision.reason || 'Não entregamos nesta região.');
+      }
+
+      const deliveryFeeCalculation = decision
+        ? { fee: decision.fee }
+        : await this.deliveryRateService.calculateRate({
+            tenantId,
+            address: options?.deliveryAddress,
+            distanceKm: null,
+          });
+
+      deliveryFee = deliveryFeeCalculation.fee;
     }
-
-    const deliveryFeeCalculation = decision
-      ? { fee: decision.fee }
-      : await this.deliveryRateService.calculateRate({
-          tenantId,
-          address: options?.deliveryAddress,
-          distanceKm: null,
-        });
-
-    const deliveryFee = deliveryFeeCalculation.fee;
 
     const finalTotal = total + deliveryFee;
 

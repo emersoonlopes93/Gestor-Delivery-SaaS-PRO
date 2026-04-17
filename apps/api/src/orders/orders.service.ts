@@ -2,12 +2,11 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
-  ConflictException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import type { Prisma } from '@prisma/client';
-import { CheckoutValidatorService, ValidatedLine } from './checkout-validator.service';
+import { CheckoutValidatorService } from './checkout-validator.service';
 import { CustomerService } from '../crm/customer.service';
 import { CashbackService } from '../promotions/cashback.service';
 import { TheoreticalStockService } from '../inventory/theoretical-stock.service';
@@ -21,6 +20,7 @@ import type {
   OrderKdsItemDTO,
   OrderDispatchItemDTO,
   PaymentMethod,
+  ValidatedLine,
 } from '@gestor/types';
 import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
@@ -34,17 +34,17 @@ export class OrdersService {
     private readonly checkoutValidator: CheckoutValidatorService,
     private readonly customerService: CustomerService,
     private readonly cashbackService: CashbackService,
-    private readonly theoreticalStockService: TheoreticalStockService,
+    private readonly inventoryService: TheoreticalStockService,
   ) {}
 
-  // ----------------------------------------------------------------
-  // CREATE ORDER (Public checkout)
-  // ----------------------------------------------------------------
   async createOrder(slug: string, dto: CreateOrderDTO): Promise<OrderResponseDTO> {
-    // Pre-resolve tenant manually to sync customer before validation
-    const tenant = await this.prisma.tenant.findUnique({ where: { slug } });
-    if (!tenant) throw new NotFoundException('Loja não encontrada');
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug },
+      include: { settings: true },
+    });
+    if (!tenant) throw new NotFoundException('Loja não encontrada.');
 
+    // Resolve or sync customer
     let customerId: string | null = null;
     if (dto.customerPhone) {
       const cust = await this.customerService.syncCustomerOnOrderUpsert(
@@ -63,6 +63,7 @@ export class OrdersService {
       useCashbackAmount: dto.useCashbackAmount,
       deliveryAddress: dto.deliveryAddress,
       payment: dto.payment,
+      channel: dto.fulfillmentType === 'delivery' ? 'storefront_delivery' : 'storefront_pickup',
     });
     const { tenantId, lines, itemsSubtotal, discountTotal, deliveryFee, total, couponId, cashbackUsed } = validation;
 
@@ -87,139 +88,134 @@ export class OrdersService {
       return this.getOrderDetail(existingOrder.id, tenantId);
     }
 
-    // 4. Transactional order creation with atomic orderNumber
-    const finalTotal = total; // Phase 4/5 had this as itemsSubtotal, Phase 8 handles exact math with discounts
+    // 4. Transactional order creation
+    const finalTotal = total; 
 
     const order = await this.prisma.$transaction(
       async (tx) => {
-      // Atomic increment of order sequence
-      const updatedTenant = await tx.tenant.update({
-        where: { id: tenantId },
-        data: { orderSequence: { increment: 1 } },
-        select: { orderSequence: true },
-      });
+        // Atomic increment of order sequence
+        const updatedTenant = await tx.tenant.update({
+          where: { id: tenantId },
+          data: { orderSequence: { increment: 1 } },
+          select: { orderSequence: true },
+        });
 
-      const orderNumber = `#${updatedTenant.orderSequence.toString().padStart(4, '0')}`;
+        const orderNumber = `#${updatedTenant.orderSequence.toString().padStart(4, '0')}`;
 
-      // Create the order
-      const newOrder = await tx.order.create({
-        data: {
-          tenantId,
-          orderNumber,
-          status: 'pending',
-          fulfillmentType: dto.fulfillmentType,
-          customerName: dto.customerName,
-          customerPhone: dto.customerPhone,
-          customerEmail: dto.customerEmail || null,
-          itemsSubtotal,
-          discountTotal: discountTotal || 0,
-          deliveryFee,
-          serviceFee: 0,
-          total: finalTotal,
-          sourceChannel: 'storefront',
-          idempotencyKey: dto.idempotencyKey,
-          notes: dto.notes || null,
-          customerId,
-          couponId,
-          cashbackUsed,
-          paymentMethod: dto.payment.method as any, // Cast to avoid Prisma enum mismatch
-          changeFor: dto.payment.changeFor || null,
-          publicTrackingToken: generatePublicTrackingToken(),
-        },
-      });
-
-      // Create order items
-      for (const line of lines) {
-        const snapshotCatalogV2Json = (line as ValidatedLine & { snapshotCatalogV2Json?: unknown })
-          .snapshotCatalogV2Json as Prisma.InputJsonValue | undefined;
-
-        const orderItem = await tx.orderItem.create({
+        const newOrder = await tx.order.create({
           data: {
-            orderId: newOrder.id,
             tenantId,
-            lineType: line.lineType,
-            productId: line.lineType === 'product' ? (line as ValidatedLine & { productId: string }).productId : null,
-            comboId: line.lineType === 'combo' ? (line as ValidatedLine & { comboId: string }).comboId : null,
-            quantity: line.quantity,
-            unitPrice: line.unitPrice,
-            lineTotal: line.lineTotal,
-            notes: line.notes || null,
-            snapshotName: line.name,
-            snapshotImage: line.image,
-            snapshotBasePrice: line.basePrice,
-            snapshotExtrasTotal: line.extrasTotal,
-            snapshotComposition: line.composition || null,
-            snapshotCatalogV2Json,
-            sourceUpsellId: (line as any).sourceUpsellId || null,
+            orderNumber,
+            status: 'pending',
+            fulfillmentType: dto.fulfillmentType,
+            customerName: dto.customerName,
+            customerPhone: dto.customerPhone,
+            customerEmail: dto.customerEmail || null,
+            itemsSubtotal,
+            discountTotal: discountTotal || 0,
+            deliveryFee,
+            serviceFee: 0,
+            total: finalTotal,
+            sourceChannel: 'storefront',
+            idempotencyKey: dto.idempotencyKey,
+            notes: dto.notes || null,
+            customerId,
+            couponId,
+            cashbackUsed,
+            paymentMethod: dto.payment.method as any, 
+            changeFor: dto.payment.changeFor || null,
+            publicTrackingToken: generatePublicTrackingToken(),
           },
         });
 
-        const hasV2Snapshot = !!(line as ValidatedLine & { snapshotCatalogV2Json?: unknown }).snapshotCatalogV2Json;
+        // Create order items
+        for (const line of lines) {
+          const snapshotCatalogV2Json = (line as ValidatedLine & { snapshotCatalogV2Json?: unknown })
+            .snapshotCatalogV2Json as Prisma.InputJsonValue | undefined;
 
-        if (!hasV2Snapshot) {
-          // LEGACY FALLBACK
-          if (line.lineType === 'product' && 'complements' in line) {
-            for (const comp of line.complements) {
-              await tx.orderItemComplement.create({
-                data: {
-                  orderItemId: orderItem.id,
-                  tenantId,
-                  complementItemId: comp.complementItemId,
-                  snapshotName: comp.snapshotName,
-                  snapshotPrice: comp.snapshotPrice,
-                },
-              });
-            }
-          }
+          const orderItem = await tx.orderItem.create({
+            data: {
+              orderId: newOrder.id,
+              tenantId,
+              lineType: line.lineType,
+              productId: line.lineType === 'product' ? (line as ValidatedLine & { productId: string }).productId : null,
+              comboId: line.lineType === 'combo' ? (line as ValidatedLine & { comboId: string }).comboId : null,
+              quantity: line.quantity,
+              unitPrice: line.unitPrice,
+              lineTotal: line.lineTotal,
+              notes: line.notes || null,
+              snapshotName: line.name,
+              snapshotImage: line.image,
+              snapshotBasePrice: line.basePrice,
+              snapshotExtrasTotal: line.extrasTotal,
+              snapshotComposition: line.composition || null,
+              snapshotCatalogV2Json,
+              sourceUpsellId: (line as any).sourceUpsellId || null,
+            },
+          });
 
-          if (line.lineType === 'combo' && 'comboSelections' in line) {
-            for (const sel of line.comboSelections) {
-              await tx.orderItemComboSelection.create({
-                data: {
-                  orderItemId: orderItem.id,
-                  tenantId,
-                  comboBlockItemId: sel.comboBlockItemId,
-                  snapshotBlockName: sel.snapshotBlockName,
-                  snapshotProductName: sel.snapshotProductName,
-                  snapshotAdditionalPrice: sel.snapshotAdditionalPrice,
-                },
-              });
+          // Legacy complements support
+          if (!snapshotCatalogV2Json) {
+            if (line.lineType === 'product' && line.complements) {
+              for (const c of line.complements) {
+                await tx.orderItemComplement.create({
+                  data: {
+                    orderItemId: orderItem.id,
+                    tenantId,
+                    complementItemId: (c as any).itemId || (c as any).complementItemId || '',
+                    snapshotName: c.snapshotName,
+                    snapshotPrice: c.snapshotPrice,
+                  },
+                });
+              }
+            } else if (line.lineType === 'combo' && line.comboSelections) {
+              for (const s of line.comboSelections) {
+                await tx.orderItemComboSelection.create({
+                  data: {
+                    orderItemId: orderItem.id,
+                    tenantId,
+                    comboBlockItemId: (s as any).blockItemId || (s as any).comboBlockItemId || '',
+                    snapshotBlockName: s.snapshotBlockName,
+                    snapshotProductName: s.snapshotProductName,
+                    snapshotAdditionalPrice: s.snapshotAdditionalPrice,
+                  },
+                });
+              }
             }
           }
         }
-      }
 
-      // Delivery address
-      if (dto.fulfillmentType === 'delivery' && dto.deliveryAddress) {
-        await tx.orderDeliveryAddress.create({
+        // Delivery address
+        if (dto.fulfillmentType === 'delivery' && dto.deliveryAddress) {
+          await tx.orderDeliveryAddress.create({
+            data: {
+              orderId: newOrder.id,
+              tenantId,
+              street: dto.deliveryAddress.street,
+              number: dto.deliveryAddress.number,
+              complement: dto.deliveryAddress.complement || null,
+              neighborhood: dto.deliveryAddress.neighborhood,
+              city: dto.deliveryAddress.city,
+              state: dto.deliveryAddress.state,
+              zipCode: dto.deliveryAddress.zipCode,
+              reference: dto.deliveryAddress.reference || null,
+              lat: dto.deliveryAddress.lat || null,
+              lng: dto.deliveryAddress.lng || null,
+            },
+          });
+        }
+
+        // Timeline entry
+        await tx.orderTimeline.create({
           data: {
             orderId: newOrder.id,
             tenantId,
-            street: dto.deliveryAddress.street,
-            number: dto.deliveryAddress.number,
-            complement: dto.deliveryAddress.complement || null,
-            neighborhood: dto.deliveryAddress.neighborhood,
-            city: dto.deliveryAddress.city,
-            state: dto.deliveryAddress.state,
-            zipCode: dto.deliveryAddress.zipCode,
-            reference: dto.deliveryAddress.reference || null,
-            lat: dto.deliveryAddress.lat || null,
-            lng: dto.deliveryAddress.lng || null,
+            status: 'pending',
+            note: 'Pedido recebido via storefront.',
           },
         });
-      }
 
-      // Initial timeline entry
-      await tx.orderTimeline.create({
-        data: {
-          orderId: newOrder.id,
-          tenantId,
-          status: 'pending',
-          note: 'Pedido criado via storefront.',
-        },
-      });
-
-      return newOrder;
+        return newOrder;
       },
       {
         timeout: 20_000,
@@ -227,7 +223,12 @@ export class OrdersService {
       },
     );
 
-    // 5. Update Cashback Ledger & Coupon Usage out of the main transaction (but wait for it to succeed)
+    // Process Stock Depletion
+    await this.inventoryService.processOrderDepletion(tenantId, order.id).catch(e => {
+        this.logger.error(`Error processing stock depletion for order ${order.id}: ${e.message}`);
+    });
+
+    // Update Cashback Ledger & Coupon Usage
     if (cashbackUsed && customerId) {
       await this.cashbackService.createTransaction({
         tenantId,
@@ -236,66 +237,171 @@ export class OrdersService {
         amount: cashbackUsed,
         orderId: order.id,
         description: `Usado no pedido ${order.orderNumber}`
-      });
+      }).catch(e => this.logger.error(`Error applying cashback: ${e.message}`));
     }
 
     if (couponId) {
       await this.prisma.coupon.update({
         where: { id: couponId },
         data: { usedCount: { increment: 1 } }
-      });
+      }).catch(e => this.logger.error(`Error updating coupon usage: ${e.message}`));
     }
 
     return this.getOrderDetail(order.id, tenantId);
   }
 
-  // ----------------------------------------------------------------
-  // LIST ORDERS (Tenant internal)
-  // ----------------------------------------------------------------
-  async listOrders(
-    tenantId: string,
-    page: number = 1,
-    limit: number = 20,
-    status?: OrderStatus,
-  ): Promise<{ data: OrderListItemDTO[]; total: number; page: number; limit: number }> {
-    const where: Record<string, unknown> = { tenantId };
-    if (status) {
-      where['status'] = status;
+  async validateCheckout(slug: string, dto: CreateOrderDTO) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug }
+    });
+    if (!tenant) throw new NotFoundException('Loja não encontrada.');
+
+    let customerId: string | null = null;
+    if (dto.customerPhone) {
+      const cust = await this.prisma.customer.findFirst({
+        where: { tenantId: tenant.id, phone: dto.customerPhone }
+      });
+      if (cust) customerId = cust.id;
     }
 
-    const [orders, total] = await Promise.all([
+    const validation = await this.checkoutValidator.validate(slug, dto.items, {
+      customerId,
+      couponCode: dto.couponCode,
+      useCashbackAmount: dto.useCashbackAmount,
+      deliveryAddress: dto.deliveryAddress,
+      payment: dto.payment,
+      channel: dto.fulfillmentType === 'delivery' ? 'storefront_delivery' : 'storefront_pickup',
+    });
+
+    return validation;
+  }
+
+  async listOrders(
+    tenantId: string,
+    page = 1,
+    limit = 20,
+    status?: OrderStatus,
+  ): Promise<{ items: OrderListItemDTO[]; total: number }> {
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.OrderWhereInput = {
+      tenantId,
+      ...(status ? { status } : {}),
+    };
+
+    const [items, total] = await Promise.all([
       this.prisma.order.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
+        skip,
         take: limit,
-        include: { _count: { select: { items: true } } },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          _count: { select: { items: true } },
+        },
       }),
       this.prisma.order.count({ where }),
     ]);
 
-    const data: OrderListItemDTO[] = orders.map((o) => ({
+    return {
+      items: items.map((o) => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        status: o.status as OrderStatus,
+        fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+        customerName: o.customerName,
+        customerPhone: o.customerPhone,
+        total: Number(o.total),
+        itemCount: o._count.items,
+        paymentMethod: o.paymentMethod as PaymentMethod,
+        createdAt: o.createdAt.toISOString(),
+      })),
+      total,
+    };
+  }
+
+  async getBoardOrders(tenantId: string, fulfillmentType?: 'delivery' | 'pickup'): Promise<OrderBoardItemDTO[]> {
+    const activeStatuses: OrderStatus[] = [
+      'pending',
+      'confirmed',
+      'preparing',
+      'ready_for_pickup',
+      'ready_for_delivery',
+      'out_for_delivery',
+    ];
+
+    const orders = await this.prisma.order.findMany({
+      where: {
+        tenantId,
+        status: { in: activeStatuses },
+        ...(fulfillmentType ? { fulfillmentType } : {}),
+      },
+      include: {
+        items: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return orders.map((o) => ({
       id: o.id,
       orderNumber: o.orderNumber,
       status: o.status as OrderStatus,
       fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
       customerName: o.customerName,
-      customerPhone: o.customerPhone,
       total: Number(o.total),
-      itemCount: o._count.items,
-      paymentMethod: o.paymentMethod as PaymentMethod,
+      itemCount: o.items.reduce((sum, i) => sum + i.quantity, 0),
+      itemsSummary: o.items.map((i) => `${i.quantity}x ${i.snapshotName}`).join(', '),
       createdAt: o.createdAt.toISOString(),
     }));
-
-    return { data, total, page, limit };
   }
 
-  // ----------------------------------------------------------------
-  // ORDER DETAIL (shared by public confirmation + tenant internal)
-  // ----------------------------------------------------------------
-  async getOrderDetail(orderId: string, tenantId: string): Promise<OrderResponseDTO> {
+  async getKdsOrders(tenantId: string): Promise<OrderKdsItemDTO[]> {
+    const kdsStatuses: OrderStatus[] = ['confirmed', 'preparing'];
+
+    const orders = await this.prisma.order.findMany({
+      where: {
+        tenantId,
+        status: { in: kdsStatuses },
+      },
+      include: {
+        items: {
+          include: {
+            complements: true,
+            comboSelections: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return orders.map((o) => ({
+      id: o.id,
+      orderNumber: o.orderNumber,
+      status: o.status as OrderStatus,
+      fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+      notes: o.notes,
+      items: o.items.map((i) => ({
+        id: i.id,
+        quantity: i.quantity,
+        notes: i.notes,
+        snapshotName: i.snapshotName,
+        snapshotComposition: i.snapshotComposition,
+        complements: i.complements.map((c) => ({
+          id: c.id,
+          snapshotName: c.snapshotName,
+        })),
+        comboSelections: i.comboSelections.map((s) => ({
+          id: s.id,
+          snapshotBlockName: s.snapshotBlockName,
+          snapshotProductName: s.snapshotProductName,
+        })),
+      })),
+      createdAt: o.createdAt.toISOString(),
+    }));
+  }
+
+  async getOrderDetail(id: string, tenantId: string): Promise<OrderResponseDTO> {
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, tenantId },
+      where: { id, tenantId },
       include: {
         items: {
           include: {
@@ -304,15 +410,11 @@ export class OrdersService {
           },
         },
         deliveryAddress: true,
-        timeline: {
-          orderBy: { createdAt: 'asc' },
-        },
+        timeline: { orderBy: { createdAt: 'asc' } },
       },
     });
 
-    if (!order) {
-      throw new NotFoundException('Pedido não encontrado.');
-    }
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
 
     return {
       id: order.id,
@@ -332,9 +434,12 @@ export class OrdersService {
       publicTrackingToken: order.publicTrackingToken,
       paymentMethod: order.paymentMethod as PaymentMethod,
       changeFor: order.changeFor ? Number(order.changeFor) : null,
+      customerId: order.customerId,
+      couponId: order.couponId,
+      cashbackUsed: order.cashbackUsed ? Number(order.cashbackUsed) : null,
       items: order.items.map((item) => ({
         id: item.id,
-        lineType: item.lineType as 'product' | 'combo',
+        lineType: item.lineType as any,
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),
         lineTotal: Number(item.lineTotal),
@@ -381,228 +486,94 @@ export class OrdersService {
     };
   }
 
-  // ----------------------------------------------------------------
-  // UPDATE STATUS (Tenant internal)
-  // ----------------------------------------------------------------
-  async updateOrderStatus(
-    orderId: string,
-    tenantId: string,
-    dto: UpdateOrderStatusDTO,
-  ): Promise<OrderResponseDTO> {
+  async updateOrderStatus(id: string, tenantId: string, dto: UpdateOrderStatusDTO) {
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, tenantId },
+      where: { id, tenantId },
     });
 
-    if (!order) {
-      throw new NotFoundException('Pedido não encontrado.');
-    }
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
 
     const currentStatus = order.status as OrderStatus;
-    const validTransitions = ORDER_STATUS_TRANSITIONS[currentStatus];
+    const nextStatus = dto.status;
 
-    if (!validTransitions.includes(dto.status)) {
-      throw new ConflictException(
-        `Transição inválida: ${currentStatus} → ${dto.status}. Transições permitidas: ${validTransitions.join(', ') || 'nenhuma'}.`,
+    if (!ORDER_STATUS_TRANSITIONS[currentStatus]?.includes(nextStatus)) {
+      throw new BadRequestException(
+        `Transição inválida de ${currentStatus} para ${nextStatus}`,
       );
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.order.update({
-        where: { id: orderId },
-        data: { status: dto.status },
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.order.update({
+        where: { id },
+        data: { status: nextStatus },
       });
 
       await tx.orderTimeline.create({
         data: {
-          orderId,
+          orderId: id,
           tenantId,
-          status: dto.status,
-          note: dto.note || null,
+          status: nextStatus,
+          note: dto.note || `Status atualizado para ${nextStatus}`,
         },
       });
-    });
 
-    // 6. Trigger theoretical stock depletion / reversal
-    if (dto.status === 'confirmed') {
-      await this.theoreticalStockService.processOrderDepletion(tenantId, orderId);
-    } else if (dto.status === 'cancelled') {
-        // We reverse if the order was already reaching some inventory-impacting status
-        // Usually if it's not pending, it likely had a depletion (confirmed, preparing, etc)
-        if (order.status !== 'pending') {
-            await this.theoreticalStockService.reverseOrderDepletion(tenantId, orderId);
-        }
-    }
-
-    return this.getOrderDetail(orderId, tenantId);
-  }
-
-  // ----------------------------------------------------------------
-  // OPERATION: Board (Kanban)
-  // ----------------------------------------------------------------
-  async getBoardOrders(
-    tenantId: string,
-    fulfillmentType?: 'delivery' | 'pickup'
-  ): Promise<OrderBoardItemDTO[]> {
-    const where: Prisma.OrderWhereInput = {
-      tenantId,
-      status: { notIn: ['completed', 'cancelled'] }, // Operational view excludes finished ones by default
-      ...(fulfillmentType ? { fulfillmentType } : {}),
-    };
-
-    const orders = await this.prisma.order.findMany({
-      where,
-      orderBy: { createdAt: 'asc' }, // Oldest first is better for operation
-      include: {
-        items: {
-          select: { quantity: true, snapshotName: true }
-        }
-      }
-    });
-
-    return orders.map(o => {
-      // Create items summary like "1x Pizza, 2x Coca"
-      const itemsSummary = o.items.map(i => `${i.quantity}x ${i.snapshotName}`).join(', ');
-      
-      return {
-        id: o.id,
-        orderNumber: o.orderNumber,
-        status: o.status as OrderStatus,
-        fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
-        customerName: o.customerName,
-        total: Number(o.total),
-        itemCount: o.items.reduce((sum, i) => sum + i.quantity, 0),
-        itemsSummary,
-        createdAt: o.createdAt.toISOString(),
-      };
+      return updated;
     });
   }
 
-  // ----------------------------------------------------------------
-  // OPERATION: KDS (Kitchen Display System)
-  // ----------------------------------------------------------------
-  async getKdsOrders(tenantId: string): Promise<OrderKdsItemDTO[]> {
-    const orders = await this.prisma.order.findMany({
-      where: {
-        tenantId,
-        // Only orders that need kitchen attention
-        status: { in: ['confirmed', 'preparing'] },
-      },
-      orderBy: { createdAt: 'asc' },
-      include: {
-        items: {
-          include: {
-            complements: true,
-            comboSelections: true,
-          }
-        }
-      }
-    });
-
-    return orders.map(o => ({
-      id: o.id,
-      orderNumber: o.orderNumber,
-      status: o.status as OrderStatus,
-      fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
-      notes: o.notes,
-      items: o.items.map(i => ({
-        id: i.id,
-        quantity: i.quantity,
-        notes: i.notes,
-        snapshotName: i.snapshotName,
-        snapshotComposition: i.snapshotComposition,
-        complements: i.complements.map(c => ({
-          id: c.id,
-          snapshotName: c.snapshotName,
-        })),
-        comboSelections: i.comboSelections.map(s => ({
-          id: s.id,
-          snapshotBlockName: s.snapshotBlockName,
-          snapshotProductName: s.snapshotProductName,
-        })),
-      })),
-      createdAt: o.createdAt.toISOString(),
-    }));
-  }
-
-  // ----------------------------------------------------------------
-  // OPERATION: Dispatch (Phase 6)
-  // ----------------------------------------------------------------
   async getDispatchOrders(tenantId: string): Promise<OrderDispatchItemDTO[]> {
+    const dispatchStatuses: OrderStatus[] = [
+      'ready_for_delivery',
+      'out_for_delivery',
+    ];
+
     const orders = await this.prisma.order.findMany({
       where: {
         tenantId,
         fulfillmentType: 'delivery',
-        // Show preparing (warning), ready_for_delivery, out_for_delivery
-        status: { in: ['preparing', 'ready_for_delivery', 'out_for_delivery'] },
+        status: { in: dispatchStatuses },
       },
-      orderBy: { createdAt: 'asc' },
       include: {
         deliveryAddress: true,
         deliveryDriver: true,
       },
     });
 
-    return orders.map(o => ({
+    return orders.map((o) => ({
       id: o.id,
       orderNumber: o.orderNumber,
       customerName: o.customerName,
       customerPhone: o.customerPhone,
       fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
       status: o.status as OrderStatus,
-      total: Number(o.total),
-      deliveryAddress: o.deliveryAddress ? {
-        street: o.deliveryAddress.street,
-        number: o.deliveryAddress.number,
-        complement: o.deliveryAddress.complement || undefined,
-        neighborhood: o.deliveryAddress.neighborhood,
-        city: o.deliveryAddress.city,
-        state: o.deliveryAddress.state,
-        zipCode: o.deliveryAddress.zipCode,
-        reference: o.deliveryAddress.reference || undefined,
-        lat: o.deliveryAddress.lat || undefined,
-        lng: o.deliveryAddress.lng || undefined,
-      } : undefined,
+      deliveryAddress: o.deliveryAddress
+        ? {
+            street: o.deliveryAddress.street,
+            number: o.deliveryAddress.number,
+            neighborhood: o.deliveryAddress.neighborhood,
+            city: o.deliveryAddress.city,
+            state: o.deliveryAddress.state,
+            zipCode: o.deliveryAddress.zipCode,
+          }
+        : undefined,
+      deliveryLat: o.deliveryAddress?.lat ?? undefined,
+      deliveryLng: o.deliveryAddress?.lng ?? undefined,
       deliveryDriverId: o.deliveryDriverId || undefined,
-      deliveryDriverName: o.deliveryDriver?.name,
+      deliveryDriverName: o.deliveryDriver?.name || undefined,
+      total: Number(o.total),
       createdAt: o.createdAt.toISOString(),
     }));
   }
 
-  async assignDriver(
-    tenantId: string,
-    orderId: string,
-    driverId: string | null,
-    actorId?: string
-  ): Promise<OrderResponseDTO> {
-    const order = await this.prisma.order.findUnique({
+  async assignDriver(tenantId: string, orderId: string, driverId: string | null, actorId?: string) {
+    const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },
     });
 
-    if (!order) {
-      throw new NotFoundException('Pedido não encontrado.');
-    }
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
 
-    if (order.fulfillmentType !== 'delivery') {
-      throw new BadRequestException('Este pedido não é do tipo delivery.');
-    }
-
-    const currentStatus = order.status as OrderStatus;
-    // Driver can be assigned during preparing, ready_for_delivery, or even out_for_delivery (re-assign)
-    if (!['preparing', 'ready_for_delivery', 'out_for_delivery'].includes(currentStatus)) {
-      throw new ConflictException('Status do pedido não permite atribuição de entregador no momento.');
-    }
-
-    if (driverId) {
-      const driver = await this.prisma.deliveryDriver.findUnique({
-        where: { id: driverId, tenantId },
-      });
-      if (!driver) {
-        throw new NotFoundException('Entregador não encontrado.');
-      }
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.order.update({
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.order.update({
         where: { id: orderId },
         data: { deliveryDriverId: driverId },
       });
@@ -611,14 +582,13 @@ export class OrdersService {
         data: {
           orderId,
           tenantId,
-          status: currentStatus, // Doesn't change status automatically
-          note: driverId ? 'Entregador atribuído ao pedido' : 'Entregador removido do pedido',
-          actorId: actorId || null,
-          actorType: 'tenant_user',
+          status: order.status as OrderStatus,
+          note: driverId ? `Entregador atribuído.` : `Entregador removido do pedido.`,
+          actorId,
         },
       });
-    });
 
-    return this.getOrderDetail(orderId, tenantId);
+      return updated;
+    });
   }
 }

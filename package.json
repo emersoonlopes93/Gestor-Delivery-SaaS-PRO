@@ -18,7 +18,11 @@
     "db:generate": "pnpm --filter @gestor/api prisma:generate",
     "db:migrate": "pnpm --filter @gestor/api prisma:migrate",
     "db:seed": "pnpm --filter @gestor/api prisma:seed",
-    "db:studio": "pnpm --filter @gestor/api prisma:studio"
+    "db:studio": "pnpm --filter @gestor/api prisma:studio",
+    "start:api": "pnpm --filter @gestor/api start:prod",
+    "start:web-tenant": "pnpm --filter @gestor/web-tenant preview",
+    "start:web-admin": "pnpm --filter @gestor/web-admin preview",
+    "start:web-storefront": "pnpm --filter @gestor/web-storefront preview"
   },
   "engines": {
     "node": ">=20.0.0",

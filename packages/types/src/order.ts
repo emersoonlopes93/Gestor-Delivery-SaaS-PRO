@@ -333,3 +333,60 @@ export interface OrderDispatchItemDTO {
   total: number;
   createdAt?: string;
 }
+
+export interface ValidatedProductLine {
+  lineType: 'product';
+  productId: string;
+  name: string;
+  image: string | null;
+  basePrice: number;
+  effectiveBasePrice?: number;
+  extrasTotal: number;
+  unitPrice: number;
+  lineTotal: number;
+  quantity: number;
+  notes?: string;
+  composition: string;
+  sourceUpsellId?: string | null;
+  complements: Array<{
+    complementItemId: string;
+    snapshotName: string;
+    snapshotPrice: number;
+  }>;
+  snapshotCatalogV2Json?: any;
+}
+
+export interface ValidatedComboLine {
+  lineType: 'combo';
+  comboId: string;
+  name: string;
+  image: string | null;
+  basePrice: number;
+  effectiveBasePrice: number;
+  extrasTotal: number;
+  unitPrice: number;
+  lineTotal: number;
+  quantity: number;
+  notes?: string;
+  composition: string;
+  comboSelections: Array<{
+    comboBlockItemId: string;
+    snapshotBlockName: string;
+    snapshotProductName: string;
+    snapshotAdditionalPrice: number;
+  }>;
+  snapshotCatalogV2Json?: any;
+}
+
+export type ValidatedLine = ValidatedProductLine | ValidatedComboLine;
+
+export interface CheckoutValidationResult {
+  tenantId: string;
+  lines: ValidatedLine[];
+  itemsSubtotal: number;
+  discountTotal: number;
+  deliveryFee: number;
+  total: number;
+  couponId: string | null;
+  cashbackUsed: number | null;
+}

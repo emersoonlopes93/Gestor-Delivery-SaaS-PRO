@@ -10,7 +10,7 @@ import { CashService } from '../cash/cash.service';
 import { CustomerService } from '../crm/customer.service';
 import { CashbackService } from '../promotions/cashback.service';
 import { TheoreticalStockService } from '../inventory/theoretical-stock.service';
-import { CheckoutValidatorService, ValidatedLine } from '../orders/checkout-validator.service';
+import { CheckoutValidatorService } from '../orders/checkout-validator.service';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
 
 import type {
@@ -20,6 +20,7 @@ import type {
   OrderStatus,
   FulfillmentType,
   PaymentMethod,
+  ValidatedLine,
 } from '@gestor/types';
 
 @Injectable()
