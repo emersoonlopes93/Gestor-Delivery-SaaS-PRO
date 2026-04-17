@@ -3,7 +3,7 @@ export type * from './auth';
 export * from './tenant';
 export type * from './rbac';
 export type * from './api';
-export type * from './catalog';
+export * from './catalog';
 export * from './storefront';
 export type * from './customer';
 export type * from './promotions';
