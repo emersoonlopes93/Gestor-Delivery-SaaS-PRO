@@ -1,29 +1,13 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Param,
-  Body,
-  Query,
-  Request,
-  UseGuards,
-  DefaultValuePipe,
-  ParseIntPipe,
-  BadRequestException,
-} from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, Query, Request, UseGuards, DefaultValuePipe, ParseIntPipe, BadRequestException } from '@nestjs/common';
 import { CashService } from './cash.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
 import { OpenCashSessionDTO, CloseCashSessionDTO, CreateCashMovementDTO } from '@gestor/types';
+import type { Request as ExpressRequest } from 'express';
+import type { TenantJwtPayload } from '@gestor/types';
 
-interface TenantRequest {
-  user: {
-    tenantId: string;
-    id: string;
-    permissions?: string[];
-  };
-}
+type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
 
 @Controller('cash')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -39,7 +23,7 @@ export class CashController {
   ) {
     return this.cashService.openSession(
       req.user.tenantId,
-      req.user.id,
+      req.user.sub,
       dto.openingAmount,
     );
   }
@@ -55,7 +39,7 @@ export class CashController {
     return this.cashService.closeSession(
       req.user.tenantId,
       sessionId,
-      req.user.id,
+      req.user.sub,
       dto.closingAmountDeclared,
       dto.notes,
     );
@@ -65,7 +49,7 @@ export class CashController {
   @Get('sessions/active')
   @RequirePermissions('cash.read')
   async getActiveSession(@Request() req: TenantRequest) {
-    return this.cashService.getActiveSession(req.user.tenantId, req.user.id);
+    return this.cashService.getActiveSession(req.user.tenantId, req.user.sub);
   }
 
   // GET /cash/sessions
@@ -104,7 +88,7 @@ export class CashController {
     return this.cashService.addMovement(
       req.user.tenantId,
       sessionId,
-      req.user.id,
+      req.user.sub,
       dto.type as 'withdrawal' | 'supply',
       dto.amount,
       dto.description,
