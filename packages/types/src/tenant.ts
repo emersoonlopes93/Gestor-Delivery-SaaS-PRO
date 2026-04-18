@@ -23,6 +23,9 @@ export interface TenantSettings {
   businessEmail?: string;
   address?: string;
   logoUrl?: string;
+  cnpj?: string;
+  razaoSocial?: string;
+  inscricaoEstadual?: string;
   isStorePaused: boolean;
   storePauseReason?: string;
 }

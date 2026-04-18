@@ -80,17 +80,11 @@ import { UploadModule } from './upload/upload.module';
     // Public Storefront (Phase 3)
     StorefrontModule,
 
-    // Orders & Checkout (Phase 4)
-    OrdersModule,
-
     // Logistics & Delivery (Phase 6)
     DeliveryModule,
 
     // Cash Register (Phase 7)
     CashModule,
-
-    // Point of Sale (Phase 7)
-    PosModule,
 
     // CRM (Phase 8)
     CrmModule,
@@ -109,6 +103,12 @@ import { UploadModule } from './upload/upload.module';
 
     // Upload (Images)
     UploadModule,
+
+    // Orders & Checkout (Phase 4)
+    OrdersModule,
+
+    // Point of Sale (Phase 7)
+    PosModule,
   ],
   providers: [
     {
@@ -122,4 +122,3 @@ import { UploadModule } from './upload/upload.module';
   ],
 })
 export class AppModule {}
-

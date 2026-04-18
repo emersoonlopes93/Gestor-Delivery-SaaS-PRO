@@ -12,7 +12,21 @@ export type * from './analytics';
 export type * from './goals';
 
 // Modules with classes or constants (explicit values)
-export type * from './order';
+export type { 
+  ValidatedLine,
+  ValidatedProductLine,
+  ValidatedComboLine,
+  CheckoutValidationResult,
+  OrderResponseDTO,
+  FulfillmentType,
+  OrderStatus,
+  OrderKdsItemDTO,
+  UpdateOrderStatusDTO,
+  OrderBoardItemDTO,
+  OrderListItemDTO,
+  OrderDispatchItemDTO,
+} from './order';
+
 export { 
   ORDER_STATUS_TRANSITIONS, 
   DeliveryAddressDTO, 
@@ -23,7 +37,8 @@ export {
   CreateOrderItemComboSlotSelectionItemDTO,
   CreateOrderItemComboSlotSelectionDTO,
   CreateOrderItemDTO, 
-  CreateOrderDTO 
+  CreateOrderDTO,
+  PaymentInput,
 } from './order';
 
 export type * from './delivery';

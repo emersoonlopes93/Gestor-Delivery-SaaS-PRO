@@ -14,7 +14,16 @@ import { DeliveryModule } from '../delivery/delivery.module';
 import { CatalogModule } from '../catalog/catalog.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, RbacModule, PromotionsModule, CrmModule, InventoryModule, DeliveryModule, CatalogModule],
+  imports: [
+    DatabaseModule,
+    AuthModule,
+    RbacModule,
+    PromotionsModule,
+    CrmModule,
+    InventoryModule,
+    DeliveryModule,
+    CatalogModule,
+  ],
   controllers: [OrdersController, PublicOrdersController],
   providers: [OrdersService, CheckoutValidatorService, AvailabilityService],
   exports: [OrdersService, CheckoutValidatorService],

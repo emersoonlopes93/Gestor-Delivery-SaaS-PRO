@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEmail, MaxLength } from 'class-validator';
+import { IsString, IsOptional, IsEmail, MaxLength, Matches } from 'class-validator';
 
 export class UpdateTenantSettingsDto {
   @IsOptional()
@@ -34,4 +34,22 @@ export class UpdateTenantSettingsDto {
   @IsString()
   @MaxLength(500)
   logoUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(18)
+  @Matches(/^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/, {
+    message: 'CNPJ inválido. Use o formato XX.XXX.XXX/XXXX-XX ou apenas números.',
+  })
+  cnpj?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  razaoSocial?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  inscricaoEstadual?: string;
 }

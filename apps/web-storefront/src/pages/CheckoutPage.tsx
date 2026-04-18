@@ -51,6 +51,7 @@ export function CheckoutPage() {
 
   // Financial state (calculated server-side)
   const [deliveryFee, setDeliveryFee] = useState(0);
+  const [discountTotal, setDiscountTotal] = useState(0);
   const [isValidating, setIsValidating] = useState(false);
 
   // Idempotency key — generated once per checkout session
@@ -121,12 +122,14 @@ export function CheckoutPage() {
         });
 
         setDeliveryFee(result.deliveryFee || 0);
+        setDiscountTotal(result.discountTotal || 0);
         if (isDelivery) setSubmitError(null);
       } catch (err: any) {
         console.error('Validation error:', err);
         const msg = err.response?.data?.message || 'Erro ao validar entrega nesta região.';
         if (isDelivery) setSubmitError(msg);
         setDeliveryFee(0);
+        setDiscountTotal(0);
       } finally {
         setIsValidating(false);
       }
@@ -135,7 +138,7 @@ export function CheckoutPage() {
     validate();
   }, [debouncedAddress, fulfillmentType, items, tenantSlug, payment]);
 
-  const total = subtotal + deliveryFee;
+  const total = subtotal + deliveryFee - discountTotal;
 
   const handleAddressSelected = (addr: StructuredAddress) => {
     setStreet(addr.street);
@@ -264,6 +267,12 @@ export function CheckoutPage() {
                 <span className={deliveryFee === 0 && !isValidating ? 'text-green-600 font-bold' : ''}>
                   {isValidating ? 'Calculando...' : deliveryFee === 0 ? 'Grátis' : deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </span>
+              </div>
+            )}
+            {discountTotal > 0 && (
+              <div className="flex justify-between text-xs text-green-600 font-semibold">
+                <span>Descontos</span>
+                <span>- {discountTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
               </div>
             )}
             <div className="flex justify-between text-lg font-black text-gray-900 pt-1">

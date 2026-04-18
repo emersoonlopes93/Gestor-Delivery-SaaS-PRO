@@ -346,6 +346,11 @@ model TenantSettings {
   address       String? @db.Text
   logoUrl       String? @map("logo_url") @db.VarChar(500)
   
+  // Fiscal / Billing
+  cnpj               String? @db.VarChar(18)
+  razaoSocial        String? @map("razao_social") @db.VarChar(255)
+  inscricaoEstadual  String? @map("inscricao_estadual") @db.VarChar(20)
+
   isStorePaused    Boolean @default(false) @map("is_store_paused")
   storePauseReason String? @map("store_pause_reason") @db.Text
 

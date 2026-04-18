@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
 import { Tenant, TenantSettings, TenantOperatingHours } from '@gestor/types';
-import { Clock, Pause, Save, Copy, Calendar } from 'lucide-react';
+import { Clock, Pause, Save, Copy, Calendar, MapPin, Building2 } from 'lucide-react';
 
 const DAY_NAMES = [
   'Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'
@@ -19,6 +19,9 @@ export function SettingsPage() {
     businessEmail: '',
     address: '',
     logoUrl: '',
+    cnpj: '',
+    razaoSocial: '',
+    inscricaoEstadual: '',
     isStorePaused: false,
     storePauseReason: '',
   });
@@ -82,6 +85,9 @@ export function SettingsPage() {
         businessEmail: settings.businessEmail?.trim() || undefined,
         address: settings.address?.trim() || undefined,
         logoUrl: settings.logoUrl?.trim() || undefined,
+        cnpj: settings.cnpj?.trim() || undefined,
+        razaoSocial: settings.razaoSocial?.trim() || undefined,
+        inscricaoEstadual: settings.inscricaoEstadual?.trim() || undefined,
       };
       
       const response = await api.patch('/tenant/settings', cleanedSettings);
@@ -286,6 +292,68 @@ export function SettingsPage() {
                   />
                 </div>
               </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <span className="p-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm"><MapPin className="w-4 h-4" /></span>
+                Endereço da Loja
+              </h2>
+              <div>
+                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Endereço Completo</label>
+                <textarea
+                  value={settings.address || ''}
+                  onChange={e => setSettings({...settings, address: e.target.value})}
+                  placeholder="Ex: Rua das Flores, 123 - Centro, São Paulo - SP, 01234-000"
+                  rows={2}
+                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium resize-none"
+                />
+                <p className="mt-1 text-[10px] text-gray-400 font-medium">Este endereço será exibido na vitrine pública da loja.</p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <span className="p-1.5 bg-purple-50 text-purple-600 rounded-lg text-sm"><Building2 className="w-4 h-4" /></span>
+                Dados Fiscais
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">CNPJ</label>
+                  <input
+                    type="text"
+                    value={settings.cnpj || ''}
+                    onChange={e => {
+                      const raw = e.target.value.replace(/\D/g, '').slice(0, 14);
+                      const formatted = raw.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+                      setSettings({...settings, cnpj: raw.length > 2 ? formatted : raw});
+                    }}
+                    placeholder="XX.XXX.XXX/XXXX-XX"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium font-mono tracking-wider"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Razão Social</label>
+                  <input
+                    type="text"
+                    value={settings.razaoSocial || ''}
+                    onChange={e => setSettings({...settings, razaoSocial: e.target.value})}
+                    placeholder="Nome jurídico da empresa"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Inscrição Estadual</label>
+                  <input
+                    type="text"
+                    value={settings.inscricaoEstadual || ''}
+                    onChange={e => setSettings({...settings, inscricaoEstadual: e.target.value})}
+                    placeholder="Opcional"
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                  />
+                </div>
+              </div>
+              <p className="mt-4 text-[10px] text-gray-400 font-medium">Estes dados são usados para fins de faturamento e emissão fiscal.</p>
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
