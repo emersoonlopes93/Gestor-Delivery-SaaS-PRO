@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { StorefrontPayload, StorefrontCategoryPayload, StorefrontComboPayload, StorefrontProductPayload } from '@gestor/types';
-import { TenantStatus, Prisma } from '@prisma/client';
+import { TenantStatus } from '@gestor/core';
+import { Prisma } from '@prisma/client';
 import { AvailabilityService, SalesChannel } from '../orders/availability.service';
 import { UpsellsService } from '../catalog/upsells.service';
 
@@ -22,7 +23,7 @@ export class StorefrontService {
 
     // 1. Resolve Tenant
     const tenant = await this.prisma.tenant.findFirst({
-      where: { slug, status: TenantStatus.active }, // only active tenants
+      where: { slug, status: TenantStatus.ACTIVE as any }, // only active tenants
       include: { settings: true },
     });
 
@@ -142,13 +143,13 @@ export class StorefrontService {
     const availabilityMap = new Map<string, boolean>(availabilityPairs);
 
     const categories: StorefrontCategoryPayload[] = categoryRows
-      .map((cat) => ({
+      .map((cat: CategoryWithProducts) => ({
         id: cat.id,
         name: cat.name,
         slug: cat.slug,
         products: cat.products
-          .filter((p) => p.isAvailable && availabilityMap.get(p.id) !== false)
-          .map((p) => ({
+          .filter((p: any) => p.isAvailable && availabilityMap.get(p.id) !== false)
+          .map((p: any) => ({
             id: p.id,
             name: p.name,
             slug: p.slug,
@@ -157,14 +158,14 @@ export class StorefrontService {
             basePrice: Number(p.basePrice),
             image: p.image,
             isAvailable: true,
-            complements: p.complementGroups.map((link) => ({
+            complements: p.complementGroups.map((link: any) => ({
               id: link.group.id,
               name: link.group.name,
               description: link.group.description,
               minSelect: link.group.minSelect,
               maxSelect: link.group.maxSelect,
               isRequired: link.group.isRequired,
-              items: link.group.items.map((item) => ({
+              items: link.group.items.map((item: any) => ({
                 id: item.id,
                 name: item.name,
                 description: item.description,
@@ -173,15 +174,15 @@ export class StorefrontService {
               })),
             })),
             upsells: p.upsellLinks
-              .filter((link) => link.upsell.displayType !== 'cart')
-              .map((link) => ({
+              .filter((link: any) => link.upsell.displayType !== 'cart')
+              .map((link: any) => ({
                 id: link.upsell.id,
                 name: link.upsell.name,
                 description: link.upsell.description,
                 displayType: link.upsell.displayType as any,
                 items: link.upsell.items
-                  .filter((i) => i.product.isActive && i.product.deletedAt === null)
-                  .map((i) => {
+                  .filter((i: any) => i.product.isActive && i.product.deletedAt === null)
+                  .map((i: any) => {
                     const originalPrice = Number(i.product.basePrice);
                     const finalPrice = this.upsellsService.calculateUpsellPrice(
                       originalPrice,
@@ -200,7 +201,7 @@ export class StorefrontService {
               })),
           })) as StorefrontProductPayload[],
       }))
-      .filter((cat) => cat.products.length > 0);
+      .filter((cat: any) => cat.products.length > 0);
 
     const combos: StorefrontComboPayload[] = comboRows
       .filter((combo) => combo.isAvailable && availabilityMap.get(combo.id) !== false)
@@ -218,14 +219,14 @@ export class StorefrontService {
         itemsSubtotal: combo.comboMode === 'bundle'
           ? Number(
               combo.comboBundleItems
-                .reduce((sum, item) => sum + (item.product ? Number(item.product.basePrice) * Math.max(1, item.qty) : 0), 0)
+                .reduce((sum: number, item: any) => sum + (item.product ? Number(item.product.basePrice) * Math.max(1, item.qty) : 0), 0)
                 .toFixed(2),
             )
           : undefined,
         discountTotal: combo.comboMode === 'bundle'
           ? Number(
               (
-                combo.comboBundleItems.reduce((sum, item) => sum + (item.product ? Number(item.product.basePrice) * Math.max(1, item.qty) : 0), 0) -
+                combo.comboBundleItems.reduce((sum: number, item: any) => sum + (item.product ? Number(item.product.basePrice) * Math.max(1, item.qty) : 0), 0) -
                 Number(combo.basePrice)
               ).toFixed(2),
             )
@@ -233,8 +234,8 @@ export class StorefrontService {
         bundleItems:
           (combo.comboMode ?? 'bundle') === 'bundle'
             ? combo.comboBundleItems
-                .filter((item) => item.product && item.product.isActive && item.product.deletedAt === null)
-                .map((item) => ({
+                .filter((item: any) => item.product && item.product.isActive && item.product.deletedAt === null)
+                .map((item: any) => ({
                   id: item.id,
                   productId: item.productId,
                   productName: item.product!.name,
@@ -245,7 +246,7 @@ export class StorefrontService {
             : undefined,
         blocks:
           (combo.comboMode ?? 'bundle') === 'slot'
-            ? combo.comboSlots.map((b) => ({
+            ? combo.comboSlots.map((b: any) => ({
                 id: b.id,
                 name: b.name,
                 description: b.description,
@@ -253,7 +254,7 @@ export class StorefrontService {
                 maxSelect: b.maxSelect,
                 items: b.allowedItems
                   .filter((item) => item.product.isActive && item.product.deletedAt === null)
-                  .map((item) => ({
+                  .map((item: any) => ({
                     id: item.id,
                     productId: item.productId,
                     productName: item.product.name,
@@ -273,6 +274,17 @@ export class StorefrontService {
       isOpen: storeStatus.isOpen,
       statusMessage: storeStatus.message,
       nextOpenAt: storeStatus.nextOpenAt,
+      paymentMethods: (tenant.settings?.paymentMethods as string[]) || [],
+      address: tenant.settings ? {
+        street: tenant.settings.street || '',
+        number: tenant.settings.number || '',
+        neighborhood: tenant.settings.neighborhood || '',
+        city: tenant.settings.city || '',
+        state: tenant.settings.state || '',
+        zipCode: tenant.settings.zipCode || '',
+        lat: tenant.settings.lat || undefined,
+        lng: tenant.settings.lng || undefined,
+      } : undefined,
     };
 
     const globalUpsellRows = await this.prisma.upsell.findMany({
@@ -289,14 +301,14 @@ export class StorefrontService {
       },
     });
 
-    const globalUpsells = globalUpsellRows.map((u) => ({
+    const globalUpsells = globalUpsellRows.map((u: any) => ({
       id: u.id,
       name: u.name,
       description: u.description,
       displayType: u.displayType as any,
       items: u.items
-        .filter((i) => i.product.isActive && i.product.deletedAt === null)
-        .map((i) => {
+        .filter((i: any) => i.product.isActive && i.product.deletedAt === null)
+        .map((i: any) => {
           const originalPrice = Number(i.product.basePrice);
           const finalPrice = this.upsellsService.calculateUpsellPrice(
             originalPrice,

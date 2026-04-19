@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEmail, MaxLength, Matches } from 'class-validator';
+import { IsString, IsOptional, IsEmail, MaxLength, Matches, IsNumber, IsArray } from 'class-validator';
 
 export class UpdateTenantSettingsDto {
   @IsOptional()
@@ -29,6 +29,73 @@ export class UpdateTenantSettingsDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  street?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  number?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  complement?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  neighborhood?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2)
+  state?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  zipCode?: string;
+
+  @IsOptional()
+  @IsNumber()
+  lat?: number;
+
+  @IsOptional()
+  @IsNumber()
+  lng?: number;
+
+  @IsOptional()
+  @IsArray()
+  paymentMethods?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  pixKey?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  bankName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  bankAgency?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  bankAccount?: string;
 
   @IsOptional()
   @IsString()

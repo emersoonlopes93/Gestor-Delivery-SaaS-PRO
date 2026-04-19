@@ -53,6 +53,26 @@ export function CheckoutPage() {
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [discountTotal, setDiscountTotal] = useState(0);
   const [isValidating, setIsValidating] = useState(false);
+  const [tenantInfo, setTenantInfo] = useState<any>(null);
+
+  useEffect(() => {
+    async function loadTenant() {
+      if (!tenantSlug) return;
+      try {
+        const { data } = await api.get<any>(`/public/storefront/${tenantSlug}`);
+        setTenantInfo(data.tenant);
+        
+        // Auto-select first available payment method if current is not available
+        const methods = (data.tenant.paymentMethods as string[]) || [];
+        if (methods.length > 0 && !methods.includes(payment.method)) {
+          setPayment({ method: methods[0] as any });
+        }
+      } catch (err) {
+        console.error('Error loading tenant info', err);
+      }
+    }
+    loadTenant();
+  }, [tenantSlug]);
 
   // Idempotency key — generated once per checkout session
   const idempotencyKey = useMemo(() => crypto.randomUUID(), []);
@@ -361,21 +381,27 @@ export function CheckoutPage() {
           <CreditCard className="w-4 h-4" /> Forma de Pagamento
         </h2>
         <div className="grid grid-cols-3 gap-2">
-          <button onClick={() => setPayment({ method: PaymentMethod.pix })}
-            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'pix' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
-            <QrCode className="w-5 h-5" />
-            <span className="text-[10px] font-bold uppercase">PIX</span>
-          </button>
-          <button onClick={() => setPayment({ method: PaymentMethod.card_on_delivery })}
-            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'card_on_delivery' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
-            <CreditCard className="w-5 h-5" />
-            <span className="text-[10px] font-bold uppercase tracking-tight text-center leading-none">Cartão na Entrega</span>
-          </button>
-          <button onClick={() => setPayment({ method: PaymentMethod.cash, changeFor: null })}
-            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'cash' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
-            <Banknote className="w-5 h-5" />
-            <span className="text-[10px] font-bold uppercase">Dinheiro</span>
-          </button>
+          {(!tenantInfo || tenantInfo.paymentMethods?.includes('pix')) && (
+            <button onClick={() => setPayment({ method: PaymentMethod.pix })}
+              className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'pix' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
+              <QrCode className="w-5 h-5" />
+              <span className="text-[10px] font-bold uppercase">PIX</span>
+            </button>
+          )}
+          {(!tenantInfo || tenantInfo.paymentMethods?.includes('card_on_delivery')) && (
+            <button onClick={() => setPayment({ method: PaymentMethod.card_on_delivery })}
+              className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'card_on_delivery' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
+              <CreditCard className="w-5 h-5" />
+              <span className="text-[10px] font-bold uppercase tracking-tight text-center leading-none">Cartão na Entrega</span>
+            </button>
+          )}
+          {(!tenantInfo || tenantInfo.paymentMethods?.includes('cash')) && (
+            <button onClick={() => setPayment({ method: PaymentMethod.cash, changeFor: null })}
+              className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'cash' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
+              <Banknote className="w-5 h-5" />
+              <span className="text-[10px] font-bold uppercase">Dinheiro</span>
+            </button>
+          )}
         </div>
 
         {payment.method === 'cash' && (

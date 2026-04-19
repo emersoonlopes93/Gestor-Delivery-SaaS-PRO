@@ -344,6 +344,29 @@ model TenantSettings {
   businessPhone String? @map("business_phone") @db.VarChar(20)
   businessEmail String? @map("business_email") @db.VarChar(255)
   address       String? @db.Text
+  
+  // Structured Address
+  street       String? @db.VarChar(255)
+  number       String? @db.VarChar(20)
+  complement   String? @db.VarChar(255)
+  neighborhood String? @db.VarChar(100)
+  city         String? @db.VarChar(100)
+  state        String? @db.VarChar(2)
+  zipCode      String? @map("zip_code") @db.VarChar(10)
+  
+  // Coordinates
+  lat          Float?
+  lng          Float?
+
+  // Payment Methods (JSON array of enabled PaymentMethod strings)
+  paymentMethods Json? @map("payment_methods")
+
+  // Financial Data
+  pixKey       String? @map("pix_key") @db.VarChar(255)
+  bankName     String? @map("bank_name") @db.VarChar(100)
+  bankAgency   String? @map("bank_agency") @db.VarChar(20)
+  bankAccount  String? @map("bank_account") @db.VarChar(50)
+
   logoUrl       String? @map("logo_url") @db.VarChar(500)
   
   // Fiscal / Billing

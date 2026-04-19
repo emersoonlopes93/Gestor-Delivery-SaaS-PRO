@@ -36,9 +36,6 @@ export function ProductsPage() {
   const tableScrollRef = React.useRef<HTMLDivElement | null>(null);
   const [tableScrollTop, setTableScrollTop] = useState(0);
   
-  // CRUD State (Unused since V2 consolidation, using redirection to EditorV2 instead)
-  // const [isModalOpen, setIsModalOpen] = useState(false);
-  // const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     loadData();
@@ -300,7 +297,6 @@ export function ProductsPage() {
               >
                 <Pencil size={16} />
               </button>
-              {/* Botão Editor V2 removido pois agora é o botão principal de editar */}
               <PermissionGate permission="catalog.publish" fallback={null}>
                 <button
                   onClick={() => handleTogglePublication(product)}
@@ -608,7 +604,6 @@ export function ProductsPage() {
                         >
                           Editar
                         </button>
-                        {/* Botão Editor V2 removido pois agora é o botão principal de editar */}
                         <button
                           onClick={() => handleToggleActive(product)}
                           className="px-3 py-2 text-xs font-black text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200"

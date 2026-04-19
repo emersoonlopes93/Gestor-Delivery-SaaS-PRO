@@ -18,6 +18,20 @@ export function SettingsPage() {
     businessPhone: '',
     businessEmail: '',
     address: '',
+    street: '',
+    number: '',
+    complement: '',
+    neighborhood: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    lat: undefined,
+    lng: undefined,
+    paymentMethods: ['pix', 'cash', 'card_on_delivery'],
+    pixKey: '',
+    bankName: '',
+    bankAgency: '',
+    bankAccount: '',
     logoUrl: '',
     cnpj: '',
     razaoSocial: '',
@@ -84,6 +98,20 @@ export function SettingsPage() {
         businessPhone: settings.businessPhone?.trim() || undefined,
         businessEmail: settings.businessEmail?.trim() || undefined,
         address: settings.address?.trim() || undefined,
+        street: settings.street?.trim() || undefined,
+        number: settings.number?.trim() || undefined,
+        complement: settings.complement?.trim() || undefined,
+        neighborhood: settings.neighborhood?.trim() || undefined,
+        city: settings.city?.trim() || undefined,
+        state: settings.state?.trim() || undefined,
+        zipCode: settings.zipCode?.trim() || undefined,
+        lat: settings.lat ? Number(settings.lat) : undefined,
+        lng: settings.lng ? Number(settings.lng) : undefined,
+        paymentMethods: settings.paymentMethods || undefined,
+        pixKey: settings.pixKey?.trim() || undefined,
+        bankName: settings.bankName?.trim() || undefined,
+        bankAgency: settings.bankAgency?.trim() || undefined,
+        bankAccount: settings.bankAccount?.trim() || undefined,
         logoUrl: settings.logoUrl?.trim() || undefined,
         cnpj: settings.cnpj?.trim() || undefined,
         razaoSocial: settings.razaoSocial?.trim() || undefined,
@@ -299,16 +327,122 @@ export function SettingsPage() {
                 <span className="p-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm"><MapPin className="w-4 h-4" /></span>
                 Endereço da Loja
               </h2>
-              <div>
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Endereço Completo</label>
-                <textarea
-                  value={settings.address || ''}
-                  onChange={e => setSettings({...settings, address: e.target.value})}
-                  placeholder="Ex: Rua das Flores, 123 - Centro, São Paulo - SP, 01234-000"
-                  rows={2}
-                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium resize-none"
-                />
-                <p className="mt-1 text-[10px] text-gray-400 font-medium">Este endereço será exibido na vitrine pública da loja.</p>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="md:col-span-1">
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">CEP</label>
+                    <input
+                      type="text"
+                      value={settings.zipCode || ''}
+                      onChange={e => setSettings({...settings, zipCode: e.target.value.replace(/\D/g, '').slice(0, 8)})}
+                      placeholder="00000-000"
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Rua / Logradouro</label>
+                    <input
+                      type="text"
+                      value={settings.street || ''}
+                      onChange={e => setSettings({...settings, street: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                    />
+                  </div>
+                  <div className="md:col-span-1">
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Número</label>
+                    <input
+                      type="text"
+                      value={settings.number || ''}
+                      onChange={e => setSettings({...settings, number: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Bairro</label>
+                    <input
+                      type="text"
+                      value={settings.neighborhood || ''}
+                      onChange={e => setSettings({...settings, neighborhood: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Cidade</label>
+                    <input
+                      type="text"
+                      value={settings.city || ''}
+                      onChange={e => setSettings({...settings, city: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Estado (UF)</label>
+                    <input
+                      type="text"
+                      value={settings.state || ''}
+                      onChange={e => setSettings({...settings, state: e.target.value.toUpperCase().slice(0, 2)})}
+                      placeholder="SP"
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Complemento</label>
+                    <input
+                      type="text"
+                      value={settings.complement || ''}
+                      onChange={e => setSettings({...settings, complement: e.target.value})}
+                      placeholder="Apto, Bloco, etc."
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Resumo (Legado)</label>
+                    <input
+                      type="text"
+                      value={settings.address || ''}
+                      onChange={e => setSettings({...settings, address: e.target.value})}
+                      placeholder="Ex: Rua das Flores, 123"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium text-gray-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-gray-100">
+                  <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
+                    📍 Geolocalização (Opcional)
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Latitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={settings.lat ?? ''}
+                        onChange={e => setSettings({...settings, lat: e.target.value ? Number(e.target.value) : undefined})}
+                        placeholder="-23.5505"
+                        className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Longitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={settings.lng ?? ''}
+                        onChange={e => setSettings({...settings, lng: e.target.value ? Number(e.target.value) : undefined})}
+                        placeholder="-46.6333"
+                        className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm outline-none"
+                      />
+                    </div>
+                  </div>
+                  <p className="mt-2 text-[10px] text-gray-400 italic">As coordenadas são fundamentais para o cálculo automático de frete por raio (KM).</p>
+                </div>
               </div>
             </div>
 
@@ -353,7 +487,85 @@ export function SettingsPage() {
                   />
                 </div>
               </div>
-              <p className="mt-4 text-[10px] text-gray-400 font-medium">Estes dados são usados para fins de faturamento e emissão fiscal.</p>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <span className="p-1.5 bg-green-50 text-green-600 rounded-lg text-sm">💰</span>
+                Configuração de Pagamento
+              </h2>
+              <div className="space-y-4">
+                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Métodos aceitos no Checkout</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {[
+                    { id: 'pix', label: 'PIX (Online/Entrega)' },
+                    { id: 'cash', label: 'Dinheiro (Na entrega)' },
+                    { id: 'card_on_delivery', label: 'Cartão (Na entrega)' },
+                  ].map((m) => (
+                    <label key={m.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl hover:bg-gray-50 cursor-pointer transition-all">
+                      <input
+                        type="checkbox"
+                        checked={settings.paymentMethods?.includes(m.id) ?? false}
+                        onChange={(e) => {
+                          const current = settings.paymentMethods || [];
+                          const next = e.target.checked
+                            ? [...current, m.id]
+                            : current.filter((x) => x !== m.id);
+                          setSettings({ ...settings, paymentMethods: next });
+                        }}
+                        className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+                      />
+                      <span className="text-sm font-bold text-gray-700">{m.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-gray-100 space-y-6">
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                  Dados para Repasse / PIX
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Chave PIX da Loja</label>
+                    <input
+                      type="text"
+                      value={settings.pixKey || ''}
+                      onChange={e => setSettings({...settings, pixKey: e.target.value})}
+                      placeholder="E-mail, CPF, CNPJ ou Aleatória"
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Nome do Banco</label>
+                    <input
+                      type="text"
+                      value={settings.bankName || ''}
+                      onChange={e => setSettings({...settings, bankName: e.target.value})}
+                      placeholder="Ex: Nubank, Itaú..."
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Agência</label>
+                    <input
+                      type="text"
+                      value={settings.bankAgency || ''}
+                      onChange={e => setSettings({...settings, bankAgency: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Conta com Dígito</label>
+                    <input
+                      type="text"
+                      value={settings.bankAccount || ''}
+                      onChange={e => setSettings({...settings, bankAccount: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">

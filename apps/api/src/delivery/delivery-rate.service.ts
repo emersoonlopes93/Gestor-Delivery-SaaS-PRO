@@ -1,19 +1,11 @@
 import { Inject, Injectable, NotFoundException, Logger, UnprocessableEntityException } from '@nestjs/common';
+import { PrismaService } from '../database/prisma.service';
 import type { DeliveryAddressDTO } from '@gestor/types';
 import { Prisma } from '@prisma/client';
 import type { DeliveryCoverageConfig, DeliveryRateRule } from '@prisma/client';
 
-type DeliveryRateRuleRepo = {
-  findMany: (args?: Prisma.DeliveryRateRuleFindManyArgs) => PromiseLike<DeliveryRateRule[]>;
-  findFirst: (args: Prisma.DeliveryRateRuleFindFirstArgs) => PromiseLike<DeliveryRateRule | null>;
-  create: (args: Prisma.DeliveryRateRuleCreateArgs) => PromiseLike<DeliveryRateRule>;
-  update: (args: Prisma.DeliveryRateRuleUpdateArgs) => PromiseLike<DeliveryRateRule>;
-  delete: (args: Prisma.DeliveryRateRuleDeleteArgs) => PromiseLike<DeliveryRateRule>;
-};
-
-type DeliveryCoverageRepo = {
-  findUnique: (args: Prisma.DeliveryCoverageConfigFindUniqueArgs) => PromiseLike<DeliveryCoverageConfig | null>;
-};
+type DeliveryRateRuleRepo = any;
+type DeliveryCoverageRepo = any;
 
 export interface DeliveryFeeCalculation {
   fee: number;
@@ -65,6 +57,7 @@ export class DeliveryRateService {
   constructor(
     @Inject(DELIVERY_RATE_RULE_REPO) deliveryRateRuleRepo: DeliveryRateRuleRepo,
     @Inject(DELIVERY_COVERAGE_REPO) deliveryCoverageRepo: DeliveryCoverageRepo,
+    private readonly prisma: PrismaService,
   ) {
     this.deliveryRateRuleRepo = deliveryRateRuleRepo;
     this.deliveryCoverageRepo = deliveryCoverageRepo;
@@ -106,9 +99,15 @@ export class DeliveryRateService {
   }
 
   async calculateDeliveryDecision(input: CalculateDeliveryRateInput): Promise<DeliveryDecision> {
-    const cfg = await this.deliveryCoverageRepo.findUnique({
-      where: { tenantId: input.tenantId },
-    });
+    const [cfg, settings] = await Promise.all([
+      this.deliveryCoverageRepo.findUnique({
+        where: { tenantId: input.tenantId },
+      }),
+      this.prisma.tenantSettings.findUnique({
+        where: { tenantId: input.tenantId },
+        select: { lat: true, lng: true },
+      }),
+    ]);
 
     if (!cfg) {
       const legacy = await this.calculateRateLegacy(input);
@@ -139,10 +138,14 @@ export class DeliveryRateService {
       throw new UnprocessableEntityException('Coordenadas (lat/lng) são obrigatórias para calcular entrega.');
     }
 
+    // Use TenantSettings coordinates as priority if available
+    const storeLat = settings?.lat ?? cfg.storeLat;
+    const storeLng = settings?.lng ?? cfg.storeLng;
+
     const distanceKm =
       typeof input.distanceKm === 'number' && Number.isFinite(input.distanceKm)
         ? input.distanceKm
-        : this.haversineDistanceKm({ lat: cfg.storeLat, lng: cfg.storeLng }, { lat, lng });
+        : this.haversineDistanceKm({ lat: storeLat, lng: storeLng }, { lat, lng });
 
     const insideRadius = distanceKm <= Number(cfg.maxRadiusKm);
 
@@ -690,7 +693,7 @@ export class DeliveryRateService {
         );
       }
 
-      ruleData.geoJson = data.geoJson ?? Prisma.JsonNull;
+      ruleData.geoJson = data.geoJson ?? (null as any);
       const polygonJson = this.toInputJsonValue(normalizedCoords);
       if (!polygonJson) {
         throw new UnprocessableEntityException('polygonCoordinates inválido');

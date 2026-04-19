@@ -8,6 +8,17 @@ export interface StorefrontTenantInfo {
   isOpen: boolean; 
   statusMessage?: string | null;
   nextOpenAt?: string | null;
+  paymentMethods?: string[];
+  address?: {
+    street: string;
+    number: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    lat?: number;
+    lng?: number;
+  };
 }
 
 // Layer 2: Published entity, Layer 3: Currently available to sell
