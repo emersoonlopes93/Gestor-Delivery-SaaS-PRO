@@ -87,6 +87,29 @@ export function SettingsPage() {
     }
   };
 
+  const handleCepBlur = async () => {
+    const cep = settings.zipCode?.replace(/\D/g, '');
+    if (cep && cep.length === 8) {
+      try {
+        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+        const data = await response.json();
+        
+        if (!data.erro) {
+          setSettings(prev => ({
+            ...prev,
+            street: data.logradouro || '',
+            neighborhood: data.bairro || '',
+            city: data.localidade || '',
+            state: data.uf || '',
+            complement: data.complemento || ''
+          }));
+        }
+      } catch (error) {
+        console.error('Erro ao buscar CEP:', error);
+      }
+    }
+  };
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -335,6 +358,7 @@ export function SettingsPage() {
                       type="text"
                       value={settings.zipCode || ''}
                       onChange={e => setSettings({...settings, zipCode: e.target.value.replace(/\D/g, '').slice(0, 8)})}
+                      onBlur={handleCepBlur}
                       placeholder="00000-000"
                       className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
                     />
@@ -413,37 +437,7 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <div className="pt-4 border-t border-gray-100">
-                  <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
-                    📍 Geolocalização (Opcional)
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Latitude</label>
-                      <input
-                        type="number"
-                        step="any"
-                        value={settings.lat ?? ''}
-                        onChange={e => setSettings({...settings, lat: e.target.value ? Number(e.target.value) : undefined})}
-                        placeholder="-23.5505"
-                        className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Longitude</label>
-                      <input
-                        type="number"
-                        step="any"
-                        value={settings.lng ?? ''}
-                        onChange={e => setSettings({...settings, lng: e.target.value ? Number(e.target.value) : undefined})}
-                        placeholder="-46.6333"
-                        className="w-full px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm outline-none"
-                      />
-                    </div>
-                  </div>
-                  <p className="mt-2 text-[10px] text-gray-400 italic">As coordenadas são fundamentais para o cálculo automático de frete por raio (KM).</p>
-                </div>
-              </div>
+                              </div>
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">

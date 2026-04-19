@@ -1089,27 +1089,10 @@ export function DeliveryZonesPage() {
               </div>
 
               <div className="p-5 space-y-5">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-black text-gray-500 uppercase tracking-wider">Latitude da loja</label>
-                    <input
-                      type="number"
-                      step="0.000001"
-                      value={coverageDraft.storeLat}
-                      onChange={(e) => setCoverageDraft((d) => ({ ...d, storeLat: Number(e.target.value) }))}
-                      className="mt-2 w-full h-10 px-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all duration-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-gray-500 uppercase tracking-wider">Longitude da loja</label>
-                    <input
-                      type="number"
-                      step="0.000001"
-                      value={coverageDraft.storeLng}
-                      onChange={(e) => setCoverageDraft((d) => ({ ...d, storeLng: Number(e.target.value) }))}
-                      className="mt-2 w-full h-10 px-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all duration-200"
-                    />
-                  </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+                  <p className="text-sm text-blue-800 font-medium">
+                    <span className="font-black">Dica:</span> Use os botões abaixo para definir sua localização automaticamente. O sistema usará o endereço cadastrado nas configurações ou sua localização atual.
+                  </p>
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
@@ -1119,7 +1102,7 @@ export function DeliveryZonesPage() {
                     className="h-10 px-4 rounded-lg bg-white border border-gray-200 text-sm font-black text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 shadow-md"
                   >
                     <Crosshair className="h-4 w-4" />
-                    Centralizar
+                    Centralizar no mapa
                   </button>
 
                   <button
@@ -1127,7 +1110,8 @@ export function DeliveryZonesPage() {
                     onClick={handleUseCurrentLocation}
                     className="h-10 px-4 rounded-lg bg-white border border-gray-200 text-sm font-black text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 shadow-md"
                   >
-                    Usar localização atual
+                    <MapPin className="h-4 w-4" />
+                    Usar minha localização
                   </button>
                 </div>
 

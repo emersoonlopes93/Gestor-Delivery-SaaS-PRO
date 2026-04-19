@@ -11,6 +11,9 @@ interface ProductPersonalizationProps {
   openEditLinkModal: (link: any) => void;
   removeGroupLink: (id: string) => void;
   savingStates: Record<string, boolean>;
+  isProductWizard?: boolean;
+  goPrevWizardStep?: () => void;
+  goNextWizardStep?: () => void;
 }
 
 export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
@@ -23,6 +26,9 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
   openEditLinkModal,
   removeGroupLink,
   savingStates,
+  isProductWizard = false,
+  goPrevWizardStep,
+  goNextWizardStep,
 }) => {
   if (isComboMode) return null;
 
@@ -194,6 +200,25 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
           </div>
         )}
       </div>
+
+      {isProductWizard && (
+        <div className="mt-8 flex justify-between">
+          <button
+            type="button"
+            onClick={goPrevWizardStep}
+            className="px-8 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-black rounded-xl transition-all"
+          >
+            Voltar
+          </button>
+          <button
+            type="button"
+            onClick={goNextWizardStep}
+            className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-xl shadow-lg shadow-primary-200 transition-all"
+          >
+            Próximo
+          </button>
+        </div>
+      )}
     </section>
   );
 };

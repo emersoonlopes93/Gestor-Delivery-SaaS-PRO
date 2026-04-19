@@ -190,15 +190,7 @@ export function App() {
           }
         />
 
-        <Route
-          path="/delivery/rates/legacy"
-          element={
-            <PermissionGate permission="delivery.manage">
-              <DeliveryRatesPage />
-            </PermissionGate>
-          }
-        />
-
+        
         {/* Cash Register (Phase 7) */}
         <Route
           path="/cash"

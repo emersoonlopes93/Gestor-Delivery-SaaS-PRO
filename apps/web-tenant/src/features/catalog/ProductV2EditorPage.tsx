@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Sparkles, Plus } from 'lucide-react';
 import { api } from '../../lib/api-client';
 import { Modal } from '../../components/Modal'; // Assuming Modal is here
@@ -64,6 +64,7 @@ type ProductV2EditorPageProps = {
 };
 
 const COMBO_WIZARD_TABS: TabKey[] = ['geral', 'combo', 'publicacao'];
+const PRODUCT_WIZARD_TABS: TabKey[] = ['geral', 'personalizacao', 'publicacao'];
 
 const CHANNEL_LABELS: Record<string, string> = {
   storefront_delivery: 'Delivery',
@@ -91,9 +92,11 @@ const formatDaysLabel = (days: number[] = []) => {
 export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPageProps) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isComboMode = mode === 'combo';
 
-  const [tab, setTab] = useState<TabKey>('geral');
+  const initialTab = (searchParams.get('tab') as TabKey) || 'geral';
+  const [tab, setTab] = useState<TabKey>(initialTab);
   const [isLoading, setIsLoading] = useState(true);
   const [product, setProduct] = useState<ProductDetails | null>(null);
   const [categories, setCategories] = useState<any[]>([]);
@@ -103,18 +106,28 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   const isNew = id === 'new' || !id;
   const productId = isNew ? '' : id;
   const isComboWizard = isComboMode && isNew;
+  const isProductWizard = !isComboMode && isNew;
   const comboWizardIndex = COMBO_WIZARD_TABS.indexOf(tab);
+  const productWizardIndex = PRODUCT_WIZARD_TABS.indexOf(tab);
 
   const goNextWizardStep = () => {
-    if (!isComboWizard) return;
-    const nextIndex = Math.min(comboWizardIndex + 1, COMBO_WIZARD_TABS.length - 1);
-    setTab(COMBO_WIZARD_TABS[nextIndex]);
+    if (isComboWizard) {
+      const nextIndex = Math.min(comboWizardIndex + 1, COMBO_WIZARD_TABS.length - 1);
+      setTab(COMBO_WIZARD_TABS[nextIndex]);
+    } else if (isProductWizard) {
+      const nextIndex = Math.min(productWizardIndex + 1, PRODUCT_WIZARD_TABS.length - 1);
+      setTab(PRODUCT_WIZARD_TABS[nextIndex]);
+    }
   };
 
   const goPrevWizardStep = () => {
-    if (!isComboWizard) return;
-    const prevIndex = Math.max(comboWizardIndex - 1, 0);
-    setTab(COMBO_WIZARD_TABS[prevIndex]);
+    if (isComboWizard) {
+      const prevIndex = Math.max(comboWizardIndex - 1, 0);
+      setTab(COMBO_WIZARD_TABS[prevIndex]);
+    } else if (isProductWizard) {
+      const prevIndex = Math.max(productWizardIndex - 1, 0);
+      setTab(PRODUCT_WIZARD_TABS[prevIndex]);
+    }
   };
 
   const [productForm, setProductForm] = useState<any>({
@@ -395,7 +408,13 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
       if (isNew) {
         const res = await api.post<Product>('/catalog/products', payload);
         if (res.success) {
-          navigate(isComboMode ? '/catalog/combos' : `/catalog/products/${res.data.id}/v2`, { replace: true });
+          if (isComboMode) {
+            // Para wizard de combo, continua para o próximo passo (aba combo)
+            navigate(`/catalog/combos/${res.data.id}/v2?tab=combo`, { replace: true });
+          } else {
+            // Para wizard de produto, continua para personalização
+            navigate(`/catalog/products/${res.data.id}/v2?tab=personalizacao`, { replace: true });
+          }
         }
       } else {
         const res = await api.patch<Product>(`/catalog/products/${productId}`, payload);
@@ -956,16 +975,16 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           onClick={() => setTab('geral')}
           className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'geral' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50'}`}
         >
-          {isComboWizard ? '1. Informações Gerais' : 'Informações Gerais'}
+          {(isComboWizard || isProductWizard) ? '1. Informações Gerais' : 'Informações Gerais'}
         </button>
         {!isComboMode && (
           <button
             type="button"
             onClick={() => setTab('personalizacao')}
-            disabled={isNew}
+            disabled={isProductWizard && productWizardIndex < 1}
             className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'personalizacao' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
           >
-            Grupos e Tamanhos
+            {isProductWizard ? '2. Personalização' : 'Personalização'}
           </button>
         )}
         {isComboMode && (
@@ -989,10 +1008,10 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
         <button
           type="button"
           onClick={() => setTab('publicacao')}
-          disabled={isComboWizard && comboWizardIndex < 2}
+          disabled={(isComboWizard && comboWizardIndex < 2) || (isProductWizard && productWizardIndex < 2)}
           className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'publicacao' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
         >
-          {isComboWizard ? '4. Venda e Disponibilidade' : 'Venda e Disponibilidade'}
+          {isComboWizard ? '4. Venda e Disponibilidade' : (isProductWizard ? '3. Venda e Disponibilidade' : 'Venda e Disponibilidade')}
         </button>
       </div>
 
@@ -1035,6 +1054,9 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               openEditLinkModal={openEditLinkModal}
               removeGroupLink={removeGroupLink}
               savingStates={savingStates}
+              isProductWizard={isProductWizard}
+              goPrevWizardStep={goPrevWizardStep}
+              goNextWizardStep={goNextWizardStep}
             />
           )}
 
@@ -1132,6 +1154,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               formatChannelLabel={formatChannelLabel}
               formatDaysLabel={formatDaysLabel}
               isComboWizard={isComboWizard}
+              isProductWizard={isProductWizard}
               goPrevWizardStep={goPrevWizardStep}
               handleSaveProduct={handleSaveProduct}
               savingStates={savingStates}

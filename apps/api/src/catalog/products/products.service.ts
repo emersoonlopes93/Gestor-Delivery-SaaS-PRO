@@ -6,6 +6,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { slugify } from '@gestor/utils';
 import { CatalogTemplatesService } from '../catalog-templates.service';
+import type { Upsell } from '@gestor/types';
 
 @Injectable()
 export class ProductsService {
@@ -186,16 +187,54 @@ export class ProductsService {
       }
     }
 
+    // Auto-create publication for storefront visibility
+    if (createProductDto.sellableOnline !== false) {
+      await this.prisma.tenantClient.catalogPublication.create({
+        data: {
+          tenantId,
+          productId: product.id,
+          publicationStatus: 'published',
+          operationalStatus: 'active',
+        },
+      });
+    }
+
     return product;
   }
 
-  async findAll() {
+  async findAll(search?: string, limit?: number) {
     const tenantId = this.getRequiredTenantId();
-    return this.prisma.tenantClient.product.findMany({
-      where: { tenantId, deletedAt: null },
+    
+    const whereClause = {
+      tenantId,
+      deletedAt: null,
+      isActive: true,
+      isAvailable: true,
+      ...(search && {
+        name: {
+          contains: search,
+          mode: 'insensitive' as const
+        }
+      })
+    };
+
+    const products = await this.prisma.tenantClient.product.findMany({
+      where: {
+        ...whereClause,
+        publication: {
+          publicationStatus: 'published',
+          operationalStatus: 'active'
+        }
+      },
       orderBy: { order: 'asc' },
       include: { category: true, publication: true }
     });
+
+    if (limit) {
+      return products.slice(0, limit);
+    }
+    
+    return products;
   }
 
   async findOne(id: string) {
@@ -341,5 +380,18 @@ export class ProductsService {
         slug: `${product.slug}-deleted-${timestamp}`,
       },
     });
+  }
+
+  async listUpsellsForProduct(productId: string): Promise<Upsell[]> {
+    await this.findOne(productId);
+
+    const links = await this.prisma.tenantClient.productUpsell.findMany({
+      where: { productId },
+      include: { upsell: true },
+    });
+
+    return links
+      .map((l) => l.upsell)
+      .filter((u): u is NonNullable<typeof u> => Boolean(u)) as unknown as Upsell[];
   }
 }

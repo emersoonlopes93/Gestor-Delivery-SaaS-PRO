@@ -1,14 +1,7 @@
-import { X, Trash2, ShoppingBag, Plus, Minus, MapPin, Store, ChevronRight, Sparkles } from 'lucide-react';
+import { X, Trash2, ShoppingBag, Plus, Minus, ChevronRight, Sparkles } from 'lucide-react';
 import { useCartStore } from '../store/use-cart-store';
-import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 import { StorefrontUpsellPayload, StorefrontUpsellItemPayload } from '@gestor/types';
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
 
 interface CartDrawerProps {
   onClose: () => void;

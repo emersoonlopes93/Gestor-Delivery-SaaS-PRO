@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -19,14 +19,20 @@ export class ProductsController {
 
   @Get()
   @RequirePermissions('catalog.read')
-  findAll() {
-    return this.productsService.findAll();
+  findAll(@Query('search') search?: string, @Query('limit') limit?: string) {
+    return this.productsService.findAll(search, limit ? parseInt(limit) : undefined);
   }
 
   @Get(':id')
   @RequirePermissions('catalog.read')
   findOne(@Param('id') id: string) {
     return this.productsService.findOne(id);
+  }
+
+  @Get(':id/upsells')
+  @RequirePermissions('catalog.read')
+  listUpsells(@Param('id') id: string) {
+    return this.productsService.listUpsellsForProduct(id);
   }
 
   @Patch(':id')

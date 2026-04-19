@@ -253,7 +253,7 @@ export class StorefrontService {
                 minSelect: b.minSelect,
                 maxSelect: b.maxSelect,
                 items: b.allowedItems
-                  .filter((item) => item.product.isActive && item.product.deletedAt === null)
+                  .filter((item: any) => item.product.isActive && item.product.deletedAt === null)
                   .map((item: any) => ({
                     id: item.id,
                     productId: item.productId,

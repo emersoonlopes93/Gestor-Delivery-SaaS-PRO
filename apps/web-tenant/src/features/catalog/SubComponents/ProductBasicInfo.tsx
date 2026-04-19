@@ -83,12 +83,12 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                 </div>
               )}
               <div>
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">SKU / Cód. Interno</label>
+                <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Código do Produto</label>
                 <input
                   value={productForm.sku}
                   onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
-                  placeholder="Identificador opcional"
+                  placeholder="Código de controle (opcional)"
                 />
               </div>
             </div>
@@ -115,8 +115,8 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                   onChange={(e) => setProductForm({ ...productForm, type: e.target.value })}
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
                 >
-                  <option value="simple">Simples</option>
-                  <option value="configurable">Configurável (com variações)</option>
+                  <option value="simple">Produto Simples</option>
+                  <option value="configurable">Produto com Opções</option>
                 </select>
               </div>
             ) : (
@@ -274,7 +274,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
         })()}
 
         <div className="mt-8 flex justify-end">
-          {isComboWizard ? (
+          {isComboWizard || (isNew && !isComboMode) ? (
             <button
               type="button"
               onClick={goNextWizardStep}

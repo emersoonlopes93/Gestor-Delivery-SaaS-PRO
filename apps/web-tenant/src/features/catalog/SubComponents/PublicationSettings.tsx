@@ -9,6 +9,7 @@ interface PublicationSettingsProps {
   formatChannelLabel: (channel: string) => string;
   formatDaysLabel: (days: number[]) => string;
   isComboWizard: boolean;
+  isProductWizard?: boolean;
   goPrevWizardStep: () => void;
   handleSaveProduct: () => void;
   savingStates: Record<string, boolean>;
@@ -23,6 +24,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
   formatChannelLabel,
   formatDaysLabel,
   isComboWizard,
+  isProductWizard = false,
   goPrevWizardStep,
   handleSaveProduct,
   savingStates,
@@ -171,7 +173,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
       </div>
 
       <div className="mt-8 flex justify-end">
-        {isComboWizard ? (
+        {(isComboWizard || isProductWizard) ? (
           <div className="flex gap-4">
             <button
               type="button"
@@ -187,7 +189,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
               className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-xl shadow-lg transition-all flex items-center gap-2"
             >
               {savingStates.saveProduct && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-              Salvar Alterações
+              {isComboWizard ? 'Finalizar Combo' : 'Finalizar Produto'}
             </button>
           </div>
         ) : null}
