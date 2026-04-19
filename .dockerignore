@@ -1,0 +1,12 @@
+**/*node_modules
+**/dist
+.git
+.github
+.turbo
+*.log
+api_logs.txt
+build_logs.txt
+*.md
+.dockerignore
+Dockerfile
+docker-compose.yml
