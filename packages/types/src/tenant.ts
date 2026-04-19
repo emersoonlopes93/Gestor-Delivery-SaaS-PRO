@@ -21,13 +21,41 @@ export interface TenantSettings {
   language: string;
   businessPhone?: string;
   businessEmail?: string;
-  address?: string;
+  address?: string; // Legacy/Plain text
+
+  // Structured Address
+  street?: string;
+  number?: string;
+  complement?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+
+  // Coordinates
+  lat?: number;
+  lng?: number;
+
+  // Payment Methods
+  paymentMethods?: string[];
+
+  // Financial / Pix
+  pixKey?: string;
+  bankName?: string;
+  bankAgency?: string;
+  bankAccount?: string;
+
   logoUrl?: string;
+
+  // Fiscal / Billing
   cnpj?: string;
   razaoSocial?: string;
   inscricaoEstadual?: string;
+
   isStorePaused: boolean;
   storePauseReason?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface TenantOperatingHours {

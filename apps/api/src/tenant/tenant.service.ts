@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { PrismaService } from '../database/prisma.service';
 import { TenantStatus } from '@gestor/core';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
+import type { TenantOperatingHours } from '@gestor/types';
 
 @Injectable()
 export class TenantService {
@@ -87,7 +88,7 @@ export class TenantService {
   /**
    * Update operating hours in batch.
    */
-  async updateOperatingHours(tenantId: string, hours: any[]) {
+  async updateOperatingHours(tenantId: string, hours: Omit<TenantOperatingHours, 'id' | 'tenantId'>[]) {
     // Basic validation: openTime < closeTime
     for (const h of hours) {
       if (h.isOpen && h.openTime && h.closeTime) {
@@ -129,3 +130,4 @@ export class TenantService {
     });
   }
 }
+

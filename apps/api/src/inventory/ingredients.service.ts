@@ -44,9 +44,11 @@ export class IngredientsService {
   }
 
   async create(tenantId: string, dto: CreateIngredientDTO): Promise<IngredientDTO> {
-    if (dto.sku) {
+    const safeSku = dto.sku && dto.sku.trim() !== '' ? dto.sku.trim() : null;
+
+    if (safeSku) {
       const existing = await this.prisma.ingredient.findFirst({
-        where: { tenantId, sku: dto.sku },
+        where: { tenantId, sku: safeSku },
       });
 
       if (existing) {
@@ -57,6 +59,7 @@ export class IngredientsService {
     const ingredient = await this.prisma.ingredient.create({
       data: {
         ...dto,
+        sku: safeSku,
         tenantId,
       },
     });
@@ -67,9 +70,11 @@ export class IngredientsService {
   async update(tenantId: string, id: string, dto: UpdateIngredientDTO): Promise<IngredientDTO> {
     const ingredient = await this.findOne(tenantId, id);
 
-    if (dto.sku && dto.sku !== ingredient.sku) {
+    const safeSku = dto.sku === undefined ? undefined : (dto.sku && dto.sku.trim() !== '' ? dto.sku.trim() : null);
+
+    if (safeSku && safeSku !== ingredient.sku) {
       const existing = await this.prisma.ingredient.findFirst({
-        where: { tenantId, sku: dto.sku },
+        where: { tenantId, sku: safeSku },
       });
 
       if (existing) {
@@ -79,7 +84,10 @@ export class IngredientsService {
 
     const updated = await this.prisma.ingredient.update({
       where: { id },
-      data: dto,
+      data: {
+        ...dto,
+        sku: safeSku,
+      },
     });
 
     return this.mapToDTO(updated);

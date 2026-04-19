@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { TenantContextService } from '../../common/context/tenant-context.service';
 import type { Prisma } from '@prisma/client';
@@ -117,6 +117,14 @@ export class ProductsService {
         ? null
         : (createProductDto.categoryId ?? null);
 
+    const productExists = await this.prisma.tenantClient.product.findFirst({
+      where: { tenantId, slug },
+    });
+
+    if (productExists) {
+      throw new ConflictException(`Já existe um produto com o nome "${createProductDto.name}" (slug: ${slug}).`);
+    }
+
     const product = await this.prisma.tenantClient.product.create({
       data: {
         tenantId,
@@ -135,8 +143,8 @@ export class ProductsService {
         isFeatured: createProductDto.isFeatured ?? false,
         isAvailable: createProductDto.isAvailable ?? true,
         sellableOnline: createProductDto.sellableOnline ?? true,
-        sku: createProductDto.sku ?? null,
         order: createProductDto.order ?? 0,
+        sku: createProductDto.sku && createProductDto.sku.trim() !== '' ? createProductDto.sku : null,
       },
       include: { category: true }
     });
@@ -212,6 +220,21 @@ export class ProductsService {
     const nextPricingValue = nextType === 'combo' && nextComboMode === 'bundle'
       ? Number((updateProductDto as unknown as { comboPricingValue?: number }).comboPricingValue ?? previous?.comboPricingValue ?? 0)
       : null;
+
+    if (slug) {
+      const tenantId = this.getRequiredTenantId();
+      const slugExists = await this.prisma.tenantClient.product.findFirst({
+        where: {
+          tenantId,
+          slug,
+          id: { not: id },
+        },
+      });
+      if (slugExists) {
+        throw new ConflictException(`Já existe outro produto com o nome "${updateProductDto.name}" (slug: ${slug}).`);
+      }
+    }
+
     const normalizedCategoryId =
       updateProductDto.categoryId === undefined
         ? undefined
@@ -242,7 +265,7 @@ export class ProductsService {
         isFeatured: updateProductDto.isFeatured,
         isAvailable: updateProductDto.isAvailable,
         sellableOnline: updateProductDto.sellableOnline,
-        sku: updateProductDto.sku ?? undefined,
+        sku: updateProductDto.sku && updateProductDto.sku.trim() !== '' ? updateProductDto.sku : (updateProductDto.sku === '' ? null : undefined),
         order: updateProductDto.order,
         ...(slug ? { slug } : {}),
       },

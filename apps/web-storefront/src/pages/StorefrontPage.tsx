@@ -4,7 +4,7 @@ import { api } from '../lib/api-client';
 import type { StorefrontPayload, StorefrontProductPayload, StorefrontComboPayload } from '@gestor/types';
 import { useCartStore } from '../store/use-cart-store';
 import { useEffect, useState } from 'react';
-import { Loader2, Store, ShoppingBag, Box, Truck, AlertCircle } from 'lucide-react';
+import { Loader2, Store, ShoppingBag, Box, AlertCircle } from 'lucide-react';
 import { ProductDetailsModal } from '../components/ProductDetailsModal';
 import { CartDrawer } from '../components/CartDrawer';
 import { ComboDetailsModal } from '../components/ComboDetailsModal';

@@ -34,13 +34,13 @@ export class UpsellsController {
   }
 
   @Post()
-  @RequirePermissions('catalog.write')
+  @RequirePermissions('catalog.create')
   async create(@Request() req: any, @Body() dto: CreateUpsellDto) {
     return this.upsellsService.createUpsell(req.user.tenantId, dto);
   }
 
   @Patch(':id')
-  @RequirePermissions('catalog.write')
+  @RequirePermissions('catalog.update')
   async update(
     @Request() req: any,
     @Param('id') id: string,
@@ -50,13 +50,13 @@ export class UpsellsController {
   }
 
   @Delete(':id')
-  @RequirePermissions('catalog.write')
+  @RequirePermissions('catalog.delete')
   async delete(@Request() req: any, @Param('id') id: string) {
     return this.upsellsService.deleteUpsell(req.user.tenantId, id);
   }
 
   @Put(':id/items')
-  @RequirePermissions('catalog.write')
+  @RequirePermissions('catalog.update')
   async setItems(
     @Request() req: any,
     @Param('id') id: string,
@@ -66,7 +66,7 @@ export class UpsellsController {
   }
 
   @Post(':id/link/:productId')
-  @RequirePermissions('catalog.write')
+  @RequirePermissions('catalog.update')
   async link(
     @Request() req: any,
     @Param('id') id: string,
@@ -76,7 +76,7 @@ export class UpsellsController {
   }
 
   @Delete(':id/link/:productId')
-  @RequirePermissions('catalog.write')
+  @RequirePermissions('catalog.update')
   async unlink(
     @Request() req: any,
     @Param('id') id: string,

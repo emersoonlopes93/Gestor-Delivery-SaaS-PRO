@@ -3,6 +3,7 @@ import {
   BadRequestException,
   NotFoundException,
   ConflictException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import type {
@@ -15,16 +16,16 @@ import type {
 export class CashService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ----------------------------------------------------------------
-  // OPEN SESSION
-  // ----------------------------------------------------------------
+  /**
+   * Open a new cash session for an operator.
+   */
   async openSession(
     tenantId: string,
     operatorId: string,
     openingAmount: number,
   ): Promise<CashSessionDTO> {
     // Enforce: only one open session per operator per tenant
-    const existing = await this.prisma.tenantClient.cashSession.findFirst({
+    const existing = await this.prisma.cashSession.findFirst({
       where: { tenantId, operatorId, status: 'open' },
     });
 
@@ -34,50 +35,57 @@ export class CashService {
       );
     }
 
-    const session = await this.prisma.tenantClient.$transaction(async (tx) => {
-      const newSession = await tx.cashSession.create({
-        data: {
-          tenantId,
-          operatorId,
-          status: 'open',
-          openingAmount,
-        },
+    try {
+      const session = await this.prisma.$transaction(async (tx) => {
+        const newSession = await tx.cashSession.create({
+          data: {
+            tenantId,
+            operatorId,
+            status: 'open',
+            openingAmount,
+          },
+        });
+
+        // Create opening movement
+        await tx.cashMovement.create({
+          data: {
+            tenantId,
+            cashSessionId: newSession.id,
+            type: 'opening',
+            amount: openingAmount,
+            description: 'Abertura de caixa',
+          },
+        });
+
+        // Buscar sessão com operador incluído para o DTO
+        const sessionWithOperator = await tx.cashSession.findUnique({
+          where: { id: newSession.id },
+          include: { 
+            operator: { 
+              select: { name: true } 
+            } 
+          },
+        });
+
+        if (!sessionWithOperator) {
+          throw new InternalServerErrorException('Falha ao recuperar sessão de caixa após criação');
+        }
+        
+        return sessionWithOperator;
       });
 
-      // Create opening movement
-      await tx.cashMovement.create({
-        data: {
-          tenantId,
-          cashSessionId: newSession.id,
-          type: 'opening',
-          amount: openingAmount,
-          description: 'Abertura de caixa',
-        },
-      });
-
-      // Buscar sessão com operador incluído
-      const sessionWithOperator = await tx.cashSession.findUnique({
-        where: { id: newSession.id },
-        include: { 
-          operator: { 
-            select: { name: true } 
-          } 
-        },
-      });
-
-      if (!sessionWithOperator) {
-        throw new Error('Falha ao criar sessão de caixa');
+      return this.mapSessionToDTO(session);
+    } catch (error) {
+      if (error instanceof ConflictException || error instanceof InternalServerErrorException) {
+        throw error;
       }
-      
-      return sessionWithOperator;
-    });
-
-    return this.mapSessionToDTO(session);
+      throw new InternalServerErrorException('Erro ao abrir sessão de caixa: ' + (error instanceof Error ? error.message : String(error)));
+    }
   }
 
-  // ----------------------------------------------------------------
-  // CLOSE SESSION
-  // ----------------------------------------------------------------
+  /**
+   * Close an open cash session.
+   */
   async closeSession(
     tenantId: string,
     sessionId: string,
@@ -134,9 +142,9 @@ export class CashService {
     return this.mapSessionDetailToDTO(updated);
   }
 
-  // ----------------------------------------------------------------
-  // GET ACTIVE SESSION (for current operator)
-  // ----------------------------------------------------------------
+  /**
+   * Get active session for current operator.
+   */
   async getActiveSession(
     tenantId: string,
     operatorId: string,
@@ -149,9 +157,9 @@ export class CashService {
     return session ? this.mapSessionToDTO(session) : null;
   }
 
-  // ----------------------------------------------------------------
-  // LIST SESSIONS
-  // ----------------------------------------------------------------
+  /**
+   * List all sessions for a tenant.
+   */
   async listSessions(
     tenantId: string,
     page: number = 1,
@@ -174,9 +182,9 @@ export class CashService {
     };
   }
 
-  // ----------------------------------------------------------------
-  // SESSION DETAIL
-  // ----------------------------------------------------------------
+  /**
+   * Get detailed session info.
+   */
   async getSessionDetail(
     tenantId: string,
     sessionId: string,
@@ -199,9 +207,9 @@ export class CashService {
     return this.mapSessionDetailToDTO(session);
   }
 
-  // ----------------------------------------------------------------
-  // ADD MOVEMENT (withdrawal / supply)
-  // ----------------------------------------------------------------
+  /**
+   * Add a manual movement (withdrawal or supply).
+   */
   async addMovement(
     tenantId: string,
     sessionId: string,
@@ -234,9 +242,9 @@ export class CashService {
     return this.mapMovementToDTO(movement);
   }
 
-  // ----------------------------------------------------------------
-  // REGISTER SALE MOVEMENT (used by POS module)
-  // ----------------------------------------------------------------
+  /**
+   * Register a sale as a cash movement.
+   */
   async registerSaleMovement(
     tenantId: string,
     cashSessionId: string,
@@ -250,16 +258,16 @@ export class CashService {
         cashSessionId,
         type: 'sale',
         amount,
-        paymentMethod: paymentMethod as 'cash' | 'pix' | 'credit_card' | 'debit_card' | 'other',
+        paymentMethod: paymentMethod as any, // Enum type checking via cast if necessary
         orderId,
         description: 'Venda PDV',
       },
     });
   }
 
-  // ----------------------------------------------------------------
-  // REGISTER REFUND MOVEMENT (used for cancellation)
-  // ----------------------------------------------------------------
+  /**
+   * Register a refund as a cash movement.
+   */
   async registerRefundMovement(
     tenantId: string,
     cashSessionId: string,
@@ -278,9 +286,9 @@ export class CashService {
     });
   }
 
-  // ----------------------------------------------------------------
-  // HELPERS
-  // ----------------------------------------------------------------
+  /**
+   * Helper to calculate expected cash balance in a session.
+   */
   private async calculateExpectedAmount(sessionId: string): Promise<number> {
     const movements = await this.prisma.cashMovement.findMany({
       where: { cashSessionId: sessionId },
@@ -299,58 +307,63 @@ export class CashService {
         case 'refund':
           expected -= amount;
           break;
-        // closing and adjustment are not counted
       }
     }
 
     return Math.round(expected * 100) / 100;
   }
 
-  private mapSessionToDTO(session: Record<string, unknown>): CashSessionDTO {
-    const operator = session['operator'] as Record<string, unknown>;
+  /**
+   * Mapper for Session DTO.
+   */
+  private mapSessionToDTO(session: any): CashSessionDTO {
     return {
-      id: session['id'] as string,
-      tenantId: session['tenantId'] as string,
-      operatorId: session['operatorId'] as string,
-      operatorName: operator['name'] as string,
-      status: session['status'] as CashSessionDTO['status'],
-      openingAmount: Number(session['openingAmount']),
-      openedAt: (session['openedAt'] as Date).toISOString(),
-      closedAt: session['closedAt'] ? (session['closedAt'] as Date).toISOString() : null,
-      closingAmountDeclared: session['closingAmountDeclared'] !== null ? Number(session['closingAmountDeclared']) : null,
-      closingAmountCalculated: session['closingAmountCalculated'] !== null ? Number(session['closingAmountCalculated']) : null,
-      closingDifference: session['closingDifference'] !== null ? Number(session['closingDifference']) : null,
-      notes: (session['notes'] as string | null) || null,
+      id: session.id,
+      tenantId: session.tenantId,
+      operatorId: session.operatorId,
+      operatorName: session.operator?.name || 'Operador Desconhecido',
+      status: session.status,
+      openingAmount: Number(session.openingAmount),
+      openedAt: session.openedAt.toISOString(),
+      closedAt: session.closedAt?.toISOString() || null,
+      closingAmountDeclared: session.closingAmountDeclared !== null ? Number(session.closingAmountDeclared) : null,
+      closingAmountCalculated: session.closingAmountCalculated !== null ? Number(session.closingAmountCalculated) : null,
+      closingDifference: session.closingDifference !== null ? Number(session.closingDifference) : null,
+      notes: session.notes || null,
     };
   }
 
-  private mapSessionDetailToDTO(session: Record<string, unknown>): CashSessionDetailDTO {
+  /**
+   * Mapper for Detailed Session DTO.
+   */
+  private mapSessionDetailToDTO(session: any): CashSessionDetailDTO {
     const base = this.mapSessionToDTO(session);
-    const movements = (session['movements'] as Array<Record<string, unknown>>) || [];
-
-    const mapped = movements.map((m) => this.mapMovementToDTO(m));
+    const movements = (session.movements || []).map((m: any) => this.mapMovementToDTO(m));
 
     return {
       ...base,
-      movements: mapped,
-      totalSales: mapped.filter(m => m.type === 'sale').reduce((s, m) => s + m.amount, 0),
-      totalWithdrawals: mapped.filter(m => m.type === 'withdrawal').reduce((s, m) => s + m.amount, 0),
-      totalSupplies: mapped.filter(m => m.type === 'supply').reduce((s, m) => s + m.amount, 0),
-      totalRefunds: mapped.filter(m => m.type === 'refund').reduce((s, m) => s + m.amount, 0),
+      movements,
+      totalSales: movements.filter((m: any) => m.type === 'sale').reduce((s: number, m: any) => s + m.amount, 0),
+      totalWithdrawals: movements.filter((m: any) => m.type === 'withdrawal').reduce((s: number, m: any) => s + m.amount, 0),
+      totalSupplies: movements.filter((m: any) => m.type === 'supply').reduce((s: number, m: any) => s + m.amount, 0),
+      totalRefunds: movements.filter((m: any) => m.type === 'refund').reduce((s: number, m: any) => s + m.amount, 0),
     };
   }
 
-  private mapMovementToDTO(m: Record<string, unknown>): CashMovementDTO {
-    const order = m['order'] as Record<string, unknown> | null;
+  /**
+   * Mapper for Movement DTO.
+   */
+  private mapMovementToDTO(m: any): CashMovementDTO {
     return {
-      id: m['id'] as string,
-      type: m['type'] as CashMovementDTO['type'],
-      amount: Number(m['amount']),
-      paymentMethod: (m['paymentMethod'] as string | null) || null,
-      orderId: (m['orderId'] as string | null) || null,
-      orderNumber: order ? (order['orderNumber'] as string) : null,
-      description: (m['description'] as string | null) || null,
-      createdAt: (m['createdAt'] as Date).toISOString(),
+      id: m.id,
+      type: m.type,
+      amount: Number(m.amount),
+      paymentMethod: m.paymentMethod || null,
+      orderId: m.orderId || null,
+      orderNumber: m.order?.orderNumber || null,
+      description: m.description || null,
+      createdAt: m.createdAt.toISOString(),
     };
   }
 }
+

@@ -4,6 +4,7 @@ import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { CurrentTenant, RequirePermissions } from '../common/decorators';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
+import { UpdateOperatingHoursRequest, UpdateStorePauseRequest } from '@gestor/types';
 
 @Controller('tenant')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -47,7 +48,7 @@ export class TenantController {
   @RequirePermissions('settings.manage')
   async updateOperatingHours(
     @CurrentTenant() tenantId: string,
-    @Body() body: { hours: any[] },
+    @Body() body: UpdateOperatingHoursRequest,
   ) {
     return this.tenantService.updateOperatingHours(tenantId, body.hours);
   }
@@ -59,8 +60,9 @@ export class TenantController {
   @RequirePermissions('settings.manage')
   async updateStorePause(
     @CurrentTenant() tenantId: string,
-    @Body() body: { isStorePaused: boolean; storePauseReason?: string },
+    @Body() body: UpdateStorePauseRequest,
   ) {
     return this.tenantService.updateStorePause(tenantId, body.isStorePaused, body.storePauseReason);
   }
 }
+
