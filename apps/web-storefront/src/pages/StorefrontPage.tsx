@@ -18,13 +18,12 @@ export function StorefrontPage() {
   const [selectedProduct, setSelectedProduct] = useState<StorefrontProductPayload | null>(null);
   const [selectedCombo, setSelectedCombo] = useState<StorefrontComboPayload | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [fulfillmentType, setFulfillmentType] = useState<'delivery' | 'pickup'>('delivery');
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['storefront', tenantSlug, fulfillmentType],
+    queryKey: ['storefront', tenantSlug],
     queryFn: async () => {
       const res = await api.get<StorefrontPayload>(
-        `/public/storefront/${tenantSlug}?fulfillmentType=${fulfillmentType}`,
+        `/public/storefront/${tenantSlug}`,
       );
       return res.data;
     },
@@ -80,30 +79,7 @@ export function StorefrontPage() {
         </div>
       </header>
 
-      <div className="mb-5 grid grid-cols-2 gap-2">
-        <button
-          onClick={() => setFulfillmentType('delivery')}
-          className={`rounded-xl px-3 py-2.5 text-sm font-bold border transition-colors flex items-center justify-center gap-2 ${
-            fulfillmentType === 'delivery'
-              ? 'bg-primary-600 text-white border-primary-600'
-              : 'bg-white text-gray-700 border-gray-200 hover:border-primary-200'
-          }`}
-        >
-          <Truck className="w-4 h-4" />
-          Entrega
-        </button>
-        <button
-          onClick={() => setFulfillmentType('pickup')}
-          className={`rounded-xl px-3 py-2.5 text-sm font-bold border transition-colors flex items-center justify-center gap-2 ${
-            fulfillmentType === 'pickup'
-              ? 'bg-primary-600 text-white border-primary-600'
-              : 'bg-white text-gray-700 border-gray-200 hover:border-primary-200'
-          }`}
-        >
-          <Store className="w-4 h-4" />
-          Retirada
-        </button>
-      </div>
+
 
       {!data.tenant.isOpen ? (
         <div className="mb-6 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm font-bold flex items-center gap-3">

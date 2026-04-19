@@ -965,7 +965,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             disabled={isNew}
             className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'personalizacao' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
           >
-            Opcionais e Complementos
+            Grupos e Tamanhos
           </button>
         )}
         {isComboMode && (

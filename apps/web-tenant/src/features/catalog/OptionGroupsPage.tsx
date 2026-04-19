@@ -184,15 +184,15 @@ export function OptionGroupsPage() {
     <div className="p-6 max-w-7xl mx-auto text-left">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Complementos</h1>
-          <p className="text-gray-500 mt-1">Biblioteca reutilizável de complementos para vincular aos produtos.</p>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Grupos e Tamanhos</h1>
+          <p className="text-gray-500 mt-1">Biblioteca reutilizável de grupos e tamanhos para vincular aos produtos.</p>
         </div>
         <button
           onClick={() => openGroupModal()}
           className="bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2"
           type="button"
         >
-          Novo Complemento
+          Novo Grupo/Tamanho
         </button>
       </div>
 
@@ -303,7 +303,7 @@ export function OptionGroupsPage() {
                       {items.length === 0 && (
                         <tr>
                           <td colSpan={4} className="px-6 py-10 text-center text-gray-400 text-sm italic">
-                            Nenhum item neste complemento.
+                            Nenhum item neste grupo.
                           </td>
                         </tr>
                       )}
@@ -315,7 +315,7 @@ export function OptionGroupsPage() {
           })}
 
           {groupsSorted.length === 0 && (
-            <div className="py-16 text-center text-gray-400 font-bold italic">Nenhum complemento criado ainda.</div>
+            <div className="py-16 text-center text-gray-400 font-bold italic">Nenhum grupo cadastrado ainda.</div>
           )}
         </div>
       )}
@@ -323,7 +323,7 @@ export function OptionGroupsPage() {
       <Modal
         isOpen={isGroupModalOpen}
         onClose={() => setIsGroupModalOpen(false)}
-        title={editingGroup ? 'Editar complemento' : 'Novo complemento'}
+        title={editingGroup ? 'Editar grupo/tamanho' : 'Novo grupo/tamanho'}
         footer={
           <>
             <button
@@ -420,7 +420,7 @@ export function OptionGroupsPage() {
       <Modal
         isOpen={isItemModalOpen}
         onClose={() => setIsItemModalOpen(false)}
-        title={editingItem ? 'Editar item do complemento' : 'Novo item do complemento'}
+        title={editingItem ? 'Editar item do grupo' : 'Novo item do grupo'}
         footer={
           <>
             <button

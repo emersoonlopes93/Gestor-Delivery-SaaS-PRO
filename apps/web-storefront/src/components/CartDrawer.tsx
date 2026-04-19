@@ -17,7 +17,6 @@ interface CartDrawerProps {
 
 export function CartDrawer({ onClose, upsells }: CartDrawerProps) {
   const { items, subtotal, addItem, removeItem, updateQuantity } = useCartStore();
-  const [fulfillment, setFulfillment] = useState<'delivery' | 'pickup'>('delivery');
   const navigate = useNavigate();
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
 
@@ -84,31 +83,7 @@ export function CartDrawer({ onClose, upsells }: CartDrawerProps) {
           </button>
         </header>
 
-        {/* Delivery/Pickup Switcher */}
-        <div className="px-6 py-4 bg-gray-50 border-b">
-          <div className="bg-white p-1 rounded-2xl flex border border-gray-100 shadow-inner">
-            <button 
-              onClick={() => setFulfillment('delivery')}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all text-sm font-bold",
-                fulfillment === 'delivery' ? "bg-primary-600 text-white shadow-md shadow-primary-100" : "text-gray-500 hover:bg-gray-50"
-              )}
-            >
-              <MapPin className={cn("w-4 h-4", fulfillment === 'delivery' ? "text-white" : "text-gray-400")} />
-              Entrega
-            </button>
-            <button 
-              onClick={() => setFulfillment('pickup')}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-3 rounded-xl transition-all text-sm font-bold",
-                fulfillment === 'pickup' ? "bg-primary-600 text-white shadow-md shadow-primary-100" : "text-gray-500 hover:bg-gray-50"
-              )}
-            >
-              <Store className={cn("w-4 h-4", fulfillment === 'pickup' ? "text-white" : "text-gray-400")} />
-              Retirada
-            </button>
-          </div>
-        </div>
+
 
         {/* Items List */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
@@ -206,19 +181,12 @@ export function CartDrawer({ onClose, upsells }: CartDrawerProps) {
               <span>Subtotal</span>
               <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}</span>
             </div>
-            {fulfillment === 'delivery' ? (
-              <div className="flex justify-between text-sm text-gray-500">
-                <span className="flex items-center gap-1.5 font-medium underline decoration-primary-200 underline-offset-4 decoration-2">
-                  Taxa de entrega
-                </span>
-                <span className="font-bold text-green-600 italic">Grátis</span>
-              </div>
-            ) : (
-              <div className="flex justify-between text-sm text-gray-400 italic">
-                <span>Retirada no local</span>
-                <span>--</span>
-              </div>
-            )}
+            <div className="flex justify-between text-sm text-gray-500">
+              <span className="flex items-center gap-1.5 font-medium underline decoration-primary-200 underline-offset-4 decoration-2">
+                Taxa de entrega
+              </span>
+              <span className="font-medium italic">Calculada na próxima etapa</span>
+            </div>
             <div className="pt-3 border-t flex justify-between">
               <span className="text-lg font-black text-gray-900 uppercase">Total</span>
               <span className="text-xl font-black text-primary-600 tracking-tight">
