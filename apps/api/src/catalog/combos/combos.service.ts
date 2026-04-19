@@ -25,6 +25,36 @@ export class CombosService {
     const tenantId = this.getRequiredTenantId();
     const slug = slugify(createComboDto.name);
 
+    // Check if there is an active combo with the same slug.
+    const comboExists = await this.prisma.tenantClient.productCombo.findFirst({
+      where: {
+        tenantId,
+        slug,
+        deletedAt: null,
+      },
+    });
+
+    if (comboExists) {
+      throw new ConflictException(`Já existe um combo com o nome "${createComboDto.name}".`);
+    }
+
+    // Check if there is a soft-deleted combo with the same slug.
+    const deletedComboConflict = await this.prisma.tenantClient.productCombo.findFirst({
+      where: {
+        tenantId,
+        slug,
+        NOT: { deletedAt: null },
+      },
+    });
+
+    if (deletedComboConflict) {
+      // Free up the slug
+      await this.prisma.tenantClient.productCombo.update({
+        where: { id: deletedComboConflict.id },
+        data: { slug: `${slug}-deleted-${Date.now()}` },
+      });
+    }
+
     return this.prisma.tenantClient.productCombo.create({
       data: {
         tenantId,
@@ -41,16 +71,18 @@ export class CombosService {
   }
 
   async findAll() {
+    const tenantId = this.getRequiredTenantId();
     return this.prisma.tenantClient.productCombo.findMany({
-      where: { deletedAt: null },
+      where: { tenantId, deletedAt: null },
       orderBy: { order: 'asc' },
       include: { blocks: { include: { items: true } } },
     });
   }
 
   async findOne(id: string) {
+    const tenantId = this.getRequiredTenantId();
     const combo = await this.prisma.tenantClient.productCombo.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, tenantId, deletedAt: null },
       include: { blocks: { include: { items: { include: { product: true } } } } },
     });
 
@@ -82,12 +114,16 @@ export class CombosService {
   }
 
   async remove(id: string) {
-    await this.findOne(id);
+    const combo = await this.findOne(id);
 
     // Soft delete
+    const timestamp = Date.now();
     return this.prisma.tenantClient.productCombo.update({
       where: { id },
-      data: { deletedAt: new Date() },
+      data: {
+        deletedAt: new Date(),
+        slug: `${combo.slug}-deleted-${timestamp}`,
+      },
     });
   }
 

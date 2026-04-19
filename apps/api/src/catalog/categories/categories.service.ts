@@ -24,6 +24,36 @@ export class CategoriesService {
     const tenantId = this.getRequiredTenantId();
     const slug = slugify(createCategoryDto.name);
 
+    // Check if there is an active category with the same slug.
+    const categoryExists = await this.prisma.tenantClient.productCategory.findFirst({
+      where: {
+        tenantId,
+        slug,
+        deletedAt: null,
+      },
+    });
+
+    if (categoryExists) {
+      throw new Error(`Já existe uma categoria com o nome "${createCategoryDto.name}".`);
+    }
+
+    // Check if there is a soft-deleted category with the same slug.
+    const deletedCategoryConflict = await this.prisma.tenantClient.productCategory.findFirst({
+      where: {
+        tenantId,
+        slug,
+        NOT: { deletedAt: null },
+      },
+    });
+
+    if (deletedCategoryConflict) {
+      // Free up the slug
+      await this.prisma.tenantClient.productCategory.update({
+        where: { id: deletedCategoryConflict.id },
+        data: { slug: `${slug}-deleted-${Date.now()}` },
+      });
+    }
+
     return this.prisma.tenantClient.productCategory.create({
       data: {
         tenantId,
@@ -41,8 +71,9 @@ export class CategoriesService {
   }
 
   async findAll() {
+    const tenantId = this.getRequiredTenantId();
     return this.prisma.tenantClient.productCategory.findMany({
-      where: { deletedAt: null },
+      where: { tenantId, deletedAt: null },
       orderBy: { order: 'asc' },
     });
   }
@@ -76,8 +107,9 @@ export class CategoriesService {
   }
 
   async findOne(id: string) {
+    const tenantId = this.getRequiredTenantId();
     const category = await this.prisma.tenantClient.productCategory.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, tenantId, deletedAt: null },
     });
 
     if (!category) {
@@ -123,13 +155,16 @@ export class CategoriesService {
   }
 
   async remove(id: string) {
-    // Check if exists
-    await this.findOne(id);
+    const category = await this.findOne(id);
 
     // Soft delete
+    const timestamp = Date.now();
     return this.prisma.tenantClient.productCategory.update({
       where: { id },
-      data: { deletedAt: new Date() },
+      data: {
+        deletedAt: new Date(),
+        slug: `${category.slug}-deleted-${timestamp}`,
+      },
     });
   }
 }

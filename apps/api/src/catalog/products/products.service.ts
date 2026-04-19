@@ -118,11 +118,33 @@ export class ProductsService {
         : (createProductDto.categoryId ?? null);
 
     const productExists = await this.prisma.tenantClient.product.findFirst({
-      where: { tenantId, slug },
+      where: {
+        tenantId,
+        slug,
+        deletedAt: null,
+      },
     });
 
     if (productExists) {
       throw new ConflictException(`Já existe um produto com o nome "${createProductDto.name}" (slug: ${slug}).`);
+    }
+
+    // Check if there is a soft-deleted product with the same slug.
+    // If so, we must rename its slug to avoid unique constraint violation in the database.
+    const deletedProductConflict = await this.prisma.tenantClient.product.findFirst({
+      where: {
+        tenantId,
+        slug,
+        NOT: { deletedAt: null },
+      },
+    });
+
+    if (deletedProductConflict) {
+      // Free up the slug by renaming the deleted product's slug
+      await this.prisma.tenantClient.product.update({
+        where: { id: deletedProductConflict.id },
+        data: { slug: `${slug}-deleted-${Date.now()}` },
+      });
     }
 
     const product = await this.prisma.tenantClient.product.create({
@@ -168,16 +190,18 @@ export class ProductsService {
   }
 
   async findAll() {
+    const tenantId = this.getRequiredTenantId();
     return this.prisma.tenantClient.product.findMany({
-      where: { deletedAt: null },
+      where: { tenantId, deletedAt: null },
       orderBy: { order: 'asc' },
       include: { category: true, publication: true }
     });
   }
 
   async findOne(id: string) {
+    const tenantId = this.getRequiredTenantId();
     const product = await this.prisma.tenantClient.product.findFirst({
-      where: { id, deletedAt: null },
+      where: { id, tenantId, deletedAt: null },
       include: {
         category: true,
         complementGroups: { include: { group: true } },
@@ -306,12 +330,16 @@ export class ProductsService {
   }
 
   async remove(id: string) {
-    await this.findOne(id);
+    const product = await this.findOne(id);
 
-    // Soft delete
+    // Soft delete - we also rename the slug to free it up for new products with the same name
+    const timestamp = Date.now();
     return this.prisma.tenantClient.product.update({
       where: { id },
-      data: { deletedAt: new Date() },
+      data: {
+        deletedAt: new Date(),
+        slug: `${product.slug}-deleted-${timestamp}`,
+      },
     });
   }
 }
