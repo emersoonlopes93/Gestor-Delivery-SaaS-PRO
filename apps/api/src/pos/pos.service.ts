@@ -62,9 +62,10 @@ export class PosService {
     }
 
     // 3. Idempotency check
-    const existingOrder = await this.prisma.order.findUnique({
+    const existingOrder = await this.prisma.order.findFirst({
       where: {
-        tenantId_idempotencyKey: { tenantId, idempotencyKey: dto.idempotencyKey },
+        tenantId,
+        idempotencyKey: dto.idempotencyKey,
       },
     });
 
@@ -112,6 +113,10 @@ export class PosService {
 
       const orderNumber = `#${updatedTenant.orderSequence.toString().padStart(4, '0')}`;
 
+      // Calculate final total including delivery fee
+      const deliveryFee = dto.deliveryFee || 0;
+      const orderTotal = Math.round((finalTotal + deliveryFee) * 100) / 100;
+
       // Create the order
       const newOrder = await tx.order.create({
         data: {
@@ -123,9 +128,9 @@ export class PosService {
           customerPhone: dto.customerPhone || '',
           itemsSubtotal,
           discountTotal: combinedDiscountTotal,
-          deliveryFee: 0,
+          deliveryFee,
           serviceFee: 0,
-          total: finalTotal,
+          total: orderTotal,
           sourceChannel: 'pos',
           idempotencyKey: dto.idempotencyKey,
           notes: dto.notes || null,
@@ -137,6 +142,24 @@ export class PosService {
           publicTrackingToken: generatePublicTrackingToken(),
         },
       });
+
+      // Create delivery address if provided
+      if (dto.deliveryAddress) {
+        await tx.orderDeliveryAddress.create({
+          data: {
+            orderId: newOrder.id,
+            tenantId,
+            street: dto.deliveryAddress.street,
+            number: dto.deliveryAddress.number,
+            neighborhood: dto.deliveryAddress.neighborhood,
+            complement: dto.deliveryAddress.complement,
+            reference: dto.deliveryAddress.reference,
+            zipCode: dto.deliveryAddress.zipCode || '',
+            city: dto.deliveryAddress.city || '',
+            state: dto.deliveryAddress.state || '',
+          },
+        });
+      }
 
       // Create order items (same as storefront)
       for (const line of lines) {
@@ -218,7 +241,7 @@ export class PosService {
       tenantId,
       activeSession.id,
       order.id,
-      finalTotal,
+      Number(order.total),
       dto.paymentMethod,
     );
 

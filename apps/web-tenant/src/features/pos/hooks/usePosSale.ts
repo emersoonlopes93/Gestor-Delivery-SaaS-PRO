@@ -18,6 +18,17 @@ export interface PosCreateSalePayload {
   customerPhone?: string;
   fulfillmentType: PosFulfillmentType;
   tableNumber?: string;
+  deliveryFee?: number;
+  deliveryAddress?: {
+    street: string;
+    number: string;
+    neighborhood: string;
+    complement?: string;
+    reference?: string;
+    zipCode?: string;
+    city?: string;
+    state?: string;
+  };
   paymentMethod: PaymentMethod;
   discountTotal?: number;
   notes?: string;
