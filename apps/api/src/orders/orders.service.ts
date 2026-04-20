@@ -483,6 +483,8 @@ export class OrdersService {
       items: order.items.map((item) => ({
         id: item.id,
         lineType: item.lineType as any,
+        productId: item.productId,
+        comboId: item.comboId,
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),
         lineTotal: Number(item.lineTotal),
@@ -494,11 +496,13 @@ export class OrdersService {
         snapshotComposition: item.snapshotComposition,
         complements: item.complements.map((c) => ({
           id: c.id,
+          complementItemId: c.complementItemId,
           snapshotName: c.snapshotName,
           snapshotPrice: Number(c.snapshotPrice),
         })),
         comboSelections: item.comboSelections.map((s) => ({
           id: s.id,
+          comboBlockItemId: s.comboBlockItemId,
           snapshotBlockName: s.snapshotBlockName,
           snapshotProductName: s.snapshotProductName,
           snapshotAdditionalPrice: Number(s.snapshotAdditionalPrice),

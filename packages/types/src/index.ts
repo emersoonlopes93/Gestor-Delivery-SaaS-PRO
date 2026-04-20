@@ -18,6 +18,7 @@ export type {
   ValidatedComboLine,
   CheckoutValidationResult,
   OrderResponseDTO,
+  OrderItemResponseDTO,
   FulfillmentType,
   OrderStatus,
   OrderKdsItemDTO,

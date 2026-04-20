@@ -192,13 +192,16 @@ export class CreateOrderDTO {
 // --- DTOs de Saída ---
 
 export interface OrderItemComplementResponseDTO {
-  id: string;
+  id: string; // response id
+  complementItemId: string; // original catalog id
   snapshotName: string;
   snapshotPrice: number;
 }
 
 export interface OrderItemComboSelectionResponseDTO {
-  id: string;
+  id: string; // response id
+  comboBlockItemId: string; // original catalog id
+  productId?: string; // original catalog product id
   snapshotBlockName: string;
   snapshotProductName: string;
   snapshotAdditionalPrice: number;
@@ -207,6 +210,8 @@ export interface OrderItemComboSelectionResponseDTO {
 export interface OrderItemResponseDTO {
   id: string;
   lineType: OrderLineType;
+  productId?: string | null;
+  comboId?: string | null;
   quantity: number;
   unitPrice: number;
   lineTotal: number;

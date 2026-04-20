@@ -13,7 +13,7 @@ import {
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useCartStore } from '../store/use-cart-store';
 import { useToast } from '../components/Toast';
-import type { OrderListItemDTO, OrderResponseDTO, OrderItemResponseDTO } from '@gestor/types';
+import type { OrderListItemDTO, OrderResponseDTO } from '@gestor/types';
 
 export function OrdersHistoryPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -58,30 +58,29 @@ export function OrdersHistoryPage() {
         throw new Error('Pedido não encontrado');
       }
 
-      for (const item of order.items as OrderItemResponseDTO[]) {
-        if (item.lineType === 'product') {
+      for (const item of order.items) {
+        if (item.lineType === 'product' && item.productId) {
           // Map to CartLineItem snapshot format
           const cartItem = {
             cartLineId: crypto.randomUUID(),
             productId: item.productId,
             quantity: item.quantity,
-            notes: item.notes,
-            selectedOptions: item.complements.map((c: any) => ({
-              id: c.id,
+            notes: item.notes || undefined,
+            selectedOptions: item.complements.map((c) => ({
+              groupId: '', // Not stored in legacy snapshot, but needed for type
+              itemId: c.complementItemId,
               name: c.snapshotName,
               price: c.snapshotPrice,
             })),
             snapshot: {
               productName: item.snapshotName,
-              productImage: item.snapshotImage,
+              productImage: item.snapshotImage || undefined,
               basePrice: item.snapshotBasePrice,
               lineSubtotal: item.lineTotal,
-              extrasDescription: item.complements.map((c: any) => c.snapshotName).join(', '),
+              extrasDescription: item.complements.map((c) => c.snapshotName).join(', '),
             }
           };
           
-          // Use a private or custom way to add these items since addItem requires StorefrontProductPayload
-          // Or just update the store state directly (hacky but works for this MVP)
           useCartStore.setState((state) => {
             const newItems = [...state.items, cartItem as any];
             return {
@@ -90,7 +89,6 @@ export function OrdersHistoryPage() {
             };
           });
         }
-        // Combo reorder could be added here similarly
       }
 
       showToast({ title: 'Itens adicionados ao carrinho!', type: 'success' });

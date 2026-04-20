@@ -37,7 +37,12 @@ export const OrderTypeSelector: React.FC<OrderTypeSelectorProps> = ({
       {ORDER_TYPES.map((type) => {
         const Icon = type.icon;
         const isActive = currentType === type.id;
-        
+        const colors = {
+          emerald: 'bg-emerald-500/10 border-emerald-500 text-emerald-400 shadow-emerald-500/10',
+          indigo: 'bg-indigo-500/10 border-indigo-500 text-indigo-400 shadow-indigo-500/10',
+          amber: 'bg-amber-500/10 border-amber-500 text-amber-400 shadow-amber-500/10',
+        };
+
         return (
           <button
             key={type.id}
@@ -45,7 +50,7 @@ export const OrderTypeSelector: React.FC<OrderTypeSelectorProps> = ({
             className={`
               flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-200
               ${isActive 
-                ? `bg-${type.color}-500/10 border-${type.color}-500 text-${type.color}-400 shadow-lg shadow-${type.color}-500/10` 
+                ? `${colors[type.color as keyof typeof colors]} shadow-lg` 
                 : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500 hover:bg-gray-750'}
             `}
           >
