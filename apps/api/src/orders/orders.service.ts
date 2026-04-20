@@ -319,6 +319,49 @@ export class OrdersService {
     };
   }
 
+  async listCustomerOrders(
+    tenantId: string,
+    customerId: string,
+    page = 1,
+    limit = 20,
+  ): Promise<{ items: OrderListItemDTO[]; total: number }> {
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.OrderWhereInput = {
+      tenantId,
+      customerId,
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          _count: { select: { items: true } },
+        },
+      }),
+      this.prisma.order.count({ where }),
+    ]);
+
+    return {
+      items: items.map((o) => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        status: o.status as OrderStatus,
+        fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+        customerName: o.customerName,
+        customerPhone: o.customerPhone,
+        total: Number(o.total),
+        itemCount: o._count.items,
+        paymentMethod: o.paymentMethod as PaymentMethod,
+        createdAt: o.createdAt.toISOString(),
+      })),
+      total,
+    };
+  }
+
   async getBoardOrders(tenantId: string, fulfillmentType?: 'delivery' | 'pickup'): Promise<OrderBoardItemDTO[]> {
     const activeStatuses: OrderStatus[] = [
       'pending',

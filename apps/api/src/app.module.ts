@@ -24,6 +24,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { GoalsModule } from './goals/goals.module';
 import { validateEnv } from './config/env.validation';
 import { UploadModule } from './upload/upload.module';
+import { CustomerAuthModule } from './auth/customer-auth.module';
 
 @Module({
   imports: [
@@ -109,6 +110,9 @@ import { UploadModule } from './upload/upload.module';
 
     // Point of Sale (Phase 7)
     PosModule,
+
+    // Customer Auth (B2C)
+    CustomerAuthModule,
   ],
   providers: [
     {

@@ -1,27 +1,43 @@
-import { Controller, Get, NotFoundException, Param, Query } from '@nestjs/common';
-import { Public } from '../common/decorators';
+import { Controller, Get, NotFoundException, Param, Query, UseGuards } from '@nestjs/common';
+import { Public, CurrentCustomer } from '../common/decorators';
 import { PrismaService } from '../database/prisma.service';
 import { Throttle } from '@nestjs/throttler';
+import { OrdersService } from './orders.service';
+import { CustomerAuthGuard } from '../auth/guards/customer-auth.guard';
+import { CustomerJwtPayload } from '@gestor/types';
 
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
-}
-
-function pickString(obj: Record<string, unknown>, key: string): string | null {
-  const v = obj[key];
-  return typeof v === 'string' ? v : null;
-}
-
-function pickNumber(obj: Record<string, unknown>, key: string): number | null {
-  const v = obj[key];
-  return typeof v === 'number' ? v : null;
-}
-
-@Public()
 @Controller('public/orders')
 export class PublicOrdersController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ordersService: OrdersService,
+  ) {}
 
+  @Get('history')
+  @UseGuards(CustomerAuthGuard)
+  async history(
+    @CurrentCustomer() customer: CustomerJwtPayload,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.ordersService.listCustomerOrders(
+      customer.tenantId,
+      customer.sub,
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 20,
+    );
+  }
+
+  @Get(':id')
+  @UseGuards(CustomerAuthGuard)
+  async detail(
+    @CurrentCustomer() customer: CustomerJwtPayload,
+    @Param('id') id: string,
+  ) {
+    return this.ordersService.getOrderDetail(id, customer.tenantId);
+  }
+
+  @Public()
   @Get(':token/tracking')
   @Throttle({ public: { limit: 60, ttl: 60 } })
   async tracking(@Param('token') token: string) {
@@ -29,7 +45,7 @@ export class PublicOrdersController {
       throw new NotFoundException('Pedido não encontrado');
     }
 
-    const orderRaw: unknown = await this.prisma.order.findUnique({
+    const orderRaw: any = await this.prisma.order.findUnique({
       where: {
         publicTrackingToken: token,
       },
@@ -49,31 +65,23 @@ export class PublicOrdersController {
       },
     });
 
-    const order = asRecord(orderRaw);
-
-    if (!order) {
+    if (!orderRaw) {
       throw new NotFoundException('Pedido não encontrado');
     }
 
-    const orderId = pickString(order, 'id');
-    const status = pickString(order, 'status');
-    const isInRoute = status === 'out_for_delivery';
-    const deliveryDriver = asRecord(order.deliveryDriver);
+    const isInRoute = orderRaw.status === 'out_for_delivery';
+    const deliveryDriver = orderRaw.deliveryDriver;
 
-    if (!orderId || !status) {
-      throw new NotFoundException('Pedido não encontrado');
-    }
+    const driverId = deliveryDriver ? deliveryDriver.id : null;
+    const driverName = deliveryDriver ? deliveryDriver.name : null;
 
-    const driverId = deliveryDriver ? pickString(deliveryDriver, 'id') : null;
-    const driverName = deliveryDriver ? pickString(deliveryDriver, 'name') : null;
-
-    const currentLat = deliveryDriver ? pickNumber(deliveryDriver, 'currentLat') : null;
-    const currentLng = deliveryDriver ? pickNumber(deliveryDriver, 'currentLng') : null;
+    const currentLat = deliveryDriver ? Number(deliveryDriver.currentLat) : null;
+    const currentLng = deliveryDriver ? Number(deliveryDriver.currentLng) : null;
     const lastLocationAt = deliveryDriver ? deliveryDriver.lastLocationAt : null;
 
     return {
-      orderId,
-      status,
+      orderId: orderRaw.id,
+      status: orderRaw.status,
       driver: driverId && driverName ? { id: driverId, name: driverName } : null,
       driverLocation:
         isInRoute && currentLat != null && currentLng != null

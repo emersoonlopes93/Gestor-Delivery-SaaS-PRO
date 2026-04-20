@@ -14,6 +14,18 @@ export const CurrentUser = createParamDecorator(
 );
 
 /**
+ * Extracts the current authenticated customer from the request.
+ */
+export const CurrentCustomer = createParamDecorator(
+  (_data: unknown, ctx: ExecutionContext) => {
+    const request = ctx.switchToHttp().getRequest();
+    const user = request.user;
+    if (user?.type !== 'customer') return null;
+    return user;
+  },
+);
+
+/**
  * Extracts the tenant ID from the request (tenant context only).
  */
 export const CurrentTenant = createParamDecorator(

@@ -9,8 +9,19 @@ async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<ApiResponse<T>> {
+  // Get token from storage (using the key defined in useCustomerStore)
+  const customerStorage = localStorage.getItem('customer-storage');
+  let token = null;
+  if (customerStorage) {
+    try {
+      const parsed = JSON.parse(customerStorage);
+      token = parsed.state.accessToken;
+    } catch (e) {}
+  }
+
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...options.headers,
   };
 
@@ -48,6 +59,11 @@ export const api = {
   post: <T>(endpoint: string, body?: unknown) =>
     apiFetch<T>(endpoint, {
       method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+    }),
+  patch: <T>(endpoint: string, body?: unknown) =>
+    apiFetch<T>(endpoint, {
+      method: 'PATCH',
       body: body ? JSON.stringify(body) : undefined,
     }),
 };

@@ -76,6 +76,7 @@ model Tenant {
   comboSlotAllowedItems    ComboSlotAllowedItem[]
   comboBundleItems         ComboBundleItem[]
   productOptionItemPrices  ProductOptionItemPrice[]
+  customerOtps             CustomerOTP[]
 
   @@map("tenants")
 }
@@ -1579,4 +1580,23 @@ model Goal {
 
   @@index([tenantId])
   @@map("goals")
+}
+
+// ============================================================
+// CUSTOMER AUTH (Phase 12 - Customer Retention)
+// ============================================================
+
+model CustomerOTP {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  phone     String   @db.VarChar(30)
+  code      String   @db.VarChar(6)
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, phone])
+  @@map("customer_otps")
 }

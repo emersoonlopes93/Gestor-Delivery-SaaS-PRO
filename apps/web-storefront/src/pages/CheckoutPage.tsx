@@ -16,6 +16,8 @@ import {
 import { AddressAutocomplete } from '../components/AddressAutocomplete';
 import { StructuredAddress } from '../lib/maps-service';
 import { useDebounce } from '../hooks/use-debounce';
+import { useCustomerStore } from '../store/useCustomerStore';
+import { LoginModal } from '../components/LoginModal';
 
 export function CheckoutPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -23,6 +25,9 @@ export function CheckoutPage() {
   const items = useCartStore(s => s.items);
   const subtotal = useCartStore(s => s.subtotal);
   const clearCart = useCartStore(s => s.clearCart);
+
+  const { customer, isLoggedIn } = useCustomerStore();
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
 
   // Form state
   const [customerName, setCustomerName] = useState('');
@@ -73,6 +78,14 @@ export function CheckoutPage() {
     }
     loadTenant();
   }, [tenantSlug]);
+
+  // Pre-fill customer data
+  useEffect(() => {
+    if (isLoggedIn && customer) {
+      setCustomerName(prev => prev || customer.name);
+      setCustomerPhone(prev => prev || customer.phone);
+    }
+  }, [isLoggedIn, customer]);
 
   // Idempotency key — generated once per checkout session
   const idempotencyKey = useMemo(() => crypto.randomUUID(), []);
@@ -313,6 +326,27 @@ export function CheckoutPage() {
           <input type="tel" placeholder="Seu WhatsApp (apenas números)" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
             className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" />
         </div>
+
+        {!isLoggedIn && (
+          <div className="mt-4 p-4 bg-primary-50 rounded-2xl border border-primary-100 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-primary-600 shadow-sm">
+                <User className="w-5 h-5" />
+              </div>
+              <div className="pr-4">
+                <p className="text-xs font-bold text-primary-900">Já pediu antes?</p>
+                <p className="text-[10px] text-primary-700">Entre para carregar seus dados.</p>
+              </div>
+            </div>
+            <button 
+              type="button"
+              onClick={() => setIsLoginOpen(true)}
+              className="bg-primary-600 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm shrink-0"
+            >
+              ENTRAR
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="mb-6">
@@ -450,6 +484,12 @@ export function CheckoutPage() {
           )}
         </button>
       </div>
+
+      <LoginModal 
+        isOpen={isLoginOpen} 
+        onClose={() => setIsLoginOpen(false)} 
+        tenantSlug={tenantSlug!} 
+      />
     </div>
   );
 }

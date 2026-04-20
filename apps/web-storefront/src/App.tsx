@@ -4,6 +4,7 @@ import { CheckoutPage } from './pages/CheckoutPage';
 import { OrderConfirmationPage } from './pages/OrderConfirmationPage';
 import { PublicTrackingPage } from './pages/PublicTrackingPage';
 import { OrderTrackingPage } from './pages/OrderTrackingPage';
+import { OrdersHistoryPage } from './pages/OrdersHistoryPage';
 import { StorefrontLayout } from './layouts/StorefrontLayout';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
@@ -25,6 +26,9 @@ export function App() {
 
           {/* Tracking by order id (UX premium) */}
           <Route path="/:tenantSlug/order/:orderId/tracking" element={<OrderTrackingPage />} />
+
+          {/* Orders history */}
+          <Route path="/:tenantSlug/orders" element={<OrdersHistoryPage />} />
 
           {/* Public tracking */}
           <Route path="/:tenantSlug/tracking/:token" element={<PublicTrackingPage />} />

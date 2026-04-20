@@ -74,3 +74,36 @@ export interface AdminUserSession {
   roles: string[];
   permissions: string[];
 }
+
+/** JWT payload for customer (B2C) */
+export interface CustomerJwtPayload {
+  sub: string;        // customerId
+  tenantId: string;
+  type: 'customer';
+  phone: string;
+  name: string;
+  iat?: number;
+  exp?: number;
+}
+
+/** Customer Login Request */
+export interface SendOtpRequest {
+  phone: string;
+}
+
+/** Customer OTP Validation Request */
+export interface ValidateOtpRequest {
+  phone: string;
+  code: string;
+}
+
+/** Customer Login Response */
+export interface CustomerLoginResponse {
+  accessToken: string;
+  customer: {
+    id: string;
+    tenantId: string;
+    name: string;
+    phone: string;
+  };
+}
