@@ -21,6 +21,7 @@ export enum PosFulfillmentType {
   DINE_IN = 'dine_in',
   PICKUP = 'pickup',
   DELIVERY = 'delivery',
+  TABLE = 'table',
 }
 
 // ============================================================
@@ -48,6 +49,10 @@ export class CreatePosOrderDTO {
 
   @IsEnum(PosFulfillmentType)
   fulfillmentType!: PosFulfillmentType;
+
+  @IsString()
+  @IsOptional()
+  tableNumber?: string;
 
   @IsEnum(PaymentMethod)
   paymentMethod!: PaymentMethod;

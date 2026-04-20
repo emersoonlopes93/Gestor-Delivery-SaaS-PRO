@@ -23,8 +23,9 @@ export class AdminAuthService {
    * Authenticate a SaaS admin user.
    */
   async login(email: string, password: string) {
+    const normalizedEmail = email.toLowerCase();
     const user = await this.prisma.adminUser.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
       include: {
         userRoles: {
           include: {
@@ -41,11 +42,13 @@ export class AdminAuthService {
     });
 
     if (!user || !user.isActive) {
+      this.logger.warn(`Admin login failed: User not found or inactive: ${normalizedEmail}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const passwordValid = await bcrypt.compare(password, user.passwordHash);
     if (!passwordValid) {
+      this.logger.warn(`Admin login failed: Invalid password for: ${normalizedEmail}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 

@@ -56,15 +56,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd }) => {
       </div>
 
       {/* Info Area */}
-      <div className="p-3 text-left flex-1 flex flex-col justify-between">
+      <div className="p-2 text-left flex-1 flex flex-col justify-between">
         <div>
-          <h3 className="font-bold text-gray-100 text-sm leading-tight line-clamp-2 min-h-[2.5rem] group-hover:text-emerald-400 transition-colors">
+          <h3 className="font-bold text-gray-100 text-[12px] leading-tight line-clamp-2 min-h-[2rem] group-hover:text-emerald-400 transition-colors">
             {product.name}
           </h3>
-          <p className="text-[10px] text-gray-500 uppercase tracking-wider mt-1">{product.categoryName}</p>
+          <p className="text-[9px] text-gray-600 uppercase tracking-wider mt-0.5">{product.categoryName}</p>
         </div>
         
-        <div className="mt-2 text-emerald-400 font-extrabold text-lg">
+        <div className="mt-1 text-emerald-400 font-black text-sm">
           {formatCurrency(product.basePrice)}
         </div>
       </div>

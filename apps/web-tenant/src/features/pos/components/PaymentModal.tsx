@@ -110,43 +110,70 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   );
 
   const renderCashDetails = () => (
-    <div className="space-y-6 py-4">
-      <div className="text-center">
-        <p className="text-gray-400 text-sm mb-1">Total a receber</p>
-        <p className="text-4xl font-black text-emerald-400">{formatCurrency(total)}</p>
+    <div className="space-y-4 py-2">
+      <div className="text-center bg-gray-950/30 p-4 rounded-2xl border border-gray-800">
+        <p className="text-gray-500 text-[10px] uppercase font-black tracking-[0.2em] mb-1">Total a receber</p>
+        <p className="text-4xl font-black text-emerald-400 tracking-tighter">{formatCurrency(total)}</p>
       </div>
 
       <div className="space-y-2">
-        <label className="text-xs text-gray-500 uppercase font-black tracking-widest">Quanto o cliente pagou?</label>
+        <label className="text-[10px] text-gray-500 uppercase font-black tracking-widest ml-1">Quanto o cliente pagou?</label>
         <div className="relative">
           <input
             type="number"
             autoFocus
             value={cashAmount || ''}
             onChange={(e) => setCashAmount(parseFloat(e.target.value) || 0)}
-            className="w-full bg-gray-900 border-2 border-gray-700 focus:border-emerald-500 rounded-2xl px-4 py-4 text-2xl font-bold text-white outline-none transition-all"
+            className={`w-full bg-gray-900 border-2 rounded-2xl px-4 py-4 text-2xl font-black text-white outline-none transition-all ${cashAmount < total && cashAmount !== 0 ? 'border-red-500/50 text-red-400' : 'border-gray-800 focus:border-emerald-500'}`}
             placeholder="0,00"
           />
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">R$</div>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">R$</div>
         </div>
       </div>
 
-      <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex justify-between items-center animate-in slide-in-from-bottom-2">
+      {/* Quick Cash Buttons */}
+      <div className="grid grid-cols-4 gap-2">
+         <button 
+           onClick={() => setCashAmount(total)}
+           className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 py-2 rounded-xl text-[10px] font-black uppercase transition-all"
+         >
+           Exato
+         </button>
+         {[20, 50, 100].map(val => (
+            <button 
+              key={val}
+              onClick={() => setCashAmount(val)}
+              className="bg-gray-800 hover:bg-gray-750 border border-gray-700 text-gray-300 py-2 rounded-xl text-[10px] font-black uppercase transition-all"
+            >
+              R$ {val}
+            </button>
+         ))}
+      </div>
+
+      <div className={`rounded-2xl p-4 flex justify-between items-center transition-all ${cashAmount >= total ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-red-500/5 border border-red-500/10 opacity-50'}`}>
         <div>
-          <p className="text-xs text-emerald-500/70 uppercase font-black">Troco para devolver</p>
-          <p className="text-2xl font-black text-emerald-400">{formatCurrency(change)}</p>
+          <p className={`text-[10px] uppercase font-black ${cashAmount >= total ? 'text-emerald-500/70' : 'text-red-500/70'}`}>
+            {cashAmount >= total ? 'Troco para devolver' : 'Faltando'}
+          </p>
+          <p className={`text-2xl font-black ${cashAmount >= total ? 'text-emerald-400' : 'text-red-400'}`}>
+            {formatCurrency(Math.abs(cashAmount - total))}
+          </p>
         </div>
-        <div className="w-10 h-10 bg-emerald-500 text-white rounded-full flex items-center justify-center">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${cashAmount >= total ? 'bg-emerald-500 text-white' : 'bg-red-500/20 text-red-500'}`}>
           <Banknote size={20} />
         </div>
       </div>
       
+      {cashAmount < total && cashAmount !== 0 && (
+        <p className="text-center text-red-400 text-[10px] font-black uppercase animate-pulse">Atenção: Valor insuficiente</p>
+      )}
+
       <button
         onClick={() => onConfirm(PaymentMethod.cash, { cashAmount })}
-        disabled={isPending || (cashAmount < total && cashAmount !== 0)}
-        className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-700 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
+        disabled={isPending || cashAmount < total}
+        className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-800 disabled:text-gray-600 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
       >
-        {isPending ? 'Finalizando...' : 'Confirmar Recebimento'}
+        {isPending ? 'FINALIZANDO...' : 'CONFIRMAR RECEBIMENTO'}
         <CheckCircle2 size={20} />
       </button>
     </div>

@@ -15,6 +15,12 @@ const ORDER_TYPES = [
     color: 'emerald',
   },
   {
+    id: PosFulfillmentType.TABLE,
+    label: 'Mesa',
+    icon: Utensils, // You can change to a specific table icon if available
+    color: 'emerald',
+  },
+  {
     id: PosFulfillmentType.PICKUP,
     label: 'Retirada',
     icon: ShoppingBag,
@@ -33,7 +39,7 @@ export const OrderTypeSelector: React.FC<OrderTypeSelectorProps> = ({
   onTypeChange,
 }) => {
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-4 gap-1.5">
       {ORDER_TYPES.map((type) => {
         const Icon = type.icon;
         const isActive = currentType === type.id;
@@ -48,7 +54,7 @@ export const OrderTypeSelector: React.FC<OrderTypeSelectorProps> = ({
             key={type.id}
             onClick={() => onTypeChange(type.id)}
             className={`
-              flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-200
+              flex flex-col items-center justify-center p-1.5 rounded-xl border-2 transition-all duration-200
               ${isActive 
                 ? `${colors[type.color as keyof typeof colors]} shadow-lg` 
                 : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500 hover:bg-gray-750'}

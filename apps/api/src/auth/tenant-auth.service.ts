@@ -25,6 +25,9 @@ export class TenantAuthService {
    * Resolves the tenant from the user record.
    */
   async login(email: string, password: string, tenantSlug?: string) {
+    const normalizedEmail = email.toLowerCase();
+    this.logger.debug(`Login attempt for email: ${normalizedEmail} (tenantSlug: ${tenantSlug})`);
+
     // Find user — if tenantSlug provided, narrow to that tenant
     let user;
     if (tenantSlug) {
@@ -32,11 +35,12 @@ export class TenantAuthService {
         where: { slug: tenantSlug },
       });
       if (!tenant) {
+        this.logger.warn(`Login failed: Tenant not found for slug: ${tenantSlug}`);
         throw new UnauthorizedException('Tenant not found');
       }
       user = await this.prisma.tenantUser.findUnique({
         where: {
-          tenantId_email: { tenantId: tenant.id, email },
+          tenantId_email: { tenantId: tenant.id, email: normalizedEmail },
         },
         include: {
           tenant: true,
@@ -56,7 +60,7 @@ export class TenantAuthService {
     } else {
       // Find by email across tenants (first match)
       user = await this.prisma.tenantUser.findFirst({
-        where: { email },
+        where: { email: normalizedEmail },
         include: {
           tenant: true,
           userRoles: {
@@ -74,7 +78,13 @@ export class TenantAuthService {
       });
     }
 
-    if (!user || !user.isActive) {
+    if (!user) {
+      this.logger.warn(`Login failed: User not found for email: ${normalizedEmail}`);
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!user.isActive) {
+      this.logger.warn(`Login failed: User is inactive: ${normalizedEmail}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -85,16 +95,17 @@ export class TenantAuthService {
 
     const passwordValid = await bcrypt.compare(password, user.passwordHash);
     if (!passwordValid) {
+      this.logger.warn(`Login failed: Invalid password for user: ${email}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
     // Build permissions from roles
-    const roles = user.userRoles.map((ur) => ur.role.slug);
+    const roles = user.userRoles.map((ur) => ur.role?.slug).filter(Boolean);
     const permissions = [
       ...new Set(
         user.userRoles.flatMap((ur) =>
-          ur.role.rolePermissions.map((rp) => rp.permission.slug),
-        ),
+          ur.role?.rolePermissions.map((rp) => rp.permission?.slug) || [],
+        ).filter(Boolean),
       ),
     ];
 
@@ -113,7 +124,7 @@ export class TenantAuthService {
     });
 
     this.logger.log(
-      `Tenant user logged in: ${user.email} (tenant: ${user.tenant.slug})`,
+      `Tenant user logged in: ${normalizedEmail} (tenant: ${user.tenant.slug})`,
     );
 
     return {

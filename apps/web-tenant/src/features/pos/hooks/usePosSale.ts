@@ -17,6 +17,7 @@ export interface PosCreateSalePayload {
   customerName?: string;
   customerPhone?: string;
   fulfillmentType: PosFulfillmentType;
+  tableNumber?: string;
   paymentMethod: PaymentMethod;
   discountTotal?: number;
   notes?: string;
