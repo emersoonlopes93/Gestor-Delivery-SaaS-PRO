@@ -48,7 +48,7 @@ export type * from './cash';
 export { OpenCashSessionDTO, CloseCashSessionDTO, CreateCashMovementDTO } from './cash';
 
 export type * from './pos';
-export { CreatePosOrderDTO } from './pos';
+export { CreatePosOrderDTO, PosFulfillmentType } from './pos';
 
 export { UpdateCustomerDTO } from './customer';
 export { CreateCouponDTO, UpdateCouponDTO } from './promotions';
