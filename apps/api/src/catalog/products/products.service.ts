@@ -210,6 +210,7 @@ export class ProductsService {
       deletedAt: null,
       isActive: true,
       isAvailable: true,
+      // Incluir todos os tipos para PDV: simple, configurable, combo
       ...(search && {
         name: {
           contains: search,
@@ -221,10 +222,29 @@ export class ProductsService {
     const products = await this.prisma.tenantClient.product.findMany({
       where: {
         ...whereClause,
-        publication: {
-          publicationStatus: 'published',
-          operationalStatus: 'active'
-        }
+        OR: [
+          // Produtos com publication ativa
+          {
+            publication: {
+              publicationStatus: 'published',
+              operationalStatus: 'active'
+            }
+          },
+          // Produtos sem publication (considerados visíveis por padrão)
+          {
+            publication: null
+          },
+          // Produtos com publication inativa (mas ainda ativos no catálogo)
+          {
+            publication: {
+              OR: [
+                { publicationStatus: 'draft' },
+                { publicationStatus: { not: 'published' } },
+                { operationalStatus: { not: 'active' } }
+              ]
+            }
+          }
+        ]
       },
       orderBy: { order: 'asc' },
       include: { category: true, publication: true }

@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import { useActiveSession } from '../cash/hooks/useCashSession';
 import { useCreatePosSale, type PosCreateSalePayload } from './hooks/usePosSale';
+import type { OrderResponseDTO } from '@gestor/types';
+import { PosFulfillmentType, PaymentMethod } from '@gestor/types';
 
 interface CatalogProduct {
   id: string;
@@ -10,11 +12,14 @@ interface CatalogProduct {
   basePrice: number;
   image: string | null;
   categoryName: string;
+  type: 'simple' | 'configurable' | 'combo';
 }
 
 interface CartItem {
   cartLineId: string;
-  productId: string;
+  lineType: 'product' | 'combo';
+  productId?: string;
+  comboId?: string;
   name: string;
   basePrice: number;
   quantity: number;
@@ -30,17 +35,17 @@ function generateId(): string {
 }
 
 const PAYMENT_METHODS = [
-  { value: 'cash', label: 'Dinheiro' },
-  { value: 'pix', label: 'PIX' },
-  { value: 'credit_card', label: 'Crédito' },
-  { value: 'debit_card', label: 'Débito' },
-  { value: 'other', label: 'Outro' },
-] as const;
+  { value: PaymentMethod.cash, label: 'Dinheiro' },
+  { value: PaymentMethod.pix, label: 'PIX' },
+  { value: PaymentMethod.credit_card, label: 'Crédito' },
+  { value: PaymentMethod.debit_card, label: 'Débito' },
+  { value: PaymentMethod.other, label: 'Outro' },
+];
 
 const FULFILLMENT_TYPES = [
-  { value: 'dine_in', label: 'Balcão' },
-  { value: 'pickup', label: 'Retirada' },
-] as const;
+  { value: PosFulfillmentType.DINE_IN, label: 'Balcão' },
+  { value: PosFulfillmentType.PICKUP, label: 'Retirada' },
+];
 
 export default function PosPage() {
   const { data: activeSession, isLoading: sessionLoading } = useActiveSession();
@@ -48,8 +53,8 @@ export default function PosPage() {
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PosCreateSalePayload['paymentMethod']>('cash');
-  const [fulfillmentType, setFulfillmentType] = useState<PosCreateSalePayload['fulfillmentType']>('dine_in');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.cash);
+  const [fulfillmentType, setFulfillmentType] = useState<PosFulfillmentType>(PosFulfillmentType.DINE_IN);
   const [discountTotal, setDiscountTotal] = useState(0);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -64,13 +69,14 @@ export default function PosPage() {
     queryKey: ['posCatalog', searchTerm],
     queryFn: async () => {
       const res = await api.get(`/catalog/products?search=${encodeURIComponent(searchTerm)}&limit=50`);
-      const data = res.data as { data: Array<Record<string, unknown>> };
-      return (data.data || []).map((p: Record<string, unknown>) => ({
+      const data = res.data as Array<Record<string, unknown>>;
+      return (data || []).map((p: Record<string, unknown>) => ({
         id: p['id'] as string,
         name: p['name'] as string,
         basePrice: Number(p['basePrice'] ?? p['base_price'] ?? 0),
         image: (p['image'] as string | null) || null,
         categoryName: ((p['category'] as Record<string, unknown>)?.['name'] as string) || '',
+        type: (p['type'] as 'simple' | 'configurable' | 'combo') || 'simple',
       }));
     },
     refetchOnWindowFocus: false,
@@ -78,11 +84,13 @@ export default function PosPage() {
 
   // Add product to cart
   const addToCart = useCallback((product: CatalogProduct) => {
+    const isCombo = product.type === 'combo';
     setCart((prev) => [
       ...prev,
       {
         cartLineId: generateId(),
-        productId: product.id,
+        lineType: isCombo ? 'combo' : 'product',
+        ...(isCombo ? { comboId: product.id } : { productId: product.id }),
         name: product.name,
         basePrice: product.basePrice,
         quantity: 1,
@@ -120,8 +128,8 @@ export default function PosPage() {
     const payload: PosCreateSalePayload = {
       idempotencyKey: generateId(),
       items: cart.map((item) => ({
-        lineType: 'product' as const,
-        productId: item.productId,
+        lineType: item.lineType,
+        ...(item.lineType === 'product' ? { productId: item.productId } : { comboId: item.comboId }),
         quantity: item.quantity,
         notes: item.notes || undefined,
       })),
@@ -193,7 +201,14 @@ export default function PosPage() {
                 onClick={() => addToCart(product)}
                 className="bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-emerald-500 rounded-xl p-4 text-left transition-all group"
               >
-                <p className="font-medium text-white group-hover:text-emerald-400 truncate">{product.name}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-medium text-white group-hover:text-emerald-400 truncate flex-1">{product.name}</p>
+                  {product.type === 'combo' && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                      Combo
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-gray-500 mt-1">{product.categoryName}</p>
                 <p className="text-emerald-400 font-bold mt-2">{formatCurrency(product.basePrice)}</p>
               </button>
@@ -284,7 +299,7 @@ export default function PosPage() {
           <div className="flex gap-2">
             <select
               value={fulfillmentType}
-              onChange={(e) => setFulfillmentType(e.target.value as PosCreateSalePayload['fulfillmentType'])}
+              onChange={(e) => setFulfillmentType(e.target.value as unknown as PosFulfillmentType)}
               className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
             >
               {FULFILLMENT_TYPES.map((f) => (
@@ -293,7 +308,7 @@ export default function PosPage() {
             </select>
             <select
               value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value as PosCreateSalePayload['paymentMethod'])}
+              onChange={(e) => setPaymentMethod(e.target.value as unknown as PaymentMethod)}
               className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
             >
               {PAYMENT_METHODS.map((p) => (

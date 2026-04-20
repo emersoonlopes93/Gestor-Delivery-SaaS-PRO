@@ -148,7 +148,7 @@ export class StorefrontService {
         name: cat.name,
         slug: cat.slug,
         products: cat.products
-          .filter((p: any) => p.isAvailable && availabilityMap.get(p.id) !== false)
+          .filter((p: any) => p.isAvailable) // Mostrar produtos disponíveis independentemente do horário da loja
           .map((p: any) => ({
             id: p.id,
             name: p.name,
@@ -204,7 +204,7 @@ export class StorefrontService {
       .filter((cat: any) => cat.products.length > 0);
 
     const combos: StorefrontComboPayload[] = comboRows
-      .filter((combo) => combo.isAvailable && availabilityMap.get(combo.id) !== false)
+      .filter((combo) => combo.isAvailable) // Mostrar combos disponíveis independentemente do horário da loja
       .map((combo) => ({
         id: combo.id,
         name: combo.name,

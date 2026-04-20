@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
 import { Tenant, TenantSettings, TenantOperatingHours } from '@gestor/types';
+
+interface OperatingHourForm {
+  id?: string;
+  dayOfWeek: number;
+  isOpen: boolean;
+  openTime?: string;
+  closeTime?: string;
+}
+
 import { Clock, Pause, Save, Copy, Calendar, MapPin, Building2 } from 'lucide-react';
 
 const DAY_NAMES = [
@@ -40,7 +49,7 @@ export function SettingsPage() {
     storePauseReason: '',
   });
 
-  const [hours, setHours] = useState<any[]>([]);
+  const [hours, setHours] = useState<OperatingHourForm[]>([]);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
@@ -426,7 +435,7 @@ export function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Resumo (Legado)</label>
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Endereço</label>
                     <input
                       type="text"
                       value={settings.address || ''}

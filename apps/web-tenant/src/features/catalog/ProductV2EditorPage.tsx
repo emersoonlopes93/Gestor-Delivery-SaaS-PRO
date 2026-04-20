@@ -424,7 +424,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             navigate('/catalog/combos');
           } else {
             alert('Produto salvo com sucesso!');
-            loadAll();
+            navigate('/catalog/products');
           }
         }
       }
@@ -472,6 +472,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
         order: links.length,
         pricingAxis: 'secondary',
       };
+      if (!productId) throw new Error('productId não disponível');
       await api.post(`/catalog/products/${productId}/option-groups`, payload);
       setIsAddGroupModalOpen(false);
       await loadAll();
@@ -490,6 +491,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
       });
       if (!created.success) return;
 
+      if (!productId) throw new Error('productId não disponível');
       await api.post(`/catalog/products/${productId}/option-groups`, {
         optionGroupId: created.data.id,
         order: links.length,
@@ -517,6 +519,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     if (!window.confirm('Remover este grupo do produto?')) return;
     setSavingStates((p) => ({ ...p, [`remove-${linkId}`]: true }));
     try {
+      if (!productId) throw new Error('productId não disponível');
       await api.delete(`/catalog/products/${productId}/option-groups/${linkId}`);
       await loadAll();
     } finally {
@@ -546,6 +549,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
         ...(linkForm.overrideMaxSelect !== undefined && { overrideMaxSelect: linkForm.overrideMaxSelect }),
         ...(linkForm.pricingAxis && { pricingAxis: linkForm.pricingAxis }),
       };
+      if (!productId) throw new Error('productId não disponível');
       await api.patch(`/catalog/products/${productId}/option-groups/${editingLink.id}`, payload);
       setIsEditLinkModalOpen(false);
       await loadAll();
@@ -557,6 +561,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   const reorderLinks = async (orderedIds: string[]) => {
     setSavingStates((p) => ({ ...p, reorderLinks: true }));
     try {
+      if (!productId) throw new Error('productId não disponível');
       await api.post(`/catalog/products/${productId}/option-groups/reorder`, { orderedLinkIds: orderedIds });
       await loadAll();
     } finally {
@@ -624,9 +629,11 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
 
       if (editingSlot) {
         const upd: UpdateComboSlotDto = payload;
-        await api.patch(`/catalog/products/${productId}/combo-slots/${editingSlot.id}`, upd);
+        if (!productId) throw new Error('productId não disponível');
+      await api.patch(`/catalog/products/${productId}/combo-slots/${editingSlot.id}`, upd);
       } else {
-        await api.post(`/catalog/products/${productId}/combo-slots`, payload);
+        if (!productId) throw new Error('productId não disponível');
+      await api.post(`/catalog/products/${productId}/combo-slots`, payload);
       }
 
       setIsSlotModalOpen(false);
@@ -640,6 +647,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     if (!window.confirm('Excluir este slot do combo?')) return;
     setSavingStates((p) => ({ ...p, [`delete-slot-${slotId}`]: true }));
     try {
+      if (!productId) throw new Error('productId não disponível');
       await api.delete(`/catalog/products/${productId}/combo-slots/${slotId}`);
       await loadAll();
     } finally {
@@ -650,6 +658,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   const reorderSlots = async (orderedSlotIds: string[]) => {
     setSavingStates((p) => ({ ...p, reorderSlots: true }));
     try {
+      if (!productId) throw new Error('productId não disponível');
       await api.post(`/catalog/products/${productId}/combo-slots/reorder`, { orderedSlotIds });
       await loadAll();
     } finally {
@@ -706,12 +715,14 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
 
       if (editingAllowed) {
         const upd: UpdateComboSlotAllowedItemDto = payload as UpdateComboSlotAllowedItemDto;
-        await api.patch(
-          `/catalog/products/${productId}/combo-slots/${allowedTargetSlotId}/allowed-items/${editingAllowed.id}`,
-          upd,
-        );
+        if (!allowedTargetSlotId || !editingAllowed?.id) throw new Error('Parâmetros inválidos');
+      await api.patch(
+        `/catalog/products/${productId}/combo-slots/${allowedTargetSlotId}/allowed-items/${editingAllowed.id}`,
+        upd,
+      );
       } else {
-        await api.post(`/catalog/products/${productId}/combo-slots/${allowedTargetSlotId}/allowed-items`, payload);
+        if (!allowedTargetSlotId) throw new Error('allowedTargetSlotId não disponível');
+      await api.post(`/catalog/products/${productId}/combo-slots/${allowedTargetSlotId}/allowed-items`, payload);
       }
 
       setIsAllowedModalOpen(false);
@@ -725,6 +736,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     if (!window.confirm('Excluir este item permitido?')) return;
     setSavingStates((p) => ({ ...p, [`delete-allowed-${idToDelete}`]: true }));
     try {
+      if (!productId) throw new Error('productId não disponível');
       await api.delete(`/catalog/products/${productId}/combo-slots/${slotId}/allowed-items/${idToDelete}`);
       await loadAll();
     } finally {
@@ -735,6 +747,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   const reorderAllowed = async (slotId: string, orderedAllowedItemIds: string[]) => {
     setSavingStates((p) => ({ ...p, [`reorder-allowed-${slotId}`]: true }));
     try {
+      if (!productId) throw new Error('productId não disponível');
       await api.post(`/catalog/products/${productId}/combo-slots/${slotId}/allowed-items/reorder`, { orderedAllowedItemIds });
       await loadAll();
     } finally {
@@ -790,9 +803,11 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           qty: payload.qty,
           sortOrder: payload.sortOrder,
         };
-        await api.patch(`/catalog/products/${productId}/bundle-items/${editingBundleItem.id}`, upd);
+        if (!productId) throw new Error('productId não disponível');
+      await api.patch(`/catalog/products/${productId}/bundle-items/${editingBundleItem.id}`, upd);
       } else {
-        await api.post(`/catalog/products/${productId}/bundle-items`, payload);
+        if (!productId) throw new Error('productId não disponível');
+      await api.post(`/catalog/products/${productId}/bundle-items`, payload);
       }
       setIsBundleItemModalOpen(false);
       await loadAll();
@@ -808,6 +823,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     if (!window.confirm('Remover este item do combo?')) return;
     setSavingStates((p) => ({ ...p, [`delete-bundle-${idToDelete}`]: true }));
     try {
+      if (!productId) throw new Error('productId não disponível');
       await api.delete(`/catalog/products/${productId}/bundle-items/${idToDelete}`);
       await loadAll();
     } finally {
@@ -819,6 +835,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     if (!productId) return;
     setSavingStates((p) => ({ ...p, updateComboPricing: true }));
     try {
+      if (!productId) throw new Error('productId não disponível');
       await api.patch(`/catalog/products/${productId}`, {
         comboPricingType,
         comboPricingValue,
@@ -833,6 +850,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     if (!productId) return;
     setSavingStates((p) => ({ ...p, convertBundle: true }));
     try {
+      if (!productId) throw new Error('productId não disponível');
       await api.patch(`/catalog/products/${productId}`, {
         comboMode: 'bundle',
         comboPricingType: comboPricingType ?? 'fixed_price',
@@ -850,6 +868,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   const patchPublication = async (payload: UpsertPublicationDto) => {
     setSavingStates((p) => ({ ...p, patchPublication: true }));
     try {
+      if (!productId) throw new Error('productId não disponível');
       const res = await api.patch<CatalogPublication>(`/catalog/products/${productId}/publication`, payload);
       if (res.success) {
         setPublication(res.data);
@@ -889,7 +908,8 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     try {
       if (editingRule) {
         const upd: UpdateAvailabilityRuleDto = ruleForm as UpdateAvailabilityRuleDto;
-        await api.patch(`/catalog/products/${productId}/publication/rules/${editingRule.id}`, upd);
+        if (!productId) throw new Error('productId não disponível');
+      await api.patch(`/catalog/products/${productId}/publication/rules/${editingRule.id}`, upd);
       } else {
         const channelsToCreate = ruleChannels.length > 0 ? ruleChannels : ['storefront_delivery'];
         await Promise.all(
@@ -898,6 +918,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               ...ruleForm,
               channel: channel as CreateAvailabilityRuleDto['channel'],
             };
+            if (!productId) throw new Error('productId não disponível');
             return api.post(`/catalog/products/${productId}/publication/rules`, create);
           }),
         );
@@ -913,6 +934,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     if (!window.confirm('Excluir esta regra?')) return;
     setSavingStates((p) => ({ ...p, [`delete-rule-${ruleId}`]: true }));
     try {
+      if (!productId) throw new Error('productId não disponível');
       await api.delete(`/catalog/products/${productId}/publication/rules/${ruleId}`);
       await loadAll();
     } finally {
@@ -925,9 +947,11 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     const isLinked = productUpsells.includes(upsellId);
     try {
       if (isLinked) {
-        await api.delete(`/upsells/${upsellId}/link/${productId}`);
+        if (!productId) throw new Error('productId não disponível');
+      await api.delete(`/upsells/${upsellId}/link/${productId}`);
       } else {
-        await api.post(`/upsells/${upsellId}/link/${productId}`);
+        if (!productId) throw new Error('productId não disponível');
+      await api.post(`/upsells/${upsellId}/link/${productId}`);
       }
       setProductUpsells(prev => isLinked ? prev.filter(id => id !== upsellId) : [...prev, upsellId]);
     } catch (error) {

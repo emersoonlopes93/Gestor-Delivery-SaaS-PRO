@@ -9,6 +9,7 @@ import {
   UseGuards,
   DefaultValuePipe,
   ParseIntPipe,
+  Logger,
 } from '@nestjs/common';
 import { PosService } from './pos.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
@@ -27,6 +28,8 @@ interface TenantRequest {
 @Controller('pos')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class PosController {
+  private readonly logger = new Logger(PosController.name);
+
   constructor(private readonly posService: PosService) {}
 
   // POST /pos/sales
@@ -36,16 +39,28 @@ export class PosController {
     @Request() req: TenantRequest,
     @Body() dto: CreatePosOrderDTO,
   ) {
-    const permissions = req.user.permissions || [];
-    const hasDiscountPermission =
-      permissions.includes('pos.apply_discount') || permissions.includes('cash.manage');
+    try {
+      this.logger.log(`Creating POS sale for tenant ${req.user.tenantId}, user ${req.user.id}`);
+      
+      const permissions = req.user.permissions || [];
+      const hasDiscountPermission =
+        permissions.includes('pos.apply_discount') || permissions.includes('cash.manage');
 
-    return this.posService.createSale(
-      req.user.tenantId,
-      req.user.id,
-      dto,
-      hasDiscountPermission,
-    );
+      const result = await this.posService.createSale(
+        req.user.tenantId,
+        req.user.id,
+        dto,
+        hasDiscountPermission,
+      );
+
+      this.logger.log(`POS sale created successfully: ${result.orderNumber}`);
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.logger.error(`Error creating POS sale: ${errorMessage}`, errorStack);
+      throw error;
+    }
   }
 
   // GET /pos/sales

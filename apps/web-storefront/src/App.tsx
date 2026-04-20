@@ -5,33 +5,39 @@ import { OrderConfirmationPage } from './pages/OrderConfirmationPage';
 import { PublicTrackingPage } from './pages/PublicTrackingPage';
 import { OrderTrackingPage } from './pages/OrderTrackingPage';
 import { StorefrontLayout } from './layouts/StorefrontLayout';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { ToastProvider } from './components/Toast';
 
 export function App() {
   return (
-    <Routes>
-      <Route element={<StorefrontLayout />}>
-        {/* The main storefront route with dynamic slug */}
-        <Route path="/:tenantSlug" element={<StorefrontPage />} />
+    <ToastProvider>
+      <ErrorBoundary>
+        <Routes>
+        <Route element={<StorefrontLayout />}>
+          {/* The main storefront route with dynamic slug */}
+          <Route path="/:tenantSlug" element={<StorefrontPage />} />
+          
+          {/* Checkout */}
+          <Route path="/:tenantSlug/checkout" element={<CheckoutPage />} />
+
+          {/* Order confirmation */}
+          <Route path="/:tenantSlug/order/:orderId" element={<OrderConfirmationPage />} />
+
+          {/* Tracking by order id (UX premium) */}
+          <Route path="/:tenantSlug/order/:orderId/tracking" element={<OrderTrackingPage />} />
+
+          {/* Public tracking */}
+          <Route path="/:tenantSlug/tracking/:token" element={<PublicTrackingPage />} />
+        </Route>
+
+        {/* Root redirect */}
+        <Route path="/" element={<div className="p-10 text-center">Gestor Delivery - Digite o slug da sua loja.</div>} />
         
-        {/* Checkout */}
-        <Route path="/:tenantSlug/checkout" element={<CheckoutPage />} />
-
-        {/* Order confirmation */}
-        <Route path="/:tenantSlug/order/:orderId" element={<OrderConfirmationPage />} />
-
-        {/* Tracking by order id (UX premium) */}
-        <Route path="/:tenantSlug/order/:orderId/tracking" element={<OrderTrackingPage />} />
-
-        {/* Public tracking */}
-        <Route path="/:tenantSlug/tracking/:token" element={<PublicTrackingPage />} />
-      </Route>
-
-      {/* Root redirect */}
-      <Route path="/" element={<div className="p-10 text-center">Gestor Delivery - Digite o slug da sua loja.</div>} />
-      
-      {/* Catch-all */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        {/* Catch-all */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </ErrorBoundary>
+    </ToastProvider>
   );
 }
 

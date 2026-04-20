@@ -1336,7 +1336,8 @@ export function DeliveryZonesPage() {
               </div>
             </section>
 
-            {/* Section C — Advanced */}
+            {/* Section C — Advanced - HIDDEN (LEGACY) */}
+            {/*
             <section className="rounded-xl border border-gray-100 shadow-sm overflow-hidden">
               <button
                 type="button"
@@ -1371,6 +1372,7 @@ export function DeliveryZonesPage() {
                 </div>
               ) : null}
             </section>
+            */}
 
             <div className="text-xs text-gray-400">
               Dica: você pode usar zonas para "exceções" e manter a cobertura base como padrão.

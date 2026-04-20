@@ -80,9 +80,9 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
       {/* Container */}
-      <div className="bg-white w-full max-w-lg sm:rounded-3xl flex flex-col max-h-[92vh] shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-300">
+      <div className="bg-white w-full max-w-lg sm:rounded-3xl flex flex-col max-h-[85vh] sm:max-h-[92vh] shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-300">
         
         {/* Header */}
         <div className="relative">

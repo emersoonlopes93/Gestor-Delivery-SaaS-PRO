@@ -18,7 +18,6 @@ import type {
   OrderResponseDTO,
   PosOrderListItemDTO,
   OrderStatus,
-  FulfillmentType,
   PaymentMethod,
   ValidatedLine,
 } from '@gestor/types';

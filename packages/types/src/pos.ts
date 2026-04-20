@@ -17,7 +17,11 @@ import { CreateOrderItemDTO } from './order';
 
 import { PaymentMethod } from './enums';
 
-export type PosFulfillmentType = 'dine_in' | 'pickup' | 'delivery';
+export enum PosFulfillmentType {
+  DINE_IN = 'dine_in',
+  PICKUP = 'pickup',
+  DELIVERY = 'delivery',
+}
 
 // ============================================================
 // POS DTOs — Input
@@ -29,7 +33,7 @@ export class CreatePosOrderDTO {
   idempotencyKey!: string;
 
   @IsArray()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Items cannot be empty' })
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemDTO)
   items!: CreateOrderItemDTO[];
@@ -42,8 +46,7 @@ export class CreatePosOrderDTO {
   @IsOptional()
   customerPhone?: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsEnum(PosFulfillmentType)
   fulfillmentType!: PosFulfillmentType;
 
   @IsEnum(PaymentMethod)

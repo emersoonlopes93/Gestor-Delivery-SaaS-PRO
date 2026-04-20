@@ -68,9 +68,10 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
         type="text"
         disabled={loading}
         placeholder={loading ? 'Carregando mapas...' : error || placeholder}
-        className="w-full pl-12 pr-4 py-4 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-2xl 
+        className="w-full pl-12 pr-4 py-3 sm:py-4 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl sm:rounded-2xl 
                    focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all
-                   disabled:opacity-50 disabled:cursor-not-allowed shadow-sm text-gray-700 placeholder:text-gray-400"
+                   disabled:opacity-50 disabled:cursor-not-allowed shadow-sm text-gray-700 placeholder:text-gray-400
+                   text-sm sm:text-base"
       />
       {!loading && !error && (
         <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-medium text-gray-300 uppercase tracking-widest pointer-events-none">

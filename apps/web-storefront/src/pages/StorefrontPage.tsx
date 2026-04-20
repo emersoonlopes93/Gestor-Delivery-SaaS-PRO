@@ -4,10 +4,11 @@ import { api } from '../lib/api-client';
 import type { StorefrontPayload, StorefrontProductPayload, StorefrontComboPayload } from '@gestor/types';
 import { useCartStore } from '../store/use-cart-store';
 import { useEffect, useState } from 'react';
-import { Loader2, Store, ShoppingBag, Box, AlertCircle } from 'lucide-react';
+import { Store, ShoppingBag, Box, AlertCircle } from 'lucide-react';
 import { ProductDetailsModal } from '../components/ProductDetailsModal';
 import { CartDrawer } from '../components/CartDrawer';
 import { ComboDetailsModal } from '../components/ComboDetailsModal';
+import { ProductSkeleton, ComboSkeleton } from '../components/ProductSkeleton';
 
 export function StorefrontPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -38,9 +39,38 @@ export function StorefrontPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] p-8">
-        <Loader2 className="w-10 h-10 text-primary-500 animate-spin" />
-        <p className="mt-4 text-gray-500 font-medium">Carregando cardápio...</p>
+      <div className="px-4 py-6">
+        {/* Store Header Skeleton */}
+        <div className="mb-8 flex items-center gap-4">
+          <div className="w-16 h-16 rounded-lg bg-gray-200 animate-pulse"></div>
+          <div className="flex-1">
+            <div className="h-8 bg-gray-200 rounded mb-2 w-48"></div>
+            <div className="h-4 bg-gray-200 rounded w-32"></div>
+          </div>
+        </div>
+
+        {/* Categories Navigation Skeleton */}
+        <div className="flex gap-2 overflow-x-auto pb-4 mb-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-8 bg-gray-200 rounded-full w-24 animate-pulse"></div>
+          ))}
+        </div>
+
+        {/* Combos Skeleton */}
+        <div className="mb-8">
+          <div className="h-6 bg-gray-200 rounded mb-4 w-40"></div>
+          <ComboSkeleton count={2} />
+        </div>
+
+        {/* Categories Skeleton */}
+        <div className="space-y-8">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i}>
+              <div className="h-6 bg-gray-200 rounded mb-4 w-32"></div>
+              <ProductSkeleton count={4} />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -108,7 +138,7 @@ export function StorefrontPage() {
               <span className="w-1 h-6 bg-orange-500 rounded-full" />
               COMBOS ESPECIAIS
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2 xl:grid-cols-3">
               {combos.map((combo) => (
                 <button
                   key={combo.id}
@@ -130,7 +160,13 @@ export function StorefrontPage() {
                     </div>
                   </div>
                   {combo.image && (
-                    <img src={combo.image} alt={combo.name} className="w-24 h-24 rounded-lg object-cover" />
+                    <img 
+                      src={combo.image} 
+                      alt={combo.name} 
+                      className="w-24 h-24 rounded-lg object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
                   )}
                 </button>
               ))}
@@ -146,7 +182,7 @@ export function StorefrontPage() {
               {category.name}
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2 xl:grid-cols-3">
               {category.products.map((product) => (
                 <button
                   key={product.id}
@@ -165,7 +201,13 @@ export function StorefrontPage() {
                     </div>
                   </div>
                   {product.image && (
-                    <img src={product.image} alt={product.name} className="w-24 h-24 rounded-lg object-cover" />
+                    <img 
+                      src={product.image} 
+                      alt={product.name} 
+                      className="w-24 h-24 rounded-lg object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
                   )}
                 </button>
               ))}

@@ -521,7 +521,7 @@ export function AppLayout() {
               <Menu className="h-4 w-4" aria-hidden />
             </button>
 
-            <div className="relative flex-1 max-w-[520px]">
+            <div className="relative flex-1 max-w-[320px] lg:max-w-[520px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" aria-hidden />
               <input
                 value={desktopSearch}
@@ -531,18 +531,20 @@ export function AppLayout() {
               />
             </div>
 
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-              title="Atalhos"
-            >
-              <CornerDownRight className="h-4 w-4" aria-hidden />
-              <span className="hidden lg:inline">Atalhos</span>
-            </button>
+            <div className="hidden sm:flex items-center gap-2">
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                title="Atalhos"
+              >
+                <CornerDownRight className="h-4 w-4" aria-hidden />
+                <span className="hidden xl:inline">Atalhos</span>
+              </button>
+            </div>
 
             <button
               type="button"
-              className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-2 sm:px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               title="Notificações"
               aria-label="Notificações"
             >
@@ -551,11 +553,11 @@ export function AppLayout() {
 
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-2 sm:px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
               title="Perfil"
             >
               <UserCircle className="h-4 w-4" aria-hidden />
-              <span className="hidden lg:inline truncate max-w-[180px]">{user?.name || 'Conta'}</span>
+              <span className="hidden lg:inline truncate max-w-[120px] xl:max-w-[180px]">{user?.name || 'Conta'}</span>
             </button>
           </div>
         </header>
