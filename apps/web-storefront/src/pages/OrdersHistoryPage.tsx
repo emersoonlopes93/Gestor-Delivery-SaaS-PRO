@@ -13,7 +13,7 @@ import {
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useCartStore } from '../store/use-cart-store';
 import { useToast } from '../components/Toast';
-import type { OrderListItemDTO } from '@gestor/types';
+import type { OrderListItemDTO, OrderResponseDTO, OrderItemResponseDTO } from '@gestor/types';
 
 export function OrdersHistoryPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -52,16 +52,13 @@ export function OrdersHistoryPage() {
     try {
       showToast({ title: 'Recriando seu carrinho...', type: 'info' });
       
-      const { data: order }: any = await api.get(`/public/orders/${orderId}`);
+      const { data: order } = await api.get<OrderResponseDTO>(`/public/orders/${orderId}`);
       
       if (!order || !order.items) {
         throw new Error('Pedido não encontrado');
       }
 
-      // Clear current cart first? Let's append or ask. Usually iFood appends.
-      // For simplicity, let's append.
-      
-      for (const item of order.items) {
+      for (const item of order.items as OrderItemResponseDTO[]) {
         if (item.lineType === 'product') {
           // Map to CartLineItem snapshot format
           const cartItem = {
