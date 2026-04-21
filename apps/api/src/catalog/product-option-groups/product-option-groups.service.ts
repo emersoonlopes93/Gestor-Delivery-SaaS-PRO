@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, PriceImpactType, PricingAxis } from '@prisma/client';
+import { Prisma, PricingAxis } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { TenantContextService } from '../../common/context/tenant-context.service';
 import { CreateProductOptionGroupLinkDto } from './dto/create-product-option-group-link.dto';

@@ -2,21 +2,17 @@
 // PROMOTIONS & CASHBACK DOMAIN TYPES — Phase 8
 // ============================================================
 
-export type CouponType = 'percentage' | 'fixed_amount' | 'free_shipping';
+export type CouponType = 'percentage' | 'fixed';
 
 export interface CouponDTO {
   id: string;
   tenantId: string;
   code: string;
-  name: string;
-  description?: string | null;
   type: CouponType;
   value: number;
   minOrderValue?: number | null;
-  maxDiscountValue?: number | null;
   usageLimit?: number | null;
   usedCount: number;
-  startsAt?: string | null;
   expiresAt?: string | null;
   isActive: boolean;
   createdAt: string;

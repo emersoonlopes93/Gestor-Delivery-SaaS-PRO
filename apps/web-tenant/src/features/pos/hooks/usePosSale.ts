@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import type { OrderResponseDTO } from '@gestor/types';
 import { PosFulfillmentType, PaymentMethod } from '@gestor/types';
+import type { CreateOrderItemSelectionGroupDTO, CreateOrderItemComboSlotSelectionDTO, PizzaCompositionDTO } from '@gestor/types';
 
 export interface PosCreateSalePayload {
   idempotencyKey: string;
@@ -13,6 +14,9 @@ export interface PosCreateSalePayload {
     notes?: string;
     complements?: Array<{ groupId: string; itemId: string }>;
     comboSelections?: Array<{ blockId: string; blockItemId: string }>;
+    selections?: CreateOrderItemSelectionGroupDTO[];
+    pizzaComposition?: PizzaCompositionDTO;
+    slots?: CreateOrderItemComboSlotSelectionDTO[];
   }>;
   customerName?: string;
   customerPhone?: string;
@@ -41,16 +45,11 @@ export function useCreatePosSale() {
   return useMutation({
     mutationFn: async (payload: PosCreateSalePayload) => {
       try {
-        console.log('Creating POS sale with payload:', payload);
         const res = await api.post('/pos/sales', payload);
-        console.log('POS sale created successfully:', res.data);
         return res.data as OrderResponseDTO;
       } catch (error) {
-        console.error('Error creating POS sale:', error);
-        
         // Capturar erros específicos de conexão
         if (error instanceof Error && error.message.includes('Could not establish connection')) {
-          console.error('Chrome extension connection error detected - this may be caused by browser extensions');
           // Relançar com mensagem mais amigável
           throw new Error('Erro de conexão. Tente desabilitar extensões do navegador e recarregar a página.');
         }

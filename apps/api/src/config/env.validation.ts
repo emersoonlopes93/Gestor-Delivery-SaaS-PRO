@@ -18,6 +18,12 @@ const envSchema = z.object({
   RATE_LIMIT_PUBLIC_MAX_REQUESTS: z.coerce.number().int().positive().default(60),
   SWAGGER_ENABLED: z.enum(['true', 'false']).default('false'),
   SWAGGER_PATH: z.string().min(1).default('/docs'),
+
+  // WhatsApp Cloud API (Customer OTP)
+  WHATSAPP_CLOUD_ACCESS_TOKEN: z.string().default(''),
+  WHATSAPP_CLOUD_PHONE_NUMBER_ID: z.string().default(''),
+  WHATSAPP_CLOUD_GRAPH_API_VERSION: z.string().default('v19.0'),
+  WHATSAPP_OTP_MESSAGE_TEMPLATE: z.string().default('Seu código de acesso é: {{CODE}}'),
 });
 
 export type Env = z.infer<typeof envSchema>;

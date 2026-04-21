@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsBoolean, IsNumber, IsInt } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsInt } from 'class-validator';
 import { CreateProductComplementGroupDto as ICreateProductComplementGroupDto } from '@gestor/types';
 
 export class CreateComplementGroupDto implements ICreateProductComplementGroupDto {

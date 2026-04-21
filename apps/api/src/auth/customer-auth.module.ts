@@ -4,6 +4,7 @@ import { CustomerAuthController } from './customer-auth.controller';
 import { AuthModule } from './auth.module';
 import { DatabaseModule } from '../database/database.module';
 import { CrmModule } from '../crm/crm.module';
+import { WhatsAppCloudService } from './whatsapp-cloud.service';
 
 @Module({
   imports: [
@@ -12,7 +13,7 @@ import { CrmModule } from '../crm/crm.module';
     CrmModule,  // Provides CustomerService
   ],
   controllers: [CustomerAuthController],
-  providers: [CustomerAuthService],
+  providers: [CustomerAuthService, WhatsAppCloudService],
   exports: [CustomerAuthService],
 })
 export class CustomerAuthModule {}

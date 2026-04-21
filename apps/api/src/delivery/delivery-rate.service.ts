@@ -2,7 +2,7 @@ import { Inject, Injectable, NotFoundException, Logger, UnprocessableEntityExcep
 import { PrismaService } from '../database/prisma.service';
 import type { DeliveryAddressDTO } from '@gestor/types';
 import { Prisma } from '@prisma/client';
-import type { DeliveryCoverageConfig, DeliveryRateRule } from '@prisma/client';
+import type { DeliveryRateRule } from '@prisma/client';
 
 type DeliveryRateRuleRepo = any;
 type DeliveryCoverageRepo = any;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { api, ApiError } from '../../lib/api-client';
 
 interface ModuleItem {
   key: string;
@@ -14,18 +15,29 @@ export function TenantModulesPage() {
   const [modules, setModules] = useState<ModuleItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!tenantId) return;
 
     setLoading(true);
-    fetch(`/api/admin/modules/${tenantId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setModules(data);
+    setSaveMessage(null);
+    setErrorMessage(null);
+
+    api
+      .get<ModuleItem[]>(`/admin/modules/${tenantId}`)
+      .then((res) => {
+        if (res.success) {
+          setModules(res.data);
+        } else {
+          setModules([]);
+          setErrorMessage('Erro ao carregar módulos.');
+        }
       })
-      .catch(() => {
-        console.error('Erro ao carregar módulos');
+      .catch((err: unknown) => {
+        const msg = err instanceof ApiError ? err.message : 'Erro ao carregar módulos.';
+        setErrorMessage(msg);
       })
       .finally(() => setLoading(false));
   }, [tenantId]);
@@ -40,21 +52,22 @@ export function TenantModulesPage() {
     if (!tenantId) return;
 
     setSaving(true);
+    setSaveMessage(null);
+    setErrorMessage(null);
     try {
-      const response = await fetch(`/api/admin/modules/${tenantId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          modules: modules.map(({ key, enabled }) => ({ module: key, enabled }))
-        })
+      const res = await api.put(`/admin/modules/${tenantId}`, {
+        modules: modules.map(({ key, enabled }) => ({ module: key, enabled })),
       });
 
-      if (!response.ok) throw new Error('Erro ao salvar');
-      
-      alert('Configuração de módulos salva com sucesso!');
+      if (!res.success) {
+        setErrorMessage('Erro ao salvar configuração de módulos.');
+        return;
+      }
+
+      setSaveMessage('Configuração de módulos salva com sucesso!');
     } catch (error) {
-      console.error('Erro ao salvar:', error);
-      alert('Erro ao salvar configuração de módulos');
+      const msg = error instanceof ApiError ? error.message : 'Erro ao salvar configuração de módulos.';
+      setErrorMessage(msg);
     } finally {
       setSaving(false);
     }
@@ -76,6 +89,18 @@ export function TenantModulesPage() {
           Configure quais módulos estão disponíveis para este tenant
         </p>
       </div>
+
+      {errorMessage && (
+        <div className="mb-4 p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
+          {errorMessage}
+        </div>
+      )}
+
+      {saveMessage && (
+        <div className="mb-4 p-3 rounded-lg border border-green-200 bg-green-50 text-sm text-green-700">
+          {saveMessage}
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="p-6 border-b border-gray-200">

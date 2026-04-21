@@ -1,7 +1,7 @@
 import { useAuthStore } from '../../stores/auth.store';
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api-client';
-import { TenantSettings, TenantOperatingHours, ProductCategory, Product } from '@gestor/types';
+import { TenantSettings, TenantOperatingHours, ProductCategory, Product, DashboardStatsDTO } from '@gestor/types';
 import { SetupWizard } from './SetupWizard';
 import { Loader2 } from 'lucide-react';
 
@@ -15,16 +15,25 @@ export function DashboardPage() {
   const [settings, setSettings] = useState<TenantSettings | null>(null);
   const [operatingHours, setOperatingHours] = useState<TenantOperatingHours[]>([]);
   const [stats, setStats] = useState({ hasCategories: false, hasProducts: false });
+  const [dashboardStats, setDashboardStats] = useState<DashboardStatsDTO | null>(null);
 
   useEffect(() => {
     async function loadOnboardingData() {
       try {
+        const end = new Date();
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+
         const [meRes, hoursRes, catRes, prodRes] = await Promise.all([
           api.get<{ settings: TenantSettings }>('/tenant/me'),
           api.get<TenantOperatingHours[]>('/tenant/operating-hours'),
           api.get<ProductCategory[]>('/catalog/categories'),
-          api.get<Product[]>('/catalog/products')
+          api.get<Product[]>('/catalog/products'),
         ]);
+
+        const dashboardRes = await api.get<DashboardStatsDTO>(
+          `/analytics/dashboard?startDate=${encodeURIComponent(start.toISOString())}&endDate=${encodeURIComponent(end.toISOString())}`,
+        );
 
         if (meRes.success) setSettings(meRes.data.settings);
         if (hoursRes.success) setOperatingHours(hoursRes.data);
@@ -32,8 +41,9 @@ export function DashboardPage() {
           hasCategories: catRes.success && catRes.data.length > 0,
           hasProducts: prodRes.success && prodRes.data.length > 0
         });
+        if (dashboardRes.success) setDashboardStats(dashboardRes.data);
       } catch (err) {
-        console.error('Error loading onboarding data:', err);
+        setDashboardStats(null);
       } finally {
         setLoading(false);
       }
@@ -67,10 +77,26 @@ export function DashboardPage() {
           {/* Info cards placeholder */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {[
-              { label: 'Pedidos Hoje', value: '0', icon: '📦' },
-              { label: 'Faturamento', value: 'R$ 0,00', icon: '💰' },
-              { label: 'Ticket Médio', value: 'R$ 0,00', icon: '📊' },
-              { label: 'Em Preparo', value: '0', icon: '🍕' },
+              {
+                label: 'Pedidos Hoje',
+                value: String(dashboardStats?.operational?.totalOrders ?? 0),
+                icon: '📦',
+              },
+              {
+                label: 'Faturamento',
+                value: (dashboardStats?.commercial?.totalRevenue ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+                icon: '💰',
+              },
+              {
+                label: 'Ticket Médio',
+                value: (dashboardStats?.commercial?.averageTicket ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+                icon: '📊',
+              },
+              {
+                label: 'Cancelamento',
+                value: `${((dashboardStats?.operational?.cancellationRate ?? 0) * 100).toFixed(1)}%`,
+                icon: '⚠️',
+              },
             ].map((card) => (
               <div
                 key={card.label}

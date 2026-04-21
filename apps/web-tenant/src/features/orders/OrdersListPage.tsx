@@ -57,8 +57,6 @@ export function OrdersListPage() {
       const params = new URLSearchParams({ page: String(page), limit: '20' });
       if (statusFilter) params.set('status', statusFilter);
 
-      console.log('[OrdersListPage] Buscando pedidos...', { page, statusFilter });
-
       const res = await fetch(`${API_BASE}/orders?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -68,15 +66,22 @@ export function OrdersListPage() {
       }
 
       const json = await res.json();
-      console.log('[OrdersListPage] Resposta da API:', json);
 
       // Validar estrutura da resposta
       if (!json || typeof json !== 'object') {
         throw new Error('Resposta inválida da API');
       }
 
-      setOrders(Array.isArray(json.data) ? json.data : []);
-      setTotal(typeof json.total === 'number' ? json.total : 0);
+      // Compat: API antiga pode retornar { data, total }.
+      // Contrato atual do backend: { items, total }.
+      const items = Array.isArray((json as any).items)
+        ? (json as any).items
+        : Array.isArray((json as any).data)
+          ? (json as any).data
+          : [];
+
+      setOrders(items as OrderListItemDTO[]);
+      setTotal(typeof (json as any).total === 'number' ? (json as any).total : 0);
     } catch (err) {
       console.error('[OrdersListPage] Erro ao buscar pedidos:', err);
       setError(err instanceof Error ? err.message : 'Erro ao carregar pedidos');

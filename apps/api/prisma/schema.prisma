@@ -27,6 +27,7 @@ model Tenant {
 
   // Relations
   settings               TenantSettings?
+  subscription           TenantSubscription?
   users                  TenantUser[]
   roles                  TenantRole[]
   categories             ProductCategory[]
@@ -43,13 +44,16 @@ model Tenant {
   orderItemComboSelections OrderItemComboSelection[]
   orderDeliveryAddresses OrderDeliveryAddress[]
   orderTimelines         OrderTimeline[]
+  coupons                Coupon[]
+  scheduledOrders        ScheduledOrder[]
+  paymentTransactions     PaymentTransaction[]
   deliveryDrivers        DeliveryDriver[]
   deliveryDriverLocations DeliveryDriverLocation[]
+  printJobs              PrintJob[]
   cashSessions           CashSession[]
   cashMovements          CashMovement[]
 
   customers              Customer[]
-  coupons                Coupon[]
   cashbackTransactions   CashbackTransaction[]
 
   ingredients                Ingredient[]
@@ -968,6 +972,10 @@ model Order {
   cashbackHistory  CashbackTransaction[]
   stockMovements   StockMovement[]
   activeTable      DineInTable?          @relation("ActiveTableOrder")
+  orderCoupons    OrderCoupon[]
+  paymentTransactions PaymentTransaction[]
+  scheduledOrders  ScheduledOrder[]
+  printJobs       PrintJob[]
 
   @@unique([tenantId, idempotencyKey])
   @@unique([tenantId, orderNumber])
@@ -1158,6 +1166,154 @@ enum PaymentMethod {
   other
 }
 
+// ============================================================
+// BILLING — Phase 2
+// ============================================================
+
+enum BillingCycle {
+  monthly
+  yearly
+}
+
+enum SubscriptionStatus {
+  trial
+  active
+  canceled
+  overdue
+  suspended
+}
+
+model Plan {
+  id            String       @id @default(uuid())
+  name          String       @db.VarChar(100)
+  slug          String       @unique @db.VarChar(60)
+  price         Decimal      @db.Decimal(10, 2)
+  billingCycle  BillingCycle @default(monthly)
+  features      Json?        // { orders: true, analytics: true, kds: true, ... }
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  subscriptions TenantSubscription[]
+}
+
+model TenantSubscription {
+  id                   String             @id @default(uuid())
+  tenantId             String             @map("tenant_id")
+  planId               String             @map("plan_id")
+  status               SubscriptionStatus @default(active)
+  trialEndsAt          DateTime?          @map("trial_ends_at")
+  currentPeriodStartsAt DateTime           @map("current_period_starts_at")
+  currentPeriodEndsAt   DateTime           @map("current_period_ends_at")
+  canceledAt            DateTime?          @map("canceled_at")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId])
+}
+
+model PaymentTransaction {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  orderId         String?  @map("order_id")
+  gatewayName     String   @map("gateway_name") @db.VarChar(50) // "mercadopago", "stripe"
+  gatewayTxId     String   @map("gateway_tx_id") @db.VarChar(255)
+  method          PaymentMethod @map("method")
+  amount          Decimal  @db.Decimal(10, 2)
+  status          PaymentTxStatus @default(pending) @map("status")
+  metadata        Json?    // qrCode, expiresAt, etc
+  confirmedAt     DateTime? @map("confirmed_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order  Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([gatewayTxId])
+}
+
+enum PaymentTxStatus {
+  pending
+  confirmed
+  failed
+  expired
+}
+
+enum CouponType {
+  percentage
+  fixed
+}
+
+model Coupon {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  code          String   @db.VarChar(32)
+  type          CouponType
+  value         Decimal  @db.Decimal(10, 2)
+  minOrderValue Decimal? @map("min_order_value") @db.Decimal(10, 2)
+  usageLimit    Int?     @map("usage_limit")
+  usedCount     Int      @default(0) @map("used_count")
+  isActive      Boolean  @default(true) @map("is_active")
+  expiresAt     DateTime? @map("expires_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderCoupons OrderCoupon[]
+  orders        Order[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("coupons")
+}
+
+model OrderCoupon {
+  id            String   @id @default(uuid())
+  orderId       String   @map("order_id")
+  couponId      String   @map("coupon_id")
+  discountAmount Decimal  @map("discount_amount") @db.Decimal(10, 2)
+
+  // Relations
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, couponId])
+}
+
+model ScheduledOrder {
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  orderId         String?   @map("order_id") // null até ser confirmado
+  customerName    String    @map("customer_name") @db.VarChar(100)
+  customerPhone   String    @map("customer_phone") @db.VarChar(20)
+  fulfillmentType FulfillmentType @map("fulfillment_type")
+  scheduledFor    DateTime  @map("scheduled_for")
+  notes           String?   @db.Text
+  status          ScheduledOrderStatus @default(scheduled) @map("status")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order  Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, scheduledFor])
+}
+
+enum ScheduledOrderStatus {
+  scheduled
+  confirmed
+  cancelled
+  expired
+}
+
 enum CashSessionStatus {
   open
   closed
@@ -1171,6 +1327,39 @@ enum CashMovementType {
   refund
   adjustment
   closing
+}
+
+model PrintJob {
+  id          String    @id @default(uuid())
+  tenantId    String    @map("tenant_id")
+  orderId     String    @map("order_id")
+  station     String    @db.VarChar(50) // "kitchen", "bar", "cashier"
+  type        PrintType // "customer", "kitchen", "summary"
+  content     String    @db.Text
+  status      PrintJobStatus @default(pending) @map("status")
+  tries       Int       @default(0)
+  lastTriedAt DateTime? @map("last_tried_at")
+  printedAt   DateTime? @map("printed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+}
+
+enum PrintType {
+  customer
+  kitchen
+  summary
+}
+
+enum PrintJobStatus {
+  pending
+  printing
+  failed
+  completed
 }
 
 model CashSession {
@@ -1253,44 +1442,11 @@ model Customer {
   @@map("customers")
 }
 
-enum CouponType {
-  percentage
-  fixed_amount
-  free_shipping
-}
-
-model Coupon {
-  id               String     @id @default(uuid())
-  tenantId         String     @map("tenant_id")
-  code             String     @db.VarChar(50)
-  name             String     @db.VarChar(100)
-  description      String?    @db.Text
-  type             CouponType
-  value            Decimal    @db.Decimal(10, 2)
-  minOrderValue    Decimal?   @map("min_order_value") @db.Decimal(10, 2)
-  maxDiscountValue Decimal?   @map("max_discount_value") @db.Decimal(10, 2)
-  usageLimit       Int?       @map("usage_limit")
-  usedCount        Int        @default(0) @map("used_count")
-  startsAt         DateTime?  @map("starts_at")
-  expiresAt        DateTime?  @map("expires_at")
-  isActive         Boolean    @default(true) @map("is_active")
-
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
-
-  tenant           Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  orders           Order[]
-
-  @@unique([tenantId, code])
-  @@index([tenantId])
-  @@map("coupons")
-}
-
 enum CashbackTransactionType {
   earned
-  redeemed
-  adjustment
+  used
   expired
+  refunded
 }
 
 model CashbackTransaction {

@@ -24,6 +24,8 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
   const [bundleItems] = useState<CartBundleItemSnapshot[]>(combo.bundleItems ?? []);
   const [notes, setNotes] = useState('');
 
+  const isComboAvailable = combo.isAvailable && !isStoreClosed;
+
   // Calculate current subtotal for the modal view
   const currentPrice = useMemo(() => {
     const extras = selectedItems.reduce((sum, item) => sum + item.price, 0);
@@ -65,6 +67,7 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
 
   const handleAddToCart = () => {
     if (validationError) return;
+    if (!isComboAvailable) return;
     addCombo(combo, quantity, selectedItems, bundleItems, notes);
     onClose();
   };
@@ -99,6 +102,13 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
               {combo.description || 'Escolha seus itens favoritos neste combo.'}
             </p>
           </header>
+
+          {!combo.isAvailable ? (
+            <div className="mb-6 bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-2 text-red-700 text-xs font-medium">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              Indisponível no momento.
+            </div>
+          ) : null}
 
           <div className="space-y-8">
             {isBundle ? (
@@ -214,15 +224,15 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
 
             <button
               onClick={handleAddToCart}
-              disabled={!!validationError || isStoreClosed}
+              disabled={!!validationError || !isComboAvailable}
               className={cn(
                 "flex-1 h-12 rounded-2xl flex items-center justify-between px-6 font-bold transition-all active:scale-[0.98]",
-                (validationError || isStoreClosed)
+                (validationError || !isComboAvailable)
                   ? "bg-gray-200 text-gray-400 cursor-not-allowed" 
                   : "bg-orange-600 text-white shadow-lg shadow-orange-100 hover:bg-orange-700"
               )}
             >
-              <span>{isStoreClosed ? 'Loja Fechada' : 'Adicionar Combo'}</span>
+              <span>{isStoreClosed ? 'Loja Fechada' : !combo.isAvailable ? 'Indisponível' : 'Adicionar Combo'}</span>
               <span className="text-lg">
                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentPrice)}
               </span>

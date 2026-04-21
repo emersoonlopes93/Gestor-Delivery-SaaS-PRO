@@ -291,7 +291,9 @@ export class CheckoutValidatorService {
       throw new BadRequestException(`Produto não encontrado ou não pertence a esta loja.`);
     }
 
-    if (hasNewSelections) {
+    const shouldCheckAvailabilityByChannel = channel !== 'pos';
+
+    if (shouldCheckAvailabilityByChannel) {
       await this.availabilityService.assertCanSell({
         tenantId,
         productId: item.productId,

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { UpsertRecipeDTO, RecipeIngredientDTO, UnitType } from '@gestor/types';
 import { UnitType as PrismaUnitType } from '@prisma/client';

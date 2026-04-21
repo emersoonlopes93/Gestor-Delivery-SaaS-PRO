@@ -2,8 +2,6 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../database/prisma.service';
 import {
   Upsell,
-  UpsellItem,
-  ProductUpsell,
   CreateUpsellDto,
   UpdateUpsellDto,
   UpsellWithItems,

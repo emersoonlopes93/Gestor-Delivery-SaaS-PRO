@@ -8,6 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
 import { CustomerService } from '../crm/customer.service';
+import { WhatsAppCloudService } from './whatsapp-cloud.service';
 import type { CustomerJwtPayload } from '@gestor/types';
 
 @Injectable()
@@ -19,6 +20,7 @@ export class CustomerAuthService {
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
     private readonly customerService: CustomerService,
+    private readonly whatsappCloud: WhatsAppCloudService,
   ) {}
 
   /**
@@ -49,7 +51,7 @@ export class CustomerAuthService {
     });
 
     if (lastOtp) {
-       throw new BadRequestException('Aguarde 60 segundos para solicitar um novo código');
+      throw new BadRequestException('Aguarde 60 segundos para solicitar um novo código');
     }
 
     // Generate 6-digit code
@@ -57,7 +59,7 @@ export class CustomerAuthService {
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
     // Save to DB
-    await this.prisma.customerOTP.create({
+    const created = await this.prisma.customerOTP.create({
       data: {
         tenantId: tenant.id,
         phone: cleanPhone,
@@ -66,12 +68,12 @@ export class CustomerAuthService {
       },
     });
 
-    // MOCK: In production, send via SMS/WhatsApp gateway
-    this.logger.log(`[OTP_SENT] Tenant: ${tenantSlug}, Phone: ${cleanPhone}`);
-    
-    // In dev, show code. In prod, this would be hidden.
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`\n\n>>> OTP CODE FOR ${cleanPhone}: ${code} <<<\n\n`);
+    try {
+      await this.whatsappCloud.sendOtp(cleanPhone, code);
+    } catch (e) {
+      // Se falhar o envio, remove o OTP criado para evitar "código pendurado" sem entrega.
+      await this.prisma.customerOTP.delete({ where: { id: created.id } }).catch(() => undefined);
+      throw new BadRequestException('Não foi possível enviar o código no momento. Tente novamente.');
     }
 
     return { message: 'Código enviado com sucesso' };

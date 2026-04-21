@@ -148,121 +148,129 @@ export class StorefrontService {
         name: cat.name,
         slug: cat.slug,
         products: cat.products
-          .filter((p: any) => p.isAvailable) // Mostrar produtos disponíveis independentemente do horário da loja
-          .map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            slug: p.slug,
-            shortDescription: p.shortDescription,
-            longDescription: p.longDescription,
-            basePrice: Number(p.basePrice),
-            image: p.image,
-            isAvailable: true,
-            complements: p.complementGroups.map((link: any) => ({
-              id: link.group.id,
-              name: link.group.name,
-              description: link.group.description,
-              minSelect: link.group.minSelect,
-              maxSelect: link.group.maxSelect,
-              isRequired: link.group.isRequired,
-              items: link.group.items.map((item: any) => ({
-                id: item.id,
-                name: item.name,
-                description: item.description,
-                additionalPrice: Number(item.additionalPrice),
-                isAvailable: item.isActive,
+          .map((p: any) => {
+            const canSell = availabilityMap.get(p.id) ?? true;
+            const isAvailable = Boolean(p.isAvailable) && canSell;
+            return {
+              id: p.id,
+              name: p.name,
+              slug: p.slug,
+              shortDescription: p.shortDescription,
+              longDescription: p.longDescription,
+              basePrice: Number(p.basePrice),
+              image: p.image,
+              isAvailable,
+              complements: p.complementGroups.map((link: any) => ({
+                id: link.group.id,
+                name: link.group.name,
+                description: link.group.description,
+                minSelect: link.group.minSelect,
+                maxSelect: link.group.maxSelect,
+                isRequired: link.group.isRequired,
+                items: link.group.items.map((item: any) => ({
+                  id: item.id,
+                  name: item.name,
+                  description: item.description,
+                  additionalPrice: Number(item.additionalPrice),
+                  isAvailable: item.isActive,
+                })),
               })),
-            })),
-            upsells: p.upsellLinks
-              .filter((link: any) => link.upsell.displayType !== 'cart')
-              .map((link: any) => ({
-                id: link.upsell.id,
-                name: link.upsell.name,
-                description: link.upsell.description,
-                displayType: link.upsell.displayType as any,
-                items: link.upsell.items
-                  .filter((i: any) => i.product.isActive && i.product.deletedAt === null)
-                  .map((i: any) => {
-                    const originalPrice = Number(i.product.basePrice);
-                    const finalPrice = this.upsellsService.calculateUpsellPrice(
-                      originalPrice,
-                      link.upsell.pricingType,
-                      Number(link.upsell.pricingValue),
-                    );
-                    return {
-                      productId: i.productId,
-                      name: i.product.name,
-                      image: i.product.image,
-                      originalPrice,
-                      finalPrice,
-                      discountApplied: originalPrice - finalPrice,
-                    };
-                  }),
-              })),
-          })) as StorefrontProductPayload[],
+              upsells: p.upsellLinks
+                .filter((link: any) => link.upsell.displayType !== 'cart')
+                .map((link: any) => ({
+                  id: link.upsell.id,
+                  name: link.upsell.name,
+                  description: link.upsell.description,
+                  displayType: link.upsell.displayType as any,
+                  items: link.upsell.items
+                    .filter((i: any) => i.product.isActive && i.product.deletedAt === null)
+                    .map((i: any) => {
+                      const originalPrice = Number(i.product.basePrice);
+                      const finalPrice = this.upsellsService.calculateUpsellPrice(
+                        originalPrice,
+                        link.upsell.pricingType,
+                        Number(link.upsell.pricingValue),
+                      );
+                      return {
+                        productId: i.productId,
+                        name: i.product.name,
+                        image: i.product.image,
+                        originalPrice,
+                        finalPrice,
+                        discountApplied: originalPrice - finalPrice,
+                      };
+                    }),
+                })),
+            };
+          })
+          .filter((p: any) => p.isAvailable) as StorefrontProductPayload[],
       }))
       .filter((cat: any) => cat.products.length > 0);
 
     const combos: StorefrontComboPayload[] = comboRows
-      .filter((combo) => combo.isAvailable) // Mostrar combos disponíveis independentemente do horário da loja
-      .map((combo) => ({
-        id: combo.id,
-        name: combo.name,
-        slug: combo.slug,
-        description: combo.shortDescription,
-        basePrice: Number(combo.basePrice),
-        image: combo.image,
-        isAvailable: true,
-        comboMode: combo.comboMode ?? 'bundle',
-        pricingType: combo.comboPricingType ?? 'fixed_price',
-        pricingValue: Number(combo.comboPricingValue ?? 0),
-        itemsSubtotal: combo.comboMode === 'bundle'
-          ? Number(
-              combo.comboBundleItems
-                .reduce((sum: number, item: any) => sum + (item.product ? Number(item.product.basePrice) * Math.max(1, item.qty) : 0), 0)
-                .toFixed(2),
-            )
-          : undefined,
-        discountTotal: combo.comboMode === 'bundle'
-          ? Number(
-              (
-                combo.comboBundleItems.reduce((sum: number, item: any) => sum + (item.product ? Number(item.product.basePrice) * Math.max(1, item.qty) : 0), 0) -
-                Number(combo.basePrice)
-              ).toFixed(2),
-            )
-          : undefined,
-        bundleItems:
-          (combo.comboMode ?? 'bundle') === 'bundle'
-            ? combo.comboBundleItems
-                .filter((item: any) => item.product && item.product.isActive && item.product.deletedAt === null)
-                .map((item: any) => ({
-                  id: item.id,
-                  productId: item.productId,
-                  productName: item.product!.name,
-                  qty: Math.max(1, item.qty),
-                  unitPrice: Number(item.product!.basePrice),
-                  subtotal: Number((Number(item.product!.basePrice) * Math.max(1, item.qty)).toFixed(2)),
-                }))
+      .map((combo) => {
+        const canSell = availabilityMap.get(combo.id) ?? true;
+        const isAvailable = Boolean(combo.isAvailable) && canSell;
+        return {
+          id: combo.id,
+          name: combo.name,
+          slug: combo.slug,
+          description: combo.shortDescription,
+          basePrice: Number(combo.basePrice),
+          image: combo.image,
+          isAvailable,
+          comboMode: combo.comboMode ?? 'bundle',
+          pricingType: combo.comboPricingType ?? 'fixed_price',
+          pricingValue: Number(combo.comboPricingValue ?? 0),
+          itemsSubtotal: combo.comboMode === 'bundle'
+            ? Number(
+                combo.comboBundleItems
+                  .reduce((sum: number, item: any) => sum + (item.product ? Number(item.product.basePrice) * Math.max(1, item.qty) : 0), 0)
+                  .toFixed(2),
+              )
             : undefined,
-        blocks:
-          (combo.comboMode ?? 'bundle') === 'slot'
-            ? combo.comboSlots.map((b: any) => ({
-                id: b.id,
-                name: b.name,
-                description: b.description,
-                minSelect: b.minSelect,
-                maxSelect: b.maxSelect,
-                items: b.allowedItems
-                  .filter((item: any) => item.product.isActive && item.product.deletedAt === null)
+          discountTotal: combo.comboMode === 'bundle'
+            ? Number(
+                (
+                  combo.comboBundleItems.reduce((sum: number, item: any) => sum + (item.product ? Number(item.product.basePrice) * Math.max(1, item.qty) : 0), 0) -
+                  Number(combo.basePrice)
+                ).toFixed(2),
+              )
+            : undefined,
+          bundleItems:
+            (combo.comboMode ?? 'bundle') === 'bundle'
+              ? combo.comboBundleItems
+                  .filter((item: any) => item.product && item.product.isActive && item.product.deletedAt === null)
                   .map((item: any) => ({
                     id: item.id,
                     productId: item.productId,
-                    productName: item.product.name,
-                    additionalPrice: Number(item.additionalPrice),
-                  })),
-              }))
-            : undefined,
-      }));
+                    productName: item.product!.name,
+                    qty: Math.max(1, item.qty),
+                    unitPrice: Number(item.product!.basePrice),
+                    subtotal: Number((Number(item.product!.basePrice) * Math.max(1, item.qty)).toFixed(2)),
+                  }))
+              : undefined,
+          blocks:
+            (combo.comboMode ?? 'bundle') === 'slot'
+              ? combo.comboSlots.map((b: any) => ({
+                  id: b.id,
+                  name: b.name,
+                  description: b.description,
+                  minSelect: b.minSelect,
+                  maxSelect: b.maxSelect,
+                  items: b.allowedItems
+                    .filter((item: any) => item.product.isActive && item.product.deletedAt === null)
+                    .map((item: any) => ({
+                      id: item.id,
+                      productId: item.productId,
+                      productName: item.product.name,
+                      additionalPrice: Number(item.additionalPrice),
+                    })),
+                }))
+              : undefined,
+        };
+      })
+      .filter((combo) => combo.isAvailable);
 
     const storeStatus = await this.availabilityService.getStoreStatus(tenant.id);
 

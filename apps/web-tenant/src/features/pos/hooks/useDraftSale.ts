@@ -16,9 +16,6 @@ export function useDraftSale() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posSalon'] });
-    },
-    onError: (err: Error) => {
-      console.error('Draft save error:', err.message);
     }
   });
 }

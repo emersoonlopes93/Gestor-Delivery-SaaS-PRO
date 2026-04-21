@@ -28,6 +28,8 @@ import { ProductCard } from './components/ProductCard';
 import { PaymentModal } from './components/PaymentModal';
 import { PosSalonView, type SalonTable } from './components/PosSalonView';
 import { TransferTableModal } from './components/TransferTableModal';
+import { PosItemConfiguratorModal } from './components/PosItemConfiguratorModal';
+import type { CreateOrderItemSelectionGroupDTO, CreateOrderItemComboSlotSelectionDTO, PizzaCompositionDTO } from '@gestor/types';
 
 interface CatalogProduct {
   id: string;
@@ -48,6 +50,11 @@ interface CartItem {
   basePrice: number;
   quantity: number;
   notes: string;
+  complements?: Array<{ groupId: string; itemId: string }>;
+  selections?: CreateOrderItemSelectionGroupDTO[];
+  slots?: CreateOrderItemComboSlotSelectionDTO[];
+  pizzaComposition?: PizzaCompositionDTO;
+  compositionLabel?: string;
 }
 
 interface CustomerResult {
@@ -114,6 +121,8 @@ export default function PosPage() {
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [sourceTableForTransfer, setSourceTableForTransfer] = useState<SalonTable | null>(null);
 
+  const [configProductId, setConfigProductId] = useState<string | null>(null);
+
   const handleTransferTable = useCallback((table: SalonTable) => {
     setSourceTableForTransfer(table);
     setIsTransferModalOpen(true);
@@ -161,7 +170,7 @@ export default function PosPage() {
         }
       }
     } catch (err) {
-      console.error('Print error:', err);
+      // Falha de impressão não deve bloquear o PDV.
     }
   };
 
@@ -218,13 +227,24 @@ export default function PosPage() {
   }, [products, selectedCategoryId]);
 
   const addToCart = useCallback((product: CatalogProduct) => {
-    const isCombo = product.type === 'combo';
-    setCart((prev) => [...prev, {
+    // Produtos configuráveis/combos devem passar pelo fluxo de configuração.
+    if (product.type === 'configurable' || product.type === 'combo') {
+      setConfigProductId(product.id);
+      return;
+    }
+
+    setCart((prev) => [
+      ...prev,
+      {
         cartLineId: generateId(),
-        lineType: isCombo ? 'combo' : 'product',
-        ...(isCombo ? { comboId: product.id } : { productId: product.id }),
-        name: product.name, basePrice: product.basePrice, quantity: 1, notes: '',
-    }]);
+        lineType: 'product',
+        productId: product.id,
+        name: product.name,
+        basePrice: product.basePrice,
+        quantity: 1,
+        notes: '',
+      },
+    ]);
   }, []);
 
   const updateCartItem = (lineId: string, updates: Partial<CartItem>) => {
@@ -274,7 +294,17 @@ export default function PosPage() {
     idempotencyKey: generateId(),
     items: cart.map((item) => ({
       lineType: item.lineType,
-      ...(item.lineType === 'product' ? { productId: item.productId } : { comboId: item.comboId }),
+      ...(item.lineType === 'product'
+        ? {
+            productId: item.productId,
+            complements: item.complements,
+            selections: item.selections,
+            pizzaComposition: item.pizzaComposition,
+          }
+        : {
+            // Para combos V2, o backend espera productId quando vier com slots.
+            ...(item.slots && item.productId ? { productId: item.productId, slots: item.slots } : { comboId: item.comboId }),
+          }),
       quantity: item.quantity,
       notes: item.notes || undefined,
     })),
@@ -429,22 +459,27 @@ export default function PosPage() {
                </div>
              ) : (
                cart.map((item) => (
-                 <div key={item.cartLineId} className="bg-gray-800/40 border border-gray-800/50 rounded-2xl p-4 group transition-all hover:bg-gray-800/60">
-                    <div className="flex justify-between items-start gap-4 mb-3">
-                       <p className="font-bold text-gray-100 text-[13px] leading-tight">{item.name}</p>
-                       <button onClick={() => removeFromCart(item.cartLineId)} className="text-gray-600 hover:text-red-500 transition-colors"><X size={16} /></button>
-                    </div>
-                    <div className="flex items-center justify-between">
-                       <div className="flex items-center bg-gray-950 rounded-xl p-1 border border-gray-800/50">
-                          <button onClick={() => updateCartItem(item.cartLineId, { quantity: Math.max(1, item.quantity - 1) })} className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-white"><Minus size={14} strokeWidth={3} /></button>
-                          <span className="w-8 text-center font-black text-sm text-white">{item.quantity}</span>
-                          <button onClick={() => updateCartItem(item.cartLineId, { quantity: item.quantity + 1 })} className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-white"><Plus size={14} strokeWidth={3} /></button>
-                       </div>
-                       <p className="text-emerald-400 font-extrabold text-lg">{formatCurrency(item.basePrice * item.quantity)}</p>
-                    </div>
-                 </div>
-               ))
-             )}
+                <div key={item.cartLineId} className="bg-gray-800/40 border border-gray-800/50 rounded-2xl p-4 group transition-all hover:bg-gray-800/60">
+                   <div className="flex justify-between items-start gap-4 mb-3">
+                      <p className="font-bold text-gray-100 text-[13px] leading-tight">{item.name}</p>
+                      <button onClick={() => removeFromCart(item.cartLineId)} className="text-gray-600 hover:text-red-500 transition-colors"><X size={16} /></button>
+                   </div>
+                   {item.compositionLabel ? (
+                     <div className="text-[10px] text-gray-500 font-bold mb-2 line-clamp-2">
+                       {item.compositionLabel}
+                     </div>
+                   ) : null}
+                   <div className="flex items-center justify-between">
+                      <div className="flex items-center bg-gray-950 rounded-xl p-1 border border-gray-800/50">
+                         <button onClick={() => updateCartItem(item.cartLineId, { quantity: Math.max(1, item.quantity - 1) })} className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-white"><Minus size={14} strokeWidth={3} /></button>
+                         <span className="w-8 text-center font-black text-sm text-white">{item.quantity}</span>
+                         <button onClick={() => updateCartItem(item.cartLineId, { quantity: item.quantity + 1 })} className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-white"><Plus size={14} strokeWidth={3} /></button>
+                      </div>
+                      <p className="text-emerald-400 font-extrabold text-lg">{formatCurrency(item.basePrice * item.quantity)}</p>
+                   </div>
+                </div>
+              ))
+            )}
         </div>
 
         <div className="p-4 bg-gray-950 space-y-4 shadow-[0_-10px_20px_rgba(0,0,0,0.2)]">
@@ -502,6 +537,37 @@ export default function PosPage() {
           sourceTableId={sourceTableForTransfer.id}
           sourceTableName={sourceTableForTransfer.name}
           availableTables={salonTables?.filter(t => t.id !== sourceTableForTransfer.id).map(t => ({ id: t.id, name: t.name, status: t.status })) || []}
+        />
+      )}
+
+      {configProductId && (
+        <PosItemConfiguratorModal
+          isOpen={!!configProductId}
+          productId={configProductId}
+          onClose={() => setConfigProductId(null)}
+          onConfirm={(res) => {
+            setCart((prev) => [
+              ...prev,
+              {
+                cartLineId: generateId(),
+                lineType: res.lineType,
+                ...(res.lineType === 'combo'
+                  ? { comboId: res.productId, productId: res.productId, slots: res.slots }
+                  : {
+                      productId: res.productId,
+                      complements: res.complements,
+                      selections: res.selections,
+                      pizzaComposition: res.pizzaComposition,
+                    }),
+                name: res.name,
+                basePrice: res.computedUnitPrice,
+                quantity: res.quantity,
+                notes: res.notes || '',
+                compositionLabel: res.compositionLabel,
+              },
+            ]);
+            setConfigProductId(null);
+          }}
         />
       )}
     </div>

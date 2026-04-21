@@ -17,7 +17,6 @@ export class CouponsService {
       ...c,
       value: Number(c.value),
       minOrderValue: c.minOrderValue != null ? Number(c.minOrderValue) : null,
-      maxDiscountValue: c.maxDiscountValue != null ? Number(c.maxDiscountValue) : null,
     }));
   }
 
@@ -80,11 +79,8 @@ export class CouponsService {
       where: { id },
       data: {
         name: data.name !== undefined ? data.name : coupon.name,
-        description: data.description !== undefined ? data.description : coupon.description,
         minOrderValue: data.minOrderValue !== undefined ? data.minOrderValue : coupon.minOrderValue,
-        maxDiscountValue: data.maxDiscountValue !== undefined ? data.maxDiscountValue : coupon.maxDiscountValue,
         usageLimit: data.usageLimit !== undefined ? data.usageLimit : coupon.usageLimit,
-        startsAt: data.startsAt !== undefined ? (data.startsAt ? new Date(data.startsAt) : null) : coupon.startsAt,
         expiresAt: data.expiresAt !== undefined ? (data.expiresAt ? new Date(data.expiresAt) : null) : coupon.expiresAt,
         isActive: data.isActive !== undefined ? data.isActive : coupon.isActive,
       },
@@ -94,7 +90,6 @@ export class CouponsService {
       ...updated,
       value: Number(updated.value),
       minOrderValue: updated.minOrderValue ? Number(updated.minOrderValue) : null,
-      maxDiscountValue: updated.maxDiscountValue ? Number(updated.maxDiscountValue) : null,
     };
   }
 
@@ -106,17 +101,13 @@ export class CouponsService {
       },
     });
 
-    if (!coupon) throw new BadRequestException('Coupon not found');
-    if (!coupon.isActive) throw new BadRequestException('Coupon is inactive');
-
+    if (!coupon) throw new NotFoundException('Coupon not found');
+    if (!coupon.isActive) throw new BadRequestException('Coupon is not active');
     const now = new Date();
-    if (coupon.startsAt && coupon.startsAt > now) throw new BadRequestException('Coupon is not yet valid');
-    if (coupon.expiresAt && coupon.expiresAt < now) throw new BadRequestException('Coupon is expired');
-
-    if (coupon.usageLimit !== null && coupon.usedCount >= coupon.usageLimit) {
-      throw new BadRequestException('Coupon usage limit reached');
-    }
-
+    if (coupon.expiresAt && coupon.expiresAt < now) throw new BadRequestException('Coupon has expired');
+    if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) throw new BadRequestException('Coupon usage limit reached');
+    
+    let discountAmount = 0;
     if (coupon.minOrderValue && currentTotal < Number(coupon.minOrderValue)) {
       throw new BadRequestException(`Minimum order value is R$ ${coupon.minOrderValue}`);
     }
@@ -124,18 +115,11 @@ export class CouponsService {
     // Calculate discount
     let discount = 0;
     const value = Number(coupon.value);
-    const maxDiscount = coupon.maxDiscountValue ? Number(coupon.maxDiscountValue) : null;
 
-    if (coupon.type === 'fixed_amount') {
+    if (coupon.type === 'fixed') {
       discount = value;
     } else if (coupon.type === 'percentage') {
       discount = currentTotal * (value / 100);
-      if (maxDiscount && discount > maxDiscount) {
-        discount = maxDiscount;
-      }
-    } else if (coupon.type === 'free_shipping') {
-        // Handled at checkout
-        discount = 0; 
     }
 
     // Discount cannot exceed current total

@@ -183,7 +183,10 @@ export function StorefrontPage() {
                 <button
                   key={combo.id}
                   onClick={() => setSelectedCombo(combo)}
-                  className="flex bg-orange-50/50 rounded-xl p-3 border border-orange-100/50 hover:border-orange-200 transition-all text-left group"
+                  disabled={!combo.isAvailable}
+                  className={`flex bg-orange-50/50 rounded-xl p-3 border border-orange-100/50 transition-all text-left group ${
+                    combo.isAvailable ? 'hover:border-orange-200' : 'opacity-50 grayscale cursor-not-allowed'
+                  }`}
                 >
                   <div className="flex-1 pr-3">
                     <div className="flex items-center gap-2 mb-1">
@@ -191,6 +194,9 @@ export function StorefrontPage() {
                       <h3 className="font-bold text-gray-900 group-hover:text-orange-600 transition-colors uppercase text-sm tracking-wide">
                         {combo.name}
                       </h3>
+                      {!combo.isAvailable ? (
+                        <span className="ml-auto text-[10px] font-black text-red-600 uppercase">Indisponível</span>
+                      ) : null}
                     </div>
                     <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed italic">
                       {combo.description || 'Combo completo para você.'}
@@ -227,12 +233,18 @@ export function StorefrontPage() {
                 <button
                   key={product.id}
                   onClick={() => setSelectedProduct(product)}
-                  className="flex bg-white rounded-xl p-3 shadow-sm border border-gray-100 hover:border-primary-200 transition-all text-left group"
+                  disabled={!product.isAvailable}
+                  className={`flex bg-white rounded-xl p-3 shadow-sm border border-gray-100 transition-all text-left group ${
+                    product.isAvailable ? 'hover:border-primary-200' : 'opacity-50 grayscale cursor-not-allowed'
+                  }`}
                 >
                   <div className="flex-1 pr-3">
                     <h3 className="font-bold text-gray-900 group-hover:text-primary-600 transition-colors uppercase text-sm tracking-wide">
                       {product.name}
                     </h3>
+                    {!product.isAvailable ? (
+                      <div className="mt-1 text-[10px] font-black text-red-600 uppercase">Indisponível</div>
+                    ) : null}
                     <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed">
                       {product.shortDescription || 'Sem descrição.'}
                     </p>

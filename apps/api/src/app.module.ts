@@ -16,6 +16,7 @@ import { StorefrontModule } from './storefront/storefront.module';
 import { OrdersModule } from './orders/orders.module';
 import { DeliveryModule } from './delivery/delivery.module';
 import { CashModule } from './cash/cash.module';
+import { BillingModule } from './billing/billing.module';
 import { PosModule } from './pos/pos.module';
 import { CrmModule } from './crm/crm.module';
 import { PromotionsModule } from './promotions/promotions.module';
@@ -66,11 +67,10 @@ import { CustomerAuthModule } from './auth/customer-auth.module';
     // Multi-tenant
     TenantModule,
 
-    // RBAC (tenant)
+    // Auth & RBAC (Phase 2)
     RbacModule,
-
-    // SaaS Admin context
     AdminModule,
+    BillingModule,
 
     // Tenant Context (Shared)
     TenantContextModule,

@@ -38,6 +38,7 @@ export const useCartStore = create<CartState>()(
       },
 
       addItem: (product, quantity, options, notes, sourceUpsellId) => {
+        if (!product.isAvailable) return;
         const extrasPrice = options.reduce((sum, opt) => sum + opt.price, 0);
         const lineSubtotal = (product.basePrice + extrasPrice) * quantity;
         
@@ -69,6 +70,7 @@ export const useCartStore = create<CartState>()(
       },
 
       addCombo: (combo, quantity, selectedItems, bundleItems, notes) => {
+        if (!combo.isAvailable) return;
         const extrasPrice = selectedItems.reduce((sum, item) => sum + item.price, 0);
         const lineSubtotal = (combo.basePrice + extrasPrice) * quantity;
         

@@ -256,7 +256,7 @@ export class AnalyticsService {
     };
   }
 
-  private async revenueByCategory(_tenantId: string, _where: Prisma.OrderWhereInput): Promise<Record<string, number>> {
+  private async revenueByCategory(): Promise<Record<string, number>> {
     // Placeholder to keep contract stable during hardening.
     return { Destaques: 100 };
   }

@@ -8,7 +8,6 @@ import {
   ADMIN_ROLE_PERMISSIONS,
 } from '@gestor/core';
 import { TenantDefaultRole, AdminDefaultRole } from '@gestor/core';
-import { slugify } from '@gestor/utils';
 
 @Injectable()
 export class SeedService {

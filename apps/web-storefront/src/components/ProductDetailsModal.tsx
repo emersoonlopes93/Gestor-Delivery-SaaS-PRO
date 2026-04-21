@@ -22,6 +22,8 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
   const [selectedOptions, setSelectedOptions] = useState<CartSelectedComplement[]>([]);
   const [notes, setNotes] = useState('');
 
+  const isProductAvailable = product.isAvailable && !isStoreClosed;
+
   // Calculate current subtotal for the modal view
   const currentPrice = useMemo(() => {
     const extras = selectedOptions.reduce((sum, opt) => sum + opt.price, 0);
@@ -63,6 +65,7 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
 
   const handleAddToCart = () => {
     if (validationError) return;
+    if (!isProductAvailable) return;
     addItem(product, quantity, selectedOptions, notes);
     onClose();
   };
@@ -110,6 +113,13 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
               <p className="text-gray-400 mt-4 text-xs italic">{product.longDescription}</p>
             )}
           </header>
+
+          {!product.isAvailable ? (
+            <div className="mb-6 bg-red-50 border border-red-100 p-3 rounded-xl flex items-center gap-2 text-red-700 text-xs font-medium">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              Indisponível no momento.
+            </div>
+          ) : null}
 
           {/* Complements Sections */}
           <div className="space-y-8">
@@ -252,15 +262,15 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
 
             <button
               onClick={handleAddToCart}
-              disabled={!!validationError || isStoreClosed}
+              disabled={!!validationError || !isProductAvailable}
               className={cn(
                 "flex-1 h-12 rounded-2xl flex items-center justify-between px-6 font-bold transition-all active:scale-[0.98]",
-                (validationError || isStoreClosed)
+                (validationError || !isProductAvailable)
                   ? "bg-gray-200 text-gray-400 cursor-not-allowed" 
                   : "bg-primary-600 text-white shadow-lg shadow-primary-100 hover:bg-primary-700"
               )}
             >
-              <span>{isStoreClosed ? 'Loja Fechada' : 'Adicionar'}</span>
+              <span>{isStoreClosed ? 'Loja Fechada' : !product.isAvailable ? 'Indisponível' : 'Adicionar'}</span>
               <span className="text-lg">
                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentPrice)}
               </span>

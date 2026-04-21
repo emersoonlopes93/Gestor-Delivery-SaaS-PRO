@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsBoolean, IsNumber, IsDecimal } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsNumber } from 'class-validator';
 import { CreateProductDto as ICreateProductDto } from '@gestor/types';
 
 export class CreateProductDto implements ICreateProductDto {

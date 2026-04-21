@@ -22,7 +22,7 @@ export class CatalogMigrationV2Service {
   private async migrateComplementsToOptionGroups() {
     this.logger.log('Migrating Complements to OptionGroups...');
     
-    // @ts-ignore - Accessing legacy models that might be removed soon
+    // @ts-expect-error - Accessing legacy models that might be removed soon
     const legacyGroups = await this.prisma.productComplementGroup.findMany({
       include: { items: true },
     });
@@ -76,7 +76,7 @@ export class CatalogMigrationV2Service {
   private async migrateCombosToProductsV2(warnings: string[]) {
     this.logger.log('Migrating Combos to Products V2...');
 
-    // @ts-ignore
+    // @ts-expect-error - Accessing legacy model that will be removed soon
     const legacyCombos = await this.prisma.productCombo.findMany({
       include: {
         blocks: {
