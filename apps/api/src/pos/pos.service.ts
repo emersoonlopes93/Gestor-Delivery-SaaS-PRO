@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, DineInTableStatus } from '@prisma/client';
 import { CashService } from '../cash/cash.service';
 import { CustomerService } from '../crm/customer.service';
 import { CashbackService } from '../promotions/cashback.service';
@@ -34,43 +34,33 @@ export class PosService {
   ) {}
 
   // ----------------------------------------------------------------
-  // CREATE POS SALE
+  // CREATE POS SALE (Finalize)
   // ----------------------------------------------------------------
   async createSale(
     tenantId: string,
     operatorId: string,
-    dto: CreatePosOrderDTO,
+    dto: CreatePosOrderDTO & { id?: string },
     hasDiscountPermission: boolean,
   ): Promise<OrderResponseDTO> {
-    // 1. Enforce open cash session for this operator
     const activeSession = await this.prisma.cashSession.findFirst({
       where: { tenantId, operatorId, status: 'open' },
     });
 
     if (!activeSession) {
-      throw new BadRequestException(
-        'É necessário ter um caixa aberto para criar vendas no PDV. Abra o caixa primeiro.',
-      );
+      throw new BadRequestException('É necessário ter um caixa aberto para criar vendas no PDV.');
     }
 
-    // 2. Server-side discount validation
     const discountTotal = dto.discountTotal || 0;
     if (discountTotal > 0 && !hasDiscountPermission) {
-      throw new ForbiddenException(
-        'Você não tem permissão para aplicar descontos no PDV.',
-      );
+      throw new ForbiddenException('Você não tem permissão para aplicar descontos no PDV.');
     }
 
-    // 3. Idempotency check
-    const existingOrder = await this.prisma.order.findFirst({
-      where: {
-        tenantId,
-        idempotencyKey: dto.idempotencyKey,
-      },
-    });
-
-    if (existingOrder) {
-      return this.getOrderDetail(existingOrder.id, tenantId);
+    // If we're finalizing a DRAFT, we use its ID. If not, idempotency check.
+    if (!dto.id) {
+       const existingOrder = await this.prisma.order.findFirst({
+         where: { tenantId, idempotencyKey: dto.idempotencyKey },
+       });
+       if (existingOrder) return this.getOrderDetail(existingOrder.id, tenantId);
     }
 
     let customerId: string | null = null;
@@ -84,7 +74,6 @@ export class PosService {
       if (cust) customerId = cust.id;
     }
 
-    // 4. Validate items server-side (reuse checkout validator, skip sellableOnline)
     const validation = await this.checkoutValidator.validateByTenantId(tenantId, dto.items, {
       customerId,
       couponCode: dto.couponCode,
@@ -92,87 +81,77 @@ export class PosService {
     });
     const { lines, itemsSubtotal, discountTotal: commercialDiscountTotal, couponId, cashbackUsed } = validation;
 
-    // 5. Apply discount (server validated commercial + manual POS)
-    const manualDiscountTotal = discountTotal; // renamed from destructuring
+    const manualDiscountTotal = discountTotal;
     const finalItemsTotal = Math.round((itemsSubtotal - (commercialDiscountTotal || 0)) * 100) / 100;
     
     if (manualDiscountTotal > finalItemsTotal) {
-      throw new BadRequestException('Desconto manual não pode exceder o subtotal após abatimentos comerciais.');
+      throw new BadRequestException('Desconto manual excede subtotal.');
     }
     const finalTotal = Math.round((finalItemsTotal - manualDiscountTotal) * 100) / 100;
     const combinedDiscountTotal = (commercialDiscountTotal || 0) + manualDiscountTotal;
 
-    // 6. Transactional order creation
     const order = await this.prisma.$transaction(async (tx) => {
-      // Atomic order number
-      const updatedTenant = await tx.tenant.update({
-        where: { id: tenantId },
-        data: { orderSequence: { increment: 1 } },
-        select: { orderSequence: true },
-      });
-
-      const orderNumber = `#${updatedTenant.orderSequence.toString().padStart(4, '0')}`;
-
-      // Calculate final total including delivery fee
+      let currentOrder;
       const deliveryFee = dto.deliveryFee || 0;
       const orderTotal = Math.round((finalTotal + deliveryFee) * 100) / 100;
 
-      // Create the order
-      const newOrder = await tx.order.create({
-        data: {
-          tenantId,
-          orderNumber,
-          status: 'confirmed', // POS sales skip 'pending' — they are immediately confirmed
-          fulfillmentType: dto.fulfillmentType,
-          customerName: dto.customerName || 'Consumidor',
-          customerPhone: dto.customerPhone || '',
-          itemsSubtotal,
-          discountTotal: combinedDiscountTotal,
-          deliveryFee,
-          serviceFee: 0,
-          total: orderTotal,
-          sourceChannel: 'pos',
-          idempotencyKey: dto.idempotencyKey,
-          notes: dto.notes || null,
-          paymentMethod: dto.paymentMethod,
-          cashSessionId: activeSession.id,
-          customerId,
-          couponId,
-          cashbackUsed,
-          publicTrackingToken: generatePublicTrackingToken(),
-        },
-      });
-
-      // Create delivery address if provided
-      if (dto.deliveryAddress) {
-        await tx.orderDeliveryAddress.create({
+      if (dto.id) {
+        // Updating existing draft to confirmed
+        await tx.orderItem.deleteMany({ where: { orderId: dto.id, tenantId } });
+        currentOrder = await tx.order.update({
+          where: { id: dto.id },
           data: {
-            orderId: newOrder.id,
+            status: 'confirmed',
+            itemsSubtotal,
+            discountTotal: combinedDiscountTotal,
+            deliveryFee,
+            total: orderTotal,
+            paymentMethod: dto.paymentMethod,
+            cashSessionId: activeSession.id,
+            notes: dto.notes || null,
+          }
+        });
+      } else {
+        const updatedTenant = await tx.tenant.update({
+          where: { id: tenantId },
+          data: { orderSequence: { increment: 1 } },
+          select: { orderSequence: true },
+        });
+
+        currentOrder = await tx.order.create({
+          data: {
             tenantId,
-            street: dto.deliveryAddress.street,
-            number: dto.deliveryAddress.number,
-            neighborhood: dto.deliveryAddress.neighborhood,
-            complement: dto.deliveryAddress.complement,
-            reference: dto.deliveryAddress.reference,
-            zipCode: dto.deliveryAddress.zipCode || '',
-            city: dto.deliveryAddress.city || '',
-            state: dto.deliveryAddress.state || '',
+            orderNumber: `#${updatedTenant.orderSequence.toString().padStart(4, '0')}`,
+            status: 'confirmed',
+            fulfillmentType: dto.fulfillmentType,
+            customerName: dto.customerName || 'Consumidor',
+            customerPhone: dto.customerPhone || '',
+            itemsSubtotal,
+            discountTotal: combinedDiscountTotal,
+            deliveryFee,
+            total: orderTotal,
+            sourceChannel: 'pos',
+            idempotencyKey: dto.idempotencyKey,
+            notes: dto.notes || null,
+            paymentMethod: dto.paymentMethod,
+            cashSessionId: activeSession.id,
+            customerId,
+            couponId,
+            cashbackUsed,
+            publicTrackingToken: generatePublicTrackingToken(),
           },
         });
       }
 
-      // Create order items (same as storefront)
+      // Re-create items snapshots
       for (const line of lines) {
-        const snapshotCatalogV2Json = (line as ValidatedLine & { snapshotCatalogV2Json?: unknown })
-          .snapshotCatalogV2Json as Prisma.InputJsonValue | undefined;
-
-        const orderItem = await tx.orderItem.create({
+        await tx.orderItem.create({
           data: {
-            orderId: newOrder.id,
+            orderId: currentOrder.id,
             tenantId,
             lineType: line.lineType,
-            productId: line.lineType === 'product' ? (line as ValidatedLine & { productId: string }).productId : null,
-            comboId: line.lineType === 'combo' ? (line as ValidatedLine & { comboId: string }).comboId : null,
+            productId: line.lineType === 'product' ? (line as any).productId : null,
+            comboId: line.lineType === 'combo' ? (line as any).comboId : null,
             quantity: line.quantity,
             unitPrice: line.unitPrice,
             lineTotal: line.lineTotal,
@@ -182,92 +161,170 @@ export class PosService {
             snapshotBasePrice: line.basePrice,
             snapshotExtrasTotal: line.extrasTotal,
             snapshotComposition: line.composition || null,
-            snapshotCatalogV2Json,
           },
         });
+      }
 
-        const hasV2Snapshot = !!(line as ValidatedLine & { snapshotCatalogV2Json?: unknown }).snapshotCatalogV2Json;
-
-        if (!hasV2Snapshot) {
-          // LEGACY FALLBACK
-          if (line.lineType === 'product' && 'complements' in line) {
-            for (const comp of line.complements) {
-              await tx.orderItemComplement.create({
-                data: {
-                  orderItemId: orderItem.id,
-                  tenantId,
-                  complementItemId: comp.complementItemId,
-                  snapshotName: comp.snapshotName,
-                  snapshotPrice: comp.snapshotPrice,
-                },
-              });
-            }
-          }
-
-          if (line.lineType === 'combo' && 'comboSelections' in line) {
-            for (const sel of line.comboSelections) {
-              await tx.orderItemComboSelection.create({
-                data: {
-                  orderItemId: orderItem.id,
-                  tenantId,
-                  comboBlockItemId: sel.comboBlockItemId,
-                  snapshotBlockName: sel.snapshotBlockName,
-                  snapshotProductName: sel.snapshotProductName,
-                  snapshotAdditionalPrice: sel.snapshotAdditionalPrice,
-                },
-              });
-            }
-          }
+      // Free table if linked
+      if (dto.fulfillmentType === 'table' && dto.tableNumber) {
+        const table = await tx.dineInTable.findFirst({ where: { tenantId, name: dto.tableNumber } });
+        if (table) {
+          await tx.dineInTable.update({
+            where: { id: table.id },
+            data: { status: 'free', activeOrderId: null }
+          });
         }
       }
 
-      // Timeline entry
       await tx.orderTimeline.create({
         data: {
-          orderId: newOrder.id,
+          orderId: currentOrder.id,
           tenantId,
           status: 'confirmed',
-          note: 'Venda registrada via PDV.',
+          note: 'Venda finalizada via PDV.',
           actorId: operatorId,
           actorType: 'tenant_user',
         },
       });
 
-      return newOrder;
+      return currentOrder;
     });
 
-    // 7. Register sale movement in cash session
-    await this.cashService.registerSaleMovement(
-      tenantId,
-      activeSession.id,
-      order.id,
-      Number(order.total),
-      dto.paymentMethod,
-    );
-
-    // 8. Update Cashback Ledger & Coupon Usage
+    await this.cashService.registerSaleMovement(tenantId, activeSession.id, order.id, Number(order.total), dto.paymentMethod);
     if (cashbackUsed && customerId) {
       await this.cashbackService.createTransaction({
-        tenantId,
-        customerId: customerId,
-        type: 'redeemed',
-        amount: cashbackUsed,
-        orderId: order.id,
+        tenantId, customerId, type: 'redeemed', amount: cashbackUsed, orderId: order.id, 
         description: `Usado no PDV, pedido ${order.orderNumber}`
       });
     }
-
     if (couponId) {
-      await this.prisma.coupon.update({
-        where: { id: couponId },
-        data: { usedCount: { increment: 1 } }
-      });
+      await this.prisma.coupon.update({ where: { id: couponId }, data: { usedCount: { increment: 1 } } });
     }
-
-    // 9. Trigger theoretical stock depletion
     await this.theoreticalStockService.processOrderDepletion(tenantId, order.id);
 
     return this.getOrderDetail(order.id, tenantId);
+  }
+
+  // ----------------------------------------------------------------
+  // UPSERT DRAFT SALE (Open Command)
+  // ----------------------------------------------------------------
+  async upsertDraftSale(
+    tenantId: string,
+    operatorId: string,
+    dto: CreatePosOrderDTO & { id?: string },
+  ): Promise<OrderResponseDTO> {
+    const isUpdate = !!dto.id;
+    let customerId: string | null = null;
+    if (dto.customerPhone) {
+      const cust = await this.customerService.syncCustomerOnOrderUpsert(
+        tenantId, dto.customerPhone, dto.customerName || 'Consumidor', undefined
+      );
+      if (cust) customerId = cust.id;
+    }
+
+    const validation = await this.checkoutValidator.validateByTenantId(tenantId, dto.items, { customerId, couponId: dto.couponCode });
+    const { lines, itemsSubtotal, discountTotal, couponId } = validation;
+
+    const order = await this.prisma.$transaction(async (tx) => {
+      let currentOrder;
+      const finalDiscount = (discountTotal || 0) + (dto.discountTotal || 0);
+
+      if (isUpdate) {
+        await tx.orderItem.deleteMany({ where: { orderId: dto.id, tenantId } });
+        currentOrder = await tx.order.update({
+          where: { id: dto.id },
+          data: {
+            itemsSubtotal,
+            discountTotal: finalDiscount,
+            total: Math.round((Number(itemsSubtotal) - finalDiscount) * 100) / 100,
+            customerName: dto.customerName || 'Consumidor',
+            customerPhone: dto.customerPhone || '',
+            notes: dto.notes || null,
+          }
+        });
+      } else {
+        const updatedTenant = await tx.tenant.update({
+          where: { id: tenantId },
+          data: { orderSequence: { increment: 1 } },
+          select: { orderSequence: true },
+        });
+
+        currentOrder = await tx.order.create({
+          data: {
+            tenantId,
+            orderNumber: `#${updatedTenant.orderSequence.toString().padStart(4, '0')}`,
+            status: 'draft',
+            fulfillmentType: dto.fulfillmentType,
+            customerName: dto.customerName || 'Consumidor',
+            customerPhone: dto.customerPhone || '',
+            itemsSubtotal,
+            discountTotal: finalDiscount,
+            total: Math.round((Number(itemsSubtotal) - finalDiscount) * 100) / 100,
+            sourceChannel: 'pos',
+            idempotencyKey: dto.idempotencyKey,
+            notes: dto.notes || null,
+            customerId,
+            couponId,
+            publicTrackingToken: generatePublicTrackingToken(),
+          }
+        });
+      }
+
+      for (const line of lines) {
+        await tx.orderItem.create({
+          data: {
+            orderId: currentOrder.id,
+            tenantId,
+            lineType: line.lineType,
+            productId: (line as any).productId || null,
+            comboId: (line as any).comboId || null,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            lineTotal: line.lineTotal,
+            notes: line.notes || null,
+            snapshotName: line.name,
+            snapshotImage: line.image,
+            snapshotBasePrice: line.basePrice,
+            snapshotExtrasTotal: line.extrasTotal,
+            snapshotComposition: line.composition || null,
+          },
+        });
+      }
+
+      if (dto.fulfillmentType === 'table' && dto.tableNumber) {
+        const table = await tx.dineInTable.findFirst({ where: { tenantId, name: dto.tableNumber } });
+        if (table) {
+          await tx.dineInTable.update({
+            where: { id: table.id },
+            data: { status: 'occupied', activeOrderId: currentOrder.id }
+          });
+        }
+      }
+
+      return currentOrder;
+    });
+
+    return this.getOrderDetail(order.id, tenantId);
+  }
+
+  // ----------------------------------------------------------------
+  // GET SALON TABLES
+  // ----------------------------------------------------------------
+  async getSalonTables(tenantId: string) {
+    return this.prisma.dineInTable.findMany({
+      where: { tenantId },
+      orderBy: { name: 'asc' },
+      include: {
+        order: {
+          select: {
+            id: true,
+            total: true,
+            customerName: true,
+            createdAt: true,
+          }
+        }
+      }
+    });
   }
 
   // ----------------------------------------------------------------
@@ -307,7 +364,7 @@ export class PosService {
   }
 
   // ----------------------------------------------------------------
-  // CANCEL POS SALE (with refund movement)
+  // CANCEL POS SALE
   // ----------------------------------------------------------------
   async cancelPosSale(
     tenantId: string,
@@ -318,19 +375,21 @@ export class PosService {
       where: { id: orderId, tenantId, sourceChannel: 'pos' },
     });
 
-    if (!order) {
-      throw new BadRequestException('Venda PDV não encontrada.');
-    }
-
+    if (!order) throw new BadRequestException('Venda PDV não encontrada.');
     if (order.status === 'cancelled' || order.status === 'completed') {
       throw new ConflictException('Esta venda já está cancelada ou foi finalizada.');
     }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.order.update({
-        where: { id: orderId },
-        data: { status: 'cancelled' },
-      });
+      await tx.order.update({ where: { id: orderId }, data: { status: 'cancelled' } });
+      
+      // If it's a table order, free it
+      if (order.fulfillmentType === 'table') {
+        await tx.dineInTable.updateMany({
+           where: { tenantId, activeOrderId: orderId },
+           data: { status: 'free', activeOrderId: null }
+        });
+      }
 
       await tx.orderTimeline.create({
         data: {
@@ -344,26 +403,15 @@ export class PosService {
       });
     });
 
-    // Register refund in cash session if linked
-    if (order.cashSessionId) {
-      await this.cashService.registerRefundMovement(
-        tenantId,
-        order.cashSessionId,
-        orderId,
-        Number(order.total),
-      );
+    if (order.cashSessionId && order.status !== 'draft') {
+      await this.cashService.registerRefundMovement(tenantId, order.cashSessionId, orderId, Number(order.total));
     }
-
-    // Register stock reversal
     await this.theoreticalStockService.reverseOrderDepletion(tenantId, orderId);
 
     return this.getOrderDetail(orderId, tenantId);
   }
 
-  // ----------------------------------------------------------------
-  // HELPER: Get order detail (reuse from orders service logic)
-  // ----------------------------------------------------------------
-  private async getOrderDetail(orderId: string, tenantId: string): Promise<OrderResponseDTO> {
+  async getOrderDetail(orderId: string, tenantId: string): Promise<OrderResponseDTO> {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },
       include: {
@@ -378,15 +426,13 @@ export class PosService {
       },
     });
 
-    if (!order) {
-      throw new BadRequestException('Pedido não encontrado.');
-    }
+    if (!order) throw new BadRequestException('Pedido não encontrado.');
 
     return {
       id: order.id,
       orderNumber: order.orderNumber,
       status: order.status as OrderStatus,
-      fulfillmentType: order.fulfillmentType as 'delivery' | 'pickup',
+      fulfillmentType: order.fulfillmentType as any,
       customerName: order.customerName,
       customerPhone: order.customerPhone,
       customerEmail: order.customerEmail,
@@ -430,14 +476,12 @@ export class PosService {
         ? {
             street: order.deliveryAddress.street,
             number: order.deliveryAddress.number,
-            complement: order.deliveryAddress.complement || undefined,
             neighborhood: order.deliveryAddress.neighborhood,
             city: order.deliveryAddress.city,
             state: order.deliveryAddress.state,
             zipCode: order.deliveryAddress.zipCode,
+            complement: order.deliveryAddress.complement || undefined,
             reference: order.deliveryAddress.reference || undefined,
-            lat: order.deliveryAddress.lat || undefined,
-            lng: order.deliveryAddress.lng || undefined,
           }
         : null,
       timeline: order.timeline.map((t) => ({

@@ -10,9 +10,11 @@ import { CrmModule } from '../crm/crm.module';
 import { PromotionsModule } from '../promotions/promotions.module';
 import { InventoryModule } from '../inventory/inventory.module';
 
+import { PrinterService } from './printer.service';
+
 @Module({
   imports: [DatabaseModule, AuthModule, RbacModule, CashModule, OrdersModule, CrmModule, PromotionsModule, InventoryModule],
   controllers: [PosController],
-  providers: [PosService],
+  providers: [PosService, PrinterService],
 })
 export class PosModule {}

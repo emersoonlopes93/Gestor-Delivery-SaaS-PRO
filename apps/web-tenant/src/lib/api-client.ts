@@ -60,9 +60,15 @@ async function apiFetch<T>(
       }
       return retryResponse.json();
     }
-    // Refresh failed — clear local auth and let the UI decide redirection
+    // Refresh failed — clear local auth and redirect
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    
+    // Redirect to login with a flag to show the expired message
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login?expired=1';
+    }
+    
     throw new ApiError(401, 'Session expired');
   }
 

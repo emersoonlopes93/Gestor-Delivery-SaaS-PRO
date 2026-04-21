@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api-client';
 import { useAuthStore } from '../../stores/auth.store';
 import type { TenantLoginResponse } from '@gestor/types';
@@ -14,6 +14,8 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isExpired = searchParams.get('expired') === '1';
   const { setUser } = useAuthStore();
 
   const handleSubmit = async (e: FormEvent) => {
@@ -56,6 +58,13 @@ export function LoginPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
+        {isExpired && !error && (
+          <div className="bg-amber-50 text-amber-700 text-sm p-3 rounded-lg border border-amber-200 mb-4 flex items-center gap-2">
+            <span className="text-lg">⚠️</span>
+            Sua sessão expirou. Faça login novamente.
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200">
             {error}

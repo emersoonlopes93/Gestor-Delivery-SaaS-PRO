@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingBag, Utensils, Bike } from 'lucide-react';
+import { ShoppingBag, Utensils, Bike, Users, Store } from 'lucide-react';
 import { PosFulfillmentType } from '@gestor/types';
 
 interface OrderTypeSelectorProps {
@@ -11,13 +11,13 @@ const ORDER_TYPES = [
   {
     id: PosFulfillmentType.DINE_IN,
     label: 'Balcão',
-    icon: Utensils,
+    icon: Store,
     color: 'emerald',
   },
   {
     id: PosFulfillmentType.TABLE,
     label: 'Mesa',
-    icon: Utensils, // You can change to a specific table icon if available
+    icon: Users,
     color: 'emerald',
   },
   {

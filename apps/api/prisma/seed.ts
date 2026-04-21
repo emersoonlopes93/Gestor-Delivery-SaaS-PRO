@@ -381,6 +381,28 @@ async function seedDemoTenant() {
   }
 }
 
+async function seedDineInTables() {
+  const TENANT_SLUG = 'pizzaria-demo';
+  console.log('🍽️ Seeding dine-in tables...');
+
+  const tenant = await prisma.tenant.findUnique({ where: { slug: TENANT_SLUG } });
+  if (!tenant) return;
+
+  for (let i = 1; i <= 12; i++) {
+    const tableName = `Mesa ${i.toString().padStart(2, '0')}`;
+    await (prisma as any).dineInTable.upsert({
+      where: { tenantId_name: { tenantId: tenant.id, name: tableName } },
+      update: {},
+      create: {
+        tenantId: tenant.id,
+        name: tableName,
+        capacity: i % 2 === 0 ? 4 : 2,
+        status: 'free',
+      }
+    });
+  }
+  console.log('   ✅ 12 tables seeded');
+}
 
 async function main() {
   console.log('🌱 Starting seed...\n');
@@ -390,6 +412,7 @@ async function main() {
   await seedAdminRoles();
   await seedSuperAdmin();
   await seedDemoTenant();
+  await seedDineInTables();
 
   console.log('\n✅ Seed completed successfully!');
 }

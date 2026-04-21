@@ -74,6 +74,23 @@ export class CreatePosOrderDTO {
   @IsOptional()
   @Min(0)
   useCashbackAmount?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  deliveryFee?: number;
+
+  @IsOptional()
+  deliveryAddress?: {
+    street: string;
+    number: string;
+    neighborhood: string;
+    complement?: string;
+    reference?: string;
+    zipCode?: string;
+    city?: string;
+    state?: string;
+  };
 }
 
 // ============================================================

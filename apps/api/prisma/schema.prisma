@@ -62,6 +62,7 @@ model Tenant {
   deliveryCoverageConfig     DeliveryCoverageConfig?
   moduleAccess              TenantModuleAccess[]
   operatingHours            TenantOperatingHours[]
+  dineInTables              DineInTable[]
   
   upsells                   Upsell[]
   upsellItems               UpsellItem[]
@@ -887,6 +888,7 @@ model ProductUpsell {
 
 enum OrderStatus {
   pending
+  draft
   confirmed
   preparing
   ready_for_pickup
@@ -900,6 +902,7 @@ enum FulfillmentType {
   delivery
   pickup
   dine_in
+  table
 }
 
 enum OrderLineType {
@@ -960,6 +963,7 @@ model Order {
   cashbackUsed     Decimal?             @map("cashback_used") @db.Decimal(10,2)
   cashbackHistory  CashbackTransaction[]
   stockMovements   StockMovement[]
+  activeTable      DineInTable?          @relation("ActiveTableOrder")
 
   @@unique([tenantId, idempotencyKey])
   @@unique([tenantId, orderNumber])
@@ -1599,4 +1603,35 @@ model CustomerOTP {
 
   @@index([tenantId, phone])
   @@map("customer_otps")
+}
+
+// ============================================================
+// DINE-IN / SALON MANAGEMENT
+// ============================================================
+
+enum DineInTableStatus {
+  free
+  occupied
+  waiting_bill
+  reserved
+}
+
+model DineInTable {
+  id        String            @id @default(uuid())
+  tenantId  String            @map("tenant_id")
+  name      String            @db.VarChar(50) // e.g. "Mesa 01"
+  capacity  Int               @default(4)
+  status    DineInTableStatus @default(free)
+  
+  activeOrderId String? @unique @map("active_order_id")
+  
+  order     Order?    @relation("ActiveTableOrder", fields: [activeOrderId], references: [id], onDelete: SetNull)
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("dine_in_tables")
 }
