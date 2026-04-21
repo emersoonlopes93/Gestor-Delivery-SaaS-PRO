@@ -39,8 +39,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [pixCopied, setPixCopied] = useState(false);
   const [step, setStep] = useState<'selection' | 'details'>('selection');
 
-  const change = Math.max(0, cashAmount - total);
-
   useEffect(() => {
     if (isOpen) {
       setStep('selection');

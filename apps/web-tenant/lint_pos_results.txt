@@ -1,0 +1,9 @@
+﻿C:\Users\emers\Documents\GitHub\Gestor Delivery SaaS PRO\apps\web-tenant\src\features\pos\WaiterPage.tsx:7:3: 'Search' is defined but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\emers\Documents\GitHub\Gestor Delivery SaaS PRO\apps\web-tenant\src\features\pos\WaiterPage.tsx:12:3: 'ChevronRight' is defined but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\emers\Documents\GitHub\Gestor Delivery SaaS PRO\apps\web-tenant\src\features\pos\WaiterPage.tsx:14:3: 'Hash' is defined but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\emers\Documents\GitHub\Gestor Delivery SaaS PRO\apps\web-tenant\src\features\pos\WaiterPage.tsx:17:3: 'ArrowLeftRight' is defined but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\emers\Documents\GitHub\Gestor Delivery SaaS PRO\apps\web-tenant\src\features\pos\WaiterPage.tsx:65:22: 'setSearchTerm' is assigned a value but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\emers\Documents\GitHub\Gestor Delivery SaaS PRO\apps\web-tenant\src\features\pos\components\OrderTypeSelector.tsx:2:23: 'Utensils' is defined but never used. [Error/@typescript-eslint/no-unused-vars]
+C:\Users\emers\Documents\GitHub\Gestor Delivery SaaS PRO\apps\web-tenant\src\features\pos\components\PaymentModal.tsx:42:9: 'change' is assigned a value but never used. [Error/@typescript-eslint/no-unused-vars]
+
+7 problems

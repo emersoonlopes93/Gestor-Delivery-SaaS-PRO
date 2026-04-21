@@ -14,9 +14,10 @@ export type OrderStatus =
   | 'ready_for_delivery'
   | 'out_for_delivery'
   | 'completed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'draft';
 
-export type FulfillmentType = 'delivery' | 'pickup';
+export type FulfillmentType = 'delivery' | 'pickup' | 'dine_in' | 'table';
 
 export type OrderLineType = 'product' | 'combo';
 
@@ -36,6 +37,7 @@ export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   out_for_delivery: ['completed'],
   completed: [],
   cancelled: [],
+  draft: ['confirmed', 'cancelled'],
 };
 
 // --- DTOs de Entrada (Checkout) ---

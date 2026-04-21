@@ -8,21 +8,14 @@ import { PosFulfillmentType, PaymentMethod } from '@gestor/types';
 import { 
   Search, 
   ShoppingCart, 
-  Trash2, 
   Plus, 
   Minus, 
-  Wallet,
   User,
-  Phone,
-  FileText,
-  Tag,
   Store,
   ChevronRight,
   Hash,
   X,
   Keyboard,
-  MapPin,
-  Truck,
   LayoutGrid,
   Save,
   Printer,
@@ -35,7 +28,6 @@ import { ProductCard } from './components/ProductCard';
 import { PaymentModal } from './components/PaymentModal';
 import { PosSalonView, type SalonTable } from './components/PosSalonView';
 import { TransferTableModal } from './components/TransferTableModal';
-import { ArrowLeftRight } from 'lucide-react';
 
 interface CatalogProduct {
   id: string;
@@ -89,15 +81,14 @@ export default function PosPage() {
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [fulfillmentType, setFulfillmentType] = useState<PosFulfillmentType>(PosFulfillmentType.DINE_IN);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedCategoryId] = useState<string | null>(null);
   
   // Mesa Fields
   const [tableNumber, setTableNumber] = useState('');
   
   // Delivery Fields
-  const [deliveryFee, setDeliveryFee] = useState(0);
-  const [feeStatus, setFeeStatus] = useState<'idle' | 'calculating' | 'done' | 'error'>('idle');
-  const [deliveryAddress, setDeliveryAddress] = useState({
+  const [deliveryFee] = useState(0);
+  const [deliveryAddress] = useState({
     street: '',
     number: '',
     neighborhood: '',
@@ -113,10 +104,10 @@ export default function PosPage() {
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
 
   // Financials
-  const [discountTotal, setDiscountTotal] = useState(0);
-  const [saleNotes, setSaleNotes] = useState('');
-  const [couponCode, setCouponCode] = useState('');
-  const [useCashbackAmount, setUseCashbackAmount] = useState(0);
+  const [discountTotal] = useState(0);
+  const [saleNotes] = useState('');
+  const [couponCode] = useState('');
+  const [useCashbackAmount] = useState(0);
 
   // UI Flow
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -175,7 +166,7 @@ export default function PosPage() {
   };
 
   // Queries
-  const { data: products, isLoading: productsLoading } = useQuery<CatalogProduct[]>({
+  const { data: products } = useQuery<CatalogProduct[]>({
     queryKey: ['posCatalog', searchTerm],
     queryFn: async () => {
       const res = await api.get(`/catalog/products?search=${encodeURIComponent(searchTerm)}&limit=100`);
@@ -213,7 +204,7 @@ export default function PosPage() {
     enabled: customerSearchTerm.length >= 2,
   });
 
-  const categories = useMemo(() => {
+  useMemo(() => {
     if (!products) return [];
     const catsMap = new Map<string, { id: string; name: string }>();
     products.forEach(p => { if (!catsMap.has(p.categoryId)) catsMap.set(p.categoryId, { id: p.categoryId, name: p.categoryName }); });
@@ -278,7 +269,7 @@ export default function PosPage() {
   const subtotal = cart.reduce((sum, item) => sum + item.basePrice * item.quantity, 0);
   const total = Math.max(0, subtotal - discountTotal + deliveryFee);
 
-  const getPayload = (isDraft: boolean): PosCreateSalePayload & { id?: string } => ({
+  const getPayload = (): PosCreateSalePayload & { id?: string } => ({
     id: currentOrderId || undefined,
     idempotencyKey: generateId(),
     items: cart.map((item) => ({
@@ -296,11 +287,13 @@ export default function PosPage() {
     paymentMethod: PaymentMethod.cash, 
     discountTotal: discountTotal > 0 ? discountTotal : undefined,
     notes: saleNotes || undefined,
+    couponCode: couponCode || undefined,
+    useCashbackAmount: useCashbackAmount || undefined
   });
 
   const handleSaveDraft = () => {
     if (cart.length === 0) return;
-    upsertDraft.mutate(getPayload(true), {
+    upsertDraft.mutate(getPayload(), {
         onSuccess: (data) => {
             setCurrentOrderId(data.id);
             handlePrint(data.id, 'kitchen'); // Print production ticket
@@ -310,7 +303,7 @@ export default function PosPage() {
   };
 
   const handleConfirmSale = (method: PaymentMethod) => {
-    createSale.mutate({ ...getPayload(false), paymentMethod: method }, {
+    createSale.mutate({ ...getPayload(), paymentMethod: method }, {
       onSuccess: (data) => {
         handlePrint(data.id, 'customer'); // Auto-print customer receipt
         setCart([]); setCurrentOrderId(null); setTableNumber(''); setViewMode('salon'); setIsPaymentModalOpen(false);
@@ -508,7 +501,7 @@ export default function PosPage() {
           }}
           sourceTableId={sourceTableForTransfer.id}
           sourceTableName={sourceTableForTransfer.name}
-          availableTables={salonTables?.map(t => ({ id: t.id, name: t.name, status: t.status })) || []}
+          availableTables={salonTables?.filter(t => t.id !== sourceTableForTransfer.id).map(t => ({ id: t.id, name: t.name, status: t.status })) || []}
         />
       )}
     </div>

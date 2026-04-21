@@ -4,18 +4,14 @@ import { api } from '@/lib/api-client';
 import { useDraftSale } from './hooks/useDraftSale';
 import { PosFulfillmentType } from '@gestor/types';
 import { 
-  Search, 
   ShoppingCart, 
   Plus, 
   Minus, 
   LayoutGrid,
-  ChevronRight,
-  Printer,
-  Hash,
-  X,
   Store,
-  ArrowLeftRight,
-  Receipt
+  X,
+  Receipt,
+  Printer
 } from 'lucide-react';
 
 // Reusing existing components
@@ -62,7 +58,6 @@ export default function WaiterPage() {
   // Core State
   const [cart, setCart] = useState<CartItem[]>([]);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [tableNumber, setTableNumber] = useState('');
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
@@ -77,9 +72,9 @@ export default function WaiterPage() {
 
   // Queries
   const { data: products } = useQuery<CatalogProduct[]>({
-    queryKey: ['posCatalog', searchTerm],
+    queryKey: ['posCatalog'],
     queryFn: async () => {
-      const res = await api.get(`/catalog/products?search=${encodeURIComponent(searchTerm)}&limit=100`);
+      const res = await api.get(`/catalog/products?limit=100`);
       const data = res.data as Array<Record<string, unknown>>;
       return (data || []).map((p: Record<string, unknown>) => ({
         id: p['id'] as string,

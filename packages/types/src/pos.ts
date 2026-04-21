@@ -55,7 +55,8 @@ export class CreatePosOrderDTO {
   tableNumber?: string;
 
   @IsEnum(PaymentMethod)
-  paymentMethod!: PaymentMethod;
+  @IsOptional()
+  paymentMethod?: PaymentMethod;
 
   @IsNumber()
   @IsOptional()

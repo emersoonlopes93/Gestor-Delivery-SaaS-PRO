@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
-import type { OrderResponseDTO, PosOrderListItemDTO } from '@gestor/types';
+import type { OrderResponseDTO } from '@gestor/types';
 import { PosFulfillmentType, PaymentMethod } from '@gestor/types';
 
 export interface PosCreateSalePayload {

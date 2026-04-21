@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingBag, Utensils, Bike, Users, Store } from 'lucide-react';
+import { ShoppingBag, Bike, Users, Store } from 'lucide-react';
 import { PosFulfillmentType } from '@gestor/types';
 
 interface OrderTypeSelectorProps {

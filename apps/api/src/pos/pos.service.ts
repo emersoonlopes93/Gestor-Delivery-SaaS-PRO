@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { Prisma, DineInTableStatus } from '@prisma/client';
+import {} from '@prisma/client';
 import { CashService } from '../cash/cash.service';
 import { CustomerService } from '../crm/customer.service';
 import { CashbackService } from '../promotions/cashback.service';
@@ -21,6 +21,8 @@ import type {
   PaymentMethod,
   ValidatedLine,
 } from '@gestor/types';
+
+import { PosFulfillmentType } from '@gestor/types';
 
 @Injectable()
 export class PosService {
@@ -39,7 +41,7 @@ export class PosService {
   async createSale(
     tenantId: string,
     operatorId: string,
-    dto: CreatePosOrderDTO & { id?: string },
+    dto: CreatePosOrderDTO & { id?: string; waiterId?: string },
     hasDiscountPermission: boolean,
   ): Promise<OrderResponseDTO> {
     const activeSession = await this.prisma.cashSession.findFirst({
@@ -156,13 +158,16 @@ export class PosService {
 
       // Re-create items snapshots
       for (const line of lines) {
+        const productId = line.lineType === 'product' ? (line as ValidatedLine & { productId: string }).productId : null;
+        const comboId = line.lineType === 'combo' ? (line as ValidatedLine & { comboId: string }).comboId : null;
+
         await tx.orderItem.create({
           data: {
             orderId: currentOrder.id,
             tenantId,
             lineType: line.lineType,
-            productId: line.lineType === 'product' ? (line as any).productId : null,
-            comboId: line.lineType === 'combo' ? (line as any).comboId : null,
+            productId,
+            comboId,
             quantity: line.quantity,
             unitPrice: line.unitPrice,
             lineTotal: line.lineTotal,
@@ -201,6 +206,10 @@ export class PosService {
       return currentOrder;
     });
 
+    if (!dto.paymentMethod) {
+      throw new BadRequestException('Forma de pagamento é obrigatória para finalizar a venda.');
+    }
+
     await this.cashService.registerSaleMovement(tenantId, activeSession.id, order.id, Number(order.total), dto.paymentMethod);
     if (cashbackUsed && customerId) {
       await this.cashbackService.createTransaction({
@@ -222,7 +231,7 @@ export class PosService {
   async upsertDraftSale(
     tenantId: string,
     operatorId: string,
-    dto: CreatePosOrderDTO & { id?: string },
+    dto: CreatePosOrderDTO & { id?: string; waiterId?: string },
   ): Promise<OrderResponseDTO> {
     const isUpdate = !!dto.id;
     let customerId: string | null = null;
@@ -233,7 +242,7 @@ export class PosService {
       if (cust) customerId = cust.id;
     }
 
-    const validation = await this.checkoutValidator.validateByTenantId(tenantId, dto.items, { customerId, couponId: dto.couponCode });
+    const validation = await this.checkoutValidator.validateByTenantId(tenantId, dto.items, { customerId, couponCode: dto.couponCode });
     const { lines, itemsSubtotal, discountTotal, couponId } = validation;
 
     const order = await this.prisma.$transaction(async (tx) => {
@@ -252,7 +261,7 @@ export class PosService {
             customerPhone: dto.customerPhone || '',
             notes: dto.notes || null,
             tableNumber: dto.tableNumber || undefined,
-            fulfillmentType: dto.fulfillmentType || undefined,
+            fulfillmentType: (dto.fulfillmentType as any) || undefined,
           }
         });
       } else {
@@ -285,13 +294,16 @@ export class PosService {
       }
 
       for (const line of lines) {
+        const productId = (line as ValidatedLine & { productId?: string }).productId || null;
+        const comboId = (line as ValidatedLine & { comboId?: string }).comboId || null;
+
         await tx.orderItem.create({
           data: {
             orderId: currentOrder.id,
             tenantId,
             lineType: line.lineType,
-            productId: (line as any).productId || null,
-            comboId: (line as any).comboId || null,
+            productId,
+            comboId,
             quantity: line.quantity,
             unitPrice: line.unitPrice,
             lineTotal: line.lineTotal,
@@ -522,7 +534,7 @@ export class PosService {
       id: order.id,
       orderNumber: order.orderNumber,
       status: order.status as OrderStatus,
-      fulfillmentType: order.fulfillmentType as any,
+      fulfillmentType: order.fulfillmentType as PosFulfillmentType,
       customerName: order.customerName,
       customerPhone: order.customerPhone,
       customerEmail: order.customerEmail,
@@ -554,11 +566,13 @@ export class PosService {
         snapshotComposition: item.snapshotComposition,
         complements: item.complements.map((c) => ({
           id: c.id,
+          complementItemId: c.complementItemId,
           snapshotName: c.snapshotName,
           snapshotPrice: Number(c.snapshotPrice),
         })),
         comboSelections: item.comboSelections.map((s) => ({
           id: s.id,
+          comboBlockItemId: s.comboBlockItemId,
           snapshotBlockName: s.snapshotBlockName,
           snapshotProductName: s.snapshotProductName,
           snapshotAdditionalPrice: Number(s.snapshotAdditionalPrice),

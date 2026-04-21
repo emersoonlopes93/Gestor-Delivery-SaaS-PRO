@@ -2,10 +2,8 @@ import React from 'react';
 import { 
   Users, 
   Clock, 
-  DollarSign, 
   ChevronRight,
   LayoutGrid,
-  ClipboardList,
   ArrowLeftRight
 } from 'lucide-react';
 
