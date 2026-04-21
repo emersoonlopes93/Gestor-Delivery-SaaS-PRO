@@ -55,7 +55,14 @@ export class PosService {
       throw new ForbiddenException('Você não tem permissão para aplicar descontos no PDV.');
     }
 
-    // If we're finalizing a DRAFT, we use its ID. If not, idempotency check.
+    // If we're finalizing a DRAFT, we check if it already has a waiter
+    let draftWaiterId: string | null = null;
+    if (dto.id) {
+       const draft = await this.prisma.order.findUnique({ where: { id: dto.id, tenantId }, select: { waiterId: true } });
+       if (draft) draftWaiterId = draft.waiterId;
+    }
+
+    // If not finalizing a DRAFT, idempotency check.
     if (!dto.id) {
        const existingOrder = await this.prisma.order.findFirst({
          where: { tenantId, idempotencyKey: dto.idempotencyKey },
@@ -109,6 +116,8 @@ export class PosService {
             paymentMethod: dto.paymentMethod,
             cashSessionId: activeSession.id,
             notes: dto.notes || null,
+            waiterId: draftWaiterId || dto.waiterId || null,
+            tableNumber: dto.tableNumber || undefined,
           }
         });
       } else {
@@ -136,6 +145,8 @@ export class PosService {
             paymentMethod: dto.paymentMethod,
             cashSessionId: activeSession.id,
             customerId,
+            waiterId: dto.waiterId || null,
+            tableNumber: dto.tableNumber || null,
             couponId,
             cashbackUsed,
             publicTrackingToken: generatePublicTrackingToken(),
@@ -240,6 +251,8 @@ export class PosService {
             customerName: dto.customerName || 'Consumidor',
             customerPhone: dto.customerPhone || '',
             notes: dto.notes || null,
+            tableNumber: dto.tableNumber || undefined,
+            fulfillmentType: dto.fulfillmentType || undefined,
           }
         });
       } else {
@@ -264,6 +277,7 @@ export class PosService {
             idempotencyKey: dto.idempotencyKey,
             notes: dto.notes || null,
             customerId,
+            waiterId: dto.waiterId || operatorId, // Default to current operator if not specified
             couponId,
             publicTrackingToken: generatePublicTrackingToken(),
           }
@@ -294,6 +308,10 @@ export class PosService {
       if (dto.fulfillmentType === 'table' && dto.tableNumber) {
         const table = await tx.dineInTable.findFirst({ where: { tenantId, name: dto.tableNumber } });
         if (table) {
+          // Safety check: if table is occupied by ANOTHER order, don't just overwrite
+          if (table.activeOrderId && table.activeOrderId !== currentOrder.id) {
+            throw new BadRequestException(`A mesa ${dto.tableNumber} já está ocupada por outro atendimento ativo.`);
+          }
           await tx.dineInTable.update({
             where: { id: table.id },
             data: { status: 'occupied', activeOrderId: currentOrder.id }
@@ -321,10 +339,82 @@ export class PosService {
             total: true,
             customerName: true,
             createdAt: true,
+            waiterId: true,
+            waiter: {
+              select: { name: true }
+            }
           }
         }
       }
     });
+  }
+
+  // ----------------------------------------------------------------
+  // REQUEST BILL (Pré-fechamento)
+  // ----------------------------------------------------------------
+  async requestBill(tenantId: string, tableId: string, actorId?: string): Promise<void> {
+    const table = await this.prisma.dineInTable.findUnique({
+      where: { id: tableId, tenantId }
+    });
+    if (!table || table.status === 'free') {
+      throw new BadRequestException('Mesa não encontrada ou já está livre.');
+    }
+
+    await this.prisma.dineInTable.update({
+      where: { id: tableId },
+      data: { status: 'waiting_bill' }
+    });
+
+    if (table.activeOrderId) {
+      await this.prisma.orderTimeline.create({
+        data: {
+          orderId: table.activeOrderId,
+          tenantId,
+          status: 'confirmed',
+          note: 'Solicitação de fechamento (Conta pedida).',
+          actorId,
+          actorType: 'tenant_user',
+        }
+      });
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // TRANSFER TABLE
+  // ----------------------------------------------------------------
+  async transferTable(tenantId: string, sourceTableId: string, targetTableId: string, actorId?: string): Promise<void> {
+    const [source, target] = await Promise.all([
+      this.prisma.dineInTable.findUnique({ where: { id: sourceTableId, tenantId } }),
+      this.prisma.dineInTable.findUnique({ where: { id: targetTableId, tenantId } }),
+    ]);
+
+    if (!source || source.status === 'free' || !source.activeOrderId) {
+      throw new BadRequestException('Mesa de origem não possui atendimento ativo.');
+    }
+    if (!target || target.status !== 'free') {
+      throw new BadRequestException('Mesa de destino deve estar livre.');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.dineInTable.update({
+        where: { id: sourceTableId },
+        data: { status: 'free', activeOrderId: null }
+      }),
+      this.prisma.dineInTable.update({
+        where: { id: targetTableId },
+        data: { status: source.status, activeOrderId: source.activeOrderId }
+      }),
+      this.prisma.orderTimeline.create({
+        data: {
+          orderId: source.activeOrderId,
+          tenantId,
+          status: 'confirmed',
+          note: `Transferência de mesa: ${source.name} -> ${target.name}`,
+          actorId,
+          actorType: 'tenant_user',
+        }
+      })
+    ]);
   }
 
   // ----------------------------------------------------------------
@@ -446,6 +536,8 @@ export class PosService {
       paymentMethod: order.paymentMethod as PaymentMethod,
       changeFor: order.changeFor ? Number(order.changeFor) : null,
       customerId: order.customerId,
+      waiterId: order.waiterId,
+      tableNumber: order.tableNumber,
       couponId: order.couponId,
       cashbackUsed: order.cashbackUsed ? Number(order.cashbackUsed) : null,
       items: order.items.map((item) => ({

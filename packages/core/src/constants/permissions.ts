@@ -41,6 +41,8 @@ export const TENANT_PERMISSIONS = {
   'pos.read': 'View POS sales',
   'pos.create_sale': 'Create POS sale',
   'pos.apply_discount': 'Apply manual discount on POS',
+  'pos.waiter_mode': 'Access simplified waiter mode',
+  'pos.transfer_table': 'Transfer orders between tables',
 
   // Reports module
   'reports.read': 'View all reports',
@@ -185,6 +187,12 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
   marketing: [
     'crm.read', 'crm.manage_customers', 'crm.manage_coupons', 'crm.manage_loyalty_cashback',
     'reports.read', 'goals.read',
+    'catalog.read',
+    'dashboard.view',
+  ],
+  waiter: [
+    'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.view_timeline',
+    'pos.read', 'pos.create_sale', 'pos.waiter_mode', 'pos.transfer_table',
     'catalog.read',
     'dashboard.view',
   ],

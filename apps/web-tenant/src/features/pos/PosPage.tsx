@@ -34,6 +34,8 @@ import { OrderTypeSelector } from './components/OrderTypeSelector';
 import { ProductCard } from './components/ProductCard';
 import { PaymentModal } from './components/PaymentModal';
 import { PosSalonView, type SalonTable } from './components/PosSalonView';
+import { TransferTableModal } from './components/TransferTableModal';
+import { ArrowLeftRight } from 'lucide-react';
 
 interface CatalogProduct {
   id: string;
@@ -118,6 +120,13 @@ export default function PosPage() {
 
   // UI Flow
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [sourceTableForTransfer, setSourceTableForTransfer] = useState<SalonTable | null>(null);
+
+  const handleTransferTable = useCallback((table: SalonTable) => {
+    setSourceTableForTransfer(table);
+    setIsTransferModalOpen(true);
+  }, []);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -310,7 +319,7 @@ export default function PosPage() {
     });
   };
 
-  if (sessionLoading) return <div className="flex flex-col items-center justify-center h-screen bg-gray-950 text-gray-500">...</div>;
+  if (sessionLoading) return <div className="flex flex-col items-center justify-center h-screen bg-gray-950 text-gray-500 italic uppercase font-black animate-pulse">Carregando Sessão...</div>;
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] bg-gray-950 text-gray-100 overflow-hidden font-sans">
@@ -360,7 +369,7 @@ export default function PosPage() {
             </div>
            </>
         ) : (
-           <PosSalonView tables={salonTables || []} isLoading={salonLoading} onSelectTable={handleSelectTable} />
+           <PosSalonView tables={salonTables || []} isLoading={salonLoading} onSelectTable={handleSelectTable} onTransferTable={handleTransferTable} />
         )}
       </div>
 
@@ -369,7 +378,7 @@ export default function PosPage() {
         <div className="px-4 py-3 bg-emerald-500/5 flex items-center justify-between border-b border-gray-800">
            <div className="flex items-center gap-2">
              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-             <span className="text-[10px] font-black uppercase text-emerald-500">OPERADOR: {activeSession.operatorName}</span>
+             <span className="text-[10px] font-black uppercase text-emerald-500">OPERADOR: {activeSession?.operatorName || 'N/A'}</span>
            </div>
            <div className="flex gap-2">
              {currentOrderId && (
@@ -489,6 +498,19 @@ export default function PosPage() {
         isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)}
         total={total} subtotal={subtotal} discount={discountTotal} onConfirm={handleConfirmSale} isPending={createSale.isPending}
       />
+
+      {sourceTableForTransfer && (
+        <TransferTableModal 
+          isOpen={isTransferModalOpen}
+          onClose={() => {
+            setIsTransferModalOpen(false);
+            setSourceTableForTransfer(null);
+          }}
+          sourceTableId={sourceTableForTransfer.id}
+          sourceTableName={sourceTableForTransfer.name}
+          availableTables={salonTables?.map(t => ({ id: t.id, name: t.name, status: t.status })) || []}
+        />
+      )}
     </div>
   );
 }

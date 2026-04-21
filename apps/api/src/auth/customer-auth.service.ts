@@ -39,6 +39,19 @@ export class CustomerAuthService {
       throw new BadRequestException('Telefone inválido');
     }
 
+    // AUDIT: Check cooldown (prevent flooding)
+    const lastOtp = await this.prisma.customerOTP.findFirst({
+      where: {
+        tenantId: tenant.id,
+        phone: cleanPhone,
+        createdAt: { gt: new Date(Date.now() - 60 * 1000) }, // Last 60 seconds
+      },
+    });
+
+    if (lastOtp) {
+       throw new BadRequestException('Aguarde 60 segundos para solicitar um novo código');
+    }
+
     // Generate 6-digit code
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
@@ -54,8 +67,12 @@ export class CustomerAuthService {
     });
 
     // MOCK: In production, send via SMS/WhatsApp gateway
-    this.logger.log(`[OTP] Para ${cleanPhone} em ${tenantSlug}: ${code}`);
-    console.log(`\n\n>>> OTP CODE FOR ${cleanPhone}: ${code} <<<\n\n`);
+    this.logger.log(`[OTP_SENT] Tenant: ${tenantSlug}, Phone: ${cleanPhone}`);
+    
+    // In dev, show code. In prod, this would be hidden.
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`\n\n>>> OTP CODE FOR ${cleanPhone}: ${code} <<<\n\n`);
+    }
 
     return { message: 'Código enviado com sucesso' };
   }
@@ -74,19 +91,30 @@ export class CustomerAuthService {
 
     const cleanPhone = phone.replace(/\D/g, '');
 
+    // Find the latest active OTP for this phone
     const otp = await this.prisma.customerOTP.findFirst({
       where: {
         tenantId: tenant.id,
         phone: cleanPhone,
-        code,
         usedAt: null,
         expiresAt: { gt: new Date() },
+        attempts: { lt: 5 }, // Block after 5 failed attempts
       },
       orderBy: { createdAt: 'desc' },
     });
 
     if (!otp) {
-      throw new UnauthorizedException('Código inválido ou expirado');
+      throw new UnauthorizedException('Código inválido, expirado ou excesso de tentativas');
+    }
+
+    if (otp.code !== code) {
+      // Increment attempts
+      await this.prisma.customerOTP.update({
+        where: { id: otp.id },
+        data: { attempts: { increment: 1 } },
+      });
+      
+       throw new UnauthorizedException('Código inválido');
     }
 
     // Mark as used
@@ -99,7 +127,7 @@ export class CustomerAuthService {
     const customer = await this.customerService.syncCustomerOnOrderUpsert(
       tenant.id,
       cleanPhone,
-      'Cliente Novo', // Default name, can be updated later
+      'Cliente Novo',
     );
 
     if (!customer) {

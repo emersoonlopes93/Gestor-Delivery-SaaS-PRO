@@ -1,4 +1,5 @@
 import { Controller, Post, Body, Param, HttpCode, HttpStatus } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CustomerAuthService } from './customer-auth.service';
 import { Public } from '../common/decorators';
 import { SendOtpRequest, ValidateOtpRequest, CustomerLoginResponse } from '@gestor/types';
@@ -8,6 +9,7 @@ import { SendOtpRequest, ValidateOtpRequest, CustomerLoginResponse } from '@gest
 export class CustomerAuthController {
   constructor(private readonly authService: CustomerAuthService) {}
 
+  @Throttle({ auth: { limit: 5, ttl: 60 } }) // More restrictive for auth
   @Post('send')
   @HttpCode(HttpStatus.OK)
   async sendOtp(
@@ -17,6 +19,7 @@ export class CustomerAuthController {
     return this.authService.sendOtp(body.phone, tenantSlug);
   }
 
+  @Throttle({ auth: { limit: 10, ttl: 60 } })
   @Post('validate')
   @HttpCode(HttpStatus.OK)
   async validateOtp(

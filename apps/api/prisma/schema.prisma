@@ -423,6 +423,7 @@ model TenantUser {
   tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userRoles TenantUserRole[]
   cashSessions CashSession[]
+  servedOrders Order[]         @relation("WaiterOrders")
 
   // Unique email per tenant
   @@unique([tenantId, email])
@@ -921,6 +922,7 @@ model Order {
   customerName  String  @map("customer_name") @db.VarChar(150)
   customerPhone String  @map("customer_phone") @db.VarChar(30)
   customerEmail String? @map("customer_email") @db.VarChar(255)
+  tableNumber   String? @map("table_number") @db.VarChar(20)
 
   // Monetary breakdown
   itemsSubtotal Decimal @map("items_subtotal") @db.Decimal(10, 2)
@@ -958,6 +960,8 @@ model Order {
   cashMovements    CashMovement[]
   customerId       String?              @map("customer_id")
   customer         Customer?            @relation(fields: [customerId], references: [id])
+  waiterId         String?              @map("waiter_id")
+  waiter           TenantUser?          @relation("WaiterOrders", fields: [waiterId], references: [id])
   couponId         String?              @map("coupon_id")
   coupon           Coupon?              @relation(fields: [couponId], references: [id])
   cashbackUsed     Decimal?             @map("cashback_used") @db.Decimal(10,2)
@@ -1597,6 +1601,7 @@ model CustomerOTP {
   code      String   @db.VarChar(6)
   expiresAt DateTime @map("expires_at")
   usedAt    DateTime? @map("used_at")
+  attempts  Int      @default(0)
   createdAt DateTime @default(now()) @map("created_at")
 
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)

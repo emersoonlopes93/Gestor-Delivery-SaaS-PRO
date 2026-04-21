@@ -250,12 +250,14 @@ export interface OrderResponseDTO {
   notes?: string | null;
   items: OrderItemResponseDTO[];
   deliveryAddress?: DeliveryAddressDTO | null;
+  tableNumber?: string | null;
   timeline: OrderTimelineEntryDTO[];
 
   paymentMethod: PaymentMethod;
   changeFor?: number | null;
   
   customerId?: string | null;
+  waiterId?: string | null;
   couponId?: string | null;
   cashbackUsed?: number | null;
 
@@ -273,6 +275,7 @@ export interface OrderListItemDTO {
   total: number;
   itemCount: number;
   paymentMethod: PaymentMethod;
+  waiterId?: string | null;
   createdAt: string;
 }
 

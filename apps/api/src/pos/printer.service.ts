@@ -32,7 +32,9 @@ export class PrinterService {
 
     // Info
     if (order.customerName) lines.push(`CLIENTE: ${order.customerName}`);
-    if (order.fulfillmentType === 'table') lines.push(`MESA: ${order.orderNumber}`); // We should use tableNumber if available, but for now we follow the structure
+    if (order.fulfillmentType === 'table' && order.tableNumber) {
+      lines.push(`MESA: ${order.tableNumber}`);
+    }
     lines.push(separator);
 
     // Items

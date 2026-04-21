@@ -91,6 +91,10 @@ export class CreatePosOrderDTO {
     city?: string;
     state?: string;
   };
+
+  @IsString()
+  @IsOptional()
+  waiterId?: string;
 }
 
 // ============================================================

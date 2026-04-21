@@ -49,6 +49,7 @@ export enum TenantDefaultRole {
   DELIVERY_OPERATOR = 'delivery_operator',
   FINANCE = 'finance',
   MARKETING = 'marketing',
+  WAITER = 'waiter',
 }
 
 // ============================================================

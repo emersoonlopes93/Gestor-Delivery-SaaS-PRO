@@ -22,6 +22,7 @@ import { DeliveryZonesPage } from './features/delivery/DeliveryZonesPage';
 import { DeliveryMapPage } from './features/delivery/DeliveryMapPage';
 import CashPage from './features/cash/CashPage';
 import PosPage from './features/pos/PosPage';
+import WaiterPage from './features/pos/WaiterPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 
 // CRM & Promotions
@@ -207,6 +208,14 @@ export function App() {
           element={
             <PermissionGate permission="pos.read">
               <PosPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/waiter"
+          element={
+            <PermissionGate permission="pos.waiter_mode">
+              <WaiterPage />
             </PermissionGate>
           }
         />

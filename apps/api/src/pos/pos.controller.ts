@@ -92,7 +92,7 @@ export class PosController {
 
   // POST /pos/draft
   @Post('draft')
-  @RequirePermissions('pos.create_sale')
+  @RequirePermissions('pos.create_sale', 'pos.waiter_mode')
   async upsertDraft(
     @Request() req: TenantRequest,
     @Body() dto: CreatePosOrderDTO & { id?: string },
@@ -106,7 +106,7 @@ export class PosController {
 
   // GET /pos/salon
   @Get('salon')
-  @RequirePermissions('pos.read')
+  @RequirePermissions('pos.read', 'pos.waiter_mode')
   async getSalon(@Request() req: TenantRequest) {
     return this.posService.getSalonTables(req.user.tenantId);
   }
@@ -123,5 +123,27 @@ export class PosController {
       orderId,
       req.user.id,
     );
+  }
+
+  // POST /pos/tables/:id/bill
+  @Post('tables/:id/bill')
+  @RequirePermissions('pos.waiter_mode')
+  async requestBill(
+    @Request() req: TenantRequest,
+    @Param('id') tableId: string,
+  ) {
+    await this.posService.requestBill(req.user.tenantId, tableId, req.user.id);
+    return { success: true };
+  }
+
+  // POST /pos/tables/transfer
+  @Post('tables/transfer')
+  @RequirePermissions('pos.waiter_mode')
+  async transferTable(
+    @Request() req: TenantRequest,
+    @Body() body: { sourceTableId: string; targetTableId: string },
+  ) {
+    await this.posService.transferTable(req.user.tenantId, body.sourceTableId, body.targetTableId, req.user.id);
+    return { success: true };
   }
 }

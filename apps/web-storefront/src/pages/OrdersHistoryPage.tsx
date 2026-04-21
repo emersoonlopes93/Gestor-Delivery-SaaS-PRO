@@ -13,7 +13,7 @@ import {
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useCartStore } from '../store/use-cart-store';
 import { useToast } from '../components/Toast';
-import type { OrderListItemDTO, OrderResponseDTO } from '@gestor/types';
+import type { OrderListItemDTO, OrderResponseDTO, StorefrontPayload } from '@gestor/types';
 
 export function OrdersHistoryPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -30,6 +30,15 @@ export function OrdersHistoryPage() {
       return res.data;
     },
     enabled: isLoggedIn,
+  });
+
+  const { data: storefront } = useQuery({
+    queryKey: ['storefront', tenantSlug],
+    queryFn: async () => {
+      const res = await api.get<StorefrontPayload>(`/public/storefront/${tenantSlug}`);
+      return res.data;
+    },
+    enabled: !!tenantSlug,
   });
 
   if (!isLoggedIn) {
@@ -49,8 +58,13 @@ export function OrdersHistoryPage() {
   }
 
   const handleReorder = async (orderId: string) => {
+    if (!storefront) {
+      showToast({ title: 'Carregando cardápio...', type: 'info' });
+      return;
+    }
+
     try {
-      showToast({ title: 'Recriando seu carrinho...', type: 'info' });
+      showToast({ title: 'Validando itens...', type: 'info' });
       
       const { data: order } = await api.get<OrderResponseDTO>(`/public/orders/${orderId}`);
       
@@ -58,25 +72,44 @@ export function OrdersHistoryPage() {
         throw new Error('Pedido não encontrado');
       }
 
+      // Flatten items from storefront to search efficiently
+      const allProducts = storefront.categories.flatMap(c => c.products);
+      
+      let itemsAdded = 0;
+      let itemsMissing = 0;
+      let priceChanged = false;
+
       for (const item of order.items) {
         if (item.lineType === 'product' && item.productId) {
-          // Map to CartLineItem snapshot format
+          // Find current version of the product
+          const currentProduct = allProducts.find(p => p.id === item.productId);
+
+          if (!currentProduct) {
+            itemsMissing++;
+            continue;
+          }
+
+          if (currentProduct.basePrice !== item.snapshotBasePrice) {
+            priceChanged = true;
+          }
+
+          // Map to CartLineItem snapshot format, using CURRENT prices
           const cartItem = {
             cartLineId: crypto.randomUUID(),
             productId: item.productId,
             quantity: item.quantity,
             notes: item.notes || undefined,
             selectedOptions: item.complements.map((c) => ({
-              groupId: '', // Not stored in legacy snapshot, but needed for type
+              groupId: '', 
               itemId: c.complementItemId,
               name: c.snapshotName,
-              price: c.snapshotPrice,
+              price: c.snapshotPrice, // In a real V2 app, we'd also validate options prices
             })),
             snapshot: {
-              productName: item.snapshotName,
-              productImage: item.snapshotImage || undefined,
-              basePrice: item.snapshotBasePrice,
-              lineSubtotal: item.lineTotal,
+              productName: currentProduct.name,
+              productImage: currentProduct.image || undefined,
+              basePrice: currentProduct.basePrice,
+              lineSubtotal: (currentProduct.basePrice + item.snapshotExtrasTotal) * item.quantity,
               extrasDescription: item.complements.map((c) => c.snapshotName).join(', '),
             }
           };
@@ -88,11 +121,20 @@ export function OrdersHistoryPage() {
               subtotal: newItems.reduce((sum, i) => sum + i.snapshot.lineSubtotal, 0)
             };
           });
+          itemsAdded++;
         }
       }
 
-      showToast({ title: 'Itens adicionados ao carrinho!', type: 'success' });
-      navigate(`/${tenantSlug}`);
+      if (itemsAdded > 0) {
+        let msg = `${itemsAdded} item(s) adicionados.`;
+        if (itemsMissing > 0) msg += ` ${itemsMissing} item(s) não estão mais disponíveis.`;
+        if (priceChanged) msg += ` Atenção: alguns preços foram atualizados.`;
+        
+        showToast({ title: 'Carrinho atualizado!', message: msg, type: priceChanged || itemsMissing > 0 ? 'warning' : 'success' });
+        navigate(`/${tenantSlug}`);
+      } else {
+        showToast({ title: 'Erro ao repetir', message: 'Nenhum dos itens está disponível no momento.', type: 'error' });
+      }
     } catch (e: any) {
       showToast({ title: 'Erro ao repetir pedido', message: e.message, type: 'error' });
     }

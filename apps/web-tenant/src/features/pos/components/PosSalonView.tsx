@@ -5,7 +5,8 @@ import {
   DollarSign, 
   ChevronRight,
   LayoutGrid,
-  ClipboardList
+  ClipboardList,
+  ArrowLeftRight
 } from 'lucide-react';
 
 export type TableStatus = 'free' | 'occupied' | 'waiting_bill' | 'reserved';
@@ -21,12 +22,16 @@ export interface SalonTable {
     total: number;
     customerName: string;
     createdAt: string;
+    waiter?: {
+       name: string;
+    };
   };
 }
 
 interface PosSalonViewProps {
   tables: SalonTable[];
   onSelectTable: (table: SalonTable) => void;
+  onTransferTable?: (table: SalonTable) => void;
   isLoading: boolean;
 }
 
@@ -42,7 +47,7 @@ const getRelativeTime = (dateStr: string) => {
   return `${hours}h ${minutes % 60}m`;
 };
 
-export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTable, isLoading }) => {
+export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTable, onTransferTable, isLoading }) => {
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 p-6">
@@ -131,6 +136,11 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
                           <Clock size={8} />
                           {getRelativeTime(table.order.createdAt)}
                        </div>
+                       {table.order.waiter && (
+                         <div className="text-[8px] font-black uppercase text-gray-500 mt-1 opacity-60">
+                            Garçom: {table.order.waiter.name}
+                         </div>
+                       )}
                     </div>
                   </div>
                 ) : (
@@ -144,6 +154,20 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
                       <span className="text-[10px] font-black uppercase">Atender</span>
                    </div>
                 </div>
+
+                {/* Transfer Button - Only if occupied */}
+                {isOccupied && (
+                   <button 
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       onTransferTable?.(table);
+                     }}
+                     className="absolute -top-1 -left-1 w-8 h-8 bg-gray-800 border border-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-blue-600 hover:border-blue-500 transition-all z-20"
+                     title="Transferir Mesa"
+                   >
+                      <ArrowLeftRight size={14} />
+                   </button>
+                )}
               </button>
             );
           })}
