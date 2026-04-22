@@ -30,6 +30,8 @@ import { GoalsModule } from './goals/goals.module';
 import { validateEnv } from './config/env.validation';
 import { UploadModule } from './upload/upload.module';
 import { CustomerAuthModule } from './auth/customer-auth.module';
+import { PurchasingModule } from './purchasing/purchasing.module';
+import { FinanceModule } from './finance/finance.module';
 
 @Module({
   imports: [
@@ -124,6 +126,10 @@ import { CustomerAuthModule } from './auth/customer-auth.module';
 
     // Point of Sale (Phase 7)
     PosModule,
+    
+    // Management (Phase 3)
+    PurchasingModule,
+    FinanceModule,
 
     // Customer Auth (B2C)
     CustomerAuthModule,

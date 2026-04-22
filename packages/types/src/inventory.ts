@@ -1,4 +1,4 @@
-import { UnitType, StockMovementType } from './enums';
+import { UnitType, StockMovementType, InventoryCountStatus } from './enums';
 
 export interface IngredientDTO {
   id: string;
@@ -76,4 +76,39 @@ export interface IngredientStatsDTO {
   currentStock: number;
   estimatedConsumption: number; // Theoretical depletion in last 30 days or so
   lastMovementDate?: Date;
+}
+
+export interface InventoryCountDTO {
+  id: string;
+  tenantId: string;
+  status: InventoryCountStatus;
+  note?: string;
+  openedAt: Date;
+  closedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  items?: InventoryCountItemDTO[];
+}
+
+export interface InventoryCountItemDTO {
+  id: string;
+  tenantId: string;
+  inventoryCountId: string;
+  ingredientId: string;
+  theoreticalStock: number;
+  physicalStock: number;
+  adjustedQuantity: number;
+  ingredientName?: string;
+  ingredientUnit?: UnitType;
+}
+
+export interface CreateInventoryCountDTO {
+  note?: string;
+  items: CreateInventoryCountItemDTO[];
+}
+
+export interface CreateInventoryCountItemDTO {
+  ingredientId: string;
+  theoreticalStock: number;
+  physicalStock: number;
 }

@@ -31,6 +31,11 @@ import { CustomersListPage } from './features/crm/CustomersListPage';
 import { PromotionsPage } from './features/promotions/PromotionsPage';
 import { InventoryPage } from './features/inventory/InventoryPage';
 import { ReportsPage, GoalsPage } from './features/analytics';
+import { SuppliersPage } from './features/purchasing/SuppliersPage';
+import { PurchasesPage } from './features/purchasing/PurchasesPage';
+import { InventoryCountPage } from './features/purchasing/InventoryCountPage';
+import { LossesPage } from './features/purchasing/LossesPage';
+import { FinancePage } from './features/purchasing/FinancePage';
 
 export function App() {
   return (
@@ -246,6 +251,48 @@ export function App() {
           element={
             <PermissionGate permission="inventory.read">
               <InventoryPage />
+            </PermissionGate>
+          }
+        />
+
+        {/* Phase 3 - Management Layer */}
+        <Route
+          path="/management/suppliers"
+          element={
+            <PermissionGate permission="purchasing.read">
+              <SuppliersPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/management/purchases"
+          element={
+            <PermissionGate permission="purchasing.read">
+              <PurchasesPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/management/inventory-count"
+          element={
+            <PermissionGate permission="inventory.manage">
+              <InventoryCountPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/management/losses"
+          element={
+            <PermissionGate permission="inventory.manage">
+              <LossesPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/management/finance"
+          element={
+            <PermissionGate permission="finance.read">
+              <FinancePage />
             </PermissionGate>
           }
         />

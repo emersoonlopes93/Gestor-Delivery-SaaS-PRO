@@ -113,6 +113,13 @@ export class TheoreticalStockService {
       const consumptionQty = Number(recipeItem.quantity) * quantityMultiplier;
 
       await this.prisma.$transaction(async (tx) => {
+        // 0. Get current cost from ingredient
+        const ingredient = await tx.ingredient.findUnique({
+          where: { id: recipeItem.ingredientId },
+          select: { currentCost: true }
+        });
+        const unitCost = ingredient?.currentCost ? Number(ingredient.currentCost) : 0;
+
         // 1. Create movement
         await tx.stockMovement.create({
           data: {
@@ -120,6 +127,7 @@ export class TheoreticalStockService {
             ingredientId: recipeItem.ingredientId,
             type: StockMovementType.THEORETICAL_DEPLETION,
             quantity: consumptionQty,
+            unitCost: unitCost,
             orderId,
             notes: `Baixa teórica via pedido ${orderId}`,
           },

@@ -67,6 +67,13 @@ model Tenant {
   users                       TenantUser[]
   upsellItems                 UpsellItem[]
   upsells                     Upsell[]
+  suppliers                   Supplier[]
+  purchases                   Purchase[]
+  inventoryCounts             InventoryCount[]
+  financialAccounts           FinancialAccount[]
+  financialTransactions       FinancialTransaction[]
+  purchaseItems               PurchaseItem[]
+  inventoryCountItems         InventoryCountItem[]
 
   @@map("tenants")
 }
@@ -1044,6 +1051,8 @@ model Ingredient {
   tenant            Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   productRecipes    ProductRecipeIngredient[]
   movements         StockMovement[]
+  purchaseItems     PurchaseItem[]
+  inventoryCountItems InventoryCountItem[]
 
   @@unique([tenantId, sku])
   @@index([tenantId])
@@ -1273,6 +1282,142 @@ model ScheduledOrder {
   @@index([tenant_id, scheduled_for])
 }
 
+model Supplier {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  name      String   @db.VarChar(150)
+  cnpj      String?  @db.VarChar(18)
+  email     String?  @db.VarChar(255)
+  phone     String?  @db.VarChar(30)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchases Purchase[]
+
+  @@unique([tenantId, cnpj])
+  @@index([tenantId])
+  @@map("suppliers")
+}
+
+model Purchase {
+  id              String         @id @default(uuid())
+  tenantId        String         @map("tenant_id")
+  supplierId      String         @map("supplier_id")
+  number          String?        @db.VarChar(50)
+  totalValue      Decimal        @map("total_value") @db.Decimal(10, 2)
+  status          PurchaseStatus @default(draft)
+  paymentStatus   PaymentStatus  @default(pending) @map("payment_status")
+  purchaseDate    DateTime       @default(now()) @map("purchase_date")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier Supplier       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  items    PurchaseItem[]
+
+  @@index([tenantId])
+  @@index([supplierId])
+  @@map("purchases")
+}
+
+model PurchaseItem {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  purchaseId   String   @map("purchase_id")
+  ingredientId String   @map("ingredient_id")
+  quantity     Decimal  @db.Decimal(10, 4)
+  unitCost     Decimal  @map("unit_cost") @db.Decimal(10, 4)
+  totalCost    Decimal  @map("total_cost") @db.Decimal(10, 4)
+  expiryDate   DateTime? @map("expiry_date")
+
+  purchase   Purchase   @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseId])
+  @@index([ingredientId])
+  @@map("purchase_items")
+}
+
+model InventoryCount {
+  id          String               @id @default(uuid())
+  tenantId    String               @map("tenant_id")
+  status      InventoryCountStatus @default(open)
+  note        String?
+  openedAt    DateTime             @default(now()) @map("opened_at")
+  closedAt    DateTime?            @map("closed_at")
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
+
+  tenant Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items  InventoryCountItem[]
+
+  @@index([tenantId])
+  @@map("inventory_counts")
+}
+
+model InventoryCountItem {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  inventoryCountId String   @map("inventory_count_id")
+  ingredientId     String   @map("ingredient_id")
+  theoreticalStock Decimal  @map("theoretical_stock") @db.Decimal(10, 4)
+  physicalStock    Decimal  @map("physical_stock") @db.Decimal(10, 4)
+  adjustedQuantity Decimal  @map("adjusted_quantity") @db.Decimal(10, 4)
+
+  inventoryCount InventoryCount @relation(fields: [inventoryCountId], references: [id], onDelete: Cascade)
+  ingredient     Ingredient     @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryCountId])
+  @@index([ingredientId])
+  @@map("inventory_count_items")
+}
+
+model FinancialAccount {
+  id        String             @id @default(uuid())
+  tenantId  String             @map("tenant_id")
+  name      String             @db.VarChar(100)
+  type      FinancialAccountType @default(cash)
+  balance   Decimal            @default(0) @db.Decimal(10, 2)
+  active    Boolean            @default(true)
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
+
+  tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactions FinancialTransaction[]
+
+  @@index([tenantId])
+  @@map("financial_accounts")
+}
+
+model FinancialTransaction {
+  id                String                   @id @default(uuid())
+  tenantId          String                   @map("tenant_id")
+  accountId         String?                  @map("account_id")
+  type              FinancialTransactionType
+  category          String                   @db.VarChar(50)
+  amount            Decimal                  @db.Decimal(10, 2)
+  status            FinancialStatus          @default(pending)
+  dueDate           DateTime?                @map("due_date")
+  paymentDate       DateTime?                @map("payment_date")
+  description       String?
+  referenceId       String?                  @map("reference_id")
+  referenceType     String?                  @map("reference_type")
+  createdAt         DateTime                 @default(now()) @map("created_at")
+  updatedAt         DateTime                 @updatedAt @map("updated_at")
+
+  account FinancialAccount? @relation(fields: [accountId], references: [id])
+  tenant  Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([accountId])
+  @@index([dueDate])
+  @@map("financial_transactions")
+}
+
 enum TenantStatus {
   active
   inactive
@@ -1482,6 +1627,8 @@ enum StockMovementType {
   adjust
   waste
   theoretical_depletion
+  purchase_entry
+  inventory_adjustment
 }
 
 enum RateType {
@@ -1526,4 +1673,42 @@ enum DineInTableStatus {
   occupied
   waiting_bill
   reserved
+}
+
+enum PurchaseStatus {
+  draft
+  pending
+  received
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  partial
+  paid
+  cancelled
+}
+
+enum InventoryCountStatus {
+  open
+  closed
+  cancelled
+}
+
+enum FinancialAccountType {
+  cash
+  bank
+  digital_wallet
+}
+
+enum FinancialTransactionType {
+  income
+  expense
+}
+
+enum FinancialStatus {
+  pending
+  paid
+  cancelled
+  overdue
 }

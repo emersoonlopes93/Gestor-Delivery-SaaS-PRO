@@ -23,6 +23,8 @@ export enum StockMovementType {
   ADJUST = 'adjust',
   WASTE = 'waste',
   THEORETICAL_DEPLETION = 'theoretical_depletion',
+  PURCHASE_ENTRY = 'purchase_entry',
+  INVENTORY_ADJUSTMENT = 'inventory_adjustment',
 }
 
 // ============================================================
@@ -141,4 +143,46 @@ export enum GoalTrendStatus {
   ON_TRACK = 'on_track',
   AT_RISK = 'at_risk',
   BEHIND = 'behind',
+}
+
+// ============================================================
+// Phase 3 — Management Enums
+// ============================================================
+
+export enum PurchaseStatus {
+  DRAFT = 'draft',
+  PENDING = 'pending',
+  RECEIVED = 'received',
+  CANCELLED = 'cancelled',
+}
+
+export enum PaymentStatus {
+  PENDING = 'pending',
+  PARTIAL = 'partial',
+  PAID = 'paid',
+  CANCELLED = 'cancelled',
+}
+
+export enum InventoryCountStatus {
+  OPEN = 'open',
+  CLOSED = 'closed',
+  CANCELLED = 'cancelled',
+}
+
+export enum FinancialAccountType {
+  CASH = 'cash',
+  BANK = 'bank',
+  DIGITAL_WALLET = 'digital_wallet',
+}
+
+export enum FinancialTransactionType {
+  INCOME = 'income',
+  EXPENSE = 'expense',
+}
+
+export enum FinancialStatus {
+  PENDING = 'pending',
+  PAID = 'paid',
+  CANCELLED = 'cancelled',
+  OVERDUE = 'overdue',
 }

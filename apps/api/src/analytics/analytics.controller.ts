@@ -51,4 +51,13 @@ export class AnalyticsController {
   ) {
     return this.analyticsService.getCostMarginMetrics(tenantId, filter);
   }
+
+  @Get('financial')
+  @RequirePermissions('reports.read')
+  async getFinancial(
+    @CurrentTenant() tenantId: string,
+    @Query() filter: MetricFilterDTO
+  ) {
+    return this.analyticsService.getFinancialMetrics(tenantId, filter);
+  }
 }

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import type { Prisma } from '@prisma/client';
-import { OrderStatus as PrismaOrderStatus } from '@prisma/client';
+import { OrderStatus as PrismaOrderStatus, StockMovementType } from '@prisma/client';
 import { 
   OperationalMetricsDTO, 
   CommercialMetricsDTO, 
@@ -89,11 +89,22 @@ export class AnalyticsService {
   async getCostMarginMetrics(tenantId: string, filter: MetricFilterDTO): Promise<CostMarginMetricsDTO> {
     const { startDate, endDate } = filter;
 
-    type CompletedOrder = Prisma.OrderGetPayload<{
-      include: { items: { include: { complements: true } } };
-    }>;
+    // 1. Calculate Real CMV from Stock Movements (Theoretical Depletion)
+    const movements = await this.prisma.stockMovement.findMany({
+      where: {
+        tenantId,
+        type: StockMovementType.theoretical_depletion,
+        createdAt: {
+          gte: new Date(startDate),
+          lte: new Date(endDate),
+        },
+      },
+    });
 
-    const completedOrders = await this.prisma.tenantClient.order.findMany({
+    const realCMV = movements.reduce((acc: number, m: any) => acc + (Number(m.quantity) * Number(m.unitCost || 0)), 0);
+
+    // 2. Calculate Gross Revenue from Completed Orders
+    const completedOrdersValue = await this.prisma.order.aggregate({
       where: {
         tenantId,
         status: PrismaOrderStatus.completed,
@@ -102,50 +113,46 @@ export class AnalyticsService {
           lte: new Date(endDate),
         },
       },
-      include: {
-        items: {
-          include: {
-            complements: true,
-          },
-        },
-      },
+      _sum: { total: true }
     });
 
-    // In a real scenario, we might want to use snapshot costs.
-    // Here we use current ingredient costs from the recipes (estimated).
-    let totalEstimatedCost = 0;
-    const productsPerf: Record<string, { id: string; name: string; cost: number; revenue: number }> = {};
-
-    for (const order of completedOrders as CompletedOrder[]) {
-      for (const item of order.items) {
-        // Calculate estimated cost for this item quantity
-        const itemCost = await this.calculateItemEstimatedCost(tenantId, item);
-        const itemRevenue = Number(item.lineTotal);
-        
-        totalEstimatedCost += itemCost;
-
-        const key = item.productId || item.comboId || 'unknown';
-        if (!productsPerf[key]) {
-          productsPerf[key] = { id: key, name: item.snapshotName, cost: 0, revenue: 0 };
-        }
-        productsPerf[key].cost += itemCost;
-        productsPerf[key].revenue += itemRevenue;
-      }
-    }
-
-    const totalRevenue = (completedOrders as CompletedOrder[]).reduce((acc, o) => acc + Number(o.total), 0);
-    const grossMargin = totalRevenue - totalEstimatedCost;
+    const totalRevenue = Number(completedOrdersValue._sum.total || 0);
+    const grossMargin = totalRevenue - realCMV;
 
     return {
-      estimatedCMV: totalEstimatedCost,
+      estimatedCMV: realCMV,
       estimatedGrossMargin: grossMargin,
       grossMarginPercentage: totalRevenue > 0 ? (grossMargin / totalRevenue) * 100 : 0,
-      productPerformance: Object.values(productsPerf).map(p => ({
-        ...p,
-        estimatedCost: p.cost,
-        grossMargin: p.revenue - p.cost,
-        marginPercentage: p.revenue > 0 ? ((p.revenue - p.cost) / p.revenue) * 100 : 0,
-      })),
+      productPerformance: [], 
+    };
+  }
+
+  async getFinancialMetrics(tenantId: string, filter: MetricFilterDTO) {
+    const { startDate, endDate } = filter;
+
+    const transactions = await this.prisma.financialTransaction.findMany({
+      where: {
+        tenantId,
+        paymentDate: {
+          gte: new Date(startDate),
+          lte: new Date(endDate),
+        },
+        status: 'paid',
+      }
+    });
+
+    const income = transactions
+      .filter((t: any) => t.type === 'income')
+      .reduce((acc: number, t: any) => acc + Number(t.amount), 0);
+    
+    const expenses = transactions
+      .filter((t: any) => t.type === 'expense')
+      .reduce((acc: number, t: any) => acc + Number(t.amount), 0);
+
+    return {
+      totalIncome: income,
+      totalExpense: expenses,
+      netCashFlow: income - expenses,
     };
   }
 
