@@ -18,6 +18,9 @@ import { DeliveryModule } from './delivery/delivery.module';
 import { CashModule } from './cash/cash.module';
 import { BillingModule } from './billing/billing.module';
 import { PaymentGatewayModule } from './payment-gateway/payment-gateway.module';
+import { SchedulingModule } from './scheduling/scheduling.module';
+import { SplitPaymentModule } from './split-payment/split-payment.module';
+import { KdsModule } from './kds/kds.module';
 import { PosModule } from './pos/pos.module';
 import { CrmModule } from './crm/crm.module';
 import { PromotionsModule } from './promotions/promotions.module';
@@ -73,6 +76,15 @@ import { CustomerAuthModule } from './auth/customer-auth.module';
     AdminModule,
     BillingModule,
     PaymentGatewayModule,
+    SchedulingModule,
+    SplitPaymentModule,
+    KdsModule,
+    PosModule,
+    CrmModule,
+    PromotionsModule,
+    InventoryModule,
+    AnalyticsModule,
+    GoalsModule,
 
     // Tenant Context (Shared)
     TenantContextModule,

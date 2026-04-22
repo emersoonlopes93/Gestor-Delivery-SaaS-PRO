@@ -11,6 +11,7 @@ import { CustomerService } from '../crm/customer.service';
 import { CashbackService } from '../promotions/cashback.service';
 import { TheoreticalStockService } from '../inventory/theoretical-stock.service';
 import { PaymentGatewayService } from '../payment-gateway/payment-gateway.service';
+import { SchedulingService } from '../scheduling/scheduling.service';
 import type {
   CreateOrderDTO,
   OrderResponseDTO,
@@ -37,6 +38,7 @@ export class OrdersService {
     private readonly cashbackService: CashbackService,
     private readonly inventoryService: TheoreticalStockService,
     private readonly paymentGatewayService: PaymentGatewayService,
+    private readonly schedulingService: SchedulingService,
   ) {}
 
   async createOrder(slug: string, dto: CreateOrderDTO): Promise<OrderResponseDTO> {
@@ -247,6 +249,23 @@ export class OrdersService {
         where: { id: couponId },
         data: { usedCount: { increment: 1 } }
       }).catch(e => this.logger.error(`Error updating coupon usage: ${e.message}`));
+    }
+
+    // Criar agendamento se especificado
+    if (dto.scheduledFor && dto.timeSlotId && customerId) {
+      try {
+        await this.schedulingService.createScheduledOrder({
+          customerId,
+          scheduledFor: new Date(dto.scheduledFor),
+          timeSlotId: dto.timeSlotId,
+          estimatedDuration: dto.estimatedDuration || 30, // 30 min padrão
+          notes: `Agendado para pedido ${order.orderNumber}`,
+        });
+        this.logger.log(`Scheduled order ${order.id} for ${dto.scheduledFor}`);
+      } catch (error) {
+        this.logger.error(`Error creating scheduled order: ${(error as any).message}`);
+        // Não falhar o pedido, apenas logar erro
+      }
     }
 
     const orderDetail = await this.getOrderDetail(order.id, tenantId);

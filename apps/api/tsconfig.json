@@ -14,7 +14,9 @@
     "composite": false,
     "baseUrl": "./",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@gestor/core": ["../../packages/core/dist/index"],
+      "@gestor/types": ["../../packages/types/dist/index"]
     }
   },
   "include": ["src/**/*"],

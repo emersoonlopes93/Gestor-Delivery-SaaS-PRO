@@ -52,6 +52,9 @@ model Tenant {
   printJobs              PrintJob[]
   cashSessions           CashSession[]
   cashMovements          CashMovement[]
+  timeSlots              TimeSlot[]
+  orderSplits            OrderSplit[]
+  splitPayments          SplitPayment[]
 
   customers              Customer[]
   cashbackTransactions   CashbackTransaction[]
@@ -976,6 +979,7 @@ model Order {
   paymentTransactions PaymentTransaction[]
   scheduledOrders  ScheduledOrder[]
   printJobs       PrintJob[]
+  orderSplits     OrderSplit[]
 
   @@unique([tenantId, idempotencyKey])
   @@unique([tenantId, orderNumber])
@@ -1233,6 +1237,7 @@ model PaymentTransaction {
   // Relations
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   order  Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  splitPayments SplitPayment[]
 
   @@index([tenantId, status])
   @@index([gatewayTxId])
@@ -1288,23 +1293,43 @@ model OrderCoupon {
 }
 
 model ScheduledOrder {
-  id              String    @id @default(uuid())
-  tenantId        String    @map("tenant_id")
-  orderId         String?   @map("order_id") // null até ser confirmado
-  customerName    String    @map("customer_name") @db.VarChar(100)
-  customerPhone   String    @map("customer_phone") @db.VarChar(20)
-  fulfillmentType FulfillmentType @map("fulfillment_type")
-  scheduledFor    DateTime  @map("scheduled_for")
-  notes           String?   @db.Text
-  status          ScheduledOrderStatus @default(scheduled) @map("status")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  id                String              @id @default(uuid())
+  tenantId          String              @map("tenant_id")
+  orderId           String?             @map("order_id") // null até ser confirmado
+  customerId        String              @map("customer_id")
+  
+  // Agendamento
+  scheduledFor      DateTime            @map("scheduled_for")
+  estimatedDuration Int                 @map("estimated_duration") // em minutos
+  timeSlotId        String              @map("time_slot_id")
+  
+  // Dados do cliente (legado - manter para compatibilidade)
+  customerName      String              @map("customer_name") @db.VarChar(100)
+  customerPhone     String              @map("customer_phone") @db.VarChar(20)
+  fulfillmentType   FulfillmentType     @map("fulfillment_type")
+  
+  // Status
+  status            ScheduledOrderStatus @default(scheduled) @map("status")
+  confirmedAt       DateTime?           @map("confirmed_at")
+  startedAt         DateTime?           @map("started_at")
+  completedAt       DateTime?           @map("completed_at")
+  
+  // Metadata
+  notes             String?             @db.Text
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
 
   // Relations
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  order  Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order             Order?              @relation(fields: [orderId], references: [id])
+  customer          Customer            @relation(fields: [customerId], references: [id])
+  timeSlot          TimeSlot            @relation(fields: [timeSlotId], references: [id])
 
-  @@index([tenantId, scheduledFor])
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([scheduledFor])
+  @@index([status])
+  @@map("scheduled_orders")
 }
 
 enum ScheduledOrderStatus {
@@ -1333,26 +1358,53 @@ model PrintJob {
   id          String    @id @default(uuid())
   tenantId    String    @map("tenant_id")
   orderId     String    @map("order_id")
-  station     String    @db.VarChar(50) // "kitchen", "bar", "cashier"
-  type        PrintType // "customer", "kitchen", "summary"
+  
+  // Estação e tipo
+  station     String    @db.VarChar(50) // "kitchen", "bar", "cashier", "dessert", "drinks"
+  type        PrintType // "customer", "kitchen", "summary", "incremental"
+  
+  // Conteúdo e metadados
   content     String    @db.Text
+  metadata    Json?     // Dados adicionais para impressão incremental
+  
+  // Status e controle
   status      PrintJobStatus @default(pending) @map("status")
+  priority    Int       @default(0) // Prioridade de impressão
   tries       Int       @default(0)
+  maxTries    Int       @default(3) // Máximo de tentativas
   lastTriedAt DateTime? @map("last_tried_at")
   printedAt   DateTime? @map("printed_at")
+  
+  // Controle incremental
+  isIncremental Boolean @default(false) @map("is_incremental")
+  sequenceNumber Int? @map("sequence_number") // Para impressões incrementais
+  parentPrintJobId String? @map("parent_print_job_id") // Para agrupar impressões
+  
+  // Configuração
+  printerName String? @map("printer_name") @db.VarChar(100)
+  copies     Int @default(1)
+  
   createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   // Relations
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  parentPrintJob PrintJob? @relation("PrintJobHierarchy", fields: [parentPrintJobId], references: [id])
+  childPrintJobs PrintJob[] @relation("PrintJobHierarchy")
 
   @@index([tenantId, status])
+  @@index([tenantId, station])
+  @@index([orderId])
+  @@index([priority])
+  @@map("print_jobs")
 }
 
 enum PrintType {
   customer
   kitchen
   summary
+  incremental
 }
 
 enum PrintJobStatus {
@@ -1436,6 +1488,7 @@ model Customer {
   tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orders           Order[]
   cashbackHistory  CashbackTransaction[]
+  scheduledOrders  ScheduledOrder[]
 
   @@unique([tenantId, phone])
   @@index([tenantId])
@@ -1466,6 +1519,139 @@ model CashbackTransaction {
   @@index([tenantId])
   @@index([customerId])
   @@map("cashback_transactions")
+}
+
+// ============================================================
+// SCHEDULING & ETA - Phase 11
+// ============================================================
+
+enum TimeSlotStatus {
+  available
+  occupied
+  blocked
+  maintenance
+}
+
+
+model TimeSlot {
+  id                String          @id @default(uuid())
+  tenantId          String          @map("tenant_id")
+  
+  // Configuração do slot
+  startTime         DateTime        @map("start_time")
+  endTime           DateTime        @map("end_time")
+  capacity          Int             @default(1)
+  currentOccupancy  Int             @default(0) @map("current_occupancy")
+  
+  // Restrições
+  minOrderValue     Decimal?        @map("min_order_value") @db.Decimal(10, 2)
+  maxOrderValue     Decimal?        @map("max_order_value") @db.Decimal(10, 2)
+  maxItems          Int?            @map("max_items")
+  
+  // Status
+  status            TimeSlotStatus  @default(available)
+  isActive          Boolean         @default(true) @map("is_active")
+  
+  // Recorrência (para slots repetitivos)
+  isRecurring       Boolean         @default(false) @map("is_recurring")
+  recurrencePattern String?         @map("recurrence_pattern") // daily, weekly, monthly
+  recurrenceEnd     DateTime?       @map("recurrence_end")
+  
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scheduledOrders   ScheduledOrder[]
+
+  @@index([tenantId])
+  @@index([startTime])
+  @@index([status])
+  @@map("time_slots")
+}
+
+// ============================================================
+// SPLIT PAYMENT & BILL DIVISION - Phase 12
+// ============================================================
+
+enum OrderSplitStatus {
+  pending
+  confirmed
+  cancelled
+}
+
+model OrderSplit {
+  id                String              @id @default(uuid())
+  tenantId          String              @map("tenant_id")
+  orderId           String              @map("order_id")
+  
+  // Divisão
+  splitType         String              @map("split_type") // 'items', 'people', 'custom'
+  description       String?             @db.Text
+  
+  // Valores
+  subtotalAmount    Decimal             @map("subtotal_amount") @db.Decimal(10, 2)
+  discountAmount    Decimal             @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  serviceFeeAmount  Decimal             @default(0) @map("service_fee_amount") @db.Decimal(10, 2)
+  deliveryFeeAmount Decimal             @default(0) @map("delivery_fee_amount") @db.Decimal(10, 2)
+  totalAmount       Decimal             @map("total_amount") @db.Decimal(10, 2)
+  
+  // Responsável
+  responsiblePerson  String?           @map("responsible_person") @db.VarChar(100)
+  responsiblePhone   String?           @map("responsible_phone") @db.VarChar(20)
+  
+  // Status
+  status            OrderSplitStatus   @default(pending)
+  confirmedAt       DateTime?          @map("confirmed_at")
+  cancelledAt       DateTime?          @map("cancelled_at")
+  
+  // Metadata
+  notes             String?             @db.Text
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order             Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  payments          SplitPayment[]
+
+  @@index([tenantId])
+  @@index([orderId])
+  @@index([status])
+  @@map("order_splits")
+}
+
+model SplitPayment {
+  id                String              @id @default(uuid())
+  tenantId          String              @map("tenant_id")
+  orderSplitId      String              @map("order_split_id")
+  
+  // Pagamento
+  paymentMethod     PaymentMethod       @map("payment_method")
+  amount            Decimal             @map("amount") @db.Decimal(10, 2)
+  changeFor         Decimal?            @map("change_for") @db.Decimal(10, 2)
+  
+  // Transação (se for pagamento digital)
+  paymentTxId       String?             @map("payment_tx_id")
+  
+  // Status
+  isPaid            Boolean             @default(false) @map("is_paid")
+  paidAt            DateTime?           @map("paid_at")
+  
+  // Metadata
+  notes             String?             @db.Text
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  tenant            Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderSplit        OrderSplit          @relation(fields: [orderSplitId], references: [id], onDelete: Cascade)
+  paymentTransaction PaymentTransaction? @relation(fields: [paymentTxId], references: [id])
+
+  @@index([tenantId])
+  @@index([orderSplitId])
+  @@index([isPaid])
+  @@map("split_payments")
 }
 
 // ============================================================

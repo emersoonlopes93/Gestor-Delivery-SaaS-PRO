@@ -191,6 +191,11 @@ export class CreateOrderDTO {
   @Type(() => PaymentInput)
   @IsNotEmpty()
   payment!: PaymentInput;
+
+  // Agendamento
+  @IsString() @IsOptional() scheduledFor?: string;
+  @IsString() @IsOptional() timeSlotId?: string;
+  @IsNumber() @IsOptional() estimatedDuration?: number;
 }
 
 // --- DTOs de Saída ---
