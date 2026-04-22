@@ -60,7 +60,6 @@ export function CheckoutPage() {
   const [appliedCoupon, setAppliedCoupon] = useState<string>('');
   const [couponError, setCouponError] = useState<string>('');
   const [usedCashback, setUsedCashback] = useState<number>(0);
-  const [cashbackError, setCashbackError] = useState<string>('');
 
   // Financial state (calculated server-side)
   const [deliveryFee, setDeliveryFee] = useState(0);

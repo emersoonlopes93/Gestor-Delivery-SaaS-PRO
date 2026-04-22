@@ -14,6 +14,7 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   out_for_delivery: 'Em Rota',
   completed: 'Concluído',
   cancelled: 'Cancelado',
+  draft: 'Rascunho',
 };
 
 const STATUS_TONE: Record<OrderStatus, { ring: string; bg: string; text: string }> = {
@@ -25,6 +26,7 @@ const STATUS_TONE: Record<OrderStatus, { ring: string; bg: string; text: string 
   out_for_delivery: { ring: 'ring-violet-200', bg: 'bg-violet-50', text: 'text-violet-800' },
   completed: { ring: 'ring-gray-200', bg: 'bg-gray-50', text: 'text-gray-700' },
   cancelled: { ring: 'ring-red-200', bg: 'bg-red-50', text: 'text-red-800' },
+  draft: { ring: 'ring-slate-200', bg: 'bg-slate-50', text: 'text-slate-700' },
 };
 
 type BoardViewMode = 'compact' | 'standard' | 'focus_production';

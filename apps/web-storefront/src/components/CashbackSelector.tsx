@@ -1,4 +1,3 @@
-import React from 'react';
 import { DollarSign, Plus } from 'lucide-react';
 
 interface CashbackSelectorProps {

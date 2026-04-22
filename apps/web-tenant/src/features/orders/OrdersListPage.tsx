@@ -21,6 +21,7 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   out_for_delivery: 'Saiu p/ Entrega',
   completed: 'Concluído',
   cancelled: 'Cancelado',
+  draft: 'Rascunho',
 };
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
@@ -32,6 +33,7 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
   out_for_delivery: 'bg-purple-100 text-purple-800',
   completed: 'bg-gray-100 text-gray-600',
   cancelled: 'bg-red-100 text-red-800',
+  draft: 'bg-slate-100 text-slate-700',
 };
 
 export function OrdersListPage() {

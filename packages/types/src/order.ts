@@ -241,6 +241,15 @@ export interface OrderTimelineEntryDTO {
   createdAt: string;
 }
 
+export interface PixPaymentDTO {
+  transactionId: string;
+  qrCode: string;
+  qrCodeBase64: string;
+  ticketUrl: string;
+  expiresAt: string;
+  status?: 'pending' | 'confirmed' | 'failed' | 'expired';
+}
+
 export interface OrderResponseDTO {
   id: string;
   orderNumber: string;
@@ -269,6 +278,8 @@ export interface OrderResponseDTO {
   waiterId?: string | null;
   couponId?: string | null;
   cashbackUsed?: number | null;
+
+  pixPayment?: PixPaymentDTO;
 
   createdAt: string;
   updatedAt: string;

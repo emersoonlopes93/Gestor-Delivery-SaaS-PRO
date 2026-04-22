@@ -37,6 +37,8 @@ export {
   CreateOrderItemSelectionGroupDTO,
   CreateOrderItemComboSlotSelectionItemDTO,
   CreateOrderItemComboSlotSelectionDTO,
+  PizzaCompositionFlavorDTO,
+  PizzaCompositionDTO,
   CreateOrderItemDTO, 
   CreateOrderDTO,
   PaymentInput,

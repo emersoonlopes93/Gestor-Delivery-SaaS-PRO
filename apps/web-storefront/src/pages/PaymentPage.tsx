@@ -9,6 +9,7 @@ interface PixPaymentData {
   qrCodeBase64: string;
   ticketUrl: string;
   expiresAt: string;
+  status?: 'pending' | 'confirmed' | 'failed' | 'expired';
 }
 
 export function PaymentPage() {
@@ -18,7 +19,7 @@ export function PaymentPage() {
   const [paymentData, setPaymentData] = useState<PixPaymentData | null>(null);
   const [status, setStatus] = useState<'loading' | 'pending' | 'confirmed' | 'expired' | 'error'>('loading');
   const [timeLeft, setTimeLeft] = useState<string>('');
-  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+  const [pollingInterval, setPollingInterval] = useState<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const pixPayment = (location.state as any)?.pixPayment;
@@ -33,7 +34,7 @@ export function PaymentPage() {
 
   const loadPaymentData = async () => {
     try {
-      const response = await api.get(`/public/payment-gateway/pix/${transactionId}`);
+      const response = await api.get<PixPaymentData>(`/public/payment-gateway/pix/${transactionId}`);
       setPaymentData(response.data);
       setStatus(response.data.status === 'confirmed' ? 'confirmed' : 'pending');
     } catch (error) {
@@ -47,7 +48,7 @@ export function PaymentPage() {
       // Iniciar polling para verificar status do pagamento
       const interval = setInterval(async () => {
         try {
-          const response = await api.get(`/public/payment-gateway/pix/${transactionId}`);
+          const response = await api.get<PixPaymentData>(`/public/payment-gateway/pix/${transactionId}`);
           const updatedStatus = response.data.status;
           
           if (updatedStatus === 'confirmed') {
@@ -63,7 +64,7 @@ export function PaymentPage() {
                 } 
               });
             }, 2000);
-          } else if (updatedStatus === 'failed') {
+          } else if (updatedStatus === 'failed' || updatedStatus === 'expired') {
             setStatus('expired');
             setPollingInterval(null);
           }
@@ -108,13 +109,6 @@ export function PaymentPage() {
       return () => clearInterval(interval);
     }
   }, [paymentData, status, pollingInterval]);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    }).format(value);
-  };
 
   const handleCopyPixCode = async () => {
     if (paymentData?.qrCode) {

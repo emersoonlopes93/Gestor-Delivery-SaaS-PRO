@@ -8,11 +8,10 @@ export function useDraftSale() {
   return useMutation({
     mutationFn: async (payload: PosCreateSalePayload & { id?: string }) => {
       const res = await api.post<any>('/pos/draft', payload);
-      const data = res.data;
-      if (res.status >= 400) {
-        throw new Error(data?.message || 'Erro ao salvar comanda');
+      if (!res.success) {
+        throw new Error('Erro ao salvar comanda');
       }
-      return data;
+      return res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posSalon'] });

@@ -1,17 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-interface Customer {
-  id: string;
-  tenantId: string;
-  name: string;
-  phone: string;
-}
+import type { CustomerDTO } from '@gestor/types';
 
 interface CustomerState {
-  customer: Customer | null;
+  customer: CustomerDTO | null;
   accessToken: string | null;
-  setCustomer: (customer: Customer | null, accessToken: string | null) => void;
+  setCustomer: (customer: CustomerDTO | null, accessToken: string | null) => void;
   logout: () => void;
   isLoggedIn: boolean;
 }
