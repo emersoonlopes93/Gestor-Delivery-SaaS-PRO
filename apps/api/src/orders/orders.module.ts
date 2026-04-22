@@ -12,6 +12,7 @@ import { CrmModule } from '../crm/crm.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { DeliveryModule } from '../delivery/delivery.module';
 import { CatalogModule } from '../catalog/catalog.module';
+import { PaymentGatewayModule } from '../payment-gateway/payment-gateway.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { CatalogModule } from '../catalog/catalog.module';
     InventoryModule,
     DeliveryModule,
     CatalogModule,
+    PaymentGatewayModule,
   ],
   controllers: [OrdersController, PublicOrdersController],
   providers: [OrdersService, CheckoutValidatorService, AvailabilityService],

@@ -24,6 +24,8 @@ export type OrderLineType = 'product' | 'combo';
 export class PaymentInput {
   @IsString() @IsNotEmpty() method!: PaymentMethod;
   @IsNumber() @IsOptional() changeFor?: number | null;
+  @IsString() @IsOptional() couponCode?: string;
+  @IsNumber() @IsOptional() useCashbackAmount?: number;
 }
 
 // --- Valid status transitions ---

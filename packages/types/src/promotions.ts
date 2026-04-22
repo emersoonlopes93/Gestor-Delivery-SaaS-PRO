@@ -19,7 +19,7 @@ export interface CouponDTO {
   updatedAt: string;
 }
 
-export type CashbackTransactionType = 'earned' | 'redeemed' | 'adjustment' | 'expired';
+export type CashbackTransactionType = 'earned' | 'used' | 'expired' | 'refunded';
 
 export interface CashbackTransactionDTO {
   id: string;
@@ -36,24 +36,17 @@ import { IsString, IsNotEmpty, IsOptional, IsNumber, IsBoolean, IsEnum, IsDateSt
 
 export class CreateCouponDTO {
   @IsString() @IsNotEmpty() code!: string;
-  @IsString() @IsNotEmpty() name!: string;
-  @IsString() @IsOptional() description?: string;
-  @IsEnum(['percentage', 'fixed_amount', 'free_shipping']) type!: CouponType;
+  @IsEnum(['percentage', 'fixed']) type!: CouponType;
   @IsNumber() @IsNotEmpty() value!: number;
   @IsNumber() @IsOptional() minOrderValue?: number;
-  @IsNumber() @IsOptional() maxDiscountValue?: number;
   @IsNumber() @IsOptional() usageLimit?: number;
-  @IsDateString() @IsOptional() startsAt?: string;
   @IsDateString() @IsOptional() expiresAt?: string;
+  @IsBoolean() @IsOptional() isActive?: boolean;
 }
 
 export class UpdateCouponDTO {
-  @IsString() @IsOptional() name?: string;
-  @IsString() @IsOptional() description?: string;
   @IsNumber() @IsOptional() minOrderValue?: number;
-  @IsNumber() @IsOptional() maxDiscountValue?: number;
   @IsNumber() @IsOptional() usageLimit?: number;
-  @IsDateString() @IsOptional() startsAt?: string;
   @IsDateString() @IsOptional() expiresAt?: string;
   @IsBoolean() @IsOptional() isActive?: boolean;
 }

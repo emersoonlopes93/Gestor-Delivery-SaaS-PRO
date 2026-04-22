@@ -29,7 +29,6 @@ export class CouponsService {
       ...coupon,
       value: Number(coupon.value),
       minOrderValue: coupon.minOrderValue ? Number(coupon.minOrderValue) : null,
-      maxDiscountValue: coupon.maxDiscountValue ? Number(coupon.maxDiscountValue) : null,
     };
   }
 
@@ -49,15 +48,12 @@ export class CouponsService {
       data: {
         tenantId,
         code: data.code.toUpperCase(),
-        name: data.name,
-        description: data.description,
         type: data.type,
         value: data.value,
         minOrderValue: data.minOrderValue || null,
-        maxDiscountValue: data.maxDiscountValue || null,
         usageLimit: data.usageLimit || null,
-        startsAt: data.startsAt ? new Date(data.startsAt) : null,
         expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+        isActive: data.isActive ?? true,
       },
     });
 
@@ -65,7 +61,6 @@ export class CouponsService {
       ...created,
       value: Number(created.value),
       minOrderValue: created.minOrderValue ? Number(created.minOrderValue) : null,
-      maxDiscountValue: created.maxDiscountValue ? Number(created.maxDiscountValue) : null,
     };
   }
 
@@ -78,7 +73,6 @@ export class CouponsService {
     const updated = await this.db.coupon.update({
       where: { id },
       data: {
-        name: data.name !== undefined ? data.name : coupon.name,
         minOrderValue: data.minOrderValue !== undefined ? data.minOrderValue : coupon.minOrderValue,
         usageLimit: data.usageLimit !== undefined ? data.usageLimit : coupon.usageLimit,
         expiresAt: data.expiresAt !== undefined ? (data.expiresAt ? new Date(data.expiresAt) : null) : coupon.expiresAt,

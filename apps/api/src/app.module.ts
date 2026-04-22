@@ -17,6 +17,7 @@ import { OrdersModule } from './orders/orders.module';
 import { DeliveryModule } from './delivery/delivery.module';
 import { CashModule } from './cash/cash.module';
 import { BillingModule } from './billing/billing.module';
+import { PaymentGatewayModule } from './payment-gateway/payment-gateway.module';
 import { PosModule } from './pos/pos.module';
 import { CrmModule } from './crm/crm.module';
 import { PromotionsModule } from './promotions/promotions.module';
@@ -71,6 +72,7 @@ import { CustomerAuthModule } from './auth/customer-auth.module';
     RbacModule,
     AdminModule,
     BillingModule,
+    PaymentGatewayModule,
 
     // Tenant Context (Shared)
     TenantContextModule,

@@ -76,7 +76,7 @@ export class AnalyticsService {
       totalOrders,
       averageTicket: totalOrders > 0 ? totalRevenue / totalOrders : 0,
       revenueByChannel: this.aggregateRevenueByField(orders, 'sourceChannel'),
-      revenueByCategory: await this.revenueByCategory(tenantId, where),
+      revenueByCategory: await this.revenueByCategory(),
       topProducts: await this.getTopProducts(tenantId, where),
       topCombos: await this.getTopCombos(tenantId, where),
       couponUsage: this.getCouponUsage(orders),
@@ -246,7 +246,7 @@ export class AnalyticsService {
       _sum: { amount: true },
     });
     const redeemed = await this.prisma.tenantClient.cashbackTransaction.aggregate({
-      where: { tenantId, type: 'redeemed', createdAt },
+      where: { tenantId, type: 'used', createdAt },
       _sum: { amount: true },
     });
 

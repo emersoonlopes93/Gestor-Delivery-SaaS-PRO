@@ -1,0 +1,41 @@
+import { IsString, IsEmail, IsOptional } from 'class-validator';
+
+export class CreatePixPaymentDto {
+  @IsString()
+  orderId!: string;
+
+  @IsEmail()
+  customerEmail!: string;
+
+  @IsString()
+  @IsOptional()
+  customerName?: string;
+}
+
+export class WebhookDto {
+  @IsString()
+  action!: string;
+
+  @IsString()
+  api_version!: string;
+
+  @IsString()
+  data!: {
+    id: string;
+  };
+
+  @IsString()
+  date_created!: string;
+
+  @IsString()
+  id!: string;
+
+  @IsString()
+  live_mode!: string; // Mantido como string pois vem do webhook como string
+
+  @IsString()
+  type!: string;
+
+  @IsString()
+  user_id!: string;
+}

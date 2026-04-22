@@ -213,7 +213,7 @@ export class PosService {
     await this.cashService.registerSaleMovement(tenantId, activeSession.id, order.id, Number(order.total), dto.paymentMethod);
     if (cashbackUsed && customerId) {
       await this.cashbackService.createTransaction({
-        tenantId, customerId, type: 'redeemed', amount: cashbackUsed, orderId: order.id, 
+        tenantId, customerId, type: 'used', amount: cashbackUsed, orderId: order.id, 
         description: `Usado no PDV, pedido ${order.orderNumber}`
       });
     }

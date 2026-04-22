@@ -18,6 +18,8 @@ import { StructuredAddress } from '../lib/maps-service';
 import { useDebounce } from '../hooks/use-debounce';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { LoginModal } from '../components/LoginModal';
+import { CouponInput } from '../components/CouponInput';
+import { CashbackSelector } from '../components/CashbackSelector';
 
 export function CheckoutPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -53,6 +55,12 @@ export function CheckoutPage() {
   const [payment, setPayment] = useState<PaymentInput>({
     method: PaymentMethod.pix,
   });
+
+  // Coupon and Cashback state
+  const [appliedCoupon, setAppliedCoupon] = useState<string>('');
+  const [couponError, setCouponError] = useState<string>('');
+  const [usedCashback, setUsedCashback] = useState<number>(0);
+  const [cashbackError, setCashbackError] = useState<string>('');
 
   // Financial state (calculated server-side)
   const [deliveryFee, setDeliveryFee] = useState(0);
@@ -242,7 +250,11 @@ export function CheckoutPage() {
         items: orderItems,
         idempotencyKey,
         notes,
-        payment,
+        payment: {
+          ...payment,
+          couponCode: appliedCoupon || undefined,
+          useCashbackAmount: usedCashback || undefined,
+        },
         deliveryAddress: fulfillmentType === 'delivery' ? {
           street,
           number,
@@ -260,7 +272,13 @@ export function CheckoutPage() {
       const res = await api.post<OrderResponseDTO>(`/orders/public-checkout/${tenantSlug}`, payload);
       
       clearCart();
-      navigate(`/${tenantSlug}/order/${res.data.id}`, { state: { order: res.data } });
+      
+      // Se for pagamento PIX, redirecionar para página do QR code
+      if (res.data.pixPayment) {
+        navigate(`/${tenantSlug}/payment/${res.data.pixPayment.transactionId}`, { state: { pixPayment: res.data.pixPayment } });
+      } else {
+        navigate(`/${tenantSlug}/order/${res.data.id}`, { state: { order: res.data } });
+      }
     } catch (err: any) {
       console.error('Checkout error:', err);
       setSubmitError(err.response?.data?.message || 'Erro ao processar pedido. Tente novamente.');
@@ -313,6 +331,35 @@ export function CheckoutPage() {
               <span>{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="mb-6">
+        <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3">Cupom e Cashback</h2>
+        
+        <div className="space-y-4">
+          <CouponInput
+            onApplyCoupon={(code) => {
+              setAppliedCoupon(code);
+              setCouponError('');
+            }}
+            onRemoveCoupon={() => {
+              setAppliedCoupon('');
+              setCouponError('');
+            }}
+            appliedCoupon={appliedCoupon}
+            error={couponError}
+          />
+          
+          {customer && (
+            <CashbackSelector
+              availableBalance={customer.cashbackBalance}
+              usedAmount={usedCashback}
+              onUseCashback={setUsedCashback}
+              onRemoveCashback={() => setUsedCashback(0)}
+              maxUsable={subtotal + deliveryFee}
+            />
+          )}
         </div>
       </section>
 

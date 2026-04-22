@@ -10,6 +10,7 @@ import { CheckoutValidatorService } from './checkout-validator.service';
 import { CustomerService } from '../crm/customer.service';
 import { CashbackService } from '../promotions/cashback.service';
 import { TheoreticalStockService } from '../inventory/theoretical-stock.service';
+import { PaymentGatewayService } from '../payment-gateway/payment-gateway.service';
 import type {
   CreateOrderDTO,
   OrderResponseDTO,
@@ -35,6 +36,7 @@ export class OrdersService {
     private readonly customerService: CustomerService,
     private readonly cashbackService: CashbackService,
     private readonly inventoryService: TheoreticalStockService,
+    private readonly paymentGatewayService: PaymentGatewayService,
   ) {}
 
   async createOrder(slug: string, dto: CreateOrderDTO): Promise<OrderResponseDTO> {
@@ -233,7 +235,7 @@ export class OrdersService {
       await this.cashbackService.createTransaction({
         tenantId,
         customerId: customerId,
-        type: 'redeemed',
+        type: 'used',
         amount: cashbackUsed,
         orderId: order.id,
         description: `Usado no pedido ${order.orderNumber}`
@@ -247,7 +249,28 @@ export class OrdersService {
       }).catch(e => this.logger.error(`Error updating coupon usage: ${e.message}`));
     }
 
-    return this.getOrderDetail(order.id, tenantId);
+    const orderDetail = await this.getOrderDetail(order.id, tenantId);
+    
+    // Se pagamento for PIX, gerar QR code
+    if (dto.payment.method === 'pix') {
+      try {
+        const pixPayment = await this.paymentGatewayService.createPixPayment(
+          order.id,
+          dto.customerEmail || '',
+          dto.customerName
+        );
+        
+        return {
+          ...orderDetail,
+          pixPayment,
+        } as any; // Type assertion para incluir campo opcional
+      } catch (error) {
+        this.logger.error(`Error creating PIX payment: ${(error as any).message}`);
+        // Não falhar o pedido, apenas logar erro
+      }
+    }
+
+    return orderDetail;
   }
 
   async validateCheckout(slug: string, dto: CreateOrderDTO) {

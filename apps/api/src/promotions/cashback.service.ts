@@ -42,19 +42,18 @@ export class CashbackService {
       }
 
       // If it's a debit type (redeemed or expired), we must ensure balance
-      if (params.type === 'redeemed' || params.type === 'expired' || params.type === 'adjustment') {
+      if (params.type === 'used' || params.type === 'expired' || params.type === 'refunded') {
         const currentBalance = Number(customer.cashbackBalance);
-        if (params.type === 'redeemed' && currentBalance < params.amount) {
+        if (params.type === 'used' && currentBalance < params.amount) {
           throw new BadRequestException('Insufficient cashback balance');
         }
         
         let newBalance = currentBalance;
-        if (params.type === 'redeemed' || params.type === 'expired') {
+        // Se for uso ou expiração, verificar saldo
+        if (params.type === 'used' || params.type === 'expired') {
           newBalance -= params.amount;
-        } else if (params.type === 'adjustment') {
-           // For simplicity, we could allow adjustment to be either positive or negative, 
-           // but the function argument requires positive. So maybe adjustment is always credit? 
-           // Usually adjustment depends on a sign. Let's assume adjustment can be credit.
+        } else if (params.type === 'refunded') {
+           // Refund adds balance back
            newBalance += params.amount;
         }
 

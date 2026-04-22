@@ -6,6 +6,12 @@ export class CatalogMigrationV2Service {
   private readonly logger = new Logger(CatalogMigrationV2Service.name);
 
   constructor(private readonly prisma: PrismaService) {}
+  
+  private get tenantId(): string {
+    // Implementar lógica para obter tenantId atual
+    // Por enquanto, usar um valor padrão ou lançar erro
+    throw new Error('tenantId not implemented');
+  }
 
   async runMigration() {
     this.logger.log('Starting Catalog V2 Migration...');
@@ -22,12 +28,11 @@ export class CatalogMigrationV2Service {
   private async migrateComplementsToOptionGroups() {
     this.logger.log('Migrating Complements to OptionGroups...');
     
-    // @ts-expect-error - Accessing legacy models that might be removed soon
-    const legacyGroups = await this.prisma.productComplementGroup.findMany({
-      include: { items: true },
-    });
+    const legacyGroups = await this.prisma.tenantClient.$queryRaw`
+      SELECT id, name, "minItems", "maxItems" FROM "ComplementGroup" WHERE "tenantId" = ${this.tenantId}
+    `;
 
-    for (const lg of legacyGroups) {
+    for (const lg of legacyGroups as any[]) {
       const existing = await this.prisma.optionGroup.findFirst({
         where: {
           tenantId: lg.tenantId,
@@ -76,7 +81,7 @@ export class CatalogMigrationV2Service {
   private async migrateCombosToProductsV2(warnings: string[]) {
     this.logger.log('Migrating Combos to Products V2...');
 
-    // @ts-expect-error - Accessing legacy model that will be removed soon
+    // Accessing legacy model that will be removed soon
     const legacyCombos = await this.prisma.productCombo.findMany({
       include: {
         blocks: {

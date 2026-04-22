@@ -29,7 +29,7 @@ export class CashbackController {
     return this.cashbackService.createTransaction({
       tenantId: req.user.tenantId,
       customerId,
-      type: body.type || 'adjustment',
+      type: body.type || 'earned',
       amount: body.amount,
       description: body.description || 'Manual adjustment',
     });
