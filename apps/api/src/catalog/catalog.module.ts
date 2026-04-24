@@ -25,6 +25,7 @@ import { RbacModule } from '../rbac/rbac.module';
 import { PizzaController } from './pizza.controller';
 import { UpsellsController } from './upsells.controller';
 import { UpsellsService } from './upsells.service';
+import { AvailabilityService } from './publication/availability.service';
 
 @Module({
   imports: [DatabaseModule, RbacModule],
@@ -43,8 +44,9 @@ import { UpsellsService } from './upsells.service';
     PizzaEngineService,
     CatalogTemplatesService,
     UpsellsService,
+    AvailabilityService,
   ],
-  exports: [PizzaEngineService, CatalogTemplatesService, UpsellsService],
+  exports: [PizzaEngineService, CatalogTemplatesService, UpsellsService, AvailabilityService],
 })
 export class CatalogModule {}
 

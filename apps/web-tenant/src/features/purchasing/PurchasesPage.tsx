@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
 import { PurchaseDTO, PurchaseStatus, PaymentStatus } from '@gestor/types';
 import { PurchaseModal } from './PurchaseModal';
-import { ShoppingCart, Plus, Search, Calendar, Package, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { ShoppingCart, Plus, Search, Package, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 

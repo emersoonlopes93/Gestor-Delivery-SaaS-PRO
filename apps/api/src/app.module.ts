@@ -32,6 +32,7 @@ import { UploadModule } from './upload/upload.module';
 import { CustomerAuthModule } from './auth/customer-auth.module';
 import { PurchasingModule } from './purchasing/purchasing.module';
 import { FinanceModule } from './finance/finance.module';
+import { PlanGatingGuard } from './common/guards/plan-gating.guard';
 
 @Module({
   imports: [
@@ -138,6 +139,10 @@ import { FinanceModule } from './finance/finance.module';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PlanGatingGuard,
     },
     {
       provide: APP_INTERCEPTOR,

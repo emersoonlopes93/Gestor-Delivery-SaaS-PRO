@@ -5,6 +5,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { slugify } from '@gestor/utils';
 import { CatalogTemplatesService } from '../catalog-templates.service';
+import { AvailabilityService, SalesChannel } from '../publication/availability.service';
 import type { Upsell } from '@gestor/types';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class ProductsService {
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
     private readonly catalogTemplates: CatalogTemplatesService,
+    private readonly availabilityService: AvailabilityService,
   ) {}
 
   private getRequiredTenantId(): string {
@@ -201,53 +203,38 @@ export class ProductsService {
     return product;
   }
 
-  async findAll(search?: string, limit?: number) {
+  async findAll(search?: string, limit?: number, channel?: SalesChannel) {
     const tenantId = this.getRequiredTenantId();
     
-    const whereClause = {
-      tenantId,
-      deletedAt: null,
-      isActive: true,
-      isAvailable: true,
-      // Incluir todos os tipos para PDV: simple, configurable, combo
-      ...(search && {
-        name: {
-          contains: search,
-          mode: 'insensitive' as const
-        }
-      })
-    };
-
     const products = await this.prisma.tenantClient.product.findMany({
       where: {
-        ...whereClause,
-        OR: [
-          // Produtos com publication ativa
-          {
-            publication: {
-              publicationStatus: 'published',
-              operationalStatus: 'active'
-            }
-          },
-          // Produtos sem publication (considerados visíveis por padrão)
-          {
-            publication: null
-          },
-          // Produtos com publication inativa (mas ainda ativos no catálogo)
-          {
-            publication: {
-              OR: [
-                { publicationStatus: 'draft' },
-                { publicationStatus: { not: 'published' } },
-                { operationalStatus: { not: 'active' } }
-              ]
-            }
-          }
-        ]
+        tenantId,
+        deletedAt: null,
+        isActive: true,
+        // search logic...
+        ...(search && {
+          name: { contains: search, mode: 'insensitive' }
+        })
       },
       orderBy: { order: 'asc' },
-      include: { category: true, publication: true }
+      include: { category: true, publication: { include: { rules: true } } }
     });
+
+    // If channel is provided, filter using AvailabilityService
+    if (channel) {
+      const filtered: any[] = [];
+      for (const p of products) {
+        const decision = await this.availabilityService.decide({
+          tenantId,
+          productId: p.id,
+          channel,
+        });
+        if (decision.canSell) {
+          filtered.push(p);
+        }
+      }
+      return limit ? filtered.slice(0, limit) : filtered;
+    }
 
     if (limit) {
       return products.slice(0, limit);

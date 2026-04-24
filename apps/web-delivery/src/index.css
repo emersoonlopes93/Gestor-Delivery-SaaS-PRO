@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --primary: 0 165 233;
+  }
+  
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+.pwa-install-banner {
+  @apply fixed bottom-4 left-4 right-4 bg-white rounded-xl shadow-2xl p-4 flex items-center justify-between z-50 border border-gray-100 animate-in slide-in-from-bottom-full;
+}

@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
-import { IngredientDTO, UnitType } from '@gestor/types';
-import { Trash2, Plus, Search, Calendar, History, Trash, AlertCircle } from 'lucide-react';
+import { IngredientDTO } from '@gestor/types';
+import { Trash2, Plus } from 'lucide-react';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 interface LossEntry {
   id: string;

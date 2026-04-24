@@ -4,9 +4,9 @@ export interface SupplierDTO {
   id: string;
   tenantId: string;
   name: string;
-  cnpj?: string;
-  email?: string;
-  phone?: string;
+  cnpj: string | null;
+  email: string | null;
+  phone: string | null;
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -14,16 +14,17 @@ export interface SupplierDTO {
 
 export interface CreateSupplierDTO {
   name: string;
-  cnpj?: string;
-  email?: string;
-  phone?: string;
+  cnpj?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  active?: boolean;
 }
 
 export interface UpdateSupplierDTO {
   name?: string;
-  cnpj?: string;
-  email?: string;
-  phone?: string;
+  cnpj?: string | null;
+  email?: string | null;
+  phone?: string | null;
   active?: boolean;
 }
 

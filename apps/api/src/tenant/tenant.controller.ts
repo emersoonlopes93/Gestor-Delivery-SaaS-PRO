@@ -4,12 +4,16 @@ import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { CurrentTenant, RequirePermissions } from '../common/decorators';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
+import { OnboardingService } from './onboarding.service';
 import { UpdateOperatingHoursRequest, UpdateStorePauseRequest } from '@gestor/types';
 
 @Controller('tenant')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class TenantController {
-  constructor(private readonly tenantService: TenantService) {}
+  constructor(
+    private readonly tenantService: TenantService,
+    private readonly onboardingService: OnboardingService,
+  ) {}
 
   /**
    * Get the current tenant context and settings.
@@ -63,6 +67,27 @@ export class TenantController {
     @Body() body: UpdateStorePauseRequest,
   ) {
     return this.tenantService.updateStorePause(tenantId, body.isStorePaused, body.storePauseReason);
+  }
+
+  /**
+   * Get onboarding status.
+   */
+  @Get('onboarding')
+  @RequirePermissions('dashboard.view')
+  async getOnboardingStatus(@CurrentTenant() tenantId: string) {
+    return this.onboardingService.getOnboardingStatus(tenantId);
+  }
+
+  /**
+   * Update onboarding step.
+   */
+  @Patch('onboarding/step')
+  @RequirePermissions('settings.manage')
+  async updateOnboardingStep(
+    @CurrentTenant() tenantId: string,
+    @Body() body: { step: 'basicInfo' | 'catalog' | 'payment' | 'firstOrder'; completed?: boolean },
+  ) {
+    return this.onboardingService.updateStep(tenantId, body.step, body.completed ?? true);
   }
 }
 

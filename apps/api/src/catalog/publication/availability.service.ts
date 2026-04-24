@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../database/prisma.service';
+import { PrismaService } from '../../database/prisma.service';
 
 export type SalesChannel = 'storefront_delivery' | 'storefront_pickup' | 'pos';
 

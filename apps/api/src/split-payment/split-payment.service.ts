@@ -110,8 +110,8 @@ export class SplitPaymentService {
 
     // Calcular total já pago
     const paidAmount = orderSplit.payments
-      .filter(p => p.isPaid)
-      .reduce((sum, p) => sum + Number(p.amount), 0);
+      .filter((p: any) => p.isPaid)
+      .reduce((sum: number, p: any) => sum + Number(p.amount), 0);
 
     // Validar valor
     if (paidAmount + data.amount > Number(orderSplit.totalAmount)) {
@@ -212,6 +212,76 @@ export class SplitPaymentService {
     this.logger.log(`Confirmed cash payment ${splitPaymentId}`);
 
     return updated;
+  }
+
+  /**
+   * Divide um pedido igualmente por um número de pessoas
+   */
+  async splitByPeople(orderId: string, numberOfPeople: number) {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) throw new Error('Tenant context not found');
+
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, tenantId },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+
+    const total = Number(order.total);
+    const amountPerPerson = Math.round((total / numberOfPeople) * 100) / 100;
+    const lastPersonAmount = Math.round((total - (amountPerPerson * (numberOfPeople - 1))) * 100) / 100;
+
+    const splits = [];
+    for (let i = 0; i < numberOfPeople; i++) {
+      const isLast = i === numberOfPeople - 1;
+      const split = await this.createOrderSplit({
+        orderId,
+        splitType: 'people',
+        description: `Pessoa ${i + 1} de ${numberOfPeople}`,
+        totalAmount: isLast ? lastPersonAmount : amountPerPerson,
+        subtotalAmount: isLast ? lastPersonAmount : amountPerPerson,
+      });
+      splits.push(split);
+    }
+
+    return splits;
+  }
+
+  /**
+   * Divide um pedido por itens específicos
+   */
+  async splitByItems(orderId: string, items: { orderItemId: string, quantity: number }[]) {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) throw new Error('Tenant context not found');
+
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, tenantId },
+      include: { items: true },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+
+    // Calcular total dos itens selecionados
+    let subtotal = 0;
+    for (const selection of items) {
+      const orderItem = order.items.find(it => it.id === selection.orderItemId);
+      if (!orderItem) throw new BadRequestException(`Item ${selection.orderItemId} not found in order`);
+      if (selection.quantity > orderItem.quantity) throw new BadRequestException(`Insufficient quantity for item ${orderItem.snapshotName}`);
+      
+      const unitPrice = Number(orderItem.unitPrice);
+      subtotal += unitPrice * selection.quantity;
+    }
+
+    // Criar o split para esses itens
+    // Nota: Simplificado para considerar apenas o subtotal por enquanto.
+    // Em uma versão real, ratearíamos taxas e descontos do pedido original.
+    const split = await this.createOrderSplit({
+      orderId,
+      splitType: 'items',
+      description: 'Divisão por itens',
+      totalAmount: subtotal,
+      subtotalAmount: subtotal,
+    });
+
+    return split;
   }
 
   /**

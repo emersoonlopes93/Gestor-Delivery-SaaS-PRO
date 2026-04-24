@@ -3,8 +3,10 @@ import { PrismaService } from '../database/prisma.service';
 import { StorefrontPayload, StorefrontCategoryPayload, StorefrontComboPayload, StorefrontProductPayload } from '@gestor/types';
 import { TenantStatus } from '@gestor/core';
 import { Prisma } from '@prisma/client';
-import { AvailabilityService, SalesChannel } from '../orders/availability.service';
+import { AvailabilityService, SalesChannel } from '../catalog/publication/availability.service';
 import { UpsellsService } from '../catalog/upsells.service';
+
+import { SchedulingService } from '../scheduling/scheduling.service';
 
 @Injectable()
 export class StorefrontService {
@@ -12,6 +14,7 @@ export class StorefrontService {
     private readonly prisma: PrismaService,
     private readonly availabilityService: AvailabilityService,
     private readonly upsellsService: UpsellsService,
+    private readonly schedulingService: SchedulingService,
   ) {}
 
   async getStorefrontPayload(
@@ -340,5 +343,15 @@ export class StorefrontService {
       combos,
       upsells: globalUpsells,
     };
+  }
+
+  async getAvailableSlots(slug: string, date: Date) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+    if (!tenant) throw new NotFoundException('Store not found');
+
+    return this.schedulingService.getAvailableTimeSlots(date, tenant.id);
   }
 }

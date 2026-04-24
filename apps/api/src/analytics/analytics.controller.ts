@@ -16,13 +16,14 @@ export class AnalyticsController {
     @CurrentTenant() tenantId: string,
     @Query() filter: MetricFilterDTO
   ): Promise<DashboardStatsDTO> {
-    const [operational, commercial, costs] = await Promise.all([
+    const [operational, commercial, costs, financial] = await Promise.all([
       this.analyticsService.getOperationalMetrics(tenantId, filter),
       this.analyticsService.getCommercialMetrics(tenantId, filter),
       this.analyticsService.getCostMarginMetrics(tenantId, filter),
+      this.analyticsService.getFinancialMetrics(tenantId, filter),
     ]);
 
-    return { operational, commercial, costs };
+    return { operational, commercial, costs, financial };
   }
 
   @Get('operational')
@@ -52,7 +53,7 @@ export class AnalyticsController {
     return this.analyticsService.getCostMarginMetrics(tenantId, filter);
   }
 
-  @Get('financial')
+  @Get('financial-metrics')
   @RequirePermissions('reports.read')
   async getFinancial(
     @CurrentTenant() tenantId: string,

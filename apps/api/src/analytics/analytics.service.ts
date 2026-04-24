@@ -76,7 +76,7 @@ export class AnalyticsService {
       totalOrders,
       averageTicket: totalOrders > 0 ? totalRevenue / totalOrders : 0,
       revenueByChannel: this.aggregateRevenueByField(orders, 'sourceChannel'),
-      revenueByCategory: await this.revenueByCategory(),
+      revenueByCategory: await this.getRevenueByCategory(tenantId, where),
       topProducts: await this.getTopProducts(tenantId, where),
       topCombos: await this.getTopCombos(tenantId, where),
       couponUsage: this.getCouponUsage(orders),
@@ -107,7 +107,7 @@ export class AnalyticsService {
     const completedOrdersValue = await this.prisma.order.aggregate({
       where: {
         tenantId,
-        status: PrismaOrderStatus.completed,
+        status: 'completed',
         createdAt: {
           gte: new Date(startDate),
           lte: new Date(endDate),
@@ -123,8 +123,142 @@ export class AnalyticsService {
       estimatedCMV: realCMV,
       estimatedGrossMargin: grossMargin,
       grossMarginPercentage: totalRevenue > 0 ? (grossMargin / totalRevenue) * 100 : 0,
-      productPerformance: [], 
+      productPerformance: await this.getProductPerformance(tenantId, filter),
+      categoryPerformance: await this.getCategoryPerformance(tenantId, filter),
+      channelPerformance: await this.getChannelPerformance(tenantId, filter),
     };
+  }
+
+  private async getProductPerformance(tenantId: string, filter: MetricFilterDTO) {
+    const { startDate, endDate } = filter;
+    
+    // Get top 10 products by quantity sold
+    const topItems = await this.prisma.tenantClient.orderItem.groupBy({
+      by: ['productId', 'snapshotName'],
+      where: {
+        tenantId,
+        lineType: 'product',
+        order: {
+          status: 'completed',
+          createdAt: { gte: new Date(startDate), lte: new Date(endDate) },
+        },
+      },
+      _sum: { quantity: true, lineTotal: true },
+      orderBy: { _sum: { quantity: 'desc' } },
+      take: 10,
+    });
+
+    const performance = await Promise.all(
+      topItems.map(async (item) => {
+        const revenue = Number(item._sum.lineTotal || 0);
+        const quantity = item._sum.quantity || 0;
+        
+        // Estimated cost based on recipe (Theoretical)
+        let totalCost = 0;
+        if (item.productId) {
+          const recipe = await this.prisma.tenantClient.productRecipeIngredient.findMany({
+            where: { productId: item.productId },
+            include: { ingredient: true },
+          });
+          const unitCost = recipe.reduce(
+            (acc, r) => acc + Number(r.quantity) * Number(r.ingredient.currentCost),
+            0,
+          );
+          totalCost = unitCost * quantity;
+        }
+
+        const margin = revenue - totalCost;
+
+        return {
+          id: item.productId || 'unknown',
+          name: item.snapshotName || 'Produto',
+          estimatedCost: totalCost,
+          revenue,
+          grossMargin: margin,
+          marginPercentage: revenue > 0 ? (margin / revenue) * 100 : 0,
+        };
+      }),
+    );
+
+    return performance;
+  }
+
+  private async getCategoryPerformance(tenantId: string, filter: MetricFilterDTO) {
+    const { startDate, endDate } = filter;
+    
+    const items = await this.prisma.tenantClient.orderItem.findMany({
+      where: {
+        tenantId,
+        order: {
+          status: 'completed',
+          createdAt: { gte: new Date(startDate), lte: new Date(endDate) },
+        },
+      },
+      include: {
+        product: { include: { category: true } }
+      }
+    });
+
+    const categoryStats: Record<string, { revenue: number, cost: number }> = {};
+
+    for (const item of items) {
+      const categoryName = item.product?.category?.name || 'Sem Categoria';
+      if (!categoryStats[categoryName]) categoryStats[categoryName] = { revenue: 0, cost: 0 };
+      
+      const revenue = Number(item.lineTotal);
+      const cost = await this.calculateItemEstimatedCost(tenantId, item as any);
+      
+      categoryStats[categoryName].revenue += revenue;
+      categoryStats[categoryName].cost += cost;
+    }
+
+    return Object.entries(categoryStats).map(([name, stats]) => {
+      const margin = stats.revenue - stats.cost;
+      return {
+        name,
+        revenue: stats.revenue,
+        cost: stats.cost,
+        grossMargin: margin,
+        marginPercentage: stats.revenue > 0 ? (margin / stats.revenue) * 100 : 0
+      };
+    });
+  }
+
+  private async getChannelPerformance(tenantId: string, filter: MetricFilterDTO) {
+    const { startDate, endDate } = filter;
+    
+    const orders = await this.prisma.tenantClient.order.findMany({
+      where: {
+        tenantId,
+        status: 'completed',
+        createdAt: { gte: new Date(startDate), lte: new Date(endDate) },
+      },
+      include: { items: { include: { complements: true } } }
+    });
+
+    const channelStats: Record<string, { revenue: number, cost: number }> = {};
+
+    for (const order of orders) {
+      const channel = order.sourceChannel || 'Balcão';
+      if (!channelStats[channel]) channelStats[channel] = { revenue: 0, cost: 0 };
+      
+      channelStats[channel].revenue += Number(order.total);
+      
+      for (const item of order.items) {
+        channelStats[channel].cost += await this.calculateItemEstimatedCost(tenantId, item as any);
+      }
+    }
+
+    return Object.entries(channelStats).map(([name, stats]) => {
+      const margin = stats.revenue - stats.cost;
+      return {
+        name,
+        revenue: stats.revenue,
+        cost: stats.cost,
+        grossMargin: margin,
+        marginPercentage: stats.revenue > 0 ? (margin / stats.revenue) * 100 : 0
+      };
+    });
   }
 
   async getFinancialMetrics(tenantId: string, filter: MetricFilterDTO) {
@@ -149,9 +283,15 @@ export class AnalyticsService {
       .filter((t: any) => t.type === 'expense')
       .reduce((acc: number, t: any) => acc + Number(t.amount), 0);
 
+    const accounts = await this.prisma.financialAccount.aggregate({
+      where: { tenantId },
+      _sum: { balance: true }
+    });
+
     return {
       totalIncome: income,
-      totalExpense: expenses,
+      totalExpenses: expenses,
+      cashBalance: Number(accounts._sum.balance || 0),
       netCashFlow: income - expenses,
     };
   }
@@ -263,9 +403,27 @@ export class AnalyticsService {
     };
   }
 
-  private async revenueByCategory(): Promise<Record<string, number>> {
-    // Placeholder to keep contract stable during hardening.
-    return { Destaques: 100 };
+  private async getRevenueByCategory(tenantId: string, where: Prisma.OrderWhereInput): Promise<Record<string, number>> {
+    const items = await this.prisma.tenantClient.orderItem.findMany({
+      where: {
+        tenantId,
+        order: where,
+      },
+      include: {
+        product: {
+          include: { category: true },
+        },
+      },
+    });
+
+    const revenue: Record<string, number> = {};
+
+    items.forEach((item) => {
+      const categoryName = item.product?.category?.name || 'Sem Categoria';
+      revenue[categoryName] = (revenue[categoryName] || 0) + Number(item.lineTotal);
+    });
+
+    return revenue;
   }
 
   private async getTopProducts(tenantId: string, where: Prisma.OrderWhereInput) {

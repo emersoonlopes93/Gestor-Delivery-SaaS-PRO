@@ -53,12 +53,32 @@ export interface CostMarginMetricsDTO {
     grossMargin: number;
     marginPercentage: number;
   }>;
+  categoryPerformance?: Array<{
+    name: string;
+    revenue: number;
+    cost: number;
+    grossMargin: number;
+    marginPercentage: number;
+  }>;
+  channelPerformance?: Array<{
+    name: string;
+    revenue: number;
+    cost: number;
+    grossMargin: number;
+    marginPercentage: number;
+  }>;
 }
 
 export interface DashboardStatsDTO {
   operational: OperationalMetricsDTO;
   commercial: CommercialMetricsDTO;
   costs: CostMarginMetricsDTO;
+  financial: {
+    totalIncome: number;
+    totalExpenses: number;
+    cashBalance: number;
+    netCashFlow: number;
+  };
 }
 
 export interface MetricFilterDTO {

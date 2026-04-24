@@ -32,6 +32,7 @@ export class PrismaService
       // Models like AdminUser, Tenant, AdminRole, AdminPermission are NOT isolated by tenantId
       const excludedModels = [
         'Tenant',
+        'BusinessGroup',
         'AdminUser',
         'AdminRole',
         'AdminPermission',

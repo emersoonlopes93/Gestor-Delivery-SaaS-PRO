@@ -52,6 +52,12 @@ export interface TenantSettings {
   razaoSocial?: string;
   inscricaoEstadual?: string;
 
+  taxRegime?: string;
+  standardCfop?: string;
+  standardNcm?: string;
+
+  businessGroupId?: string | null;
+
   isStorePaused: boolean;
   storePauseReason?: string;
   createdAt: string;

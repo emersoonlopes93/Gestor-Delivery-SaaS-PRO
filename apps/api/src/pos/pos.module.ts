@@ -9,12 +9,13 @@ import { OrdersModule } from '../orders/orders.module';
 import { CrmModule } from '../crm/crm.module';
 import { PromotionsModule } from '../promotions/promotions.module';
 import { InventoryModule } from '../inventory/inventory.module';
+import { KdsModule } from '../kds/kds.module';
 
-import { PrinterService } from './printer.service';
+import { PrinterModule } from './printer.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, RbacModule, CashModule, OrdersModule, CrmModule, PromotionsModule, InventoryModule],
+  imports: [DatabaseModule, AuthModule, RbacModule, CashModule, OrdersModule, CrmModule, PromotionsModule, InventoryModule, KdsModule, PrinterModule],
   controllers: [PosController],
-  providers: [PosService, PrinterService],
+  providers: [PosService],
 })
 export class PosModule {}

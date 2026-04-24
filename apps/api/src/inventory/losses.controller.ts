@@ -1,10 +1,10 @@
 import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { LossesService } from './losses.service';
-import { TenantGuard } from '../auth/guards/tenant.guard';
-import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
+import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
+import { CurrentTenant } from '../common/decorators';
 
 @Controller('losses')
-@UseGuards(TenantGuard)
+@UseGuards(TenantAuthGuard)
 export class LossesController {
   constructor(private readonly lossesService: LossesService) {}
 

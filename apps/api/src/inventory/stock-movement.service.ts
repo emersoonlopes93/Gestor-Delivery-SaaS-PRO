@@ -20,6 +20,13 @@ export class StockMovementService {
         return StockMovementType.WASTE;
       case PrismaStockMovementType.theoretical_depletion:
         return StockMovementType.THEORETICAL_DEPLETION;
+      case PrismaStockMovementType.purchase_entry:
+        return StockMovementType.PURCHASE_ENTRY;
+      case PrismaStockMovementType.inventory_adjustment:
+        return StockMovementType.INVENTORY_ADJUSTMENT;
+      default:
+        // Fallback para garantir retorno de StockMovementType
+        return StockMovementType.ADJUST;
     }
   }
 

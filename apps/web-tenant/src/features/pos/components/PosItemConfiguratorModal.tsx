@@ -232,6 +232,10 @@ export function PosItemConfiguratorModal(props: {
   const [selectionState, setSelectionState] = useState<SelectionState>([]);
   const [slotState, setSlotState] = useState<SlotState>([]);
 
+  // Pizza Template State
+  const [categoryFlavors, setCategoryFlavors] = useState<ProductDetail[]>([]);
+  const [selectedPizzaFlavors, setSelectedPizzaFlavors] = useState<Array<{ productId: string; name: string }>>([]);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -248,15 +252,27 @@ export function PosItemConfiguratorModal(props: {
       .get<ProductDetail>(`/catalog/products/${productId}`)
       .then((res) => {
         if (!res.success) throw new Error('Erro ao carregar produto.');
-        setDetail(res.data);
+        const data = res.data;
+        setDetail(data);
 
-        const initialSelections: SelectionState = (res.data.optionGroupLinks ?? [])
+        // Initial selections
+        const initialSelections: SelectionState = (data.optionGroupLinks ?? [])
           .filter((l) => l.optionGroup?.isActive)
           .map((l) => ({ optionGroupId: l.optionGroup.id, items: [] }));
         setSelectionState(initialSelections);
 
-        const initialSlots: SlotState = (res.data.comboSlots ?? []).map((s) => ({ comboSlotId: s.id, items: [] }));
+        const initialSlots: SlotState = (data.comboSlots ?? []).map((s) => ({ comboSlotId: s.id, items: [] }));
         setSlotState(initialSlots);
+
+        // If Pizza, fetch other flavors in same category
+        if (data.category?.templateType === 'pizza' && data.category.id) {
+          setSelectedPizzaFlavors([{ productId: data.id, name: data.name }]);
+          api.get<ProductDetail[]>(`/catalog/products?categoryId=${data.category.id}`).then(catRes => {
+            if (catRes.success) {
+              setCategoryFlavors(catRes.data);
+            }
+          });
+        }
       })
       .catch((e: unknown) => {
         setError(e instanceof Error ? e.message : 'Erro ao carregar produto.');
@@ -326,6 +342,31 @@ export function PosItemConfiguratorModal(props: {
       return { unitPrice: Number((base + extras).toFixed(2)), label: parts.join('; ') };
     }
 
+    if (isPizzaTemplate) {
+      // Simplistic price: highest of selected flavors at selected size
+      // We need the sizeId from primary axis
+      const sizesLink = detail.optionGroupLinks?.find(l => l.pricingAxis === 'primary');
+      const selectedSizeId = selectionState.find(s => s.optionGroupId === sizesLink?.optionGroup.id)?.items[0]?.optionItemId;
+      
+      let unitPrice = base;
+      if (selectedSizeId) {
+        // Find prices for each flavor (if available in detail, but here we only have the main one)
+        // For simplicity in PDV PHASE 1: use the basePrice of the main product for now
+        // OR use the highest base price among selected flavors.
+        const highestBase = Math.max(...selectedPizzaFlavors.map(f => {
+          const flavorDetail = categoryFlavors.find(cf => cf.id === f.productId);
+          return flavorDetail?.basePrice ?? 0;
+        }), base);
+        unitPrice = highestBase;
+      }
+
+      // Add options price (like "Borda Recheada" which would be a secondary axis)
+      const secondaryOptions = computeOptionSelectionsPrice(detail, selectionState.filter(s => s.optionGroupId !== sizesLink?.optionGroup.id));
+      unitPrice += (secondaryOptions.unitPrice - base);
+
+      return { unitPrice: Number(unitPrice.toFixed(2)), label: `Sabores: ${selectedPizzaFlavors.map(f => f.name).join(' / ')}${secondaryOptions.composition ? `; ${secondaryOptions.composition}` : ''}` };
+    }
+
     return { unitPrice: base, label: '' };
   }, [detail, hasLegacyComplements, hasV2Options, isSlotCombo, selectionState, selectedComplements, slotState]);
 
@@ -372,7 +413,10 @@ export function PosItemConfiguratorModal(props: {
     }
 
     if (isPizzaTemplate) {
-      return 'Este produto usa template Pizza. O PDV ainda não possui UI de montagem (pizzaComposition) nesta fase.';
+      const sizesLink = detail.optionGroupLinks?.find(l => l.pricingAxis === 'primary');
+      const sizeSelected = selectionState.find(s => s.optionGroupId === sizesLink?.optionGroup.id)?.items.length ?? 0;
+      if (sizeSelected === 0) return 'Selecione um tamanho.';
+      if (selectedPizzaFlavors.length === 0) return 'Selecione pelo menos 1 sabor.';
     }
 
     return null;
@@ -454,6 +498,18 @@ export function PosItemConfiguratorModal(props: {
     });
   };
 
+  const togglePizzaFlavor = (flavor: { id: string; name: string }) => {
+    setSelectedPizzaFlavors(prev => {
+      const exists = prev.some(f => f.productId === flavor.id);
+      if (exists) {
+        if (prev.length === 1) return prev; // Must have at least 1
+        return prev.filter(f => f.productId !== flavor.id);
+      }
+      if (prev.length >= 4) return prev; // Limit to 4 parts
+      return [...prev, { productId: flavor.id, name: flavor.name }];
+    });
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -479,12 +535,34 @@ export function PosItemConfiguratorModal(props: {
             </div>
           ) : detail ? (
             <>
-              {currentValidationError ? (
-                <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 p-4 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4" />
-                  {currentValidationError}
+              {isPizzaTemplate && (
+                <div className="bg-gray-950/40 border border-gray-800 rounded-2xl p-4 space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="text-white font-black text-sm uppercase tracking-wider">Sabores</div>
+                      <div className="text-[10px] text-gray-500 font-bold italic">Selecione até 4 sabores para compor sua pizza</div>
+                    </div>
+                    <div className="text-[10px] font-black uppercase text-gray-600">{selectedPizzaFlavors.length}/4</div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    {categoryFlavors.map(f => {
+                      const isSelected = selectedPizzaFlavors.some(pf => pf.productId === f.id);
+                      return (
+                        <button
+                          key={f.id}
+                          onClick={() => togglePizzaFlavor({ id: f.id, name: f.name })}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            isSelected ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-gray-900 border-gray-800 hover:border-gray-700'
+                          }`}
+                        >
+                          <div className="text-white font-bold text-[11px] truncate">{f.name}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              ) : null}
+              )}
 
               {isSlotCombo ? (
                 <div className="space-y-5">
@@ -727,6 +805,14 @@ export function PosItemConfiguratorModal(props: {
                 const selectionsDto = hasV2Options ? buildSelectionsDto(selectionState) : undefined;
                 const slotsDto = isSlotCombo ? buildSlotsDto(slotState) : undefined;
 
+                const pizzaComposition: PizzaCompositionDTO | undefined = isPizzaTemplate ? {
+                  sizeId: selectionState.find(s => s.optionGroupId === detail.optionGroupLinks?.find(l => l.pricingAxis === 'primary')?.optionGroup.id)?.items[0]?.optionItemId || '',
+                  flavors: selectedPizzaFlavors.map(f => ({
+                    productId: f.productId,
+                    fraction: 1 / selectedPizzaFlavors.length
+                  }))
+                } : undefined;
+
                 onConfirm({
                   productId: detail.id,
                   name: detail.name,
@@ -735,7 +821,7 @@ export function PosItemConfiguratorModal(props: {
                   notes: notes || undefined,
                   complements: !hasV2Options && hasLegacyComplements ? selectedComplements : undefined,
                   selections: hasV2Options ? selectionsDto : undefined,
-                  pizzaComposition: undefined,
+                  pizzaComposition,
                   slots: isSlotCombo ? slotsDto : undefined,
                   computedUnitPrice: computed.unitPrice,
                   compositionLabel: computed.label,

@@ -3,6 +3,7 @@ import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 import { AdminAuthService } from './admin-auth.service';
 import { AdminAuthGuard } from './admin-auth.guard';
 import { CurrentUser, Public } from '../../common/decorators';
+import { TenantAuthService } from '../../auth/tenant-auth.service';
 
 class AdminLoginDto {
   @IsEmail()
@@ -21,7 +22,10 @@ class AdminRefreshDto {
 
 @Controller('auth/admin')
 export class AdminAuthController {
-  constructor(private readonly authService: AdminAuthService) {}
+  constructor(
+    private readonly authService: AdminAuthService,
+    private readonly tenantAuthService: TenantAuthService,
+  ) {}
 
   @Public()
   @Post('login')
@@ -39,5 +43,14 @@ export class AdminAuthController {
   @Get('me')
   async me(@CurrentUser('sub') userId: string) {
     return this.authService.getSession(userId);
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Post('impersonate')
+  async impersonate(
+    @CurrentUser('sub') adminId: string,
+    @Body() body: { tenantId: string; reason: string },
+  ) {
+    return this.tenantAuthService.impersonate(body.tenantId, adminId, body.reason);
   }
 }

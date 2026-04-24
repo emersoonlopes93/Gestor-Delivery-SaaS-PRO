@@ -12,6 +12,7 @@ import { CashbackService } from '../promotions/cashback.service';
 import { TheoreticalStockService } from '../inventory/theoretical-stock.service';
 import { CheckoutValidatorService } from '../orders/checkout-validator.service';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
+import { KdsService } from '../kds/kds.service';
 
 import type {
   CreatePosOrderDTO,
@@ -33,6 +34,7 @@ export class PosService {
     private readonly customerService: CustomerService,
     private readonly cashbackService: CashbackService,
     private readonly theoreticalStockService: TheoreticalStockService,
+    private readonly kdsService: KdsService,
   ) {}
 
   // ----------------------------------------------------------------
@@ -203,6 +205,11 @@ export class PosService {
         },
       });
 
+      // Trigger production jobs for open command
+      await this.kdsService.createProductionJobs(currentOrder.id).catch(e => {
+        console.error('KDS print jobs failed to create for draft', e);
+      });
+
       return currentOrder;
     });
 
@@ -330,6 +337,11 @@ export class PosService {
           });
         }
       }
+
+      // Trigger production jobs for open command
+      await this.kdsService.createProductionJobs(currentOrder.id).catch(e => {
+        console.error('KDS print jobs failed to create for draft', e);
+      });
 
       return currentOrder;
     });

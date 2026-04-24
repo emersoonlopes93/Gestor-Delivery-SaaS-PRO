@@ -4,8 +4,7 @@ import {
   InventoryCountDTO, 
   CreateInventoryCountDTO, 
   InventoryCountStatus, 
-  StockMovementType,
-  UnitType
+  StockMovementType
 } from '@gestor/types';
 
 @Injectable()

@@ -2,12 +2,16 @@ import { Controller, Get, Param, Query, UseGuards, Patch, Put, Body } from '@nes
 import { AdminTenantsService } from './admin-tenants.service';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
 import { AdminPermissionsGuard } from '../rbac/admin-permissions.guard';
-import { RequireAdminPermissions } from '../../common/decorators';
+import { RequireAdminPermissions, CurrentUser } from '../../common/decorators';
+import { TenantAuthService } from '../../auth/tenant-auth.service';
 
 @Controller('admin/tenants')
 @UseGuards(AdminAuthGuard, AdminPermissionsGuard)
 export class AdminTenantsController {
-  constructor(private readonly tenantsService: AdminTenantsService) {}
+  constructor(
+    private readonly tenantsService: AdminTenantsService,
+    private readonly tenantAuthService: TenantAuthService,
+  ) {}
 
   @Get()
   @RequireAdminPermissions('saas.tenants.read')
@@ -40,5 +44,15 @@ export class AdminTenantsController {
     @Body() body: { name?: string; slug?: string },
   ) {
     return this.tenantsService.update(id, body);
+  }
+  
+  @Get(':id/impersonate')
+  @RequireAdminPermissions('saas.tenants.update')
+  async impersonate(
+    @Param('id') id: string,
+    @CurrentUser('id') adminId: string,
+    @Query('reason') reason?: string,
+  ) {
+    return this.tenantAuthService.impersonate(id, adminId, reason || 'Support request');
   }
 }

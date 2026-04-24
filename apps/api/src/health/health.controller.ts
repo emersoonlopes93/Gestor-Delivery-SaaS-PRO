@@ -1,10 +1,15 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { Public } from '../common/decorators';
+import { TenantHealthService } from './tenant-health.service';
+import { AdminAuthGuard } from '../admin/auth/admin-auth.guard';
 
 @Controller('health')
 export class HealthController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tenantHealthService: TenantHealthService,
+  ) {}
 
   @Public()
   @Get()
@@ -40,5 +45,17 @@ export class HealthController {
         },
       },
     };
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Get('tenants')
+  async listTenantsHealth() {
+    return this.tenantHealthService.listAllTenantsHealth();
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Get('tenants/:id')
+  async getTenantHealth(@Param('id') id: string) {
+    return this.tenantHealthService.getTenantHealth(id);
   }
 }

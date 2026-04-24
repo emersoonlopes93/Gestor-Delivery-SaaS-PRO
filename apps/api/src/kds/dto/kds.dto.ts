@@ -102,7 +102,7 @@ export class GetPrintJobsQueryDTO {
 
 export class PrintJobQueryDTO {
   @IsString() @IsOptional()
-  station!: string;
+  station?: string;
 
   @IsNumber() @IsOptional()
   limit?: number;

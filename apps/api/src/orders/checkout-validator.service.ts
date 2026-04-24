@@ -16,7 +16,7 @@ import type {
 import { CouponsService } from '../promotions/coupons.service';
 import { CashbackService } from '../promotions/cashback.service';
 import { DeliveryRateService } from '../delivery/delivery-rate.service';
-import { AvailabilityService } from './availability.service';
+import { AvailabilityService } from '../catalog/publication/availability.service';
 import { UpsellsService } from '../catalog/upsells.service';
 import { PizzaEngineService } from '../catalog/pizza-engine.service';
 
@@ -42,6 +42,8 @@ export class CheckoutValidatorService {
       deliveryAddress?: DeliveryAddressDTO | null;
       channel?: 'storefront_delivery' | 'storefront_pickup';
       payment?: PaymentInput;
+      scheduledFor?: Date;
+      timeSlotId?: string;
     },
   ): Promise<CheckoutValidationResult> {
     // 1. Resolve tenant
@@ -67,10 +69,29 @@ export class CheckoutValidatorService {
     ]);
 
     const availabilityContext = { settings, operatingHours };
-    const storeStatus = await this.availabilityService.getStoreStatus(tenantId, new Date(), availabilityContext);
+    const checkDate = options?.scheduledFor || new Date();
+    const storeStatus = await this.availabilityService.getStoreStatus(tenantId, checkDate, availabilityContext);
 
-    if (!storeStatus.isOpen) {
+    if (!storeStatus.isOpen && !options?.scheduledFor) {
       throw new BadRequestException(storeStatus.message || 'A loja está fechada no momento.');
+    }
+
+    // If scheduled, ensure it's a valid open day for the tenant
+    if (options?.scheduledFor && !storeStatus.isOpen) {
+       throw new BadRequestException(`A loja não estará aberta na data programada (${storeStatus.message}).`);
+    }
+
+    // 1.7 Validate Time Slot if provided
+    if (options?.timeSlotId) {
+      const slot = await this.prisma.timeSlot.findUnique({
+        where: { id: options.timeSlotId, tenantId },
+      });
+      if (!slot || !slot.isActive) {
+        throw new BadRequestException('Horário agendado não disponível.');
+      }
+      if (slot.currentOccupancy >= slot.capacity) {
+        throw new BadRequestException('Este horário já atingiu o limite de pedidos.');
+      }
     }
 
     if (items.length === 0) {

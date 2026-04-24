@@ -2,10 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateDriverDTO, UpdateDriverDTO } from '@gestor/types';
 import { UpdateDriverLocationDTO } from './dto/update-driver-location.dto';
+import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
 
 @Injectable()
 export class DriversService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly trackingGateway: DeliveryTrackingGateway,
+  ) {}
 
   private asRecord(value: unknown): Record<string, unknown> | null {
     return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
@@ -58,6 +62,25 @@ export class DriversService {
         });
       }
     });
+
+    // Broadcast location to active orders being delivered by this driver
+    const activeOrders = await this.prisma.order.findMany({
+      where: {
+        deliveryDriverId: driver.id,
+        status: 'out_for_delivery',
+      },
+      select: { publicTrackingToken: true },
+    });
+
+    for (const order of activeOrders) {
+      if (order.publicTrackingToken) {
+        this.trackingGateway.emitLocationUpdate(order.publicTrackingToken, {
+          lat: data.lat,
+          lng: data.lng,
+          driverId: driver.id,
+        });
+      }
+    }
 
     return {
       success: true,

@@ -9,11 +9,11 @@ import {
   UpdateFinancialTransactionDTO,
   FinancialTransactionDTO
 } from '@gestor/types';
-import { TenantGuard } from '../auth/guards/tenant.guard';
-import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
+import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
+import { CurrentTenant } from '../common/decorators';
 
 @Controller('finance')
-@UseGuards(TenantGuard)
+@UseGuards(TenantAuthGuard)
 export class FinanceController {
   constructor(
     private readonly accountsService: FinancialAccountsService,

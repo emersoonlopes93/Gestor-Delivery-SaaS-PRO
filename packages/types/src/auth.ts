@@ -8,6 +8,8 @@ export interface TenantJwtPayload {
   tenantId: string;
   type: 'tenant';
   email: string;
+  isImpersonated?: boolean;
+  impersonatedBy?: string; // adminId
   iat?: number;
   exp?: number;
 }

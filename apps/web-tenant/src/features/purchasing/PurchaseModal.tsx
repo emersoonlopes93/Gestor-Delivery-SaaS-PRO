@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { SupplierDTO, IngredientDTO, CreatePurchaseDTO, PaymentStatus } from '@gestor/types';
 import { api } from '../../lib/api-client';
-import { X, Plus, Trash2, Search, Calendar, ChevronDown } from 'lucide-react';
+import { X, Plus, Trash2, ChevronDown } from 'lucide-react';
 
 interface PurchaseModalProps {
   isOpen: boolean;
@@ -13,9 +13,8 @@ interface PurchaseModalProps {
 export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
   const [suppliers, setSuppliers] = useState<SupplierDTO[]>([]);
   const [ingredients, setIngredients] = useState<IngredientDTO[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  const { register, control, handleSubmit, watch, setValue, reset, formState: { isSubmitting } } = useForm<CreatePurchaseDTO>({
+  const { register, control, handleSubmit, watch, formState: { isSubmitting } } = useForm<CreatePurchaseDTO>({
     defaultValues: {
       items: [{ ingredientId: '', quantity: 1, unitCost: 0 }],
       paymentStatus: PaymentStatus.PAID,
@@ -38,7 +37,6 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
   }, [isOpen]);
 
   const loadData = async () => {
-    setIsLoading(true);
     try {
       const [suppRes, ingRes] = await Promise.all([
         api.get<SupplierDTO[]>('/purchasing/suppliers'),
@@ -48,8 +46,6 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
       if (ingRes.success) setIngredients(ingRes.data);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 

@@ -35,7 +35,7 @@ export class KdsController {
   @Get('print-jobs/pending')
   @RequirePermissions('orders.view')
   async getPendingPrintJobs(@Query() query: PrintJobQueryDTO) {
-    return this.kdsService.getPendingPrintJobs(query.station, query.limit);
+    return this.kdsService.getPendingPrintJobs(query.station || 'GERAL', query.limit);
   }
 
   @Get('print-jobs')

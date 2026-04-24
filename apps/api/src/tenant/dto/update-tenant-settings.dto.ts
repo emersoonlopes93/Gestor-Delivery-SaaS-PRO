@@ -119,4 +119,19 @@ export class UpdateTenantSettingsDto {
   @IsString()
   @MaxLength(20)
   inscricaoEstadual?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  taxRegime?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  standardCfop?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  standardNcm?: string;
 }

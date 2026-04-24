@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 import { LoginPage } from './features/auth/LoginPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { AuthLayout } from './layouts/AuthLayout';
@@ -17,7 +18,6 @@ import { OperationBoardPage } from './features/orders/OperationBoardPage';
 import { KdsPage } from './features/orders/KdsPage';
 import { DriversListPage } from './features/delivery/DriversListPage';
 import { DispatchPage } from './features/delivery/DispatchPage';
-import { DeliveryRatesPage } from './features/delivery/DeliveryRatesPage';
 import { DeliveryZonesPage } from './features/delivery/DeliveryZonesPage';
 import { DeliveryMapPage } from './features/delivery/DeliveryMapPage';
 import CashPage from './features/cash/CashPage';

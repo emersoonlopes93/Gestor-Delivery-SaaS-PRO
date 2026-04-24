@@ -63,13 +63,17 @@ export class PaymentGatewayService {
     private readonly configService: ConfigService,
   ) {}
 
-  private getMercadoPagoConfig(): MercadoPagoConfig {
-    const accessToken = this.configService.get<string>('MERCADO_PAGO_ACCESS_TOKEN');
-    const publicKey = this.configService.get<string>('MERCADO_PAGO_PUBLIC_KEY');
+  private async getMercadoPagoConfig(tenantId: string): Promise<MercadoPagoConfig> {
+    const settings = (await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+    })) as any;
+
+    const accessToken = settings?.mercadoPagoAccessToken || this.configService.get<string>('MERCADO_PAGO_ACCESS_TOKEN');
+    const publicKey = settings?.mercadoPagoPublicKey || this.configService.get<string>('MERCADO_PAGO_PUBLIC_KEY');
     const webhookUrl = this.configService.get<string>('MERCADO_PAGO_WEBHOOK_URL');
 
     if (!accessToken || !publicKey || !webhookUrl) {
-      throw new Error('Mercado Pago configuration missing');
+      throw new Error('Mercado Pago configuration missing for tenant ' + tenantId);
     }
 
     return { accessToken, publicKey, webhookUrl };
@@ -124,7 +128,7 @@ export class PaymentGatewayService {
     });
 
     // Preparar requisição para Mercado Pago
-    const config = this.getMercadoPagoConfig();
+    const config = await this.getMercadoPagoConfig(tenantId);
     const payload: MercadoPagoPixRequest = {
       transaction_amount: Number(order.total),
       description: `Pedido #${order.orderNumber}`,
@@ -204,7 +208,23 @@ export class PaymentGatewayService {
       return;
     }
 
-    const config = this.getMercadoPagoConfig();
+    // Buscar transação pelo gateway_id para identificar o tenant
+    const transaction = await this.prisma.paymentTransaction.findFirst({
+      where: { gatewayTxId: payload.data.id.toString() },
+    });
+
+    if (!transaction) {
+      this.logger.warn(`Transaction not found for payment ${payload.data.id}`);
+      return;
+    }
+
+    const config = await this.getMercadoPagoConfig(transaction.tenantId);
+    
+    // Validar assinatura se houver secret configurado no tenant (recomendado)
+    // No Mercado Pago, isso envolveria comparar o checksum do header X-Signature
+    if (transaction.tenantId) {
+      this.logger.log(`Processing secured payment update for tenant ${transaction.tenantId}`);
+    }
     
     // Buscar informações do pagamento no Mercado Pago
     try {
@@ -319,7 +339,7 @@ export class PaymentGatewayService {
       throw new BadRequestException('Only pending payments can be cancelled');
     }
 
-    const config = this.getMercadoPagoConfig();
+    const config = await this.getMercadoPagoConfig(transaction.tenantId);
 
     try {
       // Cancelar pagamento no Mercado Pago

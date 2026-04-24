@@ -42,18 +42,14 @@ export class SplitPaymentController {
   @RequirePermissions('orders.create')
   @HttpCode(HttpStatus.CREATED)
   async splitByItems(@Body() data: SplitByItemsDTO) {
-    // Implementar lógica de divisão por itens
-    // Por enquanto, usar createOrderSplit manualmente
-    throw new Error('Use /splits endpoint for manual creation');
+    return this.splitPaymentService.splitByItems(data.orderId, data.items);
   }
 
   @Post('splits/by-people')
   @RequirePermissions('orders.create')
   @HttpCode(HttpStatus.CREATED)
   async splitByPeople(@Body() data: SplitByPeopleDTO) {
-    // Implementar lógica de divisão por pessoas
-    // Por enquanto, usar createOrderSplit manualmente
-    throw new Error('Use /splits endpoint for manual creation');
+    return this.splitPaymentService.splitByPeople(data.orderId, data.numberOfPeople);
   }
 
   @Post('splits/custom')

@@ -1,11 +1,11 @@
 import { Controller, Get, Post, Body, Put, Param, Delete, UseGuards } from '@nestjs/common';
 import { SuppliersService } from './suppliers.service';
 import { CreateSupplierDTO, UpdateSupplierDTO, SupplierDTO } from '@gestor/types';
-import { TenantGuard } from '../auth/guards/tenant.guard';
-import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
+import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
+import { CurrentTenant } from '../common/decorators';
 
 @Controller('suppliers')
-@UseGuards(TenantGuard)
+@UseGuards(TenantAuthGuard)
 export class SuppliersController {
   constructor(private readonly suppliersService: SuppliersService) {}
 

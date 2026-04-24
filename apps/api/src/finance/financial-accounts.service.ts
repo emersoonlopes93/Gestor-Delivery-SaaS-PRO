@@ -12,10 +12,7 @@ export class FinancialAccountsService {
       orderBy: { name: 'asc' },
     });
 
-    return accounts.map(acc => ({
-      ...acc,
-      balance: Number(acc.balance)
-    }));
+    return accounts.map(acc => this.mapToDTO(acc));
   }
 
   async findOne(tenantId: string, id: string): Promise<FinancialAccountDTO> {
@@ -27,10 +24,7 @@ export class FinancialAccountsService {
       throw new NotFoundException('Conta financeira não encontrada');
     }
 
-    return {
-      ...account,
-      balance: Number(account.balance)
-    };
+    return this.mapToDTO(account);
   }
 
   async create(tenantId: string, dto: CreateFinancialAccountDTO): Promise<FinancialAccountDTO> {
@@ -38,14 +32,19 @@ export class FinancialAccountsService {
       data: {
         tenantId,
         name: dto.name,
-        type: dto.type,
+        type: dto.type as any, // Cast para Prisma enum
         balance: dto.initialBalance || 0,
       },
     });
 
+    return this.mapToDTO(account);
+  }
+
+  private mapToDTO(acc: any): FinancialAccountDTO {
     return {
-      ...account,
-      balance: Number(account.balance)
+      ...acc,
+      type: acc.type as any, // Cast para DTO enum (mesmos valores string)
+      balance: Number(acc.balance)
     };
   }
 
@@ -54,12 +53,12 @@ export class FinancialAccountsService {
 
     const updated = await this.prisma.financialAccount.update({
       where: { id },
-      data: dto,
+      data: {
+        ...(dto.name && { name: dto.name }),
+        ...(dto.active !== undefined && { active: dto.active }),
+      },
     });
 
-    return {
-      ...updated,
-      balance: Number(updated.balance)
-    };
+    return this.mapToDTO(updated);
   }
 }

@@ -235,6 +235,10 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   });
   const [ruleChannels, setRuleChannels] = useState<Array<'storefront_delivery' | 'storefront_pickup' | 'pos'>>(['storefront_delivery']);
 
+  // Technical Hygiene: Modals/Toasts
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void } | null>(null);
+  const [alertModal, setAlertModal] = useState<{ isOpen: boolean; title: string; message: string } | null>(null);
+
   const loadAll = async () => {
     setIsLoading(true);
     try {
@@ -378,7 +382,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
 
   const handleSaveProduct = async () => {
     if (!productForm.name || (!isComboMode && !productForm.basePrice)) {
-      alert(isComboMode ? 'Nome é obrigatório.' : 'Nome e preço são obrigatórios.');
+      setAlertModal({ isOpen: true, title: 'Atenção', message: isComboMode ? 'Nome é obrigatório.' : 'Nome e preço são obrigatórios.' });
       return;
     }
     setSavingStates((p) => ({ ...p, saveProduct: true }));
@@ -423,14 +427,14 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           if (isComboMode) {
             navigate('/catalog/combos');
           } else {
-            alert('Produto salvo com sucesso!');
-            navigate('/catalog/products');
+            setAlertModal({ isOpen: true, title: 'Sucesso', message: 'Produto salvo com sucesso!' });
+            setTimeout(() => navigate('/catalog/products'), 1500);
           }
         }
       }
     } catch (error) {
       console.error('Erro ao salvar produto:', error);
-      alert('Erro ao salvar produto.');
+      setAlertModal({ isOpen: true, title: 'Erro', message: 'Erro ao salvar produto.' });
     } finally {
       setSavingStates((p) => ({ ...p, saveProduct: false }));
     }
@@ -516,15 +520,22 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   };
 
   const removeGroupLink = async (linkId: string) => {
-    if (!window.confirm('Remover este grupo do produto?')) return;
-    setSavingStates((p) => ({ ...p, [`remove-${linkId}`]: true }));
-    try {
-      if (!productId) throw new Error('productId não disponível');
-      await api.delete(`/catalog/products/${productId}/option-groups/${linkId}`);
-      await loadAll();
-    } finally {
-      setSavingStates((p) => ({ ...p, [`remove-${linkId}`]: false }));
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Confirmar Remoção',
+      message: 'Remover este grupo do produto?',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setSavingStates((p) => ({ ...p, [`remove-${linkId}`]: true }));
+        try {
+          if (!productId) throw new Error('productId não disponível');
+          await api.delete(`/catalog/products/${productId}/option-groups/${linkId}`);
+          await loadAll();
+        } finally {
+          setSavingStates((p) => ({ ...p, [`remove-${linkId}`]: false }));
+        }
+      }
+    });
   };
 
   const openEditLinkModal = (link: LinkWithGroup) => {
@@ -644,15 +655,22 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   };
 
   const deleteSlot = async (slotId: string) => {
-    if (!window.confirm('Excluir este slot do combo?')) return;
-    setSavingStates((p) => ({ ...p, [`delete-slot-${slotId}`]: true }));
-    try {
-      if (!productId) throw new Error('productId não disponível');
-      await api.delete(`/catalog/products/${productId}/combo-slots/${slotId}`);
-      await loadAll();
-    } finally {
-      setSavingStates((p) => ({ ...p, [`delete-slot-${slotId}`]: false }));
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Confirmar Exclusão',
+      message: 'Excluir este slot do combo?',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setSavingStates((p) => ({ ...p, [`delete-slot-${slotId}`]: true }));
+        try {
+          if (!productId) throw new Error('productId não disponível');
+          await api.delete(`/catalog/products/${productId}/combo-slots/${slotId}`);
+          await loadAll();
+        } finally {
+          setSavingStates((p) => ({ ...p, [`delete-slot-${slotId}`]: false }));
+        }
+      }
+    });
   };
 
   const reorderSlots = async (orderedSlotIds: string[]) => {
@@ -733,15 +751,22 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   };
 
   const deleteAllowed = async (slotId: string, idToDelete: string) => {
-    if (!window.confirm('Excluir este item permitido?')) return;
-    setSavingStates((p) => ({ ...p, [`delete-allowed-${idToDelete}`]: true }));
-    try {
-      if (!productId) throw new Error('productId não disponível');
-      await api.delete(`/catalog/products/${productId}/combo-slots/${slotId}/allowed-items/${idToDelete}`);
-      await loadAll();
-    } finally {
-      setSavingStates((p) => ({ ...p, [`delete-allowed-${idToDelete}`]: false }));
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: 'Confirmar Exclusão',
+      message: 'Excluir este item permitido?',
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setSavingStates((p) => ({ ...p, [`delete-allowed-${idToDelete}`]: true }));
+        try {
+          if (!productId) throw new Error('productId não disponível');
+          await api.delete(`/catalog/products/${productId}/combo-slots/${slotId}/allowed-items/${idToDelete}`);
+          await loadAll();
+        } finally {
+          setSavingStates((p) => ({ ...p, [`delete-allowed-${idToDelete}`]: false }));
+        }
+      }
+    });
   };
 
   const reorderAllowed = async (slotId: string, orderedAllowedItemIds: string[]) => {
@@ -1714,6 +1739,50 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           </div>
         </div>
       </Modal>
+
+      {confirmModal && (
+        <Modal
+          isOpen={confirmModal.isOpen}
+          onClose={() => setConfirmModal(null)}
+          title={confirmModal.title}
+          footer={
+            <>
+              <button
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 text-gray-500 hover:text-gray-700 font-bold"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmModal.onConfirm}
+                className="px-6 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700"
+              >
+                Confirmar
+              </button>
+            </>
+          }
+        >
+          <p className="text-gray-600">{confirmModal.message}</p>
+        </Modal>
+      )}
+
+      {alertModal && (
+        <Modal
+          isOpen={true}
+          onClose={() => setAlertModal(null)}
+          title={alertModal.title}
+          footer={
+            <button
+              onClick={() => setAlertModal(null)}
+              className="px-6 py-2 bg-primary-600 text-white rounded-xl font-bold"
+            >
+              OK
+            </button>
+          }
+        >
+          <p className="text-gray-600">{alertModal.message}</p>
+        </Modal>
+      )}
     </div>
   );
 }

@@ -67,8 +67,8 @@ export class SchedulingService {
   /**
    * Lista slots de tempo disponíveis para uma data específica
    */
-  async getAvailableTimeSlots(date: Date) {
-    const tenantId = this.tenantContext.getTenantId();
+  async getAvailableTimeSlots(date: Date, overrideTenantId?: string) {
+    const tenantId = overrideTenantId || this.tenantContext.getTenantId();
     if (!tenantId) {
       throw new Error('Tenant context not found');
     }
@@ -301,15 +301,17 @@ export class SchedulingService {
     });
 
     // Liberar capacidade do slot
-    await this.prisma.timeSlot.update({
-      where: { id: scheduledOrder.timeSlotId },
-      data: {
-        currentOccupancy: {
-          decrement: 1,
+    if (scheduledOrder.timeSlotId) {
+      await this.prisma.timeSlot.update({
+        where: { id: scheduledOrder.timeSlotId },
+        data: {
+          currentOccupancy: {
+            decrement: 1,
+          },
+          status: TimeSlotStatus.available,
         },
-        status: TimeSlotStatus.available,
-      },
-    });
+      });
+    }
 
     this.logger.log(`Cancelled scheduled order ${scheduledOrderId}`);
 
@@ -429,22 +431,24 @@ export class SchedulingService {
     }
 
     // Contar pedidos na fila para o mesmo slot
-    const queuePosition = await this.prisma.scheduledOrder.count({
-      where: {
-        tenantId,
-        timeSlotId: scheduledOrder.timeSlotId,
-        status: {
-          in: [ScheduledOrderStatus.scheduled, ScheduledOrderStatus.confirmed],
-        },
-        scheduledFor: {
-          lt: scheduledOrder.scheduledFor,
-        },
-      },
-    });
+    const queuePosition = scheduledOrder.timeSlotId 
+      ? await this.prisma.scheduledOrder.count({
+          where: {
+            tenantId,
+            timeSlotId: scheduledOrder.timeSlotId,
+            status: {
+              in: [ScheduledOrderStatus.scheduled, ScheduledOrderStatus.confirmed],
+            },
+            scheduledFor: {
+              lt: scheduledOrder.scheduledFor,
+            },
+          },
+        })
+      : 0;
 
     const estimatedStart = new Date(scheduledOrder.scheduledFor);
     const estimatedCompletion = new Date(
-      estimatedStart.getTime() + scheduledOrder.estimatedDuration * 60 * 1000
+      estimatedStart.getTime() + (scheduledOrder.estimatedDuration || 30) * 60 * 1000
     );
 
     return {

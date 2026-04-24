@@ -11,6 +11,7 @@ import {
   Plus, 
   Minus, 
   User,
+  Users,
   Store,
   ChevronRight,
   Hash,
@@ -29,6 +30,7 @@ import { PaymentModal } from './components/PaymentModal';
 import { PosSalonView, type SalonTable } from './components/PosSalonView';
 import { TransferTableModal } from './components/TransferTableModal';
 import { PosItemConfiguratorModal } from './components/PosItemConfiguratorModal';
+import { SplitPaymentModal } from './components/SplitPaymentModal';
 import type { CreateOrderItemSelectionGroupDTO, CreateOrderItemComboSlotSelectionDTO, PizzaCompositionDTO } from '@gestor/types';
 
 interface CatalogProduct {
@@ -119,6 +121,7 @@ export default function PosPage() {
   // UI Flow
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
   const [sourceTableForTransfer, setSourceTableForTransfer] = useState<SalonTable | null>(null);
 
   const [configProductId, setConfigProductId] = useState<string | null>(null);
@@ -500,6 +503,16 @@ export default function PosPage() {
                </div>
             )}
 
+            {currentOrderId && fulfillmentType === PosFulfillmentType.TABLE && (
+              <button 
+                onClick={() => setIsSplitModalOpen(true)}
+                className="w-full bg-gray-800 hover:bg-gray-750 text-gray-300 border border-gray-700 rounded-xl py-3 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all mt-2"
+              >
+                  <Users size={14} />
+                  Dividir Conta / Fechamento Parcial
+              </button>
+            )}
+
             <div className="space-y-1.5 border-t border-gray-800/50 pt-3">
                <div className="flex justify-between text-[11px] font-bold text-gray-500 uppercase tracking-tighter">
                   <span>Subtotal</span>
@@ -567,6 +580,28 @@ export default function PosPage() {
               },
             ]);
             setConfigProductId(null);
+          }}
+        />
+      )}
+
+      {currentOrderId && (
+        <SplitPaymentModal
+          isOpen={isSplitModalOpen}
+          orderId={currentOrderId}
+          orderTotal={total}
+          items={cart.map(it => ({
+            id: it.cartLineId, // Usamos cartLineId pq no PDV atual nao temos o ID real do orderItem no frontend
+                               // FIXME: Numa versao real, usariamos o ID do banco
+            snapshotName: it.name,
+            quantity: it.quantity,
+            unitPrice: it.basePrice,
+            lineTotal: it.basePrice * it.quantity
+          }))}
+          onClose={() => setIsSplitModalOpen(false)}
+          onComplete={() => {
+            queryClient.invalidateQueries({ queryKey: ['posSalon'] });
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
+            // Optionally reload order details here if needed
           }}
         />
       )}

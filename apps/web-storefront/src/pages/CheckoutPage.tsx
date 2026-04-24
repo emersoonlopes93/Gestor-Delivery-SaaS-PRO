@@ -20,6 +20,7 @@ import { useCustomerStore } from '../store/useCustomerStore';
 import { LoginModal } from '../components/LoginModal';
 import { CouponInput } from '../components/CouponInput';
 import { CashbackSelector } from '../components/CashbackSelector';
+import { SchedulingSelector } from '../components/SchedulingSelector';
 
 export function CheckoutPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -38,6 +39,11 @@ export function CheckoutPage() {
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Scheduling state
+  const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduledFor, setScheduledFor] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [timeSlotId, setTimeSlotId] = useState<string>('');
 
   // Address fields
   const [street, setStreet] = useState('');
@@ -155,10 +161,17 @@ export function CheckoutPage() {
           items: orderItems,
           fulfillmentType,
           deliveryAddress: address,
-          payment: { ...payment, changeFor: payment.changeFor || undefined },
+          payment: { 
+            ...payment, 
+            changeFor: payment.changeFor || undefined,
+            couponCode: appliedCoupon || undefined,
+            useCashbackAmount: usedCashback || undefined,
+          },
           customerName: customerName || 'Simulação',
           customerPhone: customerPhone || '0000000000',
           idempotencyKey: 'validation-only',
+          scheduledFor: isScheduled ? new Date(scheduledFor) : undefined,
+          timeSlotId: isScheduled ? timeSlotId : undefined,
         });
 
         setDeliveryFee(result.deliveryFee || 0);
@@ -176,7 +189,7 @@ export function CheckoutPage() {
     }
 
     validate();
-  }, [debouncedAddress, fulfillmentType, items, tenantSlug, payment]);
+  }, [debouncedAddress, fulfillmentType, items, tenantSlug, payment, appliedCoupon, usedCashback, isScheduled, scheduledFor, timeSlotId]);
 
   const total = subtotal + deliveryFee - discountTotal;
 
@@ -206,8 +219,10 @@ export function CheckoutPage() {
       if (!payment.changeFor || payment.changeFor < total) return false;
     }
 
+    if (isScheduled && !timeSlotId) return false;
+
     return true;
-  }, [customerName, customerPhone, items, fulfillmentType, street, number, neighborhood, city, state, zipCode, lat, lng, payment, total]);
+  }, [customerName, customerPhone, items, fulfillmentType, street, number, neighborhood, city, state, zipCode, lat, lng, payment, total, isScheduled, timeSlotId]);
 
   const handleSubmit = async () => {
     if (!isFormValid || isSubmitting) return;
@@ -263,9 +278,10 @@ export function CheckoutPage() {
           state,
           zipCode,
           reference: reference || undefined,
-          lat,
           lng,
         } : undefined,
+        scheduledFor: isScheduled ? scheduledFor : undefined,
+        timeSlotId: isScheduled ? timeSlotId : undefined,
       };
 
       const res = await api.post<OrderResponseDTO>(`/orders/public-checkout/${tenantSlug}`, payload);
@@ -409,6 +425,29 @@ export function CheckoutPage() {
             <span className="text-xs font-bold uppercase">Retirada</span>
           </button>
         </div>
+      </section>
+
+      <section className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest">Quando deseja receber?</h2>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" className="sr-only peer" checked={isScheduled} onChange={() => setIsScheduled(!isScheduled)} />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+            <span className="ml-3 text-xs font-bold text-gray-700 uppercase">{isScheduled ? 'Agendar' : 'Agora'}</span>
+          </label>
+        </div>
+        
+        {isScheduled && (
+          <SchedulingSelector
+            tenantSlug={tenantSlug!}
+            selectedDate={scheduledFor}
+            selectedSlotId={timeSlotId}
+            onSlotSelect={(slotId, date) => {
+              setTimeSlotId(slotId);
+              setScheduledFor(date);
+            }}
+          />
+        )}
       </section>
 
       {fulfillmentType === 'delivery' && (

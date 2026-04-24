@@ -18,4 +18,13 @@ export class StorefrontController {
     }
     return payload;
   }
+  
+  @Get(':slug/slots')
+  @Public()
+  async getSlots(
+    @Param('slug') slug: string,
+    @Query('date') date: string,
+  ) {
+    return this.storefrontService.getAvailableSlots(slug, new Date(date));
+  }
 }

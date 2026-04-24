@@ -68,6 +68,8 @@ export class OrdersService {
       deliveryAddress: dto.deliveryAddress,
       payment: dto.payment,
       channel: dto.fulfillmentType === 'delivery' ? 'storefront_delivery' : 'storefront_pickup',
+      scheduledFor: dto.scheduledFor ? new Date(dto.scheduledFor) : undefined,
+      timeSlotId: dto.timeSlotId,
     });
     const { tenantId, lines, itemsSubtotal, discountTotal, deliveryFee, total, couponId, cashbackUsed } = validation;
 
@@ -313,6 +315,8 @@ export class OrdersService {
       deliveryAddress: dto.deliveryAddress,
       payment: dto.payment,
       channel: dto.fulfillmentType === 'delivery' ? 'storefront_delivery' : 'storefront_pickup',
+      scheduledFor: dto.scheduledFor ? new Date(dto.scheduledFor) : undefined,
+      timeSlotId: dto.timeSlotId,
     });
 
     return validation;

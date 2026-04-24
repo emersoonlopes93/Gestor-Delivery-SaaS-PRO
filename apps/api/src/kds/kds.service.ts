@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
 import { PrintJobStatus, PrintType } from '@prisma/client';
+import { PrinterService } from '../pos/printer.service';
 
 @Injectable()
 export class KdsService {
@@ -10,6 +11,7 @@ export class KdsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
+    private readonly printerService: PrinterService,
   ) {}
 
   /**
@@ -28,7 +30,6 @@ export class KdsService {
         status: PrintJobStatus.pending,
       },
       orderBy: [
-        { priority: 'desc' },
         { createdAt: 'asc' },
       ],
       take: limit,
@@ -72,7 +73,6 @@ export class KdsService {
       this.prisma.printJob.findMany({
         where,
         orderBy: [
-          { priority: 'desc' },
           { createdAt: 'desc' },
         ],
         skip,
@@ -182,7 +182,7 @@ export class KdsService {
       throw new NotFoundException('Print job not found');
     }
 
-    const shouldRetry = printJob.tries < printJob.maxTries;
+    const shouldRetry = printJob.tries < 3;
 
     return this.prisma.printJob.update({
       where: { id: printJobId },
@@ -197,56 +197,13 @@ export class KdsService {
   }
 
   /**
-   * Cria um job de impressão incremental
+   * Cria um job de impressão
    */
   async createPrintJob(data: {
     orderId: string;
     station: string;
     content: string;
-    printerName?: string;
-    copies?: number;
-    priority?: number;
-  }) {
-    const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) {
-      throw new Error('Tenant context not found');
-    }
-
-    // Validar pedido
-    const order = await this.prisma.order.findFirst({
-      where: {
-        id: data.orderId,
-        tenantId,
-      },
-    });
-
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-
-    return this.prisma.printJob.create({
-      data: {
-        tenantId,
-        orderId: data.orderId,
-        station: data.station,
-        type: PrintType.kitchen, // Default para KDS
-        content: data.content,
-        status: PrintJobStatus.pending,
-      },
-      include: {
-        order: true,
-      },
-    });
-  }
-
-  async createIncrementalPrintJob(data: {
-    orderId: string;
-    station: string;
-    sequenceNumber: number;
-    parentPrintJobId?: string;
-    content: string;
-    metadata?: any;
-    priority?: number;
+    type?: PrintType;
   }) {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) {
@@ -258,7 +215,7 @@ export class KdsService {
         tenantId,
         orderId: data.orderId,
         station: data.station,
-        type: PrintType.incremental,
+        type: data.type || PrintType.kitchen,
         content: data.content,
         status: PrintJobStatus.pending,
       },
@@ -266,69 +223,6 @@ export class KdsService {
         order: true,
       },
     });
-  }
-
-  /**
-   * Cria múltiplos jobs de impressão incremental para um pedido
-   */
-  async createIncrementalPrintJobsForOrder(data: {
-    orderId: string;
-    station: string;
-    items: Array<{
-      sequenceNumber: number;
-      content: string;
-      metadata?: any;
-    }>;
-    parentPrintJobId?: string;
-    priority?: number;
-  }) {
-    const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) {
-      throw new Error('Tenant context not found');
-    }
-
-    // Validar pedido
-    const order = await this.prisma.order.findFirst({
-      where: {
-        id: data.orderId,
-        tenantId,
-      },
-    });
-
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-
-    // Criar jobs em lote
-    const printJobs = await this.prisma.$transaction(async (tx) => {
-      const jobs = [];
-      
-      for (const item of data.items) {
-        const job = await tx.printJob.create({
-          data: {
-            tenantId,
-            orderId: data.orderId,
-            station: data.station,
-            type: PrintType.incremental,
-            content: item.content,
-            metadata: item.metadata as any,
-            priority: data.priority || 0,
-            isIncremental: true,
-            sequenceNumber: item.sequenceNumber,
-            parentPrintJobId: data.parentPrintJobId,
-            status: PrintJobStatus.pending,
-          },
-        });
-        
-        jobs.push(job);
-      }
-      
-      return jobs;
-    });
-
-    this.logger.log(`Created ${printJobs.length} incremental print jobs for order ${data.orderId}`);
-    
-    return printJobs;
   }
 
   /**
@@ -413,14 +307,6 @@ export class KdsService {
       },
     });
 
-    const printing = await this.prisma.printJob.count({
-      where: {
-        tenantId,
-        station: station,
-        status: PrintJobStatus.printing,
-      },
-    });
-
     const completed = await this.prisma.printJob.count({
       where: {
         tenantId,
@@ -437,68 +323,164 @@ export class KdsService {
       },
     });
 
-    const total = pending + printing + completed + failed;
-
     return {
-      total,
+      total: pending + completed + failed,
       pending,
-      printing,
       completed,
       failed,
     };
   }
 
   /**
-   * Limpa jobs antigos (manutenção)
+   * Cria jobs de produção para todas as estações envolvidas no pedido
    */
-  async cleanupOldPrintJobs(daysOld = 7) {
+  async createProductionJobs(orderId: string) {
     const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) {
-      throw new Error('Tenant context not found');
-    }
+    if (!tenantId) throw new Error('Tenant context not found');
 
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysOld);
-
-    const result = await this.prisma.printJob.deleteMany({
-      where: {
-        tenantId,
-        status: {
-          in: [PrintJobStatus.completed, PrintJobStatus.failed],
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId, tenantId },
+      include: {
+        items: {
+          include: {
+            product: {
+              include: {
+                category: true
+              }
+            },
+            complements: true
+          }
         },
-        createdAt: {
-          lt: cutoffDate,
-        },
-      },
+        customer: true
+      }
     });
 
-    this.logger.log(`Cleaned up ${result.count} old print jobs older than ${daysOld} days`);
+    if (!order) throw new NotFoundException('Order not found');
+
+    // Agrupar itens por estação
+    const stationGroups: Record<string, any[]> = {};
     
-    return result;
+    for (const item of order.items) {
+      const category = item.product?.category;
+      let station = 'GERAL';
+      
+      if (category) {
+        const config = category.templateConfig as any;
+        station = config?.station || category.name;
+      }
+      
+      if (!stationGroups[station]) stationGroups[station] = [];
+      stationGroups[station].push(item);
+    }
+
+    // Para cada estação, criar um job
+    const jobs = [];
+    for (const [station, items] of Object.entries(stationGroups)) {
+      const pseudoOrder = {
+        ...order,
+        items: items as any,
+        total: Number(order.total),
+        itemsSubtotal: Number(order.itemsSubtotal),
+        discountTotal: Number(order.discountTotal),
+        deliveryFee: Number(order.deliveryFee),
+        serviceFee: Number(order.serviceFee),
+      } as any;
+
+      const content = await this.printerService.formatTicket(pseudoOrder, 'kitchen', station);
+
+      const job = await this.prisma.printJob.create({
+        data: {
+          tenantId,
+          orderId,
+          station,
+          type: PrintType.kitchen,
+          content,
+          status: PrintJobStatus.pending,
+        }
+      });
+      jobs.push(job);
+    }
+
+    this.logger.log(`Created ${jobs.length} production print jobs for order ${orderId}`);
+    return jobs;
   }
 
   /**
-   * Obtém jobs de impressão agrupados por pedido
+   * Obtém jobs agrupados por pedido
    */
   async getGroupedPrintJobs(orderId: string) {
     const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) {
-      throw new Error('Tenant context not found');
-    }
-
-    const printJobs = await this.prisma.printJob.findMany({
+    return this.prisma.printJob.findMany({
       where: {
-        tenantId,
+        tenantId: tenantId!,
         orderId,
       },
-      orderBy: [
-        { createdAt: 'asc' },
-      ],
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+  }
+
+  /**
+   * Cria um job de impressão incremental (legado/compatibilidade)
+   */
+  async createIncrementalPrintJob(data: any) {
+    const tenantId = this.tenantContext.getTenantId();
+    return this.prisma.printJob.create({
+      data: {
+        tenantId: tenantId!,
+        orderId: data.orderId,
+        station: data.station,
+        type: PrintType.kitchen,
+        content: data.content,
+        status: PrintJobStatus.pending,
+      }
+    });
+  }
+
+  /**
+   * Cria múltiplos jobs incrementais (legado/compatibilidade)
+   */
+  async createIncrementalPrintJobsForOrder(data: any) {
+    const tenantId = this.tenantContext.getTenantId();
+    const results = [];
+    for (const item of data.items) {
+      const job = await this.prisma.printJob.create({
+        data: {
+          tenantId: tenantId!,
+          orderId: data.orderId,
+          station: data.station,
+          type: PrintType.kitchen,
+          content: item.content,
+          status: PrintJobStatus.pending,
+        }
+      });
+      results.push(job);
+    }
+    return results;
+  }
+
+  /**
+   * Limpa jobs de impressão antigos
+   */
+  async cleanupOldPrintJobs(daysOld = 7) {
+    const tenantId = this.tenantContext.getTenantId();
+    const date = new Date();
+    date.setDate(date.getDate() - daysOld);
+
+    const result = await this.prisma.printJob.deleteMany({
+      where: {
+        tenantId: tenantId!,
+        createdAt: {
+          lt: date,
+        },
+        status: {
+          in: [PrintJobStatus.completed, PrintJobStatus.failed],
+        },
+      },
     });
 
-    return {
-      printJobs,
-      total: printJobs.length,
-    };
+    this.logger.log(`Cleaned up ${result.count} old print jobs for tenant ${tenantId}`);
+    return result;
   }
 }

@@ -68,15 +68,20 @@ export class FinancialTransactionsService {
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.financialTransaction.update({
         where: { id },
-        data: dto,
+        data: {
+          ...(dto.status && { status: dto.status as any }),
+          ...(dto.paymentDate && { paymentDate: dto.paymentDate }),
+          ...(dto.description && { description: dto.description }),
+          ...(dto.amount !== undefined && { amount: dto.amount }),
+        },
         include: {
           account: true
         }
       });
 
       // If status changed to PAID, update balance
-      if (existing.status !== FinancialStatus.PAID && updated.status === FinancialStatus.PAID && updated.accountId) {
-        const multiplier = updated.type === FinancialTransactionType.INCOME ? 1 : -1;
+      if (existing.status !== FinancialStatus.PAID && (updated.status as any) === FinancialStatus.PAID && updated.accountId) {
+        const multiplier = (updated.type as any) === FinancialTransactionType.INCOME ? 1 : -1;
         await tx.financialAccount.update({
           where: { id: updated.accountId },
           data: {
@@ -94,6 +99,8 @@ export class FinancialTransactionsService {
   private mapToDTO(t: any): FinancialTransactionDTO {
     return {
       ...t,
+      type: t.type as any,
+      status: t.status as any,
       amount: Number(t.amount),
       accountName: t.account?.name
     };

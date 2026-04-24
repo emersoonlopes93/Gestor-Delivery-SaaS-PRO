@@ -10,7 +10,7 @@ export class SuppliersService {
     return this.prisma.supplier.findMany({
       where: { tenantId },
       orderBy: { name: 'asc' },
-    });
+    }) as unknown as Promise<SupplierDTO[]>;
   }
 
   async findOne(tenantId: string, id: string): Promise<SupplierDTO> {
@@ -22,7 +22,7 @@ export class SuppliersService {
       throw new NotFoundException('Fornecedor não encontrado');
     }
 
-    return supplier;
+    return supplier as unknown as SupplierDTO;
   }
 
   async create(tenantId: string, dto: CreateSupplierDTO): Promise<SupplierDTO> {
@@ -41,7 +41,7 @@ export class SuppliersService {
         ...dto,
         tenantId,
       },
-    });
+    }) as unknown as Promise<SupplierDTO>;
   }
 
   async update(tenantId: string, id: string, dto: UpdateSupplierDTO): Promise<SupplierDTO> {
@@ -59,12 +59,12 @@ export class SuppliersService {
 
     return this.prisma.supplier.update({
       where: { id },
-      data: dto,
-    });
+      data: dto as any,
+    }) as unknown as Promise<SupplierDTO>;
   }
 
   async remove(tenantId: string, id: string): Promise<void> {
-    const supplier = await this.findOne(tenantId, id);
+    await this.findOne(tenantId, id);
     
     // Check if supplier has purchases before deleting? 
     // Usually we prefer soft delete or active/inactive, which we have.

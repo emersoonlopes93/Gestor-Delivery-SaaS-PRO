@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Tenant, PaginatedResponse } from '@gestor/types';
 import { api } from '../../lib/api-client';
+import { ExternalLink } from 'lucide-react';
 
 interface TenantListItem extends Tenant {
   _count?: { users: number; roles: number };
@@ -22,6 +23,20 @@ export function TenantsPage() {
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
       alert('Erro ao atualizar status do tenant');
+    }
+  };
+
+  const handleImpersonate = async (tenantId: string) => {
+    try {
+      const res = await api.get<{ accessToken: string }>(`/admin/tenants/${tenantId}/impersonate`);
+      if (res.success && res.data.accessToken) {
+        // Em desenvolvimento local o tenant-web roda na porta 5173
+        const tenantUrl = `http://localhost:5173?impersonate_token=${res.data.accessToken}`;
+        window.open(tenantUrl, '_blank');
+      }
+    } catch (error) {
+      console.error('Erro ao impersonar:', error);
+      alert('Erro ao acessar a loja');
     }
   };
 
@@ -93,6 +108,14 @@ export function TenantsPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
+                      <button
+                        onClick={() => handleImpersonate(tenant.id)}
+                        className="text-green-600 hover:text-green-900 text-sm font-medium flex items-center gap-1"
+                        title="Acessar painel como este tenant"
+                      >
+                        <ExternalLink size={14} />
+                        Loja
+                      </button>
                       <button
                         onClick={() => window.location.href = `/tenants/${tenant.id}/modules`}
                         className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"

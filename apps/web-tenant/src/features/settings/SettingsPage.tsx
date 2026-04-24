@@ -47,6 +47,10 @@ export function SettingsPage() {
     inscricaoEstadual: '',
     isStorePaused: false,
     storePauseReason: '',
+    taxRegime: '',
+    standardCfop: '',
+    standardNcm: '',
+    businessGroupId: null,
   });
 
   const [hours, setHours] = useState<OperatingHourForm[]>([]);
@@ -64,7 +68,10 @@ export function SettingsPage() {
       if (response.success) {
         setTenant(response.data);
         if (response.data.settings) {
-          setSettings(response.data.settings);
+          setSettings({
+            ...response.data.settings,
+            businessGroupId: (response.data as any).businessGroupId
+          });
         }
       }
     } catch (error) {
@@ -148,6 +155,9 @@ export function SettingsPage() {
         cnpj: settings.cnpj?.trim() || undefined,
         razaoSocial: settings.razaoSocial?.trim() || undefined,
         inscricaoEstadual: settings.inscricaoEstadual?.trim() || undefined,
+        taxRegime: settings.taxRegime || undefined,
+        standardCfop: settings.standardCfop || undefined,
+        standardNcm: settings.standardNcm || undefined,
       };
       
       const response = await api.patch('/tenant/settings', cleanedSettings);
@@ -253,6 +263,23 @@ export function SettingsPage() {
         <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Configurações da Loja</h1>
         <p className="text-gray-500 mt-1 font-medium">Gerencie o funcionamento e informações do seu estabelecimento.</p>
       </div>
+
+      {settings.businessGroupId && (
+        <div className="bg-indigo-600 rounded-2xl shadow-lg p-5 text-white flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="bg-white/20 p-2.5 rounded-xl">
+              <Building2 className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="text-xs font-black uppercase tracking-widest text-indigo-200">Plano Corporativo</div>
+              <p className="font-bold">Esta unidade faz parte de um <span className="text-indigo-100 italic">Grupo de Negócios</span>.</p>
+            </div>
+          </div>
+          <div className="hidden md:block bg-white/10 px-4 py-2 rounded-lg border border-white/20 text-xs font-bold">
+            Multi-unidade Ativado
+          </div>
+        </div>
+      )}
 
       {/* Pausa Manual */}
       <div className={`bg-white rounded-2xl shadow-sm border p-6 transition-all ${settings.isStorePaused ? 'border-amber-200 bg-amber-50/30' : 'border-gray-100'}`}>
@@ -452,7 +479,7 @@ export function SettingsPage() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
               <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-purple-50 text-purple-600 rounded-lg text-sm"><Building2 className="w-4 h-4" /></span>
-                Dados Fiscais
+                Dados Fiscais & Integração
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
@@ -488,6 +515,42 @@ export function SettingsPage() {
                     placeholder="Opcional"
                     className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
                   />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Regime Tributário</label>
+                  <select
+                    value={settings.taxRegime || ''}
+                    onChange={e => setSettings({...settings, taxRegime: e.target.value})}
+                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                  >
+                    <option value="">Selecione...</option>
+                    <option value="MEI">MEI (Microempreendedor Individual)</option>
+                    <option value="SIMPLES">Simples Nacional</option>
+                    <option value="REAL">Lucro Real</option>
+                    <option value="PRESUMIDO">Lucro Presumido</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">CFOP Padrão</label>
+                    <input
+                      type="text"
+                      value={settings.standardCfop || ''}
+                      onChange={e => setSettings({...settings, standardCfop: e.target.value})}
+                      placeholder="Ex: 5102"
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">NCM Padrão</label>
+                    <input
+                      type="text"
+                      value={settings.standardNcm || ''}
+                      onChange={e => setSettings({...settings, standardNcm: e.target.value})}
+                      placeholder="Ex: 21069090"
+                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                    />
+                  </div>
                 </div>
               </div>
             </div>

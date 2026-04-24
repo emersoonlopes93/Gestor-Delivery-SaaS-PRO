@@ -1,6 +1,7 @@
 import {
   Injectable,
   UnauthorizedException,
+  NotFoundException,
   Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -233,6 +234,66 @@ export class TenantAuthService {
         name: user.tenant.name,
         slug: user.tenant.slug,
         status: user.tenant.status,
+      },
+    };
+  }
+
+  /**
+   * Generates a tenant token for support/impersonation purposes.
+   * This should only be callable by Admin users with proper permissions.
+   */
+  async impersonate(tenantId: string, adminId: string, reason: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    // Find the first active owner or manager to impersonate
+    const user = await this.prisma.tenantUser.findFirst({
+      where: { tenantId, isActive: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('No active user found in this tenant to impersonate');
+    }
+
+    const payload: TenantJwtPayload = {
+      sub: user.id,
+      tenantId: user.tenantId,
+      type: 'tenant',
+      email: user.email,
+      isImpersonated: true,
+      impersonatedBy: adminId,
+    };
+
+    const accessToken = this.jwtService.sign(payload);
+
+    // Log the impersonation action
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId: adminId,
+        userType: 'admin',
+        action: 'impersonation_start',
+        resource: 'tenant',
+        details: {
+          impersonatedUserId: user.id,
+          reason,
+        },
+      },
+    });
+
+    this.logger.log(`Admin ${adminId} impersonating tenant ${tenantId} (Reason: ${reason})`);
+
+    return {
+      accessToken,
+      tenant: {
+        id: tenant.id,
+        name: tenant.name,
+        slug: tenant.slug,
       },
     };
   }

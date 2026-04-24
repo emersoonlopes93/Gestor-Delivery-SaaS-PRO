@@ -18,7 +18,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
   componentDidCatch(error: unknown) {
     // Intencionalmente não logamos tokens/senhas aqui
     // Para produção, isso pode ser conectado a um coletor (ex: Sentry)
-    // eslint-disable-next-line no-console
+     
     console.error('UI_ERROR_BOUNDARY', error);
   }
 

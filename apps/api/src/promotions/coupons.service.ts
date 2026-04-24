@@ -101,7 +101,7 @@ export class CouponsService {
     if (coupon.expiresAt && coupon.expiresAt < now) throw new BadRequestException('Coupon has expired');
     if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) throw new BadRequestException('Coupon usage limit reached');
     
-    let discountAmount = 0;
+    const discountAmount = 0;
     if (coupon.minOrderValue && currentTotal < Number(coupon.minOrderValue)) {
       throw new BadRequestException(`Minimum order value is R$ ${coupon.minOrderValue}`);
     }
