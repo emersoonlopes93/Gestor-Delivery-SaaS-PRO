@@ -23,7 +23,18 @@ export interface AdminJwtPayload {
   exp?: number;
 }
 
-export type JwtPayload = TenantJwtPayload | AdminJwtPayload;
+/** JWT payload for drivers */
+export interface DriverJwtPayload {
+  sub: string;        // driverId
+  tenantId: string;
+  type: 'driver';
+  phone: string;
+  name: string;
+  iat?: number;
+  exp?: number;
+}
+
+export type JwtPayload = TenantJwtPayload | AdminJwtPayload | CustomerJwtPayload | DriverJwtPayload;
 
 /** Login request body */
 export interface LoginRequest {
@@ -60,6 +71,7 @@ export interface TenantUserSession {
   name: string;
   roles: string[];
   permissions: string[];
+  onboardingCompletedAt?: string | null;
   tenant?: {
     id: string;
     name: string;
@@ -75,6 +87,20 @@ export interface AdminUserSession {
   name: string;
   roles: string[];
   permissions: string[];
+}
+
+/** Current authenticated driver context */
+export interface DriverUserSession {
+  driverId: string;
+  tenantId: string;
+  name: string;
+  phone: string;
+  isActive: boolean;
+  tenant?: {
+    id: string;
+    name: string;
+    slug: string;
+  };
 }
 
 /** JWT payload for customer (B2C) */
@@ -108,4 +134,15 @@ export interface CustomerLoginResponse {
     name: string;
     phone: string;
   };
+}
+
+/** Driver Login Request */
+export interface DriverLoginRequest {
+  phone: string;
+  pin: string; // Senha ou PIN de 4/6 dígitos usado por entregadores
+}
+
+/** Driver Login Response */
+export interface DriverLoginResponse extends AuthTokens {
+  driver: DriverUserSession;
 }

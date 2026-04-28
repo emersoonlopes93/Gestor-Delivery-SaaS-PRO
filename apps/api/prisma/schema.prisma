@@ -897,6 +897,7 @@ model DeliveryDriver {
   tenantId       String                   @map("tenant_id")
   name           String                   @db.VarChar(150)
   phone          String                   @db.VarChar(30)
+  pin            String?                  @db.VarChar(60) // hash or raw PIN
   isActive       Boolean                  @default(true) @map("is_active")
   status         DriverStatus             @default(offline)
   vehicleType    DriverVehicleType        @default(motorcycle) @map("vehicle_type")

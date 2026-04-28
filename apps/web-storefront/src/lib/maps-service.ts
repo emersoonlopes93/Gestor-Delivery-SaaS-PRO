@@ -63,3 +63,56 @@ export function loadGoogleMaps(apiKey: string): Promise<void> {
 
   return loadPromise;
 }
+
+/**
+ * Geocodifica um endereço textual para obter lat/lng
+ */
+export async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY;
+  if (!apiKey) return null;
+
+  try {
+    await loadGoogleMaps(apiKey);
+    const geocoder = new (window as any).google.maps.Geocoder();
+    
+    return new Promise((resolve) => {
+      geocoder.geocode({ address, componentRestrictions: { country: 'BR' } }, (results: any, status: any) => {
+        if (status === 'OK' && results[0]) {
+          const loc = results[0].geometry.location;
+          resolve({ lat: loc.lat(), lng: loc.lng() });
+        } else {
+          resolve(null);
+        }
+      });
+    });
+  } catch (err) {
+    console.error('Geocoding error:', err);
+    return null;
+  }
+}
+
+/**
+ * Busca endereço pelo CEP usando ViaCEP
+ */
+export async function fetchAddressByCep(cep: string) {
+  const cleanCep = cep.replace(/\D/g, '');
+  if (cleanCep.length !== 8) return null;
+
+  try {
+    const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+    const data = await response.json();
+
+    if (data.erro) return null;
+
+    return {
+      street: data.logradouro,
+      neighborhood: data.bairro,
+      city: data.localidade,
+      state: data.uf,
+      zipCode: data.cep.replace(/\D/g, ''),
+    };
+  } catch (err) {
+    console.error('ViaCEP error:', err);
+    return null;
+  }
+}

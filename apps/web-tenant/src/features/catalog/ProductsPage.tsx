@@ -5,7 +5,7 @@ import { RecipeModal } from '../inventory/RecipeModal';
 import { Modal } from '../../components/Modal';
 import { PermissionGate } from '../../components/PermissionGate';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Eye, Pencil, Trash2, FileText, Search, ChevronDown, Layers, Send, EyeOff, HelpCircle, X } from 'lucide-react';
+import { Eye, Pencil, Trash2, FileText, Search, ChevronDown, Layers, Send, EyeOff, HelpCircle, X, Copy } from 'lucide-react';
 
 type ProductsViewMode = 'all' | 'grouped';
 
@@ -173,6 +173,15 @@ export function ProductsPage() {
     }
   };
 
+  const handleDuplicate = async (id: string) => {
+    try {
+      await api.post(`/catalog/products/${id}/duplicate`);
+      loadData();
+    } catch (error) {
+      console.error('Erro ao duplicar produto:', error);
+    }
+  };
+
   const handleTogglePublication = async (product: ProductWithPublication) => {
     try {
       const nextStatus = product.publication?.publicationStatus === 'published' ? 'draft' : 'published';
@@ -296,6 +305,14 @@ export function ProductsPage() {
                 type="button"
               >
                 <Pencil size={16} />
+              </button>
+              <button
+                onClick={() => handleDuplicate(product.id)}
+                className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                title="Duplicar"
+                type="button"
+              >
+                <Copy size={16} />
               </button>
               <PermissionGate permission="catalog.publish" fallback={null}>
                 <button

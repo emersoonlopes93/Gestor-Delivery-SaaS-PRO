@@ -4,6 +4,7 @@ import { DatabaseModule } from '../database/database.module';
 import { AuthModule } from '../auth/auth.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { DriversController } from './drivers.controller';
+import { DriverOperationsController } from './driver.controller';
 import { DriversService } from './drivers.service';
 import { DeliveryCoverageController } from './delivery-coverage.controller';
 import { DeliveryCoverageService } from './delivery-coverage.service';
@@ -13,7 +14,7 @@ import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
 
 @Module({
   imports: [DatabaseModule, AuthModule, RbacModule],
-  controllers: [DriversController, DeliveryRateController, DeliveryCoverageController],
+  controllers: [DriversController, DriverOperationsController, DeliveryRateController, DeliveryCoverageController],
   providers: [
     DriversService,
     DeliveryTrackingGateway,

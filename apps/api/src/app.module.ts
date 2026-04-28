@@ -82,12 +82,6 @@ import { PlanGatingGuard } from './common/guards/plan-gating.guard';
     SchedulingModule,
     SplitPaymentModule,
     KdsModule,
-    PosModule,
-    CrmModule,
-    PromotionsModule,
-    InventoryModule,
-    AnalyticsModule,
-    GoalsModule,
 
     // Tenant Context (Shared)
     TenantContextModule,
@@ -98,36 +92,30 @@ import { PlanGatingGuard } from './common/guards/plan-gating.guard';
     // Public Storefront (Phase 3)
     StorefrontModule,
 
+    // Orders & Checkout (Phase 4)
+    OrdersModule,
+
     // Logistics & Delivery (Phase 6)
     DeliveryModule,
 
-    // Cash Register (Phase 7)
+    // Cash Register & POS (Phase 7)
     CashModule,
+    PosModule,
 
-    // CRM (Phase 8)
+    // CRM & Promotions (Phase 8)
     CrmModule,
-
-    // Promotions & Cashback (Phase 8)
     PromotionsModule,
 
     // Inventory & Recipe (Phase 9)
     InventoryModule,
 
-    // Analytics & Reports (Phase 10)
+    // Analytics & Goals (Phase 10)
     AnalyticsModule,
-
-    // Goals & Performance (Phase 10)
     GoalsModule,
 
     // Upload (Images)
     UploadModule,
 
-    // Orders & Checkout (Phase 4)
-    OrdersModule,
-
-    // Point of Sale (Phase 7)
-    PosModule,
-    
     // Management (Phase 3)
     PurchasingModule,
     FinanceModule,

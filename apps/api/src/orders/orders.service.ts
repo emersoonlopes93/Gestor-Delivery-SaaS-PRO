@@ -289,6 +289,24 @@ export class OrdersService {
         this.logger.error(`Error creating PIX payment: ${(error as any).message}`);
         // Não falhar o pedido, apenas logar erro
       }
+    } else if (dto.payment.method === 'credit_card' || dto.payment.method === 'debit_card') {
+      try {
+        const preferencePayment = await this.paymentGatewayService.createPreferencePayment(
+          order.id,
+          dto.customerEmail || '',
+          dto.customerName,
+          dto.returnUrl || 'https://gestor-delivery-pro.vercel.app', // Fallback URL if frontend didnt send
+          dto.payment.method
+        );
+
+        return {
+          ...orderDetail,
+          preferencePayment,
+        } as any;
+      } catch (error) {
+        this.logger.error(`Error creating Preference/Card payment: ${(error as any).message}`);
+        // Não falhar o pedido, logar erro
+      }
     }
 
     return orderDetail;

@@ -29,6 +29,20 @@ import {
   Upsell,
 } from '@gestor/types';
 
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <div className="group relative inline-block ml-1">
+      <div className="cursor-help text-gray-400 hover:text-primary-500 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 font-medium leading-tight text-center">
+        {text}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+      </div>
+    </div>
+  );
+}
+
 type TabKey = 'geral' | 'personalizacao' | 'combo' | 'publicacao' | 'vendas';
 
 type ProductDetails = Product & {
@@ -1025,6 +1039,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'geral' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50'}`}
         >
           {(isComboWizard || isProductWizard) ? '1. Informações Gerais' : 'Informações Gerais'}
+          <InfoTooltip text="Nome, categoria, preço base e descrição do item." />
         </button>
         {!isComboMode && (
           <button
@@ -1033,7 +1048,8 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             disabled={isProductWizard && productWizardIndex < 1}
             className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'personalizacao' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
           >
-            {isProductWizard ? '2. Personalização' : 'Personalização'}
+            {isProductWizard ? '2. Complementos' : 'Complementos'}
+            <InfoTooltip text="Adicione grupos de opções como adicionais, tamanhos ou ingredientes." />
           </button>
         )}
         {isComboMode && (
@@ -1044,6 +1060,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'combo' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
           >
             {isComboWizard ? '2. Itens do Combo' : 'Itens do Combo'}
+            <InfoTooltip text="Defina os produtos que podem ser escolhidos neste combo." />
           </button>
         )}
         <button
@@ -1053,6 +1070,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'vendas' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
         >
           {isComboWizard ? '3. Upsells' : 'Upsells / Ofertas'}
+          <InfoTooltip text="Configurar sugestões de venda (compre também) para este produto." />
         </button>
         <button
           type="button"
@@ -1060,7 +1078,8 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           disabled={(isComboWizard && comboWizardIndex < 2) || (isProductWizard && productWizardIndex < 2)}
           className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'publicacao' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
         >
-          {isComboWizard ? '4. Venda e Disponibilidade' : (isProductWizard ? '3. Venda e Disponibilidade' : 'Venda e Disponibilidade')}
+          {isComboWizard ? '4. Disponibilidade' : (isProductWizard ? '3. Disponibilidade' : 'Disponibilidade')}
+          <InfoTooltip text="Controle em quais horários e canais (Delivery, Balcão) este item está ativo." />
         </button>
       </div>
 

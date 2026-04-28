@@ -13,7 +13,8 @@ import { RequirePermissions } from '../common/decorators';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { PaymentGatewayService } from './payment-gateway.service';
-import { CreatePixPaymentDto, WebhookDto } from './dto/create-pix-payment.dto';
+import { CreatePixPaymentDto, CreatePreferenceDto, WebhookDto } from './dto/create-pix-payment.dto';
+import { PaymentMethod } from '@prisma/client';
 
 @Controller('payment-gateway')
 export class PaymentGatewayController {
@@ -27,6 +28,19 @@ export class PaymentGatewayController {
       dto.orderId,
       dto.customerEmail,
       dto.customerName
+    );
+  }
+
+  @Post('preference/create')
+  @UseGuards(TenantAuthGuard, PermissionsGuard)
+  @RequirePermissions('orders.create')
+  async createPreferencePayment(@Body() dto: CreatePreferenceDto) {
+    return this.paymentGatewayService.createPreferencePayment(
+      dto.orderId,
+      dto.customerEmail,
+      dto.customerName,
+      dto.returnUrl,
+      dto.paymentMethod as PaymentMethod
     );
   }
 

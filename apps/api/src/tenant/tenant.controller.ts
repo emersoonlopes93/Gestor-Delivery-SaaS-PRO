@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Body, UseGuards } from '@nestjs/common';
 import { TenantService } from './tenant.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { CurrentTenant, RequirePermissions } from '../common/decorators';
@@ -88,6 +88,16 @@ export class TenantController {
     @Body() body: { step: 'basicInfo' | 'catalog' | 'payment' | 'firstOrder'; completed?: boolean },
   ) {
     return this.onboardingService.updateStep(tenantId, body.step, body.completed ?? true);
+  }
+
+  /**
+   * Complete overall onboarding.
+   */
+  @Patch('onboarding/complete')
+  @Post('onboarding/complete')
+  @RequirePermissions('dashboard.view')
+  async completeOnboarding(@CurrentTenant() tenantId: string) {
+    return this.onboardingService.completeOnboarding(tenantId);
   }
 }
 

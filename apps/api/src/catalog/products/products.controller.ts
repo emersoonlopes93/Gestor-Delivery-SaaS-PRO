@@ -46,4 +46,10 @@ export class ProductsController {
   remove(@Param('id') id: string) {
     return this.productsService.remove(id);
   }
+
+  @Post(':id/duplicate')
+  @RequirePermissions('catalog.create')
+  duplicate(@Param('id') id: string) {
+    return this.productsService.duplicate(id);
+  }
 }

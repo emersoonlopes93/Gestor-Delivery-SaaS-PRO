@@ -5,7 +5,9 @@ import { DashboardPage } from './features/dashboard/DashboardPage';
 import { AuthLayout } from './layouts/AuthLayout';
 import { AppLayout } from './layouts/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { OnboardingGuard } from './components/OnboardingGuard';
 import { PermissionGate } from './components/PermissionGate';
+import { OnboardingWizard } from './features/onboarding/OnboardingWizard';
 import { CategoriesPage } from './features/catalog/CategoriesPage';
 import { ProductsPage } from './features/catalog/ProductsPage';
 import { ProductV2EditorPage } from './features/catalog/ProductV2EditorPage';
@@ -36,6 +38,7 @@ import { PurchasesPage } from './features/purchasing/PurchasesPage';
 import { InventoryCountPage } from './features/purchasing/InventoryCountPage';
 import { LossesPage } from './features/purchasing/LossesPage';
 import { FinancePage } from './features/purchasing/FinancePage';
+import { EmployeesPage } from './features/management/employees/EmployeesPage';
 
 export function App() {
   return (
@@ -49,7 +52,9 @@ export function App() {
       <Route
         element={
           <ProtectedRoute>
-            <AppLayout />
+            <OnboardingGuard>
+              <AppLayout />
+            </OnboardingGuard>
           </ProtectedRoute>
         }
       >
@@ -296,6 +301,14 @@ export function App() {
             </PermissionGate>
           }
         />
+        <Route
+          path="/management/employees"
+          element={
+            <PermissionGate permission="users.read">
+              <EmployeesPage />
+            </PermissionGate>
+          }
+        />
 
         {/* Analytics & Performance (Phase 10) */}
         <Route
@@ -328,6 +341,18 @@ export function App() {
         {/* Default redirect */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Route>
+
+      {/* Onboarding Dedicated Route (Protected but No AppLayout) */}
+      <Route
+        path="/onboarding"
+        element={
+          <ProtectedRoute>
+            <OnboardingGuard>
+              <OnboardingWizard />
+            </OnboardingGuard>
+          </ProtectedRoute>
+        }
+      />
 
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/login" replace />} />

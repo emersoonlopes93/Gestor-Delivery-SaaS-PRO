@@ -47,4 +47,34 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
   emitLocationUpdate(orderToken: string, location: { lat: number; lng: number; driverId: string }) {
     this.server.to(`order:${orderToken}`).emit('locationUpdate', location);
   }
+
+  /**
+   * Tenant joining to track all its drivers.
+   */
+  @SubscribeMessage('joinTenantTracking')
+  handleJoinTenantTracking(
+    @MessageBody() data: { tenantId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    client.join(`tenant:${data.tenantId}`);
+    this.logger.log(`Client ${client.id} joined tracking for tenant: ${data.tenantId}`);
+    return { event: 'joinedTenant', data: { tenantId: data.tenantId } };
+  }
+
+  /**
+   * Driver sends location updates continuously.
+   */
+  @SubscribeMessage('updateDriverLocation')
+  async handleUpdateDriverLocation(
+    @MessageBody() data: { driverId: string; tenantId: string; lat: number; lng: number },
+    @ConnectedSocket() client: Socket,
+  ) {
+    // Fire it to any tenant tracking UI open.
+    this.server.to(`tenant:${data.tenantId}`).emit('driverLocationUpdated', {
+      driverId: data.driverId,
+      lat: data.lat,
+      lng: data.lng,
+      timestamp: new Date().toISOString()
+    });
+  }
 }

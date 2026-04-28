@@ -12,6 +12,23 @@ export class CreatePixPaymentDto {
   customerName?: string;
 }
 
+export class CreatePreferenceDto {
+  @IsString()
+  orderId!: string;
+
+  @IsEmail()
+  customerEmail!: string;
+
+  @IsString()
+  customerName!: string;
+
+  @IsString()
+  returnUrl!: string;
+
+  @IsString()
+  paymentMethod!: string;
+}
+
 export class WebhookDto {
   @IsString()
   action!: string;

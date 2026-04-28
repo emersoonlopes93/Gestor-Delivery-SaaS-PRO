@@ -107,6 +107,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     id: 'management',
     label: 'Gestão',
     items: [
+      { id: 'management-employees', label: 'Funcionários', to: '/management/employees', icon: Users, permission: 'users.read' },
       { id: 'management-suppliers', label: 'Fornecedores', to: '/management/suppliers', icon: Truck, permission: 'purchasing.read' },
       { id: 'management-purchases', label: 'Compras / Entradas', to: '/management/purchases', icon: ShoppingCart, permission: 'purchasing.read' },
       { id: 'management-inventory-count', label: 'Inventário Físico', to: '/management/inventory-count', icon: ClipboardList, permission: 'inventory.manage' },

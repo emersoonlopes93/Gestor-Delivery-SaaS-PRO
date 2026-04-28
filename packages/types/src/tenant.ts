@@ -3,6 +3,7 @@
 // ============================================================
 
 import { TenantStatus } from './enums';
+import { TenantRole } from './rbac';
 
 export interface Tenant {
   id: string;
@@ -95,4 +96,17 @@ export interface TenantContext {
   tenantSlug: string;
   tenantName: string;
   tenantStatus: TenantStatus;
+}
+
+export interface TenantUser {
+  id: string;
+  tenantId: string;
+  email: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  userRoles?: {
+    role: TenantRole;
+  }[];
 }

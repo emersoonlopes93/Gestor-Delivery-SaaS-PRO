@@ -14,7 +14,7 @@ import {
   CheckoutValidationResult
 } from '@gestor/types';
 import { AddressAutocomplete } from '../components/AddressAutocomplete';
-import { StructuredAddress } from '../lib/maps-service';
+import { StructuredAddress, fetchAddressByCep, geocodeAddress } from '../lib/maps-service';
 import { useDebounce } from '../hooks/use-debounce';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { LoginModal } from '../components/LoginModal';
@@ -56,6 +56,7 @@ export function CheckoutPage() {
   const [reference, setReference] = useState('');
   const [lat, setLat] = useState<number | undefined>();
   const [lng, setLng] = useState<number | undefined>();
+  const [isFetchingCep, setIsFetchingCep] = useState(false);
 
   // Payment state
   const [payment, setPayment] = useState<PaymentInput>({
@@ -111,8 +112,14 @@ export function CheckoutPage() {
       if (items.length === 0 || !tenantSlug) return;
       
       const isDelivery = fulfillmentType === 'delivery';
-      if (isDelivery && (!lat || !lng)) {
+      // Only validate delivery if we have basic address parts (especially number which is required by DTO)
+      if (isDelivery && (!lat || !lng || !number || !street)) {
         setDeliveryFee(0);
+        return;
+      }
+
+      // Ensure we have a payment method (default usually cash, but safety check)
+      if (!payment.method) {
         return;
       }
 
@@ -164,9 +171,9 @@ export function CheckoutPage() {
           payment: { 
             ...payment, 
             changeFor: payment.changeFor || undefined,
-            couponCode: appliedCoupon || undefined,
-            useCashbackAmount: usedCashback || undefined,
           },
+          couponCode: appliedCoupon || undefined,
+          useCashbackAmount: usedCashback || undefined,
           customerName: customerName || 'Simulação',
           customerPhone: customerPhone || '0000000000',
           idempotencyKey: 'validation-only',
@@ -179,8 +186,12 @@ export function CheckoutPage() {
         if (isDelivery) setSubmitError(null);
       } catch (err: any) {
         console.error('Validation error:', err);
-        const msg = err.response?.data?.message || 'Erro ao validar entrega nesta região.';
-        if (isDelivery) setSubmitError(msg);
+        const msg = err.message || 'Erro ao validar entrega nesta região.';
+        const isClosed = msg.toLowerCase().includes('fechada') || msg.toLowerCase().includes('aberta');
+        
+        if (isDelivery) {
+           setSubmitError(isClosed ? msg : `Validando: ${msg}`);
+        }
         setDeliveryFee(0);
         setDiscountTotal(0);
       } finally {
@@ -203,6 +214,33 @@ export function CheckoutPage() {
     setLat(addr.lat);
     setLng(addr.lng);
   };
+
+  // CEP Autocomplete logic
+  useEffect(() => {
+    const cleanCep = zipCode.replace(/\D/g, '');
+    if (cleanCep.length === 8) {
+      const triggerCepLookup = async () => {
+        setIsFetchingCep(true);
+        const addr = await fetchAddressByCep(cleanCep);
+        if (addr) {
+          setStreet(addr.street);
+          setNeighborhood(addr.neighborhood);
+          setCity(addr.city);
+          setState(addr.state);
+          
+          // Try to get coordinates for better freight calculation
+          const fullAddress = `${addr.street}, ${addr.neighborhood}, ${addr.city} - ${addr.state}`;
+          const coords = await geocodeAddress(fullAddress);
+          if (coords) {
+            setLat(coords.lat);
+            setLng(coords.lng);
+          }
+        }
+        setIsFetchingCep(false);
+      };
+      triggerCepLookup();
+    }
+  }, [zipCode]);
 
   const isFormValid = useMemo(() => {
     if (!customerName.trim() || !customerPhone.trim()) return false;
@@ -264,11 +302,9 @@ export function CheckoutPage() {
         items: orderItems,
         idempotencyKey,
         notes,
-        payment: {
-          ...payment,
-          couponCode: appliedCoupon || undefined,
-          useCashbackAmount: usedCashback || undefined,
-        },
+        payment,
+        couponCode: appliedCoupon || undefined,
+        useCashbackAmount: usedCashback || undefined,
         deliveryAddress: fulfillmentType === 'delivery' ? {
           street,
           number,
@@ -278,10 +314,12 @@ export function CheckoutPage() {
           state,
           zipCode,
           reference: reference || undefined,
+          lat,
           lng,
         } : undefined,
         scheduledFor: isScheduled ? scheduledFor : undefined,
         timeSlotId: isScheduled ? timeSlotId : undefined,
+        returnUrl: window.location.origin + `/${tenantSlug}`,
       };
 
       const res = await api.post<OrderResponseDTO>(`/orders/public-checkout/${tenantSlug}`, payload);
@@ -291,7 +329,13 @@ export function CheckoutPage() {
       // Se for pagamento PIX, redirecionar para página do QR code
       if (res.data.pixPayment) {
         navigate(`/${tenantSlug}/payment/${res.data.pixPayment.transactionId}`, { state: { pixPayment: res.data.pixPayment } });
-      } else {
+      } 
+      // Se for Cartão on-line, redirecionar para Checkout Pro do Mercado Pago
+      else if (res.data.preferencePayment) {
+        window.location.href = res.data.preferencePayment.initPoint;
+      } 
+      // Pagamento em Dinheiro ou Máquina na Entrega
+      else {
         navigate(`/${tenantSlug}/order/${res.data.id}`, { state: { order: res.data } });
       }
     } catch (err: any) {
@@ -464,9 +508,41 @@ export function CheckoutPage() {
 
           <div className="space-y-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
             <div className="grid grid-cols-4 gap-3">
+              <div className="col-span-1">
+                <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 ml-1 tracking-wider">CEP</label>
+                <div className="relative">
+                  <input 
+                    type="text" 
+                    placeholder="00000-000" 
+                    value={zipCode} 
+                    onChange={e => {
+                      let val = e.target.value.replace(/\D/g, '');
+                      if (val.length > 8) val = val.substring(0, 8);
+                      if (val.length > 5) {
+                        val = val.substring(0, 5) + '-' + val.substring(5);
+                      }
+                      setZipCode(val);
+                    }}
+                    className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" 
+                  />
+                  {isFetchingCep && (
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                      <Loader2 className="w-3 h-3 animate-spin text-primary-500" />
+                    </div>
+                  )}
+                </div>
+              </div>
               <div className="col-span-3">
                 <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 ml-1 tracking-wider">Rua</label>
                 <input type="text" placeholder="Rua" value={street} onChange={e => setStreet(e.target.value)}
+                  className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-3">
+              <div className="col-span-3">
+                <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 ml-1 tracking-wider">Bairro</label>
+                <input type="text" placeholder="Bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)}
                   className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
               </div>
               <div className="col-span-1">
@@ -475,9 +551,6 @@ export function CheckoutPage() {
                   className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
               </div>
             </div>
-            
-            <input type="text" placeholder="Bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)}
-              className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
             
             <div className="grid grid-cols-2 gap-3">
               <input type="text" placeholder="Complemento" value={complement} onChange={e => setComplement(e.target.value)}
@@ -507,18 +580,32 @@ export function CheckoutPage() {
               <span className="text-[10px] font-bold uppercase">PIX</span>
             </button>
           )}
+          {(!tenantInfo || tenantInfo.paymentMethods?.includes('credit_card')) && (
+            <button onClick={() => setPayment({ method: PaymentMethod.credit_card })}
+              className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'credit_card' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
+              <CreditCard className="w-5 h-5" />
+              <span className="text-[10px] font-bold uppercase text-center leading-none">Crédito<br/>On-line</span>
+            </button>
+          )}
+          {(!tenantInfo || tenantInfo.paymentMethods?.includes('debit_card')) && (
+            <button onClick={() => setPayment({ method: PaymentMethod.debit_card })}
+              className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'debit_card' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
+              <CreditCard className="w-5 h-5" />
+              <span className="text-[10px] font-bold uppercase text-center leading-none">Débito<br/>On-line</span>
+            </button>
+          )}
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('card_on_delivery')) && (
             <button onClick={() => setPayment({ method: PaymentMethod.card_on_delivery })}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'card_on_delivery' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <CreditCard className="w-5 h-5" />
-              <span className="text-[10px] font-bold uppercase tracking-tight text-center leading-none">Cartão na Entrega</span>
+              <span className="text-[10px] font-bold uppercase tracking-tight text-center leading-none">Cartão na<br/>Entrega</span>
             </button>
           )}
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('cash')) && (
             <button onClick={() => setPayment({ method: PaymentMethod.cash, changeFor: null })}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'cash' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <Banknote className="w-5 h-5" />
-              <span className="text-[10px] font-bold uppercase">Dinheiro</span>
+              <span className="text-[10px] font-bold uppercase mt-2">Dinheiro</span>
             </button>
           )}
         </div>

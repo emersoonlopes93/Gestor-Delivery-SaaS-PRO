@@ -93,60 +93,11 @@ export function CombosV2Page() {
     const key = `duplicate-${combo.id}`;
     setBusy(key, true);
     try {
-      const [productRes, slotsRes] = await Promise.all([
-        api.get<Product>(`/catalog/products/${combo.id}`),
-        api.get<SlotWithAllowed[]>(`/catalog/products/${combo.id}/combo-slots`),
-      ]);
-      if (!productRes.success) return;
-
-      const createdComboRes = await api.post<Product>('/catalog/products', {
-        name: `${productRes.data.name} (Cópia)`,
-        categoryId: productRes.data.categoryId,
-        type: 'combo',
-        basePrice: Number(productRes.data.basePrice),
-        shortDescription: productRes.data.shortDescription ?? '',
-        longDescription: productRes.data.longDescription ?? '',
-        image: productRes.data.image ?? '',
-        isActive: productRes.data.isActive,
-        isAvailable: productRes.data.isAvailable,
-        sellableOnline: productRes.data.sellableOnline,
-        sku: productRes.data.sku ?? '',
-        order: productRes.data.order,
-      });
-      if (!createdComboRes.success) return;
-
-      const newComboId = createdComboRes.data.id;
-      const sourceSlots = slotsRes.success ? [...slotsRes.data].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)) : [];
-
-      for (const slot of sourceSlots) {
-        const createdSlotRes = await api.post<ComboSlot>(`/catalog/products/${newComboId}/combo-slots`, {
-          name: slot.name,
-          description: slot.description ?? '',
-          isRequired: slot.isRequired,
-          minSelect: slot.minSelect,
-          maxSelect: slot.maxSelect,
-          order: slot.order,
-        });
-        if (!createdSlotRes.success) continue;
-
-        const createdSlotId = createdSlotRes.data.id;
-        const sourceAllowed = [...(slot.allowedItems ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-        for (const allowed of sourceAllowed) {
-          await api.post(`/catalog/products/${newComboId}/combo-slots/${createdSlotId}/allowed-items`, {
-            productId: allowed.productId,
-            additionalPrice: Number(allowed.additionalPrice ?? 0),
-            order: allowed.order,
-          });
-        }
+      const res = await api.post<Product>(`/catalog/products/${combo.id}/duplicate`);
+      if (res.success) {
+        await loadData();
+        navigate(`/catalog/combos/${res.data.id}/v2`);
       }
-
-      await api.patch(`/catalog/products/${newComboId}/publication`, {
-        publicationStatus: 'draft',
-        operationalStatus: 'inactive',
-      });
-
-      await loadData();
-      navigate(`/catalog/combos/${newComboId}/v2`);
     } finally {
       setBusy(key, false);
     }

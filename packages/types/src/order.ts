@@ -24,8 +24,6 @@ export type OrderLineType = 'product' | 'combo';
 export class PaymentInput {
   @IsString() @IsNotEmpty() method!: PaymentMethod;
   @IsNumber() @IsOptional() changeFor?: number | null;
-  @IsString() @IsOptional() couponCode?: string;
-  @IsNumber() @IsOptional() useCashbackAmount?: number;
 }
 
 // --- Valid status transitions ---
@@ -192,6 +190,9 @@ export class CreateOrderDTO {
   @IsNotEmpty()
   payment!: PaymentInput;
 
+  // API Preference
+  @IsString() @IsOptional() returnUrl?: string;
+
   // Agendamento
   @IsString() @IsOptional() scheduledFor?: string;
   @IsString() @IsOptional() timeSlotId?: string;
@@ -250,6 +251,11 @@ export interface PixPaymentDTO {
   status?: 'pending' | 'confirmed' | 'failed' | 'expired';
 }
 
+export interface PreferencePaymentDTO {
+  preferenceId: string;
+  initPoint: string;
+}
+
 export interface OrderResponseDTO {
   id: string;
   orderNumber: string;
@@ -280,6 +286,7 @@ export interface OrderResponseDTO {
   cashbackUsed?: number | null;
 
   pixPayment?: PixPaymentDTO;
+  preferencePayment?: PreferencePaymentDTO;
 
   createdAt: string;
   updatedAt: string;

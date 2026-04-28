@@ -1,0 +1,2 @@
+﻿src/features/onboarding/OnboardingWizard.tsx(37,25): error TS2339: Property 'tenantName' does not exist on type 'TenantUserSession'.
+src/features/onboarding/OnboardingWizard.tsx(41,30): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'SetStateAction<Plan[]>'.

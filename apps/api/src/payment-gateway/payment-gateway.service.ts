@@ -27,6 +27,27 @@ interface MercadoPagoPixRequest {
   external_reference: string;
 }
 
+interface MercadoPagoPreferenceRequest {
+  items: Array<{
+    title: string;
+    quantity: number;
+    unit_price: number;
+    currency_id: string;
+  }>;
+  payer: {
+    email: string;
+    name?: string;
+  };
+  back_urls: {
+    success: string;
+    pending: string;
+    failure: string;
+  };
+  auto_return: 'approved' | 'all';
+  external_reference: string;
+  notification_url?: string;
+}
+
 interface MercadoPagoPixResponse {
   id: string;
   status: string;
@@ -202,6 +223,128 @@ export class PaymentGatewayService {
     }
   }
 
+  async createPreferencePayment(
+    orderId: string, 
+    customerEmail: string, 
+    customerName: string, 
+    returnUrl: string,
+    paymentMethod: PaymentMethod
+  ): Promise<{ preferenceId: string; initPoint: string }> {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) {
+      throw new Error('Tenant context not found');
+    }
+
+    const order = await this.prisma.tenantClient.order.findUnique({
+      where: { id: orderId },
+      include: { customer: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.status !== OrderStatus.pending) {
+      throw new BadRequestException('Order is not in pending status');
+    }
+
+    const paymentTransaction = await this.prisma.tenantClient.paymentTransaction.create({
+      data: {
+        tenantId,
+        orderId,
+        gatewayName: 'mercadopago',
+        gatewayTxId: '',
+        method: paymentMethod,
+        amount: order.total,
+        status: PaymentTxStatus.pending,
+        metadata: {
+          customerEmail,
+          customerName,
+          orderNumber: order.orderNumber,
+        } as any,
+      },
+    });
+
+    const config = await this.getMercadoPagoConfig(tenantId);
+    
+    // Configura os URLs integrando com o ID do pedido para a view de /order/:id do storefront
+    const checkoutSuccessUrl = `${returnUrl}/order/${order.publicTrackingToken}?payment=success`;
+    const checkoutFailureUrl = `${returnUrl}/order/${order.publicTrackingToken}?payment=failure`;
+    const checkoutPendingUrl = `${returnUrl}/order/${order.publicTrackingToken}?payment=pending`;
+
+    const payload: MercadoPagoPreferenceRequest = {
+      items: [
+        {
+          title: `Pedido #${order.orderNumber} - Gestor Delivery`,
+          quantity: 1,
+          unit_price: Number(order.total),
+          currency_id: 'BRL',
+        }
+      ],
+      payer: {
+        email: customerEmail,
+        name: customerName,
+      },
+      back_urls: {
+        success: checkoutSuccessUrl,
+        failure: checkoutFailureUrl,
+        pending: checkoutPendingUrl,
+      },
+      auto_return: 'approved',
+      external_reference: paymentTransaction.id,
+      notification_url: config.webhookUrl,
+    };
+
+    try {
+      const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${config.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        this.logger.error(`Mercado Pago Preference API error: ${error}`);
+        throw new Error('Failed to create Preference Checkout');
+      }
+
+      const mpResponse = await response.json();
+
+      await this.prisma.tenantClient.paymentTransaction.update({
+        where: { id: paymentTransaction.id },
+        data: {
+          gatewayTxId: mpResponse.id, // Para preference, salvamos o id da preference por enquanto
+          metadata: {
+            ...paymentTransaction.metadata as any,
+            preferenceId: mpResponse.id,
+            initPoint: mpResponse.init_point,
+          },
+        },
+      });
+
+      return {
+        preferenceId: mpResponse.id,
+        initPoint: mpResponse.init_point,
+      };
+    } catch (error) {
+      this.logger.error(`Error creating Preference checkout: ${(error as any).message}`);
+      await this.prisma.tenantClient.paymentTransaction.update({
+        where: { id: paymentTransaction.id },
+        data: {
+          status: PaymentTxStatus.failed,
+          metadata: {
+            ...paymentTransaction.metadata as any,
+            error: (error as any).message,
+          },
+        },
+      });
+      throw error;
+    }
+  }
+
   async processWebhook(payload: WebhookDto): Promise<void> {
     if (payload.type !== 'payment') {
       this.logger.log(`Ignoring webhook type: ${payload.type}`);
@@ -247,16 +390,31 @@ export class PaymentGatewayService {
   }
 
   private async processPaymentUpdate(payment: any): Promise<void> {
-    // Buscar transação pelo external_reference
+    // Buscar transação pelo external_reference (que usamos para o Transaction ID do sistema)
     const transaction = await this.prisma.paymentTransaction.findFirst({
-      where: { gatewayTxId: payment.id.toString() },
+      where: { id: payment.external_reference },
       include: { order: true },
     });
 
     if (!transaction) {
-      this.logger.warn(`Transaction not found for payment ${payment.id}`);
-      return;
+      // Fallback para quem salvou gatewayTxId = payment.id no Pix
+      const fallbackTx = await this.prisma.paymentTransaction.findFirst({
+        where: { gatewayTxId: payment.id.toString() },
+        include: { order: true },
+      });
+      
+      if (!fallbackTx) {
+        this.logger.warn(`Transaction not found for payment ${payment.id}`);
+        return;
+      }
+      Object.assign(transaction || {}, fallbackTx); // Trick typescript se precisasse
+      return this.updateTransactionRecord(fallbackTx, payment);
     }
+    
+    return this.updateTransactionRecord(transaction, payment);
+  }
+
+  private async updateTransactionRecord(transaction: any, payment: any): Promise<void> {
 
     let newStatus: PaymentTxStatus;
     let orderStatus: OrderStatus;

@@ -5,9 +5,11 @@ import {
   Bell,
   ChevronRight,
   CornerDownRight,
+  CreditCard,
   LayoutGrid,
   Menu,
   Search,
+  Shield,
   Store,
   UserCircle,
 } from 'lucide-react';
@@ -37,6 +39,14 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     items: [
       { id: 'dashboard', label: 'Dashboard', to: '/dashboard', icon: LayoutGrid },
       { id: 'tenants', label: 'Tenants', to: '/tenants', icon: Store, permission: 'saas.tenants.read' },
+    ],
+  },
+  {
+    id: 'platform',
+    label: 'Plataforma',
+    items: [
+      { id: 'billing', label: 'Planos & Billing', to: '/billing', icon: CreditCard, permission: 'saas.billing.read' },
+      { id: 'audit-logs', label: 'Logs de Auditoria', to: '/audit-logs', icon: Shield, permission: 'saas.audit.read' },
     ],
   },
 ];

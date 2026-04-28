@@ -48,4 +48,21 @@ export class OnboardingService {
 
     return onboarding;
   }
+
+  async completeOnboarding(tenantId: string) {
+    const onboarding = await this.prisma.tenantOnboarding.upsert({
+      where: { tenantId },
+      create: { 
+        tenantId, 
+        stepBasicInfo: true, 
+        stepCatalog: true, 
+        stepPayment: true, 
+        stepFirstOrder: true, 
+        completedAt: new Date() 
+      },
+      update: { completedAt: new Date() },
+    });
+
+    return onboarding;
+  }
 }

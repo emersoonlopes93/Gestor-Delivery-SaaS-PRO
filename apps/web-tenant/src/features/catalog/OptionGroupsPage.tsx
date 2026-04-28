@@ -12,6 +12,20 @@ import { Modal } from '../../components/Modal';
 
 type GroupWithItems = OptionGroup & { items?: OptionItem[] };
 
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <div className="group relative inline-block ml-1">
+      <div className="cursor-help text-gray-400 hover:text-primary-500 transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-[10px] rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 font-medium leading-tight">
+        {text}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+      </div>
+    </div>
+  );
+}
+
 export function OptionGroupsPage() {
   const [groups, setGroups] = useState<GroupWithItems[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -184,8 +198,8 @@ export function OptionGroupsPage() {
     <div className="p-6 max-w-7xl mx-auto text-left">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Grupos e Tamanhos</h1>
-          <p className="text-gray-500 mt-1">Biblioteca reutilizável de grupos e tamanhos para vincular aos produtos.</p>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Complementos e Adicionais</h1>
+          <p className="text-gray-500 mt-1">Gerencie os grupos de opções, tamanhos e adicionais que podem ser vinculados aos produtos.</p>
         </div>
         <button
           onClick={() => openGroupModal()}
@@ -210,7 +224,7 @@ export function OptionGroupsPage() {
                   <div className="min-w-0">
                     <div className="font-black text-gray-900 uppercase tracking-wider text-sm truncate">{g.name}</div>
                     <div className="text-xs text-gray-500 font-bold mt-1">
-                      Seleção: {g.selectionType} | {g.isRequired ? 'Obrigatório' : 'Opcional'} | Min {g.minSelect} / Max {g.maxSelect}
+                      Seleção: {g.selectionType === 'single' ? 'Única' : g.selectionType === 'multiple' ? 'Múltipla' : 'Quantidade'} | {g.isRequired ? 'Obrigatório' : 'Opcional'} | Mín {g.minSelect} / Máx {g.maxSelect}
                     </div>
                   </div>
                   <div className="flex gap-2 shrink-0">
@@ -243,7 +257,10 @@ export function OptionGroupsPage() {
                     <thead className="bg-white border-b border-gray-100">
                       <tr>
                         <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Item</th>
-                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Impacto</th>
+                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">
+                          Impacto no Preço
+                          <InfoTooltip text="Define como este item altera o valor base do produto." />
+                        </th>
                         <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Status</th>
                         <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
                       </tr>
@@ -256,8 +273,11 @@ export function OptionGroupsPage() {
                             <div className="text-xs text-gray-500 font-medium">{it.description || ''}</div>
                           </td>
                           <td className="px-6 py-4 text-sm font-bold text-gray-700 whitespace-nowrap">
-                            {it.priceImpactType} {Number(it.priceImpactValue ?? 0) ? `(${it.priceImpactValue})` : ''}
-                            {it.allowQuantity ? ' | qty' : ''}
+                            {it.priceImpactType === 'none' ? 'Nenhum' : 
+                             it.priceImpactType === 'fixed' ? 'Adicional Fixo' : 
+                             it.priceImpactType === 'percentage' ? 'Porcentagem' : 'Substituir Preço'}
+                            {Number(it.priceImpactValue ?? 0) ? ` (${it.priceImpactValue})` : ''}
+                            {it.allowQuantity ? ' | Permite Qtd' : ''}
                           </td>
                           <td className="px-6 py-4">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${it.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
@@ -363,15 +383,18 @@ export function OptionGroupsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Tipo</label>
-              <select
-                value={groupForm.selectionType}
-                onChange={(e) => setGroupForm((p) => ({ ...p, selectionType: e.target.value as any }))}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
-              >
-                <option value="single">Single</option>
-                <option value="multiple">Multiple</option>
-                <option value="quantity">Quantity</option>
-              </select>
+                <select
+                  value={groupForm.selectionType}
+                  onChange={(e) => setGroupForm((p) => ({ ...p, selectionType: e.target.value as any }))}
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                >
+                  <option value="single">Seleção Única</option>
+                  <option value="multiple">Seleção Múltipla</option>
+                  <option value="quantity">Seleção com Quantidade</option>
+                </select>
+                <div className="mt-1">
+                  <InfoTooltip text="Única: Escolhe apenas 1. Múltipla: Escolhe vários (check). Quantidade: O usuário define a quantidade de cada item." />
+                </div>
             </div>
             <div className="flex items-center gap-4 pt-6">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -460,16 +483,19 @@ export function OptionGroupsPage() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Impacto</label>
-              <select
-                value={itemForm.priceImpactType ?? 'none'}
-                onChange={(e) => setItemForm((p) => ({ ...p, priceImpactType: e.target.value as any }))}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
-              >
-                <option value="none">None</option>
-                <option value="fixed">Fixed</option>
-                <option value="replace">Replace</option>
-                <option value="percentage">Percentage</option>
-              </select>
+                <select
+                  value={itemForm.priceImpactType ?? 'none'}
+                  onChange={(e) => setItemForm((p) => ({ ...p, priceImpactType: e.target.value as any }))}
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                >
+                  <option value="none">Nenhum impacto</option>
+                  <option value="fixed">Adicional Fixo (Soma)</option>
+                  <option value="replace">Substituir Preço Base</option>
+                  <option value="percentage">Adicional por %</option>
+                </select>
+                <div className="mt-1">
+                  <InfoTooltip text="Fixo: Soma o valor ao produto. Substituir: Ignora o preço do produto e usa este. %: Calcula sobre o preço base." />
+                </div>
             </div>
             <div>
               <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Valor</label>

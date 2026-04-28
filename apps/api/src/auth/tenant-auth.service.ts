@@ -44,7 +44,7 @@ export class TenantAuthService {
           tenantId_email: { tenantId: tenant.id, email: normalizedEmail },
         },
         include: {
-          tenant: true,
+          tenant: { include: { onboarding: true } },
           userRoles: {
             include: {
               role: {
@@ -63,7 +63,7 @@ export class TenantAuthService {
       user = await this.prisma.tenantUser.findFirst({
         where: { email: normalizedEmail },
         include: {
-          tenant: true,
+          tenant: { include: { onboarding: true } },
           userRoles: {
             include: {
               role: {
@@ -144,6 +144,7 @@ export class TenantAuthService {
           slug: user.tenant.slug,
           status: user.tenant.status,
         },
+        onboardingCompletedAt: user.tenant.onboarding?.completedAt?.toISOString() || null,
       },
     };
   }
@@ -189,7 +190,7 @@ export class TenantAuthService {
     const user = await this.prisma.tenantClient.tenantUser.findUnique({
       where: { id: userId },
       include: {
-        tenant: true,
+        tenant: { include: { onboarding: true } },
         userRoles: {
           include: {
             role: {
@@ -235,6 +236,7 @@ export class TenantAuthService {
         slug: user.tenant.slug,
         status: user.tenant.status,
       },
+      onboardingCompletedAt: user.tenant.onboarding?.completedAt?.toISOString() || null,
     };
   }
 

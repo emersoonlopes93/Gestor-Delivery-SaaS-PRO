@@ -400,4 +400,122 @@ export class ProductsService {
       .map((l) => l.upsell)
       .filter((u): u is NonNullable<typeof u> => Boolean(u)) as unknown as Upsell[];
   }
+
+  async duplicate(id: string) {
+    const tenantId = this.getRequiredTenantId();
+    const source = await this.prisma.tenantClient.product.findFirst({
+      where: { id, tenantId, deletedAt: null },
+      include: {
+        optionGroupLinks: true,
+        comboSlots: { include: { allowedItems: true } },
+        comboBundleItems: true,
+        publication: true,
+      },
+    });
+
+    if (!source) {
+      throw new NotFoundException('Produto base não encontrado');
+    }
+
+    const newName = `${source.name} (Cópia)`;
+    const newSlug = slugify(newName) + '-' + Math.random().toString(36).substring(2, 7);
+
+    return this.prisma.$transaction(async (tx) => {
+      const duplicate = await tx.product.create({
+        data: {
+          tenantId,
+          name: newName,
+          slug: newSlug,
+          type: source.type,
+          comboMode: source.comboMode,
+          comboPricingType: source.comboPricingType,
+          comboPricingValue: source.comboPricingValue,
+          categoryId: source.categoryId,
+          shortDescription: source.shortDescription,
+          longDescription: source.longDescription,
+          basePrice: source.basePrice,
+          image: source.image,
+          isActive: false, // Start inactive for safety
+          isFeatured: source.isFeatured,
+          isAvailable: source.isAvailable,
+          sellableOnline: source.sellableOnline,
+          sku: source.sku ? `${source.sku}-COPY` : null,
+          order: (source.order ?? 0) + 1,
+        },
+      });
+
+      // Duplicate Option Group Links
+      if (source.optionGroupLinks.length > 0) {
+        await tx.productOptionGroupLink.createMany({
+          data: source.optionGroupLinks.map((l) => ({
+            tenantId,
+            productId: duplicate.id,
+            optionGroupId: l.optionGroupId,
+            order: l.order,
+            pricingAxis: l.pricingAxis,
+            overrideName: l.overrideName,
+            overrideDescription: l.overrideDescription,
+            overrideIsRequired: l.overrideIsRequired,
+            overrideMinSelect: l.overrideMinSelect,
+            overrideMaxSelect: l.overrideMaxSelect,
+          })),
+        });
+      }
+
+      // Duplicate Combo Slots
+      if (source.comboSlots.length > 0) {
+        for (const slot of source.comboSlots) {
+          const newSlot = await tx.comboSlot.create({
+            data: {
+              tenantId,
+              comboProductId: duplicate.id,
+              name: slot.name,
+              description: slot.description,
+              isRequired: slot.isRequired,
+              minSelect: slot.minSelect,
+              maxSelect: slot.maxSelect,
+              order: slot.order,
+            },
+          });
+
+          if (slot.allowedItems.length > 0) {
+            await tx.comboSlotAllowedItem.createMany({
+              data: slot.allowedItems.map((ai) => ({
+                tenantId,
+                comboSlotId: newSlot.id,
+                productId: ai.productId,
+                additionalPrice: ai.additionalPrice,
+                order: ai.order,
+              })),
+            });
+          }
+        }
+      }
+
+      // Duplicate Combo Bundle Items
+      if (source.comboBundleItems.length > 0) {
+        await tx.comboBundleItem.createMany({
+          data: source.comboBundleItems.map((bi) => ({
+            tenantId,
+            comboProductId: duplicate.id, // The combo product
+            productId: bi.productId,
+            qty: bi.qty,
+            sortOrder: bi.sortOrder,
+          })),
+        });
+      }
+
+      // Create Draft Publication
+      await tx.catalogPublication.create({
+        data: {
+          tenantId,
+          productId: duplicate.id,
+          publicationStatus: 'draft',
+          operationalStatus: 'inactive',
+        },
+      });
+
+      return duplicate;
+    });
+  }
 }

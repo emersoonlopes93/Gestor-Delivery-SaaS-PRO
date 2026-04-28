@@ -4,6 +4,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 import { TenantAuthController } from './tenant-auth.controller';
 import { TenantAuthService } from './tenant-auth.service';
+import { DriverAuthController } from './driver-auth.controller';
+import { DriverAuthService } from './driver-auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
@@ -20,8 +22,8 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       inject: [ConfigService],
     }),
   ],
-  controllers: [TenantAuthController],
-  providers: [TenantAuthService, JwtStrategy],
-  exports: [JwtModule, TenantAuthService],
+  controllers: [TenantAuthController, DriverAuthController],
+  providers: [TenantAuthService, DriverAuthService, JwtStrategy],
+  exports: [JwtModule, TenantAuthService, DriverAuthService],
 })
 export class AuthModule {}
