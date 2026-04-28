@@ -13,6 +13,7 @@ import { DeliveryModule } from '../delivery/delivery.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { PaymentGatewayModule } from '../payment-gateway/payment-gateway.module';
 import { SchedulingModule } from '../scheduling/scheduling.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { SchedulingModule } from '../scheduling/scheduling.module';
     CatalogModule,
     PaymentGatewayModule,
     SchedulingModule,
+    NotificationsModule,
   ],
   controllers: [OrdersController, PublicOrdersController],
   providers: [OrdersService, CheckoutValidatorService],

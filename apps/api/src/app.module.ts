@@ -33,6 +33,7 @@ import { CustomerAuthModule } from './auth/customer-auth.module';
 import { PurchasingModule } from './purchasing/purchasing.module';
 import { FinanceModule } from './finance/finance.module';
 import { PlanGatingGuard } from './common/guards/plan-gating.guard';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -122,6 +123,9 @@ import { PlanGatingGuard } from './common/guards/plan-gating.guard';
 
     // Customer Auth (B2C)
     CustomerAuthModule,
+
+    // Notifications (WhatsApp + Push)
+    NotificationsModule,
   ],
   providers: [
     {

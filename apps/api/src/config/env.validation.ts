@@ -19,11 +19,17 @@ const envSchema = z.object({
   SWAGGER_ENABLED: z.enum(['true', 'false']).default('false'),
   SWAGGER_PATH: z.string().min(1).default('/docs'),
 
-  // WhatsApp Cloud API (Customer OTP)
+  // WhatsApp Cloud API (Customer OTP + Notifications)
   WHATSAPP_CLOUD_ACCESS_TOKEN: z.string().default(''),
   WHATSAPP_CLOUD_PHONE_NUMBER_ID: z.string().default(''),
   WHATSAPP_CLOUD_GRAPH_API_VERSION: z.string().default('v19.0'),
   WHATSAPP_OTP_MESSAGE_TEMPLATE: z.string().default('Seu código de acesso é: {{CODE}}'),
+  WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().default(''),
+
+  // Web Push (VAPID)
+  VAPID_PUBLIC_KEY: z.string().default(''),
+  VAPID_PRIVATE_KEY: z.string().default(''),
+  VAPID_SUBJECT: z.string().default('mailto:admin@gestordelivery.com.br'),
 });
 
 export type Env = z.infer<typeof envSchema>;

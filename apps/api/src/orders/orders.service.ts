@@ -12,6 +12,7 @@ import { CashbackService } from '../promotions/cashback.service';
 import { TheoreticalStockService } from '../inventory/theoretical-stock.service';
 import { PaymentGatewayService } from '../payment-gateway/payment-gateway.service';
 import { SchedulingService } from '../scheduling/scheduling.service';
+import { WhatsappService } from '../notifications/whatsapp.service';
 import type {
   CreateOrderDTO,
   OrderResponseDTO,
@@ -39,6 +40,7 @@ export class OrdersService {
     private readonly inventoryService: TheoreticalStockService,
     private readonly paymentGatewayService: PaymentGatewayService,
     private readonly schedulingService: SchedulingService,
+    private readonly whatsappService: WhatsappService,
   ) {}
 
   async createOrder(slug: string, dto: CreateOrderDTO): Promise<OrderResponseDTO> {
@@ -627,6 +629,14 @@ export class OrdersService {
           note: dto.note || `Status atualizado para ${nextStatus}`,
         },
       });
+
+      // Disparar notificação WhatsApp (fire-and-forget, não bloqueia a transação)
+      const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
+      if (order.customerPhone && tenant) {
+        this.whatsappService
+          .notifyOrderStatus(order.customerPhone, order.orderNumber, nextStatus, tenant.name)
+          .catch((err) => this.logger.warn(`WhatsApp notification failed: ${err.message}`));
+      }
 
       return updated;
     });

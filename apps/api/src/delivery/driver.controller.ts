@@ -57,7 +57,7 @@ export class DriverOperationsController {
 
     const updatedOrder = await this.prisma.order.update({
       where: { id: order.id },
-      data: { status: 'delivered' }
+      data: { status: 'completed' }
     });
 
     return updatedOrder;
