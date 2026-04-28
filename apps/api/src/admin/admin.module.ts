@@ -12,11 +12,21 @@ import { AdminHealthController } from './health/admin-health.controller';
 import { AdminHealthService } from './health/admin-health.service';
 import { AdminAuditLogsController } from './audit-logs/admin-audit-logs.controller';
 import { AdminAuditLogsService } from './audit-logs/admin-audit-logs.service';
+import { AdminBillingController } from './billing/admin-billing.controller';
 import { AuthModule } from '../auth/auth.module';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
-  imports: [AuthModule],
-  controllers: [AdminAuthController, AdminTenantsController, AdminModulesController, AdminGroupsController, AdminHealthController, AdminAuditLogsController],
+  imports: [AuthModule, BillingModule],
+  controllers: [
+    AdminAuthController, 
+    AdminTenantsController, 
+    AdminModulesController, 
+    AdminGroupsController, 
+    AdminHealthController, 
+    AdminAuditLogsController,
+    AdminBillingController
+  ],
   providers: [AdminAuthService, AdminRbacService, AdminTenantsService, AdminModulesService, AdminGroupsService, AdminHealthService, AdminAuditLogsService],
   exports: [AdminAuthService, AdminRbacService],
 })

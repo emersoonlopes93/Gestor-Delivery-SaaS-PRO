@@ -16,14 +16,14 @@ export class BillingService {
   // === PLANS ===
   async createPlan(dto: CreatePlanDto) {
     const tenantId = this.tenantContext.getTenantId();
-    const existing = await this.prisma.tenantClient.plan.findUnique({
+    const existing = await this.prisma.plan.findUnique({
       where: { slug: dto.slug },
     });
     if (existing) {
       throw new BadRequestException('Já existe um plano com este slug.');
     }
 
-    const plan = await this.prisma.tenantClient.plan.create({
+    const plan = await this.prisma.plan.create({
       data: {
         name: dto.name,
         slug: dto.slug,
@@ -34,28 +34,28 @@ export class BillingService {
       },
     });
 
-    this.logger.log(`Created plan ${plan.id} for tenant ${tenantId}`);
+    this.logger.log(`Created plan ${plan.id} ${tenantId ? `for tenant ${tenantId}` : '(global)'}`);
     return plan;
   }
 
-  async listPlans() {
-    const tenantId = this.tenantContext.getTenantId();
-    return this.prisma.tenantClient.plan.findMany({
-      where: { isActive: true },
+  async listPlans(includeInactive = false) {
+    const where = includeInactive ? {} : { isActive: true };
+    return this.prisma.plan.findMany({
+      where,
       orderBy: { price: 'asc' },
     });
   }
 
   async updatePlan(planId: string, dto: UpdatePlanDto) {
     const tenantId = this.tenantContext.getTenantId();
-    const plan = await this.prisma.tenantClient.plan.findUnique({
+    const plan = await this.prisma.plan.findUnique({
       where: { id: planId },
     });
     if (!plan) {
       throw new NotFoundException('Plano não encontrado.');
     }
 
-    const updated = await this.prisma.tenantClient.plan.update({
+    const updated = await this.prisma.plan.update({
       where: { id: planId },
       data: {
         ...(dto.name && { name: dto.name }),
@@ -66,13 +66,13 @@ export class BillingService {
       },
     });
 
-    this.logger.log(`Updated plan ${planId} for tenant ${tenantId}`);
+    this.logger.log(`Updated plan ${planId} ${tenantId ? `for tenant ${tenantId}` : '(global)'}`);
     return updated;
   }
 
   // === SUBSCRIPTIONS ===
   async createSubscription(dto: CreateSubscriptionDto) {
-    const plan = await this.prisma.tenantClient.plan.findUnique({
+    const plan = await this.prisma.plan.findUnique({
       where: { id: dto.planId },
     });
     if (!plan) {
@@ -82,7 +82,7 @@ export class BillingService {
     const trialEndsAt = new Date();
     trialEndsAt.setDate(trialEndsAt.getDate() + 7); // 7 days trial
 
-    const subscription = await this.prisma.tenantClient.tenantSubscription.upsert({
+    const subscription = await this.prisma.tenantSubscription.upsert({
       where: { tenantId: dto.tenantId },
       update: {
         planId: dto.planId,
@@ -126,7 +126,7 @@ export class BillingService {
 
     // If upgrading/downgrading plan, reset period
     if (dto.planId && dto.planId !== subscription.planId) {
-      const newPlan = await this.prisma.tenantClient.plan.findUnique({
+      const newPlan = await this.prisma.plan.findUnique({
         where: { id: dto.planId },
       });
       if (!newPlan) {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { api } from '../lib/api';
+import { api } from '../lib/api-client';
 
 /**
  * Hook para gerenciar permissões e registro de Web Push.
@@ -29,7 +29,7 @@ export function usePushNotifications() {
 
     try {
       // 1. Obter VAPID Public Key do backend
-      const { data } = await api.get('/notifications/push/vapid-key');
+      const { data } = await api.get<{ publicKey: string }>('/notifications/push/vapid-key');
       const publicKey = data.publicKey;
 
       if (!publicKey) {

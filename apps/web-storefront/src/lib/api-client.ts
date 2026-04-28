@@ -54,8 +54,22 @@ export class ApiError extends Error {
 }
 
 export const api = {
-  get: <T>(endpoint: string) => apiFetch<T>(endpoint),
-  // Post/Put/Patch - might be needed for Order creation in the future
+  get: <T>(endpoint: string, options: RequestInit & { params?: Record<string, any> } = {}) => {
+    let url = endpoint;
+    if (options.params) {
+      const searchParams = new URLSearchParams();
+      Object.entries(options.params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          searchParams.append(key, String(value));
+        }
+      });
+      const qs = searchParams.toString();
+      if (qs) {
+        url += (url.includes('?') ? '&' : '?') + qs;
+      }
+    }
+    return apiFetch<T>(url, options);
+  },
   post: <T>(endpoint: string, body?: unknown) =>
     apiFetch<T>(endpoint, {
       method: 'POST',

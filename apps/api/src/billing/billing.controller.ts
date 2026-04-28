@@ -13,7 +13,8 @@ export class BillingController {
   @Get('plans')
   @RequirePermissions('billing.read')
   async listPlans() {
-    return this.billingService.listPlans();
+    // Por padrão, para admin (ou quem tem acesso a billing.read), listamos tudo
+    return this.billingService.listPlans(true);
   }
 
   @Post('plans')
