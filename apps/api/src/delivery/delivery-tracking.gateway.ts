@@ -67,7 +67,6 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
   @SubscribeMessage('updateDriverLocation')
   async handleUpdateDriverLocation(
     @MessageBody() data: { driverId: string; tenantId: string; lat: number; lng: number },
-    @ConnectedSocket() client: Socket,
   ) {
     // Fire it to any tenant tracking UI open.
     this.server.to(`tenant:${data.tenantId}`).emit('driverLocationUpdated', {

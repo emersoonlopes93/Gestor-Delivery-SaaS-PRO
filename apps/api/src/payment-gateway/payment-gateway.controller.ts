@@ -64,7 +64,7 @@ export class PaymentGatewayController {
   @HttpCode(HttpStatus.OK)
   async handleMercadoPagoWebhook(
     @Body() payload: WebhookDto,
-    @Headers('x-signature') signature: string,
+    @Headers('x-signature') _signature: string,
   ) {
     // TODO: Implementar verificação de assinatura do webhook
     // Por enquanto, processamos diretamente

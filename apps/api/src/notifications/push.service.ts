@@ -63,8 +63,8 @@ export class PushService {
   async sendNotification(
     subscription: PushSubscriptionPayload,
     title: string,
-    body: string,
-    data?: Record<string, any>,
+    _body: string,
+    _data?: Record<string, any>,
   ): Promise<boolean> {
     if (!this.isConfigured) {
       this.logger.warn('VAPID keys not configured. Skipping push notification.');

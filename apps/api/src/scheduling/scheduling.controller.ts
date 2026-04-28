@@ -57,7 +57,7 @@ export class SchedulingController {
   @Post('time-slots')
   @RequirePermissions('scheduling.manage')
   @HttpCode(HttpStatus.CREATED)
-  async createTimeSlot(@Body() data: CreateTimeSlotDTO) {
+  async createTimeSlot(@Body() _data: CreateTimeSlotDTO) {
     // Implementar criação individual de time slot
     // Por enquanto, usar generateTimeSlots para criação em massa
     throw new Error('Use /time-slots/generate for bulk creation');
@@ -66,8 +66,8 @@ export class SchedulingController {
   @Put('time-slots/:id')
   @RequirePermissions('scheduling.manage')
   async updateTimeSlot(
-    @Param('id') id: string,
-    @Body() data: UpdateTimeSlotDTO,
+    @Param('id') _id: string,
+    @Body() _data: UpdateTimeSlotDTO,
   ) {
     // Implementar atualização de time slot
     throw new Error('Not implemented yet');
@@ -76,7 +76,7 @@ export class SchedulingController {
   @Delete('time-slots/:id')
   @RequirePermissions('scheduling.manage')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteTimeSlot(@Param('id') id: string) {
+  async deleteTimeSlot(@Param('id') _id: string) {
     // Implementar exclusão de time slot
     throw new Error('Not implemented yet');
   }
@@ -112,7 +112,7 @@ export class SchedulingController {
 
   @Get('scheduled-orders/:id')
   @RequirePermissions('scheduling.view')
-  async getScheduledOrder(@Param('id') id: string) {
+  async getScheduledOrder(@Param('id') _id: string) {
     // Implementar busca individual de scheduled order
     throw new Error('Not implemented yet');
   }
@@ -120,8 +120,8 @@ export class SchedulingController {
   @Put('scheduled-orders/:id')
   @RequirePermissions('scheduling.update')
   async updateScheduledOrder(
-    @Param('id') id: string,
-    @Body() data: UpdateScheduledOrderDTO,
+    @Param('id') _id: string,
+    @Body() _data: UpdateScheduledOrderDTO,
   ) {
     // Implementar atualização de scheduled order
     throw new Error('Not implemented yet');

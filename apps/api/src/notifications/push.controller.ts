@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Body, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body } from '@nestjs/common';
 import { PushService, PushSubscriptionPayload } from './push.service';
-import { Request } from 'express';
+
 
 /**
  * Controller público para gerenciar subscriptions de Web Push.

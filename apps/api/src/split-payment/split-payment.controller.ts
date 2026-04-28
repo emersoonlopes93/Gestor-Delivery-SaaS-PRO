@@ -20,7 +20,6 @@ import {
   AddPaymentToSplitDTO,
   UpdateOrderSplitDTO,
   CancelOrderSplitDTO,
-  ConfirmPaymentDTO,
   SplitByItemsDTO,
   SplitByPeopleDTO,
   CustomSplitDTO,
@@ -55,7 +54,7 @@ export class SplitPaymentController {
   @Post('splits/custom')
   @RequirePermissions('orders.create')
   @HttpCode(HttpStatus.CREATED)
-  async customSplit(@Body() data: CustomSplitDTO) {
+  async customSplit(@Body() _data: CustomSplitDTO) {
     // Implementar lógica de divisão customizada
     // Por enquanto, usar createOrderSplit manualmente
     throw new Error('Use /splits endpoint for manual creation');
@@ -90,8 +89,8 @@ export class SplitPaymentController {
   @Put('splits/:id')
   @RequirePermissions('orders.update')
   async updateOrderSplit(
-    @Param('id') id: string,
-    @Body() data: UpdateOrderSplitDTO,
+    @Param('id') _id: string,
+    @Body() _data: UpdateOrderSplitDTO,
   ) {
     // Implementar atualização de split
     throw new Error('Not implemented yet');

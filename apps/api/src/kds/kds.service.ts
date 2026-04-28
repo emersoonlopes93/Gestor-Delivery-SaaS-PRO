@@ -165,7 +165,7 @@ export class KdsService {
   /**
    * Marca um job de impressão como falhado
    */
-  async markAsFailed(printJobId: string, error?: string) {
+  async markAsFailed(printJobId: string) {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) {
       throw new Error('Tenant context not found');

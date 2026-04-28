@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
-import { BillingCycle, SubscriptionStatus, Prisma } from '@prisma/client';
+import { BillingCycle, SubscriptionStatus } from '@prisma/client';
 import type { CreatePlanDto, UpdatePlanDto, CreateSubscriptionDto, UpdateSubscriptionDto } from './dto/create-plan.dto';
 
 @Injectable()

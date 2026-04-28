@@ -23,7 +23,7 @@ export class PrinterService {
     const thinSeparator = '-'.repeat(width);
 
     // Filter items if station is provided (only for kitchen)
-    let itemsToPrint = order.items;
+    const itemsToPrint = order.items;
     if (type === 'kitchen' && station) {
       // Note: This assumes items have a 'categoryName' property or similar in OrderResponseDTO
       // If not available, we'll need to pass filtered items directly or enhance the DTO

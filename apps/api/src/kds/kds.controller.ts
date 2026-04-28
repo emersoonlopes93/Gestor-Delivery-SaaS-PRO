@@ -20,8 +20,6 @@ import {
   CreateIncrementalPrintJobDTO,
   CreateMultipleIncrementalPrintJobsDTO,
   UpdatePrintJobStatusDTO,
-  ReprintPrintJobDTO,
-  CancelPrintJobDTO,
   CleanupPrintJobsDTO,
   GetPrintJobsQueryDTO,
   PrintJobQueryDTO,
@@ -51,7 +49,7 @@ export class KdsController {
 
   @Get('print-jobs/:id')
   @RequirePermissions('orders.view')
-  async getPrintJob(@Param('id') id: string) {
+  async getPrintJob(@Param('id') _id: string) {
     // Implementar busca individual
     throw new Error('Not implemented yet');
   }
@@ -108,9 +106,9 @@ export class KdsController {
   @HttpCode(HttpStatus.OK)
   async markAsFailed(
     @Param('id') id: string,
-    @Body() data: UpdatePrintJobStatusDTO,
+    @Body() _data: UpdatePrintJobStatusDTO,
   ) {
-    return this.kdsService.markAsFailed(id, data.error);
+    return this.kdsService.markAsFailed(id);
   }
 
   @Post('print-jobs/:id/reprint')

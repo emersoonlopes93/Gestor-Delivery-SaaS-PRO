@@ -83,7 +83,7 @@ export class TenantUserService {
   }
 
   async update(tenantId: string, id: string, dto: UpdateTenantUserDto) {
-    const user = await this.findById(tenantId, id);
+    await this.findById(tenantId, id);
 
     const data: Prisma.TenantUserUpdateInput = {
       name: dto.name,
