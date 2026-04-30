@@ -989,8 +989,8 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   if (!productId && !isNew) {
     return (
       <div className="p-6 max-w-4xl mx-auto">
-        <div className="bg-white border border-gray-200 rounded-2xl p-6">
-          <div className="font-black text-gray-900">Produto inválido.</div>
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
+          <div className="font-black text-gray-900 dark:text-gray-100">Produto inválido.</div>
         </div>
       </div>
     );
@@ -1000,10 +1000,10 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     <div className="p-3 sm:p-6 max-w-7xl mx-auto text-left">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
         <div className="min-w-0">
-          <h1 className="text-2xl font-black text-gray-900 truncate">
+          <h1 className="text-2xl font-black text-gray-900 dark:text-gray-100 truncate">
             {isNew ? (isComboMode ? 'Novo Combo' : 'Novo Produto') : (isComboMode ? 'Editor de Combo' : 'Editor de Produto')}
           </h1>
-          <p className="text-gray-500 mt-1 truncate">
+          <p className="text-gray-500 dark:text-gray-400 mt-1 truncate">
             {isNew
               ? (isComboMode ? 'Crie a base do combo para iniciar a montagem' : 'Preencha as informações básicas para começar')
               : (product?.name ?? 'Carregando...')}
@@ -1013,18 +1013,18 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           <button
             type="button"
             onClick={() => navigate(isComboMode ? '/catalog/combos' : '/catalog/products')}
-            className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl border border-gray-200 bg-white"
+            className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
           >
             Voltar
           </button>
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-2xl p-2 shadow-sm mb-4 sm:mb-6 flex gap-2 overflow-x-auto">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-2 shadow-sm mb-4 sm:mb-6 flex gap-2 overflow-x-auto">
         <button
           type="button"
           onClick={() => setTab('geral')}
-          className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'geral' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50'}`}
+          className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'geral' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50'}`}
         >
           {(isComboWizard || isProductWizard) ? '1. Informações Gerais' : 'Informações Gerais'}
           <InfoTooltip text="Nome, categoria, preço base e descrição do item." />
@@ -1034,7 +1034,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             type="button"
             onClick={() => setTab('personalizacao')}
             disabled={isProductWizard && productWizardIndex < 1}
-            className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'personalizacao' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
+            className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'personalizacao' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 disabled:opacity-50'}`}
           >
             {isProductWizard ? '2. Complementos' : 'Complementos'}
             <InfoTooltip text="Adicione grupos de opções como adicionais, tamanhos ou ingredientes." />
@@ -1045,7 +1045,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             type="button"
             onClick={() => setTab('combo')}
             disabled={isComboWizard && comboWizardIndex < 1}
-            className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'combo' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
+            className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'combo' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 disabled:opacity-50'}`}
           >
             {isComboWizard ? '2. Itens do Combo' : 'Itens do Combo'}
             <InfoTooltip text="Defina os produtos que podem ser escolhidos neste combo." />
@@ -1055,7 +1055,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           type="button"
           onClick={() => setTab('vendas')}
           disabled={isNew}
-          className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'vendas' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
+          className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'vendas' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 disabled:opacity-50'}`}
         >
           {isComboWizard ? '3. Upsells' : 'Upsells / Ofertas'}
           <InfoTooltip text="Configurar sugestões de venda (compre também) para este produto." />
@@ -1064,7 +1064,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           type="button"
           onClick={() => setTab('publicacao')}
           disabled={(isComboWizard && comboWizardIndex < 2) || (isProductWizard && productWizardIndex < 2)}
-          className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'publicacao' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 hover:bg-gray-50 disabled:opacity-50'}`}
+          className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'publicacao' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 disabled:opacity-50'}`}
         >
           {isComboWizard ? '4. Disponibilidade' : (isProductWizard ? '3. Disponibilidade' : 'Disponibilidade')}
           <InfoTooltip text="Controle em quais horários e canais (Delivery, Balcão) este item está ativo." />
@@ -1145,19 +1145,19 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
 
           {tab === 'vendas' && (
             <div className="space-y-6">
-              <div className="bg-white border border-gray-200 rounded-2xl p-6">
+              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
                 <div className="flex items-center gap-2 mb-2">
                   <Sparkles className="h-5 w-5 text-primary-600" />
-                  <h3 className="text-lg font-black text-gray-900">Vincular Upsells</h3>
+                  <h3 className="text-lg font-black text-gray-900 dark:text-gray-100">Vincular Upsells</h3>
                 </div>
-                <p className="text-sm text-gray-500 mb-6 font-medium">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 font-medium">
                   Selecione quais ofertas de Upsell devem aparecer quando este produto for selecionado ou estiver no carrinho. 
                   Configure as ofertas na página de <span className="text-primary-600 font-bold underline cursor-pointer" onClick={() => navigate('/catalog/upsells')}>Upsells</span>.
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {allUpsells.length === 0 ? (
-                    <div className="col-span-full py-12 text-center text-gray-400 border-2 border-dashed border-gray-100 rounded-2xl flex flex-col items-center gap-2">
+                    <div className="col-span-full py-12 text-center text-gray-400 border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-2xl flex flex-col items-center gap-2">
                       <Sparkles className="h-8 w-8 text-gray-200" />
                       <span className="font-bold">Nenhuma oferta cadastrada.</span>
                     </div>
@@ -1171,14 +1171,14 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                           className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
                             isSelected 
                               ? 'border-primary-500 bg-primary-50 shadow-sm' 
-                              : 'border-gray-100 hover:border-gray-300 bg-white'
+                              : 'border-gray-100 dark:border-gray-800 hover:border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900'
                           }`}
                         >
                           <div className="flex items-center justify-between mb-2">
                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
                                u.pricingType === 'fixed_price' ? 'bg-orange-100 text-orange-700' :
                                u.pricingType.startsWith('discount') ? 'bg-green-100 text-green-700' :
-                               'bg-gray-100 text-gray-700'
+                               'bg-gray-100 text-gray-700 dark:text-gray-300'
                              }`}>
                                {u.pricingType === 'normal' ? 'Preço Normal' : 
                                 u.pricingType === 'fixed_price' ? 'Fixo' :
@@ -1189,7 +1189,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                                <Plus className="h-3 w-3 text-white rotate-45" />
                              </div>}
                           </div>
-                          <div className="font-bold text-gray-900">{u.name}</div>
+                          <div className="font-bold text-gray-900 dark:text-gray-100">{u.name}</div>
                           <div className="text-xs text-gray-400 mt-1 line-clamp-1">{u.description}</div>
                         </div>
                       );
@@ -1229,7 +1229,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <button
               type="button"
               onClick={() => setIsAddGroupModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg"
+              className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
             >
               Cancelar
             </button>
@@ -1248,11 +1248,11 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
         <div className="space-y-3">
           {availableGroupsToAdd.length > 0 ? (
             <>
-              <div className="text-sm text-gray-600 font-bold">Selecione um complemento</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 font-bold">Selecione um complemento</div>
               <select
                 value={selectedGroupIdToAdd}
                 onChange={(e) => setSelectedGroupIdToAdd(e.target.value)}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
               >
                 {availableGroupsToAdd.map((g) => (
                   <option key={g.id} value={g.id}>
@@ -1278,7 +1278,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <button
               type="button"
               onClick={() => setIsCreateComplementModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg"
+              className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
             >
               Cancelar
             </button>
@@ -1300,7 +1300,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <input
               value={newComplementForm.name}
               onChange={(e) => setNewComplementForm((p) => ({ ...p, name: e.target.value }))}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
               placeholder="Ex: Molhos e adicionais"
             />
           </div>
@@ -1309,7 +1309,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <select
               value={newComplementForm.selectionType}
               onChange={(e) => setNewComplementForm((p) => ({ ...p, selectionType: e.target.value as 'single' | 'multiple' | 'quantity' }))}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
             >
               <option value="single">Escolha única</option>
               <option value="multiple">Múltipla escolha</option>
@@ -1323,7 +1323,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                 type="number"
                 value={newComplementForm.minSelect}
                 onChange={(e) => setNewComplementForm((p) => ({ ...p, minSelect: Number(e.target.value || 0) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
               />
             </div>
             <div>
@@ -1332,7 +1332,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                 type="number"
                 value={newComplementForm.maxSelect}
                 onChange={(e) => setNewComplementForm((p) => ({ ...p, maxSelect: Number(e.target.value || 1) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
               />
             </div>
           </div>
@@ -1343,7 +1343,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               onChange={(e) => setNewComplementForm((p) => ({ ...p, isRequired: e.target.checked }))}
               className="w-4 h-4 text-primary-600"
             />
-            <span className="text-sm font-bold text-gray-700">Obrigatório</span>
+            <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Obrigatório</span>
           </label>
         </div>
       </Modal>
@@ -1357,7 +1357,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <button
               type="button"
               onClick={() => setIsBundleItemModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg"
+              className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
             >
               Cancelar
             </button>
@@ -1379,7 +1379,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <select
               value={bundleItemForm.productId}
               onChange={(e) => setBundleItemForm((p) => ({ ...p, productId: e.target.value }))}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
             >
               {selectableBundleProducts.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -1399,7 +1399,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                 min={1}
                 value={Number(bundleItemForm.qty ?? 1)}
                 onChange={(e) => setBundleItemForm((p) => ({ ...p, qty: Math.max(1, Number(e.target.value || 1)) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
               />
             </div>
             <div>
@@ -1409,7 +1409,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                 min={0}
                 value={Number(bundleItemForm.sortOrder ?? 0)}
                 onChange={(e) => setBundleItemForm((p) => ({ ...p, sortOrder: Math.max(0, Number(e.target.value || 0)) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
               />
             </div>
           </div>
@@ -1425,7 +1425,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <button
               type="button"
               onClick={() => setIsEditLinkModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg"
+              className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
             >
               Cancelar
             </button>
@@ -1447,7 +1447,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <select
               value={(linkForm.pricingAxis as any) ?? 'secondary'}
               onChange={(e) => setLinkForm((p) => ({ ...p, pricingAxis: e.target.value as any }))}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
             >
               <option value="secondary">secondary</option>
               <option value="primary">primary</option>
@@ -1461,11 +1461,11 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               onChange={(e) => setLinkForm((p) => ({ ...p, overrideIsRequired: e.target.checked }))}
               className="w-4 h-4 text-primary-600"
             />
-            <span className="text-sm font-bold text-gray-700">Override required</span>
+            <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Override required</span>
             <button
               type="button"
               onClick={() => setLinkForm((p) => ({ ...p, overrideIsRequired: undefined }))}
-              className="ml-auto text-xs font-black text-gray-500 hover:text-gray-800"
+              className="ml-auto text-xs font-black text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:text-gray-200"
             >
               limpar
             </button>
@@ -1478,7 +1478,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                 type="number"
                 value={linkForm.overrideMinSelect ?? ''}
                 onChange={(e) => setLinkForm((p) => ({ ...p, overrideMinSelect: e.target.value === '' ? undefined : Number(e.target.value) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
               />
             </div>
             <div>
@@ -1487,7 +1487,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                 type="number"
                 value={linkForm.overrideMaxSelect ?? ''}
                 onChange={(e) => setLinkForm((p) => ({ ...p, overrideMaxSelect: e.target.value === '' ? undefined : Number(e.target.value) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
               />
             </div>
           </div>
@@ -1504,7 +1504,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <button
               type="button"
               onClick={() => setIsSlotModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg"
+              className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
             >
               Cancelar
             </button>
@@ -1526,7 +1526,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <input
               value={slotForm.name}
               onChange={(e) => setSlotForm((p) => ({ ...p, name: e.target.value }))}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
             />
           </div>
           <div>
@@ -1534,7 +1534,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <input
               value={slotForm.description ?? ''}
               onChange={(e) => setSlotForm((p) => ({ ...p, description: e.target.value }))}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -1544,7 +1544,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               onChange={(e) => setSlotForm((p) => ({ ...p, isRequired: e.target.checked }))}
               className="w-4 h-4 text-primary-600"
             />
-            <span className="text-sm font-bold text-gray-700">Obrigatório</span>
+            <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Obrigatório</span>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -1553,7 +1553,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                 type="number"
                 value={Number(slotForm.minSelect ?? 1)}
                 onChange={(e) => setSlotForm((p) => ({ ...p, minSelect: Number(e.target.value || 1) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
               />
             </div>
             <div>
@@ -1562,7 +1562,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                 type="number"
                 value={Number(slotForm.maxSelect ?? 1)}
                 onChange={(e) => setSlotForm((p) => ({ ...p, maxSelect: Number(e.target.value || 1) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
               />
             </div>
           </div>
@@ -1578,7 +1578,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <button
               type="button"
               onClick={() => setIsAllowedModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg"
+              className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
             >
               Cancelar
             </button>
@@ -1600,7 +1600,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <select
               value={allowedForm.productId}
               onChange={(e) => setAllowedForm((p) => ({ ...p, productId: e.target.value }))}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
             >
               {allowedProducts.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -1616,7 +1616,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               step="0.01"
               value={Number(allowedForm.additionalPrice ?? 0)}
               onChange={(e) => setAllowedForm((p) => ({ ...p, additionalPrice: Number(e.target.value || 0) }))}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
             />
           </div>
         </div>
@@ -1632,7 +1632,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <button
               type="button"
               onClick={() => setIsRuleModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg"
+              className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
             >
               Cancelar
             </button>
@@ -1655,7 +1655,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               <select
                 value={ruleForm.channel}
                 onChange={(e) => setRuleForm((p) => ({ ...p, channel: e.target.value as any }))}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
               >
                 <option value="storefront_delivery">Delivery</option>
                 <option value="storefront_pickup">Retirada</option>
@@ -1666,7 +1666,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                 {(Object.entries(CHANNEL_LABELS) as Array<[string, string]>).map(([value, label]) => {
                   const checked = ruleChannels.includes(value as 'storefront_delivery' | 'storefront_pickup' | 'pos');
                   return (
-                    <label key={value} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 cursor-pointer">
+                    <label key={value} className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 px-3 py-2 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={checked}
@@ -1678,7 +1678,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                         }}
                         className="w-4 h-4 text-primary-600"
                       />
-                      <span className="text-xs font-bold text-gray-700">{label}</span>
+                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300">{label}</span>
                     </label>
                   );
                 })}
@@ -1692,7 +1692,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               {DAY_OPTIONS.map((day) => {
                 const isChecked = (ruleForm.daysOfWeek ?? []).includes(day.value);
                 return (
-                  <label key={day.value} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 cursor-pointer">
+                  <label key={day.value} className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 px-3 py-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={isChecked}
@@ -1707,7 +1707,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                       }}
                       className="w-4 h-4 text-primary-600"
                     />
-                    <span className="text-xs font-bold text-gray-700">{day.label}</span>
+                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300">{day.label}</span>
                   </label>
                 );
               })}
@@ -1720,7 +1720,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               <input
                 value={ruleForm.startTime}
                 onChange={(e) => setRuleForm((p) => ({ ...p, startTime: e.target.value }))}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
                 placeholder="HH:MM"
               />
             </div>
@@ -1729,7 +1729,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               <input
                 value={ruleForm.endTime}
                 onChange={(e) => setRuleForm((p) => ({ ...p, endTime: e.target.value }))}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
                 placeholder="HH:MM"
               />
             </div>
@@ -1742,7 +1742,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               onChange={(e) => setRuleForm((p) => ({ ...p, isActive: e.target.checked }))}
               className="w-4 h-4 text-primary-600"
             />
-            <span className="text-sm font-bold text-gray-700">Ativa</span>
+            <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Ativa</span>
           </div>
         </div>
       </Modal>
@@ -1756,7 +1756,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <>
               <button
                 onClick={() => setConfirmModal(null)}
-                className="px-4 py-2 text-gray-500 hover:text-gray-700 font-bold"
+                className="px-4 py-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300 font-bold"
               >
                 Cancelar
               </button>
@@ -1769,7 +1769,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             </>
           }
         >
-          <p className="text-gray-600">{confirmModal.message}</p>
+          <p className="text-gray-600 dark:text-gray-400">{confirmModal.message}</p>
         </Modal>
       )}
 
@@ -1787,7 +1787,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             </button>
           }
         >
-          <p className="text-gray-600">{alertModal.message}</p>
+          <p className="text-gray-600 dark:text-gray-400">{alertModal.message}</p>
         </Modal>
       )}
     </div>

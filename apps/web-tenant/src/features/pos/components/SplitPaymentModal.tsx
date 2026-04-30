@@ -152,7 +152,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
         </div>
         <div>
           <h4 className="font-black text-white uppercase tracking-tight">Dividir por Pessoas</h4>
-          <p className="text-xs text-gray-500 mt-1">Divide o total igualmente entre X pessoas</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Divide o total igualmente entre X pessoas</p>
         </div>
       </button>
 
@@ -165,7 +165,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
         </div>
         <div>
           <h4 className="font-black text-white uppercase tracking-tight">Dividir por Itens</h4>
-          <p className="text-xs text-gray-500 mt-1">Selecione itens específicos para pagar agora</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Selecione itens específicos para pagar agora</p>
         </div>
       </button>
 
@@ -197,7 +197,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
   const renderPeopleSelector = () => (
     <div className="space-y-6 py-4">
       <div className="text-center">
-        <p className="text-gray-500 text-[10px] uppercase font-black tracking-widest mb-4">Quantas pessoas na mesa?</p>
+        <p className="text-gray-500 dark:text-gray-400 text-[10px] uppercase font-black tracking-widest mb-4">Quantas pessoas na mesa?</p>
         <div className="flex items-center justify-center gap-8">
           <button 
             onClick={() => setNumberOfPeople(Math.max(2, numberOfPeople - 1))}
@@ -214,7 +214,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
           </button>
         </div>
         <div className="mt-6 p-4 bg-gray-950/30 rounded-2xl border border-gray-800">
-           <p className="text-[10px] text-gray-500 uppercase font-black mb-1">Valor por pessoa</p>
+           <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-black mb-1">Valor por pessoa</p>
            <p className="text-2xl font-black text-white">{(orderTotal / numberOfPeople).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
         </div>
       </div>
@@ -237,19 +237,19 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
           <div key={item.id} className="flex items-center justify-between p-3 bg-gray-800/50 border border-gray-800 rounded-xl">
              <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-white truncate">{item.snapshotName}</p>
-                <p className="text-[10px] text-gray-500">Saldo: {item.quantity} un x {item.unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400">Saldo: {item.quantity} un x {item.unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
              </div>
              <div className="flex items-center gap-3 ml-4">
                 <button 
                   onClick={() => setItemSelections(prev => ({ ...prev, [item.id]: Math.max(0, (prev[item.id] || 0) - 1) }))}
-                  className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center text-gray-500 hover:text-white"
+                  className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-white"
                 >
                   <Minus size={14} />
                 </button>
                 <span className="w-4 text-center text-xs font-black text-emerald-400">{itemSelections[item.id] || 0}</span>
                 <button 
                   onClick={() => setItemSelections(prev => ({ ...prev, [item.id]: Math.min(item.quantity, (prev[item.id] || 0) + 1) }))}
-                  className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center text-gray-500 hover:text-white"
+                  className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-white"
                 >
                   <Plus size={14} />
                 </button>
@@ -259,7 +259,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
       </div>
 
       <div className="p-4 bg-blue-500/5 rounded-2xl border border-blue-500/10">
-         <p className="text-[10px] text-gray-500 uppercase font-black mb-1">Total Selecionado</p>
+         <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-black mb-1">Total Selecionado</p>
          <p className="text-xl font-black text-blue-400 leading-none">
            {Object.entries(itemSelections).reduce((sum, [id, qty]) => {
               const item = items.find(it => it.id === id);
@@ -341,7 +341,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
       
       <button 
         onClick={() => setMode('menu')}
-        className="w-full py-4 border-2 border-dashed border-gray-800 rounded-3xl text-gray-600 hover:text-white hover:border-gray-600 transition-all text-xs font-black uppercase"
+        className="w-full py-4 border-2 border-dashed border-gray-800 rounded-3xl text-gray-600 dark:text-gray-400 hover:text-white hover:border-gray-600 transition-all text-xs font-black uppercase"
       >
         + Nova Divisão
       </button>
@@ -356,12 +356,12 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
             <h3 className="text-xl font-black text-white tracking-tight uppercase italic flex items-center gap-2">
               {mode === 'menu' ? 'Dividir Conta' : mode === 'people' ? 'Divisão por Pessoas' : 'Divisão por Itens'}
             </h3>
-            <p className="text-[10px] text-gray-500 uppercase font-black tracking-widest mt-1">
+            <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-black tracking-widest mt-1">
               Pedido ID: #{orderId.substring(0, 8)} 
               {isLoadingSplits && ' • CARREGANDO...'}
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-white transition-all"><X size={24} /></button>
+          <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-white transition-all"><X size={24} /></button>
         </div>
 
         <div className="p-8">
@@ -381,7 +381,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
            <div className="px-8 py-4 bg-gray-950/50 border-t border-gray-800">
               <button 
                 onClick={() => setMode('menu')}
-                className="text-[10px] text-gray-500 font-black uppercase hover:text-white transition-colors"
+                className="text-[10px] text-gray-500 dark:text-gray-400 font-black uppercase hover:text-white transition-colors"
               >
                 ← Voltar para opções
               </button>

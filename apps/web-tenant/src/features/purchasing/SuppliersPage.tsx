@@ -53,11 +53,11 @@ export function SuppliersPage() {
     <div className="p-6 max-w-7xl mx-auto text-left">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight flex items-center gap-3">
             <Truck className="h-8 w-8 text-primary-600" />
             Fornecedores
           </h1>
-          <p className="text-gray-500 mt-1">Gerencie sua rede de parceiros e fornecedores de insumos.</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Gerencie sua rede de parceiros e fornecedores de insumos.</p>
         </div>
         <button
           onClick={() => {
@@ -71,8 +71,8 @@ export function SuppliersPage() {
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 bg-gray-50/50">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+        <div className="p-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50/50">
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
@@ -80,7 +80,7 @@ export function SuppliersPage() {
               placeholder="Buscar por nome ou CNPJ..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all"
+              className="w-full pl-10 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-sm focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all"
             />
           </div>
         </div>
@@ -93,33 +93,33 @@ export function SuppliersPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-50/50">
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Fornecedor</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">CNPJ/Doc</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Contato</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Ações</th>
+                <tr className="bg-gray-50 dark:bg-gray-900/50/50">
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Fornecedor</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">CNPJ/Doc</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Contato</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {filteredSuppliers.map((supplier) => (
-                  <tr key={supplier.id} className="group hover:bg-gray-50/80 transition-colors">
+                  <tr key={supplier.id} className="group hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50/80 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="font-semibold text-gray-900">{supplier.name}</div>
+                      <div className="font-semibold text-gray-900 dark:text-gray-100">{supplier.name}</div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 font-mono">
+                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 font-mono">
                       {supplier.cnpj || '---'}
                     </td>
                     <td className="px-6 py-4">
                       <div className="space-y-1">
                         {supplier.email && (
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                             <Mail className="h-3 w-3" />
                             {supplier.email}
                           </div>
                         )}
                         {supplier.phone && (
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                             <Phone className="h-3 w-3" />
                             {supplier.phone}
                           </div>
@@ -144,7 +144,7 @@ export function SuppliersPage() {
                         >
                           Editar
                         </button>
-                        <button className="text-gray-400 hover:text-gray-600 transition-colors">
+                        <button className="text-gray-400 hover:text-gray-600 dark:text-gray-400 transition-colors">
                           <FileText className="h-4 w-4" />
                         </button>
                       </div>

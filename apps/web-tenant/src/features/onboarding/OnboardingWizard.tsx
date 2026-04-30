@@ -91,8 +91,8 @@ export function OnboardingWizard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-3xl bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100 flex flex-col">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900/50 flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-3xl bg-white dark:bg-gray-900 rounded-3xl shadow-xl overflow-hidden border border-gray-100 dark:border-gray-800 flex flex-col">
         {/* Header */}
         <div className="bg-primary-600 px-8 py-10 text-white min-h-[160px] flex flex-col justify-center">
           <h1 className="text-3xl font-black mb-2 tracking-tight">Bem-vindo ao Gestor Delivery PRO</h1>
@@ -100,7 +100,7 @@ export function OnboardingWizard() {
         </div>
 
         {/* Steps */}
-        <div className="flex border-b border-gray-100 bg-gray-50 py-3 px-8">
+        <div className="flex border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 py-3 px-8">
           <div className={`flex items-center gap-2 ${step >= 1 ? 'text-primary-600' : 'text-gray-400'}`}>
             <Building className="w-4 h-4" />
             <span className="text-sm font-bold uppercase tracking-wider">Restaurante</span>
@@ -121,12 +121,12 @@ export function OnboardingWizard() {
         <div className="p-8 flex-1">
           {step === 1 && (
             <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Confirme os dados da sua loja</h2>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-6">Confirme os dados da sua loja</h2>
               <div className="space-y-4 max-w-md">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-600 mb-1">Nome do Restaurante</label>
+                  <label className="block text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1">Nome do Restaurante</label>
                   <input type="text" value={tenantName} onChange={e => setTenantName(e.target.value)}
-                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
+                    className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
                 </div>
                 <button onClick={handleNextSetup} disabled={!tenantName}
                   className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-xl transition-all shadow-md active:scale-95">
@@ -138,13 +138,13 @@ export function OnboardingWizard() {
 
           {step === 2 && (
             <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Escolha seu Plano</h2>
-              <p className="text-gray-500 mb-8 max-w-lg">Todos os planos incluem 7 dias grátis para testes. O faturamento começará automaticamente após este período caso não seja cancelado.</p>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">Escolha seu Plano</h2>
+              <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-lg">Todos os planos incluem 7 dias grátis para testes. O faturamento começará automaticamente após este período caso não seja cancelado.</p>
               
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 {plans.length === 0 && !loading && (
-                  <div className="col-span-full py-12 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                    <p className="text-gray-500 font-medium">Nenhum plano disponível no momento.</p>
+                  <div className="col-span-full py-12 text-center bg-gray-50 dark:bg-gray-900/50 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-800">
+                    <p className="text-gray-500 dark:text-gray-400 font-medium">Nenhum plano disponível no momento.</p>
                   </div>
                 )}
                 {loading && plans.length === 0 && (
@@ -157,14 +157,14 @@ export function OnboardingWizard() {
                     className={`border-2 rounded-2xl p-6 cursor-pointer transition-all ${
                       selectedPlan === plan.id 
                         ? 'border-primary-500 bg-primary-50 shadow-md ring-4 ring-primary-50' 
-                        : 'border-gray-200 hover:border-primary-300'
+                        : 'border-gray-200 dark:border-gray-800 hover:border-primary-300'
                     }`}>
-                    <h3 className="font-bold text-lg text-gray-900 mb-1">{plan.name}</h3>
+                    <h3 className="font-bold text-lg text-gray-900 dark:text-gray-100 mb-1">{plan.name}</h3>
                     <div className="flex items-baseline gap-1 mb-4">
                       <span className="text-2xl font-black">{plan.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                      <span className="text-xs text-gray-500 font-medium">/{plan.billingCycle === 'monthly' ? 'mês' : 'ano'}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">/{plan.billingCycle === 'monthly' ? 'mês' : 'ano'}</span>
                     </div>
-                    <ul className="text-sm text-gray-600 space-y-2 mb-6">
+                    <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-2 mb-6">
                       <li className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-green-500" /> Cardápio Ilimitado</li>
                       <li className="flex gap-2 items-center"><CheckCircle2 className="w-4 h-4 text-green-500" /> POS Integrado</li>
                       {plan.price > 100 && (
@@ -172,7 +172,7 @@ export function OnboardingWizard() {
                       )}
                     </ul>
                     <div className={`w-full text-center py-2 rounded-lg font-bold text-sm ${
-                      selectedPlan === plan.id ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700'
+                      selectedPlan === plan.id ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 dark:text-gray-300'
                     }`}>
                       {selectedPlan === plan.id ? 'Selecionado' : 'Selecionar'}
                     </div>
@@ -182,7 +182,7 @@ export function OnboardingWizard() {
 
               <div className="flex gap-4">
                 <button onClick={() => setStep(1)} disabled={loading}
-                  className="px-6 py-3 rounded-xl font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                  className="px-6 py-3 rounded-xl font-bold bg-gray-100 text-gray-700 dark:text-gray-300 hover:bg-gray-200 transition-colors">
                   Voltar
                 </button>
                 <button onClick={handleSubscribe} disabled={!selectedPlan || loading}
@@ -199,8 +199,8 @@ export function OnboardingWizard() {
               <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
                 <CheckCircle2 className="w-10 h-10" />
               </div>
-              <h2 className="text-2xl font-black text-gray-900 mb-3">Tudo Certo!</h2>
-              <p className="text-gray-500 mb-8">Sua loja já foi pré-configurada em nosso sistema e seu trial de 7 dias grátis começou.</p>
+              <h2 className="text-2xl font-black text-gray-900 dark:text-gray-100 mb-3">Tudo Certo!</h2>
+              <p className="text-gray-500 dark:text-gray-400 mb-8">Sua loja já foi pré-configurada em nosso sistema e seu trial de 7 dias grátis começou.</p>
               
               <button onClick={handleComplete} disabled={loading}
                 className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-4 rounded-2xl transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2 text-lg uppercase tracking-wider">

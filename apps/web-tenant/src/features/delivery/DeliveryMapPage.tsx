@@ -207,8 +207,8 @@ const DriverMarkersLayer = memo(function DriverMarkersLayer(props: {
           <Popup>
             <div className="text-sm">
               <div className="font-semibold">{d.name}</div>
-              <div className="text-gray-600">Status: {d.status === DriverStatus.available ? 'Disponível' : d.status === DriverStatus.busy ? 'Em rota' : 'Offline'}</div>
-              <div className="text-gray-600">Último update: {fmtRelativeTime(d.lastLocationAt)}</div>
+              <div className="text-gray-600 dark:text-gray-400">Status: {d.status === DriverStatus.available ? 'Disponível' : d.status === DriverStatus.busy ? 'Em rota' : 'Offline'}</div>
+              <div className="text-gray-600 dark:text-gray-400">Último update: {fmtRelativeTime(d.lastLocationAt)}</div>
               {selected?.kind === 'driver' && selected.id === d.id ? (
                 <div className="mt-2 text-[11px] text-primary-700 font-semibold">Selecionado</div>
               ) : null}
@@ -242,9 +242,9 @@ const OrderMarkersLayer = memo(function OrderMarkersLayer(props: {
           <Popup>
             <div className="text-sm">
               <div className="font-semibold">Pedido {o.orderNumber}</div>
-              <div className="text-gray-600">Status: {o.status.replace(/_/g, ' ')}</div>
+              <div className="text-gray-600 dark:text-gray-400">Status: {o.status.replace(/_/g, ' ')}</div>
               <div>Cliente: {o.customerName}</div>
-              <div className="text-gray-600">Entregador: {o.deliveryDriverName ?? '—'}</div>
+              <div className="text-gray-600 dark:text-gray-400">Entregador: {o.deliveryDriverName ?? '—'}</div>
               {selected?.kind === 'order' && selected.id === o.id ? (
                 <div className="mt-2 text-[11px] text-primary-700 font-semibold">Selecionado</div>
               ) : null}
@@ -338,15 +338,15 @@ export function DeliveryMapPage() {
       <div className="p-6 max-w-7xl mx-auto">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Operação — Mapa em tempo real</h1>
-            <p className="text-sm text-gray-500">Drivers e pedidos em rota. Polling a cada 5s.</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Operação — Mapa em tempo real</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Drivers e pedidos em rota. Polling a cada 5s.</p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleFit}
-              className="h-10 px-3 rounded-lg bg-white border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              className="h-10 px-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50"
             >
               Ajustar mapa
             </button>
@@ -360,11 +360,11 @@ export function DeliveryMapPage() {
           </div>
         </div>
 
-        {isLoading ? <div className="text-sm text-gray-500">Carregando dados do mapa...</div> : null}
+        {isLoading ? <div className="text-sm text-gray-500 dark:text-gray-400">Carregando dados do mapa...</div> : null}
         {isError ? <div className="text-sm text-red-600">Erro ao carregar dados do mapa.</div> : null}
 
         {driverMarkers.length === 0 && outForDeliveryOrders.length === 0 && !isLoading ? (
-          <div className="text-sm text-gray-500 mb-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             Nenhum driver com localização disponível e nenhum pedido em rota.
           </div>
         ) : null}
@@ -376,16 +376,16 @@ export function DeliveryMapPage() {
               'lg:static fixed left-0 right-0 bottom-0 lg:bottom-auto lg:right-auto lg:left-auto z-40'
             }
           >
-            <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
                 <div>
-                  <div className="font-bold text-gray-900">Painel operacional</div>
-                  <div className="text-xs text-gray-500">Clique para focar no mapa</div>
+                  <div className="font-bold text-gray-900 dark:text-gray-100">Painel operacional</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Clique para focar no mapa</div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsPanelOpen(false)}
-                  className="lg:hidden text-xs font-semibold text-gray-600"
+                  className="lg:hidden text-xs font-semibold text-gray-600 dark:text-gray-400"
                 >
                   Fechar
                 </button>
@@ -394,8 +394,8 @@ export function DeliveryMapPage() {
               <div className="p-4 space-y-4 max-h-[60vh] lg:max-h-[650px] overflow-auto">
                 <section>
                   <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-xs font-black text-gray-500 uppercase tracking-widest">Drivers</h2>
-                    <div className="text-xs text-gray-500">{driverMarkers.length}</div>
+                    <h2 className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Drivers</h2>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">{driverMarkers.length}</div>
                   </div>
                   <div className="space-y-2">
                     {driverMarkers.map((d) => (
@@ -407,11 +407,11 @@ export function DeliveryMapPage() {
                           'w-full text-left rounded-lg border px-3 py-2 transition-colors ' +
                           (selected?.kind === 'driver' && selected.id === d.id
                             ? 'border-primary-300 bg-primary-50'
-                            : 'border-gray-100 hover:bg-gray-50')
+                            : 'border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50')
                         }
                       >
                         <div className="flex items-center justify-between">
-                          <div className="font-semibold text-sm text-gray-900 truncate">{d.name}</div>
+                          <div className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">{d.name}</div>
                           <span
                             className="inline-flex items-center gap-1 text-[11px] font-bold"
                             style={{ color: driverColor(d.status) }}
@@ -423,7 +423,7 @@ export function DeliveryMapPage() {
                             {d.status === DriverStatus.available ? 'Disponível' : d.status === DriverStatus.busy ? 'Em rota' : 'Offline'}
                           </span>
                         </div>
-                        <div className="text-xs text-gray-500">Último update: {fmtRelativeTime(d.lastLocationAt)}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Último update: {fmtRelativeTime(d.lastLocationAt)}</div>
                       </button>
                     ))}
                     {driverMarkers.length === 0 ? (
@@ -434,8 +434,8 @@ export function DeliveryMapPage() {
 
                 <section>
                   <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-xs font-black text-gray-500 uppercase tracking-widest">Pedidos em rota</h2>
-                    <div className="text-xs text-gray-500">{outForDeliveryOrders.length}</div>
+                    <h2 className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Pedidos em rota</h2>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">{outForDeliveryOrders.length}</div>
                   </div>
                   <div className="space-y-2">
                     {outForDeliveryOrders.map((o) => (
@@ -447,15 +447,15 @@ export function DeliveryMapPage() {
                           'w-full text-left rounded-lg border px-3 py-2 transition-colors ' +
                           (selected?.kind === 'order' && selected.id === o.id
                             ? 'border-primary-300 bg-primary-50'
-                            : 'border-gray-100 hover:bg-gray-50')
+                            : 'border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50')
                         }
                       >
                         <div className="flex items-center justify-between">
-                          <div className="font-semibold text-sm text-gray-900">{o.orderNumber}</div>
+                          <div className="font-semibold text-sm text-gray-900 dark:text-gray-100">{o.orderNumber}</div>
                           <div className="text-[11px] font-black text-orange-600">EM ROTA</div>
                         </div>
-                        <div className="text-xs text-gray-600 truncate">Cliente: {o.customerName}</div>
-                        <div className="text-xs text-gray-500 truncate">Driver: {o.deliveryDriverName ?? '—'}</div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400 truncate">Cliente: {o.customerName}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">Driver: {o.deliveryDriverName ?? '—'}</div>
                       </button>
                     ))}
                     {outForDeliveryOrders.length === 0 ? (
@@ -467,7 +467,7 @@ export function DeliveryMapPage() {
             </div>
           </div>
 
-          <div className="min-h-[520px] bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+          <div className="min-h-[520px] bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm">
             <MapContainer
               center={selectedPosition ?? defaultCenter}
               zoom={13}
@@ -511,7 +511,7 @@ export function DeliveryMapPage() {
           </div>
         </div>
 
-        <div className="mt-3 text-xs text-gray-500">
+        <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
           Drivers no mapa: {driverMarkers.length} | Pedidos em rota: {outForDeliveryOrders.length}
         </div>
       </div>

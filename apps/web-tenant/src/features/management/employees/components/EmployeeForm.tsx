@@ -65,7 +65,7 @@ export function EmployeeForm({ employee, roles, onSave, onCancel }: EmployeeForm
           type="text"
           value={formData.name}
           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none"
+          className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none"
           placeholder="Ex: João da Silva"
           required
         />
@@ -79,7 +79,7 @@ export function EmployeeForm({ employee, roles, onSave, onCancel }: EmployeeForm
           type="email"
           value={formData.email}
           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none"
+          className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none"
           placeholder="exemplo@empresa.com"
           required
         />
@@ -93,7 +93,7 @@ export function EmployeeForm({ employee, roles, onSave, onCancel }: EmployeeForm
           type="password"
           value={formData.password}
           onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-          className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none"
+          className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none"
           placeholder="••••••••"
           required={!employee}
           minLength={6}
@@ -111,7 +111,7 @@ export function EmployeeForm({ employee, roles, onSave, onCancel }: EmployeeForm
               className={`flex items-center gap-2 p-3 rounded-xl border transition-all cursor-pointer ${
                 formData.roles.includes(role.slug)
                   ? 'bg-primary-50 border-primary-200 text-primary-700'
-                  : 'bg-white border-gray-100 text-gray-600 hover:bg-gray-50'
+                  : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50'
               }`}
             >
               <input
@@ -135,18 +135,18 @@ export function EmployeeForm({ employee, roles, onSave, onCancel }: EmployeeForm
           id="isActive"
           checked={formData.isActive}
           onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-          className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
+          className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 dark:border-gray-700 rounded focus:ring-primary-500"
         />
-        <label htmlFor="isActive" className="text-sm font-bold text-gray-700 cursor-pointer">
+        <label htmlFor="isActive" className="text-sm font-bold text-gray-700 dark:text-gray-300 cursor-pointer">
           Usuário Ativo
         </label>
       </div>
 
-      <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
+      <div className="flex justify-end gap-3 pt-6 border-t border-gray-100 dark:border-gray-800">
         <button
           type="button"
           onClick={onCancel}
-          className="px-6 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+          className="px-6 py-2.5 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
         >
           Cancelar
         </button>

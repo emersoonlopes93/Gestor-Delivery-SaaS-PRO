@@ -61,7 +61,7 @@ export function CustomersListPage() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">👥 Clientes (CRM)</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">👥 Clientes (CRM)</h1>
       </div>
 
       {error && (
@@ -71,9 +71,9 @@ export function CustomersListPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow border border-gray-200">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow border border-gray-200 dark:border-gray-800">
         <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200 text-gray-600">
+          <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400">
             <tr>
               <th className="p-4 font-semibold">Nome</th>
               <th className="p-4 font-semibold">Telefone</th>
@@ -83,30 +83,30 @@ export function CustomersListPage() {
               <th className="p-4 font-semibold text-right">Último Pedido</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="p-4 text-center text-gray-500">
+                <td colSpan={6} className="p-4 text-center text-gray-500 dark:text-gray-400">
                   Carregando...
                 </td>
               </tr>
             ) : customers.length === 0 ? (
               <tr>
-                <td colSpan={6} className="p-4 text-center text-gray-500">
+                <td colSpan={6} className="p-4 text-center text-gray-500 dark:text-gray-400">
                   Nenhum cliente cadastrado ainda.
                 </td>
               </tr>
             ) : (
               customers.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="p-4 font-medium text-gray-900">{c.name}</td>
-                  <td className="p-4 text-gray-600">{c.phone}</td>
+                <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 transition-colors">
+                  <td className="p-4 font-medium text-gray-900 dark:text-gray-100">{c.name}</td>
+                  <td className="p-4 text-gray-600 dark:text-gray-400">{c.phone}</td>
                   <td className="p-4 text-center">
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
                       {c.totalOrders}
                     </span>
                   </td>
-                  <td className="p-4 text-right font-medium text-gray-900">
+                  <td className="p-4 text-right font-medium text-gray-900 dark:text-gray-100">
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(c.totalSpent)}
                   </td>
                   <td className="p-4 text-center">
@@ -118,7 +118,7 @@ export function CustomersListPage() {
                       <span className="text-gray-300">-</span>
                     )}
                   </td>
-                  <td className="p-4 text-right text-gray-500">
+                  <td className="p-4 text-right text-gray-500 dark:text-gray-400">
                     {c.lastOrderDate ? new Date(c.lastOrderDate).toLocaleDateString('pt-BR') : '-'}
                   </td>
                 </tr>

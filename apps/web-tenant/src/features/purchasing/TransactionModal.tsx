@@ -68,11 +68,11 @@ export function TransactionModal({ isOpen, onClose, onSave }: TransactionModalPr
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-primary-50/30">
-          <h2 className="text-xl font-bold text-gray-900">Novo Lançamento</h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <X className="h-5 w-5 text-gray-500" />
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-primary-50/30">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Novo Lançamento</h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+            <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
 
@@ -82,7 +82,7 @@ export function TransactionModal({ isOpen, onClose, onSave }: TransactionModalPr
               <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Tipo</label>
               <select 
                 {...register('type')}
-                className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+                className="w-full bg-gray-50 dark:bg-gray-900/50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary-500 outline-none transition-all"
               >
                 <option value={FinancialTransactionType.INCOME}>Entrada (+)</option>
                 <option value={FinancialTransactionType.EXPENSE}>Saída (-)</option>
@@ -92,7 +92,7 @@ export function TransactionModal({ isOpen, onClose, onSave }: TransactionModalPr
               <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Status</label>
               <select 
                 {...register('status')}
-                className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+                className="w-full bg-gray-50 dark:bg-gray-900/50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary-500 outline-none transition-all"
               >
                 <option value={FinancialStatus.PAID}>Pago / Recebido</option>
                 <option value={FinancialStatus.PENDING}>Pendente</option>
@@ -108,7 +108,7 @@ export function TransactionModal({ isOpen, onClose, onSave }: TransactionModalPr
                 type="number"
                 step="0.01"
                 {...register('amount', { required: true })}
-                className="w-full bg-gray-50 border-none rounded-xl pl-10 pr-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+                className="w-full bg-gray-50 dark:bg-gray-900/50 border-none rounded-xl pl-10 pr-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary-500 outline-none transition-all"
                 placeholder="0,00"
               />
             </div>
@@ -118,7 +118,7 @@ export function TransactionModal({ isOpen, onClose, onSave }: TransactionModalPr
             <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Conta</label>
             <select 
               {...register('accountId')}
-              className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+              className="w-full bg-gray-50 dark:bg-gray-900/50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary-500 outline-none transition-all"
             >
               <option value="">Selecione uma conta...</option>
               {accounts.map(acc => (
@@ -131,7 +131,7 @@ export function TransactionModal({ isOpen, onClose, onSave }: TransactionModalPr
             <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Categoria</label>
             <input 
               {...register('category')}
-              className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+              className="w-full bg-gray-50 dark:bg-gray-900/50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary-500 outline-none transition-all"
               placeholder="Ex: Aluguel, Venda, Suplementos..."
             />
           </div>
@@ -140,7 +140,7 @@ export function TransactionModal({ isOpen, onClose, onSave }: TransactionModalPr
             <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Descrição</label>
             <textarea 
               {...register('description')}
-              className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary-500 outline-none transition-all min-h-[80px]"
+              className="w-full bg-gray-50 dark:bg-gray-900/50 border-none rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary-500 outline-none transition-all min-h-[80px]"
               placeholder="Detalhes adicionais..."
             />
           </div>
@@ -149,7 +149,7 @@ export function TransactionModal({ isOpen, onClose, onSave }: TransactionModalPr
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-6 py-3 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all"
+              className="flex-1 px-6 py-3 border border-gray-200 dark:border-gray-800 rounded-xl text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 transition-all"
             >
               Cancelar
             </button>

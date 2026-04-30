@@ -55,9 +55,9 @@ export function DashboardPage() {
   return (
     <div className="p-6">
       <div className="mb-8">
-        <h1 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Dashboard</h1>
-        <p className="text-gray-500 mt-1">
-          Bem-vindo de volta, <span className="font-bold text-gray-900">{user?.name}</span>
+        <h1 className="text-2xl font-black text-gray-900 dark:text-gray-100 uppercase tracking-tight">Dashboard</h1>
+        <p className="text-gray-500 dark:text-gray-400 mt-1">
+          Bem-vindo de volta, <span className="font-bold text-gray-900 dark:text-gray-100">{user?.name}</span>
         </p>
       </div>
 
@@ -100,40 +100,40 @@ export function DashboardPage() {
             ].map((card) => (
               <div
                 key={card.label}
-                className="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-xl transition-all hover:-translate-y-1 shadow-sm"
+                className="card-premium p-6 hover:-translate-y-1 hover:shadow-primary-500/10 transition-all duration-300"
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-2xl">{card.icon}</span>
                 </div>
-                <p className="text-2xl font-black text-gray-900">{card.value}</p>
+                <p className="text-2xl font-black text-gray-900 dark:text-gray-100">{card.value}</p>
                 <p className="text-xs font-black text-gray-400 uppercase tracking-widest mt-1">{card.label}</p>
               </div>
             ))}
           </div>
 
           {/* Session info */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-            <h2 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-wider">
+          <div className="card-premium p-6">
+            <h2 className="text-sm font-black text-gray-400 mb-6 uppercase tracking-widest">
               Sessão Atual
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 text-sm">
-              <div className="bg-gray-50 p-4 rounded-xl">
+              <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl">
                 <span className="block text-[10px] font-black text-gray-400 uppercase mb-1">Usuário</span>
-                <span className="font-bold text-gray-700">{user?.email}</span>
+                <span className="font-bold text-gray-700 dark:text-gray-300">{user?.email}</span>
               </div>
-              <div className="bg-gray-50 p-4 rounded-xl">
+              <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl">
                 <span className="block text-[10px] font-black text-gray-400 uppercase mb-1">Tenant ID</span>
-                <span className="font-mono text-xs text-gray-500 break-all">{user?.tenantId}</span>
+                <span className="font-mono text-xs text-gray-500 dark:text-gray-400 break-all">{user?.tenantId}</span>
               </div>
-              <div className="bg-gray-50 p-4 rounded-xl">
+              <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl">
                 <span className="block text-[10px] font-black text-gray-400 uppercase mb-1">Perfis</span>
-                <span className="font-bold text-gray-700">
+                <span className="font-bold text-gray-700 dark:text-gray-300">
                   {user?.roles.join(', ') || 'Nenhum'}
                 </span>
               </div>
-              <div className="bg-gray-50 p-4 rounded-xl">
+              <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl">
                 <span className="block text-[10px] font-black text-gray-400 uppercase mb-1">Permissões</span>
-                <span className="font-bold text-gray-700">{user?.permissions.length || 0}</span>
+                <span className="font-bold text-gray-700 dark:text-gray-300">{user?.permissions.length || 0}</span>
               </div>
             </div>
           </div>

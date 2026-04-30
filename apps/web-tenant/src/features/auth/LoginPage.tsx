@@ -51,10 +51,10 @@ export function LoginPage() {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-2xl p-8">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8">
       <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Gestor Delivery</h1>
-        <p className="text-gray-500 mt-2">Acesse o painel da sua loja</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Gestor Delivery</h1>
+        <p className="text-gray-500 dark:text-gray-400 mt-2">Acesse o painel da sua loja</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
@@ -74,7 +74,7 @@ export function LoginPage() {
         <div>
           <label
             htmlFor="email"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
           >
             E-mail
           </label>
@@ -84,7 +84,7 @@ export function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
+            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
             placeholder="seu@email.com"
           />
         </div>
@@ -92,7 +92,7 @@ export function LoginPage() {
         <div>
           <label
             htmlFor="password"
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
           >
             Senha
           </label>
@@ -102,7 +102,7 @@ export function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
+            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
             placeholder="••••••••"
           />
         </div>

@@ -33,12 +33,12 @@ export function GoalsPage() {
   );
 
   return (
-    <div className="p-6 space-y-8 bg-gray-50 min-h-screen">
+    <div className="p-6 space-y-8 bg-gray-50 dark:bg-gray-900/50 min-h-screen">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Metas e Desempenho</h1>
-          <p className="text-gray-500">Defina objetivos e acompanhe o crescimento da sua loja.</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Metas e Desempenho</h1>
+          <p className="text-gray-500 dark:text-gray-400">Defina objetivos e acompanhe o crescimento da sua loja.</p>
         </div>
         
         <button 
@@ -51,12 +51,12 @@ export function GoalsPage() {
 
       {/* Goals Dashboard Area */}
       {goals?.length === 0 ? (
-        <div className="bg-white border-2 border-dashed border-gray-200 rounded-2xl p-12 text-center">
+        <div className="bg-white dark:bg-gray-900 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center">
           <div className="bg-primary-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
             <Target className="text-primary-600" size={32} />
           </div>
-          <h3 className="text-lg font-bold text-gray-900">Nenhuma meta definida</h3>
-          <p className="text-gray-500 max-w-sm mx-auto mt-2">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Nenhuma meta definida</h3>
+          <p className="text-gray-500 dark:text-gray-400 max-w-sm mx-auto mt-2">
             Comece definindo objetivos de faturamento, volume de pedidos ou eficiência para motivar sua equipe.
           </p>
           <button 
@@ -96,7 +96,7 @@ function GoalListItem({ goal, onDelete }: { goal: GoalDTO, onDelete: () => void 
     : goal.trend === 'behind' ? 'bg-red-500' : 'bg-primary-500';
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden hover:border-primary-200 transition-all">
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden hover:border-primary-200 transition-all">
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-4">
@@ -104,8 +104,8 @@ function GoalListItem({ goal, onDelete }: { goal: GoalDTO, onDelete: () => void 
               <Target size={24} className={goal.progressPercentage >= 100 ? 'text-green-600' : 'text-primary-600'} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900">{goal.name}</h3>
-              <p className="text-sm text-gray-500 flex items-center gap-3">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">{goal.name}</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-3">
                 <span className="flex items-center gap-1"><Calendar size={14} /> {new Date(goal.startDate).toLocaleDateString()} - {new Date(goal.endDate).toLocaleDateString()}</span>
                 {goal.responsibleId && <span className="flex items-center gap-1"><User size={14} /> {goal.responsibleId}</span>}
               </p>
@@ -130,8 +130,8 @@ function GoalListItem({ goal, onDelete }: { goal: GoalDTO, onDelete: () => void 
         {/* Progress Bar Area */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-gray-700">Progresso: {goal.progressPercentage.toFixed(1)}%</span>
-            <span className="text-gray-500 font-medium">
+            <span className="font-medium text-gray-700 dark:text-gray-300">Progresso: {goal.progressPercentage.toFixed(1)}%</span>
+            <span className="text-gray-500 dark:text-gray-400 font-medium">
               {isRevenue ? `R$ ${goal.currentValue.toLocaleString()}` : goal.currentValue} / {isRevenue ? `R$ ${goal.targetValue.toLocaleString()}` : goal.targetValue}
             </span>
           </div>
@@ -145,12 +145,12 @@ function GoalListItem({ goal, onDelete }: { goal: GoalDTO, onDelete: () => void 
 
         {/* Subgoals (Simplified) */}
         {goal.subGoals && goal.subGoals.length > 0 && (
-          <div className="mt-6 pt-6 border-t border-gray-100">
+          <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
             <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Desdobramentos ({goal.subGoals.length})</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {goal.subGoals.map(sg => (
-                <div key={sg.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
-                   <span className="text-sm font-medium text-gray-700">{sg.name}</span>
+                <div key={sg.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
+                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{sg.name}</span>
                    <span className="text-sm font-bold text-primary-600">{sg.progressPercentage.toFixed(0)}%</span>
                 </div>
               ))}
@@ -182,10 +182,10 @@ function GoalFormModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">Configurar Nova Meta</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">×</button>
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Configurar Nova Meta</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:text-gray-400">×</button>
         </div>
         
         <form className="p-6 space-y-4" onSubmit={(e) => {
@@ -196,10 +196,10 @@ function GoalFormModal({ onClose }: { onClose: () => void }) {
           });
         }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nome da Meta</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nome da Meta</label>
             <input 
               required
-              className="w-full border border-gray-200 p-2 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" 
+              className="w-full border border-gray-200 dark:border-gray-800 p-2 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" 
               placeholder="Ex: Faturamento Recorde Junho"
               value={formData.name}
               onChange={e => setFormData({...formData, name: e.target.value})}
@@ -208,9 +208,9 @@ function GoalFormModal({ onClose }: { onClose: () => void }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Indicador</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de Indicador</label>
               <select 
-                className="w-full border border-gray-200 p-2 rounded-lg"
+                className="w-full border border-gray-200 dark:border-gray-800 p-2 rounded-lg"
                 value={formData.type}
                 onChange={e => setFormData({...formData, type: e.target.value as any})}
               >
@@ -221,11 +221,11 @@ function GoalFormModal({ onClose }: { onClose: () => void }) {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Valor Alvo</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Valor Alvo</label>
               <input 
                 required
                 type="number"
-                className="w-full border border-gray-200 p-2 rounded-lg"
+                className="w-full border border-gray-200 dark:border-gray-800 p-2 rounded-lg"
                 placeholder="0.00"
                 value={formData.targetValue}
                 onChange={e => setFormData({...formData, targetValue: e.target.value})}
@@ -235,19 +235,19 @@ function GoalFormModal({ onClose }: { onClose: () => void }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Data Início</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Início</label>
               <input 
                 type="date"
-                className="w-full border border-gray-200 p-2 rounded-lg"
+                className="w-full border border-gray-200 dark:border-gray-800 p-2 rounded-lg"
                 value={formData.startDate}
                 onChange={e => setFormData({...formData, startDate: e.target.value})}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Data Fim</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Fim</label>
               <input 
                 type="date"
-                className="w-full border border-gray-200 p-2 rounded-lg"
+                className="w-full border border-gray-200 dark:border-gray-800 p-2 rounded-lg"
                 value={formData.endDate}
                 onChange={e => setFormData({...formData, endDate: e.target.value})}
               />
@@ -258,7 +258,7 @@ function GoalFormModal({ onClose }: { onClose: () => void }) {
             <button 
               type="button" 
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-200 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
+              className="flex-1 px-4 py-2 border border-gray-200 dark:border-gray-800 rounded-lg text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50"
             >
               Cancelar
             </button>

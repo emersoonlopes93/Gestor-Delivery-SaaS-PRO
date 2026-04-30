@@ -97,20 +97,20 @@ export function KdsPage() {
   };
 
   return (
-    <div className="p-6 h-[calc(100vh-64px)] flex flex-col bg-gray-50/50">
+    <div className="p-6 h-[calc(100vh-64px)] flex flex-col bg-gray-50 dark:bg-gray-900/50/50">
       <header className="flex flex-col md:flex-row md:items-center justify-between mb-6 shrink-0 gap-4">
         <div>
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl font-black text-gray-900 dark:text-gray-100 tracking-tight flex items-center gap-2">
             <ChefHat className="w-8 h-8 text-blue-600" /> KDS PRO
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Gestão de Produção Individualizada</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Gestão de Produção Individualizada</p>
         </div>
         
         <div className="flex items-center gap-3">
           <select 
             value={stationId}
             onChange={(e) => setStationId(e.target.value)}
-            className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 font-bold shadow-sm"
+            className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 font-bold shadow-sm"
           >
             <option value="GERAL">SETOR: GERAL</option>
             <option value="COZINHA">SETOR: COZINHA</option>
@@ -118,8 +118,8 @@ export function KdsPage() {
             <option value="PIZZA">SETOR: PIZZA</option>
           </select>
           
-          <button onClick={fetchJobs} className="p-2.5 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shadow-sm" title="Atualizar">
-            <RefreshCw className={`w-5 h-5 text-gray-700 ${updatingId ? 'animate-spin' : ''}`} />
+          <button onClick={fetchJobs} className="p-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 transition-colors shadow-sm" title="Atualizar">
+            <RefreshCw className={`w-5 h-5 text-gray-700 dark:text-gray-300 ${updatingId ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </header>
@@ -141,7 +141,7 @@ export function KdsPage() {
             return (
               <div 
                 key={job.id} 
-                className={`min-w-[340px] w-[340px] rounded-2xl flex flex-col max-h-full border border-gray-200 shadow-sm snap-start bg-white`}
+                className={`min-w-[340px] w-[340px] rounded-2xl flex flex-col max-h-full border border-gray-200 dark:border-gray-800 shadow-sm snap-start bg-white dark:bg-gray-900`}
               >
                 <header className={`p-4 rounded-t-2xl flex justify-between items-start shrink-0 ${isUrgent ? 'bg-red-600' : 'bg-gray-800'}`}>
                   <div>
@@ -150,18 +150,18 @@ export function KdsPage() {
                       {job.station} - {order?.fulfillmentType === 'delivery' ? 'Entrega' : 'Salão'}
                     </span>
                   </div>
-                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg font-black text-sm bg-white/20 text-white`}>
+                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg font-black text-sm bg-white dark:bg-gray-900/20 text-white`}>
                     <Clock className="w-4 h-4" /> {elapsed}m
                   </div>
                 </header>
 
-                <div className="p-5 overflow-y-auto grow bg-white/50">
-                   <pre className="whitespace-pre-wrap font-mono text-xs text-gray-800 leading-tight bg-gray-50 p-3 rounded-lg border border-gray-100">
+                <div className="p-5 overflow-y-auto grow bg-white dark:bg-gray-900/50">
+                   <pre className="whitespace-pre-wrap font-mono text-xs text-gray-800 dark:text-gray-200 leading-tight bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-100 dark:border-gray-800">
                      {job.content}
                    </pre>
                 </div>
 
-                <footer className="p-4 bg-white rounded-b-2xl border-t border-gray-100 shrink-0 flex flex-col gap-2">
+                <footer className="p-4 bg-white dark:bg-gray-900 rounded-b-2xl border-t border-gray-100 dark:border-gray-800 shrink-0 flex flex-col gap-2">
                   <button
                     onClick={() => handlePrint(job.content)}
                     className="w-full bg-blue-50 border border-blue-200 text-blue-600 font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition-colors hover:bg-blue-100"

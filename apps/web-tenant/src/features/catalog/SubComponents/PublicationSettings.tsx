@@ -31,18 +31,18 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
 }) => {
   return (
     <section className="space-y-6 text-left">
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <div className="text-lg font-black text-gray-900 uppercase tracking-tight">Status de Venda</div>
-            <p className="text-sm text-gray-500 font-medium mt-1">Defina como e quando este produto aparece para o cliente.</p>
+            <div className="text-lg font-black text-gray-900 dark:text-gray-100 uppercase tracking-tight">Status de Venda</div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1">Defina como e quando este produto aparece para o cliente.</p>
           </div>
           <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
             <button
               type="button"
               onClick={() => patchPublication({ publicationStatus: 'draft' })}
               disabled={savingStates.patchPublication}
-              className="px-3 py-2 text-sm font-bold text-gray-700 hover:bg-gray-100 rounded-xl border border-gray-200 bg-white disabled:opacity-50 transition-all flex items-center gap-2"
+              className="px-3 py-2 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 disabled:opacity-50 transition-all flex items-center gap-2"
             >
               {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-gray-700 border-t-transparent rounded-full animate-spin" />}
               Rascunho
@@ -69,7 +69,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
               type="button"
               onClick={() => patchPublication({ operationalStatus: 'hidden' })}
               disabled={savingStates.patchPublication}
-              className="px-3 py-2 text-sm font-bold text-amber-700 hover:bg-amber-50 rounded-xl border border-amber-200 bg-white disabled:opacity-50 transition-all flex items-center gap-2"
+              className="px-3 py-2 text-sm font-bold text-amber-700 hover:bg-amber-50 rounded-xl border border-amber-200 bg-white dark:bg-gray-900 disabled:opacity-50 transition-all flex items-center gap-2"
             >
               {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-amber-700 border-t-transparent rounded-full animate-spin" />}
               Oculto
@@ -78,7 +78,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
               type="button"
               onClick={() => patchPublication({ operationalStatus: 'sold_out_manual' })}
               disabled={savingStates.patchPublication}
-              className="px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-50 rounded-xl border border-red-200 bg-white disabled:opacity-50 transition-all flex items-center gap-2"
+              className="px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-50 rounded-xl border border-red-200 bg-white dark:bg-gray-900 disabled:opacity-50 transition-all flex items-center gap-2"
             >
               {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-red-700 border-t-transparent rounded-full animate-spin" />}
               Esgotado
@@ -87,7 +87,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
               type="button"
               onClick={() => patchPublication({ operationalStatus: 'inactive' })}
               disabled={savingStates.patchPublication}
-              className="px-3 py-2 text-sm font-bold text-gray-700 hover:bg-gray-100 rounded-xl border border-gray-200 bg-white disabled:opacity-50 transition-all flex items-center gap-2"
+              className="px-3 py-2 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 disabled:opacity-50 transition-all flex items-center gap-2"
             >
               {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-gray-700 border-t-transparent rounded-full animate-spin" />}
               Inativo
@@ -95,17 +95,17 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
           </div>
         </div>
 
-        <div className="mt-4 text-sm font-bold text-gray-700">
+        <div className="mt-4 text-sm font-bold text-gray-700 dark:text-gray-300">
           Status atual: <span className="font-black">{(publication as any)?.publicationStatus === 'published' ? 'Publicado' : 'Rascunho'}</span>
           {' | '}Operação: <span className="font-black">{(publication as any)?.operationalStatus === 'active' ? 'Ativo' : ((publication as any)?.operationalStatus === 'inactive' ? 'Inativo' : ((publication as any)?.operationalStatus === 'sold_out_manual' ? 'Esgotado' : 'Oculto'))}</span>
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <div className="font-black text-gray-900">Regras de disponibilidade</div>
-            <div className="text-sm text-gray-500 font-medium mt-1">Janela por canal e dias da semana.</div>
+            <div className="font-black text-gray-900 dark:text-gray-100">Regras de disponibilidade</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1">Janela por canal e dias da semana.</div>
           </div>
           <button
             type="button"
@@ -117,9 +117,9 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden hidden md:block shadow-sm">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden hidden md:block shadow-sm">
         <table className="w-full text-left border-collapse">
-          <thead className="bg-gray-50/50 border-b border-gray-100">
+          <thead className="bg-gray-50 dark:bg-gray-900/50/50 border-b border-gray-100 dark:border-gray-800">
             <tr>
               <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Canal</th>
               <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Dias</th>
@@ -128,12 +128,12 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
               <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {rules.map((r) => (
-              <tr key={r.id} className="hover:bg-gray-50/30 transition-colors group">
-                <td className="px-6 py-4 font-bold text-gray-900">{formatChannelLabel(r.channel)}</td>
-                <td className="px-6 py-4 text-sm font-bold text-gray-700">{formatDaysLabel(r.daysOfWeek ?? [])}</td>
-                <td className="px-6 py-4 text-sm font-black text-gray-900">
+              <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50/30 transition-colors group">
+                <td className="px-6 py-4 font-bold text-gray-900 dark:text-gray-100">{formatChannelLabel(r.channel)}</td>
+                <td className="px-6 py-4 text-sm font-bold text-gray-700 dark:text-gray-300">{formatDaysLabel(r.daysOfWeek ?? [])}</td>
+                <td className="px-6 py-4 text-sm font-black text-gray-900 dark:text-gray-100">
                   {r.startTime} - {r.endTime}
                 </td>
                 <td className="px-6 py-4">
@@ -146,7 +146,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
                     <button
                       type="button"
                       onClick={() => openRuleModal(r)}
-                      className="px-3 py-1 text-xs font-bold text-gray-700 hover:bg-gray-100 rounded transition-all"
+                      className="px-3 py-1 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-all"
                     >
                       Editar
                     </button>
@@ -178,7 +178,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
             <button
               type="button"
               onClick={goPrevWizardStep}
-              className="px-8 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-black rounded-xl transition-all"
+              className="px-8 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 dark:text-gray-300 font-black rounded-xl transition-all"
             >
               Voltar
             </button>

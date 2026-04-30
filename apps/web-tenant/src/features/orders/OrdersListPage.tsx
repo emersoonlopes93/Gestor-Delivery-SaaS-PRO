@@ -32,7 +32,7 @@ const STATUS_COLORS: Record<string, string> = {
   ready_for_pickup: 'bg-green-100 text-green-800',
   ready_for_delivery: 'bg-green-100 text-green-800',
   out_for_delivery: 'bg-purple-100 text-purple-800',
-  completed: 'bg-gray-100 text-gray-600',
+  completed: 'bg-gray-100 text-gray-600 dark:text-gray-400',
   cancelled: 'bg-red-100 text-red-800',
   draft: 'bg-slate-100 text-slate-700',
 } as any;
@@ -86,8 +86,8 @@ export function OrdersListPage() {
     <div className="p-6">
       <header className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pedidos</h1>
-          <p className="text-sm text-gray-500 mt-1">{total} pedidos encontrados</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Pedidos</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{total} pedidos encontrados</p>
         </div>
         <button 
           onClick={fetchOrders} 
@@ -95,7 +95,7 @@ export function OrdersListPage() {
           className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
           title="Atualizar"
         >
-          <RefreshCw className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-5 h-5 text-gray-600 dark:text-gray-400 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </header>
 
@@ -127,8 +127,8 @@ export function OrdersListPage() {
         <button
           onClick={() => { setStatusFilter(''); setPage(1); }}
           disabled={loading}
-          className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border disabled:opacity-50 ${
-            statusFilter === '' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+          className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest border transition-all disabled:opacity-50 ${
+            statusFilter === '' ? 'bg-gray-900 text-white border-gray-900 shadow-md' : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50'
           }`}
         >
           Todos
@@ -138,8 +138,8 @@ export function OrdersListPage() {
             key={status}
             onClick={() => { setStatusFilter(status); setPage(1); }}
             disabled={loading}
-            className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wider border disabled:opacity-50 ${
-              statusFilter === status ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+            className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest border transition-all disabled:opacity-50 ${
+              statusFilter === status ? 'bg-gray-900 text-white border-gray-900 shadow-md' : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50'
             }`}
           >
             {STATUS_LABELS[status]}
@@ -151,7 +151,7 @@ export function OrdersListPage() {
       {loading && (
         <div className="flex flex-col items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-          <p className="mt-2 text-sm text-gray-500">Carregando pedidos...</p>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Carregando pedidos...</p>
         </div>
       )}
 
@@ -160,7 +160,7 @@ export function OrdersListPage() {
         orders.length === 0 ? (
           <div className="text-center py-12">
             <Package className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-            <p className="text-gray-500">Nenhum pedido encontrado.</p>
+            <p className="text-gray-500 dark:text-gray-400">Nenhum pedido encontrado.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -168,16 +168,16 @@ export function OrdersListPage() {
               <button
                 key={order.id}
                 onClick={() => setSelectedOrderId(order.id)}
-                className="w-full bg-white rounded-xl p-4 border border-gray-100 hover:border-gray-200 transition-all flex items-center justify-between text-left group"
+                className="w-full card-premium p-4 border border-transparent hover:border-primary-100 transition-all flex items-center justify-between text-left group hover:shadow-primary-500/10"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center">
-                    <span className="text-sm font-black text-gray-700">{order.orderNumber}</span>
+                  <div className="w-12 h-12 bg-gray-50 dark:bg-gray-900/50 rounded-xl flex items-center justify-center">
+                    <span className="text-sm font-black text-gray-700 dark:text-gray-300">{order.orderNumber}</span>
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-900 text-sm">{order.customerName}</h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${STATUS_COLORS[order.status]}`}>
+                    <h3 className="font-bold text-gray-900 dark:text-gray-100 text-sm">{order.customerName}</h3>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className={`text-[10px] font-black tracking-widest px-2.5 py-0.5 rounded-full uppercase ${STATUS_COLORS[order.status]}`}>
                         {STATUS_LABELS[order.status]}
                       </span>
                       <span className="text-[10px] text-gray-400">{order.fulfillmentType === 'delivery' ? '📦' : '🏪'}</span>
@@ -188,10 +188,10 @@ export function OrdersListPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-right">
-                      <span className="font-black text-gray-900">{fmt(order.total)}</span>
+                      <span className="font-black text-gray-900 dark:text-gray-100">{fmt(order.total)}</span>
                       <p className="text-[10px] text-gray-400">{order.itemCount} {order.itemCount === 1 ? 'item' : 'itens'}</p>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                    <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 dark:text-gray-400 transition-colors" />
                   </div>
                 </div>
               </button>
@@ -204,7 +204,7 @@ export function OrdersListPage() {
       {total > 20 && (
         <div className="flex justify-center gap-2 mt-6">
           <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-4 py-2 bg-gray-100 rounded-lg text-sm font-bold disabled:opacity-30">Anterior</button>
-          <span className="px-4 py-2 text-sm text-gray-500">Página {page}</span>
+          <span className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">Página {page}</span>
           <button disabled={page * 20 >= total} onClick={() => setPage(p => p + 1)} className="px-4 py-2 bg-gray-100 rounded-lg text-sm font-bold disabled:opacity-30">Próxima</button>
         </div>
       )}
@@ -273,19 +273,19 @@ function OrderDetailPanel({ orderId, onBack }: { orderId: string; onBack: () => 
 
   return (
     <div className="p-6 max-w-2xl">
-      <button onClick={onBack} className="text-sm text-gray-500 hover:text-gray-700 mb-4 flex items-center gap-1">
+      <button onClick={onBack} className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-1">
         ← Voltar aos pedidos
       </button>
 
       <header className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{order.orderNumber}</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{order.orderNumber}</h1>
           <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase mt-2 inline-block ${STATUS_COLORS[order.status]}`}>
             {STATUS_LABELS[order.status]}
           </span>
         </div>
         <div className="text-right">
-          <span className="text-2xl font-black text-gray-900">{fmt(order.total)}</span>
+          <span className="text-2xl font-black text-gray-900 dark:text-gray-100">{fmt(order.total)}</span>
           <p className="text-xs text-gray-400 mt-1">{order.fulfillmentType === 'delivery' ? '📦 Entrega' : '🏪 Retirada'}</p>
         </div>
       </header>
@@ -314,22 +314,22 @@ function OrderDetailPanel({ orderId, onBack }: { orderId: string; onBack: () => 
       )}
 
       {/* Customer */}
-      <section className="bg-white rounded-xl p-4 border border-gray-100 mb-4">
+      <section className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800 mb-4">
         <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Cliente</h3>
-        <p className="font-bold text-gray-900">{order.customerName}</p>
-        <p className="text-sm text-gray-500">{order.customerPhone}</p>
-        {order.customerEmail && <p className="text-sm text-gray-500">{order.customerEmail}</p>}
+        <p className="font-bold text-gray-900 dark:text-gray-100">{order.customerName}</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">{order.customerPhone}</p>
+        {order.customerEmail && <p className="text-sm text-gray-500 dark:text-gray-400">{order.customerEmail}</p>}
       </section>
 
       {/* Delivery Address */}
       {order.deliveryAddress && (
-        <section className="bg-white rounded-xl p-4 border border-gray-100 mb-4">
+        <section className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800 mb-4">
           <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Endereço</h3>
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-gray-700 dark:text-gray-300">
             {order.deliveryAddress.street}, {order.deliveryAddress.number}
             {order.deliveryAddress.complement ? ` - ${order.deliveryAddress.complement}` : ''}
           </p>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             {order.deliveryAddress.neighborhood} — {order.deliveryAddress.city}/{order.deliveryAddress.state} — CEP {order.deliveryAddress.zipCode}
           </p>
           {order.deliveryAddress.reference && (
@@ -339,29 +339,29 @@ function OrderDetailPanel({ orderId, onBack }: { orderId: string; onBack: () => 
       )}
 
       {/* Items */}
-      <section className="bg-white rounded-xl p-4 border border-gray-100 mb-4">
+      <section className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800 mb-4">
         <h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Itens</h3>
         <div className="space-y-3">
           {order.items.map(item => (
             <div key={item.id} className="flex justify-between text-sm">
               <div>
-                <span className="font-bold text-gray-800">{item.quantity}x</span>{' '}
-                <span className="text-gray-700">{item.snapshotName}</span>
+                <span className="font-bold text-gray-800 dark:text-gray-200">{item.quantity}x</span>{' '}
+                <span className="text-gray-700 dark:text-gray-300">{item.snapshotName}</span>
                 <span className="text-[10px] text-gray-400 ml-1 uppercase">[{item.lineType}]</span>
                 {item.snapshotComposition && (
                   <p className="text-[11px] text-gray-400 italic">{item.snapshotComposition}</p>
                 )}
               </div>
-              <span className="font-bold text-gray-800 ml-4">{fmt(item.lineTotal)}</span>
+              <span className="font-bold text-gray-800 dark:text-gray-200 ml-4">{fmt(item.lineTotal)}</span>
             </div>
           ))}
         </div>
         <div className="border-t mt-4 pt-3 space-y-1 text-sm">
-          <div className="flex justify-between text-gray-500"><span>Subtotal itens</span><span>{fmt(order.itemsSubtotal)}</span></div>
+          <div className="flex justify-between text-gray-500 dark:text-gray-400"><span>Subtotal itens</span><span>{fmt(order.itemsSubtotal)}</span></div>
           {order.discountTotal > 0 && <div className="flex justify-between text-green-600"><span>Desconto</span><span>-{fmt(order.discountTotal)}</span></div>}
-          {order.deliveryFee > 0 && <div className="flex justify-between text-gray-500"><span>Entrega</span><span>{fmt(order.deliveryFee)}</span></div>}
-          {order.serviceFee > 0 && <div className="flex justify-between text-gray-500"><span>Taxa de serviço</span><span>{fmt(order.serviceFee)}</span></div>}
-          <div className="flex justify-between font-black text-gray-900 pt-2 border-t"><span>Total</span><span>{fmt(order.total)}</span></div>
+          {order.deliveryFee > 0 && <div className="flex justify-between text-gray-500 dark:text-gray-400"><span>Entrega</span><span>{fmt(order.deliveryFee)}</span></div>}
+          {order.serviceFee > 0 && <div className="flex justify-between text-gray-500 dark:text-gray-400"><span>Taxa de serviço</span><span>{fmt(order.serviceFee)}</span></div>}
+          <div className="flex justify-between font-black text-gray-900 dark:text-gray-100 pt-2 border-t"><span>Total</span><span>{fmt(order.total)}</span></div>
         </div>
       </section>
 
@@ -374,7 +374,7 @@ function OrderDetailPanel({ orderId, onBack }: { orderId: string; onBack: () => 
       )}
 
       {/* Timeline */}
-      <section className="bg-white rounded-xl p-4 border border-gray-100">
+      <section className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800">
         <h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Timeline</h3>
         <div className="space-y-3">
           {order.timeline.map(entry => (
@@ -387,7 +387,7 @@ function OrderDetailPanel({ orderId, onBack }: { orderId: string; onBack: () => 
                 <p className="text-[11px] text-gray-400 mt-0.5">
                   {new Date(entry.createdAt).toLocaleString('pt-BR')}
                 </p>
-                {entry.note && <p className="text-xs text-gray-500 italic mt-0.5">{entry.note}</p>}
+                {entry.note && <p className="text-xs text-gray-500 dark:text-gray-400 italic mt-0.5">{entry.note}</p>}
               </div>
             </div>
           ))}

@@ -107,14 +107,14 @@ export function CombosV2Page() {
     <div className="p-6 max-w-7xl mx-auto text-left">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Combos</h1>
-          <p className="text-gray-500 mt-1">Crie e monte combos usando produtos já cadastrados no catálogo.</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">Combos</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Crie e monte combos usando produtos já cadastrados no catálogo.</p>
         </div>
         <button
           type="button"
           onClick={handleCreateCombo}
           disabled={savingMap.create}
-          className="bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn-primary"
         >
           {savingMap.create ? 'Criando...' : 'Novo Combo'}
         </button>
@@ -125,44 +125,44 @@ export function CombosV2Page() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="card-premium overflow-hidden">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50/50 border-b border-gray-100">
+            <thead className="bg-gray-50 dark:bg-gray-900/50/50 border-b border-gray-100 dark:border-gray-800">
               <tr>
-                <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Imagem</th>
-                <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Combo</th>
-                <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Preço Base</th>
-                <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Publicação</th>
-                <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Operação</th>
-                <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Imagem</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Combo</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Preço Base</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Publicação</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Operação</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {sortedCombos.map((combo) => (
-                <tr key={combo.id} className="hover:bg-gray-50/40 transition-colors group">
+                <tr key={combo.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50/40 transition-colors group">
                   <td className="px-6 py-4">
                     {combo.image ? (
-                      <img src={combo.image} alt={combo.name} className="w-12 h-12 rounded-xl object-cover border border-gray-200" />
+                      <img src={combo.image} alt={combo.name} className="w-12 h-12 rounded-xl object-cover border border-gray-200 dark:border-gray-800" />
                     ) : (
-                      <div className="w-12 h-12 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-[10px] font-black text-gray-400">
+                      <div className="w-12 h-12 rounded-xl bg-gray-100 border border-gray-200 dark:border-gray-800 flex items-center justify-center text-[10px] font-black text-gray-400">
                         SEM IMG
                       </div>
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <div className="font-bold text-gray-900">{combo.name}</div>
-                    <div className="text-xs text-gray-500 font-medium">{combo.shortDescription || 'Sem descrição'}</div>
+                    <div className="font-bold text-gray-900 dark:text-gray-100">{combo.name}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">{combo.shortDescription || 'Sem descrição'}</div>
                   </td>
-                  <td className="px-6 py-4 text-sm font-black text-gray-900">
+                  <td className="px-6 py-4 text-sm font-black text-gray-900 dark:text-gray-100">
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(combo.basePrice ?? 0))}
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${combo.publication?.publicationStatus === 'published' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${combo.publication?.publicationStatus === 'published' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600 dark:text-gray-400'}`}>
                       {combo.publication?.publicationStatus === 'published' ? 'Publicado' : 'Rascunho'}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${combo.publication?.operationalStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${combo.publication?.operationalStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600 dark:text-gray-400'}`}>
                       {combo.publication?.operationalStatus === 'active' ? 'Ativo' : (combo.publication?.operationalStatus === 'hidden' ? 'Oculto' : (combo.publication?.operationalStatus === 'sold_out_manual' ? 'Esgotado' : 'Inativo'))}
                     </span>
                   </td>
@@ -171,7 +171,7 @@ export function CombosV2Page() {
                       <button
                         type="button"
                         onClick={() => navigate(`/catalog/combos/${combo.id}/v2`)}
-                        className="px-3 py-1 text-xs font-bold text-primary-700 hover:bg-primary-50 rounded"
+                        className="btn-ghost text-primary-700"
                       >
                         Editar
                       </button>
@@ -179,7 +179,7 @@ export function CombosV2Page() {
                         type="button"
                         onClick={() => handleTogglePublication(combo)}
                         disabled={savingMap[`pub-${combo.id}`]}
-                        className="px-3 py-1 text-xs font-bold text-gray-700 hover:bg-gray-100 rounded disabled:opacity-50"
+                        className="btn-ghost"
                       >
                         {combo.publication?.publicationStatus === 'published' ? 'Despublicar' : 'Publicar'}
                       </button>
@@ -187,7 +187,7 @@ export function CombosV2Page() {
                         type="button"
                         onClick={() => handleToggleOperational(combo)}
                         disabled={savingMap[`op-${combo.id}`]}
-                        className="px-3 py-1 text-xs font-bold text-gray-700 hover:bg-gray-100 rounded disabled:opacity-50"
+                        className="btn-ghost"
                       >
                         {combo.publication?.operationalStatus === 'active' ? 'Inativar' : 'Ativar'}
                       </button>
@@ -195,7 +195,7 @@ export function CombosV2Page() {
                         type="button"
                         onClick={() => handleDuplicate(combo)}
                         disabled={savingMap[`duplicate-${combo.id}`]}
-                        className="px-3 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-50 rounded disabled:opacity-50"
+                        className="btn-ghost text-indigo-700"
                       >
                         Duplicar
                       </button>
@@ -203,7 +203,7 @@ export function CombosV2Page() {
                         type="button"
                         onClick={() => handleDelete(combo)}
                         disabled={savingMap[`delete-${combo.id}`]}
-                        className="px-3 py-1 text-xs font-bold text-red-600 hover:bg-red-50 rounded disabled:opacity-50"
+                        className="btn-ghost text-red-600"
                       >
                         Excluir
                       </button>

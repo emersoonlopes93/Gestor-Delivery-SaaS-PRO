@@ -82,16 +82,16 @@ export function InventoryCountPage() {
     <div className="p-6 max-w-7xl mx-auto text-left">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight flex items-center gap-3">
             <ClipboardList className="h-8 w-8 text-primary-600" />
             Inventário Físico
           </h1>
-          <p className="text-gray-500 mt-1">Realize a contagem física e ajuste seu estoque teórico.</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Realize a contagem física e ajuste seu estoque teórico.</p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={loadIngredients}
-            className="p-2.5 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors"
+            className="p-2.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
             title="Atualizar estoque teórico"
           >
             <RefreshCcw className="h-5 w-5" />
@@ -118,19 +118,19 @@ export function InventoryCountPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gray-50/50">
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Insumo</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Unidade</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Sistema (Teórico)</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider w-48">Contagem Física</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Diferença</th>
+              <tr className="bg-gray-50 dark:bg-gray-900/50/50">
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Insumo</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Unidade</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Sistema (Teórico)</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-48">Contagem Física</th>
+                <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-right">Diferença</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {isLoading ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center">
@@ -144,14 +144,14 @@ export function InventoryCountPage() {
                 const hasDiff = diff !== 0;
 
                 return (
-                  <tr key={item.ingredientId} className="hover:bg-gray-50/50 transition-colors">
+                  <tr key={item.ingredientId} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50/50 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="font-semibold text-gray-900">{item.name}</div>
+                      <div className="font-semibold text-gray-900 dark:text-gray-100">{item.name}</div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500">
+                    <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                       {unitLabels[item.unit]}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
                       {item.theoreticalStock} <span className="text-[10px] uppercase">{item.unit}</span>
                     </td>
                     <td className="px-6 py-4">
@@ -161,7 +161,7 @@ export function InventoryCountPage() {
                         value={item.physicalStock}
                         onChange={(e) => handleStockChange(item.ingredientId, e.target.value)}
                         className={`w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all font-bold ${
-                          hasDiff ? 'border-amber-200 bg-amber-50/30' : 'border-gray-200 bg-white'
+                          hasDiff ? 'border-amber-200 bg-amber-50/30' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'
                         }`}
                       />
                     </td>
@@ -191,7 +191,7 @@ export function InventoryCountPage() {
       </div>
 
       <div className="mt-8 bg-amber-50 border border-amber-100 rounded-2xl p-6 flex flex-col md:flex-row items-center gap-4">
-        <div className="p-3 bg-white rounded-xl shadow-sm">
+        <div className="p-3 bg-white dark:bg-gray-900 rounded-xl shadow-sm">
           <AlertTriangle className="h-6 w-6 text-amber-500" />
         </div>
         <div className="flex-1 text-center md:text-left">

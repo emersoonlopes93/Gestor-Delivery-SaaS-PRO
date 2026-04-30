@@ -517,7 +517,7 @@ export function PosItemConfiguratorModal(props: {
       <div className="bg-gray-900 w-full max-w-2xl sm:rounded-3xl flex flex-col max-h-[92vh] border border-gray-800 shadow-2xl">
         <div className="px-6 py-4 border-b border-gray-800 flex items-center gap-3">
           <div className="flex-1 min-w-0">
-            <div className="text-[10px] font-black uppercase tracking-widest text-gray-500">Configurar item</div>
+            <div className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Configurar item</div>
             <div className="text-white font-black text-lg truncate">{detail?.name ?? 'Carregando...'}</div>
           </div>
           <button onClick={onClose} className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-gray-800">
@@ -527,7 +527,7 @@ export function PosItemConfiguratorModal(props: {
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
           {loading ? (
-            <div className="py-10 text-center text-gray-500 font-bold uppercase tracking-widest animate-pulse">Carregando...</div>
+            <div className="py-10 text-center text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest animate-pulse">Carregando...</div>
           ) : error ? (
             <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl text-sm font-bold flex items-center gap-2">
               <AlertCircle className="w-4 h-4" />
@@ -540,9 +540,9 @@ export function PosItemConfiguratorModal(props: {
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="text-white font-black text-sm uppercase tracking-wider">Sabores</div>
-                      <div className="text-[10px] text-gray-500 font-bold italic">Selecione até 4 sabores para compor sua pizza</div>
+                      <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold italic">Selecione até 4 sabores para compor sua pizza</div>
                     </div>
-                    <div className="text-[10px] font-black uppercase text-gray-600">{selectedPizzaFlavors.length}/4</div>
+                    <div className="text-[10px] font-black uppercase text-gray-600 dark:text-gray-400">{selectedPizzaFlavors.length}/4</div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-2">
@@ -573,12 +573,12 @@ export function PosItemConfiguratorModal(props: {
                         <div className="flex items-start justify-between gap-4 mb-3">
                           <div>
                             <div className="text-white font-black text-sm uppercase tracking-wider">{slot.name}</div>
-                            <div className="text-[10px] text-gray-500 font-bold">
+                            <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">
                               {slot.isRequired ? `Obrigatório • ` : ''}
                               {slot.minSelect === slot.maxSelect ? `Escolha ${slot.minSelect}` : `Escolha ${slot.minSelect} a ${slot.maxSelect}`}
                             </div>
                           </div>
-                          <div className="text-[10px] font-black uppercase text-gray-600">{selected.length}/{slot.maxSelect}</div>
+                          <div className="text-[10px] font-black uppercase text-gray-600 dark:text-gray-400">{selected.length}/{slot.maxSelect}</div>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -599,11 +599,11 @@ export function PosItemConfiguratorModal(props: {
                                   <div className="flex items-center justify-between gap-3">
                                     <div className="min-w-0">
                                       <div className="text-white font-bold text-xs truncate">{ai.product?.name}</div>
-                                      <div className="text-[10px] text-gray-500 font-bold">
+                                      <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">
                                         + {formatCurrency(Number(ai.additionalPrice ?? 0))}
                                       </div>
                                     </div>
-                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${isSelected ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-700 text-gray-700'}`}>
+                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${isSelected ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-700 text-gray-700 dark:text-gray-300'}`}>
                                       {isSelected ? <ChevronRight className="w-4 h-4" /> : null}
                                     </div>
                                   </div>
@@ -636,12 +636,12 @@ export function PosItemConfiguratorModal(props: {
                           <div className="flex items-start justify-between gap-4 mb-3">
                             <div>
                               <div className="text-white font-black text-sm uppercase tracking-wider">{groupName}</div>
-                              <div className="text-[10px] text-gray-500 font-bold">
+                              <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">
                                 {isRequired ? `Obrigatório • ` : ''}
                                 {group.selectionType === 'single' ? 'Escolha 1' : `Escolha até ${maxSelect}`}
                               </div>
                             </div>
-                            <div className="text-[10px] font-black uppercase text-gray-600">
+                            <div className="text-[10px] font-black uppercase text-gray-600 dark:text-gray-400">
                               {(state?.items ?? []).length}/{maxSelect}
                             </div>
                           </div>
@@ -662,14 +662,14 @@ export function PosItemConfiguratorModal(props: {
                                       <div className="flex items-center justify-between gap-3">
                                         <div className="min-w-0">
                                           <div className="text-white font-bold text-xs truncate">{i.name}</div>
-                                          <div className="text-[10px] text-gray-500 font-bold">
+                                          <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">
                                             {i.priceImpactType === 'fixed' ? `+ ${formatCurrency(priceImpactValue)}` :
                                               i.priceImpactType === 'percentage' ? `+ ${priceImpactValue}%` :
                                                 i.priceImpactType === 'replace' ? `Preço: ${formatCurrency(priceImpactValue)}` :
                                                   ''}
                                           </div>
                                         </div>
-                                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${isSelected ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-700 text-gray-700'}`}>
+                                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${isSelected ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-700 text-gray-700 dark:text-gray-300'}`}>
                                           {isSelected ? <ChevronRight className="w-4 h-4" /> : null}
                                         </div>
                                       </div>
@@ -705,7 +705,7 @@ export function PosItemConfiguratorModal(props: {
                               })}
                           </div>
 
-                          <div className="mt-3 text-[10px] text-gray-500 font-bold">
+                          <div className="mt-3 text-[10px] text-gray-500 dark:text-gray-400 font-bold">
                             {Number(minSelect ?? 0) > 0 ? `Mínimo: ${minSelect}. ` : ''}
                             Máximo: {maxSelect}.
                           </div>
@@ -725,12 +725,12 @@ export function PosItemConfiguratorModal(props: {
                         <div className="flex items-start justify-between gap-4 mb-3">
                           <div>
                             <div className="text-white font-black text-sm uppercase tracking-wider">{group.name}</div>
-                            <div className="text-[10px] text-gray-500 font-bold">
+                            <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">
                               {group.isRequired ? `Obrigatório • ` : ''}
                               {group.maxSelect === 1 ? 'Escolha 1' : `Escolha até ${group.maxSelect}`}
                             </div>
                           </div>
-                          <div className="text-[10px] font-black uppercase text-gray-600">{selected.length}/{group.maxSelect}</div>
+                          <div className="text-[10px] font-black uppercase text-gray-600 dark:text-gray-400">{selected.length}/{group.maxSelect}</div>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -751,9 +751,9 @@ export function PosItemConfiguratorModal(props: {
                                   <div className="flex items-center justify-between gap-3">
                                     <div className="min-w-0">
                                       <div className="text-white font-bold text-xs truncate">{i.name}</div>
-                                      <div className="text-[10px] text-gray-500 font-bold">+ {formatCurrency(Number(i.additionalPrice ?? 0))}</div>
+                                      <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">+ {formatCurrency(Number(i.additionalPrice ?? 0))}</div>
                                     </div>
-                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${isSelected ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-700 text-gray-700'}`}>
+                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${isSelected ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-700 text-gray-700 dark:text-gray-300'}`}>
                                       {isSelected ? <ChevronRight className="w-4 h-4" /> : null}
                                     </div>
                                   </div>
@@ -768,7 +768,7 @@ export function PosItemConfiguratorModal(props: {
               ) : null}
 
               <div className="bg-gray-950/40 border border-gray-800 rounded-2xl p-4">
-                <div className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Observações</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">Observações</div>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -829,7 +829,7 @@ export function PosItemConfiguratorModal(props: {
               }}
               className={`flex-1 h-12 rounded-2xl flex items-center justify-between px-6 font-black transition-all ${
                 currentValidationError || loading || !detail
-                  ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                  ? 'bg-gray-800 text-gray-600 dark:text-gray-400 cursor-not-allowed'
                   : 'bg-emerald-600 hover:bg-emerald-700 text-white'
               }`}
             >

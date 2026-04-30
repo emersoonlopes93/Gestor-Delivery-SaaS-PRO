@@ -121,15 +121,15 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden transform transition-all animate-in zoom-in-95 duration-300">
-        <div className="px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/80">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden transform transition-all animate-in zoom-in-95 duration-300">
+        <div className="px-8 py-5 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50/80">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
               {editingIngredient ? 'Refatorar Insumo' : 'Novo Insumo Mestre'}
             </h2>
-            <p className="text-xs text-gray-500 mt-0.5">Defina a unidade base para precisão na ficha técnica.</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Defina a unidade base para precisão na ficha técnica.</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-all">
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-600 dark:text-gray-400 transition-all">
             <span className="text-2xl leading-none">&times;</span>
           </button>
         </div>
@@ -139,37 +139,37 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
           <div className="space-y-5">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-1 h-5 bg-primary-500 rounded-full"></div>
-              <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider">Bloco A — Dados do Insumo</h3>
+              <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Bloco A — Dados do Insumo</h3>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-600 uppercase">Nome do Insumo *</label>
+                <label className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Nome do Insumo *</label>
                 <input
                   type="text"
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
                   placeholder="Ex: Açúcar Refinado, Farinha de Trigo"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-600 uppercase">SKU / Categoria</label>
+                <label className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">SKU / Categoria</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={formData.sku}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    className="w-1/2 px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm"
+                    className="w-1/2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm"
                     placeholder="Código"
                   />
                   <input
                     type="text"
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-1/2 px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 outline-none text-sm"
+                    className="w-1/2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 focus:ring-2 focus:ring-primary-500 outline-none text-sm"
                     placeholder="Ex: Secos"
                   />
                 </div>
@@ -178,11 +178,11 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-600 uppercase">Unidade Base (Consumo) *</label>
+                <label className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Unidade Base (Consumo) *</label>
                 <select
                   value={formData.unit}
                   onChange={(e) => setFormData({ ...formData, unit: e.target.value as UnitType })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 outline-none appearance-none bg-white cursor-pointer"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 focus:ring-2 focus:ring-primary-500 outline-none appearance-none bg-white dark:bg-gray-900 cursor-pointer"
                 >
                   {unitOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
@@ -190,31 +190,31 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-600 uppercase">Fator de Conversão</label>
+                <label className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Fator de Conversão</label>
                 <input
                   type="number"
                   step="0.0001"
                   value={formData.conversionFactor}
                   onChange={(e) => setFormData({ ...formData, conversionFactor: Number(e.target.value) })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 outline-none text-sm"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 focus:ring-2 focus:ring-primary-500 outline-none text-sm"
                 />
                 <p className="text-[10px] text-gray-400">Ex: 1000 se base=g e compra=kg</p>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-600 uppercase">Estoque Mínimo</label>
+                <label className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Estoque Mínimo</label>
                 <input
                   type="number"
                   step="0.01"
                   value={formData.minStock}
                   onChange={(e) => setFormData({ ...formData, minStock: Number(e.target.value) })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 outline-none"
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 focus:ring-2 focus:ring-primary-500 outline-none"
                 />
               </div>
             </div>
           </div>
 
-          <hr className="my-8 border-gray-100" />
+          <hr className="my-8 border-gray-100 dark:border-gray-800" />
 
           {/* BLOCO B - COMPRA INICIAL / ENTRADA INICIAL */}
           {!editingIngredient && (
@@ -222,7 +222,7 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <div className="w-1 h-5 bg-emerald-500 rounded-full"></div>
-                  <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider">Bloco B — Entrada de Estoque</h3>
+                  <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Bloco B — Entrada de Estoque</h3>
                 </div>
                 <label className="inline-flex items-center cursor-pointer">
                   <input 
@@ -231,8 +231,8 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
                     checked={formData.initialPurchaseActive}
                     onChange={(e) => setFormData({ ...formData, initialPurchaseActive: e.target.checked })}
                   />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                  <span className="ml-3 text-sm font-medium text-gray-600">Lançar compra agora</span>
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white dark:bg-gray-900 after:border-gray-300 dark:border-gray-700 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                  <span className="ml-3 text-sm font-medium text-gray-600 dark:text-gray-400">Lançar compra agora</span>
                 </label>
               </div>
 
@@ -262,7 +262,7 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
                           ...formData, 
                           initialPurchase: { ...formData.initialPurchase!, unit: e.target.value as UnitType } 
                         })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-emerald-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white cursor-pointer"
+                        className="w-full px-4 py-2.5 rounded-xl border border-emerald-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white dark:bg-gray-900 cursor-pointer"
                       >
                         {unitOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                       </select>
@@ -287,17 +287,17 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
 
                   {/* BLOCO C - RESULTADO AUTOMÁTICO */}
                   {calculatedValues && (
-                    <div className="bg-white/80 p-4 rounded-xl border border-emerald-100 flex flex-wrap gap-6 justify-between items-center">
+                    <div className="bg-white dark:bg-gray-900/80 p-4 rounded-xl border border-emerald-100 flex flex-wrap gap-6 justify-between items-center">
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Custo p/ Unidade Base ({formData.unit})</span>
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider">Custo p/ Unidade Base ({formData.unit})</span>
                         <span className="text-lg font-black text-emerald-700">R$ {calculatedValues.costPerBaseUnit.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Custo p/ Unidade Compra ({formData.initialPurchase?.unit})</span>
-                        <span className="text-sm font-bold text-gray-700">R$ {calculatedValues.costPerPurchaseUnit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider">Custo p/ Unidade Compra ({formData.initialPurchase?.unit})</span>
+                        <span className="text-sm font-bold text-gray-700 dark:text-gray-300">R$ {calculatedValues.costPerPurchaseUnit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Estoque Inicial Total</span>
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider">Estoque Inicial Total</span>
                         <span className="text-lg font-black text-emerald-700">{calculatedValues.quantityBase} <span className="text-sm font-medium">{formData.unit}</span></span>
                       </div>
                     </div>
@@ -321,7 +321,7 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-6 py-3 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 transition-all uppercase tracking-wide text-sm"
+              className="flex-1 px-6 py-3 rounded-xl border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 font-bold hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 transition-all uppercase tracking-wide text-sm"
             >
               Cancelar
             </button>

@@ -27,9 +27,12 @@ import {
   CornerDownRight,
   Copy,
   ExternalLink,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
+import { useThemeStore } from '../stores/theme.store';
 
 type SidebarItem = {
   id: string;
@@ -196,12 +199,12 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
         className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all group ${
           isAnyItemActive
             ? 'bg-primary-50 text-primary-700 shadow-sm shadow-primary-500/10'
-            : 'text-gray-500 hover:bg-gray-100/50 hover:text-gray-900'
+            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:text-gray-100'
         }`}
         title={collapsed ? group.label : undefined}
       >
         <span className="flex items-center gap-2 min-w-0">
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] group-hover:text-gray-600 transition-colors">
+          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] group-hover:text-gray-600 dark:text-gray-400 transition-colors">
             {!collapsed ? group.label : group.label.slice(0, 1)}
           </span>
         </span>
@@ -229,9 +232,9 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
                   href={item.to}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-gray-500 hover:bg-gray-100/50 hover:text-gray-900"
+                  className="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:text-gray-100"
                 >
-                  <span className="w-6 flex items-center justify-center text-gray-400 group-hover:text-gray-600 transition-colors" aria-hidden>
+                  <span className="w-6 flex items-center justify-center text-gray-400 group-hover:text-gray-600 dark:text-gray-400 transition-colors" aria-hidden>
                     <item.icon className="h-4 w-4" aria-hidden />
                   </span>
                   {!collapsed ? <span className="truncate">{item.label}</span> : null}
@@ -250,13 +253,13 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
                   return `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
                     isActive
                       ? 'bg-primary-50 text-primary-700 shadow-sm shadow-primary-500/10'
-                      : 'text-gray-500 hover:bg-gray-100/50 hover:text-gray-900'
+                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:text-gray-100'
                   }`;
                 }}
               >
                 {({ isActive }) => (
                   <>
-                    <span className={`w-6 flex items-center justify-center transition-colors ${isActive ? 'text-primary-600' : 'text-gray-400 group-hover:text-gray-600'}`} aria-hidden>
+                    <span className={`w-6 flex items-center justify-center transition-colors ${isActive ? 'text-primary-600' : 'text-gray-400 group-hover:text-gray-600 dark:text-gray-400'}`} aria-hidden>
                       <item.icon className="h-4 w-4" aria-hidden />
                     </span>
                     {!collapsed ? <span className="truncate">{item.label}</span> : null}
@@ -281,6 +284,7 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
  */
 export function AppLayout() {
   const { user, clearUser } = useAuthStore();
+  const { theme, setTheme } = useThemeStore();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -430,26 +434,26 @@ export function AppLayout() {
   }, [publicMenuUrl]);
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
+    <div className="min-h-screen flex bg-gray-50 dark:bg-gray-900/50 dark:bg-gray-950 transition-colors">
       {isMobileOpen ? (
         <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={closeMobile} />
       ) : null}
 
       <aside
-        className={`fixed z-50 inset-y-0 left-0 bg-white border-r border-gray-200 flex flex-col transition-[transform,width] duration-200 ease-out md:static md:translate-x-0 ${
+        className={`fixed z-50 inset-y-0 left-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-[transform,width,background-color] duration-200 ease-out md:static md:translate-x-0 ${
           collapsed ? 'w-[72px]' : 'w-64'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
         aria-label="Sidebar"
       >
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between gap-2">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-2">
           {!collapsed ? (
             <div className="min-w-0">
-              <h1 className="text-xl font-black text-gray-900 tracking-tight truncate">Gestor<span className="text-primary-600">PRO</span></h1>
-              <p className="text-xs font-bold text-gray-500 mt-0.5 truncate">{user?.name || 'Carregando...'}</p>
+              <h1 className="text-xl font-black text-gray-900 dark:text-gray-100 tracking-tight truncate">Gestor<span className="text-primary-600">PRO</span></h1>
+              <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mt-0.5 truncate">{user?.name || 'Carregando...'}</p>
             </div>
           ) : (
             <div className="w-full text-center">
-              <span className="text-xl font-black text-gray-900 tracking-tight" aria-hidden>
+              <span className="text-xl font-black text-gray-900 dark:text-gray-100 tracking-tight" aria-hidden>
                 G<span className="text-primary-600">P</span>
               </span>
             </div>
@@ -457,17 +461,17 @@ export function AppLayout() {
         </div>
 
         {tenantSlug ? (
-          <div className="px-3 py-3 border-b border-gray-200 bg-gray-50">
-            <div className="text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2">
+          <div className="px-3 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 dark:bg-gray-900/50">
+            <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-2">
               Cardápio Público
             </div>
-            <div className="text-xs text-gray-700 font-medium truncate">/{tenantSlug}</div>
+            <div className="text-xs text-gray-700 dark:text-gray-300 dark:text-gray-300 font-medium truncate">/{tenantSlug}</div>
             <div className="mt-2 grid grid-cols-2 gap-2">
               <a
                 href={publicMenuUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
+                className="inline-flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-gray-800 dark:border-gray-700 bg-white dark:bg-gray-900 dark:bg-gray-800 text-gray-700 dark:text-gray-300 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 dark:hover:bg-gray-700"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
                 Ver
@@ -475,7 +479,7 @@ export function AppLayout() {
               <button
                 type="button"
                 onClick={handleCopyPublicUrl}
-                className="inline-flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
+                className="inline-flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-gray-800 dark:border-gray-700 bg-white dark:bg-gray-900 dark:bg-gray-800 text-gray-700 dark:text-gray-300 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 dark:hover:bg-gray-700"
               >
                 <Copy className="h-3.5 w-3.5" />
                 {copiedPublicLink ? 'Copiado' : 'Copiar'}
@@ -501,10 +505,10 @@ export function AppLayout() {
           })}
         </nav>
 
-        <div className="p-3 border-t border-gray-200">
+        <div className="p-3 border-t border-gray-200 dark:border-gray-800">
           <button
             onClick={handleLogout}
-            className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 transition-all ${
+            className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all ${
               collapsed ? 'flex items-center justify-center' : ''
             }`}
             title={collapsed ? 'Sair' : undefined}
@@ -515,12 +519,12 @@ export function AppLayout() {
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="hidden md:flex sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-gray-200/60">
+        <header className="hidden md:flex sticky top-0 z-30 bg-white dark:bg-gray-900/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800/60 dark:border-gray-800/60">
           <div className="h-16 px-6 flex items-center gap-4 w-full">
             <button
               type="button"
               onClick={toggleCollapsed}
-              className="inline-flex items-center justify-center rounded-xl p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-all"
+              className="inline-flex items-center justify-center rounded-xl p-2 text-gray-400 hover:text-gray-900 dark:text-gray-100 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 dark:hover:bg-gray-800 transition-all"
               aria-label="Alternar sidebar"
               title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
             >
@@ -550,7 +554,17 @@ export function AppLayout() {
 
             <button
               type="button"
-              className="btn-ghost w-10 h-10 p-0 rounded-full bg-gray-50"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="btn-ghost w-10 h-10 p-0 rounded-full bg-gray-50 dark:bg-gray-900/50 dark:bg-gray-800"
+              title="Tema"
+              aria-label="Alternar Tema"
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
+            </button>
+
+            <button
+              type="button"
+              className="btn-ghost w-10 h-10 p-0 rounded-full bg-gray-50 dark:bg-gray-900/50 dark:bg-gray-800"
               title="Notificações"
               aria-label="Notificações"
             >
@@ -559,7 +573,7 @@ export function AppLayout() {
 
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-2 py-1 sm:pr-3 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-sm"
+              className="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-800 dark:border-gray-700 bg-white dark:bg-gray-900 dark:bg-gray-800 px-2 py-1 sm:pr-3 text-sm font-bold text-gray-700 dark:text-gray-300 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 dark:hover:bg-gray-700 transition-all shadow-sm"
               title="Perfil"
             >
               <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center">
@@ -570,19 +584,19 @@ export function AppLayout() {
           </div>
         </header>
 
-        <header className="md:hidden sticky top-0 z-30 bg-white border-b border-gray-200">
+        <header className="md:hidden sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
           <div className="h-14 px-4 flex items-center justify-between">
             <button
               type="button"
               onClick={openMobile}
-              className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              className="inline-flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50"
               aria-label="Abrir menu"
             >
               <Menu className="h-4 w-4" aria-hidden />
             </button>
             <div className="min-w-0 text-center">
-              <div className="text-sm font-semibold text-gray-900 truncate">Gestor Delivery</div>
-              <div className="text-xs text-gray-500 truncate">{user?.name || 'Carregando...'}</div>
+              <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">Gestor Delivery</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.name || 'Carregando...'}</div>
             </div>
             <div className="w-10" />
           </div>

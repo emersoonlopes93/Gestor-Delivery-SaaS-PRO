@@ -345,7 +345,7 @@ export default function PosPage() {
     });
   };
 
-  if (sessionLoading) return <div className="flex flex-col items-center justify-center h-screen bg-gray-950 text-gray-500 italic uppercase font-black animate-pulse">Carregando Sessão...</div>;
+  if (sessionLoading) return <div className="flex flex-col items-center justify-center h-screen bg-gray-950 text-gray-500 dark:text-gray-400 italic uppercase font-black animate-pulse">Carregando Sessão...</div>;
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] bg-gray-950 text-gray-100 overflow-hidden font-sans">
@@ -354,20 +354,20 @@ export default function PosPage() {
       <div className="hidden lg:flex w-16 flex-col bg-gray-900 border-r border-gray-800 py-4 gap-4 items-center">
         <button 
           onClick={() => setViewMode('catalog')}
-          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'catalog' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'}`}
+          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'catalog' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-700'}`}
           title="Catálogo"
         >
           <Store size={20} />
         </button>
         <button 
           onClick={() => { setViewMode('salon'); queryClient.invalidateQueries({ queryKey: ['posSalon'] }); }}
-          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'salon' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-gray-800 text-gray-500 hover:bg-gray-700'}`}
+          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'salon' ? 'bg-emerald-500 text-white shadow-lg' : 'bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-700'}`}
           title="Salão"
         >
           <LayoutGrid size={20} />
         </button>
         <div className="w-6 h-[1px] bg-gray-800" />
-        <button className="w-10 h-10 bg-gray-800 text-gray-500 rounded-xl flex items-center justify-center hover:text-white transition-colors" title="Configurações">
+        <button className="w-10 h-10 bg-gray-800 text-gray-500 dark:text-gray-400 rounded-xl flex items-center justify-center hover:text-white transition-colors" title="Configurações">
            <Keyboard size={18} />
         </button>
       </div>
@@ -378,7 +378,7 @@ export default function PosPage() {
            <>
             <div className="p-3 bg-gray-900 border-b border-gray-800 flex flex-col xl:flex-row gap-3 items-center">
               <div className="relative flex-1 group w-full">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600 group-focus-within:text-emerald-500" size={16} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-600 dark:text-gray-400 group-focus-within:text-emerald-500" size={16} />
                 <input
                   ref={searchInputRef}
                   type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
@@ -433,11 +433,11 @@ export default function PosPage() {
 
         <div className="px-4 py-3 bg-gray-850/30 border-b border-gray-800">
            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest flex items-center gap-1.5 leading-none">
+              <span className="text-[10px] font-black uppercase text-gray-500 dark:text-gray-400 tracking-widest flex items-center gap-1.5 leading-none">
                  <User size={12} className="text-emerald-500" />
                  {customerName || 'Identificar Cliente'}
               </span>
-              <button onClick={() => setShowCustomerSearch(!showCustomerSearch)} className="text-gray-500 hover:text-emerald-500 transition-colors">
+              <button onClick={() => setShowCustomerSearch(!showCustomerSearch)} className="text-gray-500 dark:text-gray-400 hover:text-emerald-500 transition-colors">
                 <Search size={16} />
               </button>
            </div>
@@ -465,18 +465,18 @@ export default function PosPage() {
                 <div key={item.cartLineId} className="bg-gray-800/40 border border-gray-800/50 rounded-2xl p-4 group transition-all hover:bg-gray-800/60">
                    <div className="flex justify-between items-start gap-4 mb-3">
                       <p className="font-bold text-gray-100 text-[13px] leading-tight">{item.name}</p>
-                      <button onClick={() => removeFromCart(item.cartLineId)} className="text-gray-600 hover:text-red-500 transition-colors"><X size={16} /></button>
+                      <button onClick={() => removeFromCart(item.cartLineId)} className="text-gray-600 dark:text-gray-400 hover:text-red-500 transition-colors"><X size={16} /></button>
                    </div>
                    {item.compositionLabel ? (
-                     <div className="text-[10px] text-gray-500 font-bold mb-2 line-clamp-2">
+                     <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold mb-2 line-clamp-2">
                        {item.compositionLabel}
                      </div>
                    ) : null}
                    <div className="flex items-center justify-between">
                       <div className="flex items-center bg-gray-950 rounded-xl p-1 border border-gray-800/50">
-                         <button onClick={() => updateCartItem(item.cartLineId, { quantity: Math.max(1, item.quantity - 1) })} className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-white"><Minus size={14} strokeWidth={3} /></button>
+                         <button onClick={() => updateCartItem(item.cartLineId, { quantity: Math.max(1, item.quantity - 1) })} className="w-7 h-7 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-white"><Minus size={14} strokeWidth={3} /></button>
                          <span className="w-8 text-center font-black text-sm text-white">{item.quantity}</span>
-                         <button onClick={() => updateCartItem(item.cartLineId, { quantity: item.quantity + 1 })} className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-white"><Plus size={14} strokeWidth={3} /></button>
+                         <button onClick={() => updateCartItem(item.cartLineId, { quantity: item.quantity + 1 })} className="w-7 h-7 flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-white"><Plus size={14} strokeWidth={3} /></button>
                       </div>
                       <p className="text-emerald-400 font-extrabold text-lg">{formatCurrency(item.basePrice * item.quantity)}</p>
                    </div>
@@ -489,7 +489,7 @@ export default function PosPage() {
             {fulfillmentType === PosFulfillmentType.TABLE && (
                <div className="grid grid-cols-2 gap-3">
                   <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600"><Hash size={14} /></span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600 dark:text-gray-400"><Hash size={14} /></span>
                     <input className="w-full bg-gray-900 border border-gray-800 rounded-xl pl-9 pr-4 py-3 text-xs font-bold text-white outline-none focus:border-blue-500" placeholder="Nº Mesa" value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} />
                   </div>
                   <button 
@@ -514,7 +514,7 @@ export default function PosPage() {
             )}
 
             <div className="space-y-1.5 border-t border-gray-800/50 pt-3">
-               <div className="flex justify-between text-[11px] font-bold text-gray-500 uppercase tracking-tighter">
+               <div className="flex justify-between text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-tighter">
                   <span>Subtotal</span>
                   <span>{formatCurrency(subtotal)}</span>
                </div>
@@ -527,7 +527,7 @@ export default function PosPage() {
             <button 
               onClick={() => setIsPaymentModalOpen(true)}
               disabled={cart.length === 0 || createSale.isPending}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-900/20 flex items-center justify-center gap-2 text-base transition-all active:scale-95 disabled:bg-gray-800 disabled:text-gray-600"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-900/20 flex items-center justify-center gap-2 text-base transition-all active:scale-95 disabled:bg-gray-800 disabled:text-gray-600 dark:text-gray-400"
             >
                {createSale.isPending ? 'PROCESSANDO...' : 'FECHAR CONTA (F4)'}
                <ChevronRight size={20} strokeWidth={3} />

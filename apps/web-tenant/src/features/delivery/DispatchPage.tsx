@@ -48,8 +48,8 @@ export function DispatchPage() {
   return (
     <div className="p-6 max-w-7xl mx-auto h-full flex flex-col">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Despacho em Tempo Real</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Despacho em Tempo Real</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           Supervisione os pedidos para entrega, atribua entregadores e controle rotas.
         </p>
       </div>
@@ -57,28 +57,28 @@ export function DispatchPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1 items-start">
         {/* Coluna 1: Em Preparo (Próximos) */}
         <div className="bg-gray-100 rounded-xl p-4 min-h-[500px]">
-          <h2 className="font-bold text-gray-700 mb-4 flex items-center justify-between">
+          <h2 className="font-bold text-gray-700 dark:text-gray-300 mb-4 flex items-center justify-between">
             <span>👩‍🍳 Em Preparo</span>
-            <span className="bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full text-sm">
+            <span className="bg-gray-200 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded-full text-sm">
               {preparingOrders.length}
             </span>
           </h2>
           <div className="space-y-4">
             {preparingOrders.map((o) => (
-              <div key={o.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <div key={o.id} className="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800">
                 <div className="flex justify-between items-start mb-2">
                   <span className="font-bold text-primary-600">{o.orderNumber}</span>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
                     {o.createdAt ? new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                   </span>
                 </div>
-                <div className="font-medium text-gray-900">{o.customerName}</div>
-                <div className="text-sm text-gray-500 mt-2 truncate">
+                <div className="font-medium text-gray-900 dark:text-gray-100">{o.customerName}</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 mt-2 truncate">
                   {o.deliveryAddress?.street}, {o.deliveryAddress?.number} - {o.deliveryAddress?.neighborhood}
                 </div>
-                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
                   <select
-                    className="text-sm border-gray-300 rounded focus:ring-primary-500 focus:border-primary-500 bg-gray-50 w-full mr-2"
+                    className="text-sm border-gray-300 dark:border-gray-700 rounded focus:ring-primary-500 focus:border-primary-500 bg-gray-50 dark:bg-gray-900/50 w-full mr-2"
                     value={selectedDriverForOrder[o.id] || o.deliveryDriverId || ''}
                     onChange={(e) =>
                       setSelectedDriverForOrder({ ...selectedDriverForOrder, [o.id]: e.target.value })
@@ -116,22 +116,22 @@ export function DispatchPage() {
           </h2>
           <div className="space-y-4">
             {readyOrders.map((o) => (
-              <div key={o.id} className="bg-white p-4 rounded-lg shadow-sm border border-yellow-200">
+              <div key={o.id} className="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm border border-yellow-200">
                 <div className="flex justify-between items-start mb-2">
                   <span className="font-bold text-yellow-600">{o.orderNumber}</span>
                   <span className="text-xs font-semibold text-yellow-600 bg-yellow-100 px-2 rounded">
                     PRONTO
                   </span>
                 </div>
-                <div className="font-medium text-gray-900">{o.customerName}</div>
-                <div className="text-sm text-gray-500 mt-2">
+                <div className="font-medium text-gray-900 dark:text-gray-100">{o.customerName}</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 mt-2">
                   {o.deliveryAddress?.street}, {o.deliveryAddress?.number} - {o.deliveryAddress?.neighborhood}
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-gray-100">
+                <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
                   <div className="flex items-center justify-between mb-3">
                     <select
-                      className="text-sm border-gray-300 rounded focus:ring-primary-500 focus:border-primary-500 bg-gray-50 w-full mr-2"
+                      className="text-sm border-gray-300 dark:border-gray-700 rounded focus:ring-primary-500 focus:border-primary-500 bg-gray-50 dark:bg-gray-900/50 w-full mr-2"
                       value={selectedDriverForOrder[o.id] || o.deliveryDriverId || ''}
                       onChange={(e) =>
                         setSelectedDriverForOrder({ ...selectedDriverForOrder, [o.id]: e.target.value })
@@ -185,15 +185,15 @@ export function DispatchPage() {
           </h2>
           <div className="space-y-4">
             {outOrders.map((o) => (
-              <div key={o.id} className="bg-white p-4 rounded-lg shadow-sm border border-primary-200">
+              <div key={o.id} className="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm border border-primary-200">
                 <div className="flex justify-between items-start mb-2">
                   <span className="font-bold text-primary-600">{o.orderNumber}</span>
                   <span className="text-xs font-semibold text-green-600 bg-green-50 border border-green-100 px-2 rounded-full py-0.5 whitespace-nowrap">
                     Em rota
                   </span>
                 </div>
-                <div className="font-medium text-gray-900">{o.customerName}</div>
-                <div className="text-sm text-gray-500 truncate mb-1">
+                <div className="font-medium text-gray-900 dark:text-gray-100">{o.customerName}</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 truncate mb-1">
                   {o.deliveryAddress?.street}, {o.deliveryAddress?.number}
                 </div>
                 <div className="text-sm font-semibold text-primary-700 bg-primary-50 p-2 rounded truncate">

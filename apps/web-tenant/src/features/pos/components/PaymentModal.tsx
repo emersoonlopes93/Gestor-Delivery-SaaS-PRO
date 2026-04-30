@@ -66,10 +66,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           </div>
           <div className="text-left">
             <p className="font-bold text-white">Dinheiro</p>
-            <p className="text-xs text-gray-500">Pagamento em espécie</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Pagamento em espécie</p>
           </div>
         </div>
-        <ChevronRight size={20} className="text-gray-600 group-hover:text-emerald-400 group-hover:translate-x-1 transition-all" />
+        <ChevronRight size={20} className="text-gray-600 dark:text-gray-400 group-hover:text-emerald-400 group-hover:translate-x-1 transition-all" />
       </button>
 
       <button
@@ -82,10 +82,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           </div>
           <div className="text-left">
             <p className="font-bold text-white">PIX</p>
-            <p className="text-xs text-gray-500">Instantâneo e sem taxas</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Instantâneo e sem taxas</p>
           </div>
         </div>
-        <ChevronRight size={20} className="text-gray-600 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
+        <ChevronRight size={20} className="text-gray-600 dark:text-gray-400 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
       </button>
 
       <div className="grid grid-cols-2 gap-3">
@@ -110,12 +110,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const renderCashDetails = () => (
     <div className="space-y-4 py-2">
       <div className="text-center bg-gray-950/30 p-4 rounded-2xl border border-gray-800">
-        <p className="text-gray-500 text-[10px] uppercase font-black tracking-[0.2em] mb-1">Total a receber</p>
+        <p className="text-gray-500 dark:text-gray-400 text-[10px] uppercase font-black tracking-[0.2em] mb-1">Total a receber</p>
         <p className="text-4xl font-black text-emerald-400 tracking-tighter">{formatCurrency(total)}</p>
       </div>
 
       <div className="space-y-2">
-        <label className="text-[10px] text-gray-500 uppercase font-black tracking-widest ml-1">Quanto o cliente pagou?</label>
+        <label className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-black tracking-widest ml-1">Quanto o cliente pagou?</label>
         <div className="relative">
           <input
             type="number"
@@ -125,7 +125,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             className={`w-full bg-gray-900 border-2 rounded-2xl px-4 py-4 text-2xl font-black text-white outline-none transition-all ${cashAmount < total && cashAmount !== 0 ? 'border-red-500/50 text-red-400' : 'border-gray-800 focus:border-emerald-500'}`}
             placeholder="0,00"
           />
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">R$</div>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 font-bold">R$</div>
         </div>
       </div>
 
@@ -169,7 +169,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       <button
         onClick={() => onConfirm(PaymentMethod.cash, { cashAmount })}
         disabled={isPending || cashAmount < total}
-        className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-800 disabled:text-gray-600 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
+        className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-800 disabled:text-gray-600 dark:text-gray-400 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
       >
         {isPending ? 'FINALIZANDO...' : 'CONFIRMAR RECEBIMENTO'}
         <CheckCircle2 size={20} />
@@ -179,11 +179,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const renderPixDetails = () => (
     <div className="space-y-6 py-4 text-center">
-      <div className="bg-white p-4 rounded-3xl inline-block shadow-2xl">
-        <div className="w-48 h-48 bg-gray-100 rounded-2xl flex items-center justify-center overflow-hidden border border-gray-200">
+      <div className="bg-white dark:bg-gray-900 p-4 rounded-3xl inline-block shadow-2xl">
+        <div className="w-48 h-48 bg-gray-100 rounded-2xl flex items-center justify-center overflow-hidden border border-gray-200 dark:border-gray-800">
            {/* Mock QR CODE */}
            <div className="relative">
-             <QrCode size={160} className="text-gray-900" />
+             <QrCode size={160} className="text-gray-900 dark:text-gray-100" />
              <div className="absolute inset-0 flex items-center justify-center">
                <div className="w-10 h-10 bg-indigo-600 text-white rounded-lg flex items-center justify-center shadow-lg border-2 border-white">
                  <img src="https://logodownload.org/wp-content/uploads/2020/02/pix-bc-logo-0.png" className="w-6 invert brightness-0" alt="PIX" />
@@ -195,7 +195,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
       <div className="space-y-2">
         <p className="text-white font-bold text-xl">{formatCurrency(total)}</p>
-        <p className="text-gray-500 text-sm">Escaneie o QR Code acima ou copie a chave</p>
+        <p className="text-gray-500 dark:text-gray-400 text-sm">Escaneie o QR Code acima ou copie a chave</p>
       </div>
 
       <button
@@ -224,7 +224,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           <CreditCard size={40} />
         </div>
         <p className="text-white font-bold text-xl">Aguardando Máquina</p>
-        <p className="text-gray-500 text-sm mt-2">Insira ou aproxime o cartão na maquininha</p>
+        <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">Insira ou aproxime o cartão na maquininha</p>
         <p className="text-amber-400 font-black text-3xl mt-4">{formatCurrency(total)}</p>
       </div>
 
@@ -248,7 +248,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           {step === 'details' && (
             <button 
               onClick={() => setStep('selection')}
-              className="text-gray-500 hover:text-white p-2 hover:bg-gray-800 rounded-full transition-all"
+              className="text-gray-500 dark:text-gray-400 hover:text-white p-2 hover:bg-gray-800 rounded-full transition-all"
             >
               <ArrowLeft size={20} />
             </button>
@@ -259,7 +259,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="ml-auto text-gray-500 hover:text-white p-2 hover:bg-gray-800 rounded-full transition-all"
+            className="ml-auto text-gray-500 dark:text-gray-400 hover:text-white p-2 hover:bg-gray-800 rounded-full transition-all"
           >
             ✕
           </button>
@@ -278,7 +278,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         {/* Footer Summary */}
         <div className="px-8 py-4 bg-gray-950/50 border-t border-gray-800 flex justify-between items-center">
           <div className="flex flex-col">
-            <span className="text-[10px] text-gray-500 uppercase font-black">Subtotal: {formatCurrency(subtotal)}</span>
+            <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-black">Subtotal: {formatCurrency(subtotal)}</span>
             {discount > 0 && <span className="text-[10px] text-amber-500 uppercase font-black">Desconto: -{formatCurrency(discount)}</span>}
           </div>
           <div className="text-right">

@@ -53,22 +53,22 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-primary-50/30">
-          <h2 className="text-xl font-bold text-gray-900">Registrar Nova Compra</h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <X className="h-5 w-5 text-gray-500" />
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between bg-primary-50/30">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Registrar Nova Compra</h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+            <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit(onSave)} className="flex-1 overflow-y-auto p-6 space-y-6 text-left">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Fornecedor</label>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Fornecedor</label>
               <div className="relative">
                 <select
                   {...register('supplierId', { required: true })}
-                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl appearance-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all"
+                  className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl appearance-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all"
                 >
                   <option value="">Selecione um fornecedor</option>
                   {suppliers.map(s => (
@@ -80,28 +80,28 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Número NF / Referência</label>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Número NF / Referência</label>
               <input
                 {...register('number')}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all"
+                className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all"
                 placeholder="Ex: 001.234"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Data da Compra</label>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Data da Compra</label>
               <input
                 {...register('purchaseDate')}
                 type="date"
                 defaultValue={new Date().toISOString().split('T')[0]}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all"
+                className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all"
               />
             </div>
           </div>
 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900">Itens da Compra</h3>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Itens da Compra</h3>
               <button
                 type="button"
                 onClick={() => append({ ingredientId: '', quantity: 1, unitCost: 0 })}
@@ -111,7 +111,7 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
               </button>
             </div>
 
-            <div className="bg-gray-50 rounded-2xl p-4 overflow-x-auto">
+            <div className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-4 overflow-x-auto">
               <table className="w-full min-w-[600px] text-left border-collapse">
                 <thead>
                   <tr className="text-xs font-bold text-gray-400 uppercase tracking-wider">
@@ -122,13 +122,13 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
                     <th className="px-2 py-2 w-16"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {fields.map((field: any, index: number) => (
                     <tr key={field.id} className="group">
                       <td className="py-3 px-2">
                         <select
                           {...register(`items.${index}.ingredientId` as const, { required: true })}
-                          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg focus:border-primary-500 outline-none text-sm transition-all"
+                          className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:border-primary-500 outline-none text-sm transition-all"
                         >
                           <option value="">Selecione o insumo</option>
                           {ingredients.map(i => (
@@ -141,7 +141,7 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
                           {...register(`items.${index}.quantity` as const, { required: true, min: 0.0001 })}
                           type="number"
                           step="any"
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-primary-500 outline-none text-sm"
+                          className="w-full px-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg focus:border-primary-500 outline-none text-sm"
                         />
                       </td>
                       <td className="py-3 px-2">
@@ -151,11 +151,11 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
                             {...register(`items.${index}.unitCost` as const, { required: true, min: 0 })}
                             type="number"
                             step="any"
-                            className="w-full pl-7 pr-3 py-2 border border-gray-200 rounded-lg focus:border-primary-500 outline-none text-sm"
+                            className="w-full pl-7 pr-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg focus:border-primary-500 outline-none text-sm"
                           />
                         </div>
                       </td>
-                      <td className="py-3 px-2 text-right font-semibold text-gray-700 text-sm">
+                      <td className="py-3 px-2 text-right font-semibold text-gray-700 dark:text-gray-300 text-sm">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
                           (watch(`items.${index}.quantity`) || 0) * (watch(`items.${index}.unitCost`) || 0)
                         )}
@@ -179,7 +179,7 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Status de Pagamento</label>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Status de Pagamento</label>
               <div className="flex gap-4">
                 {[
                   { id: PaymentStatus.PAID, label: 'Já Pago', color: 'bg-green-100 text-green-700' },
@@ -192,7 +192,7 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
                       value={opt.id}
                       className="peer sr-only"
                     />
-                    <div className={`text-center px-4 py-2.5 rounded-xl border-2 border-transparent peer-checked:border-primary-500 bg-gray-50 font-semibold text-sm transition-all ${opt.color}`}>
+                    <div className={`text-center px-4 py-2.5 rounded-xl border-2 border-transparent peer-checked:border-primary-500 bg-gray-50 dark:bg-gray-900/50 font-semibold text-sm transition-all ${opt.color}`}>
                       {opt.label}
                     </div>
                   </label>
@@ -209,11 +209,11 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
           </div>
         </form>
 
-        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/50">
+        <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3 bg-gray-50 dark:bg-gray-900/50/50">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+            className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
           >
             Cancelar
           </button>

@@ -39,8 +39,14 @@ import { InventoryCountPage } from './features/purchasing/InventoryCountPage';
 import { LossesPage } from './features/purchasing/LossesPage';
 import { FinancePage } from './features/purchasing/FinancePage';
 import { EmployeesPage } from './features/management/employees/EmployeesPage';
+import { useThemeStore } from './stores/theme.store';
 
 export function App() {
+  const initTheme = useThemeStore((s) => s.initializeTheme);
+  useEffect(() => {
+    initTheme();
+  }, [initTheme]);
+
   return (
     <Routes>
       {/* Public routes */}

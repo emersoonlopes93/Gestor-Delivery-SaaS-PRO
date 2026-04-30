@@ -34,8 +34,8 @@ export function PermissionGate({
     return (
       <div className="p-6 text-center">
         <div className="text-4xl mb-4 animate-spin">??</div>
-        <h2 className="text-xl font-semibold text-gray-700">Carregando...</h2>
-        <p className="text-gray-500 mt-2">
+        <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300">Carregando...</h2>
+        <p className="text-gray-500 dark:text-gray-400 mt-2">
           Verificando permissões de acesso.
         </p>
       </div>
@@ -48,8 +48,8 @@ export function PermissionGate({
     ) : (
       <div className="p-6 text-center">
         <div className="text-4xl mb-4">??</div>
-        <h2 className="text-xl font-semibold text-gray-700">Acesso Restrito</h2>
-        <p className="text-gray-500 mt-2">
+        <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300">Acesso Restrito</h2>
+        <p className="text-gray-500 dark:text-gray-400 mt-2">
           Você não possui permissão para acessar esta área.
         </p>
         <p className="text-xs text-gray-400 mt-1">

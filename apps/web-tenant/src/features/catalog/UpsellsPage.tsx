@@ -151,11 +151,11 @@ export function UpsellsPage() {
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-primary-600" />
             Upsells & Ofertas
           </h1>
-          <p className="text-gray-500">
+          <p className="text-gray-500 dark:text-gray-400">
             Aumente seu ticket médio oferecendo produtos adicionais com descontos especiais.
           </p>
         </div>
@@ -168,13 +168,13 @@ export function UpsellsPage() {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex items-center gap-2">
+      <div className="card-premium overflow-hidden">
+        <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-2">
           <Search className="h-5 w-5 text-gray-400" />
           <input
             type="text"
             placeholder="Buscar ofertas..."
-            className="flex-1 outline-none text-sm"
+            className="flex-1 outline-none text-sm bg-transparent"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -183,15 +183,15 @@ export function UpsellsPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                <th className="px-6 py-3 font-semibold">Oferta</th>
-                <th className="px-6 py-3 font-semibold">Regra de Preço</th>
-                <th className="px-6 py-3 font-semibold">Exibição</th>
-                <th className="px-6 py-3 font-semibold">Status</th>
-                <th className="px-6 py-3 font-semibold text-right">Ações</th>
+              <tr className="bg-gray-50 dark:bg-gray-900/50/50">
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Oferta</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Regra de Preço</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Exibição</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Status</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 italic-none">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800 italic-none">
               {loading ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-8 text-center text-gray-400">
@@ -206,11 +206,11 @@ export function UpsellsPage() {
                 </tr>
               ) : (
                 filteredUpsells.map((u) => (
-                  <tr key={u.id} className="hover:bg-gray-50 transition-colors group">
+                  <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="font-medium text-gray-900">{u.name}</span>
-                        <span className="text-xs text-gray-500 line-clamp-1">{u.description || 'Sem descrição'}</span>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{u.name}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">{u.description || 'Sem descrição'}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -218,7 +218,7 @@ export function UpsellsPage() {
                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                            u.pricingType === 'fixed_price' ? 'bg-orange-100 text-orange-700' :
                            u.pricingType.startsWith('discount') ? 'bg-green-100 text-green-700' :
-                           'bg-gray-100 text-gray-700'
+                           'bg-gray-100 text-gray-700 dark:text-gray-300'
                          }`}>
                            {u.pricingType === 'normal' ? 'Normal' : 
                             u.pricingType === 'fixed_price' ? 'Preço Fixo' :
@@ -228,7 +228,7 @@ export function UpsellsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-xs text-gray-600">
+                      <span className="text-xs text-gray-600 dark:text-gray-400">
                         {u.displayType === 'inline' ? 'No Produto' :
                          u.displayType === 'cart' ? 'No Carrinho' :
                          'Ambos'}
@@ -242,20 +242,20 @@ export function UpsellsPage() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleOpenItems(u)}
-                          className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                          className="btn-ghost"
                           title="Gerenciar Produtos"
                         >
                           <Package className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleOpenEdit(u)}
-                          className="p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 rounded-lg"
+                          className="btn-ghost"
                         >
                           <Edit2 className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(u.id)}
-                          className="p-2 text-gray-400 hover:bg-red-50 hover:text-red-500 rounded-lg"
+                          className="btn-ghost text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -277,19 +277,19 @@ export function UpsellsPage() {
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nome da Oferta (ex: Combo de Bebidas)</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nome da Oferta (ex: Combo de Bebidas)</label>
             <input
               type="text"
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Descrição Curta</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrição Curta</label>
             <textarea
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
               rows={2}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -298,9 +298,9 @@ export function UpsellsPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Preço</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de Preço</label>
               <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg outline-none"
                 value={formData.pricingType}
                 onChange={(e) => setFormData({ ...formData, pricingType: e.target.value as any })}
               >
@@ -312,14 +312,14 @@ export function UpsellsPage() {
             </div>
             {formData.pricingType !== 'normal' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   {formData.pricingType === 'fixed_price' ? 'Valor Fixo (R$)' : 'Valor do Desconto'}
                 </label>
                 <input
                   type="number"
                   step="0.01"
                   required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg outline-none"
                   value={formData.pricingValue}
                   onChange={(e) => setFormData({ ...formData, pricingValue: Number(e.target.value) })}
                 />
@@ -328,7 +328,7 @@ export function UpsellsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Local de Exibição</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Local de Exibição</label>
             <div className="grid grid-cols-3 gap-2">
               {(['inline', 'cart', 'both'] as const).map((t) => (
                 <button
@@ -338,7 +338,7 @@ export function UpsellsPage() {
                   className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
                     formData.displayType === t
                       ? 'bg-primary-50 border-primary-500 text-primary-700 ring-1 ring-primary-500'
-                      : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                      : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:border-gray-700'
                   }`}
                 >
                   {t === 'inline' ? 'No Produto' : t === 'cart' ? 'No Carrinho' : 'Ambos'}
@@ -355,14 +355,14 @@ export function UpsellsPage() {
               onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
               className="rounded text-primary-600 focus:ring-primary-500"
             />
-            <label htmlFor="isActive" className="text-sm font-medium text-gray-700">Oferta Ativa</label>
+            <label htmlFor="isActive" className="text-sm font-medium text-gray-700 dark:text-gray-300">Oferta Ativa</label>
           </div>
 
           <div className="flex justify-end gap-3 mt-6">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg"
+              className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 rounded-lg"
             >
               Cancelar
             </button>
@@ -381,25 +381,25 @@ export function UpsellsPage() {
         maxWidth="max-w-2xl"
       >
         <div className="space-y-4">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Selecione quais produtos fazem parte desta oferta de upsell. 
             O preço final será calculado automaticamente com base na regra definida.
           </p>
 
-          <div className="max-h-[400px] overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-100">
+          <div className="max-h-[400px] overflow-y-auto border border-gray-100 dark:border-gray-800 rounded-lg divide-y divide-gray-100 dark:divide-gray-800">
             {availableProducts
               .filter(p => !p.deletedAt && (p.type as string) === 'product')
               .map((product) => {
                 const isSelected = selectedUpsell?.items.some((i) => i.productId === product.id);
                 return (
-                  <div key={product.id} className="p-3 flex items-center justify-between hover:bg-gray-50">
+                  <div key={product.id} className="p-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50">
                     <div className="flex items-center gap-3">
                        <div className="h-10 w-10 bg-gray-100 rounded overflow-hidden flex-shrink-0">
                          {product.image && <img src={product.image} className="h-full w-full object-cover" />}
                        </div>
                        <div>
-                         <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                         <div className="text-xs text-gray-500">R${Number(product.basePrice).toFixed(2)}</div>
+                         <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{product.name}</div>
+                         <div className="text-xs text-gray-500 dark:text-gray-400">R${Number(product.basePrice).toFixed(2)}</div>
                        </div>
                     </div>
                     <button

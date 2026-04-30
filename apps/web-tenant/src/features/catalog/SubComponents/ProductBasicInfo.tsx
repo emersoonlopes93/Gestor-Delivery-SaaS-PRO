@@ -42,8 +42,8 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
 }) => {
   return (
     <section className="space-y-6">
-      <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm text-left">
-        <h2 className="text-lg font-black text-gray-900 mb-6">Informações Básicas</h2>
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm text-left">
+        <h2 className="text-lg font-black text-gray-900 dark:text-gray-100 mb-6">Informações Básicas</h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
@@ -52,7 +52,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
               <input
                 value={productForm.name}
                 onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
                 placeholder="Ex: Burger de Costela"
               />
             </div>
@@ -66,7 +66,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                     step="0.01"
                     value={productForm.basePrice}
                     onChange={(e) => setProductForm({ ...productForm, basePrice: Number(e.target.value) })}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
+                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
                   />
                 </div>
               ) : (
@@ -77,9 +77,9 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                     step="0.01"
                     value={Number(bundleSummary?.finalPrice ?? productForm.basePrice ?? 0)}
                     disabled
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl outline-none text-sm font-bold text-gray-700"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 dark:border-gray-800 rounded-xl outline-none text-sm font-bold text-gray-700 dark:text-gray-300"
                   />
-                  <p className="text-[10px] text-gray-500 mt-1 font-bold">Preço derivado automaticamente pelos itens + estratégia de preço.</p>
+                  <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 font-bold">Preço derivado automaticamente pelos itens + estratégia de preço.</p>
                 </div>
               )}
               <div>
@@ -87,7 +87,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                 <input
                   value={productForm.sku}
                   onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
                   placeholder="Código de controle (opcional)"
                 />
               </div>
@@ -98,7 +98,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
               <select
                 value={productForm.categoryId}
                 onChange={(e) => setProductForm({ ...productForm, categoryId: e.target.value })}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
               >
                 <option value="">Selecione uma categoria</option>
                 {categories.map((c) => (
@@ -113,7 +113,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                 <select
                   value={productForm.type}
                   onChange={(e) => setProductForm({ ...productForm, type: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
                 >
                   <option value="simple">Produto Simples</option>
                   <option value="configurable">Produto com Opções</option>
@@ -131,7 +131,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
             <div>
               <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Imagem do Produto</label>
               <div className="flex items-center gap-4">
-                <div className="w-24 h-24 rounded-2xl bg-gray-50 border border-gray-100 overflow-hidden flex items-center justify-center relative group">
+                <div className="w-24 h-24 rounded-2xl bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 overflow-hidden flex items-center justify-center relative group">
                   {(imagePreviewUrl || productForm.image) ? (
                     <img src={imagePreviewUrl || productForm.image} alt="Preview" className="w-full h-full object-cover" />
                   ) : (
@@ -145,7 +145,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                   />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs text-gray-500 font-medium mb-2">Clique na imagem para enviar um novo arquivo.</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-2">Clique na imagem para enviar um novo arquivo.</p>
                   <button
                     type="button"
                     onClick={() => { setImageFile(null); setImagePreviewUrl(null); setProductForm({ ...productForm, image: '' }); }}
@@ -162,7 +162,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
               <input
                 value={productForm.shortDescription}
                 onChange={(e) => setProductForm({ ...productForm, shortDescription: e.target.value })}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
                 placeholder="Breve descrição para o cardápio"
               />
             </div>
@@ -173,23 +173,23 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                 rows={3}
                 value={productForm.longDescription}
                 onChange={(e) => setProductForm({ ...productForm, longDescription: e.target.value })}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
                 placeholder="Detalhes completos do produto..."
               />
             </div>
           </div>
         </div>
 
-        <div className="mt-8 flex flex-wrap gap-6 border-t border-gray-100 pt-6">
+        <div className="mt-8 flex flex-wrap gap-6 border-t border-gray-100 dark:border-gray-800 pt-6">
           <label className="flex items-center gap-3 cursor-pointer group">
             <input
               type="checkbox"
               checked={productForm.isActive}
               onChange={(e) => setProductForm({ ...productForm, isActive: e.target.checked })}
-              className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              className="w-5 h-5 rounded border-gray-300 dark:border-gray-700 text-primary-600 focus:ring-primary-500"
             />
             <div>
-              <div className="text-sm font-bold text-gray-700 group-hover:text-gray-900 transition-colors">Ativo no Sistema</div>
+              <div className="text-sm font-bold text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:text-gray-100 transition-colors">Ativo no Sistema</div>
               <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Controle mestre</div>
             </div>
           </label>
@@ -199,10 +199,10 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
               type="checkbox"
               checked={productForm.isAvailable}
               onChange={(e) => setProductForm({ ...productForm, isAvailable: e.target.checked })}
-              className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              className="w-5 h-5 rounded border-gray-300 dark:border-gray-700 text-primary-600 focus:ring-primary-500"
             />
             <div>
-              <div className="text-sm font-bold text-gray-700 group-hover:text-gray-900 transition-colors">Disponível para venda</div>
+              <div className="text-sm font-bold text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:text-gray-100 transition-colors">Disponível para venda</div>
               <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Estoque / Pausa</div>
             </div>
           </label>
@@ -212,10 +212,10 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
               type="checkbox"
               checked={productForm.sellableOnline}
               onChange={(e) => setProductForm({ ...productForm, sellableOnline: e.target.checked })}
-              className="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              className="w-5 h-5 rounded border-gray-300 dark:border-gray-700 text-primary-600 focus:ring-primary-500"
             />
             <div>
-              <div className="text-sm font-bold text-gray-700 group-hover:text-gray-900 transition-colors">Vender Online</div>
+              <div className="text-sm font-bold text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:text-gray-100 transition-colors">Vender Online</div>
               <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">App / Web</div>
             </div>
           </label>
@@ -232,11 +232,11 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
 
           if (isPizzaTemplate && pizzaSizes.length > 0) {
             return (
-              <div className="mt-8 pt-8 border-t border-gray-100 animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <div className="mt-8 pt-8 border-t border-gray-100 dark:border-gray-800 animate-in fade-in slide-in-from-bottom-2 duration-500">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center text-xl">🍕</div>
                   <div>
-                    <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Configuração de Sabor</h3>
+                    <h3 className="text-sm font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest">Configuração de Sabor</h3>
                     <p className="text-[10px] text-primary-600 font-bold uppercase tracking-wider mt-0.5">Preço por tamanho</p>
                   </div>
                 </div>
@@ -248,7 +248,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {pizzaSizes.map(size => (
-                      <div key={size.id} className="bg-white p-6 rounded-2xl border border-primary-100/50 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group">
+                      <div key={size.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-primary-100/50 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group">
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 group-hover:text-primary-600 transition-colors">
                           {size.name}
                         </label>
@@ -259,7 +259,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                             step="0.01"
                             value={pizzaPrices[size.id] || ''}
                             onChange={(e) => setPizzaPrices({...pizzaPrices, [size.id]: Number(e.target.value)})}
-                            className="w-full pl-12 pr-4 py-3.5 bg-gray-50 border border-gray-100 rounded-xl outline-none text-base font-black focus:ring-2 focus:ring-primary-500 transition-all placeholder:text-gray-300"
+                            className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-xl outline-none text-base font-black focus:ring-2 focus:ring-primary-500 transition-all placeholder:text-gray-300"
                             placeholder={productForm.basePrice.toString()}
                           />
                         </div>

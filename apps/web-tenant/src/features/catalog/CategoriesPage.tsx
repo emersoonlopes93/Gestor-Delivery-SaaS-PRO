@@ -101,8 +101,8 @@ export function CategoriesPage() {
     <div className="p-6 max-w-7xl mx-auto text-left">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Categorias</h1>
-          <p className="text-gray-500 mt-1">Organize seus produtos por grupos lógicos.</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">Categorias</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Organize seus produtos por grupos lógicos.</p>
         </div>
         <button
           onClick={() => handleOpenModal()}
@@ -117,9 +117,9 @@ export function CategoriesPage() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50/50 border-b border-gray-100">
+            <thead className="bg-gray-50 dark:bg-gray-900/50/50 border-b border-gray-100 dark:border-gray-800">
               <tr>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Nome</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Produtos</th>
@@ -128,17 +128,17 @@ export function CategoriesPage() {
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {categories.map((category) => (
-                <tr key={category.id} className="hover:bg-gray-50/50 transition-colors group">
+                <tr key={category.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50/50 transition-colors group">
                   <td className="px-6 py-4">
-                    <div className="font-bold text-gray-900">{category.name}</div>
-                    <div className="text-xs text-gray-500 truncate max-w-xs">{category.description || 'Sem descrição'}</div>
+                    <div className="font-bold text-gray-900 dark:text-gray-100">{category.name}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-xs">{category.description || 'Sem descrição'}</div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600 font-bold">
+                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 font-bold">
                     {category.productCount ?? 0}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600 font-medium">
+                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 font-medium">
                     {category.order}
                   </td>
                   <td className="px-6 py-4 text-sm">
@@ -155,7 +155,7 @@ export function CategoriesPage() {
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => navigate(`/catalog/products?categoryId=${encodeURIComponent(category.id)}`)}
-                        className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
+                        className="p-2 text-gray-400 hover:text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all"
                         title="Ver produtos"
                       >
                         👁️
@@ -198,7 +198,7 @@ export function CategoriesPage() {
           <>
             <button
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             >
               Cancelar
             </button>
@@ -218,7 +218,7 @@ export function CategoriesPage() {
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none"
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none"
               placeholder="Ex: Pizzas, Bebidas, Sobremesas"
             />
           </div>
@@ -227,7 +227,7 @@ export function CategoriesPage() {
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none h-24 resize-none"
+              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none h-24 resize-none"
               placeholder="Breve descrição da categoria..."
             />
           </div>
@@ -239,7 +239,7 @@ export function CategoriesPage() {
                 type="number"
                 value={formData.order}
                 onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none"
+                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none"
               />
             </div>
             <div className="flex flex-col justify-end gap-3">
@@ -248,23 +248,23 @@ export function CategoriesPage() {
                   type="checkbox"
                   checked={formData.isActive}
                   onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
+                  className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 dark:border-gray-700 rounded focus:ring-primary-500"
                 />
-                <span className="text-sm font-bold text-gray-700 group-hover:text-gray-900 transition-colors">Ativo</span>
+                <span className="text-sm font-bold text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:text-gray-100 transition-colors">Ativo</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer group">
                 <input
                   type="checkbox"
                   checked={formData.isFeatured}
                   onChange={(e) => setFormData({ ...formData, isFeatured: e.target.checked })}
-                  className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
+                  className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 dark:border-gray-700 rounded focus:ring-primary-500"
                 />
-                <span className="text-sm font-bold text-gray-700 group-hover:text-gray-900 transition-colors">Destaque</span>
+                <span className="text-sm font-bold text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:text-gray-100 transition-colors">Destaque</span>
               </label>
             </div>
           </div>
 
-          <div className="pt-4 border-t border-gray-100">
+          <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
             <label className="block text-[10px] font-black text-primary-600 uppercase tracking-widest mb-3">Template da Categoria</label>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -276,7 +276,7 @@ export function CategoriesPage() {
                     templateType: e.target.value,
                     templateConfig: e.target.value === 'pizza' ? { pricingStrategy: 'highest', allowHalfHalf: true } : {}
                   })}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none text-sm font-bold"
+                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none text-sm font-bold"
                 >
                   <option value="none">Nenhum (Padrão)</option>
                   <option value="pizza">🍕 Pizza (Meio a Meio / Tamanhos)</option>
@@ -292,7 +292,7 @@ export function CategoriesPage() {
                       ...formData, 
                       templateConfig: { ...formData.templateConfig, pricingStrategy: e.target.value }
                     })}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none text-sm font-bold"
+                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none text-sm font-bold"
                   >
                     <option value="highest">Maior Valor</option>
                     <option value="average">Média de Valores</option>

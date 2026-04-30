@@ -72,13 +72,13 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
             </div>
             <div>
                <h2 className="text-xl font-black text-white tracking-tight">Visão de Salão</h2>
-               <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Controle operacional em tempo real</p>
+               <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-widest">Controle operacional em tempo real</p>
             </div>
          </div>
 
          <div className="flex gap-4 ml-auto">
             <div className="bg-gray-800/50 border border-gray-700 px-4 py-2 rounded-xl text-center min-w-[80px]">
-               <p className="text-[9px] font-black text-gray-500 uppercase">Livres</p>
+               <p className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase">Livres</p>
                <p className="text-xl font-black text-white">{stats.free}</p>
             </div>
             <div className="bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-xl text-center min-w-[80px]">
@@ -86,7 +86,7 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
                <p className="text-xl font-black text-emerald-400">{stats.occupied}</p>
             </div>
             <div className="bg-gray-800/50 border border-gray-700 px-4 py-2 rounded-xl text-center min-w-[80px]">
-               <p className="text-[9px] font-black text-gray-500 uppercase">Total</p>
+               <p className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase">Total</p>
                <p className="text-xl font-black text-white">{stats.total}</p>
             </div>
          </div>
@@ -109,7 +109,7 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
                     ? isWaiting
                       ? 'bg-amber-500/10 border-amber-500 text-amber-500 shadow-lg shadow-amber-500/10' 
                       : 'bg-emerald-500/10 border-emerald-500 text-emerald-500 shadow-lg shadow-emerald-500/10'
-                    : 'bg-gray-900 border-gray-800 text-gray-600 hover:border-gray-700 hover:bg-gray-800'}
+                    : 'bg-gray-900 border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-700 hover:bg-gray-800'}
                 `}
               >
                 {/* Badge Status */}
@@ -119,7 +119,7 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
                    <Users size={32} strokeWidth={isOccupied ? 2.5 : 1.5} />
                 </div>
 
-                <p className={`text-sm font-black uppercase tracking-widest ${isOccupied ? 'text-white' : 'text-gray-500'}`}>
+                <p className={`text-sm font-black uppercase tracking-widest ${isOccupied ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`}>
                    {table.name}
                 </p>
 
@@ -135,7 +135,7 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
                           {getRelativeTime(table.order.createdAt)}
                        </div>
                        {table.order.waiter && (
-                         <div className="text-[8px] font-black uppercase text-gray-500 mt-1 opacity-60">
+                         <div className="text-[8px] font-black uppercase text-gray-500 dark:text-gray-400 mt-1 opacity-60">
                             Garçom: {table.order.waiter.name}
                          </div>
                        )}
@@ -173,7 +173,7 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
       </div>
 
       {/* Footer Legend */}
-      <div className="p-4 bg-gray-900 border-t border-gray-800 flex justify-center gap-6 text-[9px] font-black uppercase tracking-widest text-gray-500">
+      <div className="p-4 bg-gray-900 border-t border-gray-800 flex justify-center gap-6 text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
          <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-gray-700" /> Livre
          </div>

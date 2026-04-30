@@ -245,10 +245,10 @@ export function ProductsPage() {
       const pubLabel = pub ? pub.publicationStatus : null;
       const opLabel = pub ? pub.operationalStatus : null;
       return (
-        <tr key={product.id} className="hover:bg-gray-50/60 transition-colors group" style={{ height: 64 }}>
+        <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50/60 transition-colors group" style={{ height: 64 }}>
           <td className="px-6 py-2">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-12 h-12 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden shrink-0">
+              <div className="w-12 h-12 rounded-lg bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 overflow-hidden shrink-0">
                 {product.image ? (
                   <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
                 ) : (
@@ -259,19 +259,19 @@ export function ProductsPage() {
               </div>
 
               <div className="min-w-0">
-                <div className="font-bold text-gray-900 truncate">{product.name}</div>
-                <div className="text-xs text-gray-500 truncate hidden sm:block">{product.shortDescription || 'Sem descrição'}</div>
+                <div className="font-bold text-gray-900 dark:text-gray-100 truncate">{product.name}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 truncate hidden sm:block">{product.shortDescription || 'Sem descrição'}</div>
                 <div className="mt-1 flex items-center gap-2">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-gray-100 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-800'}`}>
                     {typeLabel}
                   </span>
                   {pubLabel ? (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-gray-100 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-800'}`}>
                       {pubLabel}
                     </span>
                   ) : null}
                   {opLabel ? (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${opLabel === 'active' ? 'bg-green-100 text-green-700 border border-green-200' : opLabel === 'inactive' ? 'bg-gray-200 text-gray-700 border border-gray-300' : opLabel === 'hidden' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${opLabel === 'active' ? 'bg-green-100 text-green-700 border border-green-200' : opLabel === 'inactive' ? 'bg-gray-200 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700' : opLabel === 'hidden' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
                       {opLabel}
                     </span>
                   ) : null}
@@ -280,11 +280,11 @@ export function ProductsPage() {
             </div>
           </td>
 
-          <td className="px-6 py-2 text-sm text-gray-600 font-medium hidden lg:table-cell">
+          <td className="px-6 py-2 text-sm text-gray-600 dark:text-gray-400 font-medium hidden lg:table-cell">
             {categoryName}
           </td>
 
-          <td className="px-6 py-2 text-sm font-black text-gray-900 whitespace-nowrap">
+          <td className="px-6 py-2 text-sm font-black text-gray-900 dark:text-gray-100 whitespace-nowrap">
             {formatMoney(product.basePrice)}
           </td>
 
@@ -298,7 +298,7 @@ export function ProductsPage() {
             <div className="flex justify-end gap-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
               <button
                 onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
-                className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
+                className="p-2 text-gray-400 hover:text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all"
                 title="Ficha técnica"
                 type="button"
               >
@@ -409,21 +409,21 @@ export function ProductsPage() {
     <div className="p-6 max-w-7xl mx-auto text-left">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Produtos</h1>
-          <p className="text-gray-500 mt-1">Gerencie itens vendáveis. Combos têm fluxo próprio no módulo de Combos.</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">Produtos</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Gerencie itens vendáveis. Combos têm fluxo próprio no módulo de Combos.</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center bg-gray-100 p-1 rounded-xl">
             <button
               onClick={() => setViewMode('all')}
-              className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${viewMode === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${viewMode === 'all' ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300'}`}
               type="button"
             >
               Lista Completa
             </button>
             <button
               onClick={() => setViewMode('grouped')}
-              className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${viewMode === 'grouped' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${viewMode === 'grouped' ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300'}`}
               type="button"
             >
               Por Categoria
@@ -433,7 +433,7 @@ export function ProductsPage() {
           <select
             value={selectedCategoryId ?? ''}
             onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : null)}
-            className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 shadow-sm"
+            className="px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-300 shadow-sm"
           >
             <option value="">Todas as categorias</option>
             {categories.map((c) => (
@@ -471,7 +471,7 @@ export function ProductsPage() {
           <button
             key={t.id}
             onClick={() => setTypeFilter(t.id as ProductTypeFilter)}
-            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${typeFilter === t.id ? 'bg-white border-primary-600 text-primary-600 shadow-sm ring-1 ring-primary-600' : 'bg-gray-100 border-transparent text-gray-500 hover:bg-gray-200'}`}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${typeFilter === t.id ? 'bg-white dark:bg-gray-900 border-primary-600 text-primary-600 shadow-sm ring-1 ring-primary-600' : 'bg-gray-100 border-transparent text-gray-500 dark:text-gray-400 hover:bg-gray-200'}`}
           >
             {t.label}
           </button>
@@ -545,7 +545,7 @@ export function ProductsPage() {
           </div>
         </div>
 
-        <div className="mt-3 flex items-center justify-between text-xs text-gray-500 font-bold">
+        <div className="mt-3 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 font-bold">
           <div>
             {filteredProducts.length} produto(s)
           </div>
@@ -582,22 +582,22 @@ export function ProductsPage() {
                     <div key={product.id} className="card-premium p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="font-black text-gray-900 truncate">{product.name}</div>
-                          <div className="text-xs text-gray-500 font-bold mt-1 truncate">{categoryName}</div>
+                          <div className="font-black text-gray-900 dark:text-gray-100 truncate">{product.name}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 font-bold mt-1 truncate">{categoryName}</div>
                           <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-700 border border-gray-200">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-800">
                               {typeLabel}
                             </span>
                             {pubLabel ? (
                               <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-gray-100 text-gray-600 border border-gray-200'}`}
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-gray-100 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-800'}`}
                               >
                                 {pubLabel}
                               </span>
                             ) : null}
                             {opLabel ? (
                               <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${opLabel === 'active' ? 'bg-green-100 text-green-700 border border-green-200' : opLabel === 'inactive' ? 'bg-gray-200 text-gray-700 border border-gray-300' : opLabel === 'hidden' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-red-100 text-red-700 border border-red-200'}`}
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${opLabel === 'active' ? 'bg-green-100 text-green-700 border border-green-200' : opLabel === 'inactive' ? 'bg-gray-200 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700' : opLabel === 'hidden' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-red-100 text-red-700 border border-red-200'}`}
                               >
                                 {opLabel}
                               </span>
@@ -605,15 +605,15 @@ export function ProductsPage() {
                           </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <div className="text-xs text-gray-500 font-bold">Preço</div>
-                          <div className="text-sm font-black text-gray-900">{formatMoney(product.basePrice)}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 font-bold">Preço</div>
+                          <div className="text-sm font-black text-gray-900 dark:text-gray-100">{formatMoney(product.basePrice)}</div>
                         </div>
                       </div>
 
                       <div className="mt-4 grid grid-cols-2 gap-2">
                         <button
                           onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
-                          className="px-3 py-2 text-xs font-black text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200"
+                          className="px-3 py-2 text-xs font-black text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800"
                           title="Ficha técnica"
                           type="button"
                         >
@@ -638,7 +638,7 @@ export function ProductsPage() {
                         </button>
                         <button
                           onClick={() => handleToggleActive(product)}
-                          className="px-3 py-2 text-xs font-black text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200"
+                          className="px-3 py-2 text-xs font-black text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800"
                           title={product.isActive ? 'Desativar' : 'Ativar'}
                           type="button"
                         >
@@ -647,7 +647,7 @@ export function ProductsPage() {
                         <PermissionGate permission="catalog.publish" fallback={null}>
                           <button
                             onClick={() => handleTogglePublication(product)}
-                            className="px-3 py-2 text-xs font-black text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200"
+                            className="px-3 py-2 text-xs font-black text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800"
                             title={product.publication?.publicationStatus === 'published' ? 'Despublicar' : 'Publicar'}
                             type="button"
                           >
@@ -657,7 +657,7 @@ export function ProductsPage() {
                         <PermissionGate permission="catalog.publish" fallback={null}>
                           <button
                             onClick={() => handleToggleOperational(product)}
-                            className="px-3 py-2 text-xs font-black text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200"
+                            className="px-3 py-2 text-xs font-black text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800"
                             title={product.publication?.operationalStatus === 'active' ? 'Ocultar' : 'Exibir'}
                             type="button"
                           >
@@ -678,7 +678,7 @@ export function ProductsPage() {
                 })}
 
                 {filteredProducts.length === 0 ? (
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center text-gray-400 font-medium italic">
+                  <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6 text-center text-gray-400 font-medium italic">
                     {searchTerm.trim().length > 0 || statusFilter !== 'all' || typeFilter !== 'all' || publicationFilter !== 'all' || operationalFilter !== 'all' || Boolean(selectedCategoryId)
                       ? 'Nenhum resultado para os filtros atuais.'
                       : 'Nenhum produto cadastrado ainda no cardápio.'}
@@ -689,7 +689,7 @@ export function ProductsPage() {
               <div className="card-premium hidden md:block">
                 <div ref={tableScrollRef} className="max-h-[70vh] overflow-auto">
                   <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-50/50 border-b border-gray-100 sticky top-0 z-10">
+                    <thead className="bg-gray-50 dark:bg-gray-900/50/50 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
                       <tr>
                         <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Produto</th>
                         <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hidden lg:table-cell">Categoria</th>
@@ -698,7 +698,7 @@ export function ProductsPage() {
                         <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                       {filteredProducts.length > 0 && virtualAll.topSpacer > 0 && (
                         <tr>
                           <td colSpan={5} style={{ height: virtualAll.topSpacer }} className="p-0 border-0" />
@@ -736,15 +736,15 @@ export function ProductsPage() {
                     <button
                       type="button"
                       onClick={() => toggleGroupExpanded(group.key)}
-                      className="w-full px-6 py-4 bg-gray-50/40 border-b border-gray-100 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                      className="w-full px-6 py-4 bg-gray-50 dark:bg-gray-900/50/40 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 transition-colors"
                     >
                       <div className="text-left">
-                        <div className="text-sm font-black text-gray-900 uppercase tracking-tight">{title}</div>
-                        <div className="text-xs text-gray-500 font-bold">{group.products.length} produto(s)</div>
+                        <div className="text-sm font-black text-gray-900 dark:text-gray-100 uppercase tracking-tight">{title}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 font-bold">{group.products.length} produto(s)</div>
                       </div>
                       <div className="flex items-center gap-3">
                         {group.category && (
-                          <span className="text-xs font-black uppercase tracking-wider text-gray-500">
+                          <span className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">
                             {selectedCategoryId === group.category.id ? 'Filtrado' : ''}
                           </span>
                         )}
@@ -755,7 +755,7 @@ export function ProductsPage() {
                     {isExpanded && (
                       <div className="max-h-[60vh] overflow-auto">
                         <table className="w-full text-left border-collapse">
-                          <thead className="bg-white border-b border-gray-100 sticky top-0 z-10">
+                          <thead className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
                             <tr>
                               <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Produto</th>
                               <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hidden lg:table-cell">Categoria</th>
@@ -764,7 +764,7 @@ export function ProductsPage() {
                               <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-gray-100">
+                          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                             {renderRows(group.products)}
                           </tbody>
                         </table>
@@ -814,36 +814,36 @@ export function ProductsPage() {
       >
         <div className="space-y-6">
           <div>
-            <h3 className="text-sm font-black text-gray-900 mb-2">Publicação (publicationStatus)</h3>
-            <p className="text-xs text-gray-600 mb-2">Controla a visibilidade externa do produto (storefront, PDV, etc.).</p>
-            <ul className="text-xs text-gray-500 space-y-1">
-              <li><span className="font-bold text-gray-700">Draft:</span> rascunho, não visível publicamente.</li>
-              <li><span className="font-bold text-gray-700">Publicado:</span> visível em catálogos públicos.</li>
+            <h3 className="text-sm font-black text-gray-900 dark:text-gray-100 mb-2">Publicação (publicationStatus)</h3>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Controla a visibilidade externa do produto (storefront, PDV, etc.).</p>
+            <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+              <li><span className="font-bold text-gray-700 dark:text-gray-300">Draft:</span> rascunho, não visível publicamente.</li>
+              <li><span className="font-bold text-gray-700 dark:text-gray-300">Publicado:</span> visível em catálogos públicos.</li>
             </ul>
           </div>
 
           <div>
-            <h3 className="text-sm font-black text-gray-900 mb-2">Operação (operationalStatus)</h3>
-            <p className="text-xs text-gray-600 mb-2">Define se o produto pode ser vendido no momento, mesmo estando publicado.</p>
-            <ul className="text-xs text-gray-500 space-y-1">
-              <li><span className="font-bold text-gray-700">Active:</span> disponível para venda.</li>
-              <li><span className="font-bold text-gray-700">Hidden:</span> visível mas não vendável (indisponível).</li>
-              <li><span className="font-bold text-gray-700">Sold out:</span> esgotado manualmente.</li>
-              <li><span className="font-bold text-gray-700">Inactive:</span> oculto e não vendável.</li>
+            <h3 className="text-sm font-black text-gray-900 dark:text-gray-100 mb-2">Operação (operationalStatus)</h3>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Define se o produto pode ser vendido no momento, mesmo estando publicado.</p>
+            <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+              <li><span className="font-bold text-gray-700 dark:text-gray-300">Active:</span> disponível para venda.</li>
+              <li><span className="font-bold text-gray-700 dark:text-gray-300">Hidden:</span> visível mas não vendável (indisponível).</li>
+              <li><span className="font-bold text-gray-700 dark:text-gray-300">Sold out:</span> esgotado manualmente.</li>
+              <li><span className="font-bold text-gray-700 dark:text-gray-300">Inactive:</span> oculto e não vendável.</li>
             </ul>
           </div>
 
           <div>
-            <h3 className="text-sm font-black text-gray-900 mb-2">Status Geral (isActive)</h3>
-            <p className="text-xs text-gray-600 mb-2">Controle de baixo nível (soft-delete). Geralmente não alterado no dia a dia.</p>
-            <ul className="text-xs text-gray-500 space-y-1">
-              <li><span className="font-bold text-gray-700">Ativo:</span> produto existe no sistema.</li>
-              <li><span className="font-bold text-gray-700">Inativo:</span> produto desativado (soft delete).</li>
+            <h3 className="text-sm font-black text-gray-900 dark:text-gray-100 mb-2">Status Geral (isActive)</h3>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Controle de baixo nível (soft-delete). Geralmente não alterado no dia a dia.</p>
+            <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+              <li><span className="font-bold text-gray-700 dark:text-gray-300">Ativo:</span> produto existe no sistema.</li>
+              <li><span className="font-bold text-gray-700 dark:text-gray-300">Inativo:</span> produto desativado (soft delete).</li>
             </ul>
           </div>
 
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
-            <p className="text-xs text-gray-600">
+          <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl p-3">
+            <p className="text-xs text-gray-600 dark:text-gray-400">
               <span className="font-black">Dica:</span> Use <span className="font-bold">Publicado + Active</span> para vender normalmente.
               Use <span className="font-bold">Hidden</span> para manter visível mas indisponível.
               Use <span className="font-bold">Draft</span> para produtos em criação/aprovação.

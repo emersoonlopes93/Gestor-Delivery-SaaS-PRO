@@ -77,7 +77,7 @@ export function PromotionsPage() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">🎁 Cupons & Promoções</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">🎁 Cupons & Promoções</h1>
         <button
           onClick={() => setShowModal(true)}
           className="bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition"
@@ -86,9 +86,9 @@ export function PromotionsPage() {
         </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow border border-gray-200">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow border border-gray-200 dark:border-gray-800">
         <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200 text-gray-600">
+          <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400">
             <tr>
               <th className="p-4 font-semibold">Código</th>
               <th className="p-4 font-semibold">Nome</th>
@@ -98,31 +98,31 @@ export function PromotionsPage() {
               <th className="p-4 font-semibold text-right">Ação</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="p-4 text-center text-gray-500">
+                <td colSpan={6} className="p-4 text-center text-gray-500 dark:text-gray-400">
                   Carregando...
                 </td>
               </tr>
             ) : coupons.length === 0 ? (
               <tr>
-                <td colSpan={6} className="p-4 text-center text-gray-500">
+                <td colSpan={6} className="p-4 text-center text-gray-500 dark:text-gray-400">
                   Nenhum cupom cadastrado.
                 </td>
               </tr>
             ) : (
               coupons.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="p-4 font-black text-gray-900">{c.code}</td>
-                  <td className="p-4 text-gray-700">{c.name}</td>
-                  <td className="p-4 text-gray-600">
+                <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 transition-colors">
+                  <td className="p-4 font-black text-gray-900 dark:text-gray-100">{c.code}</td>
+                  <td className="p-4 text-gray-700 dark:text-gray-300">{c.name}</td>
+                  <td className="p-4 text-gray-600 dark:text-gray-400">
                     {c.type === 'percentage' && `${c.value}% OFF`}
                     {c.type === 'fixed_amount' &&
                       `R$ ${c.value.toFixed(2)} OFF`}
                     {c.type === 'free_shipping' && `Frete Grátis`}
                   </td>
-                  <td className="p-4 text-center text-gray-500">
+                  <td className="p-4 text-center text-gray-500 dark:text-gray-400">
                     {c.usedCount} / {c.usageLimit || '∞'}
                   </td>
                   <td className="p-4 text-center">
@@ -155,7 +155,7 @@ export function PromotionsPage() {
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden flex flex-col max-h-full">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg w-full max-w-md overflow-hidden flex flex-col max-h-full">
             <div className="p-4 border-b">
               <h2 className="text-xl font-bold">Novo Cupom</h2>
             </div>
@@ -219,11 +219,11 @@ export function PromotionsPage() {
                 </div>
               </form>
             </div>
-            <div className="p-4 border-t flex justify-end space-x-2 bg-gray-50">
+            <div className="p-4 border-t flex justify-end space-x-2 bg-gray-50 dark:bg-gray-900/50">
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 border rounded-lg font-medium text-gray-700 hover:bg-gray-100"
+                className="px-4 py-2 border rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
               >
                 Cancelar
               </button>

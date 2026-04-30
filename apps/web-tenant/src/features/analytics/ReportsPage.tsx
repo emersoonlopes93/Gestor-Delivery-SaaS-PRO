@@ -67,15 +67,15 @@ export function ReportsPage() {
   const statusData = Object.entries(stats.operational.ordersByStatus).map(([name, value]) => ({ name, value }));
 
   return (
-    <div className="p-6 space-y-8 bg-gray-50 min-h-screen">
+    <div className="p-6 space-y-8 bg-gray-50 dark:bg-gray-900/50 min-h-screen">
       {/* Header & Filters */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Relatórios Gerenciais</h1>
-          <p className="text-gray-500">Inteligência e performance para o seu negócio.</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Relatórios Gerenciais</h1>
+          <p className="text-gray-500 dark:text-gray-400">Inteligência e performance para o seu negócio.</p>
         </div>
         
-        <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
+        <div className="flex items-center gap-2 bg-white dark:bg-gray-900 p-1 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm">
           {INTERVALS.map((int) => (
             <button
               key={int.value}
@@ -83,7 +83,7 @@ export function ReportsPage() {
               className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${
                 interval === int.value 
                   ? 'bg-primary-600 text-white shadow-sm' 
-                  : 'text-gray-600 hover:bg-gray-100'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
               }`}
             >
               {int.label}
@@ -127,7 +127,7 @@ export function ReportsPage() {
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Commercial Trend */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
           <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
             <DollarSign size={20} className="text-primary-600" /> Vendas por Canal
           </h2>
@@ -156,22 +156,22 @@ export function ReportsPage() {
         </div>
 
         {/* Operational Efficiency */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
           <h2 className="text-lg font-bold mb-6 flex items-center gap-2">
             <Clock size={20} className="text-amber-600" /> Eficiência Operacional
           </h2>
           <div className="space-y-6">
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
               <div>
-                <p className="text-sm text-gray-500">Tempo Médio de Preparo</p>
-                <p className="text-xl font-bold text-gray-900">{stats.operational.averagePreparationTimeMinutes.toFixed(1)} min</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Tempo Médio de Preparo</p>
+                <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{stats.operational.averagePreparationTimeMinutes.toFixed(1)} min</p>
               </div>
               <Clock className="text-blue-500" />
             </div>
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
               <div>
-                <p className="text-sm text-gray-500">Tempo Médio de Entrega</p>
-                <p className="text-xl font-bold text-gray-900">{stats.operational.averageDeliveryTimeMinutes.toFixed(1)} min</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Tempo Médio de Entrega</p>
+                <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{stats.operational.averageDeliveryTimeMinutes.toFixed(1)} min</p>
               </div>
               <TrendingUp className="text-orange-500" />
             </div>
@@ -179,18 +179,18 @@ export function ReportsPage() {
         </div>
 
         {/* Top Products */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
           <h2 className="text-lg font-bold mb-6">Top 5 Produtos</h2>
           <div className="space-y-4">
             {stats.commercial.topProducts.map((product, idx) => (
               <div key={idx} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="w-6 h-6 flex items-center justify-center bg-gray-100 text-xs font-bold rounded-full">{idx + 1}</span>
-                  <span className="font-medium text-gray-700">{product.name}</span>
+                  <span className="font-medium text-gray-700 dark:text-gray-300">{product.name}</span>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-gray-900">{product.quantity} un</p>
-                  <p className="text-xs text-gray-500">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.revenue)}</p>
+                  <p className="font-bold text-gray-900 dark:text-gray-100">{product.quantity} un</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.revenue)}</p>
                 </div>
               </div>
             ))}
@@ -198,7 +198,7 @@ export function ReportsPage() {
         </div>
 
         {/* Peak Hours */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+        <div className="bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
           <h2 className="text-lg font-bold mb-6">Horários de Pico</h2>
           <div className="h-[250px] w-full">
              <ResponsiveContainer width="100%" height="100%">
@@ -219,9 +219,9 @@ export function ReportsPage() {
 
 function MetricCard({ title, value, icon, trend, trendUp }: any) {
   return (
-    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all">
+    <div className="bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
       <div className="flex items-center justify-between mb-4">
-        <div className="p-2 bg-gray-50 rounded-lg">{icon}</div>
+        <div className="p-2 bg-gray-50 dark:bg-gray-900/50 rounded-lg">{icon}</div>
         <div className={`flex items-center text-xs font-medium px-2 py-1 rounded-full ${
           trendUp ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
         }`}>
@@ -229,8 +229,8 @@ function MetricCard({ title, value, icon, trend, trendUp }: any) {
           {trend}
         </div>
       </div>
-      <p className="text-xs text-gray-500 uppercase font-black tracking-wider mb-1">{title}</p>
-      <h3 className="text-2xl font-bold text-gray-900">{value}</h3>
+      <p className="text-xs text-gray-500 dark:text-gray-400 uppercase font-black tracking-wider mb-1">{title}</p>
+      <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{value}</h3>
     </div>
   );
 }

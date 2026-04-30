@@ -85,19 +85,19 @@ export function SetupWizard({ settings, operatingHours, hasCategories, hasProduc
 
   return (
     <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-700">
-      <div className="bg-white border-2 border-primary-100 rounded-3xl overflow-hidden shadow-xl shadow-primary-50">
+      <div className="bg-white dark:bg-gray-900 border-2 border-primary-100 rounded-3xl overflow-hidden shadow-xl shadow-primary-50">
         <div className="bg-primary-600 p-6 sm:p-8 text-white">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-2xl font-black mb-1">Vamos montar sua loja? 🚀</h2>
               <p className="text-primary-100 font-medium">Complete os passos abaixo para começar a vender hoje mesmo.</p>
             </div>
-            <div className="bg-white/10 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/20">
+            <div className="bg-white dark:bg-gray-900/10 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/20">
               <div className="text-xs font-black uppercase tracking-widest text-primary-200 mb-1">Progresso</div>
               <div className="flex items-center gap-3">
-                <div className="flex-1 h-2 w-32 bg-white/20 rounded-full overflow-hidden">
+                <div className="flex-1 h-2 w-32 bg-white dark:bg-gray-900/20 rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-white transition-all duration-1000 ease-out" 
+                    className="h-full bg-white dark:bg-gray-900 transition-all duration-1000 ease-out" 
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
@@ -117,8 +117,8 @@ export function SetupWizard({ settings, operatingHours, hasCategories, hasProduc
                   step.isCompleted 
                     ? 'border-green-100 bg-green-50/30' 
                     : step.isCritical 
-                      ? 'border-amber-100 bg-white hover:border-amber-300' 
-                      : 'border-gray-100 bg-white hover:border-primary-100'
+                      ? 'border-amber-100 bg-white dark:bg-gray-900 hover:border-amber-300' 
+                      : 'border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-primary-100'
                 }`}
               >
                 <div className="flex items-start justify-between gap-4 mb-4">
@@ -140,14 +140,14 @@ export function SetupWizard({ settings, operatingHours, hasCategories, hasProduc
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className={`font-black tracking-tight ${step.isCompleted ? 'text-green-800' : 'text-gray-900'}`}>
+                    <h3 className={`font-black tracking-tight ${step.isCompleted ? 'text-green-800' : 'text-gray-900 dark:text-gray-100'}`}>
                       {step.title}
                     </h3>
                     {step.isCritical && !step.isCompleted && (
                       <span className="px-2 py-0.5 rounded-full bg-amber-100 text-[10px] font-black text-amber-700 uppercase">Obrigatório</span>
                     )}
                   </div>
-                  <p className={`text-sm font-medium leading-relaxed ${step.isCompleted ? 'text-green-600' : 'text-gray-500'}`}>
+                  <p className={`text-sm font-medium leading-relaxed ${step.isCompleted ? 'text-green-600' : 'text-gray-500 dark:text-gray-400'}`}>
                     {step.description}
                   </p>
                 </div>
@@ -161,7 +161,7 @@ export function SetupWizard({ settings, operatingHours, hasCategories, hasProduc
             ))}
           </div>
 
-          <div className="mt-8 pt-6 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3 text-amber-600">
               <AlertCircle className="h-5 w-5 shrink-0" />
               <p className="text-sm font-bold">

@@ -260,14 +260,14 @@ export function SettingsPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto text-left space-y-8">
       <div>
-        <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Configurações da Loja</h1>
-        <p className="text-gray-500 mt-1 font-medium">Gerencie o funcionamento e informações do seu estabelecimento.</p>
+        <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">Configurações da Loja</h1>
+        <p className="text-gray-500 dark:text-gray-400 mt-1 font-medium">Gerencie o funcionamento e informações do seu estabelecimento.</p>
       </div>
 
       {settings.businessGroupId && (
         <div className="bg-indigo-600 rounded-2xl shadow-lg p-5 text-white flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="bg-white/20 p-2.5 rounded-xl">
+            <div className="bg-white dark:bg-gray-900/20 p-2.5 rounded-xl">
               <Building2 className="w-6 h-6" />
             </div>
             <div>
@@ -275,22 +275,22 @@ export function SettingsPage() {
               <p className="font-bold">Esta unidade faz parte de um <span className="text-indigo-100 italic">Grupo de Negócios</span>.</p>
             </div>
           </div>
-          <div className="hidden md:block bg-white/10 px-4 py-2 rounded-lg border border-white/20 text-xs font-bold">
+          <div className="hidden md:block bg-white dark:bg-gray-900/10 px-4 py-2 rounded-lg border border-white/20 text-xs font-bold">
             Multi-unidade Ativado
           </div>
         </div>
       )}
 
       {/* Pausa Manual */}
-      <div className={`bg-white rounded-2xl shadow-sm border p-6 transition-all ${settings.isStorePaused ? 'border-amber-200 bg-amber-50/30' : 'border-gray-100'}`}>
+      <div className={`bg-white dark:bg-gray-900 rounded-2xl shadow-sm border p-6 transition-all ${settings.isStorePaused ? 'border-amber-200 bg-amber-50/30' : 'border-gray-100 dark:border-gray-800'}`}>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
             <div className={`p-3 rounded-xl ${settings.isStorePaused ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'}`}>
               <Pause className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">Pausa Temporária</h2>
-              <p className="text-sm text-gray-500 font-medium">Use isso para fechar a loja imediatamente, independente dos horários.</p>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Pausa Temporária</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Use isso para fechar a loja imediatamente, independente dos horários.</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -300,7 +300,7 @@ export function SettingsPage() {
                 placeholder="Motivo da pausa (opcional)"
                 value={settings.storePauseReason || ''}
                 onChange={(e) => setSettings({ ...settings, storePauseReason: e.target.value })}
-                className="px-4 py-2 bg-white border border-amber-200 rounded-xl outline-none text-sm w-64"
+                className="px-4 py-2 bg-white dark:bg-gray-900 border border-amber-200 rounded-xl outline-none text-sm w-64"
               />
             )}
             <button
@@ -321,16 +321,16 @@ export function SettingsPage() {
         {/* Coluna da Esquerda: Dados Básicos */}
         <div className="lg:col-span-2 space-y-6">
           <form onSubmit={handleSaveSettings} className="space-y-6">
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-primary-50 text-primary-600 rounded-lg text-sm">🏪</span>
                 Identidade e Contato
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                   <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Logotipo da Loja</label>
-                  <div className="flex items-center gap-6 p-4 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/50">
-                    <div className="relative w-24 h-24 bg-white border border-gray-100 rounded-xl flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                  <div className="flex items-center gap-6 p-4 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl bg-gray-50 dark:bg-gray-900/50/50">
+                    <div className="relative w-24 h-24 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                       {settings.logoUrl ? (
                         <img src={settings.logoUrl} alt="Logo preview" className="w-full h-full object-contain" />
                       ) : (
@@ -339,7 +339,7 @@ export function SettingsPage() {
                     </div>
                     <div className="flex flex-col gap-2 text-left">
                       <div className="flex items-center gap-2">
-                        <label className="cursor-pointer bg-white hover:bg-gray-50 text-gray-700 font-bold py-2 px-4 border border-gray-200 rounded-lg text-sm shadow-sm transition-all active:scale-95">
+                        <label className="cursor-pointer bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 text-gray-700 dark:text-gray-300 font-bold py-2 px-4 border border-gray-200 dark:border-gray-800 rounded-lg text-sm shadow-sm transition-all active:scale-95">
                           <span>{uploading ? 'Enviando...' : 'Selecionar Imagem'}</span>
                           <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} disabled={uploading} />
                         </label>
@@ -366,7 +366,7 @@ export function SettingsPage() {
                     type="text"
                     value={settings.businessPhone || ''}
                     onChange={e => setSettings({...settings, businessPhone: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
                   />
                 </div>
                 <div>
@@ -375,14 +375,14 @@ export function SettingsPage() {
                     type="email"
                     value={settings.businessEmail || ''}
                     onChange={e => setSettings({...settings, businessEmail: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm"><MapPin className="w-4 h-4" /></span>
                 Endereço da Loja
               </h2>
@@ -396,7 +396,7 @@ export function SettingsPage() {
                       onChange={e => setSettings({...settings, zipCode: e.target.value.replace(/\D/g, '').slice(0, 8)})}
                       onBlur={handleCepBlur}
                       placeholder="00000-000"
-                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
                     />
                   </div>
                   <div className="md:col-span-2">
@@ -405,7 +405,7 @@ export function SettingsPage() {
                       type="text"
                       value={settings.street || ''}
                       onChange={e => setSettings({...settings, street: e.target.value})}
-                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
                     />
                   </div>
                   <div className="md:col-span-1">
@@ -414,7 +414,7 @@ export function SettingsPage() {
                       type="text"
                       value={settings.number || ''}
                       onChange={e => setSettings({...settings, number: e.target.value})}
-                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
                     />
                   </div>
                 </div>
@@ -426,7 +426,7 @@ export function SettingsPage() {
                       type="text"
                       value={settings.neighborhood || ''}
                       onChange={e => setSettings({...settings, neighborhood: e.target.value})}
-                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
                     />
                   </div>
                   <div>
@@ -435,7 +435,7 @@ export function SettingsPage() {
                       type="text"
                       value={settings.city || ''}
                       onChange={e => setSettings({...settings, city: e.target.value})}
-                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
                     />
                   </div>
                   <div>
@@ -445,7 +445,7 @@ export function SettingsPage() {
                       value={settings.state || ''}
                       onChange={e => setSettings({...settings, state: e.target.value.toUpperCase().slice(0, 2)})}
                       placeholder="SP"
-                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
                     />
                   </div>
                 </div>
@@ -458,7 +458,7 @@ export function SettingsPage() {
                       value={settings.complement || ''}
                       onChange={e => setSettings({...settings, complement: e.target.value})}
                       placeholder="Apto, Bloco, etc."
-                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
                     />
                   </div>
                   <div>
@@ -468,7 +468,7 @@ export function SettingsPage() {
                       value={settings.address || ''}
                       onChange={e => setSettings({...settings, address: e.target.value})}
                       placeholder="Ex: Rua das Flores, 123"
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium text-gray-500"
+                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium text-gray-500 dark:text-gray-400"
                     />
                   </div>
                 </div>
@@ -476,8 +476,8 @@ export function SettingsPage() {
                               </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-purple-50 text-purple-600 rounded-lg text-sm"><Building2 className="w-4 h-4" /></span>
                 Dados Fiscais & Integração
               </h2>
@@ -493,7 +493,7 @@ export function SettingsPage() {
                       setSettings({...settings, cnpj: raw.length > 2 ? formatted : raw});
                     }}
                     placeholder="XX.XXX.XXX/XXXX-XX"
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium font-mono tracking-wider"
+                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium font-mono tracking-wider"
                   />
                 </div>
                 <div>
@@ -503,7 +503,7 @@ export function SettingsPage() {
                     value={settings.razaoSocial || ''}
                     onChange={e => setSettings({...settings, razaoSocial: e.target.value})}
                     placeholder="Nome jurídico da empresa"
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
                   />
                 </div>
                 <div>
@@ -513,7 +513,7 @@ export function SettingsPage() {
                     value={settings.inscricaoEstadual || ''}
                     onChange={e => setSettings({...settings, inscricaoEstadual: e.target.value})}
                     placeholder="Opcional"
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
                   />
                 </div>
                 <div>
@@ -521,7 +521,7 @@ export function SettingsPage() {
                   <select
                     value={settings.taxRegime || ''}
                     onChange={e => setSettings({...settings, taxRegime: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
                   >
                     <option value="">Selecione...</option>
                     <option value="MEI">MEI (Microempreendedor Individual)</option>
@@ -538,7 +538,7 @@ export function SettingsPage() {
                       value={settings.standardCfop || ''}
                       onChange={e => setSettings({...settings, standardCfop: e.target.value})}
                       placeholder="Ex: 5102"
-                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
                     />
                   </div>
                   <div>
@@ -548,15 +548,15 @@ export function SettingsPage() {
                       value={settings.standardNcm || ''}
                       onChange={e => setSettings({...settings, standardNcm: e.target.value})}
                       placeholder="Ex: 21069090"
-                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-green-50 text-green-600 rounded-lg text-sm">💰</span>
                 Configuração de Pagamento
               </h2>
@@ -568,7 +568,7 @@ export function SettingsPage() {
                     { id: 'cash', label: 'Dinheiro (Na entrega)' },
                     { id: 'card_on_delivery', label: 'Cartão (Na entrega)' },
                   ].map((m) => (
-                    <label key={m.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl hover:bg-gray-50 cursor-pointer transition-all">
+                    <label key={m.id} className="flex items-center gap-3 p-3 border border-gray-100 dark:border-gray-800 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 cursor-pointer transition-all">
                       <input
                         type="checkbox"
                         checked={settings.paymentMethods?.includes(m.id) ?? false}
@@ -579,16 +579,16 @@ export function SettingsPage() {
                             : current.filter((x) => x !== m.id);
                           setSettings({ ...settings, paymentMethods: next });
                         }}
-                        className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+                        className="w-4 h-4 text-primary-600 rounded border-gray-300 dark:border-gray-700 focus:ring-primary-500"
                       />
-                      <span className="text-sm font-bold text-gray-700">{m.label}</span>
+                      <span className="text-sm font-bold text-gray-700 dark:text-gray-300">{m.label}</span>
                     </label>
                   ))}
                 </div>
               </div>
 
-              <div className="mt-8 pt-6 border-t border-gray-100 space-y-6">
-                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+              <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800 space-y-6">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                   Dados para Repasse / PIX
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -599,7 +599,7 @@ export function SettingsPage() {
                       value={settings.pixKey || ''}
                       onChange={e => setSettings({...settings, pixKey: e.target.value})}
                       placeholder="E-mail, CPF, CNPJ ou Aleatória"
-                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
                     />
                   </div>
                   <div>
@@ -609,7 +609,7 @@ export function SettingsPage() {
                       value={settings.bankName || ''}
                       onChange={e => setSettings({...settings, bankName: e.target.value})}
                       placeholder="Ex: Nubank, Itaú..."
-                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
                     />
                   </div>
                   <div>
@@ -618,7 +618,7 @@ export function SettingsPage() {
                       type="text"
                       value={settings.bankAgency || ''}
                       onChange={e => setSettings({...settings, bankAgency: e.target.value})}
-                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
                     />
                   </div>
                   <div>
@@ -627,15 +627,15 @@ export function SettingsPage() {
                       type="text"
                       value={settings.bankAccount || ''}
                       onChange={e => setSettings({...settings, bankAccount: e.target.value})}
-                      className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-amber-50 text-amber-600 rounded-lg text-sm">🌍</span>
                 Configurações Regionais
               </h2>
@@ -645,7 +645,7 @@ export function SettingsPage() {
                   <select
                     value={settings.timezone || 'America/Sao_Paulo'}
                     onChange={e => setSettings({...settings, timezone: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none font-medium"
+                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl outline-none font-medium"
                   >
                     <option value="America/Sao_Paulo">Brasília (GMT-3)</option>
                     <option value="America/Manaus">Manaus (GMT-4)</option>
@@ -656,7 +656,7 @@ export function SettingsPage() {
                   <select
                     value={settings.currency || 'BRL'}
                     onChange={e => setSettings({...settings, currency: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none font-medium"
+                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl outline-none font-medium"
                   >
                     <option value="BRL">Real (BRL)</option>
                     <option value="USD">Dólar (USD)</option>
@@ -679,9 +679,9 @@ export function SettingsPage() {
 
         {/* Coluna da Direita: Horários */}
         <div className="space-y-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                 <Clock className="w-5 h-5 text-primary-500" />
                 Horário Semanal
               </h2>
@@ -689,14 +689,14 @@ export function SettingsPage() {
                 <button 
                   onClick={copyFirstDayToAll}
                   title="Copiar Domingo para todos"
-                  className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-primary-600 transition-colors"
+                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-primary-600 transition-colors"
                 >
                   <Copy className="w-4 h-4" />
                 </button>
                 <button 
                   onClick={applyMonToFri}
                   title="Aplicar Seg a Sex"
-                  className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-primary-600 transition-colors"
+                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-primary-600 transition-colors"
                 >
                   <Calendar className="w-4 h-4" />
                 </button>
@@ -707,9 +707,9 @@ export function SettingsPage() {
               {DAY_NAMES.map((name, i) => {
                 const day = hours.find(h => h.dayOfWeek === i) || { dayOfWeek: i, isOpen: false, openTime: '08:00', closeTime: '22:00' };
                 return (
-                  <div key={i} className="flex flex-col gap-2 p-3 rounded-xl border border-gray-50 hover:border-gray-100 transition-colors">
+                  <div key={i} className="flex flex-col gap-2 p-3 rounded-xl border border-gray-50 hover:border-gray-100 dark:border-gray-800 transition-colors">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-gray-700">{name}</span>
+                      <span className="text-sm font-bold text-gray-700 dark:text-gray-300">{name}</span>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input 
                           type="checkbox" 
@@ -717,7 +717,7 @@ export function SettingsPage() {
                           checked={day.isOpen}
                           onChange={(e) => updateDay(i, 'isOpen', e.target.checked)}
                         />
-                        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
+                        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white dark:bg-gray-900 after:border-gray-300 dark:border-gray-700 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
                       </label>
                     </div>
                     {day.isOpen && (
@@ -726,14 +726,14 @@ export function SettingsPage() {
                           type="time" 
                           value={day.openTime || '08:00'}
                           onChange={(e) => updateDay(i, 'openTime', e.target.value)}
-                          className="flex-1 px-2 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-sm outline-none focus:border-primary-300"
+                          className="flex-1 px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-lg text-sm outline-none focus:border-primary-300"
                         />
                         <span className="text-gray-300 text-xs">até</span>
                         <input 
                           type="time" 
                           value={day.closeTime || '22:00'}
                           onChange={(e) => updateDay(i, 'closeTime', e.target.value)}
-                          className="flex-1 px-2 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-sm outline-none focus:border-primary-300"
+                          className="flex-1 px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-lg text-sm outline-none focus:border-primary-300"
                         />
                       </div>
                     )}

@@ -31,8 +31,8 @@ export function DriversListPage() {
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Entregadores</h1>
-          <p className="text-sm text-gray-500">Gerencie a sua frota de entrega</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Entregadores</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Gerencie a sua frota de entrega</p>
         </div>
         <button
           onClick={handleOpenNew}
@@ -42,10 +42,10 @@ export function DriversListPage() {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-gray-50 border-b border-gray-100 text-sm font-medium text-gray-600">
+            <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-800 text-sm font-medium text-gray-600 dark:text-gray-400">
               <th className="px-6 py-4">Nome</th>
               <th className="px-6 py-4">Telefone</th>
               <th className="px-6 py-4">Veículo</th>
@@ -53,21 +53,21 @@ export function DriversListPage() {
               <th className="px-6 py-4 text-right">Ações</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 text-sm p-4">
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-sm p-4">
             {drivers.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                <td colSpan={5} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                   Nenhum entregador cadastrado.
                 </td>
               </tr>
             ) : (
               drivers.map((d: DriverDTO) => (
-                <tr key={d.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 font-medium text-gray-900">
+                <tr key={d.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 transition-colors">
+                  <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">
                     <span className={d.isActive ? '' : 'line-through text-gray-400'}>{d.name}</span>
                   </td>
-                  <td className="px-6 py-4 text-gray-600">{d.phone}</td>
-                  <td className="px-6 py-4 text-gray-600 capitalize">{d.vehicleType}</td>
+                  <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{d.phone}</td>
+                  <td className="px-6 py-4 text-gray-600 dark:text-gray-400 capitalize">{d.vehicleType}</td>
                   <td className="px-6 py-4">
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
@@ -75,7 +75,7 @@ export function DriversListPage() {
                           ? 'bg-green-100 text-green-800'
                           : d.status === 'busy'
                           ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-gray-100 text-gray-800'
+                          : 'bg-gray-100 text-gray-800 dark:text-gray-200'
                       }`}
                     >
                       {d.status === 'available' ? 'Disponível' : d.status === 'busy' ? 'Ocupado' : 'Offline'}

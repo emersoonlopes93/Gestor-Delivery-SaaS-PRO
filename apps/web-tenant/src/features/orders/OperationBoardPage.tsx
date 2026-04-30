@@ -24,7 +24,7 @@ const STATUS_TONE: Record<OrderStatus, { ring: string; bg: string; text: string 
   ready_for_pickup: { ring: 'ring-emerald-200', bg: 'bg-emerald-50', text: 'text-emerald-800' },
   ready_for_delivery: { ring: 'ring-emerald-200', bg: 'bg-emerald-50', text: 'text-emerald-800' },
   out_for_delivery: { ring: 'ring-violet-200', bg: 'bg-violet-50', text: 'text-violet-800' },
-  completed: { ring: 'ring-gray-200', bg: 'bg-gray-50', text: 'text-gray-700' },
+  completed: { ring: 'ring-gray-200', bg: 'bg-gray-50 dark:bg-gray-900/50', text: 'text-gray-700 dark:text-gray-300' },
   cancelled: { ring: 'ring-red-200', bg: 'bg-red-50', text: 'text-red-800' },
   draft: { ring: 'ring-slate-200', bg: 'bg-slate-50', text: 'text-slate-700' },
 };
@@ -58,10 +58,10 @@ const SegmentedControl = memo(function SegmentedControl(props: {
   const base =
     'px-3 py-2 text-xs font-black rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2';
   const active = 'bg-gray-900 text-white';
-  const idle = 'bg-white text-gray-700 hover:bg-gray-50 ring-1 ring-gray-200';
+  const idle = 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 ring-1 ring-gray-200';
 
   return (
-    <div className="inline-flex items-center gap-2 rounded-xl bg-gray-50 p-1 ring-1 ring-gray-200">
+    <div className="inline-flex items-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-900/50 p-1 ring-1 ring-gray-200">
       <button type="button" className={`${base} ${value === 'compact' ? active : idle}`} onClick={() => onChange('compact')}>
         Compacto
       </button>
@@ -110,13 +110,13 @@ const OrderCard = memo(function OrderCard(props: {
 
   return (
     <div
-      className={`bg-white border text-left border-gray-200/80 shadow-sm rounded-xl ${pad} flex flex-col ${gap} group hover:border-blue-300 hover:shadow-md transition-colors`}
+      className={`bg-white dark:bg-gray-900 border text-left border-gray-200 dark:border-gray-800/80 shadow-sm rounded-xl ${pad} flex flex-col ${gap} group hover:border-blue-300 hover:shadow-md transition-colors`}
     >
       <div className="flex items-center justify-between">
-        <span className={`${titleCls} font-black text-gray-900`}>{order.orderNumber}</span>
+        <span className={`${titleCls} font-black text-gray-900 dark:text-gray-100`}>{order.orderNumber}</span>
         <span
           className={`text-[10px] inline-flex items-center gap-1 font-black px-1.5 py-0.5 rounded-md ring-1 ${
-            isUrgent ? 'bg-red-50 text-red-700 ring-red-200' : 'bg-gray-50 text-gray-600 ring-gray-200'
+            isUrgent ? 'bg-red-50 text-red-700 ring-red-200' : 'bg-gray-50 dark:bg-gray-900/50 text-gray-600 dark:text-gray-400 ring-gray-200'
           }`}
         >
           <Clock className="w-3 h-3" /> {elapsedMin}m
@@ -125,22 +125,22 @@ const OrderCard = memo(function OrderCard(props: {
 
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <h3 className={`font-black text-gray-900 ${compact ? 'text-[11px]' : 'text-xs'} line-clamp-1`}>
+          <h3 className={`font-black text-gray-900 dark:text-gray-100 ${compact ? 'text-[11px]' : 'text-xs'} line-clamp-1`}>
             {order.customerName}
           </h3>
-          <p className={`${mutedCls} text-gray-500 mt-0.5 line-clamp-1`}>
+          <p className={`${mutedCls} text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1`}>
             {order.fulfillmentType === 'delivery' ? 'Entrega' : 'Retirada'}
           </p>
         </div>
         <div className="shrink-0 flex flex-col items-end gap-1">
           <StatusBadge status={order.status as OrderStatus} />
-          <span className={`${compact ? 'text-[11px]' : 'text-xs'} font-black text-gray-900`}>{totalLabel}</span>
+          <span className={`${compact ? 'text-[11px]' : 'text-xs'} font-black text-gray-900 dark:text-gray-100`}>{totalLabel}</span>
         </div>
       </div>
 
       {!compact ? (
-        <div className="bg-gray-50 rounded-lg p-2 ring-1 ring-gray-100">
-          <p className="text-[11px] text-gray-600 italic line-clamp-2">{order.itemsSummary || `${order.itemCount} itens`}</p>
+        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-2 ring-1 ring-gray-100">
+          <p className="text-[11px] text-gray-600 dark:text-gray-400 italic line-clamp-2">{order.itemsSummary || `${order.itemCount} itens`}</p>
         </div>
       ) : null}
 
@@ -281,8 +281,8 @@ export function OperationBoardPage() {
     <div className="p-6 h-[calc(100vh-64px)] flex flex-col">
       <header className="flex items-center justify-between mb-6 shrink-0">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Kanban Operacional</h1>
-          <p className="text-sm text-gray-500 mt-1">Atualizado a cada 15s</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Kanban Operacional</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Atualizado a cada 15s</p>
         </div>
         <div className="flex items-center gap-3">
           <SegmentedControl value={viewMode} onChange={setViewMode} />
@@ -293,7 +293,7 @@ export function OperationBoardPage() {
             title="Atualizar"
             type="button"
           >
-            <RefreshCw className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-5 h-5 text-gray-600 dark:text-gray-400 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </header>
@@ -323,7 +323,7 @@ export function OperationBoardPage() {
       {loading && (
         <div className="flex-1 flex flex-col items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-          <p className="mt-4 text-gray-500">Carregando quadro de pedidos...</p>
+          <p className="mt-4 text-gray-500 dark:text-gray-400">Carregando quadro de pedidos...</p>
         </div>
       )}
 
@@ -348,22 +348,22 @@ export function OperationBoardPage() {
 
               const columnTone = isProduction
                 ? 'bg-orange-50/60 border-orange-200/60'
-                : 'bg-gray-50/50 border-gray-200/60';
+                : 'bg-gray-50 dark:bg-gray-900/50/50 border-gray-200 dark:border-gray-800/60';
 
               return (
                 <section
                   key={column.id}
                   className={`rounded-2xl flex flex-col max-h-full border ${columnTone} min-h-[140px]`}
                 >
-                  <header className={`border-b flex items-start justify-between shrink-0 ${isProduction ? 'border-orange-200/50' : 'border-gray-200/50'} ${compact ? 'p-3' : 'p-4'}`}>
+                  <header className={`border-b flex items-start justify-between shrink-0 ${isProduction ? 'border-orange-200/50' : 'border-gray-200 dark:border-gray-800/50'} ${compact ? 'p-3' : 'p-4'}`}>
                     <div className="min-w-0">
-                      <h2 className="font-black text-sm text-gray-900 uppercase tracking-wide">{column.title}</h2>
+                      <h2 className="font-black text-sm text-gray-900 dark:text-gray-100 uppercase tracking-wide">{column.title}</h2>
                       {!compact && column.subtitle ? (
-                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{column.subtitle}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">{column.subtitle}</p>
                       ) : null}
                     </div>
                     <span
-                      className={`bg-white text-gray-700 text-xs font-black px-2 py-0.5 rounded-full ring-1 ${
+                      className={`bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 text-xs font-black px-2 py-0.5 rounded-full ring-1 ${
                         isProduction ? 'ring-orange-200' : 'ring-gray-200'
                       }`}
                     >

@@ -37,7 +37,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd }) => {
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-700 group-hover:text-gray-600 transition-colors">
+          <div className="w-full h-full flex items-center justify-center text-gray-700 dark:text-gray-300 group-hover:text-gray-600 dark:text-gray-400 transition-colors">
             <Package size={48} strokeWidth={1} />
           </div>
         )}
@@ -61,7 +61,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAdd }) => {
           <h3 className="font-bold text-gray-100 text-[12px] leading-tight line-clamp-2 min-h-[2rem] group-hover:text-emerald-400 transition-colors">
             {product.name}
           </h3>
-          <p className="text-[9px] text-gray-600 uppercase tracking-wider mt-0.5">{product.categoryName}</p>
+          <p className="text-[9px] text-gray-600 dark:text-gray-400 uppercase tracking-wider mt-0.5">{product.categoryName}</p>
         </div>
         
         <div className="mt-1 text-emerald-400 font-black text-sm">
