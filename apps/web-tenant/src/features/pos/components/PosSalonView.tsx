@@ -50,7 +50,7 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 p-6">
         {[1,2,3,4,5,6,7,8].map(i => (
-          <div key={i} className="aspect-square bg-gray-900 animate-pulse rounded-3xl border border-gray-800" />
+          <div key={i} className="aspect-square bg-white dark:bg-gray-900 animate-pulse rounded-3xl border border-gray-200 dark:border-gray-800" />
         ))}
       </div>
     );
@@ -63,31 +63,31 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-950">
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-950">
       {/* Salon Stats */}
-      <div className="p-6 bg-gray-900 border-b border-gray-800 flex items-center gap-8 shadow-xl">
+      <div className="p-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center gap-8 shadow-xl">
          <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 rounded-2xl flex items-center justify-center border border-emerald-500/20">
                <LayoutGrid size={24} />
             </div>
             <div>
-               <h2 className="text-xl font-black text-white tracking-tight">Visão de Salão</h2>
+               <h2 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">Visão de Salão</h2>
                <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-widest">Controle operacional em tempo real</p>
             </div>
          </div>
 
          <div className="flex gap-4 ml-auto">
-            <div className="bg-gray-800/50 border border-gray-700 px-4 py-2 rounded-xl text-center min-w-[80px]">
+            <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-xl text-center min-w-[80px]">
                <p className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase">Livres</p>
-               <p className="text-xl font-black text-white">{stats.free}</p>
+               <p className="text-xl font-black text-gray-900 dark:text-white">{stats.free}</p>
             </div>
             <div className="bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-xl text-center min-w-[80px]">
                <p className="text-[9px] font-black text-emerald-500 uppercase tracking-tighter">Ocupadas</p>
                <p className="text-xl font-black text-emerald-400">{stats.occupied}</p>
             </div>
-            <div className="bg-gray-800/50 border border-gray-700 px-4 py-2 rounded-xl text-center min-w-[80px]">
+            <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-xl text-center min-w-[80px]">
                <p className="text-[9px] font-black text-gray-500 dark:text-gray-400 uppercase">Total</p>
-               <p className="text-xl font-black text-white">{stats.total}</p>
+               <p className="text-xl font-black text-gray-900 dark:text-white">{stats.total}</p>
             </div>
          </div>
       </div>
@@ -109,17 +109,17 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
                     ? isWaiting
                       ? 'bg-amber-500/10 border-amber-500 text-amber-500 shadow-lg shadow-amber-500/10' 
                       : 'bg-emerald-500/10 border-emerald-500 text-emerald-500 shadow-lg shadow-emerald-500/10'
-                    : 'bg-gray-900 border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-700 hover:bg-gray-800'}
+                    : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-200 dark:border-gray-700 hover:bg-white dark:bg-gray-800'}
                 `}
               >
                 {/* Badge Status */}
-                <span className={`absolute top-4 right-4 w-3 h-3 rounded-full border-2 border-gray-900 animate-pulse ${isOccupied ? (isWaiting ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-gray-700'}`} />
+                <span className={`absolute top-4 right-4 w-3 h-3 rounded-full border-2 border-gray-200 dark:border-gray-900 animate-pulse ${isOccupied ? (isWaiting ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-gray-100 dark:bg-gray-700'}`} />
 
                 <div className="mb-2 transition-transform group-hover:scale-110">
                    <Users size={32} strokeWidth={isOccupied ? 2.5 : 1.5} />
                 </div>
 
-                <p className={`text-sm font-black uppercase tracking-widest ${isOccupied ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`}>
+                <p className={`text-sm font-black uppercase tracking-widest ${isOccupied ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>
                    {table.name}
                 </p>
 
@@ -147,7 +147,7 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
 
                 {/* Hover Action */}
                 <div className="absolute inset-0 bg-emerald-500 rounded-[2rem] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity translate-y-4 group-hover:translate-y-0 duration-300 pointer-events-none">
-                   <div className="flex flex-col items-center text-white">
+                   <div className="flex flex-col items-center text-gray-900 dark:text-white">
                       <ChevronRight size={32} />
                       <span className="text-[10px] font-black uppercase">Atender</span>
                    </div>
@@ -160,7 +160,7 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
                        e.stopPropagation();
                        onTransferTable?.(table);
                      }}
-                     className="absolute -top-1 -left-1 w-8 h-8 bg-gray-800 border border-gray-700 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-blue-600 hover:border-blue-500 transition-all z-20"
+                     className="absolute -top-1 -left-1 w-8 h-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:text-white hover:bg-blue-600 hover:border-blue-500 transition-all z-20"
                      title="Transferir Mesa"
                    >
                       <ArrowLeftRight size={14} />
@@ -173,9 +173,9 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
       </div>
 
       {/* Footer Legend */}
-      <div className="p-4 bg-gray-900 border-t border-gray-800 flex justify-center gap-6 text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
+      <div className="p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex justify-center gap-6 text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">
          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-gray-700" /> Livre
+            <span className="w-2.5 h-2.5 rounded-full bg-gray-100 dark:bg-gray-700" /> Livre
          </div>
          <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50" /> Ocupada / Atendimento

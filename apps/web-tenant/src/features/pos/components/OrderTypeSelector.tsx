@@ -57,7 +57,7 @@ export const OrderTypeSelector: React.FC<OrderTypeSelectorProps> = ({
               flex flex-col items-center justify-center p-1.5 rounded-xl border-2 transition-all duration-200
               ${isActive 
                 ? `${colors[type.color as keyof typeof colors]} shadow-lg` 
-                : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500 hover:bg-gray-750'}
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-500 hover:bg-gray-100 dark:bg-gray-750'}
             `}
           >
             <Icon size={20} className={isActive ? 'animate-bounce' : ''} />
