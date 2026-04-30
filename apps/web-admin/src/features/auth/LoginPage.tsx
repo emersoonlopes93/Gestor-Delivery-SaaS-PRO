@@ -69,6 +69,7 @@ export function LoginPage() {
             required
             className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
             placeholder="admin@gestordelivery.com"
+            autoComplete="email"
           />
         </div>
 
@@ -84,6 +85,7 @@ export function LoginPage() {
             required
             className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
             placeholder="••••••••"
+            autoComplete="current-password"
           />
         </div>
 

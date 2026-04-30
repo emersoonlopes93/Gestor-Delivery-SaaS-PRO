@@ -11,9 +11,8 @@ export class BillingController {
   constructor(private readonly billingService: BillingService) {}
 
   @Get('plans')
-  @RequirePermissions('billing.read')
   async listPlans() {
-    // Por padrão, para admin (ou quem tem acesso a billing.read), listamos tudo
+    // Todos os usuários autenticados do tenant podem ver os planos (necessário para onboarding)
     return this.billingService.listPlans(true);
   }
 
@@ -30,20 +29,23 @@ export class BillingController {
   }
 
   @Get('subscription')
-  @RequirePermissions('billing.read')
   async getCurrentSubscription(@CurrentTenant() tenantId: string) {
     return this.billingService.getCurrentSubscription(tenantId);
   }
 
   @Post('subscription')
-  @RequirePermissions('billing.write')
-  async createSubscription(@Body() dto: CreateSubscriptionDto) {
-    return this.billingService.createSubscription(dto);
+  async createSubscription(
+    @Body() dto: Omit<CreateSubscriptionDto, 'tenantId'>,
+    @CurrentTenant() tenantId: string,
+  ) {
+    return this.billingService.createSubscription({ ...dto, tenantId });
   }
 
   @Put('subscription')
-  @RequirePermissions('billing.write')
-  async updateSubscription(@Body() dto: UpdateSubscriptionDto, @CurrentTenant() tenantId: string) {
+  async updateSubscription(
+    @Body() dto: UpdateSubscriptionDto,
+    @CurrentTenant() tenantId: string,
+  ) {
     return this.billingService.updateSubscription(tenantId, dto);
   }
 

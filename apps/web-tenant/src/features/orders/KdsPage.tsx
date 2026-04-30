@@ -58,6 +58,44 @@ export function KdsPage() {
     return min >= 0 ? min : 0;
   };
 
+  const handlePrint = (content: string) => {
+    const printWindow = window.open('', '_blank', 'width=300,height=600');
+    if (!printWindow) return;
+    
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Imprimir Ticket</title>
+          <style>
+            @page { margin: 0; }
+            body { 
+              font-family: 'Courier New', Courier, monospace; 
+              font-size: 12px; 
+              padding: 10px;
+              width: 80mm;
+              margin: 0;
+            }
+            pre { 
+              white-space: pre-wrap; 
+              word-wrap: break-word;
+              margin: 0;
+            }
+          </style>
+        </head>
+        <body>
+          <pre>${content}</pre>
+          <script>
+            window.onload = () => {
+              window.print();
+              setTimeout(() => window.close(), 100);
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <div className="p-6 h-[calc(100vh-64px)] flex flex-col bg-gray-50/50">
       <header className="flex flex-col md:flex-row md:items-center justify-between mb-6 shrink-0 gap-4">
@@ -118,13 +156,18 @@ export function KdsPage() {
                 </header>
 
                 <div className="p-5 overflow-y-auto grow bg-white/50">
-                   {/* Digital Ticket Content */}
                    <pre className="whitespace-pre-wrap font-mono text-xs text-gray-800 leading-tight bg-gray-50 p-3 rounded-lg border border-gray-100">
                      {job.content}
                    </pre>
                 </div>
 
-                <footer className="p-4 bg-white rounded-b-2xl border-t border-gray-100 shrink-0">
+                <footer className="p-4 bg-white rounded-b-2xl border-t border-gray-100 shrink-0 flex flex-col gap-2">
+                  <button
+                    onClick={() => handlePrint(job.content)}
+                    className="w-full bg-blue-50 border border-blue-200 text-blue-600 font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition-colors hover:bg-blue-100"
+                  >
+                    <RefreshCw className="w-4 h-4" /> Imprimir Ticket
+                  </button>
                   <button
                     onClick={() => handleComplete(job.id)}
                     disabled={updatingId === job.id}

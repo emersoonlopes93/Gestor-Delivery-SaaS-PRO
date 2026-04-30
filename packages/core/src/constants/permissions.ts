@@ -95,6 +95,10 @@ export const TENANT_PERMISSIONS = {
 
   // Dashboard
   'dashboard.view': 'View dashboard',
+
+  // Billing module
+  'billing.read': 'View billing and plans',
+  'billing.write': 'Manage billing and subscriptions',
 } as const;
 
 export type TenantPermission = keyof typeof TENANT_PERMISSIONS;
@@ -146,6 +150,7 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
     'settings.read',
     'users.read',
     'dashboard.view',
+    'billing.read',
   ],
   attendant: [
     'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.view_timeline', 'orders.use_kanban',
@@ -183,6 +188,7 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
     'finance.read', 'finance.manage',
     'cash.close',
     'dashboard.view',
+    'billing.read', 'billing.write',
   ],
   marketing: [
     'crm.read', 'crm.manage_customers', 'crm.manage_coupons', 'crm.manage_loyalty_cashback',

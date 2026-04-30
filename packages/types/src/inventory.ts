@@ -7,6 +7,9 @@ export interface IngredientDTO {
   sku?: string;
   description?: string;
   unit: UnitType;
+  purchaseUnit?: UnitType;
+  conversionFactor: number;
+  category?: string;
   currentCost: number;
   currentStock: number;
   minStock?: number;
@@ -20,8 +23,16 @@ export interface CreateIngredientDTO {
   sku?: string;
   description?: string;
   unit: UnitType;
-  currentCost: number;
+  purchaseUnit?: UnitType;
+  conversionFactor?: number;
+  category?: string;
   minStock?: number;
+  initialPurchase?: {
+    quantity: number;
+    unit: UnitType;
+    totalCost: number;
+    supplierId?: string;
+  };
 }
 
 export interface UpdateIngredientDTO extends Partial<CreateIngredientDTO> {

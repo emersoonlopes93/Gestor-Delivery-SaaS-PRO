@@ -21,6 +21,13 @@ const AVAILABLE_FEATURES = [
   { id: 'custom_domain', name: 'Domínio Próprio', type: 'boolean' },
   { id: 'white_label', name: 'White Label', type: 'boolean' },
   { id: 'whatsapp_notifications', name: 'Notificações WhatsApp', type: 'boolean' },
+  { id: 'inventory_management', name: 'Gestão de Estoque', type: 'boolean' },
+  { id: 'kds_access', name: 'Sistema de Cozinha (KDS)', type: 'boolean' },
+  { id: 'pos_access', name: 'PDV / Frente de Caixa', type: 'boolean' },
+  { id: 'driver_pwa', name: 'PWA para Entregadores', type: 'boolean' },
+  { id: 'digital_menu', name: 'Cardápio Digital (Vendas Online)', type: 'boolean' },
+  { id: 'loyalty_program', name: 'Fidelidade e Cashback', type: 'boolean' },
+  { id: 'advanced_reports', name: 'Relatórios de Custos/Margens', type: 'boolean' },
 ];
 
 export function BillingPage() {
@@ -72,9 +79,10 @@ export function BillingPage() {
       }
       setIsModalOpen(false);
       fetchPlans();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao salvar plano:', err);
-      alert('Erro ao salvar o plano. Verifique se o slug é único.');
+      const message = err.response?.data?.message || err.message || 'Verifique se o slug é único.';
+      alert(`Erro ao salvar o plano: ${message}`);
     } finally {
       setSaving(false);
     }

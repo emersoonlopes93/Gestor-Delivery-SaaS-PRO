@@ -410,6 +410,7 @@ export class ProductsService {
         comboSlots: { include: { allowedItems: true } },
         comboBundleItems: true,
         publication: true,
+        recipeIngredients: true,
       },
     });
 
@@ -441,6 +442,15 @@ export class ProductsService {
           sellableOnline: source.sellableOnline,
           sku: source.sku ? `${source.sku}-COPY` : null,
           order: (source.order ?? 0) + 1,
+          recipeIngredients: {
+            createMany: {
+              data: (source as any).recipeIngredients.map((ri: any) => ({
+                tenantId,
+                ingredientId: ri.ingredientId,
+                quantity: ri.quantity,
+              })),
+            },
+          },
         },
       });
 

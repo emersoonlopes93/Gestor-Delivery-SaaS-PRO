@@ -5,6 +5,7 @@ import { TenantsPage } from './features/tenants/TenantsPage';
 import { TenantModulesPage } from './features/tenants/TenantModulesPage';
 import { BillingPage } from './features/billing/BillingPage';
 import { AuditLogsPage } from './features/audit/AuditLogsPage';
+import { FranchiseDashboard } from './features/franchise/FranchiseDashboard';
 import { AuthLayout } from './layouts/AuthLayout';
 import { AppLayout } from './layouts/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -48,7 +49,7 @@ export function App() {
         <Route
           path="/billing"
           element={
-            <PermissionGate permission="saas.billing.read">
+            <PermissionGate permission="saas.plans.read">
               <BillingPage />
             </PermissionGate>
           }
@@ -60,6 +61,16 @@ export function App() {
           element={
             <PermissionGate permission="saas.audit.read">
               <AuditLogsPage />
+            </PermissionGate>
+          }
+        />
+
+        {/* Franchise */}
+        <Route
+          path="/franchise"
+          element={
+            <PermissionGate permission="saas.franchise.read">
+              <FranchiseDashboard />
             </PermissionGate>
           }
         />

@@ -35,6 +35,7 @@ export function ProductsPage() {
   const [showStatusHelp, setShowStatusHelp] = useState(false);
   const tableScrollRef = React.useRef<HTMLDivElement | null>(null);
   const [tableScrollTop, setTableScrollTop] = useState(0);
+  const [savingMap, setSavingMap] = useState<Record<string, boolean>>({});
   
 
   useEffect(() => {
@@ -174,11 +175,16 @@ export function ProductsPage() {
   };
 
   const handleDuplicate = async (id: string) => {
+    const key = `duplicate-${id}`;
+    if (savingMap[key]) return;
+    setSavingMap((prev) => ({ ...prev, [key]: true }));
     try {
       await api.post(`/catalog/products/${id}/duplicate`);
-      loadData();
+      await loadData();
     } catch (error) {
       console.error('Erro ao duplicar produto:', error);
+    } finally {
+      setSavingMap((prev) => ({ ...prev, [key]: false }));
     }
   };
 
@@ -308,8 +314,9 @@ export function ProductsPage() {
               </button>
               <button
                 onClick={() => handleDuplicate(product.id)}
-                className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                title="Duplicar"
+                disabled={savingMap[`duplicate-${product.id}`]}
+                className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all disabled:opacity-50"
+                title={savingMap[`duplicate-${product.id}`] ? 'Duplicando...' : 'Duplicar'}
                 type="button"
               >
                 <Copy size={16} />

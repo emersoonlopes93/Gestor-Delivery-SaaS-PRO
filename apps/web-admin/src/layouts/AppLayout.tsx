@@ -45,7 +45,8 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     id: 'platform',
     label: 'Plataforma',
     items: [
-      { id: 'billing', label: 'Planos & Billing', to: '/billing', icon: CreditCard, permission: 'saas.billing.read' },
+      { id: 'franchise', label: 'Dashboard Franquias', to: '/franchise', icon: Store, permission: 'saas.franchise.read' },
+      { id: 'billing', label: 'Planos & Billing', to: '/billing', icon: CreditCard, permission: 'saas.plans.read' },
       { id: 'audit-logs', label: 'Logs de Auditoria', to: '/audit-logs', icon: Shield, permission: 'saas.audit.read' },
     ],
   },

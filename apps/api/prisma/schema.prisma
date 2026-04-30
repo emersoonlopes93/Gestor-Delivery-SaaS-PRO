@@ -1103,6 +1103,9 @@ model Ingredient {
   sku               String?                      @db.VarChar(50)
   description       String?
   unit              UnitType
+  purchaseUnit      UnitType?                    @map("purchase_unit")
+  conversionFactor  Decimal                      @default(1) @map("conversion_factor") @db.Decimal(10, 4)
+  category          String?                      @db.VarChar(50)
   currentCost       Decimal                      @default(0) @map("current_cost") @db.Decimal(10, 4)
   currentStock      Decimal                      @default(0) @map("current_stock") @db.Decimal(10, 4)
   minStock          Decimal?                     @map("min_stock") @db.Decimal(10, 4)

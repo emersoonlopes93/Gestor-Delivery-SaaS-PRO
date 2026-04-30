@@ -62,6 +62,16 @@ export class TenantService {
   }
 
   /**
+   * Update tenant basic info.
+   */
+  async update(tenantId: string, data: { name?: string }) {
+    return this.prisma.tenant.update({
+      where: { id: tenantId },
+      data,
+    });
+  }
+
+  /**
    * Update tenant settings.
    */
   async updateSettings(tenantId: string, dto: UpdateTenantSettingsDto) {

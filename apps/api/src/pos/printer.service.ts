@@ -5,14 +5,28 @@ import { OrderResponseDTO } from '@gestor/types';
 export class PrinterService {
   /**
    * Generates a TXT string formatted for 80mm thermal printers.
+   * Can return plain text or RAW ESC/POS commands.
    */
   async formatTicket(
     order: OrderResponseDTO, 
     type: 'customer' | 'kitchen' = 'customer',
-    station?: string
+    station?: string,
+    format: 'text' | 'escpos' = 'text'
   ): Promise<string> {
     const lines: string[] = [];
     const width = 48;
+
+    // ESC/POS Commands
+    const ESC = '\x1B';
+    const GS = '\x1D';
+    const INITIALIZE = `${ESC}@`;
+    const BOLD_ON = `${ESC}E\x01`;
+    const BOLD_OFF = `${ESC}E\x00`;
+    const CENTER = `${ESC}a\x01`;
+    const LEFT = `${ESC}a\x00`;
+    const FONT_NORMAL = `${GS}!\x00`;
+    const FONT_DOUBLE = `${GS}!\x11`;
+    const CUT = `${GS}V\x41\x03`;
 
     const center = (text: string) => {
       const padding = Math.max(0, Math.floor((width - text.length) / 2));
@@ -22,32 +36,36 @@ export class PrinterService {
     const separator = '='.repeat(width);
     const thinSeparator = '-'.repeat(width);
 
-    // Filter items if station is provided (only for kitchen)
     const itemsToPrint = order.items;
-    if (type === 'kitchen' && station) {
-      // Note: This assumes items have a 'categoryName' property or similar in OrderResponseDTO
-      // If not available, we'll need to pass filtered items directly or enhance the DTO
-      // For now, we'll allow passing filtered items or just use all if no station filter logic is here
-      // Better: The caller should pass the station items
-    }
+
+    if (format === 'escpos') lines.push(INITIALIZE);
 
     // Header
     if (type === 'customer') {
+      if (format === 'escpos') lines.push(CENTER, FONT_DOUBLE, BOLD_ON);
       lines.push(center('GESTOR DELIVERY SAAS PRO'));
+      if (format === 'escpos') lines.push(FONT_NORMAL);
       lines.push(center(`${order.fulfillmentType.toUpperCase()} - ${order.orderNumber}`));
     } else {
+      if (format === 'escpos') lines.push(CENTER, BOLD_ON);
       lines.push(center('*** PRODUCAO / KDS ***'));
       lines.push(center(`SETOR: ${station?.toUpperCase() || 'GERAL'}`));
+      if (format === 'escpos') lines.push(FONT_DOUBLE);
       lines.push(center(`PEDIDO: #${order.orderNumber}`));
+      if (format === 'escpos') lines.push(FONT_NORMAL);
     }
     
+    if (format === 'escpos') lines.push(CENTER);
     lines.push(center(new Date(order.createdAt).toLocaleString('pt-BR')));
+    if (format === 'escpos') lines.push(LEFT, BOLD_OFF);
     lines.push(separator);
 
     // Info
     if (order.customerName) lines.push(`CLIENTE: ${order.customerName.toUpperCase()}`);
     if (order.fulfillmentType === 'table' && order.tableNumber) {
+      if (format === 'escpos') lines.push(BOLD_ON);
       lines.push(`MESA: ${order.tableNumber}`);
+      if (format === 'escpos') lines.push(BOLD_OFF);
     }
     lines.push(separator);
 
@@ -57,10 +75,12 @@ export class PrinterService {
 
     for (const item of itemsToPrint) {
       const qtyStr = item.quantity.toString().padEnd(5);
-      // More space for name in kitchen tickets
       const nameStr = item.snapshotName.toUpperCase().substring(0, 40);
       
+      if (format === 'escpos') lines.push(BOLD_ON);
       lines.push(`${qtyStr}${nameStr}`);
+      if (format === 'escpos') lines.push(BOLD_OFF);
+
       if (item.notes) {
         lines.push(`  >> OBS: ${item.notes.toUpperCase()}`);
       }
@@ -82,14 +102,26 @@ export class PrinterService {
       lines.push(`SUBTOTAL: ${subStr}`);
       if (order.discountTotal > 0) lines.push(`DESCONTO: ${order.discountTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }).padStart(10)}`);
       lines.push(thinSeparator);
+      
+      if (format === 'escpos') lines.push(BOLD_ON, FONT_DOUBLE);
       lines.push(`TOTAL PAGO: ${totalStr}`);
+      if (format === 'escpos') lines.push(FONT_NORMAL, BOLD_OFF);
+
       lines.push(separator);
+      if (format === 'escpos') lines.push(CENTER);
       lines.push(center('Obrigado pela preferencia!'));
     } else {
+      if (format === 'escpos') lines.push(CENTER);
       lines.push(center(`--- FIM DO DOCUMENTO ---`));
     }
 
-    lines.push('\n\n\n\n\n');
+    if (format === 'escpos') {
+      lines.push('\n\n\n\n\n');
+      lines.push(CUT);
+    } else {
+      lines.push('\n\n\n\n\n');
+    }
+
     return lines.join('\n');
   }
 }

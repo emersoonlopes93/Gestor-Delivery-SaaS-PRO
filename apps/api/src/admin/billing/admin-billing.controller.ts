@@ -11,19 +11,19 @@ export class AdminBillingController {
   constructor(private readonly billingService: BillingService) {}
 
   @Get('plans')
-  @RequireAdminPermissions('saas.billing.read')
+  @RequireAdminPermissions('saas.plans.read')
   async listPlans() {
     return this.billingService.listPlans(true);
   }
 
   @Post('plans')
-  @RequireAdminPermissions('saas.billing.write')
+  @RequireAdminPermissions('saas.plans.manage')
   async createPlan(@Body() dto: CreatePlanDto) {
     return this.billingService.createPlan(dto);
   }
 
   @Put('plans/:id')
-  @RequireAdminPermissions('saas.billing.write')
+  @RequireAdminPermissions('saas.plans.manage')
   async updatePlan(@Param('id') id: string, @Body() dto: UpdatePlanDto) {
     return this.billingService.updatePlan(id, dto);
   }

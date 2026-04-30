@@ -13,6 +13,8 @@ import { AdminHealthService } from './health/admin-health.service';
 import { AdminAuditLogsController } from './audit-logs/admin-audit-logs.controller';
 import { AdminAuditLogsService } from './audit-logs/admin-audit-logs.service';
 import { AdminBillingController } from './billing/admin-billing.controller';
+import { AdminFranchiseController } from './franchise/admin-franchise.controller';
+import { AdminFranchiseService } from './franchise/admin-franchise.service';
 import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
 
@@ -25,9 +27,19 @@ import { BillingModule } from '../billing/billing.module';
     AdminGroupsController, 
     AdminHealthController, 
     AdminAuditLogsController,
-    AdminBillingController
+    AdminBillingController,
+    AdminFranchiseController
   ],
-  providers: [AdminAuthService, AdminRbacService, AdminTenantsService, AdminModulesService, AdminGroupsService, AdminHealthService, AdminAuditLogsService],
+  providers: [
+    AdminAuthService, 
+    AdminRbacService, 
+    AdminTenantsService, 
+    AdminModulesService, 
+    AdminGroupsService, 
+    AdminHealthService, 
+    AdminAuditLogsService,
+    AdminFranchiseService
+  ],
   exports: [AdminAuthService, AdminRbacService],
 })
 export class AdminModule {}

@@ -37,14 +37,25 @@ export function OnboardingWizard() {
     setTenantName(user?.tenant?.name || '');
 
     // Fetch plans
+    setLoading(true);
     api.get<Plan[]>('/billing/plans')
        .then(res => setPlans(res.data))
-       .catch(err => console.error('Error fetching plans', err));
+       .catch(err => console.error('Error fetching plans', err))
+       .finally(() => setLoading(false));
   }, [user, navigate]);
 
   const handleNextSetup = async () => {
-    // We could update tenant name here, but let's keep it simple
-    setStep(2);
+    if (!tenantName) return;
+    setLoading(true);
+    try {
+      await api.patch('/tenant', { name: tenantName });
+      await api.patch('/tenant/onboarding-step', { step: 'basicInfo', completed: true });
+      setStep(2);
+    } catch (err) {
+      console.error('Failed to save step 1', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubscribe = async () => {
@@ -52,7 +63,9 @@ export function OnboardingWizard() {
     setLoading(true);
     try {
       // Create Subscription
-      await api.post('/billing/subscriptions', { planId: selectedPlan });
+      await api.post('/billing/subscription', { planId: selectedPlan });
+      // Update step progress
+      await api.patch('/tenant/onboarding-step', { step: 'payment', completed: true });
       setStep(3);
     } catch (err) {
       console.error('Failed to subscribe', err);
@@ -64,7 +77,7 @@ export function OnboardingWizard() {
   const handleComplete = async () => {
     setLoading(true);
     try {
-      await api.post('/tenant/onboarding/complete');
+      await api.post('/tenant/onboarding-complete');
       // Update local state to bypass guard
       if (user) {
         setUser({ ...user, onboardingCompletedAt: new Date().toISOString() } as TenantUserSession);
@@ -129,6 +142,16 @@ export function OnboardingWizard() {
               <p className="text-gray-500 mb-8 max-w-lg">Todos os planos incluem 7 dias grátis para testes. O faturamento começará automaticamente após este período caso não seja cancelado.</p>
               
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                {plans.length === 0 && !loading && (
+                  <div className="col-span-full py-12 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                    <p className="text-gray-500 font-medium">Nenhum plano disponível no momento.</p>
+                  </div>
+                )}
+                {loading && plans.length === 0 && (
+                   <div className="col-span-full py-12 flex justify-center">
+                     <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+                   </div>
+                )}
                 {plans.map(plan => (
                   <div key={plan.id} onClick={() => setSelectedPlan(plan.id)}
                     className={`border-2 rounded-2xl p-6 cursor-pointer transition-all ${

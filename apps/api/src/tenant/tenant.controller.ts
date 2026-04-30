@@ -25,6 +25,18 @@ export class TenantController {
   }
 
   /**
+   * Update tenant basic info.
+   */
+  @Patch()
+  @RequirePermissions('settings.manage')
+  async updateTenant(
+    @CurrentTenant() tenantId: string,
+    @Body() body: { name: string },
+  ) {
+    return this.tenantService.update(tenantId, body);
+  }
+
+  /**
    * Update tenant settings.
    */
   @Patch('settings')
@@ -81,8 +93,7 @@ export class TenantController {
   /**
    * Update onboarding step.
    */
-  @Patch('onboarding/step')
-  @RequirePermissions('settings.manage')
+  @Patch('onboarding-step')
   async updateOnboardingStep(
     @CurrentTenant() tenantId: string,
     @Body() body: { step: 'basicInfo' | 'catalog' | 'payment' | 'firstOrder'; completed?: boolean },
@@ -90,12 +101,15 @@ export class TenantController {
     return this.onboardingService.updateStep(tenantId, body.step, body.completed ?? true);
   }
 
+  @Get('test-route')
+  async testRoute() {
+    return { message: 'Tenant controller is reachable' };
+  }
+
   /**
    * Complete overall onboarding.
    */
-  @Patch('onboarding/complete')
-  @Post('onboarding/complete')
-  @RequirePermissions('dashboard.view')
+  @Post('onboarding-complete')
   async completeOnboarding(@CurrentTenant() tenantId: string) {
     return this.onboardingService.completeOnboarding(tenantId);
   }

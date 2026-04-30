@@ -43,7 +43,7 @@ export class IngredientsService {
     return this.mapToDTO(ingredient);
   }
 
-  async create(tenantId: string, dto: CreateIngredientDTO): Promise<IngredientDTO> {
+  async create(tenantId: string, dto: any): Promise<IngredientDTO> {
     const safeSku = dto.sku && dto.sku.trim() !== '' ? dto.sku.trim() : null;
 
     if (safeSku) {
@@ -56,15 +56,81 @@ export class IngredientsService {
       }
     }
 
-    const ingredient = await this.prisma.ingredient.create({
-      data: {
-        ...dto,
-        sku: safeSku,
-        tenantId,
-      },
-    });
+    const { initialPurchase, ...ingredientData } = dto;
 
-    return this.mapToDTO(ingredient);
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Create Ingredient
+      const ingredient = await tx.ingredient.create({
+        data: {
+          name: ingredientData.name,
+          sku: safeSku,
+          description: ingredientData.description,
+          unit: ingredientData.unit as PrismaUnitType,
+          purchaseUnit: ingredientData.purchaseUnit as PrismaUnitType,
+          conversionFactor: ingredientData.conversionFactor || 1,
+          category: ingredientData.category,
+          minStock: ingredientData.minStock,
+          tenantId,
+          currentStock: 0,
+          currentCost: 0,
+        },
+      }) as any;
+
+      // 2. Handle Initial Purchase if provided
+      if (initialPurchase && initialPurchase.quantity > 0) {
+        const factor = Number(ingredient.conversionFactor);
+        const quantityBase = Number(initialPurchase.quantity) * factor;
+        const unitCostBase = Number(initialPurchase.totalCost) / quantityBase;
+
+        // Create Purchase record for history
+        const purchase = await tx.purchase.create({
+          data: {
+            tenantId,
+            supplierId: initialPurchase.supplierId || '', // Handle missing supplier
+            totalValue: initialPurchase.totalCost,
+            status: 'received',
+            purchaseDate: new Date(),
+            items: {
+              create: {
+                tenantId,
+                ingredientId: ingredient.id,
+                quantity: initialPurchase.quantity,
+                unitCost: Number(initialPurchase.totalCost) / Number(initialPurchase.quantity),
+                totalCost: initialPurchase.totalCost,
+              }
+            }
+          }
+        });
+
+        // Update Ingredient with initial stock and cost
+        await tx.ingredient.update({
+          where: { id: ingredient.id },
+          data: {
+            currentStock: quantityBase,
+            currentCost: unitCostBase,
+          }
+        });
+
+        // Create Stock Movement
+        await tx.stockMovement.create({
+          data: {
+            tenantId,
+            ingredientId: ingredient.id,
+            type: 'purchase_entry',
+            quantity: quantityBase,
+            unitCost: unitCostBase,
+            notes: `Entrada inicial via cadastro (Compra #${purchase.id})`,
+          }
+        });
+      }
+
+      // Re-fetch to get updated values
+      const finalIngredient = await tx.ingredient.findUnique({
+        where: { id: ingredient.id }
+      });
+
+      return this.mapToDTO(finalIngredient!);
+    });
   }
 
   async update(tenantId: string, id: string, dto: UpdateIngredientDTO): Promise<IngredientDTO> {
@@ -82,26 +148,43 @@ export class IngredientsService {
       }
     }
 
+    const { initialPurchase, ...updateData } = dto;
+
     const updated = await this.prisma.ingredient.update({
       where: { id },
       data: {
-        ...dto,
+        name: updateData.name,
         sku: safeSku,
+        description: updateData.description,
+        unit: updateData.unit as PrismaUnitType,
+        purchaseUnit: updateData.purchaseUnit as PrismaUnitType,
+        conversionFactor: updateData.conversionFactor,
+        category: updateData.category,
+        minStock: updateData.minStock,
+        isActive: updateData.isActive,
       },
-    });
+    }) as any;
 
     return this.mapToDTO(updated);
   }
 
-  private mapToDTO(ing: Ingredient): IngredientDTO {
+  private mapToDTO(ing: any): IngredientDTO {
     return {
-      ...ing,
+      id: ing.id,
+      tenantId: ing.tenantId,
+      name: ing.name,
       sku: ing.sku ?? undefined,
       description: ing.description ?? undefined,
       unit: this.mapUnit(ing.unit),
+      purchaseUnit: ing.purchaseUnit ? this.mapUnit(ing.purchaseUnit) : undefined,
+      conversionFactor: Number(ing.conversionFactor),
+      category: ing.category ?? undefined,
       currentCost: Number(ing.currentCost),
       currentStock: Number(ing.currentStock),
       minStock: ing.minStock ? Number(ing.minStock) : undefined,
+      isActive: ing.isActive,
+      createdAt: ing.createdAt,
+      updatedAt: ing.updatedAt,
     };
   }
 }
