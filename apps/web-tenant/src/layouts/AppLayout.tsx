@@ -193,15 +193,15 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
       <button
         type="button"
         onClick={() => onToggle(group.id)}
-        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
+        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all group ${
           isAnyItemActive
-            ? 'bg-primary-50 text-primary-700'
-            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+            ? 'bg-primary-50 text-primary-700 shadow-sm shadow-primary-500/10'
+            : 'text-gray-500 hover:bg-gray-100/50 hover:text-gray-900'
         }`}
         title={collapsed ? group.label : undefined}
       >
         <span className="flex items-center gap-2 min-w-0">
-          <span className="text-xs font-black text-gray-400 uppercase tracking-wider">
+          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] group-hover:text-gray-600 transition-colors">
             {!collapsed ? group.label : group.label.slice(0, 1)}
           </span>
         </span>
@@ -229,9 +229,9 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
                   href={item.to}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-gray-700 hover:bg-primary-50 hover:text-primary-700"
+                  className="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-gray-500 hover:bg-gray-100/50 hover:text-gray-900"
                 >
-                  <span className="w-6 flex items-center justify-center" aria-hidden>
+                  <span className="w-6 flex items-center justify-center text-gray-400 group-hover:text-gray-600 transition-colors" aria-hidden>
                     <item.icon className="h-4 w-4" aria-hidden />
                   </span>
                   {!collapsed ? <span className="truncate">{item.label}</span> : null}
@@ -247,23 +247,26 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
                 to={item.to}
                 title={collapsed ? item.label : undefined}
                 className={({ isActive }) => {
-                  const active = isActive;
-                  return `group relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    active
-                      ? 'bg-primary-100 text-primary-800'
-                      : 'text-gray-700 hover:bg-primary-50 hover:text-primary-700'
+                  return `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                    isActive
+                      ? 'bg-primary-50 text-primary-700 shadow-sm shadow-primary-500/10'
+                      : 'text-gray-500 hover:bg-gray-100/50 hover:text-gray-900'
                   }`;
                 }}
               >
-                <span className="w-6 flex items-center justify-center" aria-hidden>
-                  <item.icon className="h-4 w-4" aria-hidden />
-                </span>
-                {!collapsed ? <span className="truncate">{item.label}</span> : null}
-                {collapsed ? (
-                  <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100">
-                    {item.label}
-                  </span>
-                ) : null}
+                {({ isActive }) => (
+                  <>
+                    <span className={`w-6 flex items-center justify-center transition-colors ${isActive ? 'text-primary-600' : 'text-gray-400 group-hover:text-gray-600'}`} aria-hidden>
+                      <item.icon className="h-4 w-4" aria-hidden />
+                    </span>
+                    {!collapsed ? <span className="truncate">{item.label}</span> : null}
+                    {collapsed ? (
+                      <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100">
+                        {item.label}
+                      </span>
+                    ) : null}
+                  </>
+                )}
               </NavLink>
             );
           })}
@@ -302,7 +305,7 @@ export function AppLayout() {
     localStorage.setItem(SIDEBAR_STORAGE_KEY, JSON.stringify(next));
   }, [collapsed, openGroups]);
 
-  const userPermissions = user?.permissions ?? [];
+  const userPermissions = useMemo(() => user?.permissions ?? [], [user?.permissions]);
   const tenantSlug = user?.tenant?.slug;
   const publicMenuUrl = tenantSlug && storefrontBaseUrl ? `${storefrontBaseUrl}/${tenantSlug}` : '';
 
@@ -441,25 +444,16 @@ export function AppLayout() {
         <div className="p-4 border-b border-gray-200 flex items-center justify-between gap-2">
           {!collapsed ? (
             <div className="min-w-0">
-              <h1 className="text-lg font-bold text-primary-700 truncate">Gestor Delivery</h1>
-              <p className="text-xs text-gray-500 mt-0.5 truncate">{user?.name || 'Carregando...'}</p>
+              <h1 className="text-xl font-black text-gray-900 tracking-tight truncate">Gestor<span className="text-primary-600">PRO</span></h1>
+              <p className="text-xs font-bold text-gray-500 mt-0.5 truncate">{user?.name || 'Carregando...'}</p>
             </div>
           ) : (
             <div className="w-full text-center">
-              <span className="text-lg font-bold text-primary-700" aria-hidden>
-                GD
+              <span className="text-xl font-black text-gray-900 tracking-tight" aria-hidden>
+                G<span className="text-primary-600">P</span>
               </span>
             </div>
           )}
-
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            className="hidden md:inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm text-gray-600 hover:bg-gray-50"
-            title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
-          >
-            {collapsed ? '»' : '«'}
-          </button>
         </div>
 
         {tenantSlug ? (
@@ -510,7 +504,7 @@ export function AppLayout() {
         <div className="p-3 border-t border-gray-200">
           <button
             onClick={handleLogout}
-            className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors ${
+            className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 transition-all ${
               collapsed ? 'flex items-center justify-center' : ''
             }`}
             title={collapsed ? 'Sair' : undefined}
@@ -521,16 +515,16 @@ export function AppLayout() {
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="hidden md:flex sticky top-0 z-30 bg-white border-b border-gray-200">
-          <div className="h-14 px-4 flex items-center gap-3 w-full">
+        <header className="hidden md:flex sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-gray-200/60">
+          <div className="h-16 px-6 flex items-center gap-4 w-full">
             <button
               type="button"
               onClick={toggleCollapsed}
-              className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              className="inline-flex items-center justify-center rounded-xl p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-all"
               aria-label="Alternar sidebar"
               title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
             >
-              <Menu className="h-4 w-4" aria-hidden />
+              <Menu className="h-5 w-5" aria-hidden />
             </button>
 
             <div className="relative flex-1 max-w-[320px] lg:max-w-[520px]">
@@ -539,24 +533,24 @@ export function AppLayout() {
                 value={desktopSearch}
                 onChange={(e) => setDesktopSearch(e.target.value)}
                 placeholder="Buscar (atalhos, páginas, ações)"
-                className="w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
+                className="input-premium pl-10"
               />
             </div>
 
             <div className="hidden sm:flex items-center gap-2">
               <button
                 type="button"
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                className="btn-ghost"
                 title="Atalhos"
               >
                 <CornerDownRight className="h-4 w-4" aria-hidden />
-                <span className="hidden xl:inline">Atalhos</span>
+                <span className="hidden xl:inline font-bold">Atalhos</span>
               </button>
             </div>
 
             <button
               type="button"
-              className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-2 sm:px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              className="btn-ghost w-10 h-10 p-0 rounded-full bg-gray-50"
               title="Notificações"
               aria-label="Notificações"
             >
@@ -565,10 +559,12 @@ export function AppLayout() {
 
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-2 sm:px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-2 py-1 sm:pr-3 text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-sm"
               title="Perfil"
             >
-              <UserCircle className="h-4 w-4" aria-hidden />
+              <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center">
+                <UserCircle className="h-5 w-5" aria-hidden />
+              </div>
               <span className="hidden lg:inline truncate max-w-[120px] xl:max-w-[180px]">{user?.name || 'Conta'}</span>
             </button>
           </div>

@@ -413,20 +413,20 @@ export function ProductsPage() {
           <p className="text-gray-500 mt-1">Gerencie itens vendáveis. Combos têm fluxo próprio no módulo de Combos.</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
+          <div className="flex items-center bg-gray-100 p-1 rounded-xl">
             <button
               onClick={() => setViewMode('all')}
-              className={`px-3 py-1.5 text-xs font-black uppercase tracking-wider rounded-lg transition-colors ${viewMode === 'all' ? 'bg-primary-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}
+              className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${viewMode === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               type="button"
             >
               Lista Completa
             </button>
             <button
               onClick={() => setViewMode('grouped')}
-              className={`px-3 py-1.5 text-xs font-black uppercase tracking-wider rounded-lg transition-colors ${viewMode === 'grouped' ? 'bg-primary-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}
+              className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${viewMode === 'grouped' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               type="button"
             >
-              Visualizar por Categoria
+              Por Categoria
             </button>
           </div>
 
@@ -446,7 +446,7 @@ export function ProductsPage() {
           
           <button
             onClick={() => navigate('/catalog/simulation')}
-            className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 px-5 py-2.5 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2"
+            className="btn-secondary"
             type="button"
           >
             <span>🍕</span> Simulador
@@ -454,7 +454,7 @@ export function ProductsPage() {
           
           <button
             onClick={() => navigate('/catalog/products/new/v2')}
-            className="bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-primary-200 transition-all flex items-center gap-2"
+            className="btn-primary"
             type="button"
           >
             <span>🍔</span> Novo Produto
@@ -478,14 +478,14 @@ export function ProductsPage() {
         ))}
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+      <div className="card-premium p-5 mb-6">
         <div className="flex flex-col lg:flex-row lg:items-center gap-3">
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-medium transition-all focus:bg-white"
+              className="input-premium pl-10"
               placeholder="Buscar por nome, ingrediente ou categoria..."
               type="text"
             />
@@ -495,9 +495,9 @@ export function ProductsPage() {
             <select
               value={selectedCategoryId ?? ''}
               onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : null)}
-              className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 focus:bg-white outline-none"
+              className="input-premium py-2.5 w-auto pr-8"
             >
-              <option value="">Todas as categorias</option>
+              <option value="">Todas categorias</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -508,28 +508,27 @@ export function ProductsPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as ProductStatusFilter)}
-              className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700"
+              className="input-premium py-2.5 w-auto pr-8"
             >
-              <option value="all">Todos os status</option>
+              <option value="all">Todos status</option>
               <option value="active">Ativos</option>
               <option value="inactive">Inativos</option>
             </select>
-            {/* Filtro de tipo removido daqui e movido para pills acima */}
             <select
               value={publicationFilter}
               onChange={(e) => setPublicationFilter(e.target.value as PublicationFilter)}
-              className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700"
+              className="input-premium py-2.5 w-auto pr-8"
             >
-              <option value="all">Todas publicações</option>
+              <option value="all">Todas publ.</option>
               <option value="draft">Draft</option>
               <option value="published">Publicado</option>
             </select>
             <select
               value={operationalFilter}
               onChange={(e) => setOperationalFilter(e.target.value as OperationalFilter)}
-              className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700"
+              className="input-premium py-2.5 w-auto pr-8"
             >
-              <option value="all">Todas operações</option>
+              <option value="all">Todas oper.</option>
               <option value="active">Active</option>
               <option value="hidden">Hidden</option>
               <option value="sold_out_manual">Sold out</option>
@@ -580,7 +579,7 @@ export function ProductsPage() {
                   const pubLabel = pub ? pub.publicationStatus : null;
                   const opLabel = pub ? pub.operationalStatus : null;
                   return (
-                    <div key={product.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                    <div key={product.id} className="card-premium p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="font-black text-gray-900 truncate">{product.name}</div>
@@ -627,6 +626,15 @@ export function ProductsPage() {
                           type="button"
                         >
                           Editar
+                        </button>
+                        <button
+                          onClick={() => handleDuplicate(product.id)}
+                          disabled={savingMap[`duplicate-${product.id}`]}
+                          className="px-3 py-2 text-xs font-black text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl border border-indigo-200 disabled:opacity-50"
+                          title={savingMap[`duplicate-${product.id}`] ? 'Duplicando...' : 'Duplicar'}
+                          type="button"
+                        >
+                          {savingMap[`duplicate-${product.id}`] ? 'Copiar' : 'Duplicar'}
                         </button>
                         <button
                           onClick={() => handleToggleActive(product)}
@@ -678,16 +686,16 @@ export function ProductsPage() {
                 ) : null}
               </div>
 
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hidden md:block">
+              <div className="card-premium hidden md:block">
                 <div ref={tableScrollRef} className="max-h-[70vh] overflow-auto">
                   <table className="w-full text-left border-collapse">
                     <thead className="bg-gray-50/50 border-b border-gray-100 sticky top-0 z-10">
                       <tr>
-                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Produto</th>
-                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider hidden lg:table-cell">Categoria</th>
-                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Preço</th>
-                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Status</th>
-                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Produto</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hidden lg:table-cell">Categoria</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Preço</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -724,7 +732,7 @@ export function ProductsPage() {
                 const title = group.category?.name ?? 'Sem categoria';
                 const isExpanded = expandedGroups[group.key] ?? true;
                 return (
-                  <section key={group.key} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                  <section key={group.key} className="card-premium">
                     <button
                       type="button"
                       onClick={() => toggleGroupExpanded(group.key)}
@@ -749,11 +757,11 @@ export function ProductsPage() {
                         <table className="w-full text-left border-collapse">
                           <thead className="bg-white border-b border-gray-100 sticky top-0 z-10">
                             <tr>
-                              <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Produto</th>
-                              <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider hidden lg:table-cell">Categoria</th>
-                              <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Preço</th>
-                              <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Tipo/Status</th>
-                              <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
+                              <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Produto</th>
+                              <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hidden lg:table-cell">Categoria</th>
+                              <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Preço</th>
+                              <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipo/Status</th>
+                              <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">

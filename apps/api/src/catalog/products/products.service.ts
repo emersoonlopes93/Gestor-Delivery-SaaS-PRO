@@ -444,7 +444,7 @@ export class ProductsService {
           order: (source.order ?? 0) + 1,
           recipeIngredients: {
             createMany: {
-              data: (source as any).recipeIngredients.map((ri: any) => ({
+              data: ((source as any).recipeIngredients || []).map((ri: any) => ({
                 tenantId,
                 ingredientId: ri.ingredientId,
                 quantity: ri.quantity,
