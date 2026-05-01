@@ -36,6 +36,9 @@ import {
   CheckCircle2,
   XCircle,
   PauseCircle,
+  MessageSquare,
+  Megaphone,
+  Bot
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
@@ -142,6 +145,15 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     items: [
       { id: 'analytics-reports', label: 'Relatórios Gerenciais', to: '/analytics/reports', icon: ChartLine, permission: 'reports.read' },
       { id: 'analytics-goals', label: 'Metas e Desempenho', to: '/analytics/goals', icon: Goal, permission: 'goals.read' },
+    ],
+  },
+  {
+    id: 'whatsapp',
+    label: 'WhatsApp & IA',
+    items: [
+      { id: 'whatsapp-inbox', label: 'Caixa de Entrada', to: '/whatsapp/inbox', icon: MessageSquare, permission: 'orders.read' },
+      { id: 'whatsapp-campaigns', label: 'Campanhas', to: '/campaigns', icon: Megaphone, permission: 'crm.manage_coupons' },
+      { id: 'whatsapp-config', label: 'Agente IA', to: '/whatsapp/config', icon: Bot, permission: 'settings.manage' },
     ],
   },
   {

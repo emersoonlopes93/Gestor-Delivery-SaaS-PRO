@@ -1,0 +1,189 @@
+/**
+ * Interface de abstração para providers de WhatsApp.
+ * Implementações: EvolutionGoProvider, MetaCloudProvider
+ *
+ * Regra: NENHUMA regra de negócio (catálogo, preço, pedido) deve existir aqui.
+ * Este contrato é puramente de canal/transporte.
+ */
+
+export interface WhatsAppConnectionStatus {
+  connected: boolean;
+  phoneNumber?: string;
+  state: 'connected' | 'disconnected' | 'connecting' | 'qr_pending';
+  qrCode?: string; // base64 ou data URL
+}
+
+export interface WhatsAppSendTextInput {
+  to: string; // número destino (ex: 5582988898565)
+  text: string;
+  delay?: number; // ms de delay de digitação
+  quotedMessageId?: string;
+}
+
+export interface WhatsAppSendMediaInput {
+  to: string;
+  type: 'image' | 'video' | 'audio' | 'document';
+  url: string; // URL pública da mídia
+  caption?: string;
+  filename?: string;
+  delay?: number;
+}
+
+export interface WhatsAppSendListInput {
+  to: string;
+  title: string;
+  description: string;
+  footerText: string;
+  buttonText: string;
+  sections: Array<{
+    title: string;
+    rows: Array<{
+      rowId: string;
+      title: string;
+      description?: string;
+    }>;
+  }>;
+  delay?: number;
+}
+
+export interface WhatsAppSendButtonInput {
+  to: string;
+  title: string;
+  description: string;
+  footer: string;
+  buttons: Array<{
+    type: 'reply';
+    id: string;
+    displayText: string;
+  }>;
+  delay?: number;
+}
+
+export interface WhatsAppSendResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+}
+
+export interface WhatsAppCreateInstanceInput {
+  instanceName: string;
+  webhookUrl: string;
+  token?: string;
+}
+
+export interface WhatsAppCreateInstanceResult {
+  instanceId: string;
+  instanceName: string;
+  token?: string;
+}
+
+export interface WhatsAppConnectInput {
+  webhookUrl: string;
+  subscribe?: string[];
+}
+
+export const WHATSAPP_PROVIDER = 'WHATSAPP_PROVIDER';
+
+export interface IWhatsAppProvider {
+  /**
+   * Identifica o tipo do provider
+   */
+  readonly providerType: 'evolution_go' | 'meta_cloud';
+
+  /**
+   * Cria uma nova instância no provider externo
+   */
+  createInstance(
+    apiUrl: string,
+    apiKey: string,
+    input: WhatsAppCreateInstanceInput,
+  ): Promise<WhatsAppCreateInstanceResult>;
+
+  /**
+   * Conecta uma instância (gera QR code ou pairing code)
+   */
+  connect(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+    input: WhatsAppConnectInput,
+  ): Promise<WhatsAppConnectionStatus>;
+
+  /**
+   * Desconecta uma instância
+   */
+  disconnect(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+  ): Promise<void>;
+
+  /**
+   * Consulta status de conexão
+   */
+  getConnectionStatus(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+  ): Promise<WhatsAppConnectionStatus>;
+
+  /**
+   * Obtém QR Code para pareamento
+   */
+  getQrCode(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+  ): Promise<string | null>; // base64
+
+  /**
+   * Envia mensagem de texto
+   */
+  sendText(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+    input: WhatsAppSendTextInput,
+  ): Promise<WhatsAppSendResult>;
+
+  /**
+   * Envia mídia (imagem, vídeo, áudio, documento)
+   */
+  sendMedia(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+    input: WhatsAppSendMediaInput,
+  ): Promise<WhatsAppSendResult>;
+
+  /**
+   * Envia lista interativa
+   */
+  sendList(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+    input: WhatsAppSendListInput,
+  ): Promise<WhatsAppSendResult>;
+
+  /**
+   * Envia botões de resposta rápida
+   */
+  sendButtons(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+    input: WhatsAppSendButtonInput,
+  ): Promise<WhatsAppSendResult>;
+
+  /**
+   * Marca mensagens como lidas
+   */
+  markAsRead(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+    chatId: string,
+    messageIds: string[],
+  ): Promise<void>;
+}

@@ -39,6 +39,12 @@ import { InventoryCountPage } from './features/purchasing/InventoryCountPage';
 import { LossesPage } from './features/purchasing/LossesPage';
 import { FinancePage } from './features/purchasing/FinancePage';
 import { EmployeesPage } from './features/management/employees/EmployeesPage';
+
+// WhatsApp & IA & Campanhas (Phase 11)
+import { WhatsAppConfigPage } from './features/whatsapp/pages/WhatsAppConfigPage';
+import { InboxPage } from './features/whatsapp/pages/InboxPage';
+import { CampaignsPage } from './features/campaigns/pages/CampaignsPage';
+
 import { useThemeStore } from './stores/theme.store';
 
 export function App() {
@@ -252,6 +258,34 @@ export function App() {
           element={
             <PermissionGate permission="crm.manage_coupons">
               <PromotionsPage />
+            </PermissionGate>
+          }
+        />
+
+        {/* Campanhas (Phase 11) */}
+        <Route
+          path="/campaigns"
+          element={
+            <PermissionGate permission="crm.manage_coupons">
+              <CampaignsPage />
+            </PermissionGate>
+          }
+        />
+
+        {/* WhatsApp & IA (Phase 11) */}
+        <Route
+          path="/whatsapp/config"
+          element={
+            <PermissionGate permission="settings.manage">
+              <WhatsAppConfigPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/whatsapp/inbox"
+          element={
+            <PermissionGate permission="orders.read">
+              <InboxPage />
             </PermissionGate>
           }
         />

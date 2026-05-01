@@ -34,6 +34,9 @@ import { PurchasingModule } from './purchasing/purchasing.module';
 import { FinanceModule } from './finance/finance.module';
 import { PlanGatingGuard } from './common/guards/plan-gating.guard';
 import { NotificationsModule } from './notifications/notifications.module';
+import { WhatsAppChannelModule } from './whatsapp-channel/whatsapp-channel.module';
+import { AiAgentModule } from './ai-agent/ai-agent.module';
+import { CampaignsModule } from './campaigns/campaigns.module';
 
 @Module({
   imports: [
@@ -126,6 +129,11 @@ import { NotificationsModule } from './notifications/notifications.module';
 
     // Notifications (WhatsApp + Push)
     NotificationsModule,
+
+    // Add-on Features
+    WhatsAppChannelModule,
+    AiAgentModule,
+    CampaignsModule,
   ],
   providers: [
     {

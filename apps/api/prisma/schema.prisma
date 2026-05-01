@@ -92,6 +92,11 @@ model Tenant {
   businessGroup               BusinessGroup?               @relation(fields: [businessGroupId], references: [id])
   onboarding                  TenantOnboarding?
   auditLogs                   AuditLog[]
+  whatsappInstance             WhatsAppInstance?
+  chatSessions                ChatSession[]
+  aiAgentConfig               AiAgentConfig?
+  campaigns                   Campaign[]
+  customerOptOuts             CustomerOptOut[]
 
   @@map("tenants")
 }
@@ -1068,10 +1073,13 @@ model Customer {
   cashbackBalance Decimal               @default(0) @map("cashback_balance") @db.Decimal(10, 2)
   createdAt       DateTime              @default(now()) @map("created_at")
   updatedAt       DateTime              @updatedAt @map("updated_at")
-  cashbackHistory CashbackTransaction[]
-  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  orders          Order[]
-  scheduledOrders ScheduledOrder[]
+  cashbackHistory    CashbackTransaction[]
+  tenant             Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orders             Order[]
+  scheduledOrders    ScheduledOrder[]
+  chatSessions       ChatSession[]
+  campaignDispatches CampaignDispatch[]
+  optOuts            CustomerOptOut[]
 
   @@unique([tenantId, phone])
   @@index([tenantId])
@@ -1871,4 +1879,208 @@ enum FinancialStatus {
   paid
   cancelled
   overdue
+}
+
+// ===== WhatsApp Channel + AI Agent + Campaigns =====
+
+enum WhatsAppInstanceStatus {
+  connected
+  disconnected
+  connecting
+  qr_pending
+}
+
+enum WhatsAppProviderType {
+  evolution_go
+  meta_cloud
+}
+
+enum AiProviderType {
+  openai
+  anthropic
+}
+
+enum ChatState {
+  greeting
+  browsing_menu
+  building_cart
+  collecting_address
+  awaiting_confirmation
+  order_created
+  handoff_human
+  closed
+}
+
+enum MessageDirection {
+  inbound
+  outbound
+}
+
+enum CampaignStatus {
+  draft
+  scheduled
+  running
+  paused
+  completed
+  cancelled
+}
+
+enum CampaignDispatchStatus {
+  queued
+  sent
+  delivered
+  read
+  replied
+  failed
+  opt_out
+}
+
+model WhatsAppInstance {
+  id             String                @id @default(uuid())
+  tenantId       String                @unique @map("tenant_id")
+  providerType   WhatsAppProviderType  @default(evolution_go) @map("provider_type")
+  instanceName   String                @unique @map("instance_name") @db.VarChar(100)
+  apiUrl         String                @map("api_url") @db.VarChar(500)
+  apiKey         String                @map("api_key") @db.VarChar(500)
+  phoneNumber    String?               @map("phone_number") @db.VarChar(30)
+  status         WhatsAppInstanceStatus @default(disconnected)
+  webhookSecret  String?               @map("webhook_secret") @db.VarChar(255)
+  evolutionInstanceId String?           @map("evolution_instance_id") @db.VarChar(100)
+  createdAt      DateTime              @default(now()) @map("created_at")
+  updatedAt      DateTime              @updatedAt @map("updated_at")
+  tenant         Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("whatsapp_instances")
+}
+
+model ChatSession {
+  id              String        @id @default(uuid())
+  tenantId        String        @map("tenant_id")
+  customerPhone   String        @map("customer_phone") @db.VarChar(30)
+  customerId      String?       @map("customer_id")
+  state           ChatState     @default(greeting)
+  cartData        Json?         @map("cart_data")
+  handoffActive   Boolean       @default(false) @map("handoff_active")
+  handoffOperator String?       @map("handoff_operator")
+  handoffReason   String?       @map("handoff_reason")
+  handoffAt       DateTime?     @map("handoff_at")
+  lastMessageAt   DateTime      @default(now()) @map("last_message_at")
+  closedAt        DateTime?     @map("closed_at")
+  metadata        Json?
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  messages        ChatMessage[]
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer        Customer?     @relation(fields: [customerId], references: [id])
+
+  @@unique([tenantId, customerPhone])
+  @@index([tenantId])
+  @@index([tenantId, state])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id            String           @id @default(uuid())
+  sessionId     String           @map("session_id")
+  direction     MessageDirection
+  content       String
+  messageType   String           @default("text") @map("message_type") @db.VarChar(30)
+  externalId    String?          @unique @map("external_id") @db.VarChar(100)
+  toolCalls     Json?            @map("tool_calls")
+  metadata      Json?
+  createdAt     DateTime         @default(now()) @map("created_at")
+  session       ChatSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([externalId])
+  @@map("chat_messages")
+}
+
+model AiAgentConfig {
+  id                String        @id @default(uuid())
+  tenantId          String        @unique @map("tenant_id")
+  isEnabled         Boolean       @default(false) @map("is_enabled")
+  aiProvider        AiProviderType @default(openai) @map("ai_provider")
+  greetingMessage   String?       @map("greeting_message")
+  systemPrompt      String?       @map("system_prompt")
+  tone              String        @default("friendly") @db.VarChar(30)
+  operatingMode     String        @default("always") @map("operating_mode") @db.VarChar(30)
+  handoffPolicy     String        @default("on_request") @map("handoff_policy") @db.VarChar(30)
+  fallbackMessage   String?       @map("fallback_message")
+  maxRetries        Int           @default(3) @map("max_retries")
+  sessionTimeoutMin Int           @default(120) @map("session_timeout_min")
+  dailyMessageLimit Int           @default(1000) @map("daily_message_limit")
+  customerCooldownMin Int         @default(5) @map("customer_cooldown_min")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("ai_agent_configs")
+}
+
+model Campaign {
+  id               String             @id @default(uuid())
+  tenantId         String             @map("tenant_id")
+  name             String             @db.VarChar(200)
+  objective        String?            @db.VarChar(100)
+  status           CampaignStatus     @default(draft)
+  messageTemplate  String             @map("message_template")
+  mediaUrl         String?            @map("media_url") @db.VarChar(500)
+  segmentRules     Json               @map("segment_rules")
+  scheduledAt      DateTime?          @map("scheduled_at")
+  startedAt        DateTime?          @map("started_at")
+  completedAt      DateTime?          @map("completed_at")
+  cancelledAt      DateTime?          @map("cancelled_at")
+  totalAudience    Int                @default(0) @map("total_audience")
+  totalSent        Int                @default(0) @map("total_sent")
+  totalDelivered   Int                @default(0) @map("total_delivered")
+  totalRead        Int                @default(0) @map("total_read")
+  totalReplied     Int                @default(0) @map("total_replied")
+  totalConverted   Int                @default(0) @map("total_converted")
+  totalOptOut      Int                @default(0) @map("total_opt_out")
+  maxDispatches    Int                @default(500) @map("max_dispatches")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dispatches       CampaignDispatch[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("campaigns")
+}
+
+model CampaignDispatch {
+  id            String                 @id @default(uuid())
+  campaignId    String                 @map("campaign_id")
+  customerId    String                 @map("customer_id")
+  phone         String                 @db.VarChar(30)
+  status        CampaignDispatchStatus @default(queued)
+  sentAt        DateTime?              @map("sent_at")
+  deliveredAt   DateTime?              @map("delivered_at")
+  readAt        DateTime?              @map("read_at")
+  repliedAt     DateTime?              @map("replied_at")
+  failReason    String?                @map("fail_reason")
+  externalId    String?                @map("external_id") @db.VarChar(100)
+  createdAt     DateTime               @default(now()) @map("created_at")
+  campaign      Campaign               @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customer      Customer               @relation(fields: [customerId], references: [id])
+
+  @@index([campaignId])
+  @@index([customerId])
+  @@index([campaignId, status])
+  @@map("campaign_dispatches")
+}
+
+model CustomerOptOut {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  customerId String   @map("customer_id")
+  phone      String   @db.VarChar(30)
+  reason     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  @@unique([tenantId, phone])
+  @@map("customer_opt_outs")
 }
