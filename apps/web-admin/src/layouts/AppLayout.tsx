@@ -12,6 +12,7 @@ import {
   Shield,
   Store,
   UserCircle,
+  Puzzle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
@@ -47,6 +48,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     items: [
       { id: 'franchise', label: 'Dashboard Franquias', to: '/franchise', icon: Store, permission: 'saas.franchise.read' },
       { id: 'billing', label: 'Planos & Billing', to: '/billing', icon: CreditCard, permission: 'saas.plans.read' },
+      { id: 'integrations', label: 'Integrações & IA', to: '/integrations', icon: Puzzle, permission: 'saas.settings.read' },
       { id: 'audit-logs', label: 'Logs de Auditoria', to: '/audit-logs', icon: Shield, permission: 'saas.audit.read' },
     ],
   },

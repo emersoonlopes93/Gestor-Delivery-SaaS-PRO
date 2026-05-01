@@ -277,6 +277,56 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     }
   }
 
+  parseWebhook(payload: any, tenantId: string): any {
+    const eventType = payload?.event || payload?.data?.event || payload?.type || 'unknown';
+    
+    if (eventType === 'messages.upsert') {
+      const data = payload?.data || payload;
+      const remoteJid = data?.key?.remoteJid || data?.remoteJid || data?.from;
+      if (!remoteJid || remoteJid.includes('@g.us')) return null;
+      if (data?.key?.fromMe) return null;
+
+      const content = this.extractMessageContent(data);
+      if (!content) return null;
+
+      return {
+        type: 'message',
+        tenantId,
+        from: remoteJid.replace(/@.*$/, ''),
+        content,
+        messageType: this.detectMessageType(data),
+        externalId: data?.key?.id || data?.messageId || data?.id,
+        raw: payload
+      };
+    }
+
+    if (eventType === 'connection.update') {
+      const data = payload?.data || payload;
+      const status = this.parseConnectionStatus(data);
+      return {
+        type: 'connection',
+        tenantId,
+        state: status.state,
+        phoneNumber: status.phoneNumber,
+        raw: payload
+      };
+    }
+
+    if (eventType === 'messages.update') {
+      const data = payload?.data || payload;
+      return {
+        type: 'ack',
+        tenantId,
+        externalId: data?.key?.id || data?.messageId || data?.id,
+        status: data?.update?.status || data?.status,
+        raw: payload
+      };
+    }
+
+    return null;
+  }
+
+
   private parseConnectionStatus(data: any): WhatsAppConnectionStatus {
     if (!data) {
       return { connected: false, state: 'disconnected' };

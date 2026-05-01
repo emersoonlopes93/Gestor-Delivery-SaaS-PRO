@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { WhatsAppInstanceService } from './whatsapp-instance.service';
+import { WhatsAppProviderRegistryService } from './whatsapp-provider-registry.service';
 import type {
   WhatsAppSendTextInput,
   WhatsAppSendMediaInput,
@@ -21,6 +22,7 @@ export class WhatsAppSenderService {
 
   constructor(
     private readonly instanceService: WhatsAppInstanceService,
+    private readonly providerRegistry: WhatsAppProviderRegistryService,
   ) {}
 
   /**
@@ -115,14 +117,11 @@ export class WhatsAppSenderService {
    */
   private async resolveProvider(tenantId: string) {
     const instance = await this.instanceService.getInstance(tenantId);
-
     if (!instance) {
-      throw new Error(
-        `WhatsApp não configurado para o tenant ${tenantId}`,
-      );
+      throw new Error(`No WhatsApp instance found for tenant ${tenantId}`);
     }
 
-    const provider = this.instanceService.getProvider(instance.providerType);
+    const provider = await this.providerRegistry.resolveProvider(tenantId);
 
     return { provider, instance };
   }

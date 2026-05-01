@@ -82,6 +82,19 @@ export interface WhatsAppConnectInput {
   subscribe?: string[];
 }
 
+export interface WhatsAppWebhookEvent {
+  type: 'message' | 'connection' | 'ack' | 'other';
+  tenantId: string;
+  from?: string;
+  content?: string;
+  messageType?: string;
+  externalId?: string;
+  state?: 'connected' | 'disconnected' | 'connecting' | 'qr_pending';
+  phoneNumber?: string;
+  status?: string;
+  raw?: any;
+}
+
 export const WHATSAPP_PROVIDER = 'WHATSAPP_PROVIDER';
 
 export interface IWhatsAppProvider {
@@ -186,4 +199,9 @@ export interface IWhatsAppProvider {
     chatId: string,
     messageIds: string[],
   ): Promise<void>;
+
+  /**
+   * Faz o parsing de um payload de webhook específico do provider
+   */
+  parseWebhook(payload: any, tenantId: string): WhatsAppWebhookEvent | null;
 }

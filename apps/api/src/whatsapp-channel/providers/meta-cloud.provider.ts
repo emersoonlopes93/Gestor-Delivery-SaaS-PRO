@@ -242,4 +242,55 @@ export class MetaCloudProvider implements IWhatsAppProvider {
       }
     }
   }
+
+  parseWebhook(payload: any, tenantId: string): any {
+    // Meta Cloud API Webhook structure: { object: 'whatsapp_business_account', entry: [ { changes: [ { value: { ... } } ] } ] }
+    if (payload?.object !== 'whatsapp_business_account') return null;
+
+    const entry = payload.entry?.[0];
+    const change = entry?.changes?.[0];
+    const value = change?.value;
+
+    if (!value) return null;
+
+    // Mensagens recebidas
+    if (value.messages?.[0]) {
+      const msg = value.messages[0];
+      const contact = value.contacts?.[0];
+      
+      let content = '';
+      if (msg.type === 'text') content = msg.text?.body;
+      else if (msg.type === 'interactive') {
+        if (msg.interactive?.type === 'button_reply') content = msg.interactive.button_reply.id;
+        else if (msg.interactive?.type === 'list_reply') content = msg.interactive.list_reply.id;
+      }
+      
+      if (!content) return null;
+
+      return {
+        type: 'message',
+        tenantId,
+        from: msg.from,
+        content,
+        messageType: msg.type,
+        externalId: msg.id,
+        raw: payload
+      };
+    }
+
+    // Status de mensagens (ACK)
+    if (value.statuses?.[0]) {
+      const status = value.statuses[0];
+      return {
+        type: 'ack',
+        tenantId,
+        externalId: status.id,
+        status: status.status,
+        raw: payload
+      };
+    }
+
+    return null;
+  }
 }
+

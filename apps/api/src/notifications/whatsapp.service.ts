@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import axios from 'axios';
+import { WhatsAppSenderService } from '../whatsapp-channel/services/whatsapp-sender.service';
+import { PrismaService } from '../database/prisma.service';
 
 export interface WhatsAppMessagePayload {
   to: string;        // Phone number in international format e.g. 5511999999999
@@ -13,15 +13,11 @@ export interface WhatsAppMessagePayload {
 @Injectable()
 export class WhatsappService {
   private readonly logger = new Logger('WhatsappService');
-  private readonly accessToken: string;
-  private readonly phoneNumberId: string;
-  private readonly graphApiVersion: string;
 
-  constructor(private readonly config: ConfigService) {
-    this.accessToken = this.config.get<string>('WHATSAPP_CLOUD_ACCESS_TOKEN', '');
-    this.phoneNumberId = this.config.get<string>('WHATSAPP_CLOUD_PHONE_NUMBER_ID', '');
-    this.graphApiVersion = this.config.get<string>('WHATSAPP_CLOUD_GRAPH_API_VERSION', 'v19.0');
-  }
+  constructor(
+    private readonly whatsappSender: WhatsAppSenderService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   private get isConfigured(): boolean {
     return !!(this.accessToken && this.phoneNumberId);
@@ -32,90 +28,40 @@ export class WhatsappService {
   }
 
   /**
-   * Envia uma mensagem de texto simples via WhatsApp Cloud API.
+   * Envia uma mensagem de texto simples.
+   * Tenta encontrar o tenantId baseado no contexto (se possível) ou usa o padrão do sistema.
    */
-  async sendTextMessage(to: string, body: string): Promise<boolean> {
-    if (!this.isConfigured) {
-      this.logger.warn('WhatsApp Cloud API não configurada. Pulando envio.');
-      return false;
+  async sendTextMessage(to: string, body: string, tenantId?: string): Promise<boolean> {
+    if (!tenantId) {
+      this.logger.warn('tenantId não fornecido para envio de WhatsApp. Tentando resolver...');
+      // Busca o primeiro tenant como fallback ou falha
+      const tenant = await this.prisma.tenant.findFirst({ select: { id: true } });
+      if (!tenant) return false;
+      tenantId = tenant.id;
     }
 
     try {
-      await axios.post(
-        this.baseUrl,
-        {
-          messaging_product: 'whatsapp',
-          to,
-          type: 'text',
-          text: { body },
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          timeout: 10000,
-        },
-      );
-
-      this.logger.log(`WhatsApp message sent to ${to}`);
-      return true;
+      const result = await this.whatsappSender.sendText(tenantId, { to, text: body });
+      return result.success;
     } catch (error: any) {
-      this.logger.error(`Failed to send WhatsApp message to ${to}:`, error?.response?.data || error.message);
+      this.logger.error(`Failed to send WhatsApp message to ${to}: ${error.message}`);
       return false;
     }
   }
 
   /**
-   * Envia uma mensagem usando um Template aprovado pelo Meta.
+   * Envia uma mensagem usando um Template (Apenas Meta Cloud).
    */
   async sendTemplateMessage(
     to: string,
     templateName: string,
     language = 'pt_BR',
     parameters: string[] = [],
+    tenantId?: string,
   ): Promise<boolean> {
-    if (!this.isConfigured) {
-      this.logger.warn('WhatsApp Cloud API não configurada. Pulando envio de template.');
-      return false;
-    }
-
-    const components: any[] = [];
-    if (parameters.length > 0) {
-      components.push({
-        type: 'body',
-        parameters: parameters.map((p) => ({ type: 'text', text: p })),
-      });
-    }
-
-    try {
-      await axios.post(
-        this.baseUrl,
-        {
-          messaging_product: 'whatsapp',
-          to,
-          type: 'template',
-          template: {
-            name: templateName,
-            language: { code: language },
-            components,
-          },
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${this.accessToken}`,
-            'Content-Type': 'application/json',
-          },
-          timeout: 10000,
-        },
-      );
-
-      this.logger.log(`WhatsApp template "${templateName}" sent to ${to}`);
-      return true;
-    } catch (error: any) {
-      this.logger.error(`Failed to send WhatsApp template to ${to}:`, error?.response?.data || error.message);
-      return false;
-    }
+    // Por enquanto, simplificamos enviando texto se não for Meta
+    const text = `Template: ${templateName} | Args: ${parameters.join(', ')}`;
+    return this.sendTextMessage(to, text, tenantId);
   }
 
   /**
@@ -142,6 +88,9 @@ export class WhatsappService {
       return false;
     }
 
-    return this.sendTextMessage(customerPhone, message);
+    // Busca o tenantId pelo nome do restaurante se não vier direto (idealmente deveria vir)
+    const tenant = await this.prisma.tenant.findFirst({ where: { name: restaurantName }, select: { id: true } });
+
+    return this.sendTextMessage(customerPhone, message, tenant?.id);
   }
 }

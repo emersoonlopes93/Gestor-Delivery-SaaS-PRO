@@ -15,6 +15,8 @@ import { AdminAuditLogsService } from './audit-logs/admin-audit-logs.service';
 import { AdminBillingController } from './billing/admin-billing.controller';
 import { AdminFranchiseController } from './franchise/admin-franchise.controller';
 import { AdminFranchiseService } from './franchise/admin-franchise.service';
+import { AdminIntegrationsController } from './integrations/admin-integrations.controller';
+import { SystemConfigService } from './services/system-config.service';
 import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
 
@@ -28,7 +30,8 @@ import { BillingModule } from '../billing/billing.module';
     AdminHealthController, 
     AdminAuditLogsController,
     AdminBillingController,
-    AdminFranchiseController
+    AdminFranchiseController,
+    AdminIntegrationsController
   ],
   providers: [
     AdminAuthService, 
@@ -38,7 +41,8 @@ import { BillingModule } from '../billing/billing.module';
     AdminGroupsService, 
     AdminHealthService, 
     AdminAuditLogsService,
-    AdminFranchiseService
+    AdminFranchiseService,
+    SystemConfigService
   ],
   exports: [AdminAuthService, AdminRbacService],
 })

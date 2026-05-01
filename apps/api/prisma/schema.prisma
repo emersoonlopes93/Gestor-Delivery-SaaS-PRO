@@ -134,6 +134,19 @@ model TenantOnboarding {
   @@map("tenant_onboardings")
 }
 
+model SystemConfig {
+  id                    String             @id @default("global")
+  defaultWhatsAppProvider WhatsAppProviderType @default(evolution_go) @map("default_whatsapp_provider")
+  defaultAiProvider     AiProviderType     @default(openai) @map("default_ai_provider")
+  openaiApiKey         String?            @map("openai_api_key")
+  anthropicApiKey      String?            @map("anthropic_api_key")
+  metaAccessToken      String?            @map("meta_access_token")
+  metaAppSecret        String?            @map("meta_app_secret")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  @@map("system_configs")
+}
+
 model OptionGroup {
   id            String                   @id @default(uuid())
   tenantId      String                   @map("tenant_id")

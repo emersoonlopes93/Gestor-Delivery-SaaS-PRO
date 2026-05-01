@@ -3,7 +3,7 @@ import { AiAgentConfigService } from './ai-agent-config.service';
 import { ConversationService } from './conversation.service';
 import { AgentToolsService } from './agent-tools.service';
 import { WhatsAppSenderService } from '../../whatsapp-channel/services/whatsapp-sender.service';
-import { OpenAiProvider } from '../providers/openai.provider';
+import { AiProviderRegistryService } from './ai-provider-registry.service';
 import type { AiMessage } from '../interfaces/ai-provider.interface';
 
 @Injectable()
@@ -15,7 +15,7 @@ export class AiOrchestratorService {
     private readonly conversationService: ConversationService,
     private readonly toolsService: AgentToolsService,
     private readonly whatsappSender: WhatsAppSenderService,
-    private readonly aiProvider: OpenAiProvider, // Defaulting to OpenAI
+    private readonly aiRegistry: AiProviderRegistryService,
   ) {}
 
   /**
@@ -63,8 +63,11 @@ export class AiOrchestratorService {
       // Pega tools disponíveis
       const tools = this.toolsService.getAvailableTools();
 
+      // Resolve o provider (dinâmico por tenant/global)
+      const aiProvider = await this.aiRegistry.resolveProvider(tenantId);
+
       // Envia pro LLM
-      const completion = await this.aiProvider.complete({
+      const completion = await aiProvider.complete({
         messages,
         tools,
         temperature: 0.3, // Menos alucinação
@@ -154,7 +157,9 @@ export class AiOrchestratorService {
     }
 
     // Chama o LLM novamente com os resultados
-    const finalCompletion = await this.aiProvider.complete({
+    const aiProvider = await this.aiRegistry.resolveProvider(tenantId);
+    
+    const finalCompletion = await aiProvider.complete({
       messages: newMessages,
       tools,
       temperature: 0.3,

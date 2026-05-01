@@ -3,6 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { WhatsAppInstanceStatus, WhatsAppProviderType } from '@prisma/client';
 import { EvolutionGoProvider } from '../providers/evolution-go.provider';
 import { MetaCloudProvider } from '../providers/meta-cloud.provider';
+import { WhatsAppProviderRegistryService } from './whatsapp-provider-registry.service';
 import type { IWhatsAppProvider } from '../interfaces/whatsapp-provider.interface';
 
 export interface CreateInstanceDto {
@@ -28,22 +29,14 @@ export class WhatsAppInstanceService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly evolutionGoProvider: EvolutionGoProvider,
-    private readonly metaCloudProvider: MetaCloudProvider,
+    private readonly providerRegistry: WhatsAppProviderRegistryService,
   ) {}
 
   /**
    * Retorna o provider correto baseado no tipo
    */
   getProvider(providerType: WhatsAppProviderType): IWhatsAppProvider {
-    switch (providerType) {
-      case 'evolution_go':
-        return this.evolutionGoProvider;
-      case 'meta_cloud':
-        return this.metaCloudProvider;
-      default:
-        return this.evolutionGoProvider;
-    }
+    return this.providerRegistry.getProvider(providerType);
   }
 
   /**

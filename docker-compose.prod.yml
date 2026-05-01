@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  # Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: gestor-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-gestor_delivery}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - gestor-network
+
+  # Backend API
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: gestor-api
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-gestor_delivery}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      NODE_ENV: production
+      API_PORT: 3333
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    depends_on:
+      - postgres
+    networks:
+      - gestor-network
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gestor-api.rule=Host(`${API_DOMAIN}`)"
+      - "traefik.http.routers.gestor-api.entrypoints=websecure"
+      - "traefik.http.routers.gestor-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.gestor-api.loadbalancer.server.port=3333"
+
+  # Admin Frontend
+  web-admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        APP_NAME: "@gestor/web-admin"
+        VITE_API_URL: ${VITE_API_URL}
+    container_name: gestor-admin
+    restart: always
+    networks:
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gestor-admin.rule=Host(`${ADMIN_DOMAIN}`)"
+      - "traefik.http.routers.gestor-admin.entrypoints=websecure"
+      - "traefik.http.routers.gestor-admin.tls.certresolver=letsencrypt"
+      - "traefik.http.services.gestor-admin.loadbalancer.server.port=80"
+
+  # Tenant Frontend
+  web-tenant:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        APP_NAME: "@gestor/web-tenant"
+        VITE_API_URL: ${VITE_API_URL}
+    container_name: gestor-tenant
+    restart: always
+    networks:
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gestor-tenant.rule=Host(`${APP_DOMAIN}`)"
+      - "traefik.http.routers.gestor-tenant.entrypoints=websecure"
+      - "traefik.http.routers.gestor-tenant.tls.certresolver=letsencrypt"
+      - "traefik.http.services.gestor-tenant.loadbalancer.server.port=80"
+
+  # Storefront Frontend
+  web-storefront:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        APP_NAME: "@gestor/web-storefront"
+        VITE_API_URL: ${VITE_API_URL}
+    container_name: gestor-storefront
+    restart: always
+    networks:
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gestor-storefront.rule=Host(`${STORE_DOMAIN}`)"
+      - "traefik.http.routers.gestor-storefront.entrypoints=websecure"
+      - "traefik.http.routers.gestor-storefront.tls.certresolver=letsencrypt"
+      - "traefik.http.services.gestor-storefront.loadbalancer.server.port=80"
+
+networks:
+  gestor-network:
+    driver: bridge
+  traefik-public:
+    external: true
+
+volumes:
+  postgres_data:

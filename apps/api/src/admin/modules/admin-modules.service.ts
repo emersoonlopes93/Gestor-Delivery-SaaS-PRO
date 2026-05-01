@@ -30,6 +30,8 @@ export class AdminModulesService {
       { key: 'crm', name: 'CRM', description: 'Clientes, promoções e cashback' },
       { key: 'inventory', name: 'Estoque', description: 'Controle de ingredientes e receitas' },
       { key: 'reports', name: 'Relatórios', description: 'Relatórios gerenciais e metas' },
+      { key: 'whatsapp', name: 'WhatsApp', description: 'Conexão e automação via WhatsApp' },
+      { key: 'ai_agent', name: 'Agente IA', description: 'Assistente virtual inteligente' },
     ];
   }
 

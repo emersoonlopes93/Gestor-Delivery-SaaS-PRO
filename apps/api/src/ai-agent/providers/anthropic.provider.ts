@@ -1,0 +1,141 @@
+import { Injectable, Logger } from '@nestjs/common';
+import axios from 'axios';
+import type {
+  IAiProvider,
+  AiCompletionInput,
+  AiCompletionResult,
+  AiToolCall,
+} from '../interfaces/ai-provider.interface';
+
+/**
+ * Provider de IA via Anthropic API (Claude).
+ * 
+ * Variáveis de ambiente:
+ * - ANTHROPIC_API_KEY
+ * - ANTHROPIC_MODEL (default: claude-3-5-sonnet-20240620)
+ * - ANTHROPIC_VERSION (default: 2023-06-01)
+ */
+@Injectable()
+export class AnthropicProvider implements IAiProvider {
+  private readonly logger = new Logger('AnthropicProvider');
+  readonly providerType = 'anthropic' as const;
+
+  private get apiKey(): string {
+    return process.env.ANTHROPIC_API_KEY || '';
+  }
+
+  private get model(): string {
+    return process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20240620';
+  }
+
+  private get anthropicVersion(): string {
+    return process.env.ANTHROPIC_VERSION || '2023-06-01';
+  }
+
+  async isAvailable(): Promise<boolean> {
+    return !!this.apiKey;
+  }
+
+  async complete(input: AiCompletionInput): Promise<AiCompletionResult> {
+    const model = input.model || this.model;
+
+    // Anthropic separa System Prompt de Mensagens
+    const systemMessage = input.messages.find(m => m.role === 'system');
+    const conversationMessages = input.messages.filter(m => m.role !== 'system').map(m => {
+      if (m.role === 'tool') {
+        return {
+          role: 'user' as const,
+          content: [
+            {
+              type: 'tool_result' as const,
+              tool_use_id: m.toolCallId,
+              content: m.content,
+            }
+          ]
+        };
+      }
+      if (m.role === 'assistant' && m.toolCalls?.length) {
+        return {
+          role: 'assistant' as const,
+          content: [
+            ...(m.content ? [{ type: 'text' as const, text: m.content }] : []),
+            ...m.toolCalls.map(tc => ({
+              type: 'tool_use' as const,
+              id: tc.id,
+              name: tc.name,
+              input: tc.arguments,
+            }))
+          ]
+        };
+      }
+      return { role: m.role as 'user' | 'assistant', content: m.content };
+    });
+
+    const body: Record<string, unknown> = {
+      model,
+      messages: conversationMessages,
+      max_tokens: input.maxTokens || 4096,
+      temperature: input.temperature ?? 0.7,
+      system: systemMessage?.content,
+    };
+
+    if (input.tools?.length) {
+      body.tools = input.tools.map(t => ({
+        name: t.name,
+        description: t.description,
+        input_schema: {
+          type: 'object',
+          properties: t.parameters.properties,
+          required: t.parameters.required,
+        },
+      }));
+    }
+
+    try {
+      const { data } = await axios.post(
+        'https://api.anthropic.com/v1/messages',
+        body,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': this.apiKey,
+            'anthropic-version': this.anthropicVersion,
+          },
+          timeout: 60_000,
+        },
+      );
+
+      const content = data.content || [];
+      const textBlock = content.find((c: any) => c.type === 'text');
+      const toolBlocks = content.filter((c: any) => c.type === 'tool_use');
+
+      const toolCalls: AiToolCall[] = toolBlocks.map((tb: any) => ({
+        id: tb.id,
+        name: tb.name,
+        arguments: tb.input,
+      }));
+
+      let finishReason: AiCompletionResult['finishReason'] = 'stop';
+      if (data.stop_reason === 'tool_use') finishReason = 'tool_calls';
+      else if (data.stop_reason === 'max_tokens') finishReason = 'length';
+
+      return {
+        content: textBlock?.text || null,
+        toolCalls,
+        finishReason,
+        usage: data.usage ? {
+          promptTokens: data.usage.input_tokens,
+          completionTokens: data.usage.output_tokens,
+          totalTokens: data.usage.input_tokens + data.usage.output_tokens,
+        } : undefined,
+      };
+    } catch (error: any) {
+      this.logger.error(`Anthropic completion failed: ${error.message}`);
+      return {
+        content: null,
+        toolCalls: [],
+        finishReason: 'error',
+      };
+    }
+  }
+}
