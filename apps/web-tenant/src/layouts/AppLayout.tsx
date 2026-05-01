@@ -32,11 +32,15 @@ import {
   Store,
   LogOut,
   Globe,
+  QrCode,
+  CheckCircle2,
+  XCircle,
+  PauseCircle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeStore } from '../stores/theme.store';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api-client';
 import type { Tenant, TenantSettings } from '@gestor/types';
 
@@ -307,9 +311,30 @@ export function AppLayout() {
     staleTime: 1000 * 60 * 5,
   });
 
+  const queryClient = useQueryClient();
+  const toggleStoreMutation = useMutation({
+    mutationFn: async (isPaused: boolean) => {
+      const res = await api.patch<any>('/tenant/store-pause', { 
+        isStorePaused: isPaused, 
+        storePauseReason: '' 
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenant-settings-applayout'] });
+    },
+    onError: (err: any) => {
+      console.error('Erro ao alterar status:', err);
+      alert('Erro ao alterar status da loja.');
+    }
+  });
+
   const isStorePaused = tenantData?.settings?.isStorePaused ?? false;
-  // Fallback: If we had real "isOpen" logic based on hours, we'd use it. For now, assume Open if not paused.
   const storeStatus: 'open' | 'closed' | 'paused' = isStorePaused ? 'paused' : 'open';
+
+  const handleToggleStore = () => {
+    toggleStoreMutation.mutate(!isStorePaused);
+  };
 
   const initialSidebarState = useMemo(() => {
     const saved = safeParseSidebarState(localStorage.getItem(SIDEBAR_STORAGE_KEY));
@@ -462,10 +487,10 @@ export function AppLayout() {
           } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
         aria-label="Sidebar"
       >
-        <div className="p-6 flex flex-col gap-5">
-          <div className="flex items-center justify-between">
+        <div className={`p-4 flex flex-col gap-4 border-b border-gray-100 dark:border-gray-800/60 ${collapsed ? 'items-center' : ''}`}>
+          <div className="flex items-center justify-between gap-3">
             {!collapsed ? (
-              <div className="flex items-center gap-3.5 min-w-0">
+              <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-2xl bg-primary-600 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-primary-600/20 shrink-0 border-2 border-white dark:border-gray-800">
                   G
                 </div>
@@ -477,64 +502,62 @@ export function AppLayout() {
                 </div>
               </div>
             ) : (
-              <div className="w-full flex justify-center">
-                <div className="w-12 h-12 rounded-2xl bg-primary-600 text-white flex items-center justify-center font-black text-2xl shadow-lg shadow-primary-600/20 border-2 border-white dark:border-gray-800">
-                  G
-                </div>
+              <div className="w-10 h-10 rounded-2xl bg-primary-600 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-primary-600/20 border-2 border-white dark:border-gray-800">
+                G
               </div>
             )}
           </div>
 
           {!collapsed && (
-            <div className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-[10px] font-black tracking-widest w-fit transition-all duration-300 ${storeStatus === 'open'
-                ? 'bg-emerald-500/5 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                : storeStatus === 'paused'
-                  ? 'bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
-                  : 'bg-red-500/5 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
-              }`}>
-              <div className="relative flex h-2 w-2">
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${storeStatus === 'open' ? 'bg-emerald-400' : storeStatus === 'paused' ? 'bg-amber-400' : 'bg-red-400'}`}></span>
-                <span className={`relative inline-flex rounded-full h-2 w-2 ${storeStatus === 'open' ? 'bg-emerald-500' : storeStatus === 'paused' ? 'bg-amber-500' : 'bg-red-500'}`}></span>
-              </div>
-              {storeStatus === 'open' ? 'LOJA ABERTA' : storeStatus === 'paused' ? 'LOJA PAUSADA' : 'LOJA FECHADA'}
-            </div>
-          )}
-        </div>
-
-        {tenantSlug && !collapsed ? (
-          <div className="px-4 py-2">
-            <div className="bg-gray-50 dark:bg-gray-800/40 rounded-[2rem] p-4 border border-gray-100 dark:border-gray-800/60 shadow-sm">
-              <div className="flex items-center gap-2.5 mb-3">
-                <div className="p-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm">
-                  <Globe className="w-3.5 h-3.5 text-primary-500" />
+            <div className="space-y-4">
+              {/* Status Toggle Operational */}
+              <button
+                onClick={handleToggleStore}
+                disabled={toggleStoreMutation.isPending}
+                className={`w-full flex items-center justify-between p-2.5 rounded-2xl border transition-all duration-300 group hover:shadow-md active:scale-[0.98] ${
+                  storeStatus === 'open' 
+                    ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-600' 
+                    : 'bg-amber-500/5 border-amber-500/10 text-amber-600'
+                } ${toggleStoreMutation.isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="relative flex h-2 w-2">
+                    {storeStatus === 'open' && (
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    )}
+                    <span className={`relative inline-flex rounded-full h-2 w-2 ${storeStatus === 'open' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                  </div>
+                  <span className="text-[10px] font-black tracking-widest uppercase">
+                    {storeStatus === 'open' ? 'Loja Aberta' : 'Loja Pausada'}
+                  </span>
                 </div>
-                <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none">Cardápio Online</span>
-              </div>
-              <div className="px-1 text-[11px] text-gray-600 dark:text-gray-300 font-black truncate mb-4 bg-gray-100 dark:bg-gray-900/50 py-1 rounded-md">
-                /{tenantSlug}
-              </div>
+                <div className={`w-8 h-4 rounded-full relative transition-colors duration-300 ${storeStatus === 'open' ? 'bg-emerald-500' : 'bg-amber-500/40'}`}>
+                   <div className={`absolute top-1 w-2 h-2 rounded-full bg-white transition-all duration-300 ${storeStatus === 'open' ? 'right-1' : 'left-1'}`} />
+                </div>
+              </button>
+
+              {/* Action Buttons */}
               <div className="grid grid-cols-2 gap-2">
                 <a
                   href={publicMenuUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-1.5 px-2 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all active:scale-95 shadow-sm"
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800/40 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-primary-500/30 transition-all group shadow-sm"
                 >
-                  <ExternalLink className="h-3 w-3" />
-                  Ver
+                  <Globe className="w-4 h-4 text-primary-500 group-hover:scale-110 transition-transform" />
+                  <span className="text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">Cardápio</span>
                 </a>
                 <button
                   type="button"
-                  onClick={handleCopyPublicUrl}
-                  className="inline-flex items-center justify-center gap-1.5 px-2 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all active:scale-95 shadow-sm"
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800/40 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-primary-500/30 transition-all group shadow-sm"
                 >
-                  <Copy className="h-3 w-3" />
-                  {copiedPublicLink ? 'OK' : 'Link'}
+                  <QrCode className="w-4 h-4 text-primary-500 group-hover:scale-110 transition-transform" />
+                  <span className="text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">QR Code</span>
                 </button>
               </div>
             </div>
-          </div>
-        ) : null}
+          )}
+        </div>
 
         <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
           {groups.map((group) => {
