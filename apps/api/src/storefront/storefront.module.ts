@@ -12,5 +12,6 @@ import { SchedulingModule } from '../scheduling/scheduling.module';
   imports: [DatabaseModule, CatalogModule, SchedulingModule],
   controllers: [StorefrontController],
   providers: [StorefrontService],
+  exports: [StorefrontService],
 })
 export class StorefrontModule {}
