@@ -29,10 +29,16 @@ import {
   ExternalLink,
   Moon,
   Sun,
+  Store,
+  LogOut,
+  Globe,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeStore } from '../stores/theme.store';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../lib/api-client';
+import type { Tenant, TenantSettings } from '@gestor/types';
 
 type SidebarItem = {
   id: string;
@@ -193,35 +199,32 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
 
   return (
     <div className="select-none">
-      <button
-        type="button"
-        onClick={() => onToggle(group.id)}
-        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all group ${
-          isAnyItemActive
-            ? 'bg-primary-50 text-primary-700 shadow-sm shadow-primary-500/10'
-            : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:text-gray-100'
-        }`}
-        title={collapsed ? group.label : undefined}
-      >
-        <span className="flex items-center gap-2 min-w-0">
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] group-hover:text-gray-600 dark:text-gray-400 transition-colors">
-            {!collapsed ? group.label : group.label.slice(0, 1)}
+      {!collapsed ? (
+        <button
+          type="button"
+          onClick={() => onToggle(group.id)}
+          className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-300 group ${isAnyItemActive
+              ? 'bg-primary-50/50 dark:bg-primary-500/5 text-primary-700 dark:text-primary-400'
+              : 'text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
+            }`}
+        >
+          <span className="text-[10px] font-black uppercase tracking-[0.25em] transition-colors">
+            {group.label}
           </span>
-        </span>
-        {!collapsed ? (
           <span
-            className={`text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-90' : 'rotate-0'}`}
+            className={`transition-transform duration-300 ${isOpen ? 'rotate-90' : 'rotate-0'}`}
             aria-hidden
           >
-            <ChevronRight className="h-4 w-4" aria-hidden />
+            <ChevronRight className="h-3.5 w-3.5 opacity-50" aria-hidden />
           </span>
-        ) : null}
-      </button>
+        </button>
+      ) : (
+        <div className="mx-auto w-8 h-px bg-gray-100 dark:bg-gray-800/60 my-4" />
+      )}
 
       <div
-        className={`overflow-hidden transition-[max-height,opacity] duration-200 ${
-          isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-        }`}
+        className={`overflow-hidden transition-[max-height,opacity] duration-200 ${isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+          }`}
       >
         <div className="mt-1 space-y-1">
           {group.items.map((item) => {
@@ -250,24 +253,26 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
                 to={item.to}
                 title={collapsed ? item.label : undefined}
                 className={({ isActive }) => {
-                  return `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                    isActive
-                      ? 'bg-primary-50 text-primary-700 shadow-sm shadow-primary-500/10'
-                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:text-gray-100'
-                  }`;
+                  return `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isActive
+                      ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
+                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/40 hover:text-gray-900 dark:hover:text-gray-100'
+                    } ${collapsed ? 'justify-center' : ''}`;
                 }}
               >
                 {({ isActive }) => (
                   <>
-                    <span className={`w-6 flex items-center justify-center transition-colors ${isActive ? 'text-primary-600' : 'text-gray-400 group-hover:text-gray-600 dark:text-gray-400'}`} aria-hidden>
-                      <item.icon className="h-4 w-4" aria-hidden />
+                    <span className={`flex items-center justify-center transition-colors duration-300 ${isActive ? 'text-white' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-700 dark:group-hover:text-gray-200'}`} aria-hidden>
+                      <item.icon className="h-[18px] w-[18px] stroke-[2.5px]" aria-hidden />
                     </span>
                     {!collapsed ? <span className="truncate">{item.label}</span> : null}
                     {collapsed ? (
-                      <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100">
+                      <span className="pointer-events-none absolute left-full ml-4 whitespace-nowrap rounded-xl bg-gray-900 dark:bg-gray-800 border border-gray-800 dark:border-gray-700 px-3.5 py-2 text-xs font-black text-white opacity-0 shadow-2xl transition-all duration-300 translate-x-[-8px] group-hover:translate-x-0 group-hover:opacity-100 z-50">
                         {item.label}
                       </span>
                     ) : null}
+                    {isActive && !collapsed && (
+                      <span className="absolute right-3 w-1.5 h-1.5 rounded-full bg-white/40 animate-pulse" />
+                    )}
                   </>
                 )}
               </NavLink>
@@ -292,6 +297,19 @@ export function AppLayout() {
   const [desktopSearch, setDesktopSearch] = useState('');
   const [copiedPublicLink, setCopiedPublicLink] = useState(false);
   const [storefrontBaseUrl, setStorefrontBaseUrl] = useState('');
+
+  const { data: tenantData } = useQuery({
+    queryKey: ['tenant-settings-applayout'],
+    queryFn: async () => {
+      const res = await api.get<Tenant & { settings: TenantSettings }>('/tenant/me');
+      return res.data;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const isStorePaused = tenantData?.settings?.isStorePaused ?? false;
+  // Fallback: If we had real "isOpen" logic based on hours, we'd use it. For now, assume Open if not paused.
+  const storeStatus: 'open' | 'closed' | 'paused' = isStorePaused ? 'paused' : 'open';
 
   const initialSidebarState = useMemo(() => {
     const saved = safeParseSidebarState(localStorage.getItem(SIDEBAR_STORAGE_KEY));
@@ -440,50 +458,80 @@ export function AppLayout() {
       ) : null}
 
       <aside
-        className={`fixed z-50 inset-y-0 left-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-[transform,width,background-color] duration-200 ease-out md:static md:translate-x-0 ${
-          collapsed ? 'w-[72px]' : 'w-64'
-        } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
+        className={`fixed z-50 inset-y-0 left-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-[transform,width,background-color] duration-200 ease-out md:static md:translate-x-0 ${collapsed ? 'w-[72px]' : 'w-64'
+          } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
         aria-label="Sidebar"
       >
-        <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-2">
-          {!collapsed ? (
-            <div className="min-w-0">
-              <h1 className="text-xl font-black text-gray-900 dark:text-gray-100 tracking-tight truncate">Gestor<span className="text-primary-600">PRO</span></h1>
-              <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mt-0.5 truncate">{user?.name || 'Carregando...'}</p>
-            </div>
-          ) : (
-            <div className="w-full text-center">
-              <span className="text-xl font-black text-gray-900 dark:text-gray-100 tracking-tight" aria-hidden>
-                G<span className="text-primary-600">P</span>
-              </span>
+        <div className="p-6 flex flex-col gap-5">
+          <div className="flex items-center justify-between">
+            {!collapsed ? (
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-primary-600 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-primary-600/20 shrink-0 border-2 border-white dark:border-gray-800">
+                  G
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-sm font-black text-gray-900 dark:text-gray-100 tracking-tight truncate leading-tight flex items-center gap-1.5">
+                    Gestor<span className="text-primary-600">PRO</span>
+                  </h1>
+                  <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 mt-1 truncate leading-none uppercase tracking-wider">{user?.tenant?.name || 'Carregando...'}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="w-full flex justify-center">
+                <div className="w-12 h-12 rounded-2xl bg-primary-600 text-white flex items-center justify-center font-black text-2xl shadow-lg shadow-primary-600/20 border-2 border-white dark:border-gray-800">
+                  G
+                </div>
+              </div>
+            )}
+          </div>
+
+          {!collapsed && (
+            <div className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-[10px] font-black tracking-widest w-fit transition-all duration-300 ${storeStatus === 'open'
+                ? 'bg-emerald-500/5 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                : storeStatus === 'paused'
+                  ? 'bg-amber-500/5 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                  : 'bg-red-500/5 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
+              }`}>
+              <div className="relative flex h-2 w-2">
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${storeStatus === 'open' ? 'bg-emerald-400' : storeStatus === 'paused' ? 'bg-amber-400' : 'bg-red-400'}`}></span>
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${storeStatus === 'open' ? 'bg-emerald-500' : storeStatus === 'paused' ? 'bg-amber-500' : 'bg-red-500'}`}></span>
+              </div>
+              {storeStatus === 'open' ? 'LOJA ABERTA' : storeStatus === 'paused' ? 'LOJA PAUSADA' : 'LOJA FECHADA'}
             </div>
           )}
         </div>
 
-        {tenantSlug ? (
-          <div className="px-3 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 dark:bg-gray-900/50">
-            <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-2">
-              Cardápio Público
-            </div>
-            <div className="text-xs text-gray-700 dark:text-gray-300 dark:text-gray-300 font-medium truncate">/{tenantSlug}</div>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <a
-                href={publicMenuUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-gray-800 dark:border-gray-700 bg-white dark:bg-gray-900 dark:bg-gray-800 text-gray-700 dark:text-gray-300 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 dark:hover:bg-gray-700"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                Ver
-              </a>
-              <button
-                type="button"
-                onClick={handleCopyPublicUrl}
-                className="inline-flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-gray-800 dark:border-gray-700 bg-white dark:bg-gray-900 dark:bg-gray-800 text-gray-700 dark:text-gray-300 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 dark:hover:bg-gray-700"
-              >
-                <Copy className="h-3.5 w-3.5" />
-                {copiedPublicLink ? 'Copiado' : 'Copiar'}
-              </button>
+        {tenantSlug && !collapsed ? (
+          <div className="px-4 py-2">
+            <div className="bg-gray-50 dark:bg-gray-800/40 rounded-[2rem] p-4 border border-gray-100 dark:border-gray-800/60 shadow-sm">
+              <div className="flex items-center gap-2.5 mb-3">
+                <div className="p-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm">
+                  <Globe className="w-3.5 h-3.5 text-primary-500" />
+                </div>
+                <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none">Cardápio Online</span>
+              </div>
+              <div className="px-1 text-[11px] text-gray-600 dark:text-gray-300 font-black truncate mb-4 bg-gray-100 dark:bg-gray-900/50 py-1 rounded-md">
+                /{tenantSlug}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href={publicMenuUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-1.5 px-2 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all active:scale-95 shadow-sm"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Ver
+                </a>
+                <button
+                  type="button"
+                  onClick={handleCopyPublicUrl}
+                  className="inline-flex items-center justify-center gap-1.5 px-2 py-2 text-[10px] font-black uppercase tracking-wider rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all active:scale-95 shadow-sm"
+                >
+                  <Copy className="h-3 w-3" />
+                  {copiedPublicLink ? 'OK' : 'Link'}
+                </button>
+              </div>
             </div>
           </div>
         ) : null}
@@ -505,15 +553,15 @@ export function AppLayout() {
           })}
         </nav>
 
-        <div className="p-3 border-t border-gray-200 dark:border-gray-800">
+        <div className="p-4 border-t border-gray-100 dark:border-gray-800/60">
           <button
             onClick={handleLogout}
-            className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all ${
-              collapsed ? 'flex items-center justify-center' : ''
-            }`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all active:scale-95 ${collapsed ? 'justify-center' : ''
+              }`}
             title={collapsed ? 'Sair' : undefined}
           >
-            <span aria-hidden>{collapsed ? '🚪' : '🚪 Sair'}</span>
+            <LogOut className="w-[18px] h-[18px] stroke-[2.5px]" />
+            {!collapsed && <span>Sair do Sistema</span>}
           </button>
         </div>
       </aside>
