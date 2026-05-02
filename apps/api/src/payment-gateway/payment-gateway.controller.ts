@@ -80,7 +80,7 @@ export class PaymentGatewayController {
     try {
       const status = await this.paymentGatewayService.getPaymentStatus(transactionId);
       return status;
-    } catch (error) {
+    } catch {
       // Não expor detalhes do erro em endpoint público
       throw new Error('Invalid transaction');
     }

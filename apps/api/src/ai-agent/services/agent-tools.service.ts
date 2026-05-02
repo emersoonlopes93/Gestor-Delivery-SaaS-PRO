@@ -188,7 +188,7 @@ export class AgentToolsService {
           ? `Entrega disponível. Taxa: R$ ${decision.fee}` 
           : 'Infelizmente não entregamos neste endereço.',
       };
-    } catch (_error) {
+    } catch {
       return { disponivel: false, mensagem: 'Erro ao calcular taxa. Peça mais detalhes do endereço.' };
     }
   }

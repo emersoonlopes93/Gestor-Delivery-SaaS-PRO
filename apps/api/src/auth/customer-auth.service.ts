@@ -70,7 +70,7 @@ export class CustomerAuthService {
 
     try {
       await this.whatsappCloud.sendOtp(cleanPhone, code);
-    } catch (e) {
+    } catch {
       // Se falhar o envio, remove o OTP criado para evitar "código pendurado" sem entrega.
       await this.prisma.customerOTP.delete({ where: { id: created.id } }).catch(() => undefined);
       throw new BadRequestException('Não foi possível enviar o código no momento. Tente novamente.');

@@ -109,7 +109,7 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
         if (config?.fallbackMessage) {
           await this.sendFinalResponse(tenantId, 'error-fallback', customerPhone, config.fallbackMessage);
         }
-      } catch (e) {}
+      } catch {}
     }
   }
 
