@@ -20,7 +20,6 @@ import {
   CreatePrintJobDTO,
   CreateIncrementalPrintJobDTO,
   CreateMultipleIncrementalPrintJobsDTO,
-  UpdatePrintJobStatusDTO,
   CleanupPrintJobsDTO,
   GetPrintJobsQueryDTO,
   PrintJobQueryDTO,

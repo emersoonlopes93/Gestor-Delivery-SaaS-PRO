@@ -1,9 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Package, Clock, ChevronRight, RefreshCw } from 'lucide-react';
 import { api, ApiError } from '../../lib/api-client';
-import { 
-  ORDER_STATUS_TRANSITIONS 
-} from '@gestor/types';
 import type { 
   OrderListItemDTO, 
   OrderResponseDTO, 
@@ -12,6 +9,17 @@ import type {
 
 // Bypass persistent build error by defining locally
 type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready_for_pickup' | 'ready_for_delivery' | 'out_for_delivery' | 'completed' | 'cancelled' | 'draft';
+const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['preparing', 'cancelled'],
+  preparing: ['ready_for_pickup', 'ready_for_delivery', 'cancelled'],
+  ready_for_pickup: ['completed'],
+  ready_for_delivery: ['out_for_delivery'],
+  out_for_delivery: ['completed'],
+  completed: [],
+  cancelled: [],
+  draft: ['confirmed', 'cancelled'],
+};
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Pendente',

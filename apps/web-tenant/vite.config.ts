@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@gestor/types': path.resolve(__dirname, '../../packages/types/src/index.ts'),
     },
   },
   server: {

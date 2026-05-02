@@ -19,10 +19,7 @@ import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { SchedulingService } from './scheduling.service';
 import {
   CreateScheduledOrderDTO,
-  CreateTimeSlotDTO,
-  UpdateScheduledOrderDTO,
   CancelScheduledOrderDTO,
-  UpdateTimeSlotDTO,
 } from './dto/create-scheduled-order.dto';
 
 @Controller('scheduling')

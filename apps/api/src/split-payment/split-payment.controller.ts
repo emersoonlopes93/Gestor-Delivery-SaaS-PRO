@@ -19,11 +19,9 @@ import { SplitPaymentService } from './split-payment.service';
 import {
   CreateOrderSplitDTO,
   AddPaymentToSplitDTO,
-  UpdateOrderSplitDTO,
   CancelOrderSplitDTO,
   SplitByItemsDTO,
   SplitByPeopleDTO,
-  CustomSplitDTO,
 } from './dto/create-split.dto';
 
 @Controller('split-payment')
