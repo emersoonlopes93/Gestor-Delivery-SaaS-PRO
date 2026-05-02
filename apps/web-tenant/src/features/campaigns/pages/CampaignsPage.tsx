@@ -1,113 +1,210 @@
-import React from 'react';
-import { Megaphone, Plus, Users, Send, PauseCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Megaphone, Plus, Users, Send, PauseCircle, Play, Square, Trash2 } from 'lucide-react';
+import { api } from '../../../lib/api-client';
+import type { Campaign, CampaignStatus } from '@gestor/types';
+import { CreateCampaignModal } from '../components/CreateCampaignModal';
 
 export function CampaignsPage() {
-  const campaigns = [
-    { id: 1, name: 'Reativação de Clientes', status: 'running', sent: 150, audience: 500, createdAt: '01/05/2026' },
-    { id: 2, name: 'Promoção Fim de Semana', status: 'draft', sent: 0, audience: 1200, createdAt: '30/04/2026' },
-  ];
+  const queryClient = useQueryClient();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const { data: campaigns = [], isLoading } = useQuery({
+    queryKey: ['campaigns'],
+    queryFn: async () => {
+      const res = await api.get<Campaign[]>('/campaigns');
+      return res.success ? res.data : [];
+    },
+  });
+
+  const startMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await api.post(`/campaigns/${id}/start`);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['campaigns'] }),
+  });
+
+  const pauseMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await api.post(`/campaigns/${id}/pause`);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['campaigns'] }),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await api.post(`/campaigns/${id}/cancel`);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['campaigns'] }),
+  });
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Campanhas Ativas</h1>
-          <p className="text-gray-400">Envie mensagens em massa segmentadas para sua base de clientes.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white mb-2">Campanhas Ativas</h1>
+          <p className="text-gray-500 dark:text-gray-400">Envie mensagens em massa segmentadas para sua base de clientes.</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-colors shadow-lg shadow-blue-500/20">
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="btn-primary"
+        >
           <Plus className="w-4 h-4" />
           Nova Campanha
         </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-[#1A1D24] p-6 rounded-2xl border border-gray-800">
+        <div className="card-premium p-6">
           <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-blue-500/10 rounded-xl text-blue-400">
+            <div className="p-3 bg-primary-500/10 rounded-xl text-primary-600 dark:text-primary-400">
               <Megaphone className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-400">Campanhas Ativas</p>
-              <h3 className="text-2xl font-bold text-white">1</h3>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Campanhas Ativas</p>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                {campaigns.filter(c => c.status === 'running').length}
+              </h3>
             </div>
           </div>
         </div>
-        <div className="bg-[#1A1D24] p-6 rounded-2xl border border-gray-800">
+        <div className="card-premium p-6">
           <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-green-500/10 rounded-xl text-green-400">
+            <div className="p-3 bg-green-500/10 rounded-xl text-green-600 dark:text-green-400">
               <Send className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-400">Mensagens Enviadas</p>
-              <h3 className="text-2xl font-bold text-white">150</h3>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Mensagens Enviadas</p>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                {campaigns.reduce((sum, c) => sum + c.totalSent, 0)}
+              </h3>
             </div>
           </div>
         </div>
-        <div className="bg-[#1A1D24] p-6 rounded-2xl border border-gray-800">
+        <div className="card-premium p-6">
           <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-purple-500/10 rounded-xl text-purple-400">
+            <div className="p-3 bg-purple-500/10 rounded-xl text-purple-600 dark:text-purple-400">
               <Users className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-gray-400">Audiência Atingida</p>
-              <h3 className="text-2xl font-bold text-white">30%</h3>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Audiência Atingida</p>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                {campaigns.length > 0
+                  ? Math.round(
+                      (campaigns.reduce((sum, c) => sum + c.totalDelivered, 0) /
+                        campaigns.reduce((sum, c) => sum + c.totalAudience, 0)) *
+                        100
+                    )
+                  : 0}%
+              </h3>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-[#1A1D24] border border-gray-800 rounded-2xl overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="border-b border-gray-800 bg-gray-800/20">
-              <th className="py-4 px-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">Campanha</th>
-              <th className="py-4 px-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">Status</th>
-              <th className="py-4 px-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">Progresso</th>
-              <th className="py-4 px-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">Data Criação</th>
-              <th className="py-4 px-6 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-800/50">
+      {isLoading ? (
+        <div className="flex justify-center items-center h-48">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+        </div>
+      ) : (
+        <div className="card-premium overflow-hidden">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/20">
+                <th className="py-4 px-6 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Campanha</th>
+                <th className="py-4 px-6 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                <th className="py-4 px-6 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Progresso</th>
+                <th className="py-4 px-6 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Data Criação</th>
+                <th className="py-4 px-6 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-right">Ações</th>
+              </tr>
+            </thead>
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800/50">
             {campaigns.map(c => (
-              <tr key={c.id} className="hover:bg-white/[0.02] transition-colors">
+              <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
                 <td className="py-4 px-6">
-                  <span className="font-medium text-gray-200">{c.name}</span>
+                  <span className="font-medium text-gray-800 dark:text-gray-200">{c.name}</span>
                 </td>
                 <td className="py-4 px-6">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    c.status === 'running' ? 'bg-green-500/10 text-green-400' : 'bg-gray-800 text-gray-400'
+                    c.status === 'running' ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 
+                    c.status === 'paused' ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' :
+                    c.status === 'completed' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400' :
+                    c.status === 'cancelled' ? 'bg-red-500/10 text-red-600 dark:text-red-400' :
+                    'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
                   }`}>
-                    {c.status === 'running' ? 'Em execução' : 'Rascunho'}
+                    {c.status === 'running' ? 'Em execução' :
+                     c.status === 'paused' ? 'Pausada' :
+                     c.status === 'completed' ? 'Concluída' :
+                     c.status === 'cancelled' ? 'Cancelada' :
+                     'Rascunho'}
                   </span>
                 </td>
                 <td className="py-4 px-6">
                   <div className="flex items-center gap-3">
-                    <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
+                    <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-blue-500 rounded-full" 
-                        style={{ width: `${(c.sent / c.audience) * 100}%` }}
+                        className="h-full bg-primary-600 rounded-full" 
+                        style={{ width: `${c.totalAudience > 0 ? (c.totalSent / c.totalAudience) * 100 : 0}%` }}
                       />
                     </div>
-                    <span className="text-sm text-gray-400">{c.sent}/{c.audience}</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">{c.totalSent}/{c.totalAudience}</span>
                   </div>
                 </td>
-                <td className="py-4 px-6 text-sm text-gray-400">{c.createdAt}</td>
+                <td className="py-4 px-6 text-sm text-gray-500 dark:text-gray-400">{new Date(c.createdAt).toLocaleDateString('pt-BR')}</td>
                 <td className="py-4 px-6 text-right">
-                  {c.status === 'running' ? (
-                    <button className="p-2 text-gray-400 hover:text-orange-400 transition-colors" title="Pausar">
-                      <PauseCircle className="w-5 h-5" />
-                    </button>
-                  ) : (
-                    <button className="text-sm text-blue-400 font-medium hover:text-blue-300 transition-colors">
-                      Editar
-                    </button>
-                  )}
+                  <div className="flex justify-end gap-2">
+                    {c.status === 'running' && (
+                      <button 
+                        onClick={() => pauseMutation.mutate(c.id)}
+                        disabled={pauseMutation.isPending}
+                        className="p-2 text-gray-400 hover:text-orange-500 transition-colors" 
+                        title="Pausar"
+                      >
+                        <PauseCircle className="w-5 h-5" />
+                      </button>
+                    )}
+                    {(c.status === 'draft' || c.status === 'paused') && (
+                      <button 
+                        onClick={() => startMutation.mutate(c.id)}
+                        disabled={startMutation.isPending}
+                        className="p-2 text-gray-400 hover:text-green-500 transition-colors" 
+                        title="Iniciar"
+                      >
+                        <Play className="w-5 h-5" />
+                      </button>
+                    )}
+                    {(c.status === 'draft' || c.status === 'paused' || c.status === 'running') && (
+                      <button 
+                        onClick={() => cancelMutation.mutate(c.id)}
+                        disabled={cancelMutation.isPending}
+                        className="p-2 text-gray-400 hover:text-red-500 transition-colors" 
+                        title="Cancelar"
+                      >
+                        <Square className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
+        {campaigns.length === 0 && !isLoading && (
+          <div className="p-16 text-center text-gray-400 dark:text-gray-500">
+            <Megaphone className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p className="text-lg font-medium mb-2">Nenhuma campanha encontrada</p>
+            <p className="text-sm">Crie sua primeira campanha para começar a enviar mensagens em massa.</p>
+          </div>
+        )}
+        </div>
+      )}
+
+      {/* Modal de Criação de Campanha */}
+      <CreateCampaignModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ['campaigns'] })}
+      />
     </div>
   );
 }

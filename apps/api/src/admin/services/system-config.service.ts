@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { WhatsAppProviderType, AiProviderType } from '@prisma/client';
 
@@ -25,17 +25,24 @@ export class SystemConfigService implements OnModuleInit {
     });
   }
 
-  async updateConfig(data: {
-    defaultWhatsAppProvider?: WhatsAppProviderType;
-    defaultAiProvider?: AiProviderType;
-    openaiApiKey?: string;
-    anthropicApiKey?: string;
-    metaAccessToken?: string;
-    metaAppSecret?: string;
-  }) {
-    return this.prisma.systemConfig.update({
-      where: { id: 'global' },
-      data,
-    });
+  async updateConfig(data: any) {
+    // Removemos campos que não devem ser atualizados manualmente
+    const { id, updatedAt, createdAt, ...updateData } = data;
+
+    try {
+      return await this.prisma.systemConfig.upsert({
+        where: { id: 'global' },
+        update: updateData,
+        create: {
+          id: 'global',
+          ...updateData,
+          defaultWhatsAppProvider: updateData.defaultWhatsAppProvider || 'evolution_go',
+          defaultAiProvider: updateData.defaultAiProvider || 'openai',
+        },
+      });
+    } catch (error: any) {
+      console.error('Error in SystemConfigService.updateConfig:', error);
+      throw new InternalServerErrorException(`Database error: ${error.message}`);
+    }
   }
 }

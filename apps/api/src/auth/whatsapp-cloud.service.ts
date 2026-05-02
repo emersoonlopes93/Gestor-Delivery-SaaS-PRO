@@ -21,10 +21,6 @@ export class WhatsAppCloudService {
     private readonly prisma: PrismaService,
   ) {}
 
-  private getMessageTemplate(): string {
-    return String(this.config.get('WHATSAPP_OTP_MESSAGE_TEMPLATE') ?? 'Seu código de acesso é: {{CODE}}');
-  }
-
   private normalizeBrazilToE164(cleanPhoneDigits: string): string {
     // Espera apenas dígitos.
     // Se já vier com DDI 55, mantém. Caso contrário, assume Brasil.

@@ -1,17 +1,20 @@
 export * from './enums';
 export type * from './auth';
-export * from './tenant';
-export * from './purchasing';
-export * from './finance';
+export type * from './tenant';
+export type * from './purchasing';
+export type * from './finance';
 export type * from './rbac';
 export type * from './api';
-export * from './catalog';
-export * from './storefront';
+export type * from './catalog';
+export { PizzaTemplateConfigSchema, CategoryTemplateConfigSchema } from './catalog';
+export type * from './storefront';
 export type * from './customer';
 export type * from './promotions';
 export type * from './inventory';
 export type * from './analytics';
 export type * from './goals';
+export type * from './campaigns';
+export type * from './chat';
 
 // Modules with classes or constants (explicit values)
 export type { 

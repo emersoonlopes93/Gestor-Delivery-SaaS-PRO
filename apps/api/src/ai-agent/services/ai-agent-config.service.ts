@@ -4,10 +4,10 @@ import { AiProviderType } from '@prisma/client';
 
 export interface UpdateAiAgentConfigDto {
   isEnabled?: boolean;
-  aiProvider?: AiProviderType;
+  agentName?: string | null;
   greetingMessage?: string | null;
-  systemPrompt?: string | null;
   tone?: string;
+  customInstructions?: string | null;
   operatingMode?: string;
   handoffPolicy?: string;
   fallbackMessage?: string | null;
@@ -29,6 +29,11 @@ export class AiAgentConfigService {
   async getConfig(tenantId: string) {
     let config = await this.prisma.aiAgentConfig.findUnique({
       where: { tenantId },
+      include: {
+        tenant: {
+          select: { name: true }
+        }
+      }
     });
 
     if (!config) {
@@ -36,7 +41,7 @@ export class AiAgentConfigService {
         data: {
           tenantId,
           isEnabled: false,
-          aiProvider: 'openai',
+          agentName: 'Assistente',
           tone: 'friendly',
           operatingMode: 'always',
           handoffPolicy: 'on_request',
@@ -46,10 +51,13 @@ export class AiAgentConfigService {
           customerCooldownMin: 5,
           greetingMessage: 'Olá! Sou o assistente virtual da loja. Como posso ajudar?',
           fallbackMessage: 'Desculpe, não consegui entender. Quer falar com um atendente?',
-          systemPrompt: `Você é um assistente virtual inteligente e amigável de delivery.
-Sua missão é ajudar o cliente a fazer o pedido, consultar o cardápio e tirar dúvidas.
-Seja sempre conciso. Responda em português (BR).`,
+          customInstructions: 'Seja sempre conciso. Responda em português (BR).',
         },
+        include: {
+          tenant: {
+            select: { name: true }
+          }
+        }
       });
       this.logger.log(`Default AI Config created for tenant ${tenantId}`);
     }
@@ -64,9 +72,30 @@ Seja sempre conciso. Responda em português (BR).`,
     // Garante que existe antes de atualizar
     await this.getConfig(tenantId);
 
+    // Filtra apenas os campos que podem ser atualizados
+    const allowedFields = {
+      isEnabled: dto.isEnabled,
+      agentName: dto.agentName,
+      greetingMessage: dto.greetingMessage,
+      tone: dto.tone,
+      customInstructions: dto.customInstructions,
+      operatingMode: dto.operatingMode,
+      handoffPolicy: dto.handoffPolicy,
+      fallbackMessage: dto.fallbackMessage,
+      maxRetries: dto.maxRetries,
+      sessionTimeoutMin: dto.sessionTimeoutMin,
+      dailyMessageLimit: dto.dailyMessageLimit,
+      customerCooldownMin: dto.customerCooldownMin,
+    };
+
+    // Remove campos undefined/null
+    const cleanData = Object.fromEntries(
+      Object.entries(allowedFields).filter(([_, value]) => value !== undefined && value !== null)
+    );
+
     const updated = await this.prisma.aiAgentConfig.update({
       where: { tenantId },
-      data: dto,
+      data: cleanData,
     });
 
     this.logger.log(`AI Config updated for tenant ${tenantId}`);

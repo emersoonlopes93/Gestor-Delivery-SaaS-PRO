@@ -19,7 +19,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ['recharts', 'lucide-react', 'react-router-dom'],
+    include: ['recharts', 'lucide-react', 'react-router-dom', '@gestor/types'],
   },
   build: {
     commonjsOptions: {

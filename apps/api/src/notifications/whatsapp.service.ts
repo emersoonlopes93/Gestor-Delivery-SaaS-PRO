@@ -19,14 +19,6 @@ export class WhatsappService {
     private readonly prisma: PrismaService,
   ) {}
 
-  private get isConfigured(): boolean {
-    return !!(this.accessToken && this.phoneNumberId);
-  }
-
-  private get baseUrl(): string {
-    return `https://graph.facebook.com/${this.graphApiVersion}/${this.phoneNumberId}/messages`;
-  }
-
   /**
    * Envia uma mensagem de texto simples.
    * Tenta encontrar o tenantId baseado no contexto (se possível) ou usa o padrão do sistema.

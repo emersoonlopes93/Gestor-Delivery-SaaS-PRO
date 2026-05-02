@@ -143,5 +143,3 @@ export class WhatsAppWebhookController {
     this.logger.debug(`ACK received for ${event.externalId}: ${event.status}`);
   }
 }
-
-}

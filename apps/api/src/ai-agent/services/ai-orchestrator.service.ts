@@ -6,6 +6,8 @@ import { WhatsAppSenderService } from '../../whatsapp-channel/services/whatsapp-
 import { AiProviderRegistryService } from './ai-provider-registry.service';
 import type { AiMessage } from '../interfaces/ai-provider.interface';
 
+import { PrismaService } from '../../database/prisma.service';
+
 @Injectable()
 export class AiOrchestratorService {
   private readonly logger = new Logger('AiOrchestratorService');
@@ -16,6 +18,7 @@ export class AiOrchestratorService {
     private readonly toolsService: AgentToolsService,
     private readonly whatsappSender: WhatsAppSenderService,
     private readonly aiRegistry: AiProviderRegistryService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -44,9 +47,23 @@ export class AiOrchestratorService {
       // Busca histórico recente
       const history = await this.conversationService.getRecentHistory(session.id, 15);
 
+      // Busca Configuração Global (SystemConfig)
+      const systemConfig = await this.prisma.systemConfig.findUnique({ where: { id: 'global' } });
+
       // Constrói array de mensagens pro LLM
+      const basePrompt = systemConfig?.baseAiPrompt || 'Você é um assistente virtual de delivery.';
+      const agentContext = `
+Você está atendendo para o restaurante: ${config.tenant.name}.
+Seu nome é: ${config.agentName || 'Assistente'}.
+Seu tom de voz deve ser: ${config.tone}.
+Sempre comece o atendimento com esta saudação: ${config.greetingMessage || 'Olá!'}.
+
+Instruções específicas do restaurante:
+${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
+      `.trim();
+
       const messages: AiMessage[] = [
-        { role: 'system', content: config.systemPrompt || 'Você é um assistente.' }
+        { role: 'system', content: `${basePrompt}\n\n${agentContext}` }
       ];
 
       for (const msg of history) {
@@ -89,7 +106,7 @@ export class AiOrchestratorService {
       // Fallback
       try {
         const config = await this.configService.getConfig(tenantId);
-        if (config.fallbackMessage) {
+        if (config?.fallbackMessage) {
           await this.sendFinalResponse(tenantId, 'error-fallback', customerPhone, config.fallbackMessage);
         }
       } catch (e) {}

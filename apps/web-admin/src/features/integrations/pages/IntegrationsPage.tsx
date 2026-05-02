@@ -15,10 +15,11 @@ import {
 interface SystemConfig {
   defaultWhatsAppProvider: 'evolution_go' | 'meta_cloud';
   defaultAiProvider: 'openai' | 'anthropic';
+  evolutionUrl: string;
+  evolutionGlobalToken: string;
   openaiApiKey: string;
   anthropicApiKey: string;
-  metaAccessToken: string;
-  metaAppSecret: string;
+  baseAiPrompt: string;
 }
 
 export default function IntegrationsPage() {
@@ -41,8 +42,8 @@ export default function IntegrationsPage() {
         }
       });
       if (!response.ok) throw new Error('Falha ao carregar configurações');
-      const data = await response.json();
-      setConfig(data);
+      const responseData = await response.json();
+      setConfig(responseData.data || responseData);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -59,13 +60,15 @@ export default function IntegrationsPage() {
       setError(null);
       setSuccess(false);
 
+      const { id, updatedAt, createdAt, ...updatePayload } = config as any;
+
       const response = await fetch('/api/v1/admin/integrations/config', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('admin_accessToken')}`
         },
-        body: JSON.stringify(config)
+        body: JSON.stringify(updatePayload)
       });
 
       if (!response.ok) throw new Error('Falha ao salvar configurações');
@@ -127,6 +130,27 @@ export default function IntegrationsPage() {
                 </select>
                 <p className="text-xs text-gray-400">Define qual provedor será sugerido para novos tenants.</p>
               </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700">URL Global Evolution Go</label>
+                <input 
+                  placeholder="https://api.meuserver.com"
+                  className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                  value={config?.evolutionUrl || ''}
+                  onChange={(e) => setConfig(prev => prev ? {...prev, evolutionUrl: e.target.value} : null)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700">Global Token Evolution Go</label>
+                <input 
+                  type="password"
+                  placeholder="Token Global do Servidor"
+                  className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                  value={config?.evolutionGlobalToken || ''}
+                  onChange={(e) => setConfig(prev => prev ? {...prev, evolutionGlobalToken: e.target.value} : null)}
+                />
+              </div>
             </div>
 
             <div className="p-4 bg-yellow-50 rounded-xl border border-yellow-100 flex gap-3">
@@ -148,39 +172,56 @@ export default function IntegrationsPage() {
           </div>
           
           <div className="p-8 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700">Provedor Padrão</label>
+                <label className="text-sm font-medium text-gray-700">Provedor de IA Padrão</label>
                 <select 
                   className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
-                  value={config?.defaultAiProvider}
+                  value={config?.defaultAiProvider || 'openai'}
                   onChange={(e) => setConfig(prev => prev ? {...prev, defaultAiProvider: e.target.value as any} : null)}
                 >
-                  <option value="openai">OpenAI (GPT-4o / GPT-3.5)</option>
-                  <option value="anthropic">Anthropic (Claude 3.5 Sonnet)</option>
+                  <option value="openai">OpenAI (GPT-4/o)</option>
+                  <option value="anthropic">Anthropic (Claude 3.5)</option>
                 </select>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700">OpenAI API Key</label>
-                <input 
-                  type="password"
-                  placeholder="sk-..."
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none font-mono text-sm"
-                  value={config?.openaiApiKey || ''}
-                  onChange={(e) => setConfig(prev => prev ? {...prev, openaiApiKey: e.target.value} : null)}
-                />
-              </div>
+              {config?.defaultAiProvider === 'openai' ? (
+                <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                  <label className="text-sm font-medium text-gray-700">OpenAI API Key</label>
+                  <input 
+                    type="password"
+                    placeholder="sk-..."
+                    className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none font-mono text-sm"
+                    value={config?.openaiApiKey || ''}
+                    onChange={(e) => setConfig(prev => prev ? {...prev, openaiApiKey: e.target.value} : null)}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                  <label className="text-sm font-medium text-gray-700">Anthropic API Key</label>
+                  <input 
+                    type="password"
+                    placeholder="sk-ant-..."
+                    className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none font-mono text-sm"
+                    value={config?.anthropicApiKey || ''}
+                    onChange={(e) => setConfig(prev => prev ? {...prev, anthropicApiKey: e.target.value} : null)}
+                  />
+                </div>
+              )}
 
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700">Anthropic API Key</label>
-                <input 
-                  type="password"
-                  placeholder="sk-ant-..."
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none font-mono text-sm"
-                  value={config?.anthropicApiKey || ''}
-                  onChange={(e) => setConfig(prev => prev ? {...prev, anthropicApiKey: e.target.value} : null)}
+                <label className="text-sm font-medium text-gray-700 flex items-center justify-between">
+                  Prompt Base Global do Sistema
+                  <span className="text-[10px] text-primary-600 font-bold uppercase tracking-wider">Injetado em todos os agentes</span>
+                </label>
+                <textarea 
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none text-sm font-mono leading-relaxed"
+                  rows={6}
+                  placeholder="Diretrizes mestre para todos os atendentes..."
+                  value={config?.baseAiPrompt || ''}
+                  onChange={(e) => setConfig(prev => prev ? {...prev, baseAiPrompt: e.target.value} : null)}
                 />
+                <p className="text-[10px] text-gray-500 italic">Este prompt define o comportamento core que nenhum tenant pode alterar.</p>
               </div>
             </div>
           </div>

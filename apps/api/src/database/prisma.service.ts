@@ -43,6 +43,7 @@ export class PrismaService
         'TenantUserRole',
         'Plan',
         'TenantSubscription',
+        'SystemConfig',
       ];
 
       const model = params.model ?? '';

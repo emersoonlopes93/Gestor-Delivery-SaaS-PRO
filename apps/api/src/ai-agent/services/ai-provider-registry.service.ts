@@ -36,12 +36,11 @@ export class AiProviderRegistryService {
     // 1. Verificar se o tenant tem um override específico na config de agente
     const agentConfig = await this.prisma.aiAgentConfig.findUnique({
       where: { tenantId },
-      select: { aiProvider: true }
+      select: { tenantId: true } // temporário até adicionar campo aiProvider no modelo
     });
 
-    if (agentConfig?.aiProvider) {
-      return this.getProvider(agentConfig.aiProvider);
-    }
+    // TODO: quando o campo aiProvider for adicionado ao AiAgentConfig, usar:
+    // if (agentConfig?.aiProvider) { return this.getProvider(agentConfig.aiProvider as AiProviderType); }
 
     // 2. Senão, buscar o default global do SystemConfig
     const systemConfig = await this.prisma.systemConfig.findUnique({

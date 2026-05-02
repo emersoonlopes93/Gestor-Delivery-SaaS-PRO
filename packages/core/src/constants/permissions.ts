@@ -124,6 +124,8 @@ export const ADMIN_PERMISSIONS = {
   'saas.users.read': 'View admin users',
   'saas.users.manage': 'Manage admin users',
   'saas.onboarding.manage': 'Manage tenant onboarding',
+  'saas.settings.read': 'View system settings',
+  'saas.settings.manage': 'Manage system settings',
 } as const;
 
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;

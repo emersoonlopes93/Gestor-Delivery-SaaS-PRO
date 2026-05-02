@@ -9,6 +9,8 @@ import {
   HttpCode,
 } from '@nestjs/common';
 import { WhatsAppInstanceService, CreateInstanceDto } from '../services/whatsapp-instance.service';
+import { ConfigService } from '@nestjs/config';
+import { PrismaService } from '../../database/prisma.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions as Permissions } from '../../common/decorators';
@@ -16,7 +18,19 @@ import { RequirePermissions as Permissions } from '../../common/decorators';
 @Controller('whatsapp/instance')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class WhatsAppInstanceController {
-  constructor(private readonly instanceService: WhatsAppInstanceService) {}
+  constructor(
+    private readonly instanceService: WhatsAppInstanceService,
+    private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  private buildWebhookUrl(req: any, tenantId: string): string {
+    const prefix = this.configService.get<string>('API_PREFIX', '/api/v1');
+    const host = req?.get?.('host') || req?.headers?.host || 'localhost:3333';
+    const forwardedProto = req?.get?.('x-forwarded-proto') || req?.headers?.['x-forwarded-proto'];
+    const proto = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || req?.protocol || 'http';
+    return `${proto}://${host}${prefix}/webhooks/whatsapp/${tenantId}`;
+  }
 
   @Get()
   @Permissions('settings.manage')
@@ -27,20 +41,35 @@ export class WhatsAppInstanceController {
   @Post()
   @Permissions('settings.manage')
   async createOrUpdateInstance(@Request() req: any, @Body() dto: CreateInstanceDto) {
-    return this.instanceService.createInstance(req.user.tenantId, dto);
+    const tenantId = req.user.tenantId;
+    const safeDto: CreateInstanceDto = {
+      ...dto,
+      webhookUrl: dto?.webhookUrl?.trim() || this.buildWebhookUrl(req, tenantId),
+    };
+    return this.instanceService.createInstance(tenantId, safeDto);
   }
 
   @Get('status')
   @Permissions('settings.manage')
   async getStatus(@Request() req: any) {
-    return this.instanceService.getStatus(req.user.tenantId);
+    console.log(`[WhatsApp Status] tenantId: ${req.user.tenantId}`);
+    const result = await this.instanceService.getStatus(req.user.tenantId);
+    console.log(`[WhatsApp Status] result:`, result);
+    return result;
   }
 
   @Post('connect')
   @HttpCode(200)
   @Permissions('settings.manage')
   async connect(@Request() req: any, @Body('webhookUrl') webhookUrl: string) {
-    return this.instanceService.connectInstance(req.user.tenantId, webhookUrl);
+    const tenantId = req.user.tenantId;
+    const effectiveWebhookUrl = webhookUrl?.trim() || this.buildWebhookUrl(req, tenantId);
+    console.log(`[WhatsApp Connect] tenantId: ${tenantId}, webhookUrl: ${effectiveWebhookUrl}`);
+    const result = await this.instanceService.connectInstance(tenantId, effectiveWebhookUrl);
+    console.log(`[WhatsApp Connect] result:`, result);
+    console.log(`[WhatsApp Connect] QR Code present:`, result.qrCode ? 'YES' : 'NO');
+    console.log(`[WhatsApp Connect] Status:`, result.status);
+    return result;
   }
 
   @Post('disconnect')
@@ -50,10 +79,52 @@ export class WhatsAppInstanceController {
     return this.instanceService.disconnectInstance(req.user.tenantId);
   }
 
+  @Post('pair')
+  @HttpCode(200)
+  @Permissions('settings.manage')
+  async generatePairingCode(@Request() req: any, @Body('phone') phone?: string) {
+    const tenantId = req.user.tenantId;
+    console.log(`[WhatsApp Pair] tenantId: ${tenantId}, phone: ${phone || 'not provided'}`);
+    const result = await this.instanceService.generatePairingCode(tenantId, phone);
+    console.log(`[WhatsApp Pair] result:`, result);
+    return result;
+  }
+
   @Get('qr-code')
   @Permissions('settings.manage')
   async getQrCode(@Request() req: any) {
     const qrCode = await this.instanceService.getQrCode(req.user.tenantId);
     return { qrCode };
+  }
+
+  @Get('debug')
+  @Permissions('settings.manage')
+  async debug(@Request() req: any) {
+    const tenantId = req.user.tenantId;
+    
+    // Verificar configuração global
+    const systemConfig = await this.prisma.systemConfig.findUnique({ where: { id: 'global' } });
+    
+    // Verificar instância do tenant
+    const instance = await this.prisma.whatsAppInstance.findUnique({ where: { tenantId } });
+    
+    return {
+      tenantId,
+      systemConfig: {
+        evolutionUrl: systemConfig?.evolutionUrl,
+        evolutionGlobalToken: systemConfig?.evolutionGlobalToken ? '***CONFIGURADO***' : 'NÃO CONFIGURADO',
+        defaultWhatsAppProvider: systemConfig?.defaultWhatsAppProvider,
+      },
+      instance: instance ? {
+        id: instance.id,
+        instanceName: instance.instanceName,
+        providerType: instance.providerType,
+        status: instance.status,
+        phoneNumber: instance.phoneNumber,
+        apiUrl: instance.apiUrl,
+        apiKey: instance.apiKey ? '***CONFIGURADO***' : 'NÃO CONFIGURADO',
+        evolutionInstanceId: instance.evolutionInstanceId,
+      } : 'NÃO ENCONTRADA',
+    };
   }
 }

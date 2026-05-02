@@ -134,18 +134,7 @@ model TenantOnboarding {
   @@map("tenant_onboardings")
 }
 
-model SystemConfig {
-  id                    String             @id @default("global")
-  defaultWhatsAppProvider WhatsAppProviderType @default(evolution_go) @map("default_whatsapp_provider")
-  defaultAiProvider     AiProviderType     @default(openai) @map("default_ai_provider")
-  openaiApiKey         String?            @map("openai_api_key")
-  anthropicApiKey      String?            @map("anthropic_api_key")
-  metaAccessToken      String?            @map("meta_access_token")
-  metaAppSecret        String?            @map("meta_app_secret")
-  updatedAt            DateTime           @updatedAt @map("updated_at")
 
-  @@map("system_configs")
-}
 
 model OptionGroup {
   id            String                   @id @default(uuid())
@@ -2009,14 +1998,36 @@ model ChatMessage {
   @@map("chat_messages")
 }
 
+model SystemConfig {
+  id                    String             @id @default("global")
+  defaultWhatsAppProvider WhatsAppProviderType @default(evolution_go) @map("default_whatsapp_provider")
+  defaultAiProvider     AiProviderType     @default(openai) @map("default_ai_provider")
+  
+  // WhatsApp Infrastructure
+  evolutionUrl          String?            @map("evolution_url") @db.VarChar(500)
+  evolutionGlobalToken  String?            @map("evolution_global_token") @db.VarChar(500)
+  
+  // AI Infrastructure
+  openaiApiKey         String?            @map("openai_api_key")
+  anthropicApiKey      String?            @map("anthropic_api_key")
+  baseAiPrompt         String?            @map("base_ai_prompt") @db.Text
+  
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  @@map("system_configs")
+}
+
 model AiAgentConfig {
   id                String        @id @default(uuid())
   tenantId          String        @unique @map("tenant_id")
   isEnabled         Boolean       @default(false) @map("is_enabled")
-  aiProvider        AiProviderType @default(openai) @map("ai_provider")
-  greetingMessage   String?       @map("greeting_message")
-  systemPrompt      String?       @map("system_prompt")
+  agentName         String?       @map("agent_name") @db.VarChar(100)
+  greetingMessage   String?       @map("greeting_message") @db.Text
   tone              String        @default("friendly") @db.VarChar(30)
+  
+  // Personalização adicional (instruções específicas do restaurante)
+  customInstructions String?       @map("custom_instructions") @db.Text
+  
   operatingMode     String        @default("always") @map("operating_mode") @db.VarChar(30)
   handoffPolicy     String        @default("on_request") @map("handoff_policy") @db.VarChar(30)
   fallbackMessage   String?       @map("fallback_message")

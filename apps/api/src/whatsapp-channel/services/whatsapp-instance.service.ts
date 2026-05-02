@@ -1,4 +1,5 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import { IsString, IsOptional } from 'class-validator';
 import { PrismaService } from '../../database/prisma.service';
 import { WhatsAppInstanceStatus, WhatsAppProviderType } from '@prisma/client';
 import { EvolutionGoProvider } from '../providers/evolution-go.provider';
@@ -6,12 +7,14 @@ import { MetaCloudProvider } from '../providers/meta-cloud.provider';
 import { WhatsAppProviderRegistryService } from './whatsapp-provider-registry.service';
 import type { IWhatsAppProvider } from '../interfaces/whatsapp-provider.interface';
 
-export interface CreateInstanceDto {
-  providerType?: WhatsAppProviderType;
-  instanceName: string;
-  apiUrl: string;
-  apiKey: string;
-  webhookUrl: string;
+export class CreateInstanceDto {
+  @IsString()
+  @IsOptional()
+  webhookUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  token?: string;
 }
 
 export interface InstanceStatusDto {
@@ -40,55 +43,86 @@ export class WhatsAppInstanceService {
   }
 
   /**
-   * Cria e registra uma instância WhatsApp para o tenant
+   * Cria e registra uma instância WhatsApp para o tenant (Automático)
    */
   async createInstance(
     tenantId: string,
     dto: CreateInstanceDto,
   ): Promise<InstanceStatusDto> {
-    const providerType = dto.providerType || 'evolution_go';
-    const provider = this.getProvider(providerType);
+    try {
+      // 1. Buscar Configuração Global
+      const systemConfig = await this.prisma.systemConfig.findUnique({ where: { id: 'global' } });
+      const providerType = systemConfig?.defaultWhatsAppProvider || 'evolution_go';
+      const apiUrl = systemConfig?.evolutionUrl;
+      const apiKey = systemConfig?.evolutionGlobalToken;
 
-    // Criar instância no provider externo
-    const externalResult = await provider.createInstance(
-      dto.apiUrl,
-      dto.apiKey,
-      {
-        instanceName: dto.instanceName,
-        webhookUrl: dto.webhookUrl,
-      },
-    );
+      if (providerType === 'evolution_go' && (!apiUrl || !apiKey)) {
+        throw new BadRequestException('Infraestrutura WhatsApp não configurada no SaaS Admin.');
+      }
 
-    // Salvar no banco
-    const instance = await this.prisma.whatsAppInstance.upsert({
-      where: { tenantId },
-      create: {
-        tenantId,
-        providerType,
-        instanceName: dto.instanceName,
-        apiUrl: dto.apiUrl,
-        apiKey: dto.apiKey,
-        status: 'disconnected',
-        evolutionInstanceId: externalResult.instanceId,
-      },
-      update: {
-        providerType,
-        instanceName: dto.instanceName,
-        apiUrl: dto.apiUrl,
-        apiKey: dto.apiKey,
-        evolutionInstanceId: externalResult.instanceId,
-      },
-    });
+      // 2. Gerar Nome Automático da Instância
+      const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { slug: true } });
+      if (!tenant) throw new NotFoundException('Tenant não encontrado');
+      
+      // Sanitizar slug para evitar problemas com caracteres especiais
+      const safeSlug = tenant.slug.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+      const instanceName = `gestor_${safeSlug}_${Math.random().toString(36).substring(7)}`;
 
-    this.logger.log(`Instance created for tenant ${tenantId}: ${instance.id}`);
+      const provider = this.getProvider(providerType);
 
-    return {
-      id: instance.id,
-      instanceName: instance.instanceName,
-      providerType: instance.providerType,
-      status: instance.status,
-      phoneNumber: instance.phoneNumber,
-    };
+      // 3. Criar instância no provider externo
+      let externalResult;
+      try {
+        externalResult = await provider.createInstance(
+          apiUrl!,
+          apiKey!,
+          {
+            instanceName,
+            webhookUrl: dto.webhookUrl || '',
+          },
+        );
+      } catch (err: any) {
+        this.logger.error(`Error creating instance in external provider: ${err.message}`, err.stack);
+        throw new InternalServerErrorException(`Falha no provedor WhatsApp: ${err.response?.data?.error || err.message}`);
+      }
+
+      // 4. Salvar no banco
+      const instance = await this.prisma.whatsAppInstance.upsert({
+        where: { tenantId },
+        create: {
+          tenantId,
+          providerType,
+          instanceName,
+          apiUrl: apiUrl!,
+          apiKey: externalResult.token || apiKey!,
+          status: 'disconnected',
+          evolutionInstanceId: externalResult.instanceId,
+        },
+        update: {
+          providerType,
+          instanceName,
+          apiUrl: apiUrl!,
+          apiKey: externalResult.token || apiKey!,
+          evolutionInstanceId: externalResult.instanceId,
+        },
+      });
+
+      this.logger.log(`Instance created for tenant ${tenantId}: ${instance.id}`);
+
+      return {
+        id: instance.id,
+        instanceName: instance.instanceName,
+        providerType: instance.providerType,
+        status: instance.status,
+        phoneNumber: instance.phoneNumber,
+      };
+    } catch (error: any) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof InternalServerErrorException) {
+        throw error;
+      }
+      this.logger.error(`Unexpected error in createInstance: ${error.message}`, error.stack);
+      throw new InternalServerErrorException(`Erro ao criar instância: ${error.message}`);
+    }
   }
 
   /**
@@ -101,12 +135,16 @@ export class WhatsAppInstanceService {
     const instance = await this.getInstanceOrFail(tenantId);
     const provider = this.getProvider(instance.providerType);
 
+    console.log(`[WhatsApp Service] Connecting to instance: ${instance.evolutionInstanceId || instance.instanceName}`);
+
     const connectionStatus = await provider.connect(
       instance.apiUrl,
       instance.apiKey,
       instance.evolutionInstanceId || instance.instanceName,
       { webhookUrl },
     );
+
+    console.log(`[WhatsApp Service] Connection status received:`, connectionStatus);
 
     // Atualizar status no banco
     const statusMap: Record<string, WhatsAppInstanceStatus> = {
@@ -124,14 +162,19 @@ export class WhatsAppInstanceService {
       },
     });
 
-    return {
+    const result = {
       id: updated.id,
       instanceName: updated.instanceName,
       providerType: updated.providerType,
       status: updated.status,
-      phoneNumber: updated.phoneNumber,
+      phoneNumber: connectionStatus.phoneNumber || updated.phoneNumber,
       qrCode: connectionStatus.qrCode,
     };
+
+    console.log(`[WhatsApp Service] Final result:`, result);
+    console.log(`[WhatsApp Service] QR Code in result:`, result.qrCode ? 'YES' : 'NO');
+
+    return result;
   }
 
   /**
@@ -151,6 +194,21 @@ export class WhatsAppInstanceService {
       where: { id: instance.id },
       data: { status: 'disconnected' },
     });
+  }
+
+  /**
+   * Gera código de pareamento de 8 dígitos
+   */
+  async generatePairingCode(tenantId: string, phone?: string): Promise<{ pairingCode: string }> {
+    const instance = await this.getInstanceOrFail(tenantId);
+    const provider = this.getProvider(instance.providerType);
+
+    return await provider.generatePairingCode(
+      instance.apiUrl,
+      instance.apiKey,
+      instance.evolutionInstanceId || instance.instanceName,
+      phone,
+    );
   }
 
   /**

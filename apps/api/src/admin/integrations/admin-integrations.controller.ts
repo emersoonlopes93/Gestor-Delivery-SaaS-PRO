@@ -6,14 +6,60 @@ import {
   UseGuards,
   HttpCode,
 } from '@nestjs/common';
+import { IsOptional, IsString, IsEnum, ValidateIf } from 'class-validator';
 import { SystemConfigService } from '../services/system-config.service';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
-import { RequirePermissions as Permissions } from '../../common/decorators';
+import { AdminAuthGuard } from '../auth/admin-auth.guard';
+import { AdminPermissionsGuard } from '../rbac/admin-permissions.guard';
+import { RequireAdminPermissions as Permissions } from '../../common/decorators';
 import { WhatsAppProviderType, AiProviderType } from '@prisma/client';
 
+export class UpdateIntegrationsConfigDto {
+  @IsOptional()
+  @IsEnum(WhatsAppProviderType)
+  defaultWhatsAppProvider?: WhatsAppProviderType;
+
+  @IsOptional()
+  @IsEnum(AiProviderType)
+  defaultAiProvider?: AiProviderType;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  evolutionUrl?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  evolutionGlobalToken?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  openaiApiKey?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  anthropicApiKey?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  baseAiPrompt?: string | null;
+
+  // Campos que podem vir do frontend mas devem ser ignorados com segurança
+  @IsOptional()
+  id?: string;
+
+  @IsOptional()
+  updatedAt?: any;
+
+  @IsOptional()
+  createdAt?: any;
+}
+
 @Controller('admin/integrations')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(AdminAuthGuard, AdminPermissionsGuard)
 export class AdminIntegrationsController {
   constructor(private readonly configService: SystemConfigService) {}
 
@@ -25,15 +71,8 @@ export class AdminIntegrationsController {
 
   @Patch('config')
   @HttpCode(200)
-  @Permissions('saas.settings.write')
-  async updateConfig(@Body() data: {
-    defaultWhatsAppProvider?: WhatsAppProviderType;
-    defaultAiProvider?: AiProviderType;
-    openaiApiKey?: string;
-    anthropicApiKey?: string;
-    metaAccessToken?: string;
-    metaAppSecret?: string;
-  }) {
+  @Permissions('saas.settings.manage')
+  async updateConfig(@Body() data: UpdateIntegrationsConfigDto) {
     return this.configService.updateConfig(data);
   }
 }

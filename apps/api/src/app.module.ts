@@ -37,6 +37,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { WhatsAppChannelModule } from './whatsapp-channel/whatsapp-channel.module';
 import { AiAgentModule } from './ai-agent/ai-agent.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -134,6 +135,7 @@ import { CampaignsModule } from './campaigns/campaigns.module';
     WhatsAppChannelModule,
     AiAgentModule,
     CampaignsModule,
+    ChatModule,
   ],
   providers: [
     {

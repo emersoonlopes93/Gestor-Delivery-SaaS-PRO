@@ -150,6 +150,16 @@ export interface IWhatsAppProvider {
   ): Promise<string | null>; // base64
 
   /**
+   * Gera código de pareamento de 8 dígitos
+   */
+  generatePairingCode(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+    phone?: string,
+  ): Promise<{ pairingCode: string }>;
+
+  /**
    * Envia mensagem de texto
    */
   sendText(
