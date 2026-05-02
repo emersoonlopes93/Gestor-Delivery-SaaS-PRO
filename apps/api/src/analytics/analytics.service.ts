@@ -15,6 +15,95 @@ import {
 export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private buildDateRange(filter: MetricFilterDTO): Prisma.DateTimeFilter {
+    return {
+      gte: new Date(filter.startDate),
+      lte: new Date(filter.endDate),
+    };
+  }
+
+  private toNumber(value: unknown): number {
+    return Number(value || 0);
+  }
+
+  private async buildOrderItemCostCache(
+    items: Array<{
+      productId: string | null;
+      complements: Array<{ complementItemId: string }>;
+    }>,
+  ): Promise<{
+    productUnitCost: Map<string, number>;
+    complementUnitCost: Map<string, number>;
+  }> {
+    const productIds = Array.from(
+      new Set(items.map((item) => item.productId).filter((id): id is string => typeof id === 'string')),
+    );
+    const complementItemIds = Array.from(
+      new Set(
+        items.flatMap((item) =>
+          item.complements
+            .map((comp) => comp.complementItemId)
+            .filter((id): id is string => typeof id === 'string' && id.length > 0),
+        ),
+      ),
+    );
+
+    const [productRecipes, complementRecipes] = await Promise.all([
+      productIds.length
+        ? this.prisma.tenantClient.productRecipeIngredient.findMany({
+            where: { productId: { in: productIds } },
+            include: { ingredient: true },
+          })
+        : Promise.resolve([]),
+      complementItemIds.length
+        ? this.prisma.tenantClient.complementRecipeIngredient.findMany({
+            where: { complementItemId: { in: complementItemIds } },
+            include: { ingredient: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const productUnitCost = new Map<string, number>();
+    for (const recipe of productRecipes) {
+      const current = productUnitCost.get(recipe.productId) ?? 0;
+      productUnitCost.set(
+        recipe.productId,
+        current + this.toNumber(recipe.quantity) * this.toNumber(recipe.ingredient.currentCost),
+      );
+    }
+
+    const complementUnitCost = new Map<string, number>();
+    for (const recipe of complementRecipes) {
+      const current = complementUnitCost.get(recipe.complementItemId) ?? 0;
+      complementUnitCost.set(
+        recipe.complementItemId,
+        current + this.toNumber(recipe.quantity) * this.toNumber(recipe.ingredient.currentCost),
+      );
+    }
+
+    return { productUnitCost, complementUnitCost };
+  }
+
+  private estimateOrderItemCost(
+    item: {
+      productId: string | null;
+      quantity: unknown;
+      complements: Array<{ complementItemId: string }>;
+    },
+    cache: {
+      productUnitCost: Map<string, number>;
+      complementUnitCost: Map<string, number>;
+    },
+  ): number {
+    let unitCost = item.productId ? cache.productUnitCost.get(item.productId) ?? 0 : 0;
+
+    for (const comp of item.complements) {
+      unitCost += cache.complementUnitCost.get(comp.complementItemId) ?? 0;
+    }
+
+    return unitCost * this.toNumber(item.quantity);
+  }
+
   private toStringKey(value: unknown): string {
     return typeof value === 'string' || typeof value === 'number' ? String(value) : 'unknown';
   }
@@ -130,7 +219,7 @@ export class AnalyticsService {
   }
 
   private async getProductPerformance(tenantId: string, filter: MetricFilterDTO) {
-    const { startDate, endDate } = filter;
+    const createdAt = this.buildDateRange(filter);
     
     // Get top 10 products by quantity sold
     const topItems = await this.prisma.tenantClient.orderItem.groupBy({
@@ -140,7 +229,7 @@ export class AnalyticsService {
         lineType: 'product',
         order: {
           status: 'completed',
-          createdAt: { gte: new Date(startDate), lte: new Date(endDate) },
+          createdAt,
         },
       },
       _sum: { quantity: true, lineTotal: true },
@@ -148,56 +237,67 @@ export class AnalyticsService {
       take: 10,
     });
 
-    const performance = await Promise.all(
-      topItems.map(async (item) => {
-        const revenue = Number(item._sum.lineTotal || 0);
-        const quantity = item._sum.quantity || 0;
-        
-        // Estimated cost based on recipe (Theoretical)
-        let totalCost = 0;
-        if (item.productId) {
-          const recipe = await this.prisma.tenantClient.productRecipeIngredient.findMany({
-            where: { productId: item.productId },
-            include: { ingredient: true },
-          });
-          const unitCost = recipe.reduce(
-            (acc, r) => acc + Number(r.quantity) * Number(r.ingredient.currentCost),
-            0,
-          );
-          totalCost = unitCost * quantity;
-        }
-
-        const margin = revenue - totalCost;
-
-        return {
-          id: item.productId || 'unknown',
-          name: item.snapshotName || 'Produto',
-          estimatedCost: totalCost,
-          revenue,
-          grossMargin: margin,
-          marginPercentage: revenue > 0 ? (margin / revenue) * 100 : 0,
-        };
-      }),
+    const productIds = Array.from(
+      new Set(topItems.map((item) => item.productId).filter((id): id is string => typeof id === 'string')),
     );
+    const recipes = productIds.length
+      ? await this.prisma.tenantClient.productRecipeIngredient.findMany({
+          where: { productId: { in: productIds } },
+          include: { ingredient: true },
+        })
+      : [];
+
+    const productUnitCost = new Map<string, number>();
+    for (const recipe of recipes) {
+      const current = productUnitCost.get(recipe.productId) ?? 0;
+      productUnitCost.set(
+        recipe.productId,
+        current + this.toNumber(recipe.quantity) * this.toNumber(recipe.ingredient.currentCost),
+      );
+    }
+
+    const performance = topItems.map((item) => {
+      const revenue = this.toNumber(item._sum.lineTotal);
+      const quantity = this.toNumber(item._sum.quantity);
+      const totalCost = item.productId ? (productUnitCost.get(item.productId) ?? 0) * quantity : 0;
+      const margin = revenue - totalCost;
+
+      return {
+        id: item.productId || 'unknown',
+        name: item.snapshotName || 'Produto',
+        estimatedCost: totalCost,
+        revenue,
+        grossMargin: margin,
+        marginPercentage: revenue > 0 ? (margin / revenue) * 100 : 0,
+      };
+    });
 
     return performance;
   }
 
   private async getCategoryPerformance(tenantId: string, filter: MetricFilterDTO) {
-    const { startDate, endDate } = filter;
+    const createdAt = this.buildDateRange(filter);
     
     const items = await this.prisma.tenantClient.orderItem.findMany({
       where: {
         tenantId,
         order: {
           status: 'completed',
-          createdAt: { gte: new Date(startDate), lte: new Date(endDate) },
+          createdAt,
         },
       },
       include: {
-        product: { include: { category: true } }
+        product: { include: { category: true } },
+        complements: true,
       }
     });
+
+    const cache = await this.buildOrderItemCostCache(
+      items.map((item) => ({
+        productId: item.productId,
+        complements: item.complements.map((comp) => ({ complementItemId: comp.complementItemId })),
+      })),
+    );
 
     const categoryStats: Record<string, { revenue: number, cost: number }> = {};
 
@@ -205,8 +305,15 @@ export class AnalyticsService {
       const categoryName = item.product?.category?.name || 'Sem Categoria';
       if (!categoryStats[categoryName]) categoryStats[categoryName] = { revenue: 0, cost: 0 };
       
-      const revenue = Number(item.lineTotal);
-      const cost = await this.calculateItemEstimatedCost(tenantId, item as any);
+      const revenue = this.toNumber(item.lineTotal);
+      const cost = this.estimateOrderItemCost(
+        {
+          productId: item.productId,
+          quantity: item.quantity,
+          complements: item.complements.map((comp) => ({ complementItemId: comp.complementItemId })),
+        },
+        cache,
+      );
       
       categoryStats[categoryName].revenue += revenue;
       categoryStats[categoryName].cost += cost;
@@ -225,16 +332,24 @@ export class AnalyticsService {
   }
 
   private async getChannelPerformance(tenantId: string, filter: MetricFilterDTO) {
-    const { startDate, endDate } = filter;
+    const createdAt = this.buildDateRange(filter);
     
     const orders = await this.prisma.tenantClient.order.findMany({
       where: {
         tenantId,
         status: 'completed',
-        createdAt: { gte: new Date(startDate), lte: new Date(endDate) },
+        createdAt,
       },
       include: { items: { include: { complements: true } } }
     });
+
+    const allItems = orders.flatMap((order) => order.items);
+    const cache = await this.buildOrderItemCostCache(
+      allItems.map((item) => ({
+        productId: item.productId,
+        complements: item.complements.map((comp) => ({ complementItemId: comp.complementItemId })),
+      })),
+    );
 
     const channelStats: Record<string, { revenue: number, cost: number }> = {};
 
@@ -242,10 +357,17 @@ export class AnalyticsService {
       const channel = order.sourceChannel || 'Balcão';
       if (!channelStats[channel]) channelStats[channel] = { revenue: 0, cost: 0 };
       
-      channelStats[channel].revenue += Number(order.total);
+      channelStats[channel].revenue += this.toNumber(order.total);
       
       for (const item of order.items) {
-        channelStats[channel].cost += await this.calculateItemEstimatedCost(tenantId, item as any);
+        channelStats[channel].cost += this.estimateOrderItemCost(
+          {
+            productId: item.productId,
+            quantity: item.quantity,
+            complements: item.complements.map((comp) => ({ complementItemId: comp.complementItemId })),
+          },
+          cache,
+        );
       }
     }
 
@@ -472,37 +594,4 @@ export class AnalyticsService {
       }));
   }
 
-  private async calculateItemEstimatedCost(
-    tenantId: string,
-    item: Prisma.OrderItemGetPayload<{ include: { complements: true } }>,
-  ): Promise<number> {
-    // Logic to calculate cost from recipe ingredients
-    // This is an estimation based on current ingredient costs
-    let unitCost = 0;
-    
-    if (item.productId) {
-      const recipe = await this.prisma.tenantClient.productRecipeIngredient.findMany({
-        where: { productId: item.productId },
-        include: { ingredient: true },
-      });
-      unitCost += recipe.reduce(
-        (acc, r) => acc + Number(r.quantity) * Number(r.ingredient.currentCost),
-        0,
-      );
-    }
-
-    // Add complements cost
-    for (const comp of item.complements) {
-      const compRecipe = await this.prisma.tenantClient.complementRecipeIngredient.findMany({
-        where: { complementItemId: comp.complementItemId },
-        include: { ingredient: true },
-      });
-      unitCost += compRecipe.reduce(
-        (acc, r) => acc + Number(r.quantity) * Number(r.ingredient.currentCost),
-        0,
-      );
-    }
-
-    return unitCost * item.quantity;
-  }
 }
