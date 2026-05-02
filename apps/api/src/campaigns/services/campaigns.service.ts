@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { CampaignStatus, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 export interface CreateCampaignDto {
   name: string;

@@ -90,6 +90,15 @@ export class MetaCloudProvider implements IWhatsAppProvider {
     return null;
   }
 
+  async generatePairingCode(
+    _apiUrl: string,
+    _apiKey: string,
+    _instanceId: string,
+    _phone?: string,
+  ): Promise<{ pairingCode: string }> {
+    throw new Error('Pairing code não é suportado no provider Meta Cloud.');
+  }
+
   async sendText(
     apiUrl: string,
     apiKey: string,
@@ -256,7 +265,6 @@ export class MetaCloudProvider implements IWhatsAppProvider {
     // Mensagens recebidas
     if (value.messages?.[0]) {
       const msg = value.messages[0];
-      const contact = value.contacts?.[0];
       
       let content = '';
       if (msg.type === 'text') content = msg.text?.body;
@@ -293,4 +301,3 @@ export class MetaCloudProvider implements IWhatsAppProvider {
     return null;
   }
 }
-

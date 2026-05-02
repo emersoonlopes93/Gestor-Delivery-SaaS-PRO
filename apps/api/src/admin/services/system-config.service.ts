@@ -1,6 +1,5 @@
 import { Injectable, OnModuleInit, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { WhatsAppProviderType, AiProviderType } from '@prisma/client';
 
 @Injectable()
 export class SystemConfigService implements OnModuleInit {
@@ -27,7 +26,7 @@ export class SystemConfigService implements OnModuleInit {
 
   async updateConfig(data: any) {
     // Removemos campos que não devem ser atualizados manualmente
-    const { id, updatedAt, createdAt, ...updateData } = data;
+    const { id: _id, updatedAt: _updatedAt, createdAt: _createdAt, ...updateData } = data;
 
     try {
       return await this.prisma.systemConfig.upsert({

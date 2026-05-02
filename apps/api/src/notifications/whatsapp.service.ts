@@ -47,7 +47,7 @@ export class WhatsappService {
   async sendTemplateMessage(
     to: string,
     templateName: string,
-    language = 'pt_BR',
+    _language = 'pt_BR',
     parameters: string[] = [],
     tenantId?: string,
   ): Promise<boolean> {

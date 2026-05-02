@@ -5,7 +5,6 @@ import {
   Body,
   UseGuards,
   Request,
-  Delete,
   HttpCode,
 } from '@nestjs/common';
 import { WhatsAppInstanceService, CreateInstanceDto } from '../services/whatsapp-instance.service';

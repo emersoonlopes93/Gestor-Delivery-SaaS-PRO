@@ -1,6 +1,5 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { AiProviderType } from '@prisma/client';
 
 export interface UpdateAiAgentConfigDto {
   isEnabled?: boolean;

@@ -25,7 +25,7 @@ export class AiOrchestratorService {
    * Ponto de entrada principal para mensagens inbound do WhatsApp.
    * Deve ser chamado pelo event listener do webhook.
    */
-  async handleInboundMessage(tenantId: string, customerPhone: string, content: string) {
+  async handleInboundMessage(tenantId: string, customerPhone: string, _content: string) {
     try {
       const config = await this.configService.getConfig(tenantId);
       if (!config.isEnabled) {

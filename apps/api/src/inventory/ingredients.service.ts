@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { CreateIngredientDTO, UpdateIngredientDTO, IngredientDTO, UnitType } from '@gestor/types';
-import type { Ingredient } from '@prisma/client';
+import { UpdateIngredientDTO, IngredientDTO, UnitType } from '@gestor/types';
 import { UnitType as PrismaUnitType } from '@prisma/client';
 
 @Injectable()
@@ -148,7 +147,7 @@ export class IngredientsService {
       }
     }
 
-    const { initialPurchase, ...updateData } = dto;
+    const { ...updateData } = dto;
 
     const updated = await this.prisma.ingredient.update({
       where: { id },

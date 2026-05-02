@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, Paperclip, Smile, User, Clock, CheckCircle, Check } from 'lucide-react';
+import { MessageSquare, Send, Paperclip, Smile, Clock, CheckCircle, Check } from 'lucide-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api-client';
 import type { ChatMessage, ChatSession } from '@gestor/types';
@@ -49,8 +49,14 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       const res = await api.post(`/chat/sessions/${session.id}/handoff`, { reason });
       return res.data;
     },
-    onSuccess: (data) => {
-      onSessionUpdate({ ...session, handoffActive: true, handoffReason: reason, handoffAt: new Date().toISOString() });
+    onSuccess: (_data, reason) => {
+      if (!session) return;
+      onSessionUpdate({
+        ...session,
+        handoffActive: true,
+        handoffReason: reason,
+        handoffAt: new Date().toISOString(),
+      });
     },
   });
 
@@ -151,7 +157,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
           </button>
           <div>
             <h3 className="font-semibold text-gray-900 dark:text-white">
-              {session.name || `Cliente ${session.customerPhone}`}
+              {`Cliente ${session.customerPhone}`}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {session.handoffActive ? 'Atendimento Humano' : 'Bot Ativo'}
@@ -160,7 +166,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => handoffMutation.mutate()}
+            onClick={() => handoffMutation.mutate(undefined)}
             disabled={handoffMutation.isPending || session.handoffActive}
             className="px-3 py-1.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 text-sm font-medium rounded-lg hover:bg-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >

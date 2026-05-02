@@ -7,8 +7,6 @@ import {
   HttpCode,
   UseGuards,
   Request,
-  NotFoundException,
-  BadRequestException,
 } from '@nestjs/common';
 import { ConversationService, CreateMessageDto } from '../../ai-agent/services/conversation.service';
 import { PrismaService } from '../../database/prisma.service';

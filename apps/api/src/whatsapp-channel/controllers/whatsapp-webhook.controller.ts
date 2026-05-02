@@ -40,7 +40,7 @@ export class WhatsAppWebhookController {
   async handleWebhook(
     @Param('tenantId') tenantId: string,
     @Body() body: any,
-    @Headers('x-webhook-secret') webhookSecret?: string,
+    @Headers('x-webhook-secret') _webhookSecret?: string,
   ) {
     this.logger.log(`Webhook received for tenant ${tenantId}`);
 

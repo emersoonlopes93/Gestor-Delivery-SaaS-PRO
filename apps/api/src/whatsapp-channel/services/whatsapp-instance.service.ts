@@ -2,8 +2,6 @@ import { Injectable, Logger, NotFoundException, InternalServerErrorException, Ba
 import { IsString, IsOptional } from 'class-validator';
 import { PrismaService } from '../../database/prisma.service';
 import { WhatsAppInstanceStatus, WhatsAppProviderType } from '@prisma/client';
-import { EvolutionGoProvider } from '../providers/evolution-go.provider';
-import { MetaCloudProvider } from '../providers/meta-cloud.provider';
 import { WhatsAppProviderRegistryService } from './whatsapp-provider-registry.service';
 import type { IWhatsAppProvider } from '../interfaces/whatsapp-provider.interface';
 

@@ -165,7 +165,7 @@ export class AgentToolsService {
     return result;
   }
 
-  private async executeConsultarTaxaEntrega(tenantId: string, args: any) {
+  private async executeConsultarTaxaEntrega(tenantId: string, _args: any) {
     // Usamos um valor fixo de simulação no MVP se não conseguirmos geocodificar o endereço.
     // Em produção, isso bateria no Google Maps via GeocodingService.
     const mockCoordinates = { lat: -23.55052, lng: -46.633308 }; // São Paulo centro
@@ -188,7 +188,7 @@ export class AgentToolsService {
           ? `Entrega disponível. Taxa: R$ ${decision.fee}` 
           : 'Infelizmente não entregamos neste endereço.',
       };
-    } catch (error) {
+    } catch (_error) {
       return { disponivel: false, mensagem: 'Erro ao calcular taxa. Peça mais detalhes do endereço.' };
     }
   }

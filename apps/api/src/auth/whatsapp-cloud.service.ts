@@ -2,16 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { WhatsAppSenderService } from '../whatsapp-channel/services/whatsapp-sender.service';
 import { PrismaService } from '../database/prisma.service';
 
-interface WhatsAppCloudErrorResponse {
-  error?: {
-    message?: string;
-    type?: string;
-    code?: number;
-    error_subcode?: number;
-    fbtrace_id?: string;
-  };
-}
-
 @Injectable()
 export class WhatsAppCloudService {
   private readonly logger = new Logger('WhatsAppCloudService');

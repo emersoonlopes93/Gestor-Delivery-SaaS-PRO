@@ -10,6 +10,14 @@ interface CreateCampaignModalProps {
   onSuccess: () => void;
 }
 
+interface CampaignAudienceCustomer {
+  id: string;
+  orderCount: number;
+  totalSpent: number;
+  lastOrderAt?: string | null;
+  lastOrderDate?: string | null;
+}
+
 export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampaignModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<CreateCampaignDto>({
@@ -23,7 +31,7 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
   const { data: customers = [] } = useQuery({
     queryKey: ['customers'],
     queryFn: async () => {
-      const res = await api.get('/customers');
+      const res = await api.get<CampaignAudienceCustomer[]>('/customers');
       return res.success ? res.data : [];
     },
     enabled: isOpen,
@@ -73,24 +81,31 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
 
   const estimateAudience = () => {
     // Lógica para estimar audiência baseada nas regras
-    let filtered = customers;
+    let filtered: CampaignAudienceCustomer[] = customers;
     
-    if (formData.segmentRules.minOrders) {
-      filtered = filtered.filter(c => c.orderCount >= formData.segmentRules.minOrders);
+    const minOrders = formData.segmentRules.minOrders;
+    if (minOrders !== undefined) {
+      filtered = filtered.filter((c) => c.orderCount >= minOrders);
     }
-    if (formData.segmentRules.maxOrders) {
-      filtered = filtered.filter(c => c.orderCount <= formData.segmentRules.maxOrders);
+    const maxOrders = formData.segmentRules.maxOrders;
+    if (maxOrders !== undefined) {
+      filtered = filtered.filter((c) => c.orderCount <= maxOrders);
     }
-    if (formData.segmentRules.minSpent) {
-      filtered = filtered.filter(c => c.totalSpent >= formData.segmentRules.minSpent);
+    const minSpent = formData.segmentRules.minSpent;
+    if (minSpent !== undefined) {
+      filtered = filtered.filter((c) => c.totalSpent >= minSpent);
     }
-    if (formData.segmentRules.daysSinceLastOrder) {
+    const daysSinceLastOrder = formData.segmentRules.daysSinceLastOrder;
+    if (daysSinceLastOrder !== undefined) {
       const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - formData.segmentRules.daysSinceLastOrder);
-      filtered = filtered.filter(c => new Date(c.lastOrderAt) >= cutoffDate);
+      cutoffDate.setDate(cutoffDate.getDate() - daysSinceLastOrder);
+      filtered = filtered.filter((c) => {
+        const lastOrder = c.lastOrderAt ?? c.lastOrderDate;
+        return lastOrder ? new Date(lastOrder) >= cutoffDate : false;
+      });
     }
     if (formData.segmentRules.specificCustomers?.length) {
-      filtered = filtered.filter(c => formData.segmentRules.specificCustomers?.includes(c.id));
+      filtered = filtered.filter((c) => formData.segmentRules.specificCustomers?.includes(c.id));
     }
     
     return Math.min(filtered.length, formData.maxDispatches || Infinity);

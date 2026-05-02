@@ -34,7 +34,7 @@ export class AiProviderRegistryService {
    */
   async resolveProvider(tenantId: string): Promise<IAiProvider> {
     // 1. Verificar se o tenant tem um override específico na config de agente
-    const agentConfig = await this.prisma.aiAgentConfig.findUnique({
+    await this.prisma.aiAgentConfig.findUnique({
       where: { tenantId },
       select: { tenantId: true } // temporário até adicionar campo aiProvider no modelo
     });
