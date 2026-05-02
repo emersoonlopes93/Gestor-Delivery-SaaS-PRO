@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  NotImplementedException,
 } from '@nestjs/common';
 import { RequirePermissions } from '../common/decorators';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
@@ -54,10 +55,8 @@ export class SplitPaymentController {
   @Post('splits/custom')
   @RequirePermissions('orders.create')
   @HttpCode(HttpStatus.CREATED)
-  async customSplit(@Body() _data: CustomSplitDTO) {
-    // Implementar lógica de divisão customizada
-    // Por enquanto, usar createOrderSplit manualmente
-    throw new Error('Use /splits endpoint for manual creation');
+  async customSplit() {
+    throw new NotImplementedException('Use /splits endpoint for manual creation');
   }
 
   @Get('splits')
@@ -88,12 +87,8 @@ export class SplitPaymentController {
 
   @Put('splits/:id')
   @RequirePermissions('orders.update')
-  async updateOrderSplit(
-    @Param('id') _id: string,
-    @Body() _data: UpdateOrderSplitDTO,
-  ) {
-    // Implementar atualização de split
-    throw new Error('Not implemented yet');
+  async updateOrderSplit() {
+    throw new NotImplementedException('Not implemented yet');
   }
 
   @Post('splits/:id/cancel')

@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, NotFoundException } from '@nestjs/common';
 import { PrismaService } from './database/prisma.service';
 import { Public } from './common/decorators';
 import * as bcrypt from 'bcryptjs';
@@ -7,9 +7,17 @@ import * as bcrypt from 'bcryptjs';
 export class DebugPrismaController {
   constructor(private readonly prisma: PrismaService) {}
 
+  private ensureDebugEnabled() {
+    if (process.env.NODE_ENV === 'production') {
+      throw new NotFoundException();
+    }
+  }
+
   @Public()
   @Get('users')
   async getUsers(@Query('email') email: string) {
+    this.ensureDebugEnabled();
+
     const directUser = await this.prisma.tenantUser.findFirst({
       where: email ? { email } : {},
       include: { tenant: true }
@@ -30,6 +38,8 @@ export class DebugPrismaController {
   @Public()
   @Get('test-hash')
   async testHash(@Query('email') email: string, @Query('pass') pass: string) {
+    this.ensureDebugEnabled();
+
     const user = await this.prisma.tenantUser.findFirst({
       where: { email },
     });

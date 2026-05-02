@@ -5,6 +5,7 @@ import {
   Body, 
   Param, 
   Headers, 
+  BadRequestException,
   HttpStatus, 
   HttpCode,
   UseGuards 
@@ -64,12 +65,13 @@ export class PaymentGatewayController {
   @HttpCode(HttpStatus.OK)
   async handleMercadoPagoWebhook(
     @Body() payload: WebhookDto,
-    @Headers('x-signature') _signature: string,
+    @Headers('x-signature') signature: string | undefined,
+    @Headers('x-webhook-secret') webhookSecret: string | undefined,
   ) {
-    // TODO: Implementar verificação de assinatura do webhook
-    // Por enquanto, processamos diretamente
-    
-    await this.paymentGatewayService.processWebhook(payload);
+    await this.paymentGatewayService.processWebhook(payload, {
+      signature,
+      webhookSecret,
+    });
     
     return { status: 'ok' };
   }
@@ -82,7 +84,7 @@ export class PaymentGatewayController {
       return status;
     } catch {
       // Não expor detalhes do erro em endpoint público
-      throw new Error('Invalid transaction');
+      throw new BadRequestException('Invalid transaction');
     }
   }
 }

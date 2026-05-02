@@ -10,6 +10,8 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  BadRequestException,
+  NotImplementedException,
 } from '@nestjs/common';
 import { RequirePermissions } from '../common/decorators';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
@@ -49,7 +51,7 @@ export class SchedulingController {
   @RequirePermissions('scheduling.view')
   async getAvailableTimeSlots(@Query('date') date: string) {
     if (!date) {
-      throw new Error('Date parameter is required');
+      throw new BadRequestException('Date parameter is required');
     }
     return this.schedulingService.getAvailableTimeSlots(new Date(date));
   }
@@ -57,28 +59,21 @@ export class SchedulingController {
   @Post('time-slots')
   @RequirePermissions('scheduling.manage')
   @HttpCode(HttpStatus.CREATED)
-  async createTimeSlot(@Body() _data: CreateTimeSlotDTO) {
-    // Implementar criação individual de time slot
-    // Por enquanto, usar generateTimeSlots para criação em massa
-    throw new Error('Use /time-slots/generate for bulk creation');
+  async createTimeSlot() {
+    throw new NotImplementedException('Use /time-slots/generate for bulk creation');
   }
 
   @Put('time-slots/:id')
   @RequirePermissions('scheduling.manage')
-  async updateTimeSlot(
-    @Param('id') _id: string,
-    @Body() _data: UpdateTimeSlotDTO,
-  ) {
-    // Implementar atualização de time slot
-    throw new Error('Not implemented yet');
+  async updateTimeSlot() {
+    throw new NotImplementedException('Not implemented yet');
   }
 
   @Delete('time-slots/:id')
   @RequirePermissions('scheduling.manage')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteTimeSlot(@Param('id') _id: string) {
-    // Implementar exclusão de time slot
-    throw new Error('Not implemented yet');
+  async deleteTimeSlot() {
+    throw new NotImplementedException('Not implemented yet');
   }
 
   @Post('scheduled-orders')
@@ -112,19 +107,14 @@ export class SchedulingController {
 
   @Get('scheduled-orders/:id')
   @RequirePermissions('scheduling.view')
-  async getScheduledOrder(@Param('id') _id: string) {
-    // Implementar busca individual de scheduled order
-    throw new Error('Not implemented yet');
+  async getScheduledOrder() {
+    throw new NotImplementedException('Not implemented yet');
   }
 
   @Put('scheduled-orders/:id')
   @RequirePermissions('scheduling.update')
-  async updateScheduledOrder(
-    @Param('id') _id: string,
-    @Body() _data: UpdateScheduledOrderDTO,
-  ) {
-    // Implementar atualização de scheduled order
-    throw new Error('Not implemented yet');
+  async updateScheduledOrder() {
+    throw new NotImplementedException('Not implemented yet');
   }
 
   @Post('scheduled-orders/:id/confirm')

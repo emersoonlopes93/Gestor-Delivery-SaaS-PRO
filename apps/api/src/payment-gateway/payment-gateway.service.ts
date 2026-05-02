@@ -4,6 +4,7 @@ import { TenantContextService } from '../common/context/tenant-context.service';
 import { PaymentTxStatus, PaymentMethod, OrderStatus } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { WebhookDto } from './dto/create-pix-payment.dto';
+import { createHmac, timingSafeEqual } from 'crypto';
 
 interface MercadoPagoConfig {
   accessToken: string;
@@ -61,6 +62,10 @@ interface MercadoPagoPixResponse {
   };
 }
 
+interface WebhookHeadersInput {
+  signature?: string;
+  webhookSecret?: string;
+}
 
 
 @Injectable()
@@ -334,13 +339,15 @@ export class PaymentGatewayService {
     }
   }
 
-  async processWebhook(payload: WebhookDto): Promise<void> {
+  async processWebhook(
+    payload: WebhookDto,
+    headers?: WebhookHeadersInput,
+  ): Promise<void> {
     if (payload.type !== 'payment') {
       this.logger.log(`Ignoring webhook type: ${payload.type}`);
       return;
     }
 
-    // Buscar transação pelo gateway_id para identificar o tenant
     const transaction = await this.prisma.paymentTransaction.findFirst({
       where: { gatewayTxId: payload.data.id.toString() },
     });
@@ -350,15 +357,24 @@ export class PaymentGatewayService {
       return;
     }
 
+    const signatureValid = await this.validateWebhookSignature(
+      payload,
+      transaction.tenantId,
+      headers,
+    );
+    if (!signatureValid) {
+      this.logger.warn(
+        `Invalid webhook signature for tenant ${transaction.tenantId} payment ${payload.data.id}`,
+      );
+      throw new BadRequestException('Invalid webhook signature');
+    }
+
     const config = await this.getMercadoPagoConfig(transaction.tenantId);
-    
-    // Validar assinatura se houver secret configurado no tenant (recomendado)
-    // No Mercado Pago, isso envolveria comparar o checksum do header X-Signature
+
     if (transaction.tenantId) {
       this.logger.log(`Processing secured payment update for tenant ${transaction.tenantId}`);
     }
-    
-    // Buscar informações do pagamento no Mercado Pago
+
     try {
       const response = await fetch(`https://api.mercadopago.com/v1/payments/${payload.data.id}`, {
         headers: {
@@ -376,6 +392,64 @@ export class PaymentGatewayService {
     } catch (error) {
       this.logger.error(`Error processing webhook: ${(error as any).message}`);
     }
+  }
+
+  private async validateWebhookSignature(
+    payload: WebhookDto,
+    tenantId: string,
+    headers?: WebhookHeadersInput,
+  ): Promise<boolean> {
+    const configuredSecret = await this.getWebhookSecret(tenantId);
+    if (!configuredSecret) {
+      this.logger.warn(`Webhook secret is not configured for tenant ${tenantId}`);
+      return false;
+    }
+
+    if (headers?.webhookSecret && headers.webhookSecret === configuredSecret) {
+      return true;
+    }
+
+    const signature = headers?.signature?.trim();
+    if (!signature) {
+      return false;
+    }
+
+    if (signature === configuredSecret) {
+      return true;
+    }
+
+    const expectedHex = createHmac('sha256', configuredSecret)
+      .update(JSON.stringify(payload))
+      .digest('hex');
+
+    const v1Match = signature.match(/(?:^|,)v1=([a-fA-F0-9]+)/);
+    const providedHex = (v1Match?.[1] ?? signature).trim().toLowerCase();
+
+    if (!/^[a-f0-9]+$/.test(providedHex)) {
+      return false;
+    }
+
+    const providedBuffer = Buffer.from(providedHex, 'hex');
+    const expectedBuffer = Buffer.from(expectedHex, 'hex');
+
+    if (providedBuffer.length !== expectedBuffer.length) {
+      return false;
+    }
+
+    return timingSafeEqual(providedBuffer, expectedBuffer);
+  }
+
+  private async getWebhookSecret(tenantId: string): Promise<string | undefined> {
+    const settings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+      select: { mercadoPagoWebhookSecret: true },
+    });
+
+    const tenantSecret = settings?.mercadoPagoWebhookSecret?.trim();
+    if (tenantSecret) return tenantSecret;
+
+    const globalSecret = this.configService.get<string>('MERCADO_PAGO_WEBHOOK_SECRET')?.trim();
+    return globalSecret || undefined;
   }
 
   private async processPaymentUpdate(payment: any): Promise<void> {
