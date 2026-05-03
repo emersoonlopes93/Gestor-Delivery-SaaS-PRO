@@ -149,7 +149,7 @@ export class GoalsService {
       endDate: new Date(goal.endDate).toISOString(),
     };
 
-    switch (goal.type) {
+    switch (goal.type as any) {
       case GoalType.REVENUE: {
         const metrics = await this.analytics.getCommercialMetrics(tenantId, filter);
         return metrics.totalRevenue;

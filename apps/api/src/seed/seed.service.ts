@@ -27,7 +27,7 @@ export class SeedService {
 
   private async seedTenantPermissions() {
     console.log('Seeding tenant permissions...');
-    const entries = Object.entries(TENANT_PERMISSIONS);
+    const entries = Object.entries(TENANT_PERMISSIONS) as [string, string][];
 
     for (const [slug, description] of entries) {
       const [module, action] = slug.split('.');
@@ -42,7 +42,7 @@ export class SeedService {
 
   private async seedAdminPermissions() {
     console.log('Seeding admin permissions...');
-    const entries = Object.entries(ADMIN_PERMISSIONS);
+    const entries = Object.entries(ADMIN_PERMISSIONS) as [string, string][];
 
     for (const [slug, description] of entries) {
       const parts = slug.split('.');
@@ -60,7 +60,7 @@ export class SeedService {
   private async seedAdminRoles() {
     console.log('Seeding admin roles...');
 
-    const roleEntries = Object.values(AdminDefaultRole);
+    const roleEntries = Object.values(AdminDefaultRole) as string[];
 
     for (const roleSlug of roleEntries) {
       const roleName = roleSlug
@@ -167,7 +167,7 @@ export class SeedService {
     });
 
     // Create tenant roles
-    const roleEntries = Object.values(TenantDefaultRole);
+    const roleEntries = Object.values(TenantDefaultRole) as string[];
     for (const roleSlug of roleEntries) {
       const roleName = roleSlug
         .replace(/_/g, ' ')
