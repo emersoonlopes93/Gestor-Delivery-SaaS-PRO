@@ -1,8 +1,32 @@
-import { IsString, IsEmail, IsOptional } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsNumber } from 'class-validator';
 
 export class CreatePixPaymentDto {
   @IsString()
   orderId!: string;
+
+  @IsEmail()
+  customerEmail!: string;
+
+  @IsString()
+  @IsOptional()
+  customerName?: string;
+}
+
+export class CreateCardPaymentDto {
+  @IsString()
+  orderId!: string;
+
+  @IsString()
+  token!: string;
+
+  @IsString()
+  paymentMethodId!: string;
+
+  @IsString()
+  issuerId!: string;
+
+  @IsNumber()
+  installments!: number;
 
   @IsEmail()
   customerEmail!: string;

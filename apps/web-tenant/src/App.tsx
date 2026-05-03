@@ -28,6 +28,8 @@ import WaiterPage from './features/pos/WaiterPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { TablesPage } from './features/pos/TablesPage';
 import { QrCodesPage } from './features/settings/QrCodesPage';
+import { PrinterSettings } from './features/pos/PrinterSettings';
+import { NotificationSettings } from './features/settings/NotificationSettings';
 
 // CRM & Promotions
 import { CustomersListPage } from './features/crm/CustomersListPage';
@@ -244,6 +246,14 @@ export function App() {
           }
         />
         <Route
+          path="/pos/printers"
+          element={
+            <PermissionGate permission="settings.manage">
+              <PrinterSettings />
+            </PermissionGate>
+          }
+        />
+        <Route
           path="/waiter"
           element={
             <PermissionGate permission="pos.waiter_mode">
@@ -392,6 +402,14 @@ export function App() {
           element={
             <PermissionGate permission="settings.manage">
               <QrCodesPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/settings/notifications"
+          element={
+            <PermissionGate permission="settings.manage">
+              <NotificationSettings />
             </PermissionGate>
           }
         />

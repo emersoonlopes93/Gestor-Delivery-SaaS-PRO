@@ -21,6 +21,7 @@ import { LoginModal } from '../components/LoginModal';
 import { CouponInput } from '../components/CouponInput';
 import { CashbackSelector } from '../components/CashbackSelector';
 import { SchedulingSelector } from '../components/SchedulingSelector';
+import { CardPayment } from '../components/CardPayment';
 
 export function CheckoutPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -270,8 +271,97 @@ export function CheckoutPage() {
     return true;
   }, [customerName, customerPhone, items, fulfillmentType, street, number, neighborhood, city, state, zipCode, lat, lng, payment, total, isScheduled, timeSlotId]);
 
+  const handleCardSubmit = async (formData: any) => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const orderItems: CreateOrderItemDTO[] = items.map(item => {
+        if (item.comboId) {
+          return {
+            lineType: 'combo',
+            comboId: item.comboId,
+            productId: item.comboId,
+            quantity: item.quantity,
+            notes: item.notes,
+            comboSelections: item.selectedComboItems?.map(s => ({
+              blockId: (s as any).blockId,
+              blockItemId: (s as any).blockItemId,
+            })) || [],
+          };
+        }
+        return {
+          lineType: 'product',
+          productId: item.productId,
+          quantity: item.quantity,
+          notes: item.notes,
+          complements: item.selectedOptions?.map(o => ({
+            groupId: o.groupId,
+            itemId: o.itemId,
+          })) || [],
+        };
+      }) as any;
+
+      const payload: CreateOrderDTO = {
+        customerName,
+        customerPhone,
+        customerEmail: formData.payer.email,
+        fulfillmentType,
+        items: orderItems,
+        idempotencyKey,
+        notes,
+        payment: {
+          method: PaymentMethod.credit_card,
+          cardToken: formData.token,
+          paymentMethodId: formData.payment_method_id,
+          issuerId: formData.issuer_id,
+          installments: formData.installments,
+        },
+        couponCode: appliedCoupon || undefined,
+        useCashbackAmount: usedCashback || undefined,
+        deliveryAddress: fulfillmentType === 'delivery' ? {
+          street,
+          number,
+          complement: complement || undefined,
+          neighborhood,
+          city,
+          state,
+          zipCode,
+          reference: reference || undefined,
+          lat,
+          lng,
+        } : undefined,
+        scheduledFor: isScheduled ? scheduledFor : undefined,
+        timeSlotId: isScheduled ? timeSlotId : undefined,
+        returnUrl: window.location.origin + `/${tenantSlug}`,
+        tableId: tableId || undefined,
+      };
+
+      const res = await api.post<OrderResponseDTO>(`/orders/public-checkout/${tenantSlug}`, payload);
+      
+      clearCart();
+      navigate(`/${tenantSlug}/order/${res.data.id}`, { state: { order: res.data } });
+    } catch (err: any) {
+      console.error('Card checkout error:', err);
+      setSubmitError(err.response?.data?.message || 'Erro ao processar pagamento com cartão.');
+      throw err; // Re-throw to the brick so it can show error
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!isFormValid || isSubmitting) return;
+    
+    // Se for cartão, o botão do brick cuida do submit (ou chamamos via ref se necessário)
+    // Mas aqui o usuário clicou no botão "Enviar Pedido" customizado.
+    // Se for cartão, devemos orientar o usuário a usar o botão do Brick ou disparar o submit do brick.
+    if (payment.method === PaymentMethod.credit_card) {
+      setSubmitError('Por favor, preencha os dados do cartão e clique em "Pagar".');
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError(null);
 
@@ -637,6 +727,14 @@ export function CheckoutPage() {
             )}
           </div>
         )}
+
+        {payment.method === PaymentMethod.credit_card && tenantInfo?.mercadoPagoPublicKey && (
+          <CardPayment
+            publicKey={tenantInfo.mercadoPagoPublicKey}
+            amount={total}
+            onSubmit={handleCardSubmit}
+          />
+        )}
       </section>
 
       <section className="mb-8">
@@ -654,19 +752,21 @@ export function CheckoutPage() {
         </div>
       )}
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-gray-100 max-w-lg mx-auto z-20">
-        <button onClick={handleSubmit} disabled={!isFormValid || isSubmitting || isValidating}
-          className="w-full bg-primary-600 hover:bg-primary-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-black py-4 rounded-2xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 uppercase tracking-widest text-sm">
-          {isSubmitting ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Processando...
-            </>
-          ) : (
-            <>Enviar Pedido</>
-          )}
-        </button>
-      </div>
+      {payment.method !== PaymentMethod.credit_card && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-gray-100 max-w-lg mx-auto z-20">
+          <button onClick={handleSubmit} disabled={!isFormValid || isSubmitting || isValidating}
+            className="w-full bg-primary-600 hover:bg-primary-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-black py-4 rounded-2xl transition-all shadow-lg active:scale-95 flex items-center justify-center gap-2 uppercase tracking-widest text-sm">
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Processando...
+              </>
+            ) : (
+              <>Enviar Pedido</>
+            )}
+          </button>
+        </div>
+      )}
 
       <LoginModal 
         isOpen={isLoginOpen} 

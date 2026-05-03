@@ -217,6 +217,104 @@ export class PaymentGatewayService {
     }
   }
 
+  async createCardPayment(
+    orderId: string, 
+    token: string, 
+    paymentMethodId: string, 
+    issuerId: string, 
+    installments: number,
+    customerEmail: string,
+    customerName?: string
+  ): Promise<any> {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) throw new Error('Tenant context not found');
+
+    const order = await this.prisma.tenantClient.order.findUnique({
+      where: { id: orderId },
+    });
+
+    if (!order) throw new NotFoundException('Order not found');
+
+    const paymentTransaction = await this.prisma.tenantClient.paymentTransaction.create({
+      data: {
+        tenantId,
+        orderId,
+        gatewayName: 'mercadopago',
+        gatewayTxId: '',
+        method: PaymentMethod.credit_card,
+        amount: order.total,
+        status: PaymentTxStatus.pending,
+        metadata: { customerEmail, customerName, orderNumber: order.orderNumber } as any,
+      },
+    });
+
+    const config = await this.getMercadoPagoConfig(tenantId);
+    const payload = {
+      transaction_amount: Number(order.total),
+      token,
+      description: `Pedido #${order.orderNumber}`,
+      installments: Number(installments),
+      payment_method_id: paymentMethodId,
+      issuer_id: issuerId,
+      payer: {
+        email: customerEmail,
+        first_name: customerName?.split(' ')[0],
+        last_name: customerName?.split(' ').slice(1).join(' '),
+      },
+      external_reference: paymentTransaction.id,
+    };
+
+    try {
+      const response = await fetch('https://api.mercadopago.com/v1/payments', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${config.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const mpResponse = await response.json();
+
+      if (!response.ok) {
+        this.logger.error(`Mercado Pago API error: ${JSON.stringify(mpResponse)}`);
+        throw new Error(mpResponse.message || 'Failed to process card payment');
+      }
+
+      await this.prisma.tenantClient.paymentTransaction.update({
+        where: { id: paymentTransaction.id },
+        data: {
+          gatewayTxId: mpResponse.id.toString(),
+          status: mpResponse.status === 'approved' ? PaymentTxStatus.confirmed : PaymentTxStatus.pending,
+          metadata: {
+            ...paymentTransaction.metadata as any,
+            mercadoPagoResponse: mpResponse,
+          },
+        },
+      });
+
+      // Se aprovado, atualizar pedido
+      if (mpResponse.status === 'approved') {
+        await this.prisma.order.update({
+          where: { id: orderId },
+          data: { status: OrderStatus.confirmed },
+        });
+      }
+
+      return mpResponse;
+    } catch (error: any) {
+      this.logger.error(`Error processing card payment: ${error.message}`);
+      await this.prisma.tenantClient.paymentTransaction.update({
+        where: { id: paymentTransaction.id },
+        data: {
+          status: PaymentTxStatus.failed,
+          metadata: { ...paymentTransaction.metadata as any, error: error.message },
+        },
+      });
+      throw error;
+    }
+  }
+
   async createPreferencePayment(
     orderId: string, 
     customerEmail: string, 

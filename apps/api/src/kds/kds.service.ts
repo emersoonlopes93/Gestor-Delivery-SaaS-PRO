@@ -45,6 +45,38 @@ export class KdsService {
   }
 
   /**
+   * Busca o próximo job pendente para o spooler, marcando-o como 'printing' atomicamente.
+   */
+  async getNextPrintJobForSpooler(station: string) {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) throw new Error('Tenant context not found');
+
+    return this.prisma.$transaction(async (tx) => {
+      // Usando queryRaw para garantir lock atômico no PostgreSQL (SKIP LOCKED evita espera entre workers)
+      const jobs = await tx.$queryRaw<any[]>`
+        SELECT id FROM print_jobs 
+        WHERE tenant_id = ${tenantId} 
+          AND station = ${station} 
+          AND status = 'pending' 
+        ORDER BY created_at ASC 
+        LIMIT 1 
+        FOR UPDATE SKIP LOCKED
+      `;
+
+      if (!jobs || jobs.length === 0) return null;
+
+      return tx.printJob.update({
+        where: { id: jobs[0].id },
+        data: {
+          status: PrintJobStatus.printing,
+          lastTriedAt: new Date(),
+          tries: { increment: 1 },
+        },
+      });
+    });
+  }
+
+  /**
    * Lista todos os jobs de impressão de uma estação
    */
   async getAllPrintJobs(

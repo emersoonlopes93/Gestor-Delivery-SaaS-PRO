@@ -60,29 +60,48 @@ export class WhatsappService {
    * Envia notificação de status do pedido ao cliente.
    */
   async notifyOrderStatus(
+    tenantId: string,
     customerPhone: string,
     orderNumber: string,
     status: string,
     restaurantName: string,
   ): Promise<boolean> {
-    const statusMessages: Record<string, string> = {
-      confirmed: `✅ Pedido #${orderNumber} confirmado! ${restaurantName} já está preparando seu pedido.`,
-      preparing: `👨‍🍳 Pedido #${orderNumber} está sendo preparado por ${restaurantName}. Já já sai!`,
-      ready: `📦 Pedido #${orderNumber} está pronto! Aguardando retirada/entregador.`,
-      out_for_delivery: `🛵 Pedido #${orderNumber} saiu para entrega! Fique atento.`,
-      completed: `🎉 Pedido #${orderNumber} foi entregue! Bom apetite! Obrigado por pedir no ${restaurantName}.`,
-      cancelled: `❌ Pedido #${orderNumber} foi cancelado. Entre em contato com ${restaurantName} para mais informações.`,
-    };
+    const settings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+      select: { whatsappNotificationsEnabled: true, notificationTemplates: true }
+    });
 
-    const message = statusMessages[status];
+    if (!settings?.whatsappNotificationsEnabled) {
+      this.logger.debug(`Notifications disabled for tenant ${tenantId}`);
+      return false;
+    }
+
+    const templates = (settings.notificationTemplates as Record<string, string>) || {};
+    let message = templates[status];
+
+    if (!message) {
+      // Fallback para mensagens padrão
+      const statusMessages: Record<string, string> = {
+        confirmed: `✅ Pedido #{{orderNumber}} confirmado! {{restaurantName}} já está preparando seu pedido.`,
+        preparing: `👨‍🍳 Pedido #{{orderNumber}} está sendo preparado por {{restaurantName}}. Já já sai!`,
+        ready: `📦 Pedido #{{orderNumber}} está pronto! Aguardando retirada/entregador.`,
+        out_for_delivery: `🛵 Pedido #{{orderNumber}} saiu para entrega! Fique atento.`,
+        completed: `🎉 Pedido #{{orderNumber}} foi entregue! Bom apetite! Obrigado por pedir no {{restaurantName}}.`,
+        cancelled: `❌ Pedido #{{orderNumber}} foi cancelado. Entre em contato com {{restaurantName}} para mais informações.`,
+      };
+      message = statusMessages[status];
+    }
+
     if (!message) {
       this.logger.debug(`No WhatsApp message configured for status: ${status}`);
       return false;
     }
 
-    // Busca o tenantId pelo nome do restaurante se não vier direto (idealmente deveria vir)
-    const tenant = await this.prisma.tenant.findFirst({ where: { name: restaurantName }, select: { id: true } });
+    // Replace variables
+    const finalMessage = message
+      .replace(/{{orderNumber}}/g, orderNumber)
+      .replace(/{{restaurantName}}/g, restaurantName);
 
-    return this.sendTextMessage(customerPhone, message, tenant?.id);
+    return this.sendTextMessage(customerPhone, finalMessage, tenantId);
   }
 }

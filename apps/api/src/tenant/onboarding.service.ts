@@ -19,12 +19,10 @@ export class OnboardingService {
     return onboarding;
   }
 
-  async updateStep(tenantId: string, step: 'basicInfo' | 'catalog' | 'payment' | 'firstOrder', completed: boolean = true) {
+  async updateStep(tenantId: string, step: string, completed: boolean = true) {
     const data: any = {};
-    if (step === 'basicInfo') data.stepBasicInfo = completed;
-    if (step === 'catalog') data.stepCatalog = completed;
-    if (step === 'payment') data.stepPayment = completed;
-    if (step === 'firstOrder') data.stepFirstOrder = completed;
+    const fieldName = `step${step.charAt(0).toUpperCase()}${step.slice(1)}`;
+    data[fieldName] = completed;
 
     const onboarding = await this.prisma.tenantOnboarding.upsert({
       where: { tenantId },
@@ -32,14 +30,17 @@ export class OnboardingService {
       update: data,
     });
 
-    // If all steps completed, mark completion date
-    if (
-      onboarding.stepBasicInfo &&
-      onboarding.stepCatalog &&
-      onboarding.stepPayment &&
-      onboarding.stepFirstOrder &&
-      !onboarding.completedAt
-    ) {
+    // Check if all essential steps are completed
+    const essentialSteps = [
+      onboarding.stepBasicInfo,
+      onboarding.stepOperatingHours,
+      onboarding.stepLogo,
+      onboarding.stepAddress,
+      onboarding.stepCatalog,
+      onboarding.stepMenu,
+    ];
+
+    if (essentialSteps.every(Boolean) && !onboarding.completedAt) {
       return this.prisma.tenantOnboarding.update({
         where: { tenantId },
         data: { completedAt: new Date() },
@@ -50,19 +51,34 @@ export class OnboardingService {
   }
 
   async completeOnboarding(tenantId: string) {
-    const onboarding = await this.prisma.tenantOnboarding.upsert({
+    return this.prisma.tenantOnboarding.upsert({
       where: { tenantId },
       create: { 
         tenantId, 
         stepBasicInfo: true, 
+        stepOperatingHours: true,
+        stepLogo: true,
+        stepAddress: true,
+        stepDelivery: true,
+        stepPayments: true,
+        stepWhatsapp: true,
+        stepMenu: true,
         stepCatalog: true, 
-        stepPayment: true, 
         stepFirstOrder: true, 
         completedAt: new Date() 
       },
-      update: { completedAt: new Date() },
+      update: { 
+        stepBasicInfo: true, 
+        stepOperatingHours: true,
+        stepLogo: true,
+        stepAddress: true,
+        stepDelivery: true,
+        stepPayments: true,
+        stepWhatsapp: true,
+        stepMenu: true,
+        stepCatalog: true,
+        completedAt: new Date() 
+      },
     });
-
-    return onboarding;
   }
 }

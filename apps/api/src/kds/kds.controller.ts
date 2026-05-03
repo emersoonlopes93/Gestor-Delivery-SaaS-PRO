@@ -36,6 +36,13 @@ export class KdsController {
     return this.kdsService.getPendingPrintJobs(query.station || 'GERAL', query.limit);
   }
 
+  @Post('spooler/next')
+  @RequirePermissions('orders.view')
+  @HttpCode(HttpStatus.OK)
+  async getNextPrintJob(@Body() body: { station: string }) {
+    return this.kdsService.getNextPrintJobForSpooler(body.station || 'GERAL');
+  }
+
   @Get('print-jobs')
   @RequirePermissions('orders.view')
   async getAllPrintJobs(@Query() query: GetPrintJobsQueryDTO) {

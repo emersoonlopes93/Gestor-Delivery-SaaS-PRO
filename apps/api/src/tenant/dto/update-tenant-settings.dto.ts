@@ -134,4 +134,10 @@ export class UpdateTenantSettingsDto {
   @IsString()
   @MaxLength(10)
   standardNcm?: string;
+
+  @IsOptional()
+  whatsappNotificationsEnabled?: boolean;
+
+  @IsOptional()
+  notificationTemplates?: any;
 }

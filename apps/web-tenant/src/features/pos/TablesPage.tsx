@@ -53,14 +53,14 @@ export function TablesPage() {
   const { data: tables, isLoading } = useQuery<Table[]>({
     queryKey: ['posSalon'], // Re-use same key as PDV
     queryFn: async () => {
-      const res = await api.get('/pos/salon');
+      const res = await api.get<Table[]>('/pos/salon');
       return res.data;
     }
   });
 
   const createTableMutation = useMutation({
     mutationFn: async (data: { name: string; capacity: number }) => {
-      return api.post('/pos/tables', data);
+      return api.post<Table>('/pos/tables', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posSalon'] });
@@ -71,7 +71,7 @@ export function TablesPage() {
 
   const deleteTableMutation = useMutation({
     mutationFn: async (id: string) => {
-      return api.delete(`/pos/tables/${id}`);
+      return api.post(`/pos/tables/${id}/delete`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posSalon'] });
@@ -79,8 +79,7 @@ export function TablesPage() {
   });
 
   const filteredTables = useMemo(() => {
-    if (!tables) return [];
-    return tables.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    return (tables || []).filter((t: Table) => t.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [tables, searchTerm]);
 
   const downloadQRCode = (tableId: string, tableName: string) => {
@@ -195,7 +194,7 @@ export function TablesPage() {
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-gray-400 italic">Nenhuma mesa encontrada.</td>
                 </tr>
-              ) : filteredTables.map((table) => (
+              ) : filteredTables.map((table: Table) => (
                 <tr key={table.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">

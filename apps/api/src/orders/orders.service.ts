@@ -656,7 +656,7 @@ export class OrdersService {
       const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
       if (order.customerPhone && tenant) {
         this.whatsappService
-          .notifyOrderStatus(order.customerPhone, order.orderNumber, nextStatus, tenant.name)
+          .notifyOrderStatus(tenantId, order.customerPhone, order.orderNumber, nextStatus, tenant.name)
           .catch((err) => this.logger.warn(`WhatsApp notification failed: ${err.message}`));
       }
 

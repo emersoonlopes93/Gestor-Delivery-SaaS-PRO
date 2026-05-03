@@ -33,6 +33,7 @@ import {
   LogOut,
   Globe,
   QrCode,
+  Printer,
   CheckCircle2,
   XCircle,
   PauseCircle,
@@ -117,6 +118,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     items: [
       { id: 'pos', label: 'Ponto de Venda', to: '/pos', icon: ShoppingCart, permission: 'pos.read' },
       { id: 'pos-tables', label: 'Gestão de Mesas', to: '/pos/tables', icon: QrCode, permission: 'pos.read' },
+      { id: 'pos-printers', label: 'Impressoras', to: '/pos/printers', icon: Printer, permission: 'settings.manage' },
       { id: 'cash', label: 'Caixa', to: '/cash', icon: Wallet, permission: 'cash.read' },
     ],
   },
@@ -160,7 +162,10 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
   {
     id: 'system',
     label: 'Sistema',
-    items: [{ id: 'settings', label: 'Configurações', to: '/settings', icon: Settings, permission: 'settings.manage' }],
+    items: [
+      { id: 'settings', label: 'Configurações', to: '/settings', icon: Settings, permission: 'settings.manage' },
+      { id: 'notifications', label: 'Notificações', to: '/settings/notifications', icon: Bell, permission: 'settings.manage' },
+    ],
   },
 ];
 
