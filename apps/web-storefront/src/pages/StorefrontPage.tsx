@@ -4,6 +4,7 @@ import { api } from '../lib/api-client';
 import type { StorefrontPayload, StorefrontProductPayload, StorefrontComboPayload } from '@gestor/types';
 import { useCartStore } from '../store/use-cart-store';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Store, ShoppingBag, Box, AlertCircle } from 'lucide-react';
 import { ProductDetailsModal } from '../components/ProductDetailsModal';
 import { CartDrawer } from '../components/CartDrawer';
@@ -16,7 +17,11 @@ import { Link } from 'react-router-dom';
 
 export function StorefrontPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
+  const [searchParams] = useSearchParams();
+  const tableIdParam = searchParams.get('tableId');
+  
   const setTenantId = useCartStore(s => s.setTenantId);
+  const setTableId = useCartStore(s => s.setTableId);
   const cartSubtotal = useCartStore(s => s.subtotal);
   const cartItemsCount = useCartStore(s => s.items.length);
 
@@ -41,8 +46,11 @@ export function StorefrontPage() {
   useEffect(() => {
     if (data?.tenant.id) {
       setTenantId(data.tenant.id);
+      if (tableIdParam) {
+        setTableId(tableIdParam);
+      }
     }
-  }, [data?.tenant.id, setTenantId]);
+  }, [data?.tenant.id, setTenantId, tableIdParam, setTableId]);
 
   if (isLoading) {
     return (

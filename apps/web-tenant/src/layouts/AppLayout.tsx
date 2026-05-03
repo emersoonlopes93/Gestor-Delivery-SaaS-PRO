@@ -116,6 +116,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     label: 'PDV e Caixa',
     items: [
       { id: 'pos', label: 'Ponto de Venda', to: '/pos', icon: ShoppingCart, permission: 'pos.read' },
+      { id: 'pos-tables', label: 'Gestão de Mesas', to: '/pos/tables', icon: QrCode, permission: 'pos.read' },
       { id: 'cash', label: 'Caixa', to: '/cash', icon: Wallet, permission: 'cash.read' },
     ],
   },
@@ -561,6 +562,7 @@ export function AppLayout() {
                 </a>
                 <button
                   type="button"
+                  onClick={() => navigate('/settings/qr-codes')}
                   className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800/40 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-primary-500/30 transition-all group shadow-sm"
                 >
                   <QrCode className="w-4 h-4 text-primary-500 group-hover:scale-110 transition-transform" />

@@ -180,6 +180,8 @@ export class CreateOrderDTO {
   @Type(() => DeliveryAddressDTO)
   deliveryAddress?: DeliveryAddressDTO;
 
+  @IsString() @IsOptional() tableId?: string;
+
   @IsString() @IsOptional() notes?: string;
   
   @IsString() @IsOptional() couponCode?: string;

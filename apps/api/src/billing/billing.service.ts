@@ -3,6 +3,7 @@ import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
 import { BillingCycle, SubscriptionStatus } from '@prisma/client';
 import type { CreatePlanDto, UpdatePlanDto, CreateSubscriptionDto, UpdateSubscriptionDto } from './dto/create-plan.dto';
+import { AsaasService } from './asaas.service';
 
 @Injectable()
 export class BillingService {
@@ -11,6 +12,7 @@ export class BillingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
+    private readonly asaasService: AsaasService,
   ) {}
 
   // === PLANS ===
@@ -79,8 +81,38 @@ export class BillingService {
       throw new NotFoundException('Plano não encontrado.');
     }
 
+    const tenant = await this.prisma.tenant.findUnique({ 
+      where: { id: dto.tenantId }, 
+      include: { users: { include: { userRoles: true } } } 
+    });
+    if (!tenant) throw new NotFoundException('Tenant não encontrado.');
+
+    const adminUser = tenant.users.find(u => u.userRoles?.some(ur => ur.roleId === 'ADMIN' || ur.roleId === 'OWNER')) || tenant.users[0];
+    const customerEmail = adminUser?.email || `admin@${tenant.slug}.com`;
+    const customerPhone = '11999999999'; // TenantUser não possui campo phone no schema atual
+    const customerName = tenant.name || adminUser?.name || 'Cliente SaaS';
+
+    // Cria customer no Asaas
+    const asaasCustomer = await this.asaasService.createCustomer({
+      name: customerName,
+      email: customerEmail,
+      cpfCnpj: '00000000000', // CPF/CNPJ mockado ou extraído das configs se existir
+      phone: customerPhone,
+    });
+
     const trialEndsAt = new Date();
     trialEndsAt.setDate(trialEndsAt.getDate() + 7); // 7 days trial
+
+    // Tenta criar assinatura no Asaas logo de cara, pra trial (value = 0 na primeira fatura se for trial?
+    // O Asaas permite criar subscription com nextDueDate = trialEndsAt.
+    const asaasSub = await this.asaasService.createSubscription({
+      customer: asaasCustomer.id,
+      billingType: 'PIX', // ou cartão, dependendo da UI
+      value: Number(plan.price),
+      nextDueDate: trialEndsAt.toISOString().split('T')[0],
+      cycle: plan.billingCycle === BillingCycle.yearly ? 'YEARLY' : 'MONTHLY',
+      description: `Assinatura Plano ${plan.name} - Gestor Delivery PRO`,
+    });
 
     const subscription = await this.prisma.tenantSubscription.upsert({
       where: { tenantId: dto.tenantId },
@@ -90,6 +122,8 @@ export class BillingService {
         trialEndsAt,
         currentPeriodStartsAt: new Date(),
         currentPeriodEndsAt: trialEndsAt,
+        asaasCustomerId: asaasCustomer.id,
+        asaasSubscriptionId: asaasSub.id,
       },
       create: {
         tenantId: dto.tenantId,
@@ -98,10 +132,12 @@ export class BillingService {
         trialEndsAt,
         currentPeriodStartsAt: new Date(),
         currentPeriodEndsAt: trialEndsAt,
+        asaasCustomerId: asaasCustomer.id,
+        asaasSubscriptionId: asaasSub.id,
       },
     });
 
-    this.logger.log(`Created trial subscription for tenant ${dto.tenantId}`);
+    this.logger.log(`Created trial subscription for tenant ${dto.tenantId} with Asaas sub: ${asaasSub.id}`);
     return subscription;
   }
 

@@ -26,6 +26,8 @@ import CashPage from './features/cash/CashPage';
 import PosPage from './features/pos/PosPage';
 import WaiterPage from './features/pos/WaiterPage';
 import { SettingsPage } from './features/settings/SettingsPage';
+import { TablesPage } from './features/pos/TablesPage';
+import { QrCodesPage } from './features/settings/QrCodesPage';
 
 // CRM & Promotions
 import { CustomersListPage } from './features/crm/CustomersListPage';
@@ -234,6 +236,14 @@ export function App() {
           }
         />
         <Route
+          path="/pos/tables"
+          element={
+            <PermissionGate permission="pos.read">
+              <TablesPage />
+            </PermissionGate>
+          }
+        />
+        <Route
           path="/waiter"
           element={
             <PermissionGate permission="pos.waiter_mode">
@@ -374,6 +384,14 @@ export function App() {
           element={
             <PermissionGate permission="settings.manage">
               <SettingsPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/settings/qr-codes"
+          element={
+            <PermissionGate permission="settings.manage">
+              <QrCodesPage />
             </PermissionGate>
           }
         />

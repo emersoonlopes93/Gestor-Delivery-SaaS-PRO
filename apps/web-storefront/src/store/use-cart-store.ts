@@ -12,11 +12,13 @@ import type {
 
 interface CartState {
   tenantId: string | null;
+  tableId: string | null;
   items: CartLineItem[];
   subtotal: number;
   
   // Actions
   setTenantId: (id: string) => void;
+  setTableId: (id: string | null) => void;
   addItem: (product: StorefrontProductPayload, quantity: number, options: CartSelectedComplement[], notes?: string, sourceUpsellId?: string) => void;
   addCombo: (combo: StorefrontComboPayload, quantity: number, selectedItems: CartSelectedComboItem[], bundleItems: CartBundleItemSnapshot[], notes?: string) => void;
   removeItem: (cartLineId: string) => void;
@@ -28,14 +30,17 @@ export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       tenantId: null,
+      tableId: null,
       items: [],
       subtotal: 0,
 
       setTenantId: (id) => {
         if (get().tenantId !== id) {
-          set({ tenantId: id, items: [], subtotal: 0 });
+          set({ tenantId: id, tableId: null, items: [], subtotal: 0 });
         }
       },
+
+      setTableId: (id) => set({ tableId: id }),
 
       addItem: (product, quantity, options, notes, sourceUpsellId) => {
         if (!product.isAvailable) return;
@@ -145,7 +150,7 @@ export const useCartStore = create<CartState>()(
     {
       name: 'gestor_cart_temp',
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ items: state.items, subtotal: state.subtotal }),
+      partialize: (state) => ({ items: state.items, subtotal: state.subtotal, tableId: state.tableId }),
     }
   )
 );

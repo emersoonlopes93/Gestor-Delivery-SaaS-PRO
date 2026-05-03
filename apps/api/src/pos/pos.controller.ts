@@ -146,4 +146,23 @@ export class PosController {
     await this.posService.transferTable(req.user.tenantId, body.sourceTableId, body.targetTableId, req.user.id);
     return { success: true };
   }
+
+  @Post('tables')
+  @RequirePermissions('settings.manage')
+  async createTable(
+    @Request() req: TenantRequest,
+    @Body() body: { name: string; capacity: number }
+  ) {
+    return this.posService.createTable(req.user.tenantId, body);
+  }
+
+  @Post('tables/:id/delete')
+  @RequirePermissions('settings.manage')
+  async deleteTable(
+    @Request() req: TenantRequest,
+    @Param('id') id: string
+  ) {
+    await this.posService.deleteTable(req.user.tenantId, id);
+    return { success: true };
+  }
 }

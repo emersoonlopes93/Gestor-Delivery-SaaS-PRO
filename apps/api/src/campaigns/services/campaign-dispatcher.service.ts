@@ -1,25 +1,25 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { WhatsAppSenderService } from '../../whatsapp-channel/services/whatsapp-sender.service';
-import { CampaignDispatchStatus } from '@prisma/client';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { CampaignJobData } from './campaign.processor';
 
 @Injectable()
 export class CampaignDispatcherService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger('CampaignDispatcherService');
-  private isProcessing = false;
   private intervalId?: NodeJS.Timeout;
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly whatsappSender: WhatsAppSenderService,
+    @InjectQueue('campaign-dispatch') private readonly campaignQueue: Queue,
   ) {}
 
   onModuleInit() {
-    this.logger.log('Inicializando dispatcher de campanhas (setInterval)...');
-    // Roda a cada 30 segundos
+    this.logger.log('Inicializando alimentador de fila de campanhas (BullMQ)...');
+    // Roda a cada 1 minuto para carregar novos lotes para a fila
     this.intervalId = setInterval(() => {
-      this.processQueuedDispatches();
-    }, 30000);
+      this.feedQueue();
+    }, 60000);
   }
 
   onModuleDestroy() {
@@ -29,115 +29,82 @@ export class CampaignDispatcherService implements OnModuleInit, OnModuleDestroy 
   }
 
   /**
-   * Método que deve ser chamado via Cron Job (ex: a cada 1 minuto) ou Worker (BullMQ).
-   * Para o MVP, este método varre a tabela de dispatches e envia as mensagens.
+   * Varre campanhas 'running' e move dispatches 'queued' para o BullMQ
    */
-  async processQueuedDispatches() {
-    if (this.isProcessing) return;
-    this.isProcessing = true;
-
+  async feedQueue() {
     try {
-      // 1. Busca campanhas que estão rodando
       const runningCampaigns = await this.prisma.campaign.findMany({
         where: { status: 'running' },
-        select: { id: true, tenantId: true, messageTemplate: true, mediaUrl: true },
+        select: { 
+          id: true, 
+          tenantId: true, 
+          messageTemplate: true, 
+          mediaUrl: true 
+        },
       });
 
-      if (runningCampaigns.length === 0) {
-        this.isProcessing = false;
-        return;
-      }
+      if (runningCampaigns.length === 0) return;
 
       for (const campaign of runningCampaigns) {
-        // Pega um lote de clientes para não estourar o rate limit
-        // O rate limiting ideal seria controlado por Redis (Token Bucket)
-        // Aqui pegamos 10 mensagens por vez por campanha para evitar bloqueio.
-        const batch = await this.prisma.campaignDispatch.findMany({
+        // Pega mensagens pendentes que ainda não foram enviadas para o BullMQ
+        // Usamos status 'queued' e mudamos para 'processing' ao adicionar na fila Bull
+        const dispatches = await this.prisma.campaignDispatch.findMany({
           where: {
             campaignId: campaign.id,
             status: 'queued',
           },
-          take: 10,
-          include: { customer: { select: { name: true } } },
+          take: 50, // Lote maior para alimentar a fila
+          include: { 
+            customer: { select: { name: true } } 
+          },
         });
 
-        if (batch.length === 0) {
-          // Se não tem mais nada na fila, conclui a campanha
-          await this.prisma.campaign.update({
-            where: { id: campaign.id },
-            data: { status: 'completed', completedAt: new Date() },
+        if (dispatches.length === 0) {
+          // Verifica se ainda existem mensagens com status 'queued' ou 'failed' (que poderiam ser re-tentadas se quiséssemos)
+          // Se não tem nada mesmo, conclui
+          const pendingCount = await this.prisma.campaignDispatch.count({
+            where: { campaignId: campaign.id, status: 'queued' }
           });
-          this.logger.log(`Campaign ${campaign.id} completed.`);
+
+          if (pendingCount === 0) {
+            await this.prisma.campaign.update({
+              where: { id: campaign.id },
+              data: { status: 'completed', completedAt: new Date() },
+            });
+            this.logger.log(`Campaign ${campaign.id} marked as completed.`);
+          }
           continue;
         }
 
-        // 3. Dispara as mensagens
-        for (const dispatch of batch) {
-          try {
-            // Personaliza a mensagem (ex: troca {{nome}} pelo nome do cliente)
-            const personalizedMessage = campaign.messageTemplate.replace(
-              /{{nome}}/gi,
-              dispatch.customer.name.split(' ')[0], // Primeiro nome
-            );
+        // Adiciona na fila BullMQ
+        for (const dispatch of dispatches) {
+          const jobData: CampaignJobData = {
+            campaignId: campaign.id,
+            dispatchId: dispatch.id,
+            tenantId: campaign.tenantId,
+            phone: dispatch.phone,
+            customerName: dispatch.customer.name,
+            messageTemplate: campaign.messageTemplate,
+            mediaUrl: campaign.mediaUrl,
+          };
 
-            let result;
+          await this.campaignQueue.add('dispatch-job', jobData, {
+            jobId: `dispatch-${dispatch.id}`, // Idempotência na fila
+          });
 
-            if (campaign.mediaUrl) {
-              // Assume imagem para o MVP, pode ser aprimorado inferindo a extensão
-              result = await this.whatsappSender.sendMedia(campaign.tenantId, {
-                to: dispatch.phone,
-                type: 'image',
-                url: campaign.mediaUrl,
-                caption: personalizedMessage,
-              });
-            } else {
-              result = await this.whatsappSender.sendText(campaign.tenantId, {
-                to: dispatch.phone,
-                text: personalizedMessage,
-              });
-            }
-
-            // Atualiza status do dispatch
-            const status: CampaignDispatchStatus = result.success ? 'sent' : 'failed';
-            
-            await this.prisma.campaignDispatch.update({
-              where: { id: dispatch.id },
-              data: {
-                status,
-                externalId: result.messageId,
-                failReason: result.error,
-                sentAt: result.success ? new Date() : null,
-              },
-            });
-
-            // Incrementa contadores na campanha
-            await this.prisma.campaign.update({
-              where: { id: campaign.id },
-              data: {
-                totalSent: result.success ? { increment: 1 } : undefined,
-              },
-            });
-
-            // Delay de proteção entre mensagens (anti-ban)
-            await this.sleep(2000); 
-
-          } catch (error: any) {
-            this.logger.error(`Failed to send dispatch ${dispatch.id}: ${error.message}`);
-            await this.prisma.campaignDispatch.update({
-              where: { id: dispatch.id },
-              data: { status: 'failed', failReason: error.message },
-            });
-          }
+          // Marcamos como 'processing' para não pegar de novo no próximo feedQueue
+          // Se o worker falhar, ele atualiza para 'failed' ou tenta de novo via BullMQ
+          // 'processing' aqui significa 'entregue ao sistema de filas'
+          await this.prisma.campaignDispatch.update({
+            where: { id: dispatch.id },
+            data: { status: 'processing' }
+          });
         }
+        
+        this.logger.log(`Added ${dispatches.length} jobs to queue for campaign ${campaign.id}`);
       }
     } catch (error: any) {
-      this.logger.error(`Error in processQueuedDispatches: ${error.message}`);
-    } finally {
-      this.isProcessing = false;
+      this.logger.error(`Error in feedQueue: ${error.message}`);
     }
-  }
-
-  private sleep(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }

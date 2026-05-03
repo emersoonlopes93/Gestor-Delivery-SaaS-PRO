@@ -525,6 +525,42 @@ export class PosService {
     return this.getOrderDetail(orderId, tenantId);
   }
 
+  // ----------------------------------------------------------------
+  // TABLE MANAGEMENT
+  // ----------------------------------------------------------------
+  async createTable(tenantId: string, data: { name: string; capacity: number }) {
+    // Check if table with same name exists for this tenant
+    const existing = await this.prisma.dineInTable.findFirst({
+      where: { tenantId, name: data.name },
+    });
+    if (existing) {
+      throw new ConflictException(`Uma mesa com o nome "${data.name}" já existe.`);
+    }
+
+    return this.prisma.dineInTable.create({
+      data: {
+        tenantId,
+        name: data.name,
+        capacity: data.capacity,
+        status: 'free',
+      },
+    });
+  }
+
+  async deleteTable(tenantId: string, id: string) {
+    const table = await this.prisma.dineInTable.findUnique({
+      where: { id, tenantId },
+    });
+    if (!table) throw new BadRequestException('Mesa não encontrada.');
+    if (table.status !== 'free') {
+      throw new BadRequestException('Não é possível excluir uma mesa ocupada.');
+    }
+
+    return this.prisma.dineInTable.delete({
+      where: { id },
+    });
+  }
+
   async getOrderDetail(orderId: string, tenantId: string): Promise<OrderResponseDTO> {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },

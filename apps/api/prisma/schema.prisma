@@ -945,6 +945,8 @@ model Plan {
   billingCycle  BillingCycle         @default(monthly)
   features      Json?
   isActive      Boolean              @default(true)
+  asaasId       String?              @map("asaas_id")
+  mpPreapprovalPlanId String?        @map("mp_preapproval_plan_id")
   createdAt     DateTime             @default(now()) @map("created_at")
   updatedAt     DateTime             @updatedAt @map("updated_at")
   subscriptions TenantSubscription[]
@@ -959,6 +961,10 @@ model TenantSubscription {
   currentPeriodStartsAt DateTime           @map("current_period_starts_at")
   currentPeriodEndsAt   DateTime           @map("current_period_ends_at")
   canceledAt            DateTime?          @map("canceled_at")
+  asaasCustomerId       String?            @map("asaas_customer_id")
+  asaasSubscriptionId   String?            @map("asaas_subscription_id")
+  mpCustomerId          String?            @map("mp_customer_id")
+  mpPreapprovalId       String?            @map("mp_preapproval_id")
   createdAt             DateTime           @default(now()) @map("created_at")
   updatedAt             DateTime           @updatedAt @map("updated_at")
   plan                  Plan               @relation(fields: [planId], references: [id], onDelete: Cascade)
@@ -1929,6 +1935,7 @@ enum CampaignStatus {
 
 enum CampaignDispatchStatus {
   queued
+  processing
   sent
   delivered
   read

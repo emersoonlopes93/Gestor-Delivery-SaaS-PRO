@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import axios from 'axios';
 import { OrdersService } from '../../orders/orders.service';
 import { DeliveryRateService } from '../../delivery/delivery-rate.service';
 import { AiToolDefinition } from '../interfaces/ai-provider.interface';
@@ -165,18 +166,49 @@ export class AgentToolsService {
     return result;
   }
 
-  private async executeConsultarTaxaEntrega(tenantId: string, _args: any) {
-    // Usamos um valor fixo de simulação no MVP se não conseguirmos geocodificar o endereço.
-    // Em produção, isso bateria no Google Maps via GeocodingService.
-    const mockCoordinates = { lat: -23.55052, lng: -46.633308 }; // São Paulo centro
+  private async executeConsultarTaxaEntrega(tenantId: string, args: any) {
+    if (!args.enderecoCompleto) {
+      return { disponivel: false, mensagem: 'Por favor, informe o endereço completo para calcularmos a taxa de entrega.' };
+    }
+
+    let lat: number;
+    let lng: number;
+
+    const apiKey = process.env.GOOGLE_MAPS_KEY || process.env.VITE_GOOGLE_MAPS_KEY;
+    
+    if (apiKey) {
+      try {
+        const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+          params: {
+            address: args.enderecoCompleto,
+            key: apiKey,
+            components: 'country:BR',
+          },
+        });
+
+        if (response.data.status === 'OK' && response.data.results.length > 0) {
+          const location = response.data.results[0].geometry.location;
+          lat = location.lat;
+          lng = location.lng;
+        } else {
+          return { disponivel: false, mensagem: 'Não conseguimos localizar este endereço com precisão. Poderia confirmar o nome da rua e o bairro?' };
+        }
+      } catch (err) {
+        this.logger.error(`Geocoding error: ${(err as any).message}`);
+        return { disponivel: false, mensagem: 'Tivemos um problema temporário ao consultar o endereço. Deseja falar com um atendente?' };
+      }
+    } else {
+      // Fallback fallback: se não tiver chave, pedimos desculpas (evita mock fixo)
+      return { disponivel: false, mensagem: 'O cálculo automático de taxa está indisponível no momento devido a falta de configuração de mapas.' };
+    }
     
     try {
       const decision = await this.deliveryRateService.calculateDeliveryDecision({
         tenantId,
         address: {
           neighborhood: '',
-          lat: mockCoordinates.lat,
-          lng: mockCoordinates.lng,
+          lat,
+          lng,
         }
       });
 

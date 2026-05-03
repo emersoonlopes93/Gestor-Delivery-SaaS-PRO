@@ -27,6 +27,7 @@ export function CheckoutPage() {
   const navigate = useNavigate();
   const items = useCartStore(s => s.items);
   const subtotal = useCartStore(s => s.subtotal);
+  const tableId = useCartStore(s => s.tableId);
   const clearCart = useCartStore(s => s.clearCart);
 
   const { customer, isLoggedIn } = useCustomerStore();
@@ -100,6 +101,13 @@ export function CheckoutPage() {
       setCustomerPhone(prev => prev || customer.phone);
     }
   }, [isLoggedIn, customer]);
+
+  // Set default fulfillment to table if tableId exists
+  useEffect(() => {
+    if (tableId) {
+      setFulfillmentType('table');
+    }
+  }, [tableId]);
 
   // Idempotency key — generated once per checkout session
   const idempotencyKey = useMemo(() => crypto.randomUUID(), []);
@@ -320,6 +328,7 @@ export function CheckoutPage() {
         scheduledFor: isScheduled ? scheduledFor : undefined,
         timeSlotId: isScheduled ? timeSlotId : undefined,
         returnUrl: window.location.origin + `/${tenantSlug}`,
+        tableId: tableId || undefined,
       };
 
       const res = await api.post<OrderResponseDTO>(`/orders/public-checkout/${tenantSlug}`, payload);
@@ -455,21 +464,23 @@ export function CheckoutPage() {
         )}
       </section>
 
-      <section className="mb-6">
-        <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3">Como deseja receber?</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <button onClick={() => setFulfillmentType('delivery')}
-            className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${fulfillmentType === 'delivery' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-500'}`}>
-            <Truck className="w-6 h-6" />
-            <span className="text-xs font-bold uppercase">Entrega</span>
-          </button>
-          <button onClick={() => setFulfillmentType('pickup')}
-            className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${fulfillmentType === 'pickup' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-500'}`}>
-            <Store className="w-6 h-6" />
-            <span className="text-xs font-bold uppercase">Retirada</span>
-          </button>
-        </div>
-      </section>
+      {!tableId && (
+        <section className="mb-6">
+          <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3">Como deseja receber?</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={() => setFulfillmentType('delivery')}
+              className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${fulfillmentType === 'delivery' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-500'}`}>
+              <Truck className="w-6 h-6" />
+              <span className="text-xs font-bold uppercase">Entrega</span>
+            </button>
+            <button onClick={() => setFulfillmentType('pickup')}
+              className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${fulfillmentType === 'pickup' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-500'}`}>
+              <Store className="w-6 h-6" />
+              <span className="text-xs font-bold uppercase">Retirada</span>
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="mb-6">
         <div className="flex items-center justify-between mb-3">

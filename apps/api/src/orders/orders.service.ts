@@ -62,6 +62,16 @@ export class OrdersService {
       if (cust) customerId = cust.id;
     }
 
+    let dineInTable: any = null;
+    if (dto.tableId) {
+      dineInTable = await this.prisma.dineInTable.findUnique({
+        where: { id: dto.tableId, tenantId: tenant.id },
+      });
+      if (!dineInTable) {
+        throw new NotFoundException('Mesa não encontrada.');
+      }
+    }
+
     // 1. Validate everything server-side
     const validation = await this.checkoutValidator.validate(slug, dto.items, {
       customerId,
@@ -133,6 +143,7 @@ export class OrdersService {
             paymentMethod: dto.payment.method as any, 
             changeFor: dto.payment.changeFor || null,
             publicTrackingToken: generatePublicTrackingToken(),
+            tableNumber: dineInTable?.name || null,
           },
         });
 
@@ -222,6 +233,17 @@ export class OrdersService {
             note: 'Pedido recebido via storefront.',
           },
         });
+
+        // Update DineInTable
+        if (dineInTable) {
+          await tx.dineInTable.update({
+            where: { id: dineInTable.id },
+            data: {
+              activeOrderId: newOrder.id,
+              status: 'occupied',
+            },
+          });
+        }
 
         return newOrder;
       },
