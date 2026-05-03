@@ -4,13 +4,12 @@ RUN npm i -g pnpm
 WORKDIR /app
 
 # Stage 2: Dependencies Skeleton
-# Copiamos apenas o necessário para instalar dependências e aproveitar o cache
 FROM base AS dependencies
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 
-# Copiar package.json de todos os pacotes internos e apps para o pnpm resolver o workspace
-COPY apps/api/package.json ./apps/api/
+# Copiar package.json de todos os pacotes e apps para o pnpm resolver o workspace
 COPY packages/ ./packages/
+COPY apps/ ./apps/
 # Limpar arquivos que não são package.json para manter o cache leve
 RUN find packages -type f -not -name "package.json" -delete
 RUN find apps -type f -not -name "package.json" -delete
@@ -20,15 +19,10 @@ RUN pnpm install --frozen-lockfile
 # Stage 3: Build
 FROM dependencies AS build
 WORKDIR /app
-# Copiar o código fonte completo agora
 COPY . .
 
-# 1. Buildar pacotes internos (ordem de dependência respeitada pelo turbo/pnpm)
-RUN pnpm --filter "@gestor/types" build
-RUN pnpm --filter "@gestor/utils" build
-RUN pnpm --filter "@gestor/core" build
-RUN pnpm --filter "@gestor/auth" build
-RUN pnpm --filter "@gestor/config" build
+# 1. Buildar todos os pacotes internos (ordem resolvida pelo pnpm)
+RUN pnpm --filter "@gestor/*" build
 
 # 2. Gerar Prisma Client na API
 RUN pnpm --filter @gestor/api prisma:generate
@@ -51,13 +45,12 @@ COPY --from=build /app/apps/api/docker-entrypoint.sh ./apps/api/docker-entrypoin
 # Copiar os pacotes internos buildados (necessários para o runtime)
 COPY --from=build /app/packages/ ./packages/
 
-# Instalar Prisma CLI global para migrações no entrypoint
+# Instalar Prisma CLI global
 RUN npm i -g prisma
 
 RUN chmod +x ./apps/api/docker-entrypoint.sh
 
 EXPOSE 3333
 
-# Mudar para o diretório da API para execução
 WORKDIR /app/apps/api
 ENTRYPOINT ["./docker-entrypoint.sh"]
