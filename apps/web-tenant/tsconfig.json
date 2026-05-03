@@ -9,12 +9,26 @@
     "emitDecoratorMetadata": true,
     "jsx": "react-jsx",
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": "../../",
     "baseUrl": "./",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@gestor/types": ["../../packages/types/src"],
+      "@gestor/core": ["../../packages/core/src"],
+      "@gestor/utils": ["../../packages/utils/src"],
+      "@gestor/auth": ["../../packages/auth/src"],
+      "@gestor/config": ["../../packages/config/src"],
+      "@gestor/ui": ["../../packages/ui/src"]
     }
   },
-  "include": ["src"],
+  "include": [
+    "src",
+    "../../packages/types/src",
+    "../../packages/core/src",
+    "../../packages/utils/src",
+    "../../packages/auth/src",
+    "../../packages/config/src",
+    "../../packages/ui/src"
+  ],
   "exclude": ["node_modules", "dist"]
 }

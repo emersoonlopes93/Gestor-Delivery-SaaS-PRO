@@ -5,13 +5,16 @@ import path from 'path';
 export default defineConfig({
   plugins: [
     react(),
-    // VitePWA will be re-enabled when the app is fully implemented
-    // with proper icons, manifest and service worker
   ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@gestor/types': path.resolve(__dirname, '../../packages/types/src/index.ts'),
+      '@gestor/core': path.resolve(__dirname, '../../packages/core/src/index.ts'),
+      '@gestor/utils': path.resolve(__dirname, '../../packages/utils/src/index.ts'),
+      '@gestor/auth': path.resolve(__dirname, '../../packages/auth/src/index.ts'),
+      '@gestor/config': path.resolve(__dirname, '../../packages/config/src/index.ts'),
+      '@gestor/ui': path.resolve(__dirname, '../../packages/ui/src/index.ts'),
     },
   },
   server: {

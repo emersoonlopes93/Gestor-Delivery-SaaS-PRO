@@ -21,14 +21,11 @@ FROM dependencies AS build
 WORKDIR /app
 COPY . .
 
-# 1. Buildar todos os pacotes internos (ordem resolvida pelo pnpm)
-RUN pnpm --filter "@gestor/*" build
-
-# 2. Gerar Prisma Client na API
+# 1. Gerar Prisma Client primeiro (necessário para o build da API)
 RUN pnpm --filter @gestor/api prisma:generate
 
-# 3. Buildar a API
-RUN pnpm --filter @gestor/api build
+# 2. Buildar todos os pacotes internos e apps
+RUN pnpm --filter "@gestor/*" build
 
 # Stage 4: Production
 FROM base AS production
