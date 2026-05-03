@@ -1,6 +1,16 @@
 # Stage 1: Base
-FROM node:20-alpine AS base
-RUN npm i -g pnpm
+FROM node:20-slim AS base
+
+# Install required system libraries (e.g., for Prisma)
+RUN apt-get update -y && \
+    apt-get install -y openssl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# Setup pnpm via corepack
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+
 WORKDIR /app
 
 # Stage 2: Dependencies Skeleton

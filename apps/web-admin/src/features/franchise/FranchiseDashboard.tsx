@@ -6,7 +6,6 @@ import {
   Users, 
   ShoppingBag, 
   ArrowUpRight, 
-  ArrowDownRight,
   Filter,
   Calendar
 } from 'lucide-react';

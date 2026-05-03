@@ -16,7 +16,9 @@ async function apiFetch<T>(
     try {
       const parsed = JSON.parse(customerStorage);
       token = parsed.state.accessToken;
-    } catch (e) {}
+    } catch (e) {
+      // Ignore parsing errors for malformed storage
+    }
   }
 
   const headers: HeadersInit = {

@@ -4,11 +4,9 @@ import {
   MessageSquare, 
   Bot, 
   Save, 
-  RefreshCcw, 
+  RefreshCcw,
   AlertCircle,
   CheckCircle2,
-  ChevronRight,
-  ShieldCheck,
   Zap
 } from 'lucide-react';
 
@@ -60,7 +58,7 @@ export default function IntegrationsPage() {
       setError(null);
       setSuccess(false);
 
-      const { id, updatedAt, createdAt, ...updatePayload } = config as any;
+      const { id: _id, updatedAt: _updatedAt, createdAt: _createdAt, ...updatePayload } = config as any;
 
       const response = await fetch('/api/v1/admin/integrations/config', {
         method: 'PATCH',

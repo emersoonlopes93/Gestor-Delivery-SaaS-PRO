@@ -183,7 +183,7 @@ export function AppLayout() {
     localStorage.setItem(SIDEBAR_STORAGE_KEY, JSON.stringify(next));
   }, [collapsed, openGroups]);
 
-  const userPermissions = user?.permissions ?? [];
+  const userPermissions = useMemo(() => user?.permissions ?? [], [user?.permissions]);
   const groups = useMemo(() => {
     const filtered: SidebarGroup[] = [];
     for (const g of SIDEBAR_GROUPS) {

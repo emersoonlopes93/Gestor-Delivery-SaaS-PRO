@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api-client';
-import { CreditCard, TrendingUp, Plus, Edit2, CheckCircle2, XCircle, Trash2, Save, X } from 'lucide-react';
+import { CreditCard, TrendingUp, Plus, Edit2, CheckCircle2, XCircle, Save, X } from 'lucide-react';
 
 interface Plan {
   id: string;

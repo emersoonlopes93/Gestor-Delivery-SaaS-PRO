@@ -45,6 +45,7 @@ jobs:
       SMOKE_TENANT_SLUG: pizzaria-demo
       SMOKE_TENANT_EMAIL: owner@pizzariademo.com
       SMOKE_TENANT_PASSWORD: Owner@123
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout
