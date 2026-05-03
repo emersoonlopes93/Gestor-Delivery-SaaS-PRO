@@ -21,10 +21,17 @@ COPY . .
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
+# Build packages in order (types -> core -> other dependencies)
+RUN pnpm --filter @gestor/types build
+RUN pnpm --filter @gestor/core build
+RUN pnpm --filter @gestor/config build
+RUN pnpm --filter @gestor/auth build
+RUN pnpm --filter @gestor/utils build
+
 # Generate Prisma Client explicitly for the API
 RUN pnpm --filter @gestor/api prisma:generate
 
-# Build the API (this also triggers builds of local workspace packages thanks to turbo dependencies)
+# Build the API
 RUN pnpm --filter @gestor/api build
 
 # Runner stage
