@@ -34,8 +34,11 @@ COPY . .
 # 1. Gerar Prisma Client primeiro (necessário para o build da API)
 RUN pnpm --filter @gestor/api prisma:generate
 
-# 2. Buildar todos os pacotes internos e apps
-RUN pnpm --filter "@gestor/*" build
+# 2. Buildar pacotes internos primeiro
+RUN pnpm --filter "./packages/**" build
+
+# 3. Buildar a API
+RUN pnpm --filter @gestor/api build
 
 # Stage 4: Production
 FROM base AS production

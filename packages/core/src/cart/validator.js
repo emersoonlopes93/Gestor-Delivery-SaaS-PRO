@@ -1,4 +1,7 @@
-export class CartValidator {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CartValidator = void 0;
+class CartValidator {
     /**
      * Validates if a cart line complement configuration is valid for a given product.
      * Throws an error with a user-friendly message if invalid.
@@ -80,4 +83,5 @@ export class CartValidator {
         }
     }
 }
+exports.CartValidator = CartValidator;
 //# sourceMappingURL=validator.js.map

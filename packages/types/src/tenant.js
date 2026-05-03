@@ -1,5 +1,6 @@
+"use strict";
 // ============================================================
 // Tenant Types — Shared between frontend and backend
 // ============================================================
-export {};
+Object.defineProperty(exports, "__esModule", { value: true });
 //# sourceMappingURL=tenant.js.map

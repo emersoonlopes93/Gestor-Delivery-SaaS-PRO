@@ -1,3 +1,4 @@
+"use strict";
 // ============================================================
 // CUSTOMER & CRM DOMAIN TYPES — Phase 8
 // ============================================================
@@ -10,23 +11,26 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { IsString, IsNotEmpty, IsOptional, IsEmail } from 'class-validator';
-export class UpdateCustomerDTO {
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.UpdateCustomerDTO = void 0;
+const class_validator_1 = require("class-validator");
+class UpdateCustomerDTO {
 }
+exports.UpdateCustomerDTO = UpdateCustomerDTO;
 __decorate([
-    IsString(),
-    IsNotEmpty(),
-    IsOptional(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], UpdateCustomerDTO.prototype, "name", void 0);
 __decorate([
-    IsEmail(),
-    IsOptional(),
+    (0, class_validator_1.IsEmail)(),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], UpdateCustomerDTO.prototype, "email", void 0);
 __decorate([
-    IsString(),
-    IsOptional(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], UpdateCustomerDTO.prototype, "notes", void 0);
 //# sourceMappingURL=customer.js.map

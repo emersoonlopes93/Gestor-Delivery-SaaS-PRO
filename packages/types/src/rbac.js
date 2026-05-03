@@ -1,5 +1,6 @@
+"use strict";
 // ============================================================
 // RBAC Types — Shared between frontend and backend
 // ============================================================
-export {};
+Object.defineProperty(exports, "__esModule", { value: true });
 //# sourceMappingURL=rbac.js.map

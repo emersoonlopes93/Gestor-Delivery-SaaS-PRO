@@ -1,4 +1,7 @@
-export var ModuleKey;
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ModuleKey = void 0;
+var ModuleKey;
 (function (ModuleKey) {
     ModuleKey["CATALOG"] = "catalog";
     ModuleKey["ORDERS"] = "orders";
@@ -10,5 +13,5 @@ export var ModuleKey;
     ModuleKey["INVENTORY"] = "inventory";
     ModuleKey["REPORTS"] = "reports";
     ModuleKey["GOALS"] = "goals";
-})(ModuleKey || (ModuleKey = {}));
+})(ModuleKey || (exports.ModuleKey = ModuleKey = {}));
 //# sourceMappingURL=modules.js.map

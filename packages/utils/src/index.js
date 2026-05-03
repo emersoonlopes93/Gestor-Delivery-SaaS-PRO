@@ -1,8 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.slugify = slugify;
+exports.toISOString = toISOString;
+exports.isNullish = isNullish;
+exports.buildPagination = buildPagination;
 /**
  * Generates a slug from a string.
  * Converts to lowercase, replaces spaces/special chars with hyphens.
  */
-export function slugify(text) {
+function slugify(text) {
     return text
         .toLowerCase()
         .normalize('NFD')
@@ -13,7 +19,7 @@ export function slugify(text) {
 /**
  * Formats a date to ISO string safely.
  */
-export function toISOString(date) {
+function toISOString(date) {
     if (typeof date === 'string')
         return new Date(date).toISOString();
     return date.toISOString();
@@ -21,13 +27,13 @@ export function toISOString(date) {
 /**
  * Checks if a value is null or undefined.
  */
-export function isNullish(value) {
+function isNullish(value) {
     return value === null || value === undefined;
 }
 /**
  * Creates a pagination object from count and params.
  */
-export function buildPagination(total, page, pageSize) {
+function buildPagination(total, page, pageSize) {
     const totalPages = Math.ceil(total / pageSize);
     return {
         total,

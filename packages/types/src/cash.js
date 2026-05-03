@@ -1,3 +1,4 @@
+"use strict";
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -7,47 +8,52 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-import { IsNumber, IsOptional, IsString, IsEnum, Min } from 'class-validator';
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CreateCashMovementDTO = exports.CloseCashSessionDTO = exports.OpenCashSessionDTO = void 0;
+const class_validator_1 = require("class-validator");
 // ============================================================
 // CASH SESSION ENUMS
 // ============================================================
-import { CashMovementType } from './enums';
+const enums_1 = require("./enums");
 // ============================================================
 // CASH DTOs — Input
 // ============================================================
-export class OpenCashSessionDTO {
+class OpenCashSessionDTO {
 }
+exports.OpenCashSessionDTO = OpenCashSessionDTO;
 __decorate([
-    IsNumber(),
-    Min(0),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(0),
     __metadata("design:type", Number)
 ], OpenCashSessionDTO.prototype, "openingAmount", void 0);
-export class CloseCashSessionDTO {
+class CloseCashSessionDTO {
 }
+exports.CloseCashSessionDTO = CloseCashSessionDTO;
 __decorate([
-    IsNumber(),
-    Min(0),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(0),
     __metadata("design:type", Number)
 ], CloseCashSessionDTO.prototype, "closingAmountDeclared", void 0);
 __decorate([
-    IsString(),
-    IsOptional(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CloseCashSessionDTO.prototype, "notes", void 0);
-export class CreateCashMovementDTO {
+class CreateCashMovementDTO {
 }
+exports.CreateCashMovementDTO = CreateCashMovementDTO;
 __decorate([
-    IsEnum(CashMovementType),
+    (0, class_validator_1.IsEnum)(enums_1.CashMovementType),
     __metadata("design:type", String)
 ], CreateCashMovementDTO.prototype, "type", void 0);
 __decorate([
-    IsNumber(),
-    Min(0.01),
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(0.01),
     __metadata("design:type", Number)
 ], CreateCashMovementDTO.prototype, "amount", void 0);
 __decorate([
-    IsString(),
-    IsOptional(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreateCashMovementDTO.prototype, "description", void 0);
 //# sourceMappingURL=cash.js.map

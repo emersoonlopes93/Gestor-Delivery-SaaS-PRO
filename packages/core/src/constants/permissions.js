@@ -1,7 +1,10 @@
+"use strict";
 // ============================================================
 // Tenant Permissions — Granular permissions per module/action
 // ============================================================
-export const TENANT_PERMISSIONS = {
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ADMIN_ROLE_PERMISSIONS = exports.TENANT_ROLE_PERMISSIONS = exports.ADMIN_PERMISSIONS = exports.TENANT_PERMISSIONS = void 0;
+exports.TENANT_PERMISSIONS = {
     // Orders module
     'orders.read': 'View orders',
     'orders.create': 'Create orders',
@@ -88,7 +91,7 @@ export const TENANT_PERMISSIONS = {
 // ============================================================
 // Admin Permissions — SaaS Admin granular permissions
 // ============================================================
-export const ADMIN_PERMISSIONS = {
+exports.ADMIN_PERMISSIONS = {
     'saas.tenants.read': 'View tenants',
     'saas.tenants.create': 'Create tenants',
     'saas.tenants.update': 'Update tenants',
@@ -111,9 +114,9 @@ export const ADMIN_PERMISSIONS = {
 // ============================================================
 // Default Role → Permission Mappings
 // ============================================================
-export const TENANT_ROLE_PERMISSIONS = {
-    tenant_owner: Object.keys(TENANT_PERMISSIONS),
-    tenant_admin: Object.keys(TENANT_PERMISSIONS),
+exports.TENANT_ROLE_PERMISSIONS = {
+    tenant_owner: Object.keys(exports.TENANT_PERMISSIONS),
+    tenant_admin: Object.keys(exports.TENANT_PERMISSIONS),
     manager: [
         'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.cancel', 'orders.view_timeline', 'orders.use_kanban', 'orders.use_kds',
         'catalog.read', 'catalog.create', 'catalog.update', 'catalog.publish', 'catalog.manage_products', 'catalog.manage_option_groups', 'catalog.bulk_edit', 'catalog.manage_complements', 'catalog.manage_combos',
@@ -182,8 +185,8 @@ export const TENANT_ROLE_PERMISSIONS = {
         'dashboard.view',
     ],
 };
-export const ADMIN_ROLE_PERMISSIONS = {
-    super_admin: Object.keys(ADMIN_PERMISSIONS),
+exports.ADMIN_ROLE_PERMISSIONS = {
+    super_admin: Object.keys(exports.ADMIN_PERMISSIONS),
     support: [
         'saas.tenants.read',
         'saas.support.access',

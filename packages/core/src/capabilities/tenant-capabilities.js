@@ -1,7 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PRO_CAPABILITIES = exports.DEFAULT_CAPABILITIES = void 0;
 /**
  * Default capabilities for a "Trial" or "Basic" tenant.
  */
-export const DEFAULT_CAPABILITIES = {
+exports.DEFAULT_CAPABILITIES = {
     catalog: {
         maxCategories: 10,
         maxProducts: 50,
@@ -33,7 +36,7 @@ export const DEFAULT_CAPABILITIES = {
 /**
  * Capabilities for a "Pro" / "Active" tenant.
  */
-export const PRO_CAPABILITIES = {
+exports.PRO_CAPABILITIES = {
     catalog: {
         maxCategories: 100,
         maxProducts: 1000,

@@ -1,22 +1,25 @@
+"use strict";
 // ============================================================
 // Tenant Enums
 // ============================================================
-export var TenantStatus;
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AdminDefaultRole = exports.TenantDefaultRole = exports.ActorType = exports.StockMovementType = exports.UnitType = exports.TenantStatus = void 0;
+var TenantStatus;
 (function (TenantStatus) {
     TenantStatus["ACTIVE"] = "active";
     TenantStatus["INACTIVE"] = "inactive";
     TenantStatus["SUSPENDED"] = "suspended";
     TenantStatus["TRIAL"] = "trial";
-})(TenantStatus || (TenantStatus = {}));
-export var UnitType;
+})(TenantStatus || (exports.TenantStatus = TenantStatus = {}));
+var UnitType;
 (function (UnitType) {
     UnitType["UN"] = "un";
     UnitType["G"] = "g";
     UnitType["KG"] = "kg";
     UnitType["ML"] = "ml";
     UnitType["L"] = "l";
-})(UnitType || (UnitType = {}));
-export var StockMovementType;
+})(UnitType || (exports.UnitType = UnitType = {}));
+var StockMovementType;
 (function (StockMovementType) {
     StockMovementType["IN"] = "in";
     StockMovementType["OUT"] = "out";
@@ -25,15 +28,15 @@ export var StockMovementType;
     StockMovementType["THEORETICAL_DEPLETION"] = "theoretical_depletion";
     StockMovementType["PURCHASE_ENTRY"] = "purchase_entry";
     StockMovementType["INVENTORY_ADJUSTMENT"] = "inventory_adjustment";
-})(StockMovementType || (StockMovementType = {}));
-export var ActorType;
+})(StockMovementType || (exports.StockMovementType = StockMovementType = {}));
+var ActorType;
 (function (ActorType) {
     ActorType["SYSTEM"] = "system";
     ActorType["USER"] = "user";
     ActorType["TENANT"] = "tenant";
     ActorType["ADMIN"] = "admin";
-})(ActorType || (ActorType = {}));
-export var TenantDefaultRole;
+})(ActorType || (exports.ActorType = ActorType = {}));
+var TenantDefaultRole;
 (function (TenantDefaultRole) {
     TenantDefaultRole["TENANT_OWNER"] = "tenant_owner";
     TenantDefaultRole["TENANT_ADMIN"] = "tenant_admin";
@@ -46,8 +49,8 @@ export var TenantDefaultRole;
     TenantDefaultRole["FINANCE"] = "finance";
     TenantDefaultRole["MARKETING"] = "marketing";
     TenantDefaultRole["WAITER"] = "waiter";
-})(TenantDefaultRole || (TenantDefaultRole = {}));
-export var AdminDefaultRole;
+})(TenantDefaultRole || (exports.TenantDefaultRole = TenantDefaultRole = {}));
+var AdminDefaultRole;
 (function (AdminDefaultRole) {
     AdminDefaultRole["SUPER_ADMIN"] = "super_admin";
     AdminDefaultRole["SUPPORT"] = "support";
@@ -56,5 +59,5 @@ export var AdminDefaultRole;
     AdminDefaultRole["ONBOARDING"] = "onboarding";
     AdminDefaultRole["OPERATIONS"] = "operations";
     AdminDefaultRole["AUDITOR"] = "auditor";
-})(AdminDefaultRole || (AdminDefaultRole = {}));
+})(AdminDefaultRole || (exports.AdminDefaultRole = AdminDefaultRole = {}));
 //# sourceMappingURL=index.js.map

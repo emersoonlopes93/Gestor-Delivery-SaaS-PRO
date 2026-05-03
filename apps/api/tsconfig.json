@@ -1,36 +1,33 @@
 {
-  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "../../",
     "module": "commonjs",
-    "moduleResolution": "node",
-    "target": "ES2021",
     "declaration": true,
+    "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2021",
     "sourceMap": true,
-    "incremental": false,
-    "composite": false,
+    "outDir": "./dist",
     "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": false,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "forceConsistentCasingInFileNames": false,
+    "noFallthroughCasesInSwitch": false,
+    "moduleResolution": "node",
+    "rootDir": "src",
     "paths": {
       "@/*": ["src/*"],
-      "@gestor/types": ["../../packages/types/src"],
-      "@gestor/core": ["../../packages/core/src"],
-      "@gestor/utils": ["../../packages/utils/src"],
-      "@gestor/auth": ["../../packages/auth/src"],
-      "@gestor/config": ["../../packages/config/src"],
-      "@gestor/ui": ["../../packages/ui/src"]
+      "@gestor/types": ["../../packages/types/dist"],
+      "@gestor/core": ["../../packages/core/dist"],
+      "@gestor/utils": ["../../packages/utils/dist"],
+      "@gestor/auth": ["../../packages/auth/dist"],
+      "@gestor/config": ["../../packages/config/dist"]
     }
   },
-  "include": [
-    "src/**/*",
-    "../../packages/types/src",
-    "../../packages/core/src",
-    "../../packages/utils/src",
-    "../../packages/auth/src",
-    "../../packages/config/src",
-    "../../packages/ui/src"
-  ],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "test"]
 }

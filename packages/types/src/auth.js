@@ -1,5 +1,6 @@
+"use strict";
 // ============================================================
 // Auth Types — Shared between frontend and backend
 // ============================================================
-export {};
+Object.defineProperty(exports, "__esModule", { value: true });
 //# sourceMappingURL=auth.js.map
