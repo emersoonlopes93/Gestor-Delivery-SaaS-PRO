@@ -31,12 +31,19 @@ FROM dependencies AS build
 WORKDIR /app
 COPY . .
 
-# 1. Gerar Prisma Client primeiro (necessário para os tipos no build da API)
+# 1. Buildar dependências internas uma a uma (para visibilidade total no log do CI)
+# A ordem segue o grafo de dependências (@gestor/types é a base)
+RUN pnpm --filter @gestor/types build
+RUN pnpm --filter @gestor/utils build
+RUN pnpm --filter @gestor/config build
+RUN pnpm --filter @gestor/auth build
+RUN pnpm --filter @gestor/core build
+
+# 3. Gerar Prisma Client (necessário para os tipos no build da API)
 RUN pnpm --filter @gestor/api prisma:generate
 
-# 2. Buildar a API e todas as suas dependências internas recursivamente
-# Isso garante a ordem correta e evita buildar pacotes desnecessários (ex: @gestor/ui)
-RUN pnpm --filter @gestor/api... build
+# 4. Buildar a API
+RUN pnpm --filter @gestor/api build
 
 # Stage 4: Production
 FROM base AS production
