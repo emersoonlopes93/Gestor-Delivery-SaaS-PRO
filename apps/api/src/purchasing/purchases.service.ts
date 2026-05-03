@@ -7,8 +7,10 @@ import {
   PaymentStatus, 
   StockMovementType,
   FinancialTransactionType,
-  FinancialStatus
+  FinancialStatus,
+  UnitType
 } from '@gestor/types';
+import type { Prisma } from '@prisma/client';
 
 @Injectable()
 export class PurchasesService {
@@ -143,16 +145,21 @@ export class PurchasesService {
     });
   }
 
-  private mapToDTO(p: any): PurchaseDTO {
+  private mapToDTO(p: Prisma.PurchaseGetPayload<{ include: { supplier: true, items: { include: { ingredient: true } } } }>): PurchaseDTO {
     return {
       ...p,
+      number: p.number ?? undefined,
+      status: p.status as PurchaseStatus,
+      paymentStatus: p.paymentStatus as PaymentStatus,
       totalValue: Number(p.totalValue),
-      items: p.items?.map((item: any) => ({
+      items: p.items?.map((item) => ({
         ...item,
+        expiryDate: item.expiryDate ?? undefined,
         quantity: Number(item.quantity),
         unitCost: Number(item.unitCost),
         totalCost: Number(item.totalCost),
-        ingredientName: item.ingredient?.name
+        ingredientName: item.ingredient?.name,
+        ingredientUnit: item.ingredient?.unit as unknown as UnitType
       }))
     };
   }

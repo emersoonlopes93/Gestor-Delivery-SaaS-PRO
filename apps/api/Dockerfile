@@ -3,23 +3,37 @@ FROM node:20-alpine AS base
 RUN npm i -g pnpm
 WORKDIR /app
 
-# Stage 2: Dependencies
+# Stage 2: Dependencies Skeleton
+# Copiamos apenas o necessário para instalar dependências e aproveitar o cache
 FROM base AS dependencies
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 
-# Copiar todos os package.json para garantir que o pnpm consiga resolver o workspace
-# No modo monorepo, o lockfile depende de todos os pacotes definidos no workspace.yaml
-COPY apps/ ./apps/
+# Copiar package.json de todos os pacotes internos e apps para o pnpm resolver o workspace
+COPY apps/api/package.json ./apps/api/
 COPY packages/ ./packages/
+# Limpar arquivos que não são package.json para manter o cache leve
+RUN find packages -type f -not -name "package.json" -delete
+RUN find apps -type f -not -name "package.json" -delete
 
-# Remove os arquivos de código para manter o cache das dependências limpo
-# Mas mantemos os package.json. (Opcional, mas pnpm install precisa deles)
 RUN pnpm install --frozen-lockfile
 
 # Stage 3: Build
 FROM dependencies AS build
+WORKDIR /app
+# Copiar o código fonte completo agora
 COPY . .
+
+# 1. Buildar pacotes internos (ordem de dependência respeitada pelo turbo/pnpm)
+RUN pnpm --filter "@gestor/types" build
+RUN pnpm --filter "@gestor/utils" build
+RUN pnpm --filter "@gestor/core" build
+RUN pnpm --filter "@gestor/auth" build
+RUN pnpm --filter "@gestor/config" build
+
+# 2. Gerar Prisma Client na API
 RUN pnpm --filter @gestor/api prisma:generate
+
+# 3. Buildar a API
 RUN pnpm --filter @gestor/api build
 
 # Stage 4: Production
@@ -27,18 +41,23 @@ FROM base AS production
 ENV NODE_ENV=production
 WORKDIR /app
 
-COPY --from=build /app/apps/api/dist ./dist
-COPY --from=build /app/apps/api/package.json ./package.json
-COPY --from=build /app/apps/api/prisma ./prisma
-COPY --from=build /app/apps/api/docker-entrypoint.sh ./docker-entrypoint.sh
+# Copiar node_modules e artefatos de build
 COPY --from=dependencies /app/node_modules ./node_modules
-COPY --from=dependencies /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=build /app/apps/api/dist ./apps/api/dist
+COPY --from=build /app/apps/api/package.json ./apps/api/package.json
+COPY --from=build /app/apps/api/prisma ./apps/api/prisma
+COPY --from=build /app/apps/api/docker-entrypoint.sh ./apps/api/docker-entrypoint.sh
 
-# Precisamos do prisma CLI no runtime para o migrate deploy
+# Copiar os pacotes internos buildados (necessários para o runtime)
+COPY --from=build /app/packages/ ./packages/
+
+# Instalar Prisma CLI global para migrações no entrypoint
 RUN npm i -g prisma
 
-RUN chmod +x ./docker-entrypoint.sh
+RUN chmod +x ./apps/api/docker-entrypoint.sh
 
 EXPOSE 3333
 
+# Mudar para o diretório da API para execução
+WORKDIR /app/apps/api
 ENTRYPOINT ["./docker-entrypoint.sh"]

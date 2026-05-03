@@ -4,8 +4,10 @@ import {
   InventoryCountDTO, 
   CreateInventoryCountDTO, 
   InventoryCountStatus, 
-  StockMovementType
+  StockMovementType,
+  UnitType
 } from '@gestor/types';
+import type { Prisma } from '@prisma/client';
 
 @Injectable()
 export class InventoryCountService {
@@ -100,16 +102,19 @@ export class InventoryCountService {
     });
   }
 
-  private mapToDTO(c: any): InventoryCountDTO {
+  private mapToDTO(c: Prisma.InventoryCountGetPayload<{ include: { items: { include: { ingredient: true } } } }>): InventoryCountDTO {
     return {
       ...c,
-      items: c.items?.map((item: any) => ({
+      status: c.status as InventoryCountStatus,
+      note: c.note ?? undefined,
+      closedAt: c.closedAt ?? undefined,
+      items: c.items?.map((item) => ({
         ...item,
         theoreticalStock: Number(item.theoreticalStock),
         physicalStock: Number(item.physicalStock),
         adjustedQuantity: Number(item.adjustedQuantity),
         ingredientName: item.ingredient?.name,
-        ingredientUnit: item.ingredient?.unit as any
+        ingredientUnit: item.ingredient?.unit as unknown as UnitType
       }))
     };
   }

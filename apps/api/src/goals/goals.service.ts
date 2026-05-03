@@ -24,7 +24,7 @@ export class GoalsService {
       tenantId: goal.tenantId,
       name: goal.name,
       description: goal.description ?? undefined,
-      type: goal.type as unknown as GoalType,
+      type: goal.type as GoalType,
       targetValue: Number(goal.targetValue),
       startDate: goal.startDate.toISOString(),
       endDate: goal.endDate.toISOString(),
