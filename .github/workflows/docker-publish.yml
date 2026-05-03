@@ -34,6 +34,23 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
+      # Step de Debug para Auditoria Cirúrgica
+      - name: Debug Environment
+        run: |
+          echo "=== GIT INFO ==="
+          git rev-parse HEAD
+          git branch --show-current
+          echo "=== DOCKERFILE CONTENT ==="
+          cat apps/api/Dockerfile
+          echo "=== DOCKERIGNORE CONTENT ==="
+          cat .dockerignore || echo "No .dockerignore found"
+          echo "=== ROOT LISTING ==="
+          ls -Rla | head -n 100
+          echo "=== PACKAGES LISTING ==="
+          ls -la packages/
+          echo "=== API LISTING ==="
+          ls -la apps/api/
+
       # Build e Push API
       - name: Build and push API
         uses: docker/build-push-action@v5
@@ -41,6 +58,8 @@ jobs:
           context: .
           file: apps/api/Dockerfile
           push: true
+          no-cache: true
+          pull: true
           tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/gestor-api:latest
 
       # Build e Push Web Admin
