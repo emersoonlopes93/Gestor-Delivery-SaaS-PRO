@@ -24,6 +24,12 @@ export type OrderLineType = 'product' | 'combo';
 export class PaymentInput {
   @IsString() @IsNotEmpty() method!: PaymentMethod;
   @IsNumber() @IsOptional() changeFor?: number | null;
+  
+  // Online Payment Fields (Mercado Pago / Stripe)
+  @IsString() @IsOptional() cardToken?: string;
+  @IsString() @IsOptional() paymentMethodId?: string;
+  @IsString() @IsOptional() issuerId?: string;
+  @IsNumber() @IsOptional() installments?: number;
 }
 
 // --- Valid status transitions ---
