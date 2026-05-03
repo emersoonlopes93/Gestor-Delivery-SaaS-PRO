@@ -4,8 +4,9 @@ services:
   # Database
   postgres:
     image: postgres:16-alpine
-    container_name: gestor-db
-    restart: always
+    deploy:
+      restart_policy:
+        condition: on-failure
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
@@ -17,11 +18,10 @@ services:
 
   # Backend API
   api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-    container_name: gestor-api
-    restart: always
+    image: ghcr.io/${GITHUB_USER}/gestor-api:latest
+    deploy:
+      restart_policy:
+        condition: on-failure
     environment:
       DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-gestor_delivery}?schema=public
       JWT_SECRET: ${JWT_SECRET}
@@ -43,14 +43,10 @@ services:
 
   # Admin Frontend
   web-admin:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-      args:
-        APP_NAME: "@gestor/web-admin"
-        VITE_API_URL: ${VITE_API_URL}
-    container_name: gestor-admin
-    restart: always
+    image: ghcr.io/${GITHUB_USER}/gestor-admin:latest
+    deploy:
+      restart_policy:
+        condition: on-failure
     networks:
       - traefik-public
     labels:
@@ -62,14 +58,10 @@ services:
 
   # Tenant Frontend
   web-tenant:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-      args:
-        APP_NAME: "@gestor/web-tenant"
-        VITE_API_URL: ${VITE_API_URL}
-    container_name: gestor-tenant
-    restart: always
+    image: ghcr.io/${GITHUB_USER}/gestor-tenant:latest
+    deploy:
+      restart_policy:
+        condition: on-failure
     networks:
       - traefik-public
     labels:
@@ -81,14 +73,10 @@ services:
 
   # Storefront Frontend
   web-storefront:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-      args:
-        APP_NAME: "@gestor/web-storefront"
-        VITE_API_URL: ${VITE_API_URL}
-    container_name: gestor-storefront
-    restart: always
+    image: ghcr.io/${GITHUB_USER}/gestor-storefront:latest
+    deploy:
+      restart_policy:
+        condition: on-failure
     networks:
       - traefik-public
     labels:
@@ -100,7 +88,7 @@ services:
 
 networks:
   gestor-network:
-    driver: bridge
+    driver: overlay
   traefik-public:
     external: true
 

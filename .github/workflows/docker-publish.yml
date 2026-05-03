@@ -1,0 +1,76 @@
+name: Docker Publish
+
+on:
+  push:
+    branches: ["main", "master"]
+    tags: ["v*.*.*"]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      # Build e Push API
+      - name: Build and push API
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/gestor-api:latest
+
+      # Build e Push Web Admin
+      - name: Build and push Web Admin
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.frontend
+          build-args: |
+            APP_NAME=@gestor/web-admin
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/gestor-admin:latest
+
+      # Build e Push Web Tenant
+      - name: Build and push Web Tenant
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.frontend
+          build-args: |
+            APP_NAME=@gestor/web-tenant
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/gestor-tenant:latest
+
+      # Build e Push Web Storefront
+      - name: Build and push Web Storefront
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.frontend
+          build-args: |
+            APP_NAME=@gestor/web-storefront
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/gestor-storefront:latest
