@@ -15,14 +15,14 @@ WORKDIR /app
 
 # Stage 2: Dependencies Skeleton
 FROM base AS dependencies
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 
-# Copiar package.json de todos os pacotes e apps para o pnpm resolver o workspace
+# Copiar package.json e tsconfig.json de todos os pacotes e apps
 COPY packages/ ./packages/
 COPY apps/ ./apps/
-# Limpar arquivos que não são package.json para manter o cache leve
-RUN find packages -type f -not -name "package.json" -delete
-RUN find apps -type f -not -name "package.json" -delete
+# Preservar tsconfig.json para permitir o correto link do workspace e scripts de build
+RUN find packages -type f -not -name "package.json" -not -name "tsconfig.json" -delete
+RUN find apps -type f -not -name "package.json" -not -name "tsconfig.json" -delete
 
 RUN pnpm install --frozen-lockfile
 
@@ -31,14 +31,12 @@ FROM dependencies AS build
 WORKDIR /app
 COPY . .
 
-# 1. Gerar Prisma Client primeiro (necessário para o build da API)
+# 1. Gerar Prisma Client primeiro (necessário para os tipos no build da API)
 RUN pnpm --filter @gestor/api prisma:generate
 
-# 2. Buildar pacotes internos primeiro
-RUN pnpm --filter "./packages/**" build
-
-# 3. Buildar a API
-RUN pnpm --filter @gestor/api build
+# 2. Buildar a API e todas as suas dependências internas recursivamente
+# Isso garante a ordem correta e evita buildar pacotes desnecessários (ex: @gestor/ui)
+RUN pnpm --filter @gestor/api... build
 
 # Stage 4: Production
 FROM base AS production
