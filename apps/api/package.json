@@ -18,9 +18,10 @@
     "test:delivery-rate-engine": "ts-node scripts/unit-test-delivery-rate-engine.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:studio": "prisma studio",
-    "clean": "rimraf dist"
+    "clean": "pnpm exec rimraf dist"
   },
   "dependencies": {
     "@gestor/auth": "workspace:*",

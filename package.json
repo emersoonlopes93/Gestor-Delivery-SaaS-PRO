@@ -13,7 +13,7 @@
     "build:api": "pnpm --filter @gestor/api build",
     "build:web-tenant": "pnpm --filter @gestor/web-tenant build",
     "build:web-admin": "pnpm --filter @gestor/web-admin build",
-    "lint": "pnpm -r run lint",
+    "lint": "pnpm -r --if-present run lint",
     "clean": "pnpm -r run clean",
     "db:generate": "pnpm --filter @gestor/api prisma:generate",
     "db:migrate": "pnpm --filter @gestor/api prisma:migrate",

@@ -61,11 +61,17 @@ jobs:
       - name: Install
         run: pnpm -w install --frozen-lockfile
 
+      - name: Lint
+        run: pnpm lint
+
+      - name: Generate Prisma Client
+        run: pnpm db:generate
+
       - name: Build
         run: pnpm -w build
 
       - name: Migrate DB
-        run: pnpm --filter @gestor/api prisma:migrate
+        run: pnpm --filter @gestor/api prisma:migrate:deploy
 
       - name: Seed DB
         run: pnpm --filter @gestor/api prisma:seed
