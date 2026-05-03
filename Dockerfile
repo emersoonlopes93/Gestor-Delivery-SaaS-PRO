@@ -13,34 +13,46 @@ RUN corepack enable
 
 WORKDIR /app
 
-# Builder stage
-FROM base AS builder
+# Stage 2: Dependencies Skeleton
+FROM base AS dependencies
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 
-COPY . .
+# Copiar package.json de todos os pacotes e apps para o pnpm resolver o workspace
+COPY packages/ ./packages/
+COPY apps/ ./apps/
+# Limpar arquivos que não são package.json para manter o cache leve
+RUN find packages -type f -not -name "package.json" -delete
+RUN find apps -type f -not -name "package.json" -delete
 
-# Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Build packages in order (types -> core -> other dependencies)
-RUN pnpm --filter @gestor/types build
-RUN pnpm --filter @gestor/core build
-RUN pnpm --filter @gestor/config build
-RUN pnpm --filter @gestor/auth build
-RUN pnpm --filter @gestor/utils build
+# Stage 3: Build
+FROM dependencies AS builder
+WORKDIR /app
+COPY . .
 
-# Generate Prisma Client explicitly for the API
+# 1. Buildar todos os pacotes internos (ordem resolvida pelo pnpm)
+RUN pnpm --filter "@gestor/*" build
+
+# 2. Gerar Prisma Client na API
 RUN pnpm --filter @gestor/api prisma:generate
 
-# Build the API
+# 3. Buildar a API
 RUN pnpm --filter @gestor/api build
 
-# Runner stage
+# Stage 4: Production (Runner)
 FROM base AS runner
-
 WORKDIR /app
 
-# Copy the entire workspace from builder to retain symlinks for monorepo packages.
-COPY --from=builder /app ./
+# Copiar node_modules e artefatos de build do builder
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
+COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
+COPY --from=builder /app/apps/api/docker-entrypoint.sh ./apps/api/docker-entrypoint.sh
+
+# Copiar os pacotes internos buildados (necessários para o runtime)
+COPY --from=builder /app/packages/ ./packages/
 
 # Set the production environment
 ENV NODE_ENV=production
@@ -48,5 +60,12 @@ ENV NODE_ENV=production
 # Expose Render standard ports
 EXPOSE 3333
 
+# Instalar Prisma CLI global para migrações no entrypoint
+RUN npm i -g prisma
+
+RUN chmod +x ./apps/api/docker-entrypoint.sh
+
 # Start the application, passing Render's PORT to API_PORT dynamically
-CMD API_PORT=${PORT:-3333} pnpm start:api
+WORKDIR /app/apps/api
+ENTRYPOINT ["./docker-entrypoint.sh"]
+CMD ["pnpm", "start:api"]

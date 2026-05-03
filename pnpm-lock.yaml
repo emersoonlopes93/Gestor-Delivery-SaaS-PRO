@@ -231,9 +231,18 @@ importers:
 
   apps/web-delivery:
     dependencies:
+      '@gestor/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@gestor/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@gestor/types':
         specifier: workspace:*
         version: link:../../packages/types
+      '@gestor/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
       '@tanstack/react-query':
         specifier: ^5.60.0
         version: 5.100.8(react@18.3.1)
@@ -265,18 +274,39 @@ importers:
         specifier: ^5.0.0
         version: 5.0.12(@types/react@18.3.28)(immer@11.1.4)(react@18.3.1)(use-sync-external-store@1.6.0(react@18.3.1))
     devDependencies:
+      '@eslint/js':
+        specifier: ^8.57.0
+        version: 8.57.1
       '@types/react':
         specifier: ^18.3.12
         version: 18.3.28
       '@types/react-dom':
         specifier: ^18.3.1
         version: 18.3.7(@types/react@18.3.28)
+      '@typescript-eslint/eslint-plugin':
+        specifier: ^7.7.0
+        version: 7.18.0(@typescript-eslint/parser@7.18.0(eslint@8.57.1)(typescript@5.9.3))(eslint@8.57.1)(typescript@5.9.3)
+      '@typescript-eslint/parser':
+        specifier: ^7.7.0
+        version: 7.18.0(eslint@8.57.1)(typescript@5.9.3)
       '@vitejs/plugin-react':
         specifier: ^4.3.0
         version: 4.7.0(vite@5.4.21(@types/node@22.19.17)(terser@5.46.2))
       autoprefixer:
         specifier: ^10.4.20
         version: 10.5.0(postcss@8.5.13)
+      eslint:
+        specifier: ^8.57.0
+        version: 8.57.1
+      eslint-plugin-react-hooks:
+        specifier: ^4.6.0
+        version: 4.6.2(eslint@8.57.1)
+      eslint-plugin-react-refresh:
+        specifier: ^0.4.6
+        version: 0.4.26(eslint@8.57.1)
+      globals:
+        specifier: ^15.0.0
+        version: 15.15.0
       postcss:
         specifier: ^8.4.49
         version: 8.5.13
@@ -286,6 +316,9 @@ importers:
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
+      typescript-eslint:
+        specifier: ^7.7.0
+        version: 7.18.0(eslint@8.57.1)(typescript@5.9.3)
       vite:
         specifier: ^5.4.0
         version: 5.4.21(@types/node@22.19.17)(terser@5.46.2)
@@ -501,7 +534,14 @@ importers:
         version: 5.9.3
 
   packages/config:
+    dependencies:
+      '@gestor/types':
+        specifier: workspace:*
+        version: link:../types
     devDependencies:
+      rimraf:
+        specifier: ^5.0.0
+        version: 5.0.10
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
@@ -548,7 +588,14 @@ importers:
         version: 5.9.3
 
   packages/utils:
+    dependencies:
+      '@gestor/types':
+        specifier: workspace:*
+        version: link:../types
     devDependencies:
+      rimraf:
+        specifier: ^5.0.0
+        version: 5.0.10
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
