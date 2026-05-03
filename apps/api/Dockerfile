@@ -6,13 +6,14 @@ WORKDIR /app
 # Stage 2: Dependencies
 FROM base AS dependencies
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-COPY apps/api/package.json ./apps/api/
-COPY packages/ ./packages/
-# Adicione outros apps se necessário para o lockfile bater
-COPY apps/web-admin/package.json ./apps/web-admin/
-COPY apps/web-tenant/package.json ./apps/web-tenant/
-COPY apps/web-storefront/package.json ./apps/web-storefront/
 
+# Copiar todos os package.json para garantir que o pnpm consiga resolver o workspace
+# No modo monorepo, o lockfile depende de todos os pacotes definidos no workspace.yaml
+COPY apps/ ./apps/
+COPY packages/ ./packages/
+
+# Remove os arquivos de código para manter o cache das dependências limpo
+# Mas mantemos os package.json. (Opcional, mas pnpm install precisa deles)
 RUN pnpm install --frozen-lockfile
 
 # Stage 3: Build
