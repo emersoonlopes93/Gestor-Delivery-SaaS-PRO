@@ -10,7 +10,7 @@ import { StructuredLoggerService } from './common/logging/structured-logger.serv
 import { requestIdMiddleware } from './common/middlewares/request-id.middleware';
 import helmet from 'helmet';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import express from 'express';
+import * as express from 'express';
 import { join } from 'path';
 
 async function bootstrap() {

@@ -43,7 +43,7 @@ Este script irá gerar as seguintes imagens locais:
 
 ### Criando a rede do Traefik
 ```bash
-docker network create traefik-public
+docker network create --driver overlay traefik-public
 ```
 
 ---
