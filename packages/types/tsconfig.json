@@ -3,9 +3,7 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "isolatedModules": true
+    "isolatedModules": false
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
