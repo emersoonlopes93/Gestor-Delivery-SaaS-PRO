@@ -21,11 +21,11 @@
     "moduleResolution": "node",
     "paths": {
       "@/*": ["src/*"],
-      "@gestor/types": ["../../packages/types/dist"],
-      "@gestor/core": ["../../packages/core/dist"],
-      "@gestor/utils": ["../../packages/utils/dist"],
-      "@gestor/auth": ["../../packages/auth/dist"],
-      "@gestor/config": ["../../packages/config/dist"]
+      "@gestor/types": ["../../packages/types/src"],
+      "@gestor/core": ["../../packages/core/src"],
+      "@gestor/utils": ["../../packages/utils/src"],
+      "@gestor/auth": ["../../packages/auth/src"],
+      "@gestor/config": ["../../packages/config/src"]
     }
   },
   "include": ["src/**/*"],
