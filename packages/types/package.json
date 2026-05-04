@@ -4,13 +4,6 @@
   "private": true,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
-    }
-  },
   "scripts": {
     "build": "tsc -b --force",
     "clean": "pnpm exec rimraf dist"
@@ -18,11 +11,6 @@
   "dependencies": {
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
-    "reflect-metadata": "^0.2.0",
-    "zod": "^3.23.0"
-  },
-  "devDependencies": {
-    "rimraf": "^5.0.0",
-    "typescript": "^5.5.0"
+    "reflect-metadata": "^0.2.0"
   }
 }
