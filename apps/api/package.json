@@ -7,7 +7,7 @@
     "dev:watch": "nest start --watch",
     "build": "nest build",
     "start": "nest start",
-    "start:prod": "node dist/apps/api/src/main",
+    "start:prod": "node dist/main",
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "smoke:auth": "ts-node scripts/smoke-test-auth.ts",
     "smoke:combos": "ts-node scripts/smoke-test-combos.ts",

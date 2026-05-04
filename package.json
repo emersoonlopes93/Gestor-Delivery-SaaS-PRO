@@ -10,7 +10,7 @@
     "dev:web-storefront": "pnpm --filter @gestor/web-storefront dev",
     "dev:all": "pnpm -r --parallel --filter @gestor/api --filter @gestor/web-tenant --filter @gestor/web-admin --filter @gestor/web-storefront run dev",
     "build": "pnpm -r run build",
-    "build:api": "pnpm --filter @gestor/api build",
+    "build:api": "pnpm --filter @gestor/api... build",
     "build:web-tenant": "pnpm --filter @gestor/web-tenant build",
     "build:web-admin": "pnpm --filter @gestor/web-admin build",
     "lint": "pnpm -r --if-present run lint",
@@ -22,8 +22,7 @@
     "start:api": "pnpm --filter @gestor/api start:prod",
     "start:web-tenant": "pnpm --filter @gestor/web-tenant preview",
     "start:web-admin": "pnpm --filter @gestor/web-admin preview",
-    "start:web-storefront": "pnpm --filter @gestor/web-storefront preview",
-    "build:api": "pnpm --filter @gestor/api... build"
+    "start:web-storefront": "pnpm --filter @gestor/web-storefront preview"
   },
   "engines": {
     "node": ">=20.0.0",
