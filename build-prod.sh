@@ -3,7 +3,7 @@
 # Script para build das imagens do Gestor Delivery SaaS PRO
 # Use este script na sua VPS antes de fazer o deploy no Portainer
 
-echo "🚀 Iniciando build das imagens de produção..."
+echo "🚀  Iniciando build das imagens de produção..."
 
 # Build API
 echo "📦 Building API..."
