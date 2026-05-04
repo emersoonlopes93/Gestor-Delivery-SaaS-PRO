@@ -37,7 +37,7 @@ export enum ActorType {
 }
 
 // ============================================================
-// RBAC — Tenant Default Roles (slugs)
+// RBAC - Tenant Default Roles (slugs)
 // ============================================================
 
 export enum TenantDefaultRole {
@@ -55,7 +55,7 @@ export enum TenantDefaultRole {
 }
 
 // ============================================================
-// RBAC — Admin Default Roles (slugs)
+// RBAC - Admin Default Roles (slugs)
 // ============================================================
 
 export enum AdminDefaultRole {
@@ -146,7 +146,7 @@ export enum GoalTrendStatus {
 }
 
 // ============================================================
-// Phase 3 — Management Enums
+// Phase 3 - Management Enums
 // ============================================================
 
 export enum PurchaseStatus {
