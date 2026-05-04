@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Stage 2: Dependencies
 FROM base AS dependencies
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json turbo.json* ./
 COPY apps/ ./apps/
 COPY packages/ ./packages/
 RUN pnpm install --frozen-lockfile

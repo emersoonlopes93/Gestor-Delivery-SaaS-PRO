@@ -10,3 +10,8 @@ build_logs.txt
 .dockerignore
 Dockerfile
 docker-compose.yml
+
+# Ignorar arquivos JS/DTS dentro de pastas src (sujeira local)
+**/src/**/*.js
+**/src/**/*.d.ts
+**/src/**/*.js.map

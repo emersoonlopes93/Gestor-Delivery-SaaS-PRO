@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Database
   postgres:
@@ -18,7 +16,7 @@ services:
 
   # Backend API
   api:
-    image: ghcr.io/${GITHUB_USER}/gestor-api:latest
+    image: gestor-api:latest
     deploy:
       restart_policy:
         condition: on-failure
@@ -43,7 +41,7 @@ services:
 
   # Admin Frontend
   web-admin:
-    image: ghcr.io/${GITHUB_USER}/gestor-admin:latest
+    image: gestor-admin:latest
     deploy:
       restart_policy:
         condition: on-failure
@@ -58,7 +56,7 @@ services:
 
   # Tenant Frontend
   web-tenant:
-    image: ghcr.io/${GITHUB_USER}/gestor-tenant:latest
+    image: gestor-tenant:latest
     deploy:
       restart_policy:
         condition: on-failure
@@ -73,7 +71,7 @@ services:
 
   # Storefront Frontend
   web-storefront:
-    image: ghcr.io/${GITHUB_USER}/gestor-storefront:latest
+    image: gestor-storefront:latest
     deploy:
       restart_policy:
         condition: on-failure

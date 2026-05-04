@@ -15,7 +15,7 @@ WORKDIR /app
 
 # Stage 2: Dependencies Skeleton
 FROM base AS dependencies
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json turbo.json* ./
 
 # Copiar package.json de todos os pacotes e apps para o pnpm resolver o workspace
 COPY packages/ ./packages/
