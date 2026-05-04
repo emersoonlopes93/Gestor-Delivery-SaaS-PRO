@@ -22,6 +22,11 @@
     "emitDecoratorMetadata": true,
     "baseUrl": ".",
     "paths": {
+      "@gestor/types": ["packages/types/dist"],
+      "@gestor/core": ["packages/core/dist"],
+      "@gestor/utils": ["packages/utils/dist"],
+      "@gestor/auth": ["packages/auth/dist"],
+      "@gestor/config": ["packages/config/dist"]
     }
 
   },
