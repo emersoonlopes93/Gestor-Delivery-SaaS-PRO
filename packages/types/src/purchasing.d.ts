@@ -66,4 +66,3 @@ export interface UpdatePurchaseDTO {
     status?: PurchaseStatus;
     paymentStatus?: PaymentStatus;
 }
-//# sourceMappingURL=purchasing.d.ts.map

@@ -84,4 +84,3 @@ export interface TenantUser {
         role: TenantRole;
     }[];
 }
-//# sourceMappingURL=tenant.d.ts.map

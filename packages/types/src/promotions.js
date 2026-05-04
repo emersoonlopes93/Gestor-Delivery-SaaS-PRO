@@ -1,7 +1,4 @@
 "use strict";
-// ============================================================
-// PROMOTIONS & CASHBACK DOMAIN TYPES — Phase 8
-// ============================================================
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -15,13 +12,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdateCouponDTO = exports.CreateCouponDTO = void 0;
 const class_validator_1 = require("class-validator");
 class CreateCouponDTO {
-    code;
-    type;
-    value;
-    minOrderValue;
-    usageLimit;
-    expiresAt;
-    isActive;
 }
 exports.CreateCouponDTO = CreateCouponDTO;
 __decorate([
@@ -59,10 +49,6 @@ __decorate([
     __metadata("design:type", Boolean)
 ], CreateCouponDTO.prototype, "isActive", void 0);
 class UpdateCouponDTO {
-    minOrderValue;
-    usageLimit;
-    expiresAt;
-    isActive;
 }
 exports.UpdateCouponDTO = UpdateCouponDTO;
 __decorate([

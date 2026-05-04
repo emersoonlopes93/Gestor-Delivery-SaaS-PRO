@@ -25,4 +25,3 @@ export type * from './pos';
 export { CreatePosOrderDTO, PosFulfillmentType } from './pos';
 export { UpdateCustomerDTO } from './customer';
 export { CreateCouponDTO, UpdateCouponDTO } from './promotions';
-//# sourceMappingURL=index.d.ts.map

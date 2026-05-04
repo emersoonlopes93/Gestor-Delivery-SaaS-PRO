@@ -43,4 +43,3 @@ export interface PosOrderListItemDTO {
     sourceChannel: string;
     createdAt: string;
 }
-//# sourceMappingURL=pos.d.ts.map

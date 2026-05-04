@@ -19,4 +19,3 @@ export declare class UpdateCustomerDTO {
     email?: string;
     notes?: string;
 }
-//# sourceMappingURL=customer.d.ts.map

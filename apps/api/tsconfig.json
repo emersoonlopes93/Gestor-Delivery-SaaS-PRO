@@ -9,6 +9,7 @@
     "target": "ES2021",
     "sourceMap": true,
     "outDir": "./dist",
+    "rootDir": "src",
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
@@ -21,11 +22,11 @@
     "moduleResolution": "node",
     "paths": {
       "@/*": ["src/*"],
-      "@gestor/types": ["../../packages/types/src"],
-      "@gestor/core": ["../../packages/core/src"],
-      "@gestor/utils": ["../../packages/utils/src"],
-      "@gestor/auth": ["../../packages/auth/src"],
-      "@gestor/config": ["../../packages/config/src"]
+      "@gestor/types": ["../../packages/types/dist"],
+      "@gestor/core": ["../../packages/core/dist"],
+      "@gestor/utils": ["../../packages/utils/dist"],
+      "@gestor/auth": ["../../packages/auth/dist"],
+      "@gestor/config": ["../../packages/config/dist"]
     }
   },
   "include": ["src/**/*"],

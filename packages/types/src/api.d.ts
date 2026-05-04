@@ -1,10 +1,8 @@
-/** Standard API success response */
 export interface ApiResponse<T = unknown> {
     success: true;
     data: T;
     message?: string;
 }
-/** Standard API error response */
 export interface ApiErrorResponse {
     success: false;
     error: {
@@ -16,7 +14,6 @@ export interface ApiErrorResponse {
     timestamp: string;
     path: string;
 }
-/** Paginated response */
 export interface PaginatedResponse<T> {
     items: T[];
     total: number;
@@ -26,14 +23,12 @@ export interface PaginatedResponse<T> {
     hasNext: boolean;
     hasPrevious: boolean;
 }
-/** Pagination query params */
 export interface PaginationParams {
     page?: number;
     pageSize?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
 }
-/** Health check response */
 export interface HealthCheckResponse {
     status: 'ok' | 'degraded' | 'error';
     version: string;
@@ -43,4 +38,3 @@ export interface HealthCheckResponse {
         database: 'ok' | 'error';
     };
 }
-//# sourceMappingURL=api.d.ts.map

@@ -61,4 +61,3 @@ export interface CreateCampaignDto {
     scheduledAt?: string;
     maxDispatches?: number;
 }
-//# sourceMappingURL=campaigns.d.ts.map

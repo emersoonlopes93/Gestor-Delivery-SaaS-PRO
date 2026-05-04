@@ -365,9 +365,9 @@ export interface UpdateComboSlotAllowedItemDto extends Partial<CreateComboSlotAl
 export declare const PizzaTemplateConfigSchema: z.ZodObject<{
     pricingStrategy: z.ZodDefault<z.ZodEnum<["highest", "lowest", "average", "sum_halves"]>>;
 }, "strip", z.ZodTypeAny, {
-    pricingStrategy: "highest" | "lowest" | "average" | "sum_halves";
+    pricingStrategy?: "highest" | "lowest" | "average" | "sum_halves";
 }, {
-    pricingStrategy?: "highest" | "lowest" | "average" | "sum_halves" | undefined;
+    pricingStrategy?: "highest" | "lowest" | "average" | "sum_halves";
 }>;
 export type PizzaTemplateConfig = z.infer<typeof PizzaTemplateConfigSchema>;
 export declare const CategoryTemplateConfigSchema: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodAny>>;
@@ -446,4 +446,3 @@ export interface UpsellWithItems extends Upsell {
         product: Product;
     }>;
 }
-//# sourceMappingURL=catalog.d.ts.map

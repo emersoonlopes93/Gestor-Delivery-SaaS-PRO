@@ -47,4 +47,3 @@ export interface ChatSessionListItem {
     status?: 'handoff' | 'bot';
     time?: string;
 }
-//# sourceMappingURL=chat.d.ts.map

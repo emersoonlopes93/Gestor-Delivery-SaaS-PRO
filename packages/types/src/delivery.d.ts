@@ -28,4 +28,3 @@ export interface DriverDTO {
     createdAt: Date | string;
     updatedAt: Date | string;
 }
-//# sourceMappingURL=delivery.d.ts.map

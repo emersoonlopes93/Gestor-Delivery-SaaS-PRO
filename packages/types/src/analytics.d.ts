@@ -84,4 +84,3 @@ export interface MetricFilterDTO {
     endDate: string;
     channel?: string;
 }
-//# sourceMappingURL=analytics.d.ts.map

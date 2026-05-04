@@ -1,7 +1,4 @@
 "use strict";
-// ============================================================
-// Tenant Enums
-// ============================================================
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FinancialStatus = exports.FinancialTransactionType = exports.FinancialAccountType = exports.InventoryCountStatus = exports.PaymentStatus = exports.PurchaseStatus = exports.GoalTrendStatus = exports.GoalStatus = exports.GoalType = exports.PaymentMethod = exports.CashMovementType = exports.CashSessionStatus = exports.DriverVehicleType = exports.DriverStatus = exports.AdminDefaultRole = exports.TenantDefaultRole = exports.ActorType = exports.StockMovementType = exports.UnitType = exports.TenantStatus = void 0;
 var TenantStatus;
@@ -29,17 +26,11 @@ var StockMovementType;
     StockMovementType["PURCHASE_ENTRY"] = "purchase_entry";
     StockMovementType["INVENTORY_ADJUSTMENT"] = "inventory_adjustment";
 })(StockMovementType || (exports.StockMovementType = StockMovementType = {}));
-// ============================================================
-// Auth Enums
-// ============================================================
 var ActorType;
 (function (ActorType) {
     ActorType["TENANT"] = "tenant";
     ActorType["ADMIN"] = "admin";
 })(ActorType || (exports.ActorType = ActorType = {}));
-// ============================================================
-// RBAC — Tenant Default Roles (slugs)
-// ============================================================
 var TenantDefaultRole;
 (function (TenantDefaultRole) {
     TenantDefaultRole["TENANT_OWNER"] = "tenant_owner";
@@ -54,9 +45,6 @@ var TenantDefaultRole;
     TenantDefaultRole["MARKETING"] = "marketing";
     TenantDefaultRole["WAITER"] = "waiter";
 })(TenantDefaultRole || (exports.TenantDefaultRole = TenantDefaultRole = {}));
-// ============================================================
-// RBAC — Admin Default Roles (slugs)
-// ============================================================
 var AdminDefaultRole;
 (function (AdminDefaultRole) {
     AdminDefaultRole["SUPER_ADMIN"] = "super_admin";
@@ -67,9 +55,6 @@ var AdminDefaultRole;
     AdminDefaultRole["OPERATIONS"] = "operations";
     AdminDefaultRole["AUDITOR"] = "auditor";
 })(AdminDefaultRole || (exports.AdminDefaultRole = AdminDefaultRole = {}));
-// ============================================================
-// Delivery Enums
-// ============================================================
 var DriverStatus;
 (function (DriverStatus) {
     DriverStatus["available"] = "available";
@@ -82,9 +67,6 @@ var DriverVehicleType;
     DriverVehicleType["bicycle"] = "bicycle";
     DriverVehicleType["car"] = "car";
 })(DriverVehicleType || (exports.DriverVehicleType = DriverVehicleType = {}));
-// ============================================================
-// Cash Enums
-// ============================================================
 var CashSessionStatus;
 (function (CashSessionStatus) {
     CashSessionStatus["open"] = "open";
@@ -100,9 +82,6 @@ var CashMovementType;
     CashMovementType["adjustment"] = "adjustment";
     CashMovementType["closing"] = "closing";
 })(CashMovementType || (exports.CashMovementType = CashMovementType = {}));
-// ============================================================
-// POS Enums
-// ============================================================
 var PaymentMethod;
 (function (PaymentMethod) {
     PaymentMethod["cash"] = "cash";
@@ -112,9 +91,6 @@ var PaymentMethod;
     PaymentMethod["card_on_delivery"] = "card_on_delivery";
     PaymentMethod["other"] = "other";
 })(PaymentMethod || (exports.PaymentMethod = PaymentMethod = {}));
-// ============================================================
-// Analytics & Goals Enums (Phase 10)
-// ============================================================
 var GoalType;
 (function (GoalType) {
     GoalType["REVENUE"] = "revenue";
@@ -140,9 +116,6 @@ var GoalTrendStatus;
     GoalTrendStatus["AT_RISK"] = "at_risk";
     GoalTrendStatus["BEHIND"] = "behind";
 })(GoalTrendStatus || (exports.GoalTrendStatus = GoalTrendStatus = {}));
-// ============================================================
-// Phase 3 — Management Enums
-// ============================================================
 var PurchaseStatus;
 (function (PurchaseStatus) {
     PurchaseStatus["DRAFT"] = "draft";

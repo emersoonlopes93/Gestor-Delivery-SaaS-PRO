@@ -286,4 +286,3 @@ export interface CheckoutValidationResult {
     couponId: string | null;
     cashbackUsed: number | null;
 }
-//# sourceMappingURL=order.d.ts.map

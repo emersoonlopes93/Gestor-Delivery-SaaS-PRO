@@ -13,9 +13,6 @@ exports.CreatePosOrderDTO = exports.PosFulfillmentType = void 0;
 const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
 const order_1 = require("./order");
-// ============================================================
-// POS ENUMS
-// ============================================================
 const enums_1 = require("./enums");
 var PosFulfillmentType;
 (function (PosFulfillmentType) {
@@ -24,24 +21,7 @@ var PosFulfillmentType;
     PosFulfillmentType["DELIVERY"] = "delivery";
     PosFulfillmentType["TABLE"] = "table";
 })(PosFulfillmentType || (exports.PosFulfillmentType = PosFulfillmentType = {}));
-// ============================================================
-// POS DTOs — Input
-// ============================================================
 class CreatePosOrderDTO {
-    idempotencyKey;
-    items;
-    customerName;
-    customerPhone;
-    fulfillmentType;
-    tableNumber;
-    paymentMethod;
-    discountTotal;
-    notes;
-    couponCode;
-    useCashbackAmount;
-    deliveryFee;
-    deliveryAddress;
-    waiterId;
 }
 exports.CreatePosOrderDTO = CreatePosOrderDTO;
 __decorate([

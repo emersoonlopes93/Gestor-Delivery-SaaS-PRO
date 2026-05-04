@@ -110,4 +110,3 @@ export interface CreateInventoryCountItemDTO {
     theoreticalStock: number;
     physicalStock: number;
 }
-//# sourceMappingURL=inventory.d.ts.map

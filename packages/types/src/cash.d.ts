@@ -42,4 +42,3 @@ export interface CashSessionDetailDTO extends CashSessionDTO {
     totalSupplies: number;
     totalRefunds: number;
 }
-//# sourceMappingURL=cash.d.ts.map

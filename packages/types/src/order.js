@@ -1,7 +1,4 @@
 "use strict";
-// ============================================================
-// ORDER DOMAIN TYPES — Phase 4
-// ============================================================
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -17,13 +14,6 @@ const class_validator_1 = require("class-validator");
 const class_transformer_1 = require("class-transformer");
 const enums_1 = require("./enums");
 class PaymentInput {
-    method;
-    changeFor;
-    // Online Payment Fields (Mercado Pago / Stripe)
-    cardToken;
-    paymentMethodId;
-    issuerId;
-    installments;
 }
 exports.PaymentInput = PaymentInput;
 __decorate([
@@ -34,7 +24,7 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsNumber)(),
     (0, class_validator_1.IsOptional)(),
-    __metadata("design:type", Object)
+    __metadata("design:type", Number)
 ], PaymentInput.prototype, "changeFor", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
@@ -56,7 +46,6 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Number)
 ], PaymentInput.prototype, "installments", void 0);
-// --- Valid status transitions ---
 exports.ORDER_STATUS_TRANSITIONS = {
     pending: ['confirmed', 'cancelled'],
     confirmed: ['preparing', 'cancelled'],
@@ -68,18 +57,7 @@ exports.ORDER_STATUS_TRANSITIONS = {
     cancelled: [],
     draft: ['confirmed', 'cancelled'],
 };
-// --- DTOs de Entrada (Checkout) ---
 class DeliveryAddressDTO {
-    street;
-    number;
-    complement;
-    neighborhood;
-    city;
-    state;
-    zipCode;
-    reference;
-    lat;
-    lng;
 }
 exports.DeliveryAddressDTO = DeliveryAddressDTO;
 __decorate([
@@ -133,8 +111,6 @@ __decorate([
     __metadata("design:type", Number)
 ], DeliveryAddressDTO.prototype, "lng", void 0);
 class CreateOrderItemComplementDTO {
-    groupId;
-    itemId;
 }
 exports.CreateOrderItemComplementDTO = CreateOrderItemComplementDTO;
 __decorate([
@@ -148,8 +124,6 @@ __decorate([
     __metadata("design:type", String)
 ], CreateOrderItemComplementDTO.prototype, "itemId", void 0);
 class CreateOrderItemComboSelectionDTO {
-    blockId;
-    blockItemId;
 }
 exports.CreateOrderItemComboSelectionDTO = CreateOrderItemComboSelectionDTO;
 __decorate([
@@ -163,8 +137,6 @@ __decorate([
     __metadata("design:type", String)
 ], CreateOrderItemComboSelectionDTO.prototype, "blockItemId", void 0);
 class CreateOrderItemSelectionItemDTO {
-    optionItemId;
-    qty;
 }
 exports.CreateOrderItemSelectionItemDTO = CreateOrderItemSelectionItemDTO;
 __decorate([
@@ -178,8 +150,6 @@ __decorate([
     __metadata("design:type", Number)
 ], CreateOrderItemSelectionItemDTO.prototype, "qty", void 0);
 class CreateOrderItemSelectionGroupDTO {
-    optionGroupId;
-    items;
 }
 exports.CreateOrderItemSelectionGroupDTO = CreateOrderItemSelectionGroupDTO;
 __decorate([
@@ -195,8 +165,6 @@ __decorate([
     __metadata("design:type", Array)
 ], CreateOrderItemSelectionGroupDTO.prototype, "items", void 0);
 class CreateOrderItemComboSlotSelectionItemDTO {
-    productId;
-    qty;
 }
 exports.CreateOrderItemComboSlotSelectionItemDTO = CreateOrderItemComboSlotSelectionItemDTO;
 __decorate([
@@ -210,8 +178,6 @@ __decorate([
     __metadata("design:type", Number)
 ], CreateOrderItemComboSlotSelectionItemDTO.prototype, "qty", void 0);
 class CreateOrderItemComboSlotSelectionDTO {
-    comboSlotId;
-    items;
 }
 exports.CreateOrderItemComboSlotSelectionDTO = CreateOrderItemComboSlotSelectionDTO;
 __decorate([
@@ -227,8 +193,6 @@ __decorate([
     __metadata("design:type", Array)
 ], CreateOrderItemComboSlotSelectionDTO.prototype, "items", void 0);
 class PizzaCompositionFlavorDTO {
-    productId;
-    fraction;
 }
 exports.PizzaCompositionFlavorDTO = PizzaCompositionFlavorDTO;
 __decorate([
@@ -242,8 +206,6 @@ __decorate([
     __metadata("design:type", Number)
 ], PizzaCompositionFlavorDTO.prototype, "fraction", void 0);
 class PizzaCompositionDTO {
-    sizeId;
-    flavors;
 }
 exports.PizzaCompositionDTO = PizzaCompositionDTO;
 __decorate([
@@ -258,22 +220,6 @@ __decorate([
     __metadata("design:type", Array)
 ], PizzaCompositionDTO.prototype, "flavors", void 0);
 class CreateOrderItemDTO {
-    lineType;
-    productId;
-    comboId; // Legacy field
-    quantity;
-    notes;
-    // For Legacy Complements
-    complements;
-    // For Legacy Combo Blocks
-    comboSelections;
-    // For Catalog V2 Product Options
-    selections;
-    // For Pizza Engine
-    pizzaComposition;
-    // For Catalog V2 Combo Slots
-    slots;
-    sourceUpsellId;
 }
 exports.CreateOrderItemDTO = CreateOrderItemDTO;
 __decorate([
@@ -341,24 +287,6 @@ __decorate([
     __metadata("design:type", String)
 ], CreateOrderItemDTO.prototype, "sourceUpsellId", void 0);
 class CreateOrderDTO {
-    idempotencyKey;
-    items;
-    customerName;
-    customerPhone;
-    customerEmail;
-    fulfillmentType;
-    deliveryAddress;
-    tableId;
-    notes;
-    couponCode;
-    useCashbackAmount;
-    payment;
-    // API Preference
-    returnUrl;
-    // Agendamento
-    scheduledFor;
-    timeSlotId;
-    estimatedDuration;
 }
 exports.CreateOrderDTO = CreateOrderDTO;
 __decorate([

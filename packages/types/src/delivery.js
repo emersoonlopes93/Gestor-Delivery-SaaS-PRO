@@ -13,10 +13,6 @@ exports.UpdateDriverDTO = exports.CreateDriverDTO = void 0;
 const class_validator_1 = require("class-validator");
 const enums_1 = require("./enums");
 class CreateDriverDTO {
-    name;
-    phone;
-    vehicleType;
-    notes;
 }
 exports.CreateDriverDTO = CreateDriverDTO;
 __decorate([
@@ -40,12 +36,6 @@ __decorate([
     __metadata("design:type", String)
 ], CreateDriverDTO.prototype, "notes", void 0);
 class UpdateDriverDTO {
-    name;
-    phone;
-    isActive;
-    status;
-    vehicleType;
-    notes;
 }
 exports.UpdateDriverDTO = UpdateDriverDTO;
 __decorate([

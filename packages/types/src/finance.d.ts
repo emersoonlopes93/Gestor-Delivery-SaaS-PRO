@@ -53,4 +53,3 @@ export interface UpdateFinancialTransactionDTO {
     description?: string;
     amount?: number;
 }
-//# sourceMappingURL=finance.d.ts.map

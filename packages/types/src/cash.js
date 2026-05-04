@@ -11,15 +11,8 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateCashMovementDTO = exports.CloseCashSessionDTO = exports.OpenCashSessionDTO = void 0;
 const class_validator_1 = require("class-validator");
-// ============================================================
-// CASH SESSION ENUMS
-// ============================================================
 const enums_1 = require("./enums");
-// ============================================================
-// CASH DTOs — Input
-// ============================================================
 class OpenCashSessionDTO {
-    openingAmount;
 }
 exports.OpenCashSessionDTO = OpenCashSessionDTO;
 __decorate([
@@ -28,8 +21,6 @@ __decorate([
     __metadata("design:type", Number)
 ], OpenCashSessionDTO.prototype, "openingAmount", void 0);
 class CloseCashSessionDTO {
-    closingAmountDeclared;
-    notes;
 }
 exports.CloseCashSessionDTO = CloseCashSessionDTO;
 __decorate([
@@ -43,9 +34,6 @@ __decorate([
     __metadata("design:type", String)
 ], CloseCashSessionDTO.prototype, "notes", void 0);
 class CreateCashMovementDTO {
-    type;
-    amount;
-    description;
 }
 exports.CreateCashMovementDTO = CreateCashMovementDTO;
 __decorate([

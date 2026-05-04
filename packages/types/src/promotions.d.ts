@@ -39,4 +39,3 @@ export declare class UpdateCouponDTO {
     expiresAt?: string;
     isActive?: boolean;
 }
-//# sourceMappingURL=promotions.d.ts.map

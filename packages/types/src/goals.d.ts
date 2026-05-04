@@ -47,4 +47,3 @@ export interface GoalProgressDTO {
     status: GoalStatus;
     lastUpdated: string;
 }
-//# sourceMappingURL=goals.d.ts.map

@@ -1,4 +1,3 @@
-/** Role for tenant users */
 export interface TenantRole {
     id: string;
     tenantId: string;
@@ -8,7 +7,6 @@ export interface TenantRole {
     isSystem: boolean;
     permissions: string[];
 }
-/** Role for admin users */
 export interface AdminRole {
     id: string;
     name: string;
@@ -17,7 +15,6 @@ export interface AdminRole {
     isSystem: boolean;
     permissions: string[];
 }
-/** Permission definition */
 export interface Permission {
     id: string;
     module: string;
@@ -25,7 +22,6 @@ export interface Permission {
     slug: string;
     description?: string;
 }
-/** Actor context — unified representation of who is performing an action */
 export type ActorContext = {
     type: 'tenant';
     userId: string;
@@ -36,4 +32,3 @@ export type ActorContext = {
     userId: string;
     permissions: string[];
 };
-//# sourceMappingURL=rbac.d.ts.map

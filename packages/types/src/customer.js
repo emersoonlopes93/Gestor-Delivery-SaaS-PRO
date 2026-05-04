@@ -1,7 +1,4 @@
 "use strict";
-// ============================================================
-// CUSTOMER & CRM DOMAIN TYPES — Phase 8
-// ============================================================
 var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -15,9 +12,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdateCustomerDTO = void 0;
 const class_validator_1 = require("class-validator");
 class UpdateCustomerDTO {
-    name;
-    email;
-    notes;
 }
 exports.UpdateCustomerDTO = UpdateCustomerDTO;
 __decorate([
