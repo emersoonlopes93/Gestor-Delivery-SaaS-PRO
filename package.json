@@ -22,7 +22,8 @@
     "start:api": "pnpm --filter @gestor/api start:prod",
     "start:web-tenant": "pnpm --filter @gestor/web-tenant preview",
     "start:web-admin": "pnpm --filter @gestor/web-admin preview",
-    "start:web-storefront": "pnpm --filter @gestor/web-storefront preview"
+    "start:web-storefront": "pnpm --filter @gestor/web-storefront preview",
+    "build:api": "pnpm --filter @gestor/api... build"
   },
   "engines": {
     "node": ">=20.0.0",
