@@ -7,7 +7,7 @@
     "moduleResolution": "bundler",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "isolatedModules": true
+    "isolatedModules": false
   },
   "include": ["src"]
 }
