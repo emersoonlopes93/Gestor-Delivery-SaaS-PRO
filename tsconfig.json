@@ -1,4 +1,14 @@
 {
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@gestor/types": ["packages/types/src"],
+      "@gestor/core": ["packages/core/src"],
+      "@gestor/utils": ["packages/utils/src"],
+      "@gestor/auth": ["packages/auth/src"],
+      "@gestor/config": ["packages/config/src"]
+    }
+  },
   "files": [],
   "references": [
     { "path": "packages/types" },
