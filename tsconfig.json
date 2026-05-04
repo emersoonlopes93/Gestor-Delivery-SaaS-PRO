@@ -17,10 +17,6 @@
     { "path": "packages/auth" },
     { "path": "packages/core" },
     { "path": "packages/ui" },
-    { "path": "apps/api" },
-    { "path": "apps/web-admin" },
-    { "path": "apps/web-delivery" },
-    { "path": "apps/web-storefront" },
-    { "path": "apps/web-tenant" }
+    { "path": "apps/api" }
   ]
 }
