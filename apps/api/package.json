@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "ts-node-dev -r tsconfig-paths/register --respawn --transpile-only src/main.ts",
     "dev:watch": "nest start --watch",
-    "build": "nest build",
+    "build": "nest build -p tsconfig.build.json",
     "start": "nest start",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,test}/**/*.ts\"",
