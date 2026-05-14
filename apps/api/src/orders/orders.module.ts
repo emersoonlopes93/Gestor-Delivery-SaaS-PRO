@@ -3,6 +3,7 @@ import { DatabaseModule } from '../database/database.module';
 import { OrdersController } from './orders.controller';
 import { PublicOrdersController } from './public-orders.controller';
 import { OrdersService } from './orders.service';
+import { OrdersGateway } from './orders.gateway';
 import { CheckoutValidatorService } from './checkout-validator.service';
 import { AuthModule } from '../auth/auth.module';
 import { RbacModule } from '../rbac/rbac.module';
@@ -30,7 +31,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     NotificationsModule,
   ],
   controllers: [OrdersController, PublicOrdersController],
-  providers: [OrdersService, CheckoutValidatorService],
-  exports: [OrdersService, CheckoutValidatorService],
+  providers: [OrdersService, CheckoutValidatorService, OrdersGateway],
+  exports: [OrdersService, CheckoutValidatorService, OrdersGateway],
 })
 export class OrdersModule {}

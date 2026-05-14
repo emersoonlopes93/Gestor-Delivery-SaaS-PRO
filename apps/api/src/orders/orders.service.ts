@@ -27,6 +27,7 @@ import type {
 } from '@gestor/types';
 import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
+import { OrdersGateway } from './orders.gateway';
 
 @Injectable()
 export class OrdersService {
@@ -41,6 +42,7 @@ export class OrdersService {
     private readonly paymentGatewayService: PaymentGatewayService,
     private readonly schedulingService: SchedulingService,
     private readonly whatsappService: WhatsappService,
+    private readonly ordersGateway: OrdersGateway,
   ) {}
 
   async createOrder(slug: string, dto: CreateOrderDTO): Promise<OrderResponseDTO> {
@@ -651,6 +653,11 @@ export class OrdersService {
           note: dto.note || `Status atualizado para ${nextStatus}`,
         },
       });
+
+      // Emitir via Socket para o storefront (tempo real)
+      if (order.publicTrackingToken) {
+        this.ordersGateway.emitOrderStatusUpdated(order.publicTrackingToken, nextStatus, dto.note);
+      }
 
       // Disparar notificação WhatsApp (fire-and-forget, não bloqueia a transação)
       const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });

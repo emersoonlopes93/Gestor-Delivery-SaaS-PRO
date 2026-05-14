@@ -15,6 +15,10 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { api } from '../lib/api-client';
+import { useOrderSocket } from '../hooks/useOrderSocket';
+import { useDeliverySocket } from '../hooks/useDeliverySocket';
+import { useQueryClient } from '@tanstack/react-query';
+import { logger } from '../lib/logger';
 
 type LatLng = { lat: number; lng: number };
 
@@ -227,6 +231,8 @@ function clamp01(v: number): number {
 export function OrderTrackingPage() {
   const { tenantSlug, orderId } = useParams<{ tenantSlug: string; orderId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [realtimeLocation, setRealtimeLocation] = useState<LatLng | null>(null);
 
   const token = orderId ? sessionStorage.getItem(`tracking:token:${orderId}`) : null;
 
@@ -256,7 +262,19 @@ export function OrderTrackingPage() {
       return normalized;
     },
     enabled: !!token,
-    refetchInterval: 5000,
+    refetchInterval: 60000, // Polling de backup (1 min)
+  });
+
+  // Real-time Status via Webhook
+  useOrderSocket(token, (data) => {
+    logger.log('Real-time status update received', data);
+    // Invalida a query para forçar o refetch do objeto inteiro
+    queryClient.invalidateQueries({ queryKey: ['order-tracking-premium', token] });
+  });
+
+  // Real-time Location via Webhook
+  useDeliverySocket(token, (data: LatLng) => {
+    setRealtimeLocation(data);
   });
 
   const driverIcon = useMemo(() => createDriverIcon(), []);
@@ -268,7 +286,7 @@ export function OrderTrackingPage() {
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const loc = query.data?.driverLocation;
+    const loc = realtimeLocation || query.data?.driverLocation;
     if (!loc) return;
 
     const next: LatLng = { lat: loc.lat, lng: loc.lng };
@@ -312,10 +330,10 @@ export function OrderTrackingPage() {
 
   const driverPos = useMemo<LatLng | null>(() => {
     if (animatedPos) return animatedPos;
-    const loc = query.data?.driverLocation;
+    const loc = realtimeLocation || query.data?.driverLocation;
     if (!loc) return null;
     return { lat: loc.lat, lng: loc.lng };
-  }, [animatedPos, query.data?.driverLocation]);
+  }, [animatedPos, realtimeLocation, query.data?.driverLocation]);
 
   const distanceKm = useMemo(() => {
     if (!driverPos || !dest) return null;

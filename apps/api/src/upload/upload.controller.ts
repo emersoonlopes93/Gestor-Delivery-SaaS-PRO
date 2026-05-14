@@ -9,9 +9,9 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request as ExpressRequest } from 'express';
-import { diskStorage } from 'multer';
-import { mkdirSync } from 'fs';
+import { memoryStorage } from 'multer';
 import { extname } from 'path';
+import { ImageOptimizerService } from './image-optimizer.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
@@ -30,31 +30,14 @@ type MulterFileLike = {
 @Controller('upload')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class UploadController {
+  constructor(private readonly optimizer: ImageOptimizerService) {}
   @Post('image')
   @RequirePermissions('catalog.update')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: (req: ExpressRequest, _file: MulterFileLike, cb: DestinationCallback) => {
-          const tenantId = (req as ExpressRequest & { user?: TenantJwtPayload }).user?.tenantId;
-          if (!tenantId) {
-            cb(new Error('TenantId ausente'), '');
-            return;
-          }
-          const destination = `uploads/${tenantId}`;
-          mkdirSync(destination, { recursive: true });
-          cb(null, destination);
-        },
-        filename: (_req: ExpressRequest, file: MulterFileLike, cb: FileNameCallback) => {
-          const safeExt = extname(file.originalname || '').toLowerCase();
-          const allowedExts = new Set(['.jpg', '.jpeg', '.png', '.webp']);
-          const finalExt = allowedExts.has(safeExt) ? safeExt : '.jpg';
-          const random = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-          cb(null, `${random}${finalExt}`);
-        },
-      }),
+      storage: memoryStorage(),
       limits: {
-        fileSize: 5 * 1024 * 1024,
+        fileSize: 10 * 1024 * 1024, // Aumentado para 10MB pois vamos comprimir
       },
       fileFilter: (_req: ExpressRequest, file: MulterFileLike, cb: FileFilterCallback) => {
         const allowedMime = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -74,13 +57,16 @@ export class UploadController {
       throw new BadRequestException('Arquivo não enviado');
     }
 
-    const uploaded = file as { filename?: unknown };
-    if (typeof uploaded.filename !== 'string' || uploaded.filename.length === 0) {
-      throw new BadRequestException('Upload inválido');
-    }
-
+    const uploaded = file as { buffer: Buffer; originalname: string };
     const tenantId = req.user.tenantId;
-    const url = `/api/v1/static/${encodeURIComponent(tenantId)}/${encodeURIComponent(uploaded.filename)}`;
+
+    const filename = await this.optimizer.optimize(
+      uploaded.buffer,
+      tenantId,
+      uploaded.originalname,
+    );
+
+    const url = `/api/v1/static/${encodeURIComponent(tenantId)}/${encodeURIComponent(filename)}`;
 
     return { url };
   }
