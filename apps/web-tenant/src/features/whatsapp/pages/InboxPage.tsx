@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MessageSquare, User, Clock, CheckCircle } from 'lucide-react';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../../lib/api-client';
 import type { ChatSessionListItem, ChatSession } from '@gestor/types';
 import { ChatArea } from '../components/ChatArea';
@@ -9,22 +8,12 @@ export function InboxPage() {
   const queryClient = useQueryClient();
   const [selectedSession, setSelectedSession] = useState<ChatSession | null>(null);
 
-  const { data: sessions = [], isLoading } = useQuery({
+  const { data: sessions = [] } = useQuery({
     queryKey: ['chat-sessions'],
     queryFn: async () => {
       const res = await api.get<ChatSessionListItem[]>('/chat/sessions');
       return res.success ? res.data : [];
     },
-  });
-
-  const { data: fullSession } = useQuery({
-    queryKey: ['chat-session', selectedSession?.id],
-    queryFn: async () => {
-      if (!selectedSession) return null;
-      const res = await api.get<ChatSession>(`/chat/sessions/${selectedSession.id}`);
-      return res.success ? res.data : null;
-    },
-    enabled: !!selectedSession,
   });
 
   const handleSessionSelect = (session: ChatSessionListItem) => {

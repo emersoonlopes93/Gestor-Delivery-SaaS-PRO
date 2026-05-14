@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
-import { Wallet, ArrowUpCircle, ArrowDownCircle, Search, Plus, Calendar, MoreVertical, CreditCard, Banknote, Building, Download, Share2 } from 'lucide-react';
+import { Wallet, ArrowUpCircle, ArrowDownCircle, Plus, Calendar, MoreVertical, Banknote, Building, Download, Share2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 import { TransactionModal } from './TransactionModal';
@@ -47,7 +47,7 @@ export function FinancePage() {
       t.paymentDate ? format(new Date(t.paymentDate), 'dd/MM/yyyy') : format(new Date(t.createdAt), 'dd/MM/yyyy')
     ]);
     
-    let csvContent = "data:text/csv;charset=utf-8," 
+    const csvContent = "data:text/csv;charset=utf-8," 
       + headers.join(",") + "\n"
       + rows.map(e => e.join(",")).join("\n");
 

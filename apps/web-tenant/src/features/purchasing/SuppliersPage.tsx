@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
 import { SupplierDTO, CreateSupplierDTO } from '@gestor/types';
 import { SupplierModal } from './SupplierModal';

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, MapPin, Route, DollarSign, Layers, ChevronUp, ChevronDown } from 'lucide-react';
 import { api } from '../../lib/api-client';
 import { MapContainer, TileLayer, FeatureGroup, Polygon, useMap } from 'react-leaflet';
@@ -60,20 +60,6 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null;
 }
 
-function pickString(obj: Record<string, unknown>, key: string): string | null {
-  const v = obj[key];
-  return typeof v === 'string' ? v : null;
-}
-
-function pickNumber(obj: Record<string, unknown>, key: string): number | null {
-  const v = obj[key];
-  return typeof v === 'number' ? v : null;
-}
-
-function pickBoolean(obj: Record<string, unknown>, key: string): boolean | null {
-  const v = obj[key];
-  return typeof v === 'boolean' ? v : null;
-}
 
 function normalizePolygonCoordinates(value: unknown): PolygonCoordinates | null {
   if (!Array.isArray(value)) return null;

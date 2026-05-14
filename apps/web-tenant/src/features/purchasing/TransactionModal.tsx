@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { api } from '../../lib/api-client';
 import { 
-  FinancialTransactionDTO, 
-  CreateFinancialTransactionDTO, 
   FinancialAccountDTO,
   FinancialTransactionType,
   FinancialStatus
@@ -18,7 +16,6 @@ interface TransactionModalProps {
 
 export function TransactionModal({ isOpen, onClose, onSave }: TransactionModalProps) {
   const [accounts, setAccounts] = useState<FinancialAccountDTO[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
 
   const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<any>({
     defaultValues: {
@@ -35,14 +32,11 @@ export function TransactionModal({ isOpen, onClose, onSave }: TransactionModalPr
   }, [isOpen]);
 
   const loadAccounts = async () => {
-    setIsLoading(true);
     try {
       const res = await api.get<FinancialAccountDTO[]>('/finance/accounts');
       if (res.success) setAccounts(res.data);
     } catch (error) {
       console.error('Erro ao carregar contas:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 

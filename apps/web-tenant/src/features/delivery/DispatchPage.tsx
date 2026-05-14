@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useDispatch } from './hooks/useDispatch';
 import { useDrivers } from './hooks/useDrivers';
 

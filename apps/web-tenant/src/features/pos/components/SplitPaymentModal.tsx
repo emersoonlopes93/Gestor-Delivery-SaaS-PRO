@@ -5,7 +5,6 @@ import {
   Plus, 
   Minus, 
   X,
-  CreditCard,
   Banknote,
   QrCode,
   CheckCircle2,

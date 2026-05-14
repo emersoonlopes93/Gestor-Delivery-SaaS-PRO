@@ -5,20 +5,14 @@ import 'leaflet-draw';
 import {
   AlertCircle,
   Ban,
-  Check,
   CheckCircle,
-  ChevronDown,
-  ChevronUp,
   Crosshair,
   DollarSign,
   Edit2,
-  Gift,
   Loader2,
-  LocateFixed,
   MapPin,
   Pencil,
   Plus,
-  Ruler,
   Target,
   Save,
   TrendingUp,
@@ -166,16 +160,7 @@ function zoneLabel(zone: DeliveryRateRule): string {
   return name && name.trim() !== '' ? name : 'Zona sem nome';
 }
 
-function kindLabel(kind: DeliveryZoneKind | null): string {
-  if (kind === 'blocked_zone') return 'Área bloqueada';
-  return 'Zona personalizada';
-}
 
-function pricingLabel(mode: DeliveryPricingMode | null): string {
-  if (mode === 'free') return 'Entrega grátis';
-  if (mode === 'distance') return 'Cobrança por km';
-  return 'Cobrança fixa';
-}
 
 function fmtMoney(v: number | null | undefined): string {
   if (typeof v !== 'number' || !Number.isFinite(v)) return '—';
@@ -473,7 +458,7 @@ export function DeliveryZonesPage() {
   });
 
   const [zones, setZones] = useState<DeliveryRateRule[]>([]);
-  const [legacyRules, setLegacyRules] = useState<DeliveryRateRule[]>([]);
+
 
   const [loading, setLoading] = useState(true);
   const [savingCoverage, setSavingCoverage] = useState(false);
@@ -487,7 +472,6 @@ export function DeliveryZonesPage() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [drawMode, setDrawMode] = useState<DrawMode>('idle');
 
-  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const [hoveredZoneId, setHoveredZoneId] = useState<string | null>(null);
   const [highlightZoneId, setHighlightZoneId] = useState<string | null>(null);
@@ -574,10 +558,8 @@ export function DeliveryZonesPage() {
       if (rulesRes.success) {
         const all = rulesRes.data ?? [];
         const zs = all.filter((r) => r.type === 'polygon');
-        const legacy = all.filter((r) => r.type !== 'polygon');
 
         setZones(zs.sort((a, b) => a.priority - b.priority));
-        setLegacyRules(legacy.sort((a, b) => a.priority - b.priority));
 
         if (zs.length > 0 && !selectedZoneId) setSelectedZoneId(zs[0].id);
       }
@@ -656,87 +638,12 @@ export function DeliveryZonesPage() {
     );
   }, []);
 
-  type ZonePreset = 'blocked' | 'free' | 'fixed' | 'distance';
-  const [presetPickerOpen, setPresetPickerOpen] = useState(false);
-
-  const openNewZoneWithPreset = useCallback(
-    (preset: ZonePreset) => {
-      resetZoneForm();
-
-      const next =
-        preset === 'blocked'
-          ? ({
-              zoneKind: 'blocked_zone' as const,
-              pricingMode: 'fixed' as const,
-              blocksDelivery: true,
-              fixedFee: null,
-              pricePerKm: null,
-              color: zoneColorPreset('blocked_zone', 'fixed'),
-            })
-          : preset === 'free'
-            ? ({
-                zoneKind: 'custom_zone' as const,
-                pricingMode: 'free' as const,
-                blocksDelivery: false,
-                fixedFee: null,
-                pricePerKm: null,
-                color: zoneColorPreset('custom_zone', 'free'),
-              })
-            : preset === 'distance'
-              ? ({
-                  zoneKind: 'custom_zone' as const,
-                  pricingMode: 'distance' as const,
-                  blocksDelivery: false,
-                  fixedFee: null,
-                  pricePerKm: 2.5,
-                  color: zoneColorPreset('custom_zone', 'distance'),
-                })
-              : ({
-                  zoneKind: 'custom_zone' as const,
-                  pricingMode: 'fixed' as const,
-                  blocksDelivery: false,
-                  fixedFee: 10,
-                  pricePerKm: null,
-                  color: zoneColorPreset('custom_zone', 'fixed'),
-                });
-
-      setZoneForm((z) => ({
-        ...z,
-        ...next,
-      }));
-
-      setPresetPickerOpen(false);
-      setEditorOpen(true);
-      setDrawMode('drawing');
-      setShowMapMobile(true);
-    },
-    [resetZoneForm],
-  );
-
   const openNewZone = useCallback(() => {
-    setPresetPickerOpen(true);
-  }, []);
-
-  const openEditZone = useCallback((z: DeliveryRateRule) => {
-    const coords = normalizePolygonCoordinates(z.polygonCoordinates);
-    setZoneForm({
-      id: z.id,
-      name: z.name ?? z.geoJson?.properties?.name ?? '',
-      color: z.color ?? z.geoJson?.properties?.color ?? defaultZoneColor(),
-      isActive: z.isActive,
-      priority: z.priority,
-      zoneKind: z.zoneKind ?? (z.blocksDelivery ? 'blocked_zone' : 'custom_zone'),
-      pricingMode: z.pricingMode ?? 'fixed',
-      blocksDelivery: z.blocksDelivery,
-      fixedFee: parseDecimalString(z.fixedFee) ?? parseDecimalString(z.fixedRate) ?? 0,
-      pricePerKm: parseDecimalString(z.pricePerKm) ?? parseDecimalString(z.ratePerKm) ?? 0,
-      polygonCoordinates: coords,
-    });
-    setSelectedZoneId(z.id);
+    resetZoneForm();
     setEditorOpen(true);
-    setDrawMode('idle');
+    setDrawMode('drawing');
     setShowMapMobile(true);
-  }, []);
+  }, [resetZoneForm]);
 
   const closeEditor = useCallback(() => {
     setEditorOpen(false);
@@ -747,26 +654,6 @@ export function DeliveryZonesPage() {
     setZoneForm((z) => ({ ...z, polygonCoordinates: coords }));
   }, []);
 
-  const handleDuplicate = useCallback((z: DeliveryRateRule) => {
-    const coords = normalizePolygonCoordinates(z.polygonCoordinates);
-    const baseName = zoneLabel(z);
-    const nextName = `${baseName} (cópia)`;
-    setZoneForm({
-      id: null,
-      name: nextName,
-      color: z.color ?? z.geoJson?.properties?.color ?? defaultZoneColor(),
-      isActive: z.isActive,
-      priority: z.priority + 1,
-      zoneKind: z.zoneKind ?? (z.blocksDelivery ? 'blocked_zone' : 'custom_zone'),
-      pricingMode: z.pricingMode ?? 'fixed',
-      blocksDelivery: z.blocksDelivery,
-      fixedFee: parseDecimalString(z.fixedFee) ?? parseDecimalString(z.fixedRate) ?? 0,
-      pricePerKm: parseDecimalString(z.pricePerKm) ?? parseDecimalString(z.ratePerKm) ?? 0,
-      polygonCoordinates: coords,
-    });
-    setEditorOpen(true);
-    setDrawMode('idle');
-  }, []);
 
   const handleDeleteZone = useCallback(
     async (z: DeliveryRateRule) => {
@@ -1018,6 +905,17 @@ export function DeliveryZonesPage() {
           }
         >
           <div className="p-6 space-y-6">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-sm font-medium">{error}</span>
+                </div>
+                <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h1 className="text-2xl font-black text-gray-900 dark:text-gray-100">Zonas de Entrega</h1>
@@ -1336,43 +1234,7 @@ export function DeliveryZonesPage() {
               </div>
             </section>
 
-            {/* Section C — Advanced - HIDDEN (LEGACY) */}
-            {/*
-            <section className="rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setAdvancedOpen((v) => !v)}
-                className="w-full p-4 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50"
-              >
-                <div>
-                  <div className="text-sm font-black text-gray-900 dark:text-gray-100">Avançado / Legado</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    Compatibilidade com regras antigas (não recomendado para o fluxo principal).
-                  </div>
-                </div>
-                {advancedOpen ? <ChevronUp className="h-4 w-4 text-gray-500 dark:text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-500 dark:text-gray-400" />}
-              </button>
 
-              {advancedOpen ? (
-                <div className="p-4 border-t border-gray-100 dark:border-gray-800">
-                  {legacyRules.length === 0 ? (
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Nenhuma regra legada configurada.</div>
-                  ) : (
-                    <div className="space-y-2">
-                      {legacyRules.map((r) => (
-                        <div key={r.id} className="rounded-lg border border-gray-100 dark:border-gray-800 p-3">
-                          <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">{r.type}</div>
-                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                            Prioridade {r.priority} {r.isActive ? '• Ativa' : '• Inativa'}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : null}
-            </section>
-            */}
 
             <div className="text-xs text-gray-400">
               Dica: você pode usar zonas para "exceções" e manter a cobertura base como padrão.

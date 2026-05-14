@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useDrivers } from '../hooks/useDrivers';
-import type { DriverDTO, CreateDriverDTO, UpdateDriverDTO } from '@gestor/types';
+import type { DriverDTO } from '@gestor/types';
 import { DriverStatus, DriverVehicleType } from '@gestor/types';
 
 interface Props {

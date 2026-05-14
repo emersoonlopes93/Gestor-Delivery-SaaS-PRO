@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
-  Plus, Target, TrendingUp, AlertCircle, CheckCircle2, 
-  ChevronRight, Calendar, User, MoreVertical, Trash2
+  Plus, Target, Calendar, User, Trash2
 } from 'lucide-react';
 import { api } from '../../lib/api-client';
-import { GoalDTO, ApiResponse, GoalType, GoalStatus } from '@gestor/types';
+import { GoalDTO, GoalType } from '@gestor/types';
 
 export function GoalsPage() {
   const queryClient = useQueryClient();
@@ -90,7 +89,6 @@ export function GoalsPage() {
 
 function GoalListItem({ goal, onDelete }: { goal: GoalDTO, onDelete: () => void }) {
   const isRevenue = goal.type === GoalType.REVENUE;
-  const unit = isRevenue ? 'R$' : '';
   const progressColor = goal.progressPercentage >= 100 
     ? 'bg-green-500' 
     : goal.trend === 'behind' ? 'bg-red-500' : 'bg-primary-500';

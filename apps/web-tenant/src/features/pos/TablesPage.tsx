@@ -1,13 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { api } from '@/lib/api-client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
-  QrCode, 
   Plus, 
   Trash2, 
   Download, 
   Users, 
-  ChevronRight,
   Info,
   ExternalLink,
   Search,

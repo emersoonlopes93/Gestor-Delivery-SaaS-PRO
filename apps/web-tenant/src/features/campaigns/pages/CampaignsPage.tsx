@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Megaphone, Plus, Users, Send, PauseCircle, Play, Square, Trash2 } from 'lucide-react';
+import { Megaphone, Plus, Users, Send, PauseCircle, Play, Square } from 'lucide-react';
 import { api } from '../../../lib/api-client';
-import type { Campaign, CampaignStatus } from '@gestor/types';
+import type { Campaign } from '@gestor/types';
 import { CreateCampaignModal } from '../components/CreateCampaignModal';
 
 export function CampaignsPage() {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Sparkles, Plus } from 'lucide-react';
 import { api } from '../../lib/api-client';
@@ -1103,7 +1103,6 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <ProductPersonalization
               isComboMode={isComboMode}
               links={links}
-              isNew={isNew}
               moveLink={moveLink}
               openAddGroupModal={openAddGroupModal}
               setIsCreateComplementModalOpen={setIsCreateComplementModalOpen}

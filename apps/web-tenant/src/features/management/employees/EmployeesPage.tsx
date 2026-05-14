@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useEmployees } from './hooks/useEmployees';
 import { Modal } from '../../../components/Modal';
 import { EmployeeForm } from './components/EmployeeForm';

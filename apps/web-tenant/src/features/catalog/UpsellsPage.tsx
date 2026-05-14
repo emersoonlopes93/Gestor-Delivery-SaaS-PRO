@@ -3,27 +3,20 @@ import {
   Sparkles,
   Plus,
   Search,
-  MoreVertical,
   Trash2,
   Edit2,
-  Link2,
   Package,
-  ArrowRight,
-  ChevronRight,
 } from 'lucide-react';
 import { api } from '../../lib/api-client';
-import { useAuthStore } from '../../stores/auth.store';
 import { Modal } from '../../components/Modal';
 import {
   Upsell,
   UpsellWithItems,
   CreateUpsellDto,
-  UpdateUpsellDto,
   Product,
 } from '@gestor/types';
 
 export function UpsellsPage() {
-  const { user } = useAuthStore();
   const [upsells, setUpsells] = useState<Upsell[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');

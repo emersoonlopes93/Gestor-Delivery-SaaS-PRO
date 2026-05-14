@@ -96,3 +96,6 @@ pnpm dev:all
 ---
 
 > **Nota Técnica:** Todas as dependências circulares de módulos (KDS, Storefront, Printer) foram resolvidas durante a auditoria de Abril/2026, garantindo que a aplicação suba sem erros de injeção de dependência.
+
+pnpm -r exec rm -rf node_modules
+pnpm install

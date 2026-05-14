@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
-import { Tenant, TenantSettings, TenantOperatingHours } from '@gestor/types';
+import { Tenant, TenantSettings } from '@gestor/types';
 
 interface OperatingHourForm {
   id?: string;
@@ -19,7 +19,6 @@ const DAY_NAMES = [
 export function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [tenant, setTenant] = useState<Tenant | null>(null);
   const [settings, setSettings] = useState<Partial<TenantSettings>>({
     timezone: 'America/Sao_Paulo',
     currency: 'BRL',
@@ -66,7 +65,6 @@ export function SettingsPage() {
     try {
       const response = await api.get<Tenant & { settings: TenantSettings }>('/tenant/me');
       if (response.success) {
-        setTenant(response.data);
         if (response.data.settings) {
           setSettings({
             ...response.data.settings,

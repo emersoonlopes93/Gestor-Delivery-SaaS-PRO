@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api-client';
-import { ComboSlot, ComboSlotAllowedItem, Product } from '@gestor/types';
+import { Product } from '@gestor/types';
 
 type ComboListItem = Product & {
   publication?: {
@@ -10,9 +10,6 @@ type ComboListItem = Product & {
   } | null;
 };
 
-type SlotWithAllowed = ComboSlot & {
-  allowedItems?: Array<ComboSlotAllowedItem>;
-};
 
 export function CombosV2Page() {
   const navigate = useNavigate();

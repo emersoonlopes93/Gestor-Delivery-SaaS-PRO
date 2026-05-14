@@ -45,6 +45,5 @@
     "../../packages/auth/src",
     "../../packages/config/src",
     "../../packages/ui/src"
-  ],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  ]
 }

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { api } from '../../lib/api-client';
-import { ProductCategory, Product, OptionGroup, OptionItem } from '@gestor/types';
+import { ProductCategory, Product, OptionGroup } from '@gestor/types';
 
 interface SimulationResult {
   sizeId: string;

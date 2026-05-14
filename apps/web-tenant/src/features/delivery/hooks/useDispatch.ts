@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
-import type { OrderDispatchItemDTO, OrderStatus } from '@gestor/types';
+import type { OrderDispatchItemDTO } from '@gestor/types';
 
 export function useDispatch() {
   const queryClient = useQueryClient();

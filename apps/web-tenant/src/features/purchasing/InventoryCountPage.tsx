@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
 import { IngredientDTO, UnitType } from '@gestor/types';
 import { ClipboardList, Save, AlertTriangle, CheckCircle2, RefreshCcw } from 'lucide-react';

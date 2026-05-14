@@ -54,8 +54,6 @@ export function OrdersListPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
-  const token = localStorage.getItem('accessToken');
-
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -230,8 +228,6 @@ function OrderDetailPanel({ orderId, onBack }: { orderId: string; onBack: () => 
   const [order, setOrder] = useState<OrderResponseDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-
-  const token = localStorage.getItem('accessToken');
 
   const fetchOrder = useCallback(async () => {
     setLoading(true);

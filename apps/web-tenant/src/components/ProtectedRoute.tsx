@@ -15,7 +15,7 @@ import type { TenantUserSession } from '@gestor/types';
  * Loads user session on mount.
  */
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading, setUser, clearUser, setLoading } =
+  const { isAuthenticated, isLoading, setUser, clearUser } =
     useAuthStore();
   const navigate = useNavigate();
 

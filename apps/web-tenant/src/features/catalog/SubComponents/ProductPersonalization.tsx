@@ -1,10 +1,8 @@
 import React from 'react';
-import { ProductOptionGroupLink } from '@gestor/types';
 
 interface ProductPersonalizationProps {
   isComboMode: boolean;
   links: any[];
-  isNew: boolean;
   moveLink: (id: string, direction: -1 | 1) => void;
   openAddGroupModal: () => void;
   setIsCreateComplementModalOpen: (open: boolean) => void;
@@ -19,7 +17,6 @@ interface ProductPersonalizationProps {
 export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
   isComboMode,
   links,
-  isNew,
   moveLink,
   openAddGroupModal,
   setIsCreateComplementModalOpen,

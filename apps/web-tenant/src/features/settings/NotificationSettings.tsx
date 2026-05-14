@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Bell, 
   Save, 
   MessageSquare, 
-  CheckCircle2, 
-  XCircle, 
   Info,
-  Loader2,
-  ChevronRight
+  Loader2
 } from 'lucide-react';
 import { api } from '../../lib/api-client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';

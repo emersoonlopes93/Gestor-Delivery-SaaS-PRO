@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useDrivers } from './hooks/useDrivers';
 import { DriverFormModal } from './components/DriverFormModal';
 import type { DriverDTO } from '@gestor/types';

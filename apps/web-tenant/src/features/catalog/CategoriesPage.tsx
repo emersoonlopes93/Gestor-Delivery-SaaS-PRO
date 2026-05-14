@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
-import { ProductCategory, CreateCategoryDto } from '@gestor/types';
+import { ProductCategory } from '@gestor/types';
 import { Modal } from '../../components/Modal';
 import { useNavigate } from 'react-router-dom';
 

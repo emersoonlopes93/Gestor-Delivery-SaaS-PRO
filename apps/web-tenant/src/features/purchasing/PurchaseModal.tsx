@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { SupplierDTO, IngredientDTO, CreatePurchaseDTO, PaymentStatus } from '@gestor/types';
 import { api } from '../../lib/api-client';

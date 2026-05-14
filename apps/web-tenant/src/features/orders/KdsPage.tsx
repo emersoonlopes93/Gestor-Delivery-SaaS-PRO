@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Clock, CheckCircle2, PlayCircle, ChefHat } from 'lucide-react';
-import type { OrderKdsItemDTO, OrderStatus, UpdateOrderStatusDTO } from '@gestor/types';
+import { RefreshCw, Clock, CheckCircle2, ChefHat } from 'lucide-react';
+
 
 const API_BASE = '/api/v1';
 

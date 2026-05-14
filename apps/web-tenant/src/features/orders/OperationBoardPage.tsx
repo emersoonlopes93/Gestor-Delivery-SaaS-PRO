@@ -1,7 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshCw, Clock, ArrowRight } from 'lucide-react';
 import type { OrderBoardItemDTO, OrderStatus, UpdateOrderStatusDTO } from '@gestor/types';
-import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
 
 const API_BASE = '/api/v1';
 

@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, 
+  BarChart, Bar, PieChart, Pie, Cell, 
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
 } from 'recharts';
 import { 
-  TrendingUp, Users, Package, Clock, DollarSign, 
-  ArrowUpRight, ArrowDownRight, Filter, Download
+  TrendingUp, Package, Clock, DollarSign, 
+  ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
 import { api } from '../../lib/api-client';
-import { DashboardStatsDTO, ApiResponse } from '@gestor/types';
+import { DashboardStatsDTO } from '@gestor/types';
 
 /**
  * Filter intervals for the reports
@@ -64,7 +64,6 @@ export function ReportsPage() {
 
   // Prepare data for charts
   const channelData = Object.entries(stats.commercial.revenueByChannel).map(([name, value]) => ({ name, value }));
-  const statusData = Object.entries(stats.operational.ordersByStatus).map(([name, value]) => ({ name, value }));
 
   return (
     <div className="p-6 space-y-8 bg-gray-50 dark:bg-gray-900/50 min-h-screen">
@@ -144,7 +143,7 @@ export function ReportsPage() {
                   dataKey="value"
                   label={({ name, percent }) => `${name} ${(Number(percent || 0) * 100).toFixed(0)}%`}
                 >
-                  {channelData.map((entry, index) => (
+                  {channelData.map((_, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>

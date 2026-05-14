@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Bot, Smartphone, Settings, Zap, RefreshCw, AlertCircle, CheckCircle2, QrCode as QrIcon } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Bot, Smartphone, Settings, RefreshCw, QrCode as QrIcon } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../../lib/api-client';
 

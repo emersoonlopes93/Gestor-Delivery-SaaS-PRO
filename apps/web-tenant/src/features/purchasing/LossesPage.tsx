@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
 import { IngredientDTO } from '@gestor/types';
 import { Trash2, Plus } from 'lucide-react';

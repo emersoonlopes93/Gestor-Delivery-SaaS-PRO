@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Megaphone, Users, Calendar, MessageSquare, ChevronRight, ChevronLeft } from 'lucide-react';
+import { useState } from 'react';
+import { X, Megaphone, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api-client';
 import type { CreateCampaignDto } from '@gestor/types';

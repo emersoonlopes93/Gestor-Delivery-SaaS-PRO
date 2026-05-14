@@ -5,7 +5,7 @@ import { RecipeModal } from '../inventory/RecipeModal';
 import { Modal } from '../../components/Modal';
 import { PermissionGate } from '../../components/PermissionGate';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Eye, Pencil, Trash2, FileText, Search, ChevronDown, Layers, Send, EyeOff, HelpCircle, X, Copy } from 'lucide-react';
+import { Eye, Pencil, Trash2, FileText, Search, ChevronDown, Send, EyeOff, HelpCircle, Copy } from 'lucide-react';
 
 type ProductsViewMode = 'all' | 'grouped';
 
@@ -24,8 +24,6 @@ export function ProductsPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ProductsViewMode>('all');
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProductStatusFilter>('all');
   const [typeFilter, setTypeFilter] = useState<ProductTypeFilter>('all');

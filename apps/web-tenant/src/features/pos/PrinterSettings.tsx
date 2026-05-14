@@ -1,32 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Printer, 
-  Settings, 
-  Plus, 
-  Trash2, 
   RefreshCw, 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
   Play, 
   Square,
   AlertTriangle,
   Monitor
 } from 'lucide-react';
 import { api } from '../../lib/api-client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
-interface PrintJob {
-  id: string;
-  orderNumber: string;
-  station: string;
-  status: string;
-  createdAt: string;
-  content: string;
-}
 
 export function PrinterSettings() {
-  const queryClient = useQueryClient();
+
   const [isSpoolerRunning, setIsSpoolerRunning] = useState(false);
   const [selectedStation, setSelectedStation] = useState('GERAL');
   const [logs, setLogs] = useState<string[]>([]);

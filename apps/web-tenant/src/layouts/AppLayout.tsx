@@ -25,18 +25,12 @@ import {
   UserCircle,
   ChevronRight,
   CornerDownRight,
-  Copy,
-  ExternalLink,
   Moon,
   Sun,
-  Store,
   LogOut,
   Globe,
   QrCode,
   Printer,
-  CheckCircle2,
-  XCircle,
-  PauseCircle,
   MessageSquare,
   Megaphone,
   Bot
@@ -317,7 +311,6 @@ export function AppLayout() {
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [desktopSearch, setDesktopSearch] = useState('');
-  const [copiedPublicLink, setCopiedPublicLink] = useState(false);
   const [storefrontBaseUrl, setStorefrontBaseUrl] = useState('');
 
   const { data: tenantData } = useQuery({
@@ -487,12 +480,7 @@ export function AppLayout() {
     navigate('/login');
   };
 
-  const handleCopyPublicUrl = useCallback(async () => {
-    if (!publicMenuUrl) return;
-    await navigator.clipboard.writeText(publicMenuUrl);
-    setCopiedPublicLink(true);
-    window.setTimeout(() => setCopiedPublicLink(false), 1500);
-  }, [publicMenuUrl]);
+
 
   return (
     <div className="min-h-screen flex bg-gray-50 dark:bg-gray-900/50 dark:bg-gray-950 transition-colors">
