@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { PrismaService } from '../database/prisma.service';
 import { StorefrontPayload, StorefrontCategoryPayload, StorefrontComboPayload, StorefrontProductPayload } from '@gestor/types';
 import { TenantStatus } from '@gestor/core';
@@ -15,6 +17,7 @@ export class StorefrontService {
     private readonly availabilityService: AvailabilityService,
     private readonly upsellsService: UpsellsService,
     private readonly schedulingService: SchedulingService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   async getStorefrontPayload(
@@ -23,6 +26,12 @@ export class StorefrontService {
   ): Promise<StorefrontPayload> {
     const channel: SalesChannel =
       fulfillmentType === 'pickup' ? 'storefront_pickup' : 'storefront_delivery';
+
+    const cacheKey = `storefront:${slug}:${fulfillmentType}`;
+    const cachedPayload = await this.cacheManager.get<StorefrontPayload>(cacheKey);
+    if (cachedPayload) {
+      return cachedPayload;
+    }
 
     // 1. Resolve Tenant
     const tenant = await this.prisma.tenant.findFirst({
@@ -133,17 +142,17 @@ export class StorefrontService {
     }
     for (const combo of comboRows) idsToCheck.add(combo.id);
 
-    const availabilityPairs = await Promise.all(
-      [...idsToCheck].map(async (productId) => {
-        const decision = await this.availabilityService.decide({
-          tenantId: tenant.id,
-          productId,
-          channel,
-        });
-        return [productId, decision.canSell] as const;
-      }),
-    );
-    const availabilityMap = new Map<string, boolean>(availabilityPairs);
+    const productIdsArray = Array.from(idsToCheck);
+    const availabilityMapResults = await this.availabilityService.decideMany({
+      tenantId: tenant.id,
+      productIds: productIdsArray,
+      channel,
+    });
+
+    const availabilityMap = new Map<string, boolean>();
+    for (const [id, decision] of availabilityMapResults.entries()) {
+      availabilityMap.set(id, decision.canSell);
+    }
 
     const categories: StorefrontCategoryPayload[] = categoryRows
       .map((cat: CategoryWithProducts) => ({
@@ -337,12 +346,17 @@ export class StorefrontService {
         }),
     }));
 
-    return {
+    const payload = {
       tenant: tenantInfo,
       categories,
       combos,
       upsells: globalUpsells,
     };
+
+    // Cache for 60 seconds
+    await this.cacheManager.set(cacheKey, payload, 60000);
+
+    return payload;
   }
 
   async getAvailableSlots(slug: string, date: Date) {

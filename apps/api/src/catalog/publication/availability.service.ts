@@ -182,6 +182,89 @@ export class AvailabilityService {
     return { canSell: true, reason: null, effectiveStatus: publication.operationalStatus };
   }
 
+  async decideMany(input: {
+    tenantId: string;
+    productIds: string[];
+    channel: SalesChannel;
+    now?: Date;
+    context?: { settings?: any; operatingHours?: any[] };
+  }): Promise<Map<string, AvailabilityDecision>> {
+    const now = input.now ?? new Date();
+    const storeStatus = await this.getStoreStatus(input.tenantId, now, input.context);
+    
+    const results = new Map<string, AvailabilityDecision>();
+
+    if (!storeStatus.isOpen) {
+      for (const id of input.productIds) {
+        results.set(id, { canSell: false, reason: `STORE_${storeStatus.reason}`, effectiveStatus: storeStatus.message });
+      }
+      return results;
+    }
+
+    const publications = await this.prisma.catalogPublication.findMany({
+      where: { tenantId: input.tenantId, productId: { in: input.productIds } },
+      include: { rules: { where: { isActive: true, channel: input.channel } } }
+    });
+
+    const pubMap = new Map<string, any>(publications.map(p => [p.productId, p]));
+
+    const settings = input.context?.settings || await this.prisma.tenantSettings.findUnique({
+      where: { tenantId: input.tenantId },
+      select: { timezone: true },
+    });
+    const timezone = settings?.timezone || 'America/Sao_Paulo';
+    const { dayOfWeek, timeHHmm } = this.getTenantLocalDayAndTime(now, timezone);
+
+    const isStorefront = input.channel.startsWith('storefront_');
+
+    for (const productId of input.productIds) {
+      const pub = pubMap.get(productId);
+      if (!pub) {
+        results.set(productId, { canSell: true, reason: null, effectiveStatus: null });
+        continue;
+      }
+
+      if (isStorefront && pub.publicationStatus !== 'published') {
+        results.set(productId, { canSell: false, reason: 'NOT_PUBLISHED', effectiveStatus: pub.operationalStatus });
+        continue;
+      }
+
+      if (pub.operationalStatus === 'inactive') {
+        results.set(productId, { canSell: false, reason: 'INACTIVE', effectiveStatus: pub.operationalStatus });
+        continue;
+      }
+
+      if (pub.operationalStatus === 'sold_out_manual') {
+        results.set(productId, { canSell: false, reason: 'SOLD_OUT', effectiveStatus: pub.operationalStatus });
+        continue;
+      }
+
+      if (isStorefront && pub.operationalStatus === 'hidden') {
+        results.set(productId, { canSell: false, reason: 'HIDDEN', effectiveStatus: pub.operationalStatus });
+        continue;
+      }
+
+      if (!pub.rules || pub.rules.length === 0) {
+        results.set(productId, { canSell: true, reason: null, effectiveStatus: pub.operationalStatus });
+        continue;
+      }
+
+      const matchesAny = pub.rules.some((r: any) => {
+        const days = (r.daysOfWeek || []) as number[];
+        if (!days.includes(dayOfWeek)) return false;
+        return this.isTimeInRange(timeHHmm, r.startTime, r.endTime);
+      });
+
+      if (!matchesAny) {
+        results.set(productId, { canSell: false, reason: 'OUT_OF_SCHEDULE', effectiveStatus: pub.operationalStatus });
+      } else {
+        results.set(productId, { canSell: true, reason: null, effectiveStatus: pub.operationalStatus });
+      }
+    }
+
+    return results;
+  }
+
   async assertCanSell(input: {
     tenantId: string;
     productId: string;

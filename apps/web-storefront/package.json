@@ -7,7 +7,8 @@
     "dev": "vite --port 3000",
     "build": "tsc -b --noEmit && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "node server.js"
   },
   "dependencies": {
     "@gestor/core": "workspace:*",
@@ -15,6 +16,8 @@
     "@tanstack/react-query": "^5.60.0",
     "axios": "^1.7.7",
     "clsx": "^2.1.1",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.2",
     "leaflet": "^1.9.4",
     "lucide-react": "0.453.0",
     "react": "^18.3.1",
