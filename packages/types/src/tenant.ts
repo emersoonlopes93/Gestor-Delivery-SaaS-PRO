@@ -61,6 +61,12 @@ export interface TenantSettings {
 
   isStorePaused: boolean;
   storePauseReason?: string;
+  whatsappNotificationsEnabled?: boolean;
+  notificationTemplates?: Record<string, string>;
+  audioNotificationEnabled?: boolean;
+  newOrderSound?: string;
+  cancellationSound?: string;
+  notificationVolume?: number;
   createdAt: string;
   updatedAt: string;
 }

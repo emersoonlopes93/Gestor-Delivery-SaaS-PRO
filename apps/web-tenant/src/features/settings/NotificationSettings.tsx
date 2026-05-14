@@ -4,7 +4,10 @@ import {
   Save, 
   MessageSquare, 
   Info,
-  Loader2
+  Loader2,
+  Volume2,
+  VolumeX,
+  Play
 } from 'lucide-react';
 import { api } from '../../lib/api-client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -21,6 +24,8 @@ const DEFAULT_TEMPLATES = {
 export function NotificationSettings() {
   const queryClient = useQueryClient();
   const [enabled, setEnabled] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [volume, setVolume] = useState(1.0);
   const [templates, setTemplates] = useState<Record<string, string>>(DEFAULT_TEMPLATES);
 
   const { data: settings, isLoading } = useQuery({
@@ -37,6 +42,8 @@ export function NotificationSettings() {
       if (settings.notificationTemplates) {
         setTemplates({ ...DEFAULT_TEMPLATES, ...settings.notificationTemplates });
       }
+      setAudioEnabled(settings.audioNotificationEnabled ?? true);
+      setVolume(settings.notificationVolume ?? 1.0);
     }
   }, [settings]);
 
@@ -53,8 +60,16 @@ export function NotificationSettings() {
   const handleSave = () => {
     mutation.mutate({
       whatsappNotificationsEnabled: enabled,
-      notificationTemplates: templates
+      notificationTemplates: templates,
+      audioNotificationEnabled: audioEnabled,
+      notificationVolume: volume,
     });
+  };
+
+  const handleTestSound = () => {
+    const audio = new Audio('/sounds/new-order.mp3');
+    audio.volume = volume;
+    audio.play().catch(() => alert('Clique na página primeiro para permitir o áudio!'));
   };
 
   if (isLoading) return (
@@ -106,6 +121,53 @@ export function NotificationSettings() {
             >
               <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${enabled ? 'right-1' : 'left-1'}`} />
             </button>
+          </div>
+        </section>
+
+        {/* Notificações Sonoras */}
+        <section className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 p-8 shadow-sm">
+           <div className="flex items-center justify-between mb-8">
+            <div className="flex gap-4">
+              <div className={`p-3 rounded-2xl transition-colors ${audioEnabled ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-400'}`}>
+                {audioEnabled ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
+              </div>
+              <div>
+                <h2 className="text-lg font-black text-gray-900 dark:text-gray-100">Alertas Sonoros</h2>
+                <p className="text-sm text-gray-500 font-medium">Toque um som sempre que um novo pedido chegar.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setAudioEnabled(!audioEnabled)}
+              className={`w-14 h-8 rounded-full relative transition-colors duration-300 ${audioEnabled ? 'bg-primary-500' : 'bg-gray-200 dark:bg-gray-800'}`}
+            >
+              <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${audioEnabled ? 'right-1' : 'left-1'}`} />
+            </button>
+          </div>
+
+          <div className={`space-y-6 transition-opacity ${audioEnabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-black uppercase tracking-widest text-gray-400">Volume do Alerta</label>
+                <span className="text-xs font-bold text-gray-900 dark:text-gray-100">{Math.round(volume * 100)}%</span>
+              </div>
+              <input 
+                type="range" 
+                min="0" max="1" step="0.1" 
+                value={volume}
+                onChange={(e) => setVolume(parseFloat(e.target.value))}
+                className="w-full h-2 bg-gray-100 dark:bg-gray-800 rounded-lg appearance-none cursor-pointer accent-primary-600"
+              />
+            </div>
+
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={handleTestSound}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-xs hover:bg-gray-200 transition-all"
+              >
+                <Play className="w-4 h-4" />
+                Testar Som de Novo Pedido
+              </button>
+            </div>
           </div>
         </section>
 

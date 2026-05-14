@@ -39,11 +39,29 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { event: 'joined', data: { token: data.token } };
   }
 
+  @SubscribeMessage('joinTenant')
+  handleJoinTenant(
+    @MessageBody() data: { tenantId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    if (!data.tenantId) return { event: 'error', data: 'TenantId missing' };
+    client.join(`tenant:${data.tenantId}`);
+    this.logger.log(`Client ${client.id} joined updates for tenant: ${data.tenantId}`);
+    return { event: 'joinedTenant', data: { tenantId: data.tenantId } };
+  }
+
   emitOrderStatusUpdated(token: string, status: string, note?: string) {
     this.server.to(`order:${token}`).emit('statusUpdated', { 
       status, 
       note, 
       timestamp: new Date().toISOString() 
+    });
+  }
+
+  emitNewOrder(tenantId: string, order: any) {
+    this.server.to(`tenant:${tenantId}`).emit('newOrder', {
+      order,
+      timestamp: new Date().toISOString()
     });
   }
 }

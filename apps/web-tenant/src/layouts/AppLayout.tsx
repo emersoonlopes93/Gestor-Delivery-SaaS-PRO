@@ -41,6 +41,7 @@ import { useThemeStore } from '../stores/theme.store';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api-client';
 import type { Tenant, TenantSettings } from '@gestor/types';
+import { useNotificationAudio } from '../hooks/useNotificationAudio';
 
 type SidebarItem = {
   id: string;
@@ -346,6 +347,12 @@ export function AppLayout() {
   const handleToggleStore = () => {
     toggleStoreMutation.mutate(!isStorePaused);
   };
+
+  // Audio Notifications Integration
+  useNotificationAudio(tenantData?.id, {
+    enabled: tenantData?.settings?.audioNotificationEnabled ?? true,
+    volume: tenantData?.settings?.notificationVolume ?? 1.0,
+  });
 
   const initialSidebarState = useMemo(() => {
     const saved = safeParseSidebarState(localStorage.getItem(SIDEBAR_STORAGE_KEY));
