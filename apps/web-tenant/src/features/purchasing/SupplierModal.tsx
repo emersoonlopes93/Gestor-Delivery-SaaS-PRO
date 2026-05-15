@@ -113,5 +113,3 @@ export function SupplierModal({ isOpen, onClose, onSave, editingSupplier }: Supp
     </Modal>
   );
 }
-  );
-}

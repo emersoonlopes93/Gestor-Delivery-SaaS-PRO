@@ -156,5 +156,3 @@ export function TransactionModal({ isOpen, onClose, onSave }: TransactionModalPr
     </Modal>
   );
 }
-  );
-}

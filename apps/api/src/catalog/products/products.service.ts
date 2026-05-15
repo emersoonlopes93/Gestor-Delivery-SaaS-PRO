@@ -210,7 +210,7 @@ export class ProductsService {
       where: {
         tenantId,
         deletedAt: null,
-        isActive: true,
+        isActive: channel ? true : undefined,
         // search logic...
         ...(search && {
           name: { contains: search, mode: 'insensitive' }
@@ -411,6 +411,9 @@ export class ProductsService {
         comboBundleItems: true,
         publication: true,
         recipeIngredients: true,
+        complementGroups: true,
+        optionItemPrices: true,
+        upsellLinks: true,
       },
     });
 
@@ -443,13 +446,11 @@ export class ProductsService {
           sku: source.sku ? `${source.sku}-COPY` : null,
           order: (source.order ?? 0) + 1,
           recipeIngredients: {
-            createMany: {
-              data: ((source as any).recipeIngredients || []).map((ri: any) => ({
-                tenantId,
-                ingredientId: ri.ingredientId,
-                quantity: ri.quantity,
-              })),
-            },
+            create: (source.recipeIngredients || []).map((ri: any) => ({
+              tenantId,
+              ingredientId: ri.ingredientId,
+              quantity: ri.quantity,
+            })),
           },
         },
       });
@@ -468,6 +469,41 @@ export class ProductsService {
             overrideIsRequired: l.overrideIsRequired,
             overrideMinSelect: l.overrideMinSelect,
             overrideMaxSelect: l.overrideMaxSelect,
+          })),
+        });
+      }
+
+      // Duplicate Complement Group Links
+      if (source.complementGroups && source.complementGroups.length > 0) {
+        await tx.productComplementGroupLink.createMany({
+          data: source.complementGroups.map((l: any) => ({
+            tenantId,
+            productId: duplicate.id,
+            complementGroupId: l.complementGroupId,
+            order: l.order,
+          })),
+        });
+      }
+
+      // Duplicate Option Item Prices
+      if (source.optionItemPrices && source.optionItemPrices.length > 0) {
+        await tx.productOptionItemPrice.createMany({
+          data: source.optionItemPrices.map((p: any) => ({
+            tenantId,
+            productId: duplicate.id,
+            optionItemId: p.optionItemId,
+            price: p.price,
+          })),
+        });
+      }
+
+      // Duplicate Upsell Links
+      if (source.upsellLinks && source.upsellLinks.length > 0) {
+        await tx.productUpsell.createMany({
+          data: source.upsellLinks.map((l: any) => ({
+            tenantId,
+            productId: duplicate.id,
+            upsellId: l.upsellId,
           })),
         });
       }

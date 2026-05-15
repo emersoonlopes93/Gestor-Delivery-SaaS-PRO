@@ -7,7 +7,8 @@ import {
   Copy, 
   Check,
   ChevronRight,
-  ArrowLeft
+  ArrowLeft,
+  X
 } from 'lucide-react';
 import { PaymentMethod } from '@gestor/types';
 

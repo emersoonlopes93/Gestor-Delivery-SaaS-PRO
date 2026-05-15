@@ -3,6 +3,7 @@ import { api } from '../../lib/api-client';
 import { IngredientDTO } from '@gestor/types';
 import { Trash2, Plus } from 'lucide-react';
 import { format } from 'date-fns';
+import { Modal } from '../../components/Modal';
 
 interface LossEntry {
   id: string;
@@ -139,7 +140,6 @@ export function LossesPage() {
         </div>
       </div>
 
-import { Modal } from '../../components/Modal';
 
       <Modal
         isOpen={isModalOpen}
