@@ -167,7 +167,7 @@ export function UpsellsPage() {
           <input
             type="text"
             placeholder="Buscar ofertas..."
-            className="flex-1 outline-none text-sm bg-transparent"
+            className="flex-1 outline-none text-sm bg-transparent text-gray-900 dark:text-gray-100"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -176,7 +176,7 @@ export function UpsellsPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gray-50 dark:bg-gray-900/50/50">
+              <tr className="bg-gray-50 dark:bg-gray-950">
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Oferta</th>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Regra de Preço</th>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Exibição</th>
@@ -199,7 +199,7 @@ export function UpsellsPage() {
                 </tr>
               ) : (
                 filteredUpsells.map((u) => (
-                  <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 transition-colors group">
+                  <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/40 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
                         <span className="font-medium text-gray-900 dark:text-gray-100">{u.name}</span>
@@ -274,7 +274,7 @@ export function UpsellsPage() {
             <input
               type="text"
               required
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              className="input-premium"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
@@ -282,7 +282,7 @@ export function UpsellsPage() {
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrição Curta</label>
             <textarea
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+              className="input-premium h-20 resize-none"
               rows={2}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -293,7 +293,7 @@ export function UpsellsPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de Preço</label>
               <select
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg outline-none"
+                className="input-premium"
                 value={formData.pricingType}
                 onChange={(e) => setFormData({ ...formData, pricingType: e.target.value as any })}
               >
@@ -312,7 +312,7 @@ export function UpsellsPage() {
                   type="number"
                   step="0.01"
                   required
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg outline-none"
+                  className="input-premium"
                   value={formData.pricingValue}
                   onChange={(e) => setFormData({ ...formData, pricingValue: Number(e.target.value) })}
                 />

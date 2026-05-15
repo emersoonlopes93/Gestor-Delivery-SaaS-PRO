@@ -1525,7 +1525,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <input
               value={slotForm.name}
               onChange={(e) => setSlotForm((p) => ({ ...p, name: e.target.value }))}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+              className="input-premium"
             />
           </div>
           <div>
@@ -1533,7 +1533,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <input
               value={slotForm.description ?? ''}
               onChange={(e) => setSlotForm((p) => ({ ...p, description: e.target.value }))}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+              className="input-premium"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -1552,7 +1552,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                 type="number"
                 value={Number(slotForm.minSelect ?? 1)}
                 onChange={(e) => setSlotForm((p) => ({ ...p, minSelect: Number(e.target.value || 1) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                className="input-premium"
               />
             </div>
             <div>
@@ -1561,7 +1561,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                 type="number"
                 value={Number(slotForm.maxSelect ?? 1)}
                 onChange={(e) => setSlotForm((p) => ({ ...p, maxSelect: Number(e.target.value || 1) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                className="input-premium"
               />
             </div>
           </div>
@@ -1599,7 +1599,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <select
               value={allowedForm.productId}
               onChange={(e) => setAllowedForm((p) => ({ ...p, productId: e.target.value }))}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+              className="input-premium"
             >
               {allowedProducts.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -1615,7 +1615,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               step="0.01"
               value={Number(allowedForm.additionalPrice ?? 0)}
               onChange={(e) => setAllowedForm((p) => ({ ...p, additionalPrice: Number(e.target.value || 0) }))}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+              className="input-premium"
             />
           </div>
         </div>
@@ -1654,7 +1654,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               <select
                 value={ruleForm.channel}
                 onChange={(e) => setRuleForm((p) => ({ ...p, channel: e.target.value as any }))}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                className="input-premium"
               >
                 <option value="storefront_delivery">Delivery</option>
                 <option value="storefront_pickup">Retirada</option>
@@ -1719,7 +1719,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               <input
                 value={ruleForm.startTime}
                 onChange={(e) => setRuleForm((p) => ({ ...p, startTime: e.target.value }))}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                className="input-premium"
                 placeholder="HH:MM"
               />
             </div>
@@ -1728,7 +1728,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               <input
                 value={ruleForm.endTime}
                 onChange={(e) => setRuleForm((p) => ({ ...p, endTime: e.target.value }))}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                className="input-premium"
                 placeholder="HH:MM"
               />
             </div>

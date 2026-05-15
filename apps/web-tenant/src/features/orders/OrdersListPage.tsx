@@ -296,19 +296,19 @@ function OrderDetailPanel({ orderId, onBack }: { orderId: string; onBack: () => 
 
       {/* Status Actions */}
       {validTransitions.length > 0 && (
-        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6">
-          <p className="text-xs font-bold text-blue-700 uppercase mb-3">Ações Disponíveis</p>
+        <div className="bg-primary-500/5 border border-primary-500/20 rounded-2xl p-5 mb-6">
+          <p className="text-[10px] font-black text-primary-600 dark:text-primary-400 uppercase tracking-widest mb-4">Ações Disponíveis</p>
           <div className="flex gap-2 flex-wrap">
             {validTransitions.map(status => (
               <button
                 key={status}
                 onClick={() => handleStatusUpdate(status)}
                 disabled={updating}
-                className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors ${
+                className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 ${
                   status === 'cancelled'
-                    ? 'bg-red-600 text-white hover:bg-red-700'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                } disabled:opacity-50`}
+                    ? 'bg-red-600 text-white hover:bg-red-700 shadow-red-900/10'
+                    : 'bg-primary-600 text-white hover:bg-primary-700 shadow-primary-900/10'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 {STATUS_LABELS[status]}
               </button>
@@ -371,9 +371,9 @@ function OrderDetailPanel({ orderId, onBack }: { orderId: string; onBack: () => 
 
       {/* Notes */}
       {order.notes && (
-        <section className="bg-orange-50 dark:bg-orange-500/10 rounded-xl p-4 border border-orange-100 dark:border-orange-500/20 mb-4">
-          <h3 className="text-xs font-bold text-orange-700 dark:text-orange-400 uppercase mb-1">Observações</h3>
-          <p className="text-sm text-orange-800 dark:text-orange-200 italic">{order.notes}</p>
+        <section className="bg-amber-500/5 dark:bg-amber-500/10 rounded-2xl p-5 border border-amber-500/10 dark:border-amber-500/20 mb-4">
+          <h3 className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-2">Observações do Pedido</h3>
+          <p className="text-sm text-amber-900 dark:text-amber-200 font-medium italic">"{order.notes}"</p>
         </section>
       )}
 

@@ -119,7 +119,7 @@ export function CategoriesPage() {
       ) : (
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50 dark:bg-gray-900/50/50 border-b border-gray-100 dark:border-gray-800">
+            <thead className="bg-gray-50 dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800">
               <tr>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Nome</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Produtos</th>
@@ -130,7 +130,7 @@ export function CategoriesPage() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {categories.map((category) => (
-                <tr key={category.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50/50 transition-colors group">
+                <tr key={category.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/40 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="font-bold text-gray-900 dark:text-gray-100">{category.name}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-xs">{category.description || 'Sem descrição'}</div>
@@ -142,11 +142,11 @@ export function CategoriesPage() {
                     {category.order}
                   </td>
                   <td className="px-6 py-4 text-sm">
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${category.isActive ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${category.isActive ? 'status-badge-success' : 'status-badge-danger'}`}>
                       {category.isActive ? 'Ativo' : 'Inativo'}
                     </span>
                     {category.isFeatured && (
-                      <span className="ml-2 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200">
+                      <span className="ml-2 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider status-badge-warning">
                         Destaque
                       </span>
                     )}
@@ -162,14 +162,14 @@ export function CategoriesPage() {
                       </button>
                       <button
                         onClick={() => handleOpenModal(category)}
-                        className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                        className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-500/10 rounded-lg transition-all"
                         title="Editar"
                       >
                         ✏️
                       </button>
                       <button
                         onClick={() => handleDelete(category.id)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
                         title="Excluir"
                       >
                         🗑️
@@ -218,7 +218,7 @@ export function CategoriesPage() {
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none"
+              className="input-premium"
               placeholder="Ex: Pizzas, Bebidas, Sobremesas"
             />
           </div>
@@ -227,7 +227,7 @@ export function CategoriesPage() {
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none h-24 resize-none"
+              className="input-premium h-24 resize-none"
               placeholder="Breve descrição da categoria..."
             />
           </div>
@@ -239,7 +239,7 @@ export function CategoriesPage() {
                 type="number"
                 value={formData.order}
                 onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none"
+                className="input-premium"
               />
             </div>
             <div className="flex flex-col justify-end gap-3">
@@ -276,7 +276,7 @@ export function CategoriesPage() {
                     templateType: e.target.value,
                     templateConfig: e.target.value === 'pizza' ? { pricingStrategy: 'highest', allowHalfHalf: true } : {}
                   })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none text-sm font-bold"
+                  className="input-premium text-sm font-bold"
                 >
                   <option value="none">Nenhum (Padrão)</option>
                   <option value="pizza">🍕 Pizza (Meio a Meio / Tamanhos)</option>
@@ -292,7 +292,7 @@ export function CategoriesPage() {
                       ...formData, 
                       templateConfig: { ...formData.templateConfig, pricingStrategy: e.target.value }
                     })}
-                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none text-sm font-bold"
+                    className="input-premium text-sm font-bold"
                   >
                     <option value="highest">Maior Valor</option>
                     <option value="average">Média de Valores</option>
@@ -304,8 +304,8 @@ export function CategoriesPage() {
             </div>
 
             {formData.templateType === 'pizza' && (
-              <div className="mt-4 p-4 bg-primary-50 rounded-xl border border-primary-100">
-                <p className="text-xs text-primary-700 leading-relaxed font-medium">
+              <div className="mt-4 p-4 bg-primary-50 dark:bg-primary-500/10 rounded-xl border border-primary-100 dark:border-primary-500/30">
+                <p className="text-xs text-primary-700 dark:text-primary-400 leading-relaxed font-medium">
                   <strong>💡 Template Pizza Ativado:</strong> Novos produtos nesta categoria serão configurados automaticamente como Sabores e vinculados aos grupos de Tamanhos e Montagem.
                 </p>
               </div>

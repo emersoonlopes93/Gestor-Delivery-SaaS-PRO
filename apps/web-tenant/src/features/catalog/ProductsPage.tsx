@@ -243,7 +243,7 @@ export function ProductsPage() {
       const pubLabel = pub ? pub.publicationStatus : null;
       const opLabel = pub ? pub.operationalStatus : null;
       return (
-        <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50/60 transition-colors group" style={{ height: 64 }}>
+        <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/40 transition-colors group" style={{ height: 64 }}>
           <td className="px-6 py-2">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-12 h-12 rounded-lg bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 overflow-hidden shrink-0">
@@ -260,16 +260,16 @@ export function ProductsPage() {
                 <div className="font-bold text-gray-900 dark:text-gray-100 truncate">{product.name}</div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 truncate hidden sm:block">{product.shortDescription || 'Sem descrição'}</div>
                 <div className="mt-1 flex items-center gap-2">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-gray-100 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-800'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700'}`}>
                     {typeLabel}
                   </span>
                   {pubLabel ? (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-gray-100 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-800'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700'}`}>
                       {pubLabel}
                     </span>
                   ) : null}
                   {opLabel ? (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${opLabel === 'active' ? 'bg-green-100 text-green-700 border border-green-200' : opLabel === 'inactive' ? 'bg-gray-200 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700' : opLabel === 'hidden' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${opLabel === 'active' ? 'status-badge-success' : opLabel === 'inactive' ? 'status-badge-neutral' : opLabel === 'hidden' ? 'status-badge-warning' : 'status-badge-danger'}`}>
                       {opLabel}
                     </span>
                   ) : null}
@@ -287,7 +287,7 @@ export function ProductsPage() {
           </td>
 
           <td className="px-6 py-2 text-sm whitespace-nowrap">
-            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${product.isActive ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
+            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${product.isActive ? 'status-badge-success' : 'status-badge-danger'}`}>
               {product.isActive ? 'Ativo' : 'Inativo'}
             </span>
           </td>
@@ -304,7 +304,7 @@ export function ProductsPage() {
               </button>
               <button
                 onClick={() => navigate(`/catalog/products/${product.id}/v2`)}
-                className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-500/10 rounded-lg transition-all"
                 title="Editar"
                 type="button"
               >
@@ -313,7 +313,7 @@ export function ProductsPage() {
               <button
                 onClick={() => handleDuplicate(product.id)}
                 disabled={savingMap[`duplicate-${product.id}`]}
-                className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all disabled:opacity-50"
+                className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-all disabled:opacity-50"
                 title={savingMap[`duplicate-${product.id}`] ? 'Duplicando...' : 'Duplicar'}
                 type="button"
               >
@@ -322,7 +322,7 @@ export function ProductsPage() {
               <PermissionGate permission="catalog.publish" fallback={null}>
                 <button
                   onClick={() => handleTogglePublication(product)}
-                  className={`p-2 rounded-lg transition-all ${product.publication?.publicationStatus === 'published' ? 'text-green-600 hover:text-green-700 hover:bg-green-50' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'}`}
+                  className={`p-2 rounded-lg transition-all ${product.publication?.publicationStatus === 'published' ? 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-500/10' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10'}`}
                   title={product.publication?.publicationStatus === 'published' ? 'Despublicar' : 'Publicar'}
                   type="button"
                 >
@@ -332,7 +332,7 @@ export function ProductsPage() {
               <PermissionGate permission="catalog.publish" fallback={null}>
                 <button
                   onClick={() => handleToggleOperational(product)}
-                  className={`p-2 rounded-lg transition-all ${product.publication?.operationalStatus === 'active' ? 'text-green-600 hover:text-green-700 hover:bg-green-50' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'}`}
+                  className={`p-2 rounded-lg transition-all ${product.publication?.operationalStatus === 'active' ? 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-500/10' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10'}`}
                   title={product.publication?.operationalStatus === 'active' ? 'Ocultar' : 'Exibir'}
                   type="button"
                 >
@@ -341,7 +341,7 @@ export function ProductsPage() {
               </PermissionGate>
               <button
                 onClick={() => handleToggleActive(product)}
-                className={`p-2 rounded-lg transition-all ${product.isActive ? 'text-gray-400 hover:text-amber-700 hover:bg-amber-50' : 'text-gray-400 hover:text-green-700 hover:bg-green-50'}`}
+                className={`p-2 rounded-lg transition-all ${product.isActive ? 'text-gray-400 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-500/10' : 'text-gray-400 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-500/10'}`}
                 title={product.isActive ? 'Desativar' : 'Ativar'}
                 type="button"
               >
@@ -349,7 +349,7 @@ export function ProductsPage() {
               </button>
               <button
                 onClick={() => handleDelete(product.id)}
-                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
                 title="Excluir"
                 type="button"
               >
@@ -411,7 +411,7 @@ export function ProductsPage() {
           <p className="text-gray-500 dark:text-gray-400 mt-1">Gerencie itens vendáveis. Combos têm fluxo próprio no módulo de Combos.</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center bg-gray-100 p-1 rounded-xl">
+          <div className="flex items-center bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
             <button
               onClick={() => setViewMode('all')}
               className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${viewMode === 'all' ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300'}`}
@@ -469,7 +469,7 @@ export function ProductsPage() {
           <button
             key={t.id}
             onClick={() => setTypeFilter(t.id as ProductTypeFilter)}
-            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${typeFilter === t.id ? 'bg-white dark:bg-gray-900 border-primary-600 text-primary-600 shadow-sm ring-1 ring-primary-600' : 'bg-gray-100 border-transparent text-gray-500 dark:text-gray-400 hover:bg-gray-200'}`}
+            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${typeFilter === t.id ? 'bg-white dark:bg-gray-900 border-primary-600 text-primary-600 shadow-sm ring-1 ring-primary-600' : 'bg-gray-100 dark:bg-gray-800 border-transparent text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
           >
             {t.label}
           </button>
@@ -687,7 +687,7 @@ export function ProductsPage() {
               <div className="card-premium hidden md:block">
                 <div ref={tableScrollRef} className="max-h-[70vh] overflow-auto">
                   <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-50 dark:bg-gray-900/50/50 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
+                    <thead className="bg-gray-50 dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
                       <tr>
                         <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Produto</th>
                         <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hidden lg:table-cell">Categoria</th>
@@ -734,7 +734,7 @@ export function ProductsPage() {
                     <button
                       type="button"
                       onClick={() => toggleGroupExpanded(group.key)}
-                      className="w-full px-6 py-4 bg-gray-50 dark:bg-gray-900/50/40 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 transition-colors"
+                      className="w-full px-6 py-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                     >
                       <div className="text-left">
                         <div className="text-sm font-black text-gray-900 dark:text-gray-100 uppercase tracking-tight">{title}</div>

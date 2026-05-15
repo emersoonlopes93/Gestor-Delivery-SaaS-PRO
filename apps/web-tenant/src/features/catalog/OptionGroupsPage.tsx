@@ -208,7 +208,7 @@ export function OptionGroupsPage() {
             const items = [...(g.items ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
             return (
               <section key={g.id} className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
-                <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900/50/50 border-b border-gray-100 dark:border-gray-800 flex justify-between items-start gap-4">
+                <div className="px-6 py-4 bg-gray-50 dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800 flex justify-between items-start gap-4">
                   <div className="min-w-0">
                     <div className="font-black text-gray-900 dark:text-gray-100 uppercase tracking-wider text-sm truncate">{g.name}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 font-bold mt-1">
@@ -218,7 +218,7 @@ export function OptionGroupsPage() {
                   <div className="flex gap-2 shrink-0">
                     <button
                       onClick={() => openItemModal(g.id)}
-                      className="text-xs font-bold text-primary-600 hover:bg-primary-50 px-3 py-1.5 rounded-lg transition-colors"
+                      className="text-xs font-bold text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-500/10 px-3 py-1.5 rounded-lg transition-colors"
                       type="button"
                     >
                       Novo item
@@ -255,7 +255,7 @@ export function OptionGroupsPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                       {items.map((it) => (
-                        <tr key={it.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50/30 transition-colors group">
+                        <tr key={it.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/40 transition-colors group">
                           <td className="px-6 py-4">
                             <div className="font-bold text-gray-800 dark:text-gray-200">{it.name}</div>
                             <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">{it.description || ''}</div>
@@ -268,7 +268,7 @@ export function OptionGroupsPage() {
                             {it.allowQuantity ? ' | Permite Qtd' : ''}
                           </td>
                           <td className="px-6 py-4">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${it.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${it.isActive ? 'status-badge-success' : 'status-badge-danger'}`}>
                               {it.isActive ? 'Ativo' : 'Inativo'}
                             </span>
                           </td>
@@ -357,7 +357,7 @@ export function OptionGroupsPage() {
             <input
               value={groupForm.name}
               onChange={(e) => setGroupForm((p) => ({ ...p, name: e.target.value }))}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none focus:ring-2 focus:ring-primary-500"
+              className="input-premium"
             />
           </div>
           <div>
@@ -365,7 +365,7 @@ export function OptionGroupsPage() {
             <input
               value={groupForm.description ?? ''}
               onChange={(e) => setGroupForm((p) => ({ ...p, description: e.target.value }))}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+              className="input-premium"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -374,7 +374,7 @@ export function OptionGroupsPage() {
                 <select
                   value={groupForm.selectionType}
                   onChange={(e) => setGroupForm((p) => ({ ...p, selectionType: e.target.value as any }))}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                  className="input-premium"
                 >
                   <option value="single">Seleção Única</option>
                   <option value="multiple">Seleção Múltipla</option>
@@ -457,7 +457,7 @@ export function OptionGroupsPage() {
             <input
               value={itemForm.name}
               onChange={(e) => setItemForm((p) => ({ ...p, name: e.target.value }))}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none focus:ring-2 focus:ring-primary-500"
+              className="input-premium"
             />
           </div>
           <div>
@@ -465,7 +465,7 @@ export function OptionGroupsPage() {
             <input
               value={itemForm.description ?? ''}
               onChange={(e) => setItemForm((p) => ({ ...p, description: e.target.value }))}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+              className="input-premium"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -474,7 +474,7 @@ export function OptionGroupsPage() {
                 <select
                   value={itemForm.priceImpactType ?? 'none'}
                   onChange={(e) => setItemForm((p) => ({ ...p, priceImpactType: e.target.value as any }))}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                  className="input-premium"
                 >
                   <option value="none">Nenhum impacto</option>
                   <option value="fixed">Adicional Fixo (Soma)</option>

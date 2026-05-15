@@ -144,27 +144,27 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
     <div className="grid grid-cols-1 gap-4 py-4">
       <button
         onClick={() => setMode('people')}
-        className="flex items-center gap-4 p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-3xl hover:border-emerald-500 transition-all text-left"
+        className="flex items-center gap-4 p-6 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl hover:border-emerald-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-left group"
       >
-        <div className="w-14 h-14 bg-emerald-500/10 text-emerald-400 rounded-2xl flex items-center justify-center">
+        <div className="w-14 h-14 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 rounded-2xl flex items-center justify-center border border-emerald-500/20 group-hover:scale-110 transition-transform">
           <Users size={28} />
         </div>
         <div>
-          <h4 className="font-black text-gray-900 dark:text-white uppercase tracking-tight">Dividir por Pessoas</h4>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Divide o total igualmente entre X pessoas</p>
+          <h4 className="font-black text-gray-900 dark:text-white uppercase tracking-tight leading-none">Dividir por Pessoas</h4>
+          <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-2 font-bold uppercase tracking-widest">Divide o total igualmente entre X pessoas</p>
         </div>
       </button>
 
       <button
         onClick={() => setMode('items')}
-        className="flex items-center gap-4 p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-3xl hover:border-blue-500 transition-all text-left"
+        className="flex items-center gap-4 p-6 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl hover:border-blue-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-left group"
       >
-        <div className="w-14 h-14 bg-blue-500/10 text-blue-400 rounded-2xl flex items-center justify-center">
+        <div className="w-14 h-14 bg-blue-500/10 text-blue-500 dark:text-blue-400 rounded-2xl flex items-center justify-center border border-blue-500/20 group-hover:scale-110 transition-transform">
           <ListChecks size={28} />
         </div>
         <div>
-          <h4 className="font-black text-gray-900 dark:text-white uppercase tracking-tight">Dividir por Itens</h4>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Selecione itens específicos para pagar agora</p>
+          <h4 className="font-black text-gray-900 dark:text-white uppercase tracking-tight leading-none">Dividir por Itens</h4>
+          <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-2 font-bold uppercase tracking-widest">Selecione itens específicos para pagar agora</p>
         </div>
       </button>
 
@@ -200,14 +200,14 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
         <div className="flex items-center justify-center gap-8">
           <button 
             onClick={() => setNumberOfPeople(Math.max(2, numberOfPeople - 1))}
-            className="w-12 h-12 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center text-gray-900 dark:text-white hover:bg-gray-100 dark:bg-gray-750 transition-colors"
+            className="w-12 h-12 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center text-gray-900 dark:text-white hover:bg-white dark:hover:bg-gray-700 transition-all border border-transparent hover:border-gray-200 dark:hover:border-gray-700 shadow-sm"
           >
             <Minus size={24} />
           </button>
-          <span className="text-6xl font-black text-emerald-400 tracking-tighter italic">{numberOfPeople}</span>
+          <span className="text-6xl font-black text-emerald-500 dark:text-emerald-400 tracking-tighter italic">{numberOfPeople}</span>
           <button 
             onClick={() => setNumberOfPeople(numberOfPeople + 1)}
-            className="w-12 h-12 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center text-gray-900 dark:text-white hover:bg-gray-100 dark:bg-gray-750 transition-colors"
+            className="w-12 h-12 bg-gray-50 dark:bg-gray-800 rounded-full flex items-center justify-center text-gray-900 dark:text-white hover:bg-white dark:hover:bg-gray-700 transition-all border border-transparent hover:border-gray-200 dark:hover:border-gray-700 shadow-sm"
           >
             <Plus size={24} />
           </button>
@@ -233,22 +233,22 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
     <div className="space-y-4 py-2 flex flex-col max-h-[60vh]">
       <div className="flex-1 overflow-y-auto pr-2 space-y-2">
         {items.map((item) => (
-          <div key={item.id} className="flex items-center justify-between p-3 bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-800 rounded-xl">
+          <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-950 border border-gray-100 dark:border-gray-800 rounded-2xl">
              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{item.snapshotName}</p>
-                <p className="text-[10px] text-gray-500 dark:text-gray-400">Saldo: {item.quantity} un x {item.unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                <p className="text-xs font-black text-gray-900 dark:text-white truncate uppercase tracking-tight">{item.snapshotName}</p>
+                <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest mt-1">Saldo: {item.quantity} un x {item.unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
              </div>
-             <div className="flex items-center gap-3 ml-4">
+             <div className="flex items-center gap-3 ml-4 bg-white dark:bg-gray-900 p-1.5 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
                 <button 
-                  onClick={() => setItemSelections(prev => ({ ...prev, [item.id]: Math.max(0, (prev[item.id] || 0) - 1) }))}
-                  className="w-8 h-8 bg-white dark:bg-gray-900 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:text-white"
+                   onClick={() => setItemSelections(prev => ({ ...prev, [item.id]: Math.max(0, (prev[item.id] || 0) - 1) }))}
+                   className="w-8 h-8 bg-gray-50 dark:bg-gray-800 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
                 >
                   <Minus size={14} />
                 </button>
-                <span className="w-4 text-center text-xs font-black text-emerald-400">{itemSelections[item.id] || 0}</span>
+                <span className="w-4 text-center text-xs font-black text-emerald-500 dark:text-emerald-400">{itemSelections[item.id] || 0}</span>
                 <button 
-                  onClick={() => setItemSelections(prev => ({ ...prev, [item.id]: Math.min(item.quantity, (prev[item.id] || 0) + 1) }))}
-                  className="w-8 h-8 bg-white dark:bg-gray-900 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:text-white"
+                   onClick={() => setItemSelections(prev => ({ ...prev, [item.id]: Math.min(item.quantity, (prev[item.id] || 0) + 1) }))}
+                   className="w-8 h-8 bg-gray-50 dark:bg-gray-800 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
                 >
                   <Plus size={14} />
                 </button>

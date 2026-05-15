@@ -77,6 +77,14 @@
   .status-badge-success { @apply bg-green-100 text-green-800 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20; }
   .status-badge-danger { @apply bg-red-100 text-red-800 border-red-200 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/20; }
   .status-badge-neutral { @apply bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700; }
+  .status-badge-warning { @apply bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20; }
+  .status-badge-indigo { @apply bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:border-indigo-500/20; }
+
+  /* Alert Cards */
+  .alert-info { @apply bg-primary-50 dark:bg-primary-500/10 border border-primary-100 dark:border-primary-500/30 text-primary-700 dark:text-primary-400; }
+  .alert-warning { @apply bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-400; }
+  .alert-danger { @apply bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-800 dark:text-red-400; }
+  .alert-indigo { @apply bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30 text-indigo-800 dark:text-indigo-400; }
 }
 
 /* Animations */

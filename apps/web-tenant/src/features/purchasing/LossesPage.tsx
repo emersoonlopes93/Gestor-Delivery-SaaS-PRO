@@ -115,18 +115,18 @@ export function LossesPage() {
               {isLoading ? (
                 <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-400 animate-pulse">Carregando...</td></tr>
               ) : losses.map((loss) => (
-                <tr key={loss.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50/50 transition-colors">
-                  <td className="px-6 py-4 font-semibold text-gray-900 dark:text-gray-100">{loss.ingredient?.name}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{loss.quantity} <span className="text-[10px] uppercase">{loss.ingredient?.unit}</span></td>
+                <tr key={loss.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group">
+                  <td className="px-6 py-4 font-bold text-gray-900 dark:text-gray-100">{loss.ingredient?.name}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400 font-medium">{loss.quantity} <span className="text-[10px] font-black uppercase tracking-widest">{loss.ingredient?.unit}</span></td>
                   <td className="px-6 py-4">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700">
+                    <span className="status-badge-danger text-[10px]">
                       {reasonLabels[loss.reason] || loss.reason}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-gray-100">
+                  <td className="px-6 py-4 text-sm font-black text-gray-900 dark:text-gray-100">
                     R$ {(loss.costImpact || 0).toFixed(2)}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 font-medium">
                     {format(new Date(loss.createdAt), 'dd/MM/yyyy HH:mm')}
                   </td>
                 </tr>
@@ -139,53 +139,64 @@ export function LossesPage() {
         </div>
       </div>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Registrar Perda</h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"><X className="h-5 w-5" /></button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Insumo</label>
-                <select 
-                  value={selectedIngredient}
-                  onChange={(e) => setSelectedIngredient(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-xl outline-none focus:border-primary-500"
-                >
-                  <option value="">Selecione...</option>
-                  {ingredients.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Quantidade</label>
-                <input 
-                  type="number" 
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-xl outline-none focus:border-primary-500"
-                  placeholder="Ex: 0.5"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Motivo</label>
-                <select 
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-xl outline-none focus:border-primary-500"
-                >
-                  {Object.entries(reasonLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="p-6 bg-gray-50 dark:bg-gray-900/50 flex justify-end gap-3 border-t">
-              <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-200 rounded-xl transition-colors">Cancelar</button>
-              <button onClick={handleSave} className="px-6 py-2 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 shadow-md">Salvar Perda</button>
-            </div>
+import { Modal } from '../../components/Modal';
+
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Registrar Perda"
+        maxWidth="max-w-md"
+        footer={
+          <>
+            <button 
+              onClick={() => setIsModalOpen(false)} 
+              className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+            >
+              Cancelar
+            </button>
+            <button 
+              onClick={handleSave} 
+              className="px-6 py-2 bg-red-600 text-white text-sm font-bold rounded-xl hover:bg-red-700 shadow-lg shadow-red-900/20"
+            >
+              Salvar Perda
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Insumo</label>
+            <select 
+              value={selectedIngredient}
+              onChange={(e) => setSelectedIngredient(e.target.value)}
+              className="input-premium"
+            >
+              <option value="">Selecione...</option>
+              {ingredients.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Quantidade</label>
+            <input 
+              type="number" 
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              className="input-premium"
+              placeholder="Ex: 0.5"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Motivo</label>
+            <select 
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="input-premium"
+            >
+              {Object.entries(reasonLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            </select>
           </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

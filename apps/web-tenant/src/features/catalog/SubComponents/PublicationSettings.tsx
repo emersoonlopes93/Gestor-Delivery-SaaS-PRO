@@ -69,7 +69,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
               type="button"
               onClick={() => patchPublication({ operationalStatus: 'hidden' })}
               disabled={savingStates.patchPublication}
-              className="px-3 py-2 text-sm font-bold text-amber-700 hover:bg-amber-50 rounded-xl border border-amber-200 bg-white dark:bg-gray-900 disabled:opacity-50 transition-all flex items-center gap-2"
+              className="px-3 py-2 text-sm font-bold alert-warning rounded-xl disabled:opacity-50 transition-all flex items-center gap-2"
             >
               {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-amber-700 border-t-transparent rounded-full animate-spin" />}
               Oculto
@@ -78,7 +78,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
               type="button"
               onClick={() => patchPublication({ operationalStatus: 'sold_out_manual' })}
               disabled={savingStates.patchPublication}
-              className="px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-50 rounded-xl border border-red-200 bg-white dark:bg-gray-900 disabled:opacity-50 transition-all flex items-center gap-2"
+              className="px-3 py-2 text-sm font-bold alert-danger rounded-xl disabled:opacity-50 transition-all flex items-center gap-2"
             >
               {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-red-700 border-t-transparent rounded-full animate-spin" />}
               Esgotado
@@ -119,7 +119,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
 
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden hidden md:block shadow-sm">
         <table className="w-full text-left border-collapse">
-          <thead className="bg-gray-50 dark:bg-gray-900/50/50 border-b border-gray-100 dark:border-gray-800">
+          <thead className="bg-gray-50 dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800">
             <tr>
               <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Canal</th>
               <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Dias</th>
@@ -130,14 +130,14 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {rules.map((r) => (
-              <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50/30 transition-colors group">
+              <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/40 transition-colors group">
                 <td className="px-6 py-4 font-bold text-gray-900 dark:text-gray-100">{formatChannelLabel(r.channel)}</td>
                 <td className="px-6 py-4 text-sm font-bold text-gray-700 dark:text-gray-300">{formatDaysLabel(r.daysOfWeek ?? [])}</td>
                 <td className="px-6 py-4 text-sm font-black text-gray-900 dark:text-gray-100">
                   {r.startTime} - {r.endTime}
                 </td>
                 <td className="px-6 py-4">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${r.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${r.isActive ? 'status-badge-success' : 'status-badge-danger'}`}>
                     {r.isActive ? 'Ativo' : 'Inativo'}
                   </span>
                 </td>
@@ -154,7 +154,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
                       type="button"
                       onClick={() => deleteRule(r.id)}
                       disabled={savingStates[`delete-rule-${r.id}`]}
-                      className="px-3 py-1 text-xs font-bold text-red-600 hover:bg-red-50 rounded disabled:opacity-50 transition-all flex items-center gap-1"
+                      className="px-3 py-1 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded disabled:opacity-50 transition-all flex items-center gap-1"
                     >
                       {savingStates[`delete-rule-${r.id}`] && <div className="w-3 h-3 border border-red-600 border-t-transparent rounded-full animate-spin" />}
                       Excluir

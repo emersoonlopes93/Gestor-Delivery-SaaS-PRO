@@ -52,7 +52,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
               <input
                 value={productForm.name}
                 onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
+                className="input-premium"
                 placeholder="Ex: Burger de Costela"
               />
             </div>
@@ -66,7 +66,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                     step="0.01"
                     value={productForm.basePrice}
                     onChange={(e) => setProductForm({ ...productForm, basePrice: Number(e.target.value) })}
-                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
+                    className="input-premium"
                   />
                 </div>
               ) : (
@@ -77,7 +77,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                     step="0.01"
                     value={Number(bundleSummary?.finalPrice ?? productForm.basePrice ?? 0)}
                     disabled
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 dark:border-gray-800 rounded-xl outline-none text-sm font-bold text-gray-700 dark:text-gray-300"
+                    className="input-premium opacity-70 cursor-not-allowed"
                   />
                   <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 font-bold">Preço derivado automaticamente pelos itens + estratégia de preço.</p>
                 </div>
@@ -87,7 +87,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                 <input
                   value={productForm.sku}
                   onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
+                  className="input-premium"
                   placeholder="Código de controle (opcional)"
                 />
               </div>
@@ -98,7 +98,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
               <select
                 value={productForm.categoryId}
                 onChange={(e) => setProductForm({ ...productForm, categoryId: e.target.value })}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
+                className="input-premium"
               >
                 <option value="">Selecione uma categoria</option>
                 {categories.map((c) => (
@@ -113,14 +113,14 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                 <select
                   value={productForm.type}
                   onChange={(e) => setProductForm({ ...productForm, type: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
+                  className="input-premium"
                 >
                   <option value="simple">Produto Simples</option>
                   <option value="configurable">Produto com Opções</option>
                 </select>
               </div>
             ) : (
-              <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
+              <div className="rounded-xl alert-indigo px-4 py-3">
                 <div className="text-xs font-black uppercase tracking-wider text-indigo-700">Tipo</div>
                 <div className="text-sm font-bold text-indigo-900 mt-1">Combo</div>
               </div>
@@ -162,7 +162,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
               <input
                 value={productForm.shortDescription}
                 onChange={(e) => setProductForm({ ...productForm, shortDescription: e.target.value })}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
+                className="input-premium"
                 placeholder="Breve descrição para o cardápio"
               />
             </div>
@@ -173,7 +173,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                 rows={3}
                 value={productForm.longDescription}
                 onChange={(e) => setProductForm({ ...productForm, longDescription: e.target.value })}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
+                className="input-premium h-24 resize-none"
                 placeholder="Detalhes completos do produto..."
               />
             </div>
@@ -234,22 +234,22 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
             return (
               <div className="mt-8 pt-8 border-t border-gray-100 dark:border-gray-800 animate-in fade-in slide-in-from-bottom-2 duration-500">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center text-xl">🍕</div>
+                  <div className="w-10 h-10 bg-primary-100 dark:bg-primary-500/20 rounded-xl flex items-center justify-center text-xl">🍕</div>
                   <div>
                     <h3 className="text-sm font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest">Configuração de Sabor</h3>
                     <p className="text-[10px] text-primary-600 font-bold uppercase tracking-wider mt-0.5">Preço por tamanho</p>
                   </div>
                 </div>
 
-                <div className="bg-primary-50/50 border border-primary-100 rounded-3xl p-6 sm:p-8">
-                  <p className="text-sm text-primary-800 font-medium mb-8 leading-relaxed">
+                <div className="alert-info rounded-3xl p-6 sm:p-8">
+                  <p className="text-sm font-medium mb-8 leading-relaxed">
                     Este produto pertence a uma categoria de <strong>Pizzas</strong>. Defina abaixo o valor deste sabor para cada tamanho disponível.
                   </p>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {pizzaSizes.map(size => (
                       <div key={size.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-primary-100/50 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group">
-                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 group-hover:text-primary-600 transition-colors">
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 group-hover:text-primary-500 transition-colors">
                           {size.name}
                         </label>
                         <div className="relative">
@@ -259,7 +259,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                             step="0.01"
                             value={pizzaPrices[size.id] || ''}
                             onChange={(e) => setPizzaPrices({...pizzaPrices, [size.id]: Number(e.target.value)})}
-                            className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-xl outline-none text-base font-black focus:ring-2 focus:ring-primary-500 transition-all placeholder:text-gray-300"
+                            className="w-full pl-12 pr-4 py-3.5 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl outline-none text-base font-black focus:ring-2 focus:ring-primary-500 transition-all placeholder:text-gray-300 dark:text-gray-100"
                             placeholder={productForm.basePrice.toString()}
                           />
                         </div>

@@ -515,12 +515,12 @@ export function PosItemConfiguratorModal(props: {
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4">
       <div className="bg-white dark:bg-gray-900 w-full max-w-2xl sm:rounded-3xl flex flex-col max-h-[92vh] border border-gray-200 dark:border-gray-800 shadow-2xl">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center gap-3">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center gap-3 bg-gray-50/50 dark:bg-gray-950/50">
           <div className="flex-1 min-w-0">
-            <div className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400">Configurar item</div>
-            <div className="text-gray-900 dark:text-white font-black text-lg truncate">{detail?.name ?? 'Carregando...'}</div>
+            <div className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 leading-none">Configurar item</div>
+            <div className="text-gray-900 dark:text-white font-black text-lg truncate mt-1 leading-none uppercase tracking-tight">{detail?.name ?? 'Carregando...'}</div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:text-white hover:bg-white dark:bg-gray-800">
+          <button onClick={onClose} className="p-2 rounded-xl text-gray-400 hover:text-gray-900 dark:text-gray-500 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -772,7 +772,7 @@ export function PosItemConfiguratorModal(props: {
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-3 text-sm text-gray-900 dark:text-white outline-none focus:border-emerald-500 min-h-[80px]"
+                  className="input-premium min-h-[80px] text-sm py-3"
                   placeholder="Ex: sem cebola..."
                 />
               </div>
@@ -780,19 +780,19 @@ export function PosItemConfiguratorModal(props: {
           ) : null}
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950/40">
+        <div className="px-6 py-6 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950/50">
           <div className="flex items-center gap-4">
-            <div className="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-1 h-12">
+            <div className="flex items-center bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-1 h-14 shadow-sm">
               <button
                 onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                className="w-10 h-10 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:text-white"
+                className="w-12 h-12 flex items-center justify-center text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-colors"
               >
                 <Minus className="w-5 h-5" />
               </button>
-              <span className="w-10 text-center font-black text-gray-900 dark:text-white">{quantity}</span>
+              <span className="w-10 text-center font-black text-gray-900 dark:text-white text-lg">{quantity}</span>
               <button
                 onClick={() => setQuantity((q) => q + 1)}
-                className="w-10 h-10 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:text-white"
+                className="w-12 h-12 flex items-center justify-center text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-colors"
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -827,16 +827,29 @@ export function PosItemConfiguratorModal(props: {
                   compositionLabel: computed.label,
                 });
               }}
-              className={`flex-1 h-12 rounded-2xl flex items-center justify-between px-6 font-black transition-all ${
+              className={`flex-1 h-14 rounded-2xl flex items-center justify-between px-6 transition-all shadow-xl active:scale-95 ${
                 currentValidationError || loading || !detail
-                  ? 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 cursor-not-allowed'
-                  : 'bg-emerald-600 hover:bg-emerald-700 text-gray-900 dark:text-white'
+                ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed shadow-none' 
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-900/20'
               }`}
             >
-              <span>Adicionar</span>
-              <span className="text-lg">{formatCurrency(total)}</span>
+              <div className="text-left">
+                <div className="text-[10px] font-black uppercase tracking-widest opacity-80 leading-none">Confirmar</div>
+                <div className="text-sm font-black leading-none mt-1">ADICIONAR AO PEDIDO</div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] font-black uppercase opacity-80 leading-none">Total</div>
+                <div className="text-lg font-black leading-none mt-1">{formatCurrency(total)}</div>
+              </div>
             </button>
           </div>
+          
+          {currentValidationError && (
+            <div className="mt-4 flex items-center justify-center gap-2 text-amber-500 font-bold text-[10px] uppercase tracking-widest bg-amber-500/5 py-2 rounded-xl border border-amber-500/10">
+              <AlertCircle className="w-3 h-3" />
+              {currentValidationError}
+            </div>
+          )}
         </div>
       </div>
     </div>

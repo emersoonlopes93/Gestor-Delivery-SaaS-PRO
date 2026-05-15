@@ -163,7 +163,7 @@ export function OrderSimulationPage() {
                 <select
                   value={selectedCategoryId}
                   onChange={(e) => setSelectedCategoryId(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold"
+                  className="input-premium"
                 >
                   {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -191,7 +191,7 @@ export function OrderSimulationPage() {
 
               <div>
                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Montagem</label>
-                <div className="flex bg-gray-100 p-1 rounded-xl">
+                <div className="flex bg-gray-100 dark:bg-gray-950 p-1 rounded-xl border border-gray-200 dark:border-gray-800">
                   <button
                     onClick={() => setMounting('inteira')}
                     className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${mounting === 'inteira' ? 'bg-white dark:bg-gray-900 text-primary-600 shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}
@@ -214,7 +214,7 @@ export function OrderSimulationPage() {
                   <select
                     value={flavor1Id}
                     onChange={(e) => setFlavor1Id(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-xl outline-none text-sm font-bold"
+                    className="input-premium"
                   >
                     <option value="">Selecione...</option>
                     {categoryFlavors.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
@@ -227,7 +227,7 @@ export function OrderSimulationPage() {
                     <select
                       value={flavor2Id}
                       onChange={(e) => setFlavor2Id(e.target.value)}
-                      className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none text-sm font-bold"
+                      className="input-premium"
                     >
                       <option value="">Selecione...</option>
                       {categoryFlavors.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
@@ -238,14 +238,14 @@ export function OrderSimulationPage() {
             </div>
 
             {error && (
-              <div className="p-4 bg-red-50 text-red-700 text-xs font-bold rounded-xl border border-red-100 animate-shake">
+              <div className="p-4 alert-danger text-xs font-bold rounded-xl animate-shake">
                 ⚠️ {error}
               </div>
             )}
 
             <button
               onClick={handleSimulate}
-              className="w-full py-4 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-2xl shadow-xl shadow-primary-100 transition-all flex items-center justify-center gap-2"
+              className="btn-primary w-full py-4 rounded-2xl"
             >
               SIMULAR PREÇO
             </button>

@@ -13,6 +13,8 @@ interface CouponListItem {
   expiresAt: string | null;
 }
 
+import { Modal } from '../../components/Modal';
+
 export function PromotionsPage() {
   const [coupons, setCoupons] = useState<CouponListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -77,60 +79,61 @@ export function PromotionsPage() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">🎁 Cupons & Promoções</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">🎁 Cupons & Promoções</h1>
         <button
           onClick={() => setShowModal(true)}
-          className="bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition"
+          className="btn-primary"
         >
           + Novo Cupom
         </button>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow border border-gray-200 dark:border-gray-800">
+      <div className="card-premium overflow-hidden">
         <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400">
-            <tr>
-              <th className="p-4 font-semibold">Código</th>
-              <th className="p-4 font-semibold">Nome</th>
-              <th className="p-4 font-semibold">Regra</th>
-              <th className="p-4 font-semibold text-center">Uso</th>
-              <th className="p-4 font-semibold text-center">Status</th>
-              <th className="p-4 font-semibold text-right">Ação</th>
+          <thead className="bg-gray-50 dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800">
+            <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              <th className="p-4">Código</th>
+              <th className="p-4">Nome</th>
+              <th className="p-4">Regra</th>
+              <th className="p-4 text-center">Uso</th>
+              <th className="p-4 text-center">Status</th>
+              <th className="p-4 text-right">Ação</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
             {isLoading ? (
               <tr>
-                <td colSpan={6} className="p-4 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={6} className="p-4 text-center text-gray-400 animate-pulse font-medium">
                   Carregando...
                 </td>
               </tr>
             ) : coupons.length === 0 ? (
               <tr>
-                <td colSpan={6} className="p-4 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={6} className="p-4 text-center text-gray-400 italic font-medium">
                   Nenhum cupom cadastrado.
                 </td>
               </tr>
             ) : (
               coupons.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 transition-colors">
+                <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                   <td className="p-4 font-black text-gray-900 dark:text-gray-100">{c.code}</td>
-                  <td className="p-4 text-gray-700 dark:text-gray-300">{c.name}</td>
-                  <td className="p-4 text-gray-600 dark:text-gray-400">
-                    {c.type === 'percentage' && `${c.value}% OFF`}
-                    {c.type === 'fixed_amount' &&
-                      `R$ ${c.value.toFixed(2)} OFF`}
-                    {c.type === 'free_shipping' && `Frete Grátis`}
+                  <td className="p-4 text-gray-700 dark:text-gray-300 font-medium">{c.name}</td>
+                  <td className="p-4">
+                    <span className="status-badge-indigo text-[10px]">
+                      {c.type === 'percentage' && `${c.value}% OFF`}
+                      {c.type === 'fixed_amount' && `R$ ${c.value.toFixed(2)} OFF`}
+                      {c.type === 'free_shipping' && `Frete Grátis`}
+                    </span>
                   </td>
-                  <td className="p-4 text-center text-gray-500 dark:text-gray-400">
+                  <td className="p-4 text-center text-gray-500 dark:text-gray-400 font-bold">
                     {c.usedCount} / {c.usageLimit || '∞'}
                   </td>
                   <td className="p-4 text-center">
                     <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
                         c.isActive
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
+                          ? 'status-badge-success'
+                          : 'status-badge-danger'
                       }`}
                     >
                       {c.isActive ? 'Ativo' : 'Inativo'}
@@ -140,7 +143,7 @@ export function PromotionsPage() {
                     {c.isActive && (
                       <button
                         onClick={() => turnOffCoupon(c.id)}
-                        className="text-red-600 hover:text-red-900 font-medium"
+                        className="text-red-600 hover:text-red-700 font-bold text-xs uppercase"
                       >
                         Inativar
                       </button>
@@ -153,91 +156,92 @@ export function PromotionsPage() {
         </table>
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg w-full max-w-md overflow-hidden flex flex-col max-h-full">
-            <div className="p-4 border-b">
-              <h2 className="text-xl font-bold">Novo Cupom</h2>
-            </div>
-            <div className="p-4 overflow-y-auto">
-              <form id="couponForm" onSubmit={handleCreate} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Código (Ex: BEMVINDO)</label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={20}
-                    className="w-full border rounded-lg px-3 py-2 uppercase"
-                    value={form.code}
-                    onChange={(e) => setForm({ ...form, code: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Nome/Descrição</label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Tipo</label>
-                    <select
-                      className="w-full border rounded-lg px-3 py-2"
-                      value={form.type}
-                      onChange={(e) => setForm({ ...form, type: e.target.value })}
-                    >
-                      <option value="percentage">Porcentagem (%)</option>
-                      <option value="fixed_amount">Valor Fixo (R$)</option>
-                      <option value="free_shipping">Frete Grátis</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Valor</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required={form.type !== 'free_shipping'}
-                      disabled={form.type === 'free_shipping'}
-                      className="w-full border rounded-lg px-3 py-2"
-                      value={form.value}
-                      onChange={(e) => setForm({ ...form, value: Number(e.target.value) })}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Limite de Usos (Opcional)</label>
-                  <input
-                    type="number"
-                    className="w-full border rounded-lg px-3 py-2"
-                    value={form.usageLimit}
-                    onChange={(e) => setForm({ ...form, usageLimit: e.target.value })}
-                  />
-                </div>
-              </form>
-            </div>
-            <div className="p-4 border-t flex justify-end space-x-2 bg-gray-50 dark:bg-gray-900/50">
-              <button
-                type="button"
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 border rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title="Novo Cupom"
+        maxWidth="max-w-md"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setShowModal(false)}
+              className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              form="couponForm"
+              className="px-6 py-2 bg-primary-600 text-white text-sm font-bold rounded-xl hover:bg-primary-700 shadow-lg shadow-primary-900/20"
+            >
+              Salvar Cupom
+            </button>
+          </>
+        }
+      >
+        <form id="couponForm" onSubmit={handleCreate} className="space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Código (Ex: BEMVINDO)</label>
+            <input
+              type="text"
+              required
+              maxLength={20}
+              className="input-premium uppercase"
+              value={form.code}
+              onChange={(e) => setForm({ ...form, code: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Nome/Descrição</label>
+            <input
+              type="text"
+              required
+              className="input-premium"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Tipo</label>
+              <select
+                className="input-premium"
+                value={form.type}
+                onChange={(e) => setForm({ ...form, type: e.target.value })}
               >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                form="couponForm"
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700"
-              >
-                Salvar
-              </button>
+                <option value="percentage">Porcentagem (%)</option>
+                <option value="fixed_amount">Valor Fixo (R$)</option>
+                <option value="free_shipping">Frete Grátis</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Valor</label>
+              <input
+                type="number"
+                step="0.01"
+                required={form.type !== 'free_shipping'}
+                disabled={form.type === 'free_shipping'}
+                className="input-premium"
+                value={form.value}
+                onChange={(e) => setForm({ ...form, value: Number(e.target.value) })}
+              />
             </div>
           </div>
-        </div>
-      )}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Limite de Usos (Opcional)</label>
+            <input
+              type="number"
+              className="input-premium"
+              value={form.usageLimit}
+              onChange={(e) => setForm({ ...form, usageLimit: e.target.value })}
+            />
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+}
     </div>
   );
 }

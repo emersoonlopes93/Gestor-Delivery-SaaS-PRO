@@ -124,7 +124,7 @@ export function CombosV2Page() {
       ) : (
         <div className="card-premium overflow-hidden">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50 dark:bg-gray-900/50/50 border-b border-gray-100 dark:border-gray-800">
+            <thead className="bg-gray-50 dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800">
               <tr>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Imagem</th>
                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Combo</th>
@@ -136,7 +136,7 @@ export function CombosV2Page() {
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {sortedCombos.map((combo) => (
-                <tr key={combo.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50/40 transition-colors group">
+                <tr key={combo.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/40 transition-colors group">
                   <td className="px-6 py-4">
                     {combo.image ? (
                       <img src={combo.image} alt={combo.name} className="w-12 h-12 rounded-xl object-cover border border-gray-200 dark:border-gray-800" />
@@ -154,12 +154,12 @@ export function CombosV2Page() {
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(combo.basePrice ?? 0))}
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${combo.publication?.publicationStatus === 'published' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600 dark:text-gray-400'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${combo.publication?.publicationStatus === 'published' ? 'status-badge-confirmed' : 'status-badge-neutral'}`}>
                       {combo.publication?.publicationStatus === 'published' ? 'Publicado' : 'Rascunho'}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${combo.publication?.operationalStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600 dark:text-gray-400'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${combo.publication?.operationalStatus === 'active' ? 'status-badge-success' : (combo.publication?.operationalStatus === 'inactive' ? 'status-badge-danger' : 'status-badge-warning')}`}>
                       {combo.publication?.operationalStatus === 'active' ? 'Ativo' : (combo.publication?.operationalStatus === 'hidden' ? 'Oculto' : (combo.publication?.operationalStatus === 'sold_out_manual' ? 'Esgotado' : 'Inativo'))}
                     </span>
                   </td>

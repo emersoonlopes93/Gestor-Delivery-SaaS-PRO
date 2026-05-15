@@ -58,9 +58,9 @@ export const TransferTableModal: React.FC<TransferTableModalProps> = ({
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
         
         {/* Header */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gray-850/50">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between bg-gray-50 dark:bg-gray-950/50">
            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-500/10 text-blue-500 rounded-2xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-blue-500/10 text-blue-500 rounded-2xl flex items-center justify-center border border-blue-500/20">
                  <ArrowLeftRight size={20} />
               </div>
               <div>
@@ -68,7 +68,7 @@ export const TransferTableModal: React.FC<TransferTableModalProps> = ({
                  <p className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest">Origem: {sourceTableName}</p>
               </div>
            </div>
-           <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:text-white transition-colors">
+           <button onClick={onClose} className="text-gray-400 hover:text-gray-900 dark:text-white p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all">
               <X size={20} />
            </button>
         </div>
@@ -117,14 +117,14 @@ export const TransferTableModal: React.FC<TransferTableModalProps> = ({
         <div className="p-6 bg-gray-50 dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 flex gap-3">
            <button 
              onClick={onClose}
-             className="flex-1 px-6 py-4 rounded-2xl text-[11px] font-black uppercase text-gray-500 dark:text-gray-400 hover:bg-white dark:bg-gray-900 transition-colors"
+             className="flex-1 px-6 py-4 rounded-2xl text-[11px] font-black uppercase text-gray-500 dark:text-gray-400 hover:bg-white dark:hover:bg-gray-900 transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-800"
            >
               Cancelar
            </button>
            <button 
              disabled={!selectedTargetId || isSubmitting}
              onClick={handleTransfer}
-             className="flex-[2] bg-blue-600 hover:bg-blue-700 text-gray-900 dark:text-white px-6 py-4 rounded-2xl text-[11px] font-black uppercase shadow-xl shadow-blue-900/20 transition-all active:scale-95 disabled:bg-white dark:bg-gray-800 disabled:text-gray-600 dark:text-gray-400"
+             className="flex-[2] bg-blue-600 hover:bg-blue-700 text-white px-6 py-4 rounded-2xl text-[11px] font-black uppercase shadow-xl shadow-blue-900/20 transition-all active:scale-95 disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:text-gray-400"
            >
               {isSubmitting ? 'Transferindo...' : 'Confirmar Transferência'}
            </button>
