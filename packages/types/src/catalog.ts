@@ -37,6 +37,7 @@ export interface Product {
   isFeatured: boolean;
   isAvailable: boolean;
   sellableOnline: boolean;
+  costPrice?: number | string | null;
   sku?: string | null;
   order: number;
   createdAt: Date | string;
@@ -142,6 +143,7 @@ export interface CreateProductDto {
   isFeatured?: boolean;
   isAvailable?: boolean;
   sellableOnline?: boolean;
+  costPrice?: number;
   sku?: string;
   order?: number;
 }

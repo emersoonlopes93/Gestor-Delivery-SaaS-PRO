@@ -143,6 +143,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     isActive: true,
     isAvailable: true,
     sellableOnline: true,
+    costPrice: 0,
     image: '',
     order: 0,
   });
@@ -284,6 +285,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           isActive: prodRes.data.isActive,
           isAvailable: prodRes.data.isAvailable,
           sellableOnline: prodRes.data.sellableOnline,
+          costPrice: Number(prodRes.data.costPrice ?? 0),
           image: prodRes.data.image || '',
           order: prodRes.data.order,
         });
@@ -404,6 +406,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
         ...productForm,
         categoryId: productForm.categoryId ? productForm.categoryId : null,
         type: isComboMode ? 'combo' : productForm.type,
+        costPrice: Number(productForm.costPrice || 0),
         image: finalImageUrl,
         optionItemPrices: Object.entries(pizzaPrices).map(([optionItemId, price]) => ({
           optionItemId,

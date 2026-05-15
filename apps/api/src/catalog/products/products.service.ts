@@ -169,6 +169,7 @@ export class ProductsService {
         sellableOnline: createProductDto.sellableOnline ?? true,
         order: createProductDto.order ?? 0,
         sku: createProductDto.sku && createProductDto.sku.trim() !== '' ? createProductDto.sku : null,
+        costPrice: createProductDto.costPrice ?? null,
       },
       include: { category: true }
     });
@@ -336,6 +337,7 @@ export class ProductsService {
         sellableOnline: updateProductDto.sellableOnline,
         sku: updateProductDto.sku && updateProductDto.sku.trim() !== '' ? updateProductDto.sku : (updateProductDto.sku === '' ? null : undefined),
         order: updateProductDto.order,
+        costPrice: updateProductDto.costPrice,
         ...(slug ? { slug } : {}),
       },
     });

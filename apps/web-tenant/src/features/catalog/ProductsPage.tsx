@@ -5,7 +5,7 @@ import { RecipeModal } from '../inventory/RecipeModal';
 import { Modal } from '../../components/Modal';
 import { PermissionGate } from '../../components/PermissionGate';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Eye, Pencil, Trash2, FileText, Search, ChevronDown, Send, EyeOff, HelpCircle, Copy } from 'lucide-react';
+import { Eye, Pencil, Trash2, FileText, Search, ChevronDown, Send, EyeOff, Copy, Plus } from 'lucide-react';
 
 type ProductsViewMode = 'all' | 'grouped';
 
@@ -28,7 +28,7 @@ export function ProductsPage() {
   const [statusFilter, setStatusFilter] = useState<ProductStatusFilter>('all');
   const [typeFilter, setTypeFilter] = useState<ProductTypeFilter>('all');
   const [publicationFilter, setPublicationFilter] = useState<PublicationFilter>('all');
-  const [operationalFilter, setOperationalFilter] = useState<OperationalFilter>('all');
+  const [operationalFilter] = useState<OperationalFilter>('all');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [showStatusHelp, setShowStatusHelp] = useState(false);
   const tableScrollRef = React.useRef<HTMLDivElement | null>(null);
@@ -404,159 +404,120 @@ export function ProductsPage() {
   }, [viewMode]);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto text-left">
-      <div className="flex justify-between items-center mb-8">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto text-left">
+      {/* Header Simplificado */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">Produtos</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Gerencie itens vendáveis. Combos têm fluxo próprio no módulo de Combos.</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">Produtos</h1>
+          <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-1">Gerencie seu cardápio de forma simples e intuitiva.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
-            <button
-              onClick={() => setViewMode('all')}
-              className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${viewMode === 'all' ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300'}`}
-              type="button"
-            >
-              Lista Completa
-            </button>
-            <button
-              onClick={() => setViewMode('grouped')}
-              className={`px-4 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all ${viewMode === 'grouped' ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300'}`}
-              type="button"
-            >
-              Por Categoria
-            </button>
-          </div>
-
-          <select
-            value={selectedCategoryId ?? ''}
-            onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : null)}
-            className="px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-sm font-bold text-gray-700 dark:text-gray-300 shadow-sm"
-          >
-            <option value="">Todas as categorias</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-            <option value="__uncategorized__">Sem categoria</option>
-          </select>
-          
+        
+        <div className="flex items-center gap-2">
           <button
             onClick={() => navigate('/catalog/simulation')}
-            className="btn-secondary"
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all shadow-sm"
             type="button"
           >
-            <span>🍕</span> Simulador
+            <Search size={14} /> Simulador
           </button>
           
           <button
             onClick={() => navigate('/catalog/products/new/v2')}
-            className="btn-primary"
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-primary-500/20"
             type="button"
           >
-            <span>🍔</span> Novo Produto
+            <Plus size={14} /> Novo
           </button>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mb-6">
-        {[
-          { id: 'all', label: 'Todos' },
-          { id: 'simple', label: 'Individuais' },
-          { id: 'configurable', label: 'Personalizados' }
-        ].map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTypeFilter(t.id as ProductTypeFilter)}
-            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${typeFilter === t.id ? 'bg-white dark:bg-gray-900 border-primary-600 text-primary-600 shadow-sm ring-1 ring-primary-600' : 'bg-gray-100 dark:bg-gray-800 border-transparent text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Barra de Busca e Filtros Consolidados */}
+      <div className="card-premium p-4 md:p-5 mb-6 border-none shadow-premium bg-white/60 dark:bg-gray-900/60 backdrop-blur-md">
+        <div className="flex flex-col gap-4">
+          {/* Linha 1: Busca e ViewMode */}
+          <div className="flex flex-col lg:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="input-premium pl-10"
+                placeholder="Buscar produtos..."
+                type="text"
+              />
+            </div>
 
-      <div className="card-premium p-5 mb-6">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-          <div className="relative flex-1">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="input-premium pl-10"
-              placeholder="Buscar por nome, ingrediente ou categoria..."
-              type="text"
-            />
+            <div className="flex items-center bg-gray-100/50 dark:bg-gray-800/50 p-1 rounded-xl w-full lg:w-auto">
+              <button
+                onClick={() => setViewMode('all')}
+                className={`flex-1 lg:px-4 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${viewMode === 'all' ? 'bg-white dark:bg-gray-900 text-primary-600 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}
+                type="button"
+              >
+                Lista
+              </button>
+              <button
+                onClick={() => setViewMode('grouped')}
+                className={`flex-1 lg:px-4 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${viewMode === 'grouped' ? 'bg-white dark:bg-gray-900 text-primary-600 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}
+                type="button"
+              >
+                Categorias
+              </button>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <select
-              value={selectedCategoryId ?? ''}
-              onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : null)}
-              className="input-premium py-2.5 w-auto pr-8"
-            >
-              <option value="">Todas categorias</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
+          {/* Linha 2: Filtros de Tipo e Status */}
+          <div className="flex flex-wrap items-center gap-2 md:gap-3">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
+              {[
+                { id: 'all', label: 'Todos' },
+                { id: 'simple', label: 'Individuais' },
+                { id: 'configurable', label: 'Personalizados' }
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTypeFilter(t.id as ProductTypeFilter)}
+                  className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border ${typeFilter === t.id ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800 text-primary-600' : 'bg-transparent border-gray-100 dark:border-gray-800 text-gray-400 hover:text-gray-600'}`}
+                >
+                  {t.label}
+                </button>
               ))}
-              <option value="__uncategorized__">Sem categoria</option>
-            </select>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as ProductStatusFilter)}
-              className="input-premium py-2.5 w-auto pr-8"
-            >
-              <option value="all">Todos status</option>
-              <option value="active">Ativos</option>
-              <option value="inactive">Inativos</option>
-            </select>
-            <select
-              value={publicationFilter}
-              onChange={(e) => setPublicationFilter(e.target.value as PublicationFilter)}
-              className="input-premium py-2.5 w-auto pr-8"
-            >
-              <option value="all">Todas publ.</option>
-              <option value="draft">Draft</option>
-              <option value="published">Publicado</option>
-            </select>
-            <select
-              value={operationalFilter}
-              onChange={(e) => setOperationalFilter(e.target.value as OperationalFilter)}
-              className="input-premium py-2.5 w-auto pr-8"
-            >
-              <option value="all">Todas oper.</option>
-              <option value="active">Active</option>
-              <option value="hidden">Hidden</option>
-              <option value="sold_out_manual">Sold out</option>
-              <option value="inactive">Inactive</option>
-            </select>
-            <button
-              type="button"
-              onClick={() => setShowStatusHelp(true)}
-              className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
-              title="Ajuda sobre status"
-            >
-              <HelpCircle size={16} />
-            </button>
-          </div>
-        </div>
+            </div>
 
-        <div className="mt-3 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 font-bold">
-          <div>
-            {filteredProducts.length} produto(s)
-          </div>
-          <div className="hidden md:flex items-center gap-2">
-            <span>Ações ficam visíveis ao passar o mouse</span>
-            <button
-              type="button"
-              onClick={() => setShowStatusHelp(true)}
-              className="text-gray-400 hover:text-primary-600 transition-colors"
-              title="Ajuda sobre status"
-            >
-              <HelpCircle size={14} />
-            </button>
+            <div className="h-4 w-[1px] bg-gray-200 dark:bg-gray-800 hidden md:block" />
+
+            <div className="flex items-center gap-2 flex-1 min-w-0 md:min-w-fit overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
+              <select
+                value={selectedCategoryId ?? ''}
+                onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : null)}
+                className="h-8 pl-2 pr-6 bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 focus:ring-0 cursor-pointer"
+              >
+                <option value="">Categorias</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+                <option value="__uncategorized__">Sem categoria</option>
+              </select>
+
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as ProductStatusFilter)}
+                className="h-8 pl-2 pr-6 bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 focus:ring-0 cursor-pointer"
+              >
+                <option value="all">Status</option>
+                <option value="active">Ativos</option>
+                <option value="inactive">Inativos</option>
+              </select>
+
+              <select
+                value={publicationFilter}
+                onChange={(e) => setPublicationFilter(e.target.value as PublicationFilter)}
+                className="h-8 pl-2 pr-6 bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 focus:ring-0 cursor-pointer"
+              >
+                <option value="all">Publicação</option>
+                <option value="draft">Rascunho</option>
+                <option value="published">Publicado</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -608,68 +569,37 @@ export function ProductsPage() {
                         </div>
                       </div>
 
-                      <div className="mt-4 grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
-                          className="px-3 py-2 text-xs font-black text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800"
-                          title="Ficha técnica"
-                          type="button"
-                        >
-                          Ficha
-                        </button>
-                        <button
-                          onClick={() => navigate(`/catalog/products/${product.id}/v2`)}
-                          className="px-3 py-2 text-xs font-black text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-xl border border-primary-200"
-                          title="Editar"
-                          type="button"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => handleDuplicate(product.id)}
-                          disabled={savingMap[`duplicate-${product.id}`]}
-                          className="px-3 py-2 text-xs font-black text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl border border-indigo-200 disabled:opacity-50"
-                          title={savingMap[`duplicate-${product.id}`] ? 'Duplicando...' : 'Duplicar'}
-                          type="button"
-                        >
-                          {savingMap[`duplicate-${product.id}`] ? 'Copiar' : 'Duplicar'}
-                        </button>
-                        <button
-                          onClick={() => handleToggleActive(product)}
-                          className="px-3 py-2 text-xs font-black text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800"
-                          title={product.isActive ? 'Desativar' : 'Ativar'}
-                          type="button"
-                        >
-                          {product.isActive ? 'Desativar' : 'Ativar'}
-                        </button>
-                        <PermissionGate permission="catalog.publish" fallback={null}>
+                      <div className="mt-4 flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-800">
+                        <div className="text-xs font-black text-gray-900 dark:text-gray-100">
+                          {formatMoney(product.basePrice)}
+                        </div>
+                        <div className="flex items-center gap-1">
                           <button
-                            onClick={() => handleTogglePublication(product)}
-                            className="px-3 py-2 text-xs font-black text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800"
-                            title={product.publication?.publicationStatus === 'published' ? 'Despublicar' : 'Publicar'}
-                            type="button"
+                            onClick={() => navigate(`/catalog/products/${product.id}/v2`)}
+                            className="p-2 text-primary-600 bg-primary-50 dark:bg-primary-900/20 rounded-lg"
                           >
-                            {product.publication?.publicationStatus === 'published' ? 'Despublicar' : 'Publicar'}
+                            <Pencil size={14} />
                           </button>
-                        </PermissionGate>
-                        <PermissionGate permission="catalog.publish" fallback={null}>
                           <button
-                            onClick={() => handleToggleOperational(product)}
-                            className="px-3 py-2 text-xs font-black text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800"
-                            title={product.publication?.operationalStatus === 'active' ? 'Ocultar' : 'Exibir'}
-                            type="button"
+                            onClick={() => handleDuplicate(product.id)}
+                            disabled={savingMap[`duplicate-${product.id}`]}
+                            className="p-2 text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg disabled:opacity-50"
                           >
-                            {product.publication?.operationalStatus === 'active' ? 'Ocultar' : 'Exibir'}
+                            <Copy size={14} />
                           </button>
-                        </PermissionGate>
-                        <button
-                          onClick={() => handleDelete(product.id)}
-                          className="col-span-2 px-3 py-2 text-xs font-black text-red-700 bg-red-50 hover:bg-red-100 rounded-xl border border-red-200"
-                          title="Excluir"
-                          type="button"
-                        >
-                          Excluir
-                        </button>
+                          <button
+                            onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
+                            className="p-2 text-gray-500 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                          >
+                            <FileText size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(product.id)}
+                            className="p-2 text-red-600 bg-red-50 dark:bg-red-900/20 rounded-lg"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );

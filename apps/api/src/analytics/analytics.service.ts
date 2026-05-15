@@ -63,13 +63,37 @@ export class AnalyticsService {
         : Promise.resolve([]),
     ]);
 
+    const productsDirectCost = productIds.length
+      ? await this.prisma.tenantClient.product.findMany({
+          where: { id: { in: productIds } },
+          select: { id: true, costPrice: true },
+        })
+      : [];
+
     const productUnitCost = new Map<string, number>();
+    
+    // Start with direct cost if available
+    for (const p of productsDirectCost) {
+      if (p.costPrice) {
+        productUnitCost.set(p.id, this.toNumber(p.costPrice));
+      }
+    }
+
+    // Add/Override with recipe cost if recipe exists (Recipe is usually more specific)
+    // Actually, if a product has both, which one should we use?
+    // Usually, if there's a recipe, the user wants the recipe-based cost.
+    // If not, they use the direct cost.
+    const recipeCosts = new Map<string, number>();
     for (const recipe of productRecipes) {
-      const current = productUnitCost.get(recipe.productId) ?? 0;
-      productUnitCost.set(
+      const current = recipeCosts.get(recipe.productId) ?? 0;
+      recipeCosts.set(
         recipe.productId,
         current + this.toNumber(recipe.quantity) * this.toNumber(recipe.ingredient.currentCost),
       );
+    }
+
+    for (const [pid, cost] of recipeCosts.entries()) {
+      productUnitCost.set(pid, cost);
     }
 
     const complementUnitCost = new Map<string, number>();
@@ -247,13 +271,34 @@ export class AnalyticsService {
         })
       : [];
 
+    const productsDirectCost = productIds.length
+      ? await this.prisma.tenantClient.product.findMany({
+          where: { id: { in: productIds } },
+          select: { id: true, costPrice: true },
+        })
+      : [];
+
     const productUnitCost = new Map<string, number>();
+
+    // Direct cost
+    for (const p of productsDirectCost) {
+      if (p.costPrice) {
+        productUnitCost.set(p.id, this.toNumber(p.costPrice));
+      }
+    }
+
+    // Recipe cost (override)
+    const recipeCosts = new Map<string, number>();
     for (const recipe of recipes) {
-      const current = productUnitCost.get(recipe.productId) ?? 0;
-      productUnitCost.set(
+      const current = recipeCosts.get(recipe.productId) ?? 0;
+      recipeCosts.set(
         recipe.productId,
         current + this.toNumber(recipe.quantity) * this.toNumber(recipe.ingredient.currentCost),
       );
+    }
+
+    for (const [pid, cost] of recipeCosts.entries()) {
+      productUnitCost.set(pid, cost);
     }
 
     const performance = topItems.map((item) => {

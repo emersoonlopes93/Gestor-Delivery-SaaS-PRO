@@ -82,6 +82,20 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                   <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 font-bold">Preço derivado automaticamente pelos itens + estratégia de preço.</p>
                 </div>
               )}
+              
+              <div>
+                <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Preço de Custo (CMV)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={productForm.costPrice}
+                  onChange={(e) => setProductForm({ ...productForm, costPrice: Number(e.target.value) })}
+                  className="input-premium border-amber-100 dark:border-amber-900/30"
+                  placeholder="Ex: 2.50"
+                />
+                <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-1 font-bold">Usado para cálculo de lucro se não houver ficha técnica.</p>
+              </div>
+
               <div>
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Código do Produto</label>
                 <input

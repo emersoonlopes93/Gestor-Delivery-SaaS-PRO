@@ -194,6 +194,7 @@ model ProductOptionItemPrice {
   productId    String     @map("product_id")
   optionItemId String     @map("option_item_id")
   price        Decimal    @db.Decimal(10, 2)
+  costPrice    Decimal?   @map("cost_price") @db.Decimal(10, 2)
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
   optionItem   OptionItem @relation(fields: [optionItemId], references: [id], onDelete: Cascade)
@@ -538,6 +539,7 @@ model Product {
   isFeatured          Boolean                      @default(false) @map("is_featured")
   isAvailable         Boolean                      @default(true) @map("is_available")
   sellableOnline      Boolean                      @default(true) @map("sellable_online")
+  costPrice           Decimal?                     @map("cost_price") @db.Decimal(10, 2)
   sku                 String?
   order               Int                          @default(0)
   createdAt           DateTime                     @default(now()) @map("created_at")
