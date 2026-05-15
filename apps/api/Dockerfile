@@ -1,15 +1,15 @@
 # Stage 1: Base
 FROM node:20-slim AS base
 
-# Install required system libraries (e.g., for Prisma)
+# Install required system libraries
 RUN apt-get update -y && \
-    apt-get install -y openssl ca-certificates && \
+    apt-get install -y openssl ca-certificates build-essential python3 make g++ && \
     rm -rf /var/lib/apt/lists/*
 
 # Setup pnpm via corepack
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
 WORKDIR /app
 

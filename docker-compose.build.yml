@@ -1,0 +1,23 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    image: ${DOCKER_USER:-gestor}/api:latest
+
+  web-tenant:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        APP_NAME: "@gestor/web-tenant"
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3333/api/v1}
+    image: ${DOCKER_USER:-gestor}/web-tenant:latest
+
+  web-storefront:
+    build:
+      context: .
+      dockerfile: Dockerfile.storefront
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3333/api/v1}
+    image: ${DOCKER_USER:-gestor}/web-storefront:latest
