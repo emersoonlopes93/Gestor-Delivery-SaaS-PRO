@@ -21,7 +21,14 @@ export class OnboardingService {
 
   async updateStep(tenantId: string, step: string, completed: boolean = true) {
     const data: any = {};
-    const fieldName = `step${step.charAt(0).toUpperCase()}${step.slice(1)}`;
+    
+    // Mapeamento de nomes de passos para campos no banco (caso não sigam o padrão simples)
+    const stepMapping: Record<string, string> = {
+      'payment': 'stepPayments',
+      'payments': 'stepPayments',
+    };
+
+    const fieldName = stepMapping[step] || `step${step.charAt(0).toUpperCase()}${step.slice(1)}`;
     data[fieldName] = completed;
 
     const onboarding = await this.prisma.tenantOnboarding.upsert({

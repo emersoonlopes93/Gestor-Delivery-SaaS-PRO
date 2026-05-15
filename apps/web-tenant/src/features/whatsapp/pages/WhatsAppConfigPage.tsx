@@ -109,6 +109,7 @@ export function WhatsAppConfigPage() {
 
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'qr' | 'pairing'>('qr');
 
   const generatePairingCodeMutation = useMutation({
     mutationFn: async (phone?: string) => {
@@ -241,9 +242,9 @@ export function WhatsAppConfigPage() {
                     {/* Tabs para escolher entre QR Code e Código de Pareamento */}
                     <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
                       <button
-                        onClick={() => setPairingCode(null)}
+                        onClick={() => setActiveTab('qr')}
                         className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                          !pairingCode
+                          activeTab === 'qr'
                             ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                         }`}
@@ -251,9 +252,9 @@ export function WhatsAppConfigPage() {
                         QR Code
                       </button>
                       <button
-                        onClick={() => setQrCode(null)}
+                        onClick={() => setActiveTab('pairing')}
                         className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                          pairingCode
+                          activeTab === 'pairing'
                             ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                         }`}
@@ -263,29 +264,43 @@ export function WhatsAppConfigPage() {
                     </div>
 
                     {/* QR Code */}
-                    {qrCode && !pairingCode && (
-                      <div className="p-4 bg-white rounded-xl flex flex-col items-center border border-gray-100 dark:border-transparent">
-                        <p className="text-xs text-gray-500 mb-4 font-bold uppercase tracking-widest">Escaneie o QR Code</p>
-                        <img src={qrCode} alt="WhatsApp QR Code" className="w-48 h-48" />
-                        <button 
-                          onClick={() => refetchStatus()}
-                          className="mt-4 flex items-center gap-2 text-xs text-primary-600 hover:text-primary-700 font-bold"
-                        >
-                          <RefreshCw className="w-3 h-3" /> Atualizar QR
-                        </button>
+                    {activeTab === 'qr' && (
+                      <div className="p-4 bg-white dark:bg-gray-900 rounded-xl flex flex-col items-center border border-gray-100 dark:border-gray-800">
+                        {qrCode ? (
+                          <>
+                            <p className="text-xs text-gray-500 mb-4 font-bold uppercase tracking-widest">Escaneie o QR Code</p>
+                            <img src={qrCode} alt="WhatsApp QR Code" className="w-48 h-48" />
+                            <button 
+                              onClick={() => refetchStatus()}
+                              className="mt-4 flex items-center gap-2 text-xs text-primary-600 hover:text-primary-700 font-bold"
+                            >
+                              <RefreshCw className="w-3 h-3" /> Atualizar QR
+                            </button>
+                          </>
+                        ) : (
+                          <div className="text-center py-8">
+                            <button
+                              onClick={() => connectMutation.mutate()}
+                              disabled={connectMutation.isPending}
+                              className="btn-primary"
+                            >
+                              {connectMutation.isPending ? 'Gerando...' : 'Gerar QR Code'}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
-
+                    
                     {/* Código de Pareamento */}
-                    {pairingCode && (
-                      <div className="p-4 bg-white rounded-xl flex flex-col items-center border border-gray-100 dark:border-transparent">
+                    {activeTab === 'pairing' && (
+                      <div className="p-4 bg-white dark:bg-gray-900 rounded-xl flex flex-col items-center border border-gray-100 dark:border-gray-800">
                         <p className="text-xs text-gray-500 mb-4 font-bold uppercase tracking-widest">Use o Código de Pareamento</p>
                         
                         <div className="space-y-4 w-full max-w-sm">
-                          {!qrCode && (
+                          {!pairingCode && (
                             <div>
                               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                Seu número (opcional)
+                                Seu número (ex: 5511999999999)
                               </label>
                               <input
                                 type="tel"
@@ -296,51 +311,52 @@ export function WhatsAppConfigPage() {
                               />
                             </div>
                           )}
-
-                          <button
-                            onClick={() => generatePairingCodeMutation.mutate(phoneNumber || undefined)}
-                            disabled={generatePairingCodeMutation.isPending}
-                            className="w-full btn-primary"
-                          >
-                            {generatePairingCodeMutation.isPending ? 'Gerando...' : 'Gerar Código'}
-                          </button>
+                          
+                          {!pairingCode && (
+                            <button
+                              onClick={() => generatePairingCodeMutation.mutate(phoneNumber || undefined)}
+                              disabled={generatePairingCodeMutation.isPending}
+                              className="w-full btn-primary"
+                            >
+                              {generatePairingCodeMutation.isPending ? 'Gerando...' : 'Gerar Código de 8 Dígitos'}
+                            </button>
+                          )}
 
                           {pairingCode && (
-                            <div className="text-center space-y-2">
-                              <div className="text-3xl font-mono font-bold text-primary-600 dark:text-primary-400 tracking-wider">
-                                {pairingCode}
+                            <div className="text-center space-y-4">
+                              <div className="p-4 bg-gray-50 dark:bg-black/40 rounded-2xl border border-primary-500/20">
+                                <div className="text-3xl font-mono font-black text-primary-600 dark:text-primary-400 tracking-[0.2em]">
+                                  {pairingCode}
+                                </div>
                               </div>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
-                                1. Abra WhatsApp → Aparelhos Conectados
-                              </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
-                                2. Conectar um aparelho → Link com código
-                              </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
-                                3. Digite o código acima
-                              </p>
-                              <button
-                                onClick={() => navigator.clipboard.writeText(pairingCode)}
-                                className="text-xs text-primary-600 hover:text-primary-700 font-medium"
-                              >
-                                📋 Copiar Código
-                              </button>
+                              <div className="space-y-1 text-left bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50">
+                                <p className="text-xs text-blue-700 dark:text-blue-300 font-bold uppercase mb-2">Instruções:</p>
+                                <p className="text-[11px] text-gray-600 dark:text-gray-400">1. Abra o WhatsApp no celular</p>
+                                <p className="text-[11px] text-gray-600 dark:text-gray-400">2. Vá em <b>Aparelhos Conectados</b></p>
+                                <p className="text-[11px] text-gray-600 dark:text-gray-400">3. Clique em <b>Conectar um aparelho</b></p>
+                                <p className="text-[11px] text-gray-600 dark:text-gray-400">4. Selecione <b>Link com código</b> na parte inferior</p>
+                                <p className="text-[11px] text-gray-600 dark:text-gray-400">5. Digite o código acima</p>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    setPairingCode(null);
+                                    setPhoneNumber('');
+                                  }}
+                                  className="flex-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-medium py-2 transition-colors"
+                                >
+                                  🔄 Gerar outro
+                                </button>
+                                <button
+                                  onClick={() => navigator.clipboard.writeText(pairingCode)}
+                                  className="flex-1 text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-bold py-2 transition-colors"
+                                >
+                                  📋 Copiar Código
+                                </button>
+                              </div>
                             </div>
                           )}
                         </div>
-                      </div>
-                    )}
-
-                    {/* Botão para gerar QR Code se não tiver */}
-                    {!qrCode && !pairingCode && (
-                      <div className="text-center">
-                        <button
-                          onClick={() => connectMutation.mutate()}
-                          disabled={connectMutation.isPending}
-                          className="btn-primary"
-                        >
-                          {connectMutation.isPending ? 'Gerando...' : 'Gerar QR Code'}
-                        </button>
                       </div>
                     )}
                   </div>

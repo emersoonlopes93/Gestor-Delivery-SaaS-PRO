@@ -30,7 +30,7 @@ export function Modal({ isOpen, onClose, title, children, footer, maxWidth = 'ma
         </div>
 
         {footer && (
-          <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900/50/50 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3 backdrop-blur-xl">
+          <div className="px-6 py-4 bg-gray-50 dark:bg-gray-950/50 border-t border-gray-100 dark:border-gray-800 flex justify-end gap-3 backdrop-blur-xl">
             {footer}
           </div>
         )}

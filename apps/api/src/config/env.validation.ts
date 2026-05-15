@@ -33,6 +33,12 @@ const envSchema = z.object({
 
   // Mercado Pago
   MERCADO_PAGO_WEBHOOK_SECRET: z.string().default(''),
+
+  // Redis
+  REDIS_HOST: z.string().default('localhost'),
+  REDIS_PORT: z.coerce.number().int().positive().default(6379),
+  REDIS_PASSWORD: z.string().default(''),
+  REDIS_TLS: z.enum(['true', 'false']).default('false'),
 });
 
 export type Env = z.infer<typeof envSchema>;

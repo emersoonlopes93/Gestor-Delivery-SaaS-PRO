@@ -34,15 +34,15 @@ const STATUS_LABELS: Record<string, string> = {
 } as any;
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  confirmed: 'bg-blue-100 text-blue-800',
-  preparing: 'bg-orange-100 text-orange-800',
-  ready_for_pickup: 'bg-green-100 text-green-800',
-  ready_for_delivery: 'bg-green-100 text-green-800',
-  out_for_delivery: 'bg-purple-100 text-purple-800',
-  completed: 'bg-gray-100 text-gray-600 dark:text-gray-400',
-  cancelled: 'bg-red-100 text-red-800',
-  draft: 'bg-slate-100 text-slate-700',
+  pending: 'status-badge-pending',
+  confirmed: 'status-badge-confirmed',
+  preparing: 'status-badge-preparing',
+  ready_for_pickup: 'status-badge-success',
+  ready_for_delivery: 'status-badge-success',
+  out_for_delivery: 'status-badge-confirmed',
+  completed: 'status-badge-neutral',
+  cancelled: 'status-badge-danger',
+  draft: 'status-badge-neutral',
 } as any;
 
 export function OrdersListPage() {
@@ -98,7 +98,7 @@ export function OrdersListPage() {
         <button 
           onClick={fetchOrders} 
           disabled={loading}
-          className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+          className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
           title="Atualizar"
         >
           <RefreshCw className={`w-5 h-5 text-gray-600 dark:text-gray-400 ${loading ? 'animate-spin' : ''}`} />
@@ -134,7 +134,7 @@ export function OrdersListPage() {
           onClick={() => { setStatusFilter(''); setPage(1); }}
           disabled={loading}
           className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest border transition-all disabled:opacity-50 ${
-            statusFilter === '' ? 'bg-gray-900 text-white border-gray-900 shadow-md' : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50'
+            statusFilter === '' ? 'bg-primary-600 text-white border-primary-600 shadow-md shadow-primary-500/20' : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
           }`}
         >
           Todos
@@ -145,7 +145,7 @@ export function OrdersListPage() {
             onClick={() => { setStatusFilter(status); setPage(1); }}
             disabled={loading}
             className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest border transition-all disabled:opacity-50 ${
-              statusFilter === status ? 'bg-gray-900 text-white border-gray-900 shadow-md' : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50'
+              statusFilter === status ? 'bg-primary-600 text-white border-primary-600 shadow-md shadow-primary-500/20' : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
             }`}
           >
             {STATUS_LABELS[status]}
@@ -209,9 +209,9 @@ export function OrdersListPage() {
       {/* Pagination */}
       {total > 20 && (
         <div className="flex justify-center gap-2 mt-6">
-          <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-4 py-2 bg-gray-100 rounded-lg text-sm font-bold disabled:opacity-30">Anterior</button>
+          <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm font-bold disabled:opacity-30 dark:text-gray-200">Anterior</button>
           <span className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">Página {page}</span>
-          <button disabled={page * 20 >= total} onClick={() => setPage(p => p + 1)} className="px-4 py-2 bg-gray-100 rounded-lg text-sm font-bold disabled:opacity-30">Próxima</button>
+          <button disabled={page * 20 >= total} onClick={() => setPage(p => p + 1)} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm font-bold disabled:opacity-30 dark:text-gray-200">Próxima</button>
         </div>
       )}
     </div>
@@ -371,9 +371,9 @@ function OrderDetailPanel({ orderId, onBack }: { orderId: string; onBack: () => 
 
       {/* Notes */}
       {order.notes && (
-        <section className="bg-orange-50 rounded-xl p-4 border border-orange-100 mb-4">
-          <h3 className="text-xs font-bold text-orange-700 uppercase mb-1">Observações</h3>
-          <p className="text-sm text-orange-800 italic">{order.notes}</p>
+        <section className="bg-orange-50 dark:bg-orange-500/10 rounded-xl p-4 border border-orange-100 dark:border-orange-500/20 mb-4">
+          <h3 className="text-xs font-bold text-orange-700 dark:text-orange-400 uppercase mb-1">Observações</h3>
+          <p className="text-sm text-orange-800 dark:text-orange-200 italic">{order.notes}</p>
         </section>
       )}
 

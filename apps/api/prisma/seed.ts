@@ -115,14 +115,37 @@ async function seedSuperAdmin() {
   if (superAdminRole) {
     await prisma.adminUserRole.upsert({
       where: {
-        userId_roleId: { userId: user.id, roleId: superAdminRole.id },
+        userId_roleId: {
+          userId: user.id,
+          roleId: superAdminRole.id,
+        },
       },
       update: {},
-      create: { userId: user.id, roleId: superAdminRole.id },
+      create: {
+        userId: user.id,
+        roleId: superAdminRole.id,
+      },
     });
   }
 
-  console.log(`   ✅ Super admin created: ${email}`);
+  console.log('   ✅ Super admin seeded');
+}
+
+async function seedSystemConfig() {
+  console.log('⚙️  Seeding system config...');
+
+  await prisma.systemConfig.upsert({
+    where: { id: 'global' },
+    update: {},
+    create: {
+      id: 'global',
+      evolutionUrl: 'http://localhost:8080', // Default local evolution url
+      evolutionGlobalToken: 'global_token_here',
+      defaultWhatsAppProvider: 'evolution_go',
+    },
+  });
+
+  console.log('   ✅ System config seeded');
 }
 
 async function seedDemoTenant() {
@@ -411,6 +434,7 @@ async function main() {
   await seedAdminPermissions();
   await seedAdminRoles();
   await seedSuperAdmin();
+  await seedSystemConfig();
   await seedDemoTenant();
   await seedDineInTables();
 

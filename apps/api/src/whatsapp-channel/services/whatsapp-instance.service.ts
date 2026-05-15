@@ -204,7 +204,7 @@ export class WhatsAppInstanceService {
     return await provider.generatePairingCode(
       instance.apiUrl,
       instance.apiKey,
-      instance.evolutionInstanceId || instance.instanceName,
+      instance.instanceName, // Usar o nome legível (slug) em vez do UUID para compatibilidade
       phone,
     );
   }

@@ -85,7 +85,7 @@ export function SetupWizard({ settings, operatingHours, hasCategories, hasProduc
 
   return (
     <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-700">
-      <div className="bg-white dark:bg-gray-900 border-2 border-primary-100 rounded-3xl overflow-hidden shadow-xl shadow-primary-50">
+      <div className="bg-white dark:bg-gray-950 border-2 border-primary-100 dark:border-primary-900/30 rounded-3xl overflow-hidden shadow-xl shadow-primary-500/10">
         <div className="bg-primary-600 p-6 sm:p-8 text-white">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -95,9 +95,9 @@ export function SetupWizard({ settings, operatingHours, hasCategories, hasProduc
             <div className="bg-white dark:bg-gray-900/10 backdrop-blur-md px-5 py-3 rounded-2xl border border-white/20">
               <div className="text-xs font-black uppercase tracking-widest text-primary-200 mb-1">Progresso</div>
               <div className="flex items-center gap-3">
-                <div className="flex-1 h-2 w-32 bg-white dark:bg-gray-900/20 rounded-full overflow-hidden">
+                <div className="flex-1 h-2 w-32 bg-white/20 dark:bg-gray-950/40 rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-white dark:bg-gray-900 transition-all duration-1000 ease-out" 
+                    className="h-full bg-white transition-all duration-1000 ease-out" 
                     style={{ width: `${progressPercent}%` }}
                   />
                 </div>
@@ -115,19 +115,19 @@ export function SetupWizard({ settings, operatingHours, hasCategories, hasProduc
                 onClick={() => navigate(step.path)}
                 className={`group relative p-5 rounded-2xl border-2 transition-all cursor-pointer hover:shadow-lg ${
                   step.isCompleted 
-                    ? 'border-green-100 bg-green-50/30' 
+                    ? 'border-green-100 dark:border-green-900/30 bg-green-50/30 dark:bg-green-500/5' 
                     : step.isCritical 
-                      ? 'border-amber-100 bg-white dark:bg-gray-900 hover:border-amber-300' 
-                      : 'border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-primary-100'
+                      ? 'border-amber-100 dark:border-amber-900/30 bg-white dark:bg-gray-900 hover:border-amber-300 dark:hover:border-amber-500/50' 
+                      : 'border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-primary-100 dark:hover:border-primary-500/50'
                 }`}
               >
                 <div className="flex items-start justify-between gap-4 mb-4">
                   <div className={`p-3 rounded-xl ${
                     step.isCompleted 
-                      ? 'bg-green-100 text-green-600' 
+                      ? 'bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400' 
                       : step.isCritical 
-                        ? 'bg-amber-100 text-amber-600' 
-                        : 'bg-gray-100 text-gray-400 group-hover:bg-primary-100 group-hover:text-primary-600'
+                        ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400' 
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 group-hover:bg-primary-100 dark:group-hover:bg-primary-500/20 group-hover:text-primary-600 dark:group-hover:text-primary-400'
                   }`}>
                     <step.icon className="h-6 w-6" />
                   </div>
@@ -140,14 +140,14 @@ export function SetupWizard({ settings, operatingHours, hasCategories, hasProduc
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className={`font-black tracking-tight ${step.isCompleted ? 'text-green-800' : 'text-gray-900 dark:text-gray-100'}`}>
+                    <h3 className={`font-black tracking-tight ${step.isCompleted ? 'text-green-800 dark:text-green-400' : 'text-gray-900 dark:text-gray-100'}`}>
                       {step.title}
                     </h3>
                     {step.isCritical && !step.isCompleted && (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-[10px] font-black text-amber-700 uppercase">Obrigatório</span>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-[10px] font-black text-amber-700 dark:text-amber-400 uppercase">Obrigatório</span>
                     )}
                   </div>
-                  <p className={`text-sm font-medium leading-relaxed ${step.isCompleted ? 'text-green-600' : 'text-gray-500 dark:text-gray-400'}`}>
+                  <p className={`text-sm font-medium leading-relaxed ${step.isCompleted ? 'text-green-600 dark:text-green-500/80' : 'text-gray-500 dark:text-gray-400'}`}>
                     {step.description}
                   </p>
                 </div>
@@ -170,7 +170,7 @@ export function SetupWizard({ settings, operatingHours, hasCategories, hasProduc
             </div>
             <button 
               onClick={() => navigate('/settings')}
-              className="px-6 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition-colors"
+              className="px-6 py-3 bg-gray-900 dark:bg-gray-800 text-white font-bold rounded-xl hover:bg-black dark:hover:bg-gray-700 transition-colors"
             >
               Configurações Completas
             </button>

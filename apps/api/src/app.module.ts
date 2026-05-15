@@ -76,6 +76,7 @@ import { ChatModule } from './chat/chat.module';
         host: process.env.REDIS_HOST || 'localhost',
         port: Number(process.env.REDIS_PORT || 6379),
         password: process.env.REDIS_PASSWORD || undefined,
+        tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
       },
       defaultJobOptions: {
         removeOnComplete: 1000,
@@ -96,6 +97,7 @@ import { ChatModule } from './chat/chat.module';
           socket: {
             host: process.env.REDIS_HOST || 'localhost',
             port: Number(process.env.REDIS_PORT || 6379),
+            tls: process.env.REDIS_TLS === 'true' ? true : undefined,
           },
           password: process.env.REDIS_PASSWORD || undefined,
           ttl: 60000, // Default 60s

@@ -151,29 +151,46 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
   ): Promise<{ pairingCode: string }> {
     const client = this.buildClient(apiUrl, apiKey);
     try {
-      console.log(`[Evolution Go] Generating pairing code for instance ${instanceId}`);
+      this.logger.log(`[Evolution Go] Generating pairing code for instance: ${instanceId}, phone: ${phone}`);
       
-      const requestBody: any = {};
-      if (phone) {
-        requestBody.phone = phone;
+      const cleanPhone = phone?.replace(/\D/g, '');
+      if (!cleanPhone) {
+        throw new Error('Número de telefone é obrigatório para gerar o código de pareamento.');
       }
+
+      const requestBody = {
+        instanceName: instanceId,
+        phone: cleanPhone
+      };
+
+      this.logger.debug(`[Evolution Go] Simple Pair Request Body: ${JSON.stringify(requestBody)}`);
 
       const { data } = await client.post('/instance/pair', requestBody);
-      console.log(`[Evolution Go] Pair response:`, data);
+      this.logger.debug(`[Evolution Go] Pair Response: ${JSON.stringify(data)}`);
       
       const responseData = data?.data || data;
-      const pairingCode = responseData?.pairingCode || responseData?.code;
+      const pairingCode = 
+        responseData?.PairingCode || 
+        responseData?.pairingCode || 
+        responseData?.code || 
+        responseData?.pairing_code;
       
       if (!pairingCode) {
-        throw new Error('No pairing code returned from Evolution Go');
+        this.logger.error(`[Evolution Go] No pairing code in response: ${JSON.stringify(data)}`);
+        throw new Error('Provedor não retornou o código de pareamento. O servidor da Evolution pode precisar de um restart.');
       }
 
-      console.log(`[Evolution Go] Pairing code generated:`, pairingCode);
+      this.logger.log(`[Evolution Go] Pairing code generated successfully: ${pairingCode}`);
       return { pairingCode };
     } catch (error: any) {
-      this.logger.error(`generatePairingCode failed: ${error.message}`);
-      console.error(`[Evolution Go] Pair error:`, error.response?.data || error.message);
-      throw error;
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message;
+      this.logger.error(`[Evolution Go] generatePairingCode failed: ${errorMsg}`);
+      
+      if (error.response?.data) {
+        this.logger.error(`[Evolution Go] Error data: ${JSON.stringify(error.response.data)}`);
+      }
+      
+      throw new Error(`Falha ao gerar código de pareamento: ${errorMsg}`);
     }
   }
 

@@ -604,7 +604,7 @@ export function AppLayout() {
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="hidden md:flex sticky top-0 z-30 bg-white dark:bg-gray-900/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800/60 dark:border-gray-800/60">
+        <header className="hidden md:flex sticky top-0 z-30 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800/60">
           <div className="h-16 px-6 flex items-center gap-4 w-full">
             <button
               type="button"
@@ -640,7 +640,7 @@ export function AppLayout() {
             <button
               type="button"
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="btn-ghost w-10 h-10 p-0 rounded-full bg-gray-50 dark:bg-gray-900/50 dark:bg-gray-800"
+              className="btn-ghost w-10 h-10 p-0 rounded-full bg-gray-50 dark:bg-gray-900 border-none"
               title="Tema"
               aria-label="Alternar Tema"
             >
@@ -658,7 +658,7 @@ export function AppLayout() {
 
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-800 dark:border-gray-700 bg-white dark:bg-gray-900 dark:bg-gray-800 px-2 py-1 sm:pr-3 text-sm font-bold text-gray-700 dark:text-gray-300 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 dark:hover:bg-gray-700 transition-all shadow-sm"
+              className="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-2 py-1 sm:pr-3 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all shadow-sm"
               title="Perfil"
             >
               <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center">
@@ -674,7 +674,7 @@ export function AppLayout() {
             <button
               type="button"
               onClick={openMobile}
-              className="inline-flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50"
+              className="inline-flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
               aria-label="Abrir menu"
             >
               <Menu className="h-4 w-4" aria-hidden />

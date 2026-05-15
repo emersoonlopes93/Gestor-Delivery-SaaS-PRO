@@ -298,7 +298,7 @@ export function SettingsPage() {
                 placeholder="Motivo da pausa (opcional)"
                 value={settings.storePauseReason || ''}
                 onChange={(e) => setSettings({ ...settings, storePauseReason: e.target.value })}
-                className="px-4 py-2 bg-white dark:bg-gray-900 border border-amber-200 rounded-xl outline-none text-sm w-64"
+                className="input-premium border-amber-200 dark:border-amber-500/30 focus:border-amber-500 w-64 !py-2"
               />
             )}
             <button
@@ -327,7 +327,7 @@ export function SettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                   <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Logotipo da Loja</label>
-                  <div className="flex items-center gap-6 p-4 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl bg-gray-50 dark:bg-gray-900/50/50">
+                  <div className="flex items-center gap-6 p-4 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl bg-gray-50 dark:bg-gray-900/20">
                     <div className="relative w-24 h-24 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                       {settings.logoUrl ? (
                         <img src={settings.logoUrl} alt="Logo preview" className="w-full h-full object-contain" />
@@ -364,7 +364,7 @@ export function SettingsPage() {
                     type="text"
                     value={settings.businessPhone || ''}
                     onChange={e => setSettings({...settings, businessPhone: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                    className="input-premium"
                   />
                 </div>
                 <div>
@@ -373,7 +373,7 @@ export function SettingsPage() {
                     type="email"
                     value={settings.businessEmail || ''}
                     onChange={e => setSettings({...settings, businessEmail: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                    className="input-premium"
                   />
                 </div>
               </div>
@@ -394,7 +394,7 @@ export function SettingsPage() {
                       onChange={e => setSettings({...settings, zipCode: e.target.value.replace(/\D/g, '').slice(0, 8)})}
                       onBlur={handleCepBlur}
                       placeholder="00000-000"
-                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                      className="input-premium"
                     />
                   </div>
                   <div className="md:col-span-2">
@@ -403,7 +403,7 @@ export function SettingsPage() {
                       type="text"
                       value={settings.street || ''}
                       onChange={e => setSettings({...settings, street: e.target.value})}
-                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                      className="input-premium"
                     />
                   </div>
                   <div className="md:col-span-1">
@@ -412,7 +412,7 @@ export function SettingsPage() {
                       type="text"
                       value={settings.number || ''}
                       onChange={e => setSettings({...settings, number: e.target.value})}
-                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                      className="input-premium"
                     />
                   </div>
                 </div>
@@ -424,7 +424,7 @@ export function SettingsPage() {
                       type="text"
                       value={settings.neighborhood || ''}
                       onChange={e => setSettings({...settings, neighborhood: e.target.value})}
-                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                      className="input-premium"
                     />
                   </div>
                   <div>
@@ -433,7 +433,7 @@ export function SettingsPage() {
                       type="text"
                       value={settings.city || ''}
                       onChange={e => setSettings({...settings, city: e.target.value})}
-                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                      className="input-premium"
                     />
                   </div>
                   <div>
@@ -443,7 +443,7 @@ export function SettingsPage() {
                       value={settings.state || ''}
                       onChange={e => setSettings({...settings, state: e.target.value.toUpperCase().slice(0, 2)})}
                       placeholder="SP"
-                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                      className="input-premium"
                     />
                   </div>
                 </div>
@@ -456,7 +456,7 @@ export function SettingsPage() {
                       value={settings.complement || ''}
                       onChange={e => setSettings({...settings, complement: e.target.value})}
                       placeholder="Apto, Bloco, etc."
-                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                      className="input-premium"
                     />
                   </div>
                   <div>
@@ -466,7 +466,7 @@ export function SettingsPage() {
                       value={settings.address || ''}
                       onChange={e => setSettings({...settings, address: e.target.value})}
                       placeholder="Ex: Rua das Flores, 123"
-                      className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium text-gray-500 dark:text-gray-400"
+                      className="input-premium opacity-60"
                     />
                   </div>
                 </div>
@@ -491,7 +491,7 @@ export function SettingsPage() {
                       setSettings({...settings, cnpj: raw.length > 2 ? formatted : raw});
                     }}
                     placeholder="XX.XXX.XXX/XXXX-XX"
-                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium font-mono tracking-wider"
+                    className="input-premium font-mono tracking-wider"
                   />
                 </div>
                 <div>
@@ -501,7 +501,7 @@ export function SettingsPage() {
                     value={settings.razaoSocial || ''}
                     onChange={e => setSettings({...settings, razaoSocial: e.target.value})}
                     placeholder="Nome jurídico da empresa"
-                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                    className="input-premium"
                   />
                 </div>
                 <div>
@@ -511,7 +511,7 @@ export function SettingsPage() {
                     value={settings.inscricaoEstadual || ''}
                     onChange={e => setSettings({...settings, inscricaoEstadual: e.target.value})}
                     placeholder="Opcional"
-                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                    className="input-premium"
                   />
                 </div>
                 <div>
@@ -519,7 +519,7 @@ export function SettingsPage() {
                   <select
                     value={settings.taxRegime || ''}
                     onChange={e => setSettings({...settings, taxRegime: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all outline-none font-medium"
+                    className="input-premium"
                   >
                     <option value="">Selecione...</option>
                     <option value="MEI">MEI (Microempreendedor Individual)</option>
@@ -536,7 +536,7 @@ export function SettingsPage() {
                       value={settings.standardCfop || ''}
                       onChange={e => setSettings({...settings, standardCfop: e.target.value})}
                       placeholder="Ex: 5102"
-                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                      className="input-premium"
                     />
                   </div>
                   <div>
@@ -546,7 +546,7 @@ export function SettingsPage() {
                       value={settings.standardNcm || ''}
                       onChange={e => setSettings({...settings, standardNcm: e.target.value})}
                       placeholder="Ex: 21069090"
-                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                      className="input-premium"
                     />
                   </div>
                 </div>
@@ -597,7 +597,7 @@ export function SettingsPage() {
                       value={settings.pixKey || ''}
                       onChange={e => setSettings({...settings, pixKey: e.target.value})}
                       placeholder="E-mail, CPF, CNPJ ou Aleatória"
-                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                      className="input-premium"
                     />
                   </div>
                   <div>
@@ -607,7 +607,7 @@ export function SettingsPage() {
                       value={settings.bankName || ''}
                       onChange={e => setSettings({...settings, bankName: e.target.value})}
                       placeholder="Ex: Nubank, Itaú..."
-                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                      className="input-premium"
                     />
                   </div>
                   <div>
@@ -616,7 +616,7 @@ export function SettingsPage() {
                       type="text"
                       value={settings.bankAgency || ''}
                       onChange={e => setSettings({...settings, bankAgency: e.target.value})}
-                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                      className="input-premium"
                     />
                   </div>
                   <div>
@@ -625,7 +625,7 @@ export function SettingsPage() {
                       type="text"
                       value={settings.bankAccount || ''}
                       onChange={e => setSettings({...settings, bankAccount: e.target.value})}
-                      className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none font-medium"
+                      className="input-premium"
                     />
                   </div>
                 </div>
