@@ -6,7 +6,7 @@ import {
   FinancialTransactionType,
   FinancialStatus
 } from '@gestor/types';
-import { X, DollarSign, Loader2 } from 'lucide-react';
+import { DollarSign, Loader2 } from 'lucide-react';
 
 interface TransactionModalProps {
   isOpen: boolean;

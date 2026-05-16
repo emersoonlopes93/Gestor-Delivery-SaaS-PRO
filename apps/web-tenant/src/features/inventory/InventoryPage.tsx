@@ -11,7 +11,6 @@ export function InventoryPage() {
   const [activeTab, setActiveTab] = useState<InventoryTab>('ingredients');
   const [ingredients, setIngredients] = useState<IngredientDTO[]>([]);
   const [summary, setSummary] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState<IngredientDTO | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -21,7 +20,6 @@ export function InventoryPage() {
   }, []);
 
   const loadAll = async () => {
-    setIsLoading(true);
     try {
       const [ingRes, summaryRes] = await Promise.all([
         api.get<IngredientDTO[]>('/inventory/ingredients'),
@@ -31,8 +29,6 @@ export function InventoryPage() {
       if (summaryRes.success) setSummary(summaryRes.data);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 

@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Sparkles, Plus } from 'lucide-react';
 import { api } from '../../lib/api-client';
 import { Modal } from '../../components/Modal'; // Assuming Modal is here
-import { RecipeModal } from './components/RecipeModal';
+import { RecipeModal } from '../inventory/RecipeModal';
 import { ProductBasicInfo } from './SubComponents/ProductBasicInfo';
 import { ProductPersonalization } from './SubComponents/ProductPersonalization';
 import { ComboBuilder } from './SubComponents/ComboBuilder';
@@ -242,6 +242,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   // Technical Hygiene: Modals/Toasts
   const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void } | null>(null);
   const [alertModal, setAlertModal] = useState<{ isOpen: boolean; title: string; message: string } | null>(null);
+  const [isRecipeModalOpen, setIsRecipeModalOpen] = useState(false);
 
   const loadAll = async () => {
     setIsLoading(true);
@@ -1100,6 +1101,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               handleSaveProduct={handleSaveProduct}
               savingStates={savingStates}
               isNew={isNew}
+              onOpenRecipe={() => setIsRecipeModalOpen(true)}
             />
           )}
 
@@ -1792,6 +1794,18 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
         >
           <p className="text-gray-600 dark:text-gray-400">{alertModal.message}</p>
         </Modal>
+      )}
+      {product && (
+        <RecipeModal
+          isOpen={isRecipeModalOpen}
+          onClose={() => {
+            setIsRecipeModalOpen(false);
+            loadAll();
+          }}
+          entityType={isComboMode ? 'combo' : 'product'}
+          entityId={product.id}
+          entityName={product.name}
+        />
       )}
     </div>
   );

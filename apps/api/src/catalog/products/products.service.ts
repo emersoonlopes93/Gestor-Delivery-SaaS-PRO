@@ -438,7 +438,7 @@ export class ProductsService {
           comboMode: source.comboMode,
           comboPricingType: source.comboPricingType,
           comboPricingValue: source.comboPricingValue,
-          category: source.categoryId ? { connect: { id: source.categoryId } } : undefined,
+          categoryId: source.categoryId,
           shortDescription: source.shortDescription,
           longDescription: source.longDescription,
           basePrice: source.basePrice,

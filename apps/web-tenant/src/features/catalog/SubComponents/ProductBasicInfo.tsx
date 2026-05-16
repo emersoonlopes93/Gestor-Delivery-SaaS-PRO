@@ -19,6 +19,7 @@ interface ProductBasicInfoProps {
   handleSaveProduct: () => void;
   savingStates: Record<string, boolean>;
   isNew: boolean;
+  onOpenRecipe: () => void;
 }
 
 export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
@@ -39,6 +40,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
   handleSaveProduct,
   savingStates,
   isNew,
+  onOpenRecipe,
 }) => {
   return (
     <section className="space-y-6">
@@ -84,7 +86,18 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
               )}
               
               <div>
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Preço de Custo (CMV)</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-black text-gray-400 uppercase tracking-wider">Preço de Custo (CMV)</label>
+                  {!isNew && (
+                    <button
+                      type="button"
+                      onClick={onOpenRecipe}
+                      className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                    >
+                      <span>Ficha Técnica</span>
+                    </button>
+                  )}
+                </div>
                 <input
                   type="number"
                   step="0.01"

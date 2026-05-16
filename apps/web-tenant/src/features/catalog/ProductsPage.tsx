@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
 import { CatalogPublication, Product, ProductCategory, CreateProductDto } from '@gestor/types';
-import { RecipeModal } from './components/RecipeModal';
+import { RecipeModal } from '../inventory/RecipeModal';
 import { Modal } from '../../components/Modal';
 import { PermissionGate } from '../../components/PermissionGate';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -718,7 +718,10 @@ export function ProductsPage() {
       {recipeTarget && (
         <RecipeModal
           isOpen={!!recipeTarget}
-          onClose={() => setRecipeTarget(null)}
+          onClose={() => {
+            setRecipeTarget(null);
+            loadData();
+          }}
           entityType="product"
           entityId={recipeTarget.id}
           entityName={recipeTarget.name}
@@ -779,17 +782,6 @@ export function ProductsPage() {
           </div>
         </div>
       </Modal>
-      {/* Recipe Modal */}
-      {recipeTarget && (
-        <RecipeModal
-          productId={recipeTarget.id}
-          productName={recipeTarget.name}
-          onClose={() => {
-            setRecipeTarget(null);
-            loadData();
-          }}
-        />
-      )}
     </div>
   );
 }

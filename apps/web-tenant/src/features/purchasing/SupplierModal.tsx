@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { SupplierDTO, CreateSupplierDTO } from '@gestor/types';
-import { X } from 'lucide-react';
+
 
 interface SupplierModalProps {
   isOpen: boolean;
