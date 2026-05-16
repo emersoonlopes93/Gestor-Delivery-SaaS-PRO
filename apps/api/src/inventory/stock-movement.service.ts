@@ -79,6 +79,9 @@ export class StockMovementService {
         tenantId,
         ...(ingredientId ? { ingredientId } : {}),
       },
+      include: {
+        ingredient: true,
+      },
       orderBy: { createdAt: 'desc' },
       take: 100, // Safety limit
     });

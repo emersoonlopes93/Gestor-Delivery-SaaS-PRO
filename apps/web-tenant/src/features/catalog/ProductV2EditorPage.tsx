@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Sparkles, Plus } from 'lucide-react';
 import { api } from '../../lib/api-client';
 import { Modal } from '../../components/Modal'; // Assuming Modal is here
+import { RecipeModal } from './components/RecipeModal';
 import { ProductBasicInfo } from './SubComponents/ProductBasicInfo';
 import { ProductPersonalization } from './SubComponents/ProductPersonalization';
 import { ComboBuilder } from './SubComponents/ComboBuilder';

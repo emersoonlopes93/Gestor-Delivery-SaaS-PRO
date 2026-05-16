@@ -167,6 +167,31 @@ export class IngredientsService {
     return this.mapToDTO(updated);
   }
 
+  async getSummary(tenantId: string) {
+    const ingredients = await this.prisma.ingredient.findMany({
+      where: { tenantId, isActive: true },
+    });
+
+    const totalValue = ingredients.reduce((acc, ing) => {
+      return acc + (Number(ing.currentStock) * Number(ing.currentCost));
+    }, 0);
+
+    const lowStockItems = ingredients.filter(ing => 
+      ing.minStock && Number(ing.currentStock) <= Number(ing.minStock)
+    ).length;
+
+    const outOfStockItems = ingredients.filter(ing => 
+      Number(ing.currentStock) <= 0
+    ).length;
+
+    return {
+      totalValue,
+      lowStockItems,
+      outOfStockItems,
+      totalActiveItems: ingredients.length,
+    };
+  }
+
   private mapToDTO(ing: any): IngredientDTO {
     return {
       id: ing.id,

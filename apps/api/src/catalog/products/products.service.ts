@@ -326,7 +326,9 @@ export class ProductsService {
         comboMode: nextType === 'combo' ? nextComboMode : null,
         comboPricingType: nextType === 'combo' ? nextPricingType : null,
         comboPricingValue: nextType === 'combo' ? nextPricingValue : null,
-        categoryId: normalizedCategoryId,
+        category: normalizedCategoryId === undefined
+          ? undefined
+          : (normalizedCategoryId === null ? { disconnect: true } : { connect: { id: normalizedCategoryId } }),
         shortDescription: updateProductDto.shortDescription ?? undefined,
         longDescription: updateProductDto.longDescription ?? undefined,
         basePrice: nextBasePrice,
@@ -436,10 +438,11 @@ export class ProductsService {
           comboMode: source.comboMode,
           comboPricingType: source.comboPricingType,
           comboPricingValue: source.comboPricingValue,
-          categoryId: source.categoryId,
+          category: source.categoryId ? { connect: { id: source.categoryId } } : undefined,
           shortDescription: source.shortDescription,
           longDescription: source.longDescription,
           basePrice: source.basePrice,
+          costPrice: source.costPrice,
           image: source.image,
           isActive: false, // Start inactive for safety
           isFeatured: source.isFeatured,

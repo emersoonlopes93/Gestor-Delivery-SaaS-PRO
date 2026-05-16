@@ -670,6 +670,11 @@ export class OrdersService {
           orderId: id, 
           orderNumber: order.orderNumber 
         });
+
+        // Reverter estoque teórico
+        await this.inventoryService.reverseOrderDepletion(tenantId, id).catch(e => {
+          this.logger.error(`Erro ao reverter estoque para pedido cancelado ${id}: ${e.message}`);
+        });
       }
 
       // Disparar notificação WhatsApp (fire-and-forget, não bloqueia a transação)

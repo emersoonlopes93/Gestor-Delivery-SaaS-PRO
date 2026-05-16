@@ -16,6 +16,12 @@ export class IngredientsController {
     return this.ingredientsService.findAll(tenantId);
   }
 
+  @Get('summary')
+  @RequirePermissions('inventory.read')
+  async getSummary(@CurrentTenant() tenantId: string) {
+    return this.ingredientsService.getSummary(tenantId);
+  }
+
   @Get(':id')
   @RequirePermissions('inventory.read')
   async findOne(
