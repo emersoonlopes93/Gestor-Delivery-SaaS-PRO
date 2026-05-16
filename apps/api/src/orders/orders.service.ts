@@ -762,4 +762,15 @@ export class OrdersService {
       return updated;
     });
   }
+
+  async getLatestCustomerOrder(tenantId: string, customerId: string) {
+    return this.prisma.order.findFirst({
+      where: { tenantId, customerId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        items: true,
+        timeline: { orderBy: { createdAt: 'desc' }, take: 1 },
+      },
+    });
+  }
 }

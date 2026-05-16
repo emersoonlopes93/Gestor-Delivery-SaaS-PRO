@@ -6,6 +6,8 @@ import { CatalogModule } from '../catalog/catalog.module';
 import { OrdersModule } from '../orders/orders.module';
 import { StorefrontModule } from '../storefront/storefront.module';
 import { DeliveryModule } from '../delivery/delivery.module';
+import { PromotionsModule } from '../promotions/promotions.module';
+import { SchedulingModule } from '../scheduling/scheduling.module';
 
 import { OpenAiProvider } from './providers/openai.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
@@ -28,6 +30,8 @@ import { AiAgentController } from './controllers/ai-agent.controller';
     OrdersModule,          // para as tools criarem pedidos
     StorefrontModule,      // para checkout e validação
     DeliveryModule,        // para calcular taxas de entrega
+    PromotionsModule,      // para cashback e cupons
+    SchedulingModule,      // para agendamentos
   ],
   controllers: [AiAgentController],
   providers: [

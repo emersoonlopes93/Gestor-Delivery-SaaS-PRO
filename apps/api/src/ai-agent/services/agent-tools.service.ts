@@ -3,6 +3,10 @@ import axios from 'axios';
 import { OrdersService } from '../../orders/orders.service';
 import { DeliveryRateService } from '../../delivery/delivery-rate.service';
 import { AiToolDefinition } from '../interfaces/ai-provider.interface';
+import { AvailabilityService } from '../../catalog/publication/availability.service';
+import { CashbackService } from '../../promotions/cashback.service';
+import { CouponsService } from '../../promotions/coupons.service';
+import { SchedulingService } from '../../scheduling/scheduling.service';
 import { CreateOrderDTO } from '@gestor/types';
 
 import { PrismaService } from '../../database/prisma.service';
@@ -17,6 +21,10 @@ export class AgentToolsService {
     private readonly deliveryRateService: DeliveryRateService,
     private readonly prisma: PrismaService,
     private readonly storefrontService: StorefrontService,
+    private readonly availabilityService: AvailabilityService,
+    private readonly cashbackService: CashbackService,
+    private readonly couponsService: CouponsService,
+    private readonly schedulingService: SchedulingService,
   ) {}
 
   /**
@@ -78,6 +86,8 @@ export class AgentToolsService {
               required: ['street', 'number', 'neighborhood', 'city'],
             },
             formaPagamento: { type: 'string', enum: ['pix', 'credit_card', 'cash'] },
+            scheduledFor: { type: 'string', description: 'Data/hora para agendamento (ISO string) se aplicável' },
+            timeSlotId: { type: 'string', description: 'ID do slot de tempo se for agendado' },
           },
           required: ['itens', 'endereco', 'formaPagamento'],
         },
@@ -90,6 +100,98 @@ export class AgentToolsService {
           properties: {
             motivo: { type: 'string', description: 'Motivo resumido da transferência' },
           },
+        },
+      },
+      {
+        name: 'consultar_horario_atendimento',
+        description: 'Consulta os horários de funcionamento da loja e se ela está aberta no momento.',
+        parameters: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      {
+        name: 'consultar_status_pedido',
+        description: 'Verifica o status atual do último pedido realizado pelo cliente.',
+        parameters: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      {
+        name: 'consultar_fidelidade',
+        description: 'Consulta o saldo de cashback ou pontos de fidelidade do cliente.',
+        parameters: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      {
+        name: 'repetir_ultimo_pedido',
+        description: 'Busca os itens do último pedido do cliente para sugerir a repetição.',
+        parameters: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      {
+        name: 'aplicar_cupom_desconto',
+        description: 'Valida e aplica um cupom de desconto ao carrinho/pedido.',
+        parameters: {
+          type: 'object',
+          properties: {
+            cupom: { type: 'string', description: 'Código do cupom (ex: BEMVINDO10)' },
+            valorCarrinho: { type: 'number', description: 'Valor total atual dos produtos no carrinho' },
+          },
+          required: ['cupom', 'valorCarrinho'],
+        },
+      },
+      {
+        name: 'consultar_tempo_espera',
+        description: 'Consulta o tempo estimado de entrega ou retirada baseado na carga atual da cozinha.',
+        parameters: {
+          type: 'object',
+          properties: {
+            tipo: { type: 'string', enum: ['delivery', 'pickup'], description: 'Se deseja saber o tempo para entrega ou retirada' },
+          },
+        },
+      },
+      {
+        name: 'obter_link_rastreamento',
+        description: 'Gera e envia o link do mapa de rastreamento em tempo real do último pedido.',
+        parameters: {
+          type: 'object',
+          properties: {},
+        },
+      },
+      {
+        name: 'verificar_disponibilidade_ingrediente',
+        description: 'Consulta se um produto específico contém um determinado ingrediente (ex: glúten, lactose).',
+        parameters: {
+          type: 'object',
+          properties: {
+            productId: { type: 'string', description: 'ID do produto a ser verificado' },
+            ingrediente: { type: 'string', description: 'Nome do ingrediente para buscar na ficha técnica' },
+          },
+          required: ['productId', 'ingrediente'],
+        },
+      },
+      {
+        name: 'consultar_slots_agendamento',
+        description: 'Consulta horários (slots) disponíveis para agendamento de pedidos em uma data específica.',
+        parameters: {
+          type: 'object',
+          properties: {
+            data: { type: 'string', description: 'Data desejada (YYYY-MM-DD). Se omitido, usa hoje.' },
+          },
+        },
+      },
+      {
+        name: 'consultar_ofertas_checkout',
+        description: 'Consulta ofertas globais e acompanhamentos (upsells) sugeridos para aumentar o pedido antes de finalizar.',
+        parameters: {
+          type: 'object',
+          properties: {},
         },
       },
     ];
@@ -120,6 +222,36 @@ export class AgentToolsService {
         case 'transferir_atendimento_humano':
           return { status: 'success', message: 'Transferência solicitada, aguardando operador humano.' };
 
+        case 'consultar_horario_atendimento':
+          return await this.executeConsultarHorarioAtendimento(tenantId);
+
+        case 'consultar_status_pedido':
+          return await this.executeConsultarStatusPedido(tenantId, sessionContext);
+
+        case 'consultar_fidelidade':
+          return await this.executeConsultarFidelidade(tenantId, sessionContext);
+
+        case 'repetir_ultimo_pedido':
+          return await this.executeRepetirUltimoPedido(tenantId, sessionContext);
+
+        case 'aplicar_cupom_desconto':
+          return await this.executeAplicarCupom(tenantId, args);
+
+        case 'consultar_tempo_espera':
+          return await this.executeConsultarTempoEspera(tenantId, args);
+
+        case 'obter_link_rastreamento':
+          return await this.executeObterLinkRastreamento(tenantId, sessionContext);
+
+        case 'verificar_disponibilidade_ingrediente':
+          return await this.executeVerificarIngrediente(tenantId, args);
+
+        case 'consultar_slots_agendamento':
+          return await this.executeConsultarSlots(tenantId, args);
+
+        case 'consultar_ofertas_checkout':
+          return await this.executeConsultarOfertasCheckout(tenantId);
+
         default:
           throw new Error(`Tool desconhecida: ${toolName}`);
       }
@@ -143,6 +275,13 @@ export class AgentToolsService {
         nome: p.name,
         preco: Number(p.basePrice),
         descricao: p.description,
+        sugestoesAdicionais: p.upsells?.map((u: any) => ({
+          nome: u.name,
+          itens: u.items.map((i: any) => ({
+            nome: i.name,
+            preco: i.finalPrice
+          }))
+        }))
       })),
     }));
 
@@ -249,6 +388,8 @@ export class AgentToolsService {
         payment: {
           method: args.formaPagamento,
         },
+        scheduledFor: args.scheduledFor,
+        timeSlotId: args.timeSlotId,
         sourceChannel: 'whatsapp_ai',
       };
 
@@ -267,5 +408,190 @@ export class AgentToolsService {
     } catch (error: any) {
       return { status: 'error', message: `Erro ao criar pedido: ${error.message}` };
     }
+  }
+
+  private async executeConsultarHorarioAtendimento(tenantId: string) {
+    const hours = await this.prisma.tenantOperatingHours.findMany({
+      where: { tenantId },
+      orderBy: { dayOfWeek: 'asc' },
+    });
+
+    const status = await this.availabilityService.getStoreStatus(tenantId);
+    const dayNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+
+    const formattedHours = hours.map(h => ({
+      dia: dayNames[h.dayOfWeek],
+      status: h.isOpen ? 'Aberto' : 'Fechado',
+      horario: h.isOpen ? `${h.openTime} às ${h.closeTime}` : '-',
+    }));
+
+    return {
+      statusAtual: status.message,
+      isOpen: status.isOpen,
+      proximaAbertura: status.nextOpenAt,
+      escalaSemanal: formattedHours.length > 0 ? formattedHours : 'Horário não configurado (Aberto 24h)',
+    };
+  }
+
+  private async executeConsultarStatusPedido(tenantId: string, sessionContext: any) {
+    if (!sessionContext?.customerId) return { status: 'error', message: 'Cliente não identificado.' };
+    
+    const order = await this.ordersService.getLatestCustomerOrder(tenantId, sessionContext.customerId);
+    if (!order) return { message: 'Você ainda não possui pedidos realizados.' };
+
+    const statusLabels: any = {
+      pending: 'Aguardando confirmação',
+      confirmed: 'Confirmado e em fila',
+      preparing: 'Sendo preparado com carinho',
+      ready_for_delivery: 'Pronto para entrega',
+      out_for_delivery: 'Em rota de entrega',
+      completed: 'Entregue / Concluído',
+      cancelled: 'Cancelado',
+    };
+
+    return {
+      pedidoNumero: order.orderNumber,
+      status: statusLabels[order.status] || order.status,
+      data: order.createdAt,
+      ultimaAtualizacao: order.timeline[0]?.note || 'Pedido recebido',
+      total: Number(order.total),
+    };
+  }
+
+  private async executeConsultarFidelidade(tenantId: string, sessionContext: any) {
+    if (!sessionContext?.customerId) return { status: 'error', message: 'Cliente não identificado.' };
+    
+    const balance = await this.cashbackService.getCashbackBalance(tenantId, sessionContext.customerId);
+    return {
+      saldoCashback: balance,
+      mensagem: balance > 0 
+        ? `Você tem R$ ${balance.toFixed(2)} de saldo para usar!` 
+        : 'Você ainda não possui saldo de cashback, mas ganhará nesta compra!'
+    };
+  }
+
+  private async executeRepetirUltimoPedido(tenantId: string, sessionContext: any) {
+    if (!sessionContext?.customerId) return { status: 'error', message: 'Cliente não identificado.' };
+    
+    const order = await this.ordersService.getLatestCustomerOrder(tenantId, sessionContext.customerId);
+    if (!order) return { message: 'Não encontramos pedidos anteriores para repetir.' };
+
+    return {
+      itens: order.items.map(i => ({
+        productId: i.productId,
+        nome: i.snapshotName,
+        quantidade: i.quantity,
+        notas: i.notes
+      })),
+      mensagem: `Seu último pedido foi o #${order.orderNumber}. Deseja que eu adicione os mesmos itens ao carrinho?`
+    };
+  }
+
+  private async executeAplicarCupom(tenantId: string, args: any) {
+    try {
+      const result = await this.couponsService.validateCouponForTotal(tenantId, args.cupom, args.valorCarrinho);
+      return {
+        status: 'success',
+        desconto: result.discountAmount,
+        mensagem: `Cupom ${args.cupom} aplicado! Desconto de R$ ${result.discountAmount.toFixed(2)}.`
+      };
+    } catch (error: any) {
+      return { status: 'error', message: error.message };
+    }
+  }
+
+  private async executeConsultarTempoEspera(tenantId: string, args: any) {
+    const orders = await this.prisma.order.count({
+      where: {
+        tenantId,
+        status: { in: ['confirmed', 'preparing'] }
+      }
+    });
+
+    const baseTime = args.tipo === 'pickup' ? 15 : 30;
+    const additionalTime = orders * 5; // 5 min por pedido na fila
+    const minTime = baseTime + additionalTime;
+    const maxTime = minTime + 15;
+
+    return {
+      tempoEstimado: `${minTime}-${maxTime} minutos`,
+      pedidosNaFila: orders,
+      mensagem: `O tempo estimado para ${args.tipo === 'pickup' ? 'retirada' : 'entrega'} é de ${minTime} a ${maxTime} minutos.`
+    };
+  }
+
+  private async executeObterLinkRastreamento(tenantId: string, sessionContext: any) {
+    if (!sessionContext?.customerId) return { status: 'error', message: 'Cliente não identificado.' };
+    
+    const order = await this.ordersService.getLatestCustomerOrder(tenantId, sessionContext.customerId);
+    if (!order) return { message: 'Não encontramos pedidos ativos para rastreio.' };
+
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    const trackingUrl = `https://${tenant?.slug}.gestordelivery.com.br/track/${order.orderNumber}`;
+
+    return {
+      pedido: order.orderNumber,
+      status: order.status,
+      linkRastreamento: trackingUrl,
+      mensagem: `Você pode acompanhar seu pedido em tempo real aqui: ${trackingUrl}`
+    };
+  }
+
+  private async executeVerificarIngrediente(tenantId: string, args: any) {
+    const productId = args.productId;
+    const term = args.ingrediente.toLowerCase();
+
+    const recipe = await this.prisma.productRecipeIngredient.findMany({
+      where: { productId, tenantId },
+      include: { ingredient: true }
+    });
+
+    const found = recipe.some(r => r.ingredient.name.toLowerCase().includes(term));
+    const list = recipe.map(r => r.ingredient.name).join(', ');
+
+    return {
+      contemIngrediente: found,
+      listaIngredientes: list,
+      mensagem: found 
+        ? `Sim, este item contém ${args.ingrediente}.` 
+        : `Não encontramos ${args.ingrediente} na ficha técnica deste item. Ingredientes principais: ${list}`
+    };
+  }
+
+  private async executeConsultarSlots(tenantId: string, args: any) {
+    const date = args.data ? new Date(args.data) : new Date();
+    const slots = await this.schedulingService.getAvailableTimeSlots(date, tenantId);
+
+    return {
+      data: date.toISOString().split('T')[0],
+      slotsDisponiveis: slots.map(s => ({
+        id: s.id,
+        horario: new Date(s.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        vagas: s.availableCapacity
+      })),
+      mensagem: slots.length > 0 
+        ? `Temos ${slots.length} horários disponíveis para agendamento nesta data.` 
+        : 'Infelizmente não há horários disponíveis para a data selecionada.'
+    };
+  }
+
+  private async executeConsultarOfertasCheckout(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) throw new Error('Loja não encontrada');
+
+    const payload = await this.storefrontService.getStorefrontPayload(tenant.slug);
+    
+    return {
+      ofertas: payload.upsells.map((u: any) => ({
+        titulo: u.name,
+        descricao: u.description,
+        opcoes: u.items.map((i: any) => ({
+          productId: i.productId,
+          nome: i.name,
+          preco: i.finalPrice
+        }))
+      })),
+      mensagem: 'Aqui estão algumas sugestões para acompanhar seu pedido!'
+    };
   }
 }
