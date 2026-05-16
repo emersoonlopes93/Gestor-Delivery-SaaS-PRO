@@ -249,6 +249,7 @@ export class AgentToolsService {
         payment: {
           method: args.formaPagamento,
         },
+        sourceChannel: 'whatsapp_ai',
       };
 
       const order = await this.ordersService.createOrder(

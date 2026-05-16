@@ -136,7 +136,7 @@ export class OrdersService {
             deliveryFee,
             serviceFee: 0,
             total: finalTotal,
-            sourceChannel: 'storefront',
+            sourceChannel: dto.sourceChannel || 'storefront',
             idempotencyKey: dto.idempotencyKey,
             notes: dto.notes || null,
             customerId,
@@ -232,7 +232,7 @@ export class OrdersService {
             orderId: newOrder.id,
             tenantId,
             status: 'pending',
-            note: 'Pedido recebido via storefront.',
+            note: `Pedido recebido via ${dto.sourceChannel || 'storefront'}.`,
           },
         });
 
@@ -406,6 +406,7 @@ export class OrdersService {
         total: Number(o.total),
         itemCount: o._count.items,
         paymentMethod: o.paymentMethod as PaymentMethod,
+        sourceChannel: o.sourceChannel,
         createdAt: o.createdAt.toISOString(),
       })),
       total,
@@ -449,6 +450,7 @@ export class OrdersService {
         total: Number(o.total),
         itemCount: o._count.items,
         paymentMethod: o.paymentMethod as PaymentMethod,
+        sourceChannel: o.sourceChannel,
         createdAt: o.createdAt.toISOString(),
       })),
       total,
@@ -486,6 +488,7 @@ export class OrdersService {
       total: Number(o.total),
       itemCount: o.items.reduce((sum, i) => sum + i.quantity, 0),
       itemsSummary: o.items.map((i) => `${i.quantity}x ${i.snapshotName}`).join(', '),
+      sourceChannel: o.sourceChannel,
       createdAt: o.createdAt.toISOString(),
     }));
   }

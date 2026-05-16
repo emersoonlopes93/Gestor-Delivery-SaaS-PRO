@@ -198,6 +198,8 @@ export class CreateOrderDTO {
   @IsNotEmpty()
   payment!: PaymentInput;
 
+  @IsString() @IsOptional() sourceChannel?: string;
+
   // API Preference
   @IsString() @IsOptional() returnUrl?: string;
 
@@ -310,6 +312,7 @@ export interface OrderListItemDTO {
   total: number;
   itemCount: number;
   paymentMethod: PaymentMethod;
+  sourceChannel: string;
   waiterId?: string | null;
   createdAt: string;
 }
@@ -330,6 +333,7 @@ export interface OrderBoardItemDTO {
   total: number;
   itemCount: number;
   itemsSummary: string; // Ex: "1x Pizza Calabresa, 2x Coca Cola"
+  sourceChannel?: string;
   createdAt: string;
 }
 

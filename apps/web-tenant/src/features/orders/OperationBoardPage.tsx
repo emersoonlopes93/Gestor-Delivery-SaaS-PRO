@@ -16,6 +16,14 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   draft: 'Rascunho',
 };
 
+const CHANNEL_LABELS: Record<string, string> = {
+  storefront: 'Online',
+  pos: 'PDV',
+  whatsapp_ai: 'IA',
+  whatsapp: 'Whats',
+  ifood: 'iFood',
+};
+
 const STATUS_TONE: Record<OrderStatus, { ring: string; bg: string; text: string }> = {
   pending: { ring: 'ring-amber-200', bg: 'bg-amber-50', text: 'text-amber-800' },
   confirmed: { ring: 'ring-blue-200', bg: 'bg-blue-50', text: 'text-blue-800' },
@@ -128,7 +136,7 @@ const OrderCard = memo(function OrderCard(props: {
             {order.customerName}
           </h3>
           <p className={`${mutedCls} text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1`}>
-            {order.fulfillmentType === 'delivery' ? 'Entrega' : 'Retirada'}
+            {order.fulfillmentType === 'delivery' ? 'Entrega' : 'Retirada'} • {CHANNEL_LABELS[order.sourceChannel || ''] || order.sourceChannel || 'Online'}
           </p>
         </div>
         <div className="shrink-0 flex flex-col items-end gap-1">

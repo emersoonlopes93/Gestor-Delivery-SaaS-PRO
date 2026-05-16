@@ -33,6 +33,14 @@ const STATUS_LABELS: Record<string, string> = {
   draft: 'Rascunho',
 } as any;
 
+const CHANNEL_LABELS: Record<string, string> = {
+  storefront: 'Loja Online',
+  pos: 'PDV / Balcão',
+  whatsapp_ai: 'Agente WhatsApp',
+  whatsapp: 'WhatsApp Manual',
+  ifood: 'iFood',
+};
+
 const STATUS_COLORS: Record<string, string> = {
   pending: 'status-badge-pending',
   confirmed: 'status-badge-confirmed',
@@ -187,6 +195,9 @@ export function OrdersListPage() {
                         {STATUS_LABELS[order.status]}
                       </span>
                       <span className="text-[10px] text-gray-400">{order.fulfillmentType === 'delivery' ? '📦' : '🏪'}</span>
+                      <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700">
+                        {CHANNEL_LABELS[order.sourceChannel] || order.sourceChannel}
+                      </span>
                       <span className="text-[10px] text-gray-400 flex items-center gap-1">
                         <Clock className="w-3 h-3" /> {fmtDate(order.createdAt)}
                       </span>
@@ -291,6 +302,11 @@ function OrderDetailPanel({ orderId, onBack }: { orderId: string; onBack: () => 
         <div className="text-right">
           <span className="text-2xl font-black text-gray-900 dark:text-gray-100">{fmt(order.total)}</span>
           <p className="text-xs text-gray-400 mt-1">{order.fulfillmentType === 'delivery' ? '📦 Entrega' : '🏪 Retirada'}</p>
+          <div className="mt-1">
+            <span className="text-[10px] font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-800">
+              Canal: {CHANNEL_LABELS[order.sourceChannel] || order.sourceChannel}
+            </span>
+          </div>
         </div>
       </header>
 
