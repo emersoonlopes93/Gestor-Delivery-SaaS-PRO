@@ -362,6 +362,97 @@ export function ProductsPage() {
     });
   };
 
+  const renderCards = (list: ProductWithPublication[]) => {
+    return list.map((product) => {
+      const categoryName = product.categoryId ? (categoriesById.get(product.categoryId)?.name ?? 'Sem Categoria') : 'Sem Categoria';
+      const pub = (product as ProductWithPublication).publication;
+      const pubLabel = pub ? pub.publicationStatus : null;
+      const opLabel = pub ? pub.operationalStatus : null;
+      return (
+        <div key={product.id} className="card-premium p-3 md:p-5 border-none shadow-sm hover:shadow-md transition-shadow bg-white dark:bg-gray-900 w-full overflow-hidden">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex gap-3 min-w-0 flex-1">
+               <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 overflow-hidden shrink-0 shadow-sm">
+                {product.image ? (
+                  <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-300 text-[10px] font-black uppercase tracking-widest">
+                    IMG
+                  </div>
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="font-black text-gray-900 dark:text-gray-100 truncate text-sm md:text-base leading-tight">{product.name}</div>
+                <div className="text-[10px] md:text-xs text-gray-500 dark:text-gray-400 font-bold mt-0.5 truncate">{categoryName}</div>
+                <div className="mt-2 flex flex-wrap items-center gap-1">
+                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-800'}`}>
+                    {product.type === 'simple' ? 'Individual' : product.type === 'configurable' ? 'Personalizado' : 'Combo'}
+                  </span>
+                  {pubLabel && (
+                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-gray-100 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-800'}`}>
+                      {pubLabel}
+                    </span>
+                  )}
+                  {opLabel && (
+                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${opLabel === 'active' ? 'status-badge-success' : opLabel === 'inactive' ? 'status-badge-neutral' : opLabel === 'hidden' ? 'status-badge-warning' : 'status-badge-danger'}`}>
+                      {opLabel}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="text-right shrink-0">
+              <div className="text-[9px] md:text-[10px] text-gray-400 font-black uppercase tracking-widest mb-0.5">Preço</div>
+              <div className="text-sm md:text-base font-black text-gray-900 dark:text-gray-100">{formatMoney(product.basePrice)}</div>
+            </div>
+          </div>
+
+          <div className="mt-3 md:mt-4 flex items-center justify-between pt-3 md:pt-4 border-t border-gray-50 dark:border-gray-800/50">
+             <div className="flex items-center gap-2">
+               <span className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${product.isActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+               <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-400">
+                {product.isActive ? 'Ativo' : 'Inativo'}
+              </span>
+             </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => navigate(`/catalog/products/${product.id}/v2`)}
+                className="p-1.5 md:p-2 text-primary-600 bg-primary-50 dark:bg-primary-500/10 rounded-xl hover:bg-primary-100 transition-colors"
+                title="Editar"
+              >
+                <Pencil size={14} />
+              </button>
+              <button
+                onClick={() => handleDuplicate(product.id)}
+                disabled={savingMap[`duplicate-${product.id}`]}
+                className="p-1.5 md:p-2 text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl hover:bg-indigo-100 transition-colors disabled:opacity-50"
+                title="Duplicar"
+              >
+                <Copy size={14} />
+              </button>
+              <button
+                onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
+                className="p-1.5 md:p-2 text-gray-500 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 transition-colors"
+                title="Ficha técnica"
+              >
+                <FileText size={14} />
+              </button>
+              <button
+                onClick={() => handleDelete(product.id)}
+                className="p-1.5 md:p-2 text-red-600 bg-red-50 dark:bg-red-900/10 rounded-xl hover:bg-red-100 transition-colors"
+                title="Excluir"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    });
+  };
+
+
   const ROW_HEIGHT = 64;
   const OVERSCAN = 8;
 
@@ -531,80 +622,7 @@ export function ProductsPage() {
           {viewMode === 'all' ? (
             <>
               <div className="space-y-3 md:hidden">
-                {filteredProducts.map((product) => {
-                  const categoryName = product.categoryId ? (categoriesById.get(product.categoryId)?.name ?? 'Sem Categoria') : 'Sem Categoria';
-                  const typeLabel = product.type ?? 'simple';
-                  const pub = (product as ProductWithPublication).publication;
-                  const pubLabel = pub ? pub.publicationStatus : null;
-                  const opLabel = pub ? pub.operationalStatus : null;
-                  return (
-                    <div key={product.id} className="card-premium p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="font-black text-gray-900 dark:text-gray-100 truncate">{product.name}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 font-bold mt-1 truncate">{categoryName}</div>
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-800">
-                              {typeLabel}
-                            </span>
-                            {pubLabel ? (
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-gray-100 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-800'}`}
-                              >
-                                {pubLabel}
-                              </span>
-                            ) : null}
-                            {opLabel ? (
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${opLabel === 'active' ? 'bg-green-100 text-green-700 border border-green-200' : opLabel === 'inactive' ? 'bg-gray-200 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-700' : opLabel === 'hidden' ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-red-100 text-red-700 border border-red-200'}`}
-                              >
-                                {opLabel}
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <div className="text-xs text-gray-500 dark:text-gray-400 font-bold">Preço</div>
-                          <div className="text-sm font-black text-gray-900 dark:text-gray-100">{formatMoney(product.basePrice)}</div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-800">
-                        <div className="text-xs font-black text-gray-900 dark:text-gray-100">
-                          {formatMoney(product.basePrice)}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => navigate(`/catalog/products/${product.id}/v2`)}
-                            className="p-2 text-primary-600 bg-primary-50 dark:bg-primary-900/20 rounded-lg"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleDuplicate(product.id)}
-                            disabled={savingMap[`duplicate-${product.id}`]}
-                            className="p-2 text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg disabled:opacity-50"
-                          >
-                            <Copy size={14} />
-                          </button>
-                          <button
-                            onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
-                            className="p-2 text-gray-500 bg-gray-50 dark:bg-gray-800 rounded-lg"
-                          >
-                            <FileText size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(product.id)}
-                            className="p-2 text-red-600 bg-red-50 dark:bg-red-900/20 rounded-lg"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-
+                {renderCards(filteredProducts)}
                 {filteredProducts.length === 0 ? (
                   <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6 text-center text-gray-400 font-medium italic">
                     {searchTerm.trim().length > 0 || statusFilter !== 'all' || typeFilter !== 'all' || publicationFilter !== 'all' || operationalFilter !== 'all' || Boolean(selectedCategoryId)
@@ -613,6 +631,7 @@ export function ProductsPage() {
                   </div>
                 ) : null}
               </div>
+
 
               <div className="card-premium hidden md:block">
                 <div ref={tableScrollRef} className="max-h-[70vh] overflow-auto">
@@ -655,47 +674,52 @@ export function ProductsPage() {
               </div>
             </>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4 max-w-full overflow-x-hidden">
               {productsGroupedByCategory.map((group) => {
                 const title = group.category?.name ?? 'Sem categoria';
                 const isExpanded = expandedGroups[group.key] ?? true;
                 return (
-                  <section key={group.key} className="card-premium">
+                  <section key={group.key} className="card-premium border-none shadow-sm">
                     <button
                       type="button"
                       onClick={() => toggleGroupExpanded(group.key)}
-                      className="w-full px-6 py-4 bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      className="w-full px-4 py-4 bg-gray-50/50 dark:bg-gray-800/20 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-800/40 transition-all"
                     >
-                      <div className="text-left">
-                        <div className="text-sm font-black text-gray-900 dark:text-gray-100 uppercase tracking-tight">{title}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 font-bold">{group.products.length} produto(s)</div>
+                      <div className="text-left min-w-0 flex-1">
+                        <div className="text-sm font-black text-gray-900 dark:text-gray-100 uppercase tracking-tight truncate">{title}</div>
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest mt-0.5">{group.products.length} {group.products.length === 1 ? 'produto' : 'produtos'}</div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        {group.category && (
-                          <span className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                            {selectedCategoryId === group.category.id ? 'Filtrado' : ''}
-                          </span>
-                        )}
-                        <ChevronDown size={18} className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      <div className="flex items-center gap-3 shrink-0 ml-4">
+                        <div className={`w-8 h-8 flex items-center justify-center rounded-full bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                          <ChevronDown size={16} className="text-gray-500" />
+                        </div>
                       </div>
                     </button>
 
                     {isExpanded && (
-                      <div className="max-h-[60vh] overflow-auto">
-                        <table className="w-full text-left border-collapse">
-                          <thead className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
-                            <tr>
-                              <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Produto</th>
-                              <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hidden lg:table-cell">Categoria</th>
-                              <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Preço</th>
-                              <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipo/Status</th>
-                              <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                            {renderRows(group.products)}
-                          </tbody>
-                        </table>
+                      <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                        {/* Mobile View: Cards */}
+                        <div className="md:hidden p-3 space-y-3">
+                          {renderCards(group.products)}
+                        </div>
+
+                        {/* Desktop View: Table */}
+                        <div className="hidden md:block max-h-[60vh] overflow-auto custom-scrollbar">
+                          <table className="w-full text-left border-collapse">
+                            <thead className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
+                              <tr>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Produto</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hidden lg:table-cell">Categoria</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Preço</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                              {renderRows(group.products)}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     )}
                   </section>
@@ -703,12 +727,18 @@ export function ProductsPage() {
               })}
 
               {productsGroupedByCategory.length === 0 && (
-                <div className="py-16 text-center text-gray-400 font-bold italic">
-                  Nenhum produto encontrado.
+                <div className="card-premium py-20 text-center flex flex-col items-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-300">
+                    <Search size={32} />
+                  </div>
+                  <div className="text-gray-400 font-black uppercase tracking-widest text-xs">
+                    Nenhum produto encontrado nesta visualização.
+                  </div>
                 </div>
               )}
             </div>
           )}
+
         </>
       )}
 

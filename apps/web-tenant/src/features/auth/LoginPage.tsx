@@ -3,9 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api-client';
 import { useAuthStore } from '../../stores/auth.store';
 import type { TenantLoginResponse } from '@gestor/types';
+import { Mail, Lock, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
 
 /**
- * Login page for tenant users.
+ * Login page for tenant users with premium aesthetics.
  */
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -43,7 +44,7 @@ export function LoginPage() {
       if (err instanceof ApiError) {
         setError(err.message);
       } else {
-        setError('Erro ao fazer login');
+        setError('Credenciais inválidas ou erro no servidor.');
       }
     } finally {
       setLoading(false);
@@ -51,69 +52,97 @@ export function LoginPage() {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8">
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Gestor Delivery</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-2">Acesse o painel da sua loja</p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-5">
+    <div className="card-premium p-8 shadow-2xl border-none bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl">
+      <form onSubmit={handleSubmit} className="space-y-6">
         {isExpired && !error && (
-          <div className="bg-amber-50 text-amber-700 text-sm p-3 rounded-lg border border-amber-200 mb-4 flex items-center gap-2">
-            <span className="text-lg">⚠️</span>
-            Sua sessão expirou. Faça login novamente.
+          <div className="alert-warning p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+            <AlertCircle size={20} className="shrink-0" />
+            <p className="text-xs font-bold uppercase tracking-wide">Sua sessão expirou. Faça login novamente.</p>
           </div>
         )}
 
         {error && (
-          <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-200">
-            {error}
+          <div className="alert-danger p-4 rounded-2xl flex items-center gap-3 animate-in shake duration-500">
+            <AlertCircle size={20} className="shrink-0" />
+            <p className="text-xs font-bold uppercase tracking-wide">{error}</p>
           </div>
         )}
 
-        <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-          >
-            E-mail
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
-            placeholder="seu@email.com"
-          />
-        </div>
+        <div className="space-y-4">
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] mb-2 ml-1"
+            >
+              E-mail de Acesso
+            </label>
+            <div className="relative group">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors">
+                <Mail size={18} />
+              </div>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="input-premium pl-12 h-12"
+                placeholder="exemplo@gestor.com"
+              />
+            </div>
+          </div>
 
-        <div>
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-          >
-            Senha
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
-            placeholder="••••••••"
-          />
+          <div>
+            <div className="flex items-center justify-between mb-2 ml-1">
+              <label
+                htmlFor="password"
+                className="block text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]"
+              >
+                Sua Senha
+              </label>
+              <button type="button" className="text-[10px] font-black text-primary-600 uppercase tracking-widest hover:underline decoration-2 underline-offset-4">
+                Esqueci a senha
+              </button>
+            </div>
+            <div className="relative group">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors">
+                <Lock size={18} />
+              </div>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="input-premium pl-12 h-12"
+                placeholder="••••••••••••"
+              />
+            </div>
+          </div>
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-primary-600 text-white py-2.5 rounded-lg font-semibold hover:bg-primary-700 focus:ring-4 focus:ring-primary-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn-primary w-full h-12 text-sm uppercase tracking-[0.2em] group relative overflow-hidden"
         >
-          {loading ? 'Entrando...' : 'Entrar'}
+          <span className={`flex items-center justify-center gap-2 transition-all ${loading ? 'opacity-0 scale-90' : 'opacity-100 scale-100'}`}>
+            Acessar Painel
+            <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+          </span>
+          
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          )}
         </button>
+
+        <div className="pt-2 text-center">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+            Não tem uma conta? <button type="button" className="text-primary-600 hover:underline decoration-2 underline-offset-4">Solicite uma demonstração</button>
+          </p>
+        </div>
       </form>
     </div>
   );

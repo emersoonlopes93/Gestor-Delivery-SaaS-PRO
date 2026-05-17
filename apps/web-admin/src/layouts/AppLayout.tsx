@@ -13,9 +13,15 @@ import {
   Store,
   UserCircle,
   Puzzle,
+  Moon,
+  Sun,
+  LogOut,
+  Globe,
+  ArrowRight
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
+import { useThemeStore } from '../stores/theme.store';
 
 type SidebarItem = {
   id: string;
@@ -39,17 +45,17 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     label: 'Admin',
     items: [
       { id: 'dashboard', label: 'Dashboard', to: '/dashboard', icon: LayoutGrid },
-      { id: 'tenants', label: 'Tenants', to: '/tenants', icon: Store, permission: 'saas.tenants.read' },
+      { id: 'tenants', label: 'Tenants (Lojas)', to: '/tenants', icon: Store, permission: 'saas.tenants.read' },
     ],
   },
   {
     id: 'platform',
     label: 'Plataforma',
     items: [
-      { id: 'franchise', label: 'Dashboard Franquias', to: '/franchise', icon: Store, permission: 'saas.franchise.read' },
-      { id: 'billing', label: 'Planos & Billing', to: '/billing', icon: CreditCard, permission: 'saas.plans.read' },
-      { id: 'integrations', label: 'Integrações & IA', to: '/integrations', icon: Puzzle, permission: 'saas.settings.read' },
-      { id: 'audit-logs', label: 'Logs de Auditoria', to: '/audit-logs', icon: Shield, permission: 'saas.audit.read' },
+      { id: 'franchise', label: 'Franquias', to: '/franchise', icon: Globe, permission: 'saas.franchise.read' },
+      { id: 'billing', label: 'Planos & Assinaturas', to: '/billing', icon: CreditCard, permission: 'saas.plans.read' },
+      { id: 'integrations', label: 'Marketplace & IA', to: '/integrations', icon: Puzzle, permission: 'saas.settings.read' },
+      { id: 'audit-logs', label: 'Auditoria', to: '/audit-logs', icon: Shield, permission: 'saas.audit.read' },
     ],
   },
 ];
@@ -85,49 +91,32 @@ function isItemActive(to: string, pathname: string): boolean {
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
-function firstActiveGroupId(groups: readonly SidebarGroup[], pathname: string): string | null {
-  for (const g of groups) {
-    for (const it of g.items) {
-      if (isItemActive(it.to, pathname)) return g.id;
-    }
-  }
-  return null;
-}
-
 const SidebarGroupView = memo(function SidebarGroupView(props: {
   group: SidebarGroup;
   collapsed: boolean;
   isOpen: boolean;
   onToggle: (groupId: string) => void;
+  pathname: string;
 }) {
-  const { group, collapsed, isOpen, onToggle } = props;
+  const { group, collapsed, isOpen, onToggle, pathname } = props;
+  const hasActive = useMemo(() => group.items.some(it => isItemActive(it.to, pathname)), [group.items, pathname]);
 
   return (
     <div className="select-none">
-      <button
-        type="button"
-        onClick={() => onToggle(group.id)}
-        className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors"
-        title={collapsed ? group.label : undefined}
-      >
-        <span className="text-xs font-black text-gray-400 uppercase tracking-wider">
-          {!collapsed ? group.label : group.label.slice(0, 1)}
-        </span>
-        {!collapsed ? (
-          <span
-            className={`text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-90' : 'rotate-0'}`}
-            aria-hidden
-          >
-            <ChevronRight className="h-4 w-4" aria-hidden />
+      {!collapsed && (
+        <button
+          type="button"
+          onClick={() => onToggle(group.id)}
+          className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all group ${hasActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'}`}
+        >
+          <span className="text-[10px] font-black uppercase tracking-widest">
+            {group.label}
           </span>
-        ) : null}
-      </button>
+          <ChevronRight className={`h-3.5 w-3.5 transition-transform duration-200 ${isOpen ? 'rotate-90' : 'rotate-0'}`} />
+        </button>
+      )}
 
-      <div
-        className={`overflow-hidden transition-[max-height,opacity] duration-200 ${
-          isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-        }`}
-      >
+      <div className={`overflow-hidden transition-[max-height,opacity] duration-200 ${isOpen || collapsed ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
         <div className="mt-1 space-y-1">
           {group.items.map((item) => (
             <NavLink
@@ -135,19 +124,19 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
               to={item.to}
               title={collapsed ? item.label : undefined}
               className={({ isActive }) =>
-                `group relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
                   isActive
-                    ? 'bg-primary-100 text-primary-800'
-                    : 'text-gray-700 hover:bg-primary-50 hover:text-primary-700'
-                }`
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/40 hover:text-gray-900 dark:hover:text-gray-100'
+                } ${collapsed ? 'justify-center' : ''}`
               }
             >
-              <span className="w-6 flex items-center justify-center" aria-hidden>
-                <item.icon className="h-4 w-4" aria-hidden />
+              <span className={`transition-colors ${collapsed ? '' : 'w-6 flex items-center justify-center'}`} aria-hidden>
+                <item.icon className="h-[18px] w-[18px] stroke-[2.5px]" aria-hidden />
               </span>
               {!collapsed ? <span className="truncate">{item.label}</span> : null}
               {collapsed ? (
-                <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100">
+                <span className="pointer-events-none absolute left-full ml-4 whitespace-nowrap rounded-xl bg-gray-900 dark:bg-gray-800 px-3.5 py-2 text-xs font-black text-white opacity-0 shadow-2xl transition-all group-hover:opacity-100 z-50">
                   {item.label}
                 </span>
               ) : null}
@@ -161,6 +150,7 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
 
 export function AppLayout() {
   const { user, clearUser } = useAuthStore();
+  const { theme, setTheme } = useThemeStore();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -193,54 +183,13 @@ export function AppLayout() {
     return filtered;
   }, [userPermissions]);
 
-  const activeGroupId = useMemo(() => {
-    return firstActiveGroupId(groups, location.pathname);
-  }, [groups, location.pathname]);
-
-  const setAccordionOpenGroup = useCallback((groupId: string) => {
-    setOpenGroups((prev) => {
-      const alreadyOpen = prev[groupId] === true;
-      const next: Record<string, boolean> = {};
-      for (const g of SIDEBAR_GROUPS) next[g.id] = false;
-      next[groupId] = !alreadyOpen;
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!activeGroupId) return;
-    setOpenGroups((prev) => {
-      if (prev[activeGroupId]) return prev;
-      const next: Record<string, boolean> = {};
-      for (const g of SIDEBAR_GROUPS) next[g.id] = false;
-      next[activeGroupId] = true;
-      return next;
-    });
-  }, [activeGroupId]);
-
   const toggleGroup = useCallback((groupId: string) => {
-    setAccordionOpenGroup(groupId);
-  }, [setAccordionOpenGroup]);
-
-  const toggleCollapsed = useCallback(() => {
-    setCollapsed((v) => !v);
+    setOpenGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
   }, []);
 
+  const toggleCollapsed = useCallback(() => setCollapsed((v) => !v), []);
   const openMobile = useCallback(() => setIsMobileOpen(true), []);
   const closeMobile = useCallback(() => setIsMobileOpen(false), []);
-
-  useEffect(() => {
-    setIsMobileOpen(false);
-  }, [location.pathname]);
-
-  useEffect(() => {
-    if (!isMobileOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsMobileOpen(false);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isMobileOpen]);
 
   const handleLogout = () => {
     localStorage.removeItem('admin_accessToken');
@@ -250,143 +199,121 @@ export function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-50">
+    <div className="min-h-screen flex bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
       {isMobileOpen ? (
-        <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={closeMobile} />
+        <div className="fixed inset-0 z-40 bg-black/40 md:hidden backdrop-blur-sm" onClick={closeMobile} />
       ) : null}
 
       <aside
-        className={`fixed z-50 inset-y-0 left-0 bg-white border-r border-gray-200 flex flex-col transition-[transform,width] duration-200 ease-out md:static md:translate-x-0 ${
+        className={`fixed z-50 inset-y-0 left-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-[width,transform] duration-300 ease-out md:static md:translate-x-0 ${
           collapsed ? 'w-[72px]' : 'w-64'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
-        aria-label="Sidebar"
       >
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between gap-2">
+        <div className={`p-6 border-b border-gray-100 dark:border-gray-800/60 ${collapsed ? 'flex justify-center' : ''}`}>
           {!collapsed ? (
-            <div className="min-w-0">
-              <h1 className="text-lg font-bold text-primary-700 truncate">SaaS Admin</h1>
-              <p className="text-xs text-gray-500 mt-0.5 truncate">{user?.name || 'Carregando...'}</p>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-indigo-600/20">
+                S
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-sm font-black text-gray-900 dark:text-gray-100 tracking-tight">SaaS<span className="text-indigo-600">Admin</span></h1>
+                <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">{user?.name || 'Carregando...'}</p>
+              </div>
             </div>
           ) : (
-            <div className="w-full text-center">
-              <span className="text-lg font-bold text-primary-700" aria-hidden>
-                SA
-              </span>
+            <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-indigo-600/20">
+              S
             </div>
           )}
-
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            className="hidden md:inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-2 py-1 text-sm text-gray-600 hover:bg-gray-50"
-            title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
-          >
-            {collapsed ? '»' : '«'}
-          </button>
         </div>
 
-        <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
-          {groups.map((group) => {
-            const isOpen = openGroups[group.id] ?? false;
-            return (
-              <SidebarGroupView
-                key={group.id}
-                group={group}
-                collapsed={collapsed}
-                isOpen={collapsed ? true : isOpen}
-                onToggle={toggleGroup}
-              />
-            );
-          })}
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto custom-scrollbar">
+          {groups.map((group) => (
+            <SidebarGroupView
+              key={group.id}
+              group={group}
+              collapsed={collapsed}
+              isOpen={openGroups[group.id] ?? true}
+              onToggle={toggleGroup}
+              pathname={location.pathname}
+            />
+          ))}
         </nav>
 
-        <div className="p-3 border-t border-gray-200">
+        <div className="p-4 border-t border-gray-100 dark:border-gray-800/60">
           <button
             onClick={handleLogout}
-            className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors ${
-              collapsed ? 'flex items-center justify-center' : ''
-            }`}
-            title={collapsed ? 'Sair' : undefined}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all ${collapsed ? 'justify-center' : ''}`}
           >
-            <span aria-hidden>{collapsed ? '🚪' : '🚪 Sair'}</span>
+            <LogOut size={18} />
+            {!collapsed && <span>Encerrar Sessão</span>}
           </button>
         </div>
       </aside>
 
-      <div className="flex-1 min-w-0 flex flex-col">
-        <header className="hidden md:flex sticky top-0 z-30 bg-white border-b border-gray-200">
-          <div className="h-14 px-4 flex items-center gap-3 w-full">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        <header className="hidden md:flex sticky top-0 z-30 h-16 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800/60 px-6 items-center gap-4">
+          <button onClick={toggleCollapsed} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all">
+            <Menu size={20} />
+          </button>
+
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              value={desktopSearch}
+              onChange={(e) => setDesktopSearch(e.target.value)}
+              placeholder="Pesquisar no sistema..."
+              className="w-full h-10 pl-10 pr-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+            />
+          </div>
+
+          <div className="ml-auto flex items-center gap-3">
             <button
-              type="button"
-              onClick={toggleCollapsed}
-              className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-              aria-label="Alternar sidebar"
-              title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
             >
-              <Menu className="h-4 w-4" aria-hidden />
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
 
-            <div className="relative flex-1 max-w-[520px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" aria-hidden />
-              <input
-                value={desktopSearch}
-                onChange={(e) => setDesktopSearch(e.target.value)}
-                placeholder="Buscar (tenants, módulos, ações)"
-                className="w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
-              />
-            </div>
-
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-              title="Atalhos"
-            >
-              <CornerDownRight className="h-4 w-4" aria-hidden />
-              <span className="hidden lg:inline">Atalhos</span>
+            <button className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all relative">
+              <Bell size={18} />
+              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-indigo-500 rounded-full border-2 border-white dark:border-gray-900" />
             </button>
 
-            <button
-              type="button"
-              className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-              title="Notificações"
-              aria-label="Notificações"
-            >
-              <Bell className="h-4 w-4" aria-hidden />
-            </button>
+            <div className="h-8 w-px bg-gray-200 dark:bg-gray-800 mx-1" />
 
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-              title="Perfil"
-            >
-              <UserCircle className="h-4 w-4" aria-hidden />
-              <span className="hidden lg:inline truncate max-w-[180px]">{user?.name || 'Conta'}</span>
+            <button className="flex items-center gap-3 pl-1 pr-3 py-1 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
+              <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center">
+                <UserCircle size={20} />
+              </div>
+              <span className="text-xs font-bold text-gray-700 dark:text-gray-300 hidden lg:block">{user?.name}</span>
             </button>
           </div>
         </header>
 
-        <header className="md:hidden sticky top-0 z-30 bg-white border-b border-gray-200">
-          <div className="h-14 px-4 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={openMobile}
-              className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-              aria-label="Abrir menu"
-            >
-              <Menu className="h-4 w-4" aria-hidden />
-            </button>
-            <div className="min-w-0 text-center">
-              <div className="text-sm font-semibold text-gray-900 truncate">SaaS Admin</div>
-              <div className="text-xs text-gray-500 truncate">{user?.name || 'Carregando...'}</div>
-            </div>
-            <div className="w-10" />
+        <header className="md:hidden sticky top-0 z-30 h-14 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 px-4 flex items-center justify-between transition-colors">
+          <button onClick={openMobile} className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300">
+            <Menu size={20} />
+          </button>
+          <div className="text-center">
+            <div className="text-sm font-black text-gray-900 dark:text-gray-100 uppercase tracking-tight">SaaS<span className="text-indigo-600">Admin</span></div>
+            <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest leading-none mt-0.5">Gestão Global</div>
           </div>
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400"
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
         </header>
 
-        <main className="flex-1 overflow-auto">
-          <Outlet />
+        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-950/50">
+          <div className="animate-in fade-in duration-500 p-4 md:p-8">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
   );
 }
+

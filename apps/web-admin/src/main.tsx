@@ -6,7 +6,11 @@ import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
 import { queryClient } from './lib/query-client';
 import { ErrorBoundary } from './components/error-boundary';
+import { useThemeStore } from './stores/theme.store';
 import './index.css';
+
+// Initialize theme
+useThemeStore.getState().initializeTheme();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -19,3 +23,4 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </React.StrictMode>,
 );
+

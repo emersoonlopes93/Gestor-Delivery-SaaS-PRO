@@ -669,23 +669,32 @@ export function AppLayout() {
           </div>
         </header>
 
-        <header className="md:hidden sticky top-0 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+        <header className="md:hidden sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 transition-colors">
           <div className="h-14 px-4 flex items-center justify-between">
             <button
               type="button"
               onClick={openMobile}
-              className="inline-flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
+              className="inline-flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 w-10 h-10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all active:scale-95"
               aria-label="Abrir menu"
             >
-              <Menu className="h-4 w-4" aria-hidden />
+              <Menu className="h-5 w-5" aria-hidden />
             </button>
             <div className="min-w-0 text-center">
-              <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">Gestor Delivery</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.name || 'Carregando...'}</div>
+              <div className="text-sm font-black text-gray-900 dark:text-gray-100 truncate flex items-center justify-center gap-1.5">
+                Gestor<span className="text-primary-600">PRO</span>
+              </div>
+              <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 truncate uppercase tracking-widest leading-none mt-0.5">{user?.tenant?.name || 'Carregando...'}</div>
             </div>
-            <div className="w-10" />
+            <button
+              type="button"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 transition-all active:scale-95"
+            >
+               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
           </div>
         </header>
+
 
         <main className="flex-1 overflow-auto">
           <Outlet />
