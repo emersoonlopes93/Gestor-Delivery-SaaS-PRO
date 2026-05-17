@@ -164,6 +164,7 @@ async function main() {
       customerName: 'Smoke Inventory',
       customerPhone: '11999990111',
       fulfillmentType: 'pickup',
+      payment: { method: 'pix' },
     },
   );
 

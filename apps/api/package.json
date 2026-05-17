@@ -24,6 +24,7 @@
     "clean": "pnpm exec rimraf dist"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1048.0",
     "@gestor/auth": "workspace:*",
     "@gestor/config": "workspace:*",
     "@gestor/core": "workspace:*",

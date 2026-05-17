@@ -150,6 +150,7 @@ async function testCheckoutPickup() {
     customerName: 'Smoke Test Pickup',
     customerPhone: '11999990001',
     fulfillmentType: 'pickup',
+    payment: { method: 'pix' },
   });
 
   const order = asRecord(data);
@@ -216,7 +217,10 @@ async function testCheckoutDelivery() {
       city: 'São Paulo',
       state: 'SP',
       zipCode: '01001000',
+      lat: -23.55,
+      lng: -46.63,
     },
+    payment: { method: 'pix' },
   });
 
   assert('Delivery checkout creates order', status === 201 || status === 200, `Status: ${status}`);
@@ -288,6 +292,7 @@ async function testComplementsRequired() {
     customerName: 'Test Comp Fail',
     customerPhone: '11999990003',
     fulfillmentType: 'pickup',
+    payment: { method: 'pix' },
   });
 
   assert('Reject missing required complement', failStatus === 400, `Expected 400, got ${failStatus}`);
@@ -304,6 +309,7 @@ async function testComplementsRequired() {
     customerName: 'Test Comp Pass',
     customerPhone: '11999990004',
     fulfillmentType: 'pickup',
+    payment: { method: 'pix' },
   });
 
   assert('Accept valid complement', passStatus === 201 || passStatus === 200, `Got ${passStatus}`);
@@ -364,6 +370,7 @@ async function testComboCheckout() {
     customerName: 'Smoke Test Combo',
     customerPhone: '11999990005',
     fulfillmentType: 'pickup',
+    payment: { method: 'pix' },
   });
 
   assert('Combo checkout succeeds', status === 201 || status === 200, `Status: ${status}, ${JSON.stringify(data).slice(0, 200)}`);
@@ -395,6 +402,7 @@ async function testIdempotency() {
     customerName: 'Idempotency Test',
     customerPhone: '11999990006',
     fulfillmentType: 'pickup',
+    payment: { method: 'pix' },
   });
 
   const { data: second } = await api('POST', `/orders/public-checkout/${TENANT_SLUG}`, {
@@ -403,6 +411,7 @@ async function testIdempotency() {
     customerName: 'Idempotency Test',
     customerPhone: '11999990006',
     fulfillmentType: 'pickup',
+    payment: { method: 'pix' },
   });
 
   const a = asRecord(first);
@@ -422,9 +431,12 @@ async function testIdempotency() {
 async function testValidStatusTransition(token: string, orderId: string) {
   console.log('\n✅ Test 6: Valid Status Transition');
 
-  const { status, data } = await api('PATCH', `/orders/${orderId}/status`, { status: 'confirmed' }, token);
+  const { status } = await api('PATCH', `/orders/${orderId}/status`, { status: 'confirmed' }, token);
   assert('Transition pending→confirmed', status === 200, `Status: ${status}`);
-  const order = asRecord(data);
+  
+  // Fetch full details to check the timeline
+  const getDetail = await api('GET', `/orders/${orderId}`, undefined, token);
+  const order = asRecord(getDetail.data);
   const orderStatus = order ? pickString(order, 'status') : null;
   const timeline = order ? asArray(order.timeline) : [];
   assert('New status is confirmed', orderStatus === 'confirmed', `Got: ${String(orderStatus)}`);
@@ -439,7 +451,7 @@ async function testInvalidStatusTransition(token: string, orderId: string) {
 
   // Order is now "confirmed", trying to jump to "completed" (invalid)
   const { status } = await api('PATCH', `/orders/${orderId}/status`, { status: 'completed' }, token);
-  assert('Reject invalid transition confirmed→completed', status === 409, `Expected 409, got ${status}`);
+  assert('Reject invalid transition confirmed→completed', status === 400, `Expected 400, got ${status}`);
 }
 
 

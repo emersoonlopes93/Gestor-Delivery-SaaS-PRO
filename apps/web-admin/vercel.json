@@ -1,5 +1,6 @@
 {
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://gestor-delivery-saas-pro-5fht.onrender.com/api/:path*" }
+    { "source": "/api/:path*", "destination": "https://gestor-delivery-saas-pro-5fht.onrender.com/api/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

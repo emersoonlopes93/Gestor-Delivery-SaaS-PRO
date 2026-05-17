@@ -201,7 +201,7 @@ export function SettingsPage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await api.upload<{ url: string }>('/upload/image', formData);
+      const response = await api.upload<{ url: string }>('/upload/image?type=logo', formData);
       if (response.success) {
         setSettings({ ...settings, logoUrl: response.data.url });
       }

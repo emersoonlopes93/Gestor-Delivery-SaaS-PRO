@@ -356,6 +356,32 @@ async function seedDemoTenant() {
       },
     });
 
+    // Create Bebidas category
+    const bebidasCategory = await prisma.productCategory.upsert({
+      where: { tenantId_slug: { tenantId: tenant.id, slug: 'bebidas' } },
+      update: {},
+      create: {
+        tenantId: tenant.id,
+        name: 'Bebidas',
+        slug: 'bebidas',
+      },
+    });
+
+    // Create simple product without complements
+    await prisma.product.upsert({
+      where: { tenantId_slug: { tenantId: tenant.id, slug: 'refrigerante' } },
+      update: {},
+      create: {
+        tenantId: tenant.id,
+        categoryId: bebidasCategory.id,
+        name: 'Refrigerante',
+        slug: 'refrigerante',
+        basePrice: 6.0,
+        isAvailable: true,
+        sellableOnline: true,
+      },
+    });
+
     // Create combo (ProductCombo)
     const combo = await prisma.productCombo.upsert({
       where: { tenantId_slug: { tenantId: tenant.id, slug: 'combo-casal' } },

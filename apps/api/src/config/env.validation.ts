@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const envSchema = z.object({
+const baseEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
   API_PORT: z.coerce.number().int().positive().default(3333),
   API_PREFIX: z.string().min(1).default('/api/v1'),
@@ -39,7 +39,67 @@ const envSchema = z.object({
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
   REDIS_PASSWORD: z.string().default(''),
   REDIS_TLS: z.enum(['true', 'false']).default('false'),
+
+  // Storage Driver & Cloudflare R2
+  STORAGE_DRIVER: z.enum(['local', 'r2']).optional(),
+  R2_ACCOUNT_ID: z.string().default(''),
+  R2_ACCESS_KEY_ID: z.string().default(''),
+  R2_SECRET_ACCESS_KEY: z.string().default(''),
+  R2_BUCKET: z.string().default(''),
+  R2_PUBLIC_BASE_URL: z.string().default(''),
+  R2_REGION: z.string().default('auto'),
 });
+
+const envSchema = baseEnvSchema
+  .transform((data) => {
+    const isProduction = data.NODE_ENV === 'production';
+    const resolvedDriver = data.STORAGE_DRIVER || (isProduction ? 'r2' : 'local');
+    return {
+      ...data,
+      STORAGE_DRIVER: resolvedDriver as 'local' | 'r2',
+    };
+  })
+  .superRefine((data, ctx) => {
+    const isProduction = data.NODE_ENV === 'production';
+
+    if (isProduction && data.STORAGE_DRIVER === 'local') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['STORAGE_DRIVER'],
+        message: `STORAGE_DRIVER='local' não é permitido em produção. Defina STORAGE_DRIVER=r2.`,
+      });
+    }
+
+    if (data.STORAGE_DRIVER === 'r2') {
+      const requiredR2Fields = [
+        'R2_ACCOUNT_ID',
+        'R2_ACCESS_KEY_ID',
+        'R2_SECRET_ACCESS_KEY',
+        'R2_BUCKET',
+        'R2_PUBLIC_BASE_URL',
+      ] as const;
+
+      for (const field of requiredR2Fields) {
+        if (!data[field] || data[field].trim() === '') {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [field],
+            message: `${field} é obrigatório quando STORAGE_DRIVER é 'r2' (ou em produção).`,
+          });
+        }
+      }
+    }
+
+    if (isProduction) {
+      if (!data.REDIS_HOST || data.REDIS_HOST === 'localhost' || data.REDIS_HOST === '127.0.0.1') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['REDIS_HOST'],
+          message: `REDIS_HOST não pode ser localhost ou vazio em produção.`,
+        });
+      }
+    }
+  });
 
 export type Env = z.infer<typeof envSchema>;
 

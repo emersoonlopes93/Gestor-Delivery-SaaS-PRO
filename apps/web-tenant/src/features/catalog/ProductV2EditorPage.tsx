@@ -398,7 +398,8 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
       if (imageFile) {
         const fd = new FormData();
         fd.append('file', imageFile);
-        const uploadRes = await api.upload<{ url: string }>('/upload/image', fd);
+        const uploadType = isComboMode ? 'combo' : 'product';
+        const uploadRes = await api.upload<{ url: string }>(`/upload/image?type=${uploadType}`, fd);
         if (uploadRes.success) {
           finalImageUrl = uploadRes.data.url;
         }

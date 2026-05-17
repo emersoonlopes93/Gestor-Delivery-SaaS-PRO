@@ -6,12 +6,14 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
+  Query,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request as ExpressRequest } from 'express';
 import { memoryStorage } from 'multer';
-import { extname } from 'path';
+import { randomUUID } from 'crypto';
 import { ImageOptimizerService } from './image-optimizer.service';
+import { StorageService } from './storage.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
@@ -30,14 +32,18 @@ type MulterFileLike = {
 @Controller('upload')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class UploadController {
-  constructor(private readonly optimizer: ImageOptimizerService) {}
+  constructor(
+    private readonly optimizer: ImageOptimizerService,
+    private readonly storageService: StorageService,
+  ) {}
+
   @Post('image')
   @RequirePermissions('catalog.update')
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
       limits: {
-        fileSize: 10 * 1024 * 1024, // Aumentado para 10MB pois vamos comprimir
+        fileSize: 10 * 1024 * 1024, // 10MB limit
       },
       fileFilter: (_req: ExpressRequest, file: MulterFileLike, cb: FileFilterCallback) => {
         const allowedMime = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -52,6 +58,7 @@ export class UploadController {
   async uploadImage(
     @Request() req: ExpressRequest & { user: TenantJwtPayload },
     @UploadedFile() file: unknown,
+    @Query('type') type?: string,
   ) {
     if (!file) {
       throw new BadRequestException('Arquivo não enviado');
@@ -60,14 +67,27 @@ export class UploadController {
     const uploaded = file as { buffer: Buffer; originalname: string };
     const tenantId = req.user.tenantId;
 
-    const filename = await this.optimizer.optimize(
+    // 1. Otimiza a imagem na memória
+    const { buffer: optimizedBuffer } = await this.optimizer.optimize(
       uploaded.buffer,
-      tenantId,
       uploaded.originalname,
     );
 
-    const url = `/api/v1/static/${encodeURIComponent(tenantId)}/${encodeURIComponent(filename)}`;
+    // 2. Define a key multi-tenant
+    const uuid = randomUUID();
+    const folder = type === 'logo' ? 'logos' : type === 'combo' ? 'combos' : 'products';
+    const key = `tenants/${tenantId}/${folder}/${uuid}.webp`;
 
-    return { url };
+    // 3. Salva no storage (local ou R2)
+    const result = await this.storageService.uploadBuffer({
+      buffer: optimizedBuffer,
+      key,
+      contentType: 'image/webp',
+    });
+
+    return {
+      url: result.url,
+      key: result.key,
+    };
   }
 }
