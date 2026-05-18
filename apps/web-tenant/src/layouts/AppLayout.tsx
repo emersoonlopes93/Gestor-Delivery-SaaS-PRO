@@ -546,17 +546,19 @@ export function AppLayout() {
 
 
   return (
-    <div className="min-h-screen flex bg-gray-50 dark:bg-gray-900/50 dark:bg-gray-950 transition-colors">
+    <div className="min-h-screen flex transition-colors" style={{ backgroundColor: 'var(--surface-page)' }}>
       {isMobileOpen ? (
         <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={closeMobile} />
       ) : null}
 
       <aside
-        className={`fixed z-50 inset-y-0 left-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-[transform,width,background-color] duration-200 ease-out md:static md:translate-x-0 ${collapsed ? 'w-[72px]' : 'w-64'
-          } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
+        className={`fixed z-50 inset-y-0 left-0 flex flex-col transition-[transform,width,background-color] duration-200 ease-out md:static md:translate-x-0 ${
+          collapsed ? 'w-[72px]' : 'w-64'
+        } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
+        style={{ backgroundColor: 'var(--surface-base)', borderRight: '1px solid var(--border-default)' }}
         aria-label="Sidebar"
       >
-        <div className={`p-4 flex flex-col gap-4 border-b border-gray-100 dark:border-gray-800/60 ${collapsed ? 'items-center' : ''}`}>
+        <div className={`p-4 flex flex-col gap-4 ${collapsed ? 'items-center' : ''}`} style={{ borderBottom: '1px solid var(--border-default)' }}>
           <div className="flex items-center justify-between gap-3">
             {!collapsed ? (
               <div className="flex items-center gap-3 min-w-0">
@@ -664,7 +666,7 @@ export function AppLayout() {
           })}
         </nav>
 
-        <div className="p-4 border-t border-gray-100 dark:border-gray-800/60">
+        <div className="p-4" style={{ borderTop: '1px solid var(--border-default)' }}>
           <button
             onClick={handleLogout}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all active:scale-95 ${collapsed ? 'justify-center' : ''
@@ -678,7 +680,7 @@ export function AppLayout() {
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="hidden md:flex sticky top-0 z-30 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800/60">
+        <header className="hidden md:flex sticky top-0 z-30 backdrop-blur-xl" style={{ backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-strong)' }}>
           <div className="h-16 px-6 flex items-center gap-4 w-full">
             <button
               type="button"
@@ -743,7 +745,7 @@ export function AppLayout() {
           </div>
         </header>
 
-        <header className="md:hidden sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 transition-colors">
+        <header className="md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors" style={{ backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-strong)' }}>
           <div className="h-14 px-4 flex items-center justify-between">
             <button
               type="button"

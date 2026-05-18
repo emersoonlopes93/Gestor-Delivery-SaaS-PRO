@@ -1258,7 +1258,7 @@ export function DeliveryZonesPage() {
         <div className={
           'h-full bg-gray-50 dark:bg-gray-900/50 relative ' +
           (showMapMobile ? 'block' : 'hidden lg:block')
-        }>
+        } style={{ isolation: 'isolate' }}>
           <div className="absolute inset-0">
             <MapContainer
               center={mapCenter}
@@ -1453,58 +1453,12 @@ export function DeliveryZonesPage() {
             </MapContainer>
           </div>
 
-          {/* Map legend (glass) */}
-          <div className="absolute bottom-4 right-4 z-[1000] pointer-events-none">
-            <div className="bg-white dark:bg-gray-900/70 backdrop-blur-md border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-3 space-y-2">
-              <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Legenda</div>
-              <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                <div className="w-3 h-3 rounded-full bg-blue-500 border border-blue-600" />
-                <span>Cobertura padrão</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                <div className="w-3 h-3 rounded-full bg-green-500 border border-green-600" />
-                <span>Entrega grátis</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                <div className="w-3 h-3 rounded-full bg-yellow-500 border border-yellow-600" />
-                <span>Zona personalizada</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                <div className="w-3 h-3 rounded-full bg-red-500 border border-red-600" />
-                <span>Área bloqueada</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Map actions */}
-          <div className="absolute top-4 left-4 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setFitToStoreSeq((v) => v + 1)}
-              className="h-10 px-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 shadow-sm inline-flex items-center gap-2"
-            >
-              <Crosshair className="h-4 w-4" />
-              Centralizar loja
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowMapMobile(false)}
-              className="lg:hidden h-10 px-3 rounded-lg bg-gray-900 text-white text-sm font-black hover:bg-black shadow-sm"
-            >
-              Voltar
-            </button>
-
-            {drawMode === 'drawing' ? (
-              <Badge tone="blue" label="Modo desenho ativo" />
-            ) : null}
-          </div>
-
-          {/* (Legenda movida para fora do MapContainer) */}
-
-          {/* Editor panel (contextual drawer) */}
+          {/* Editor panel — fora do MapContainer para evitar conflito de z-index do Leaflet durante zoom */}
           {editorOpen ? (
-            <div className="absolute top-4 right-4 w-[380px] max-w-[calc(100vw-32px)] bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-xl overflow-hidden transition-all duration-200">
+            <div
+              className="absolute top-4 right-4 w-[380px] max-w-[calc(100vw-32px)] bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-xl overflow-hidden"
+              style={{ zIndex: 2000 }}
+            >
               <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-sm font-black text-gray-900 dark:text-gray-100">
@@ -1519,7 +1473,7 @@ export function DeliveryZonesPage() {
                 <button
                   type="button"
                   onClick={closeEditor}
-                  className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50"
+                  className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
                   title="Fechar"
                 >
                   <X className="h-4 w-4" />
@@ -1611,7 +1565,7 @@ export function DeliveryZonesPage() {
                             'h-10 rounded-lg border text-sm font-black transition-colors ' +
                             (zoneForm.pricingMode === o.mode
                               ? 'border-primary-300 bg-primary-50 text-primary-800'
-                              : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50')
+                              : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800')
                           }
                         >
                           {o.label}
@@ -1691,7 +1645,7 @@ export function DeliveryZonesPage() {
                   <button
                     type="button"
                     onClick={() => setDrawMode((m) => (m === 'drawing' ? 'idle' : 'drawing'))}
-                    className="h-10 px-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 inline-flex items-center gap-2"
+                    className="h-10 px-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 inline-flex items-center gap-2"
                   >
                     <Pencil className="h-4 w-4" />
                     {drawMode === 'drawing' ? 'Parar desenho' : 'Desenhar/ajustar'}
@@ -1711,13 +1665,64 @@ export function DeliveryZonesPage() {
                 <button
                   type="button"
                   onClick={closeEditor}
-                  className="h-10 w-full px-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50"
+                  className="h-10 w-full px-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                 >
                   Cancelar
                 </button>
               </div>
             </div>
           ) : null}
+
+          {/* Map legend (glass) */}
+          <div className="absolute bottom-4 right-4 z-[1000] pointer-events-none">
+            <div className="bg-white dark:bg-gray-900/70 backdrop-blur-md border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-3 space-y-2">
+              <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Legenda</div>
+              <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                <div className="w-3 h-3 rounded-full bg-blue-500 border border-blue-600" />
+                <span>Cobertura padrão</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                <div className="w-3 h-3 rounded-full bg-green-500 border border-green-600" />
+                <span>Entrega grátis</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                <div className="w-3 h-3 rounded-full bg-yellow-500 border border-yellow-600" />
+                <span>Zona personalizada</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                <div className="w-3 h-3 rounded-full bg-red-500 border border-red-600" />
+                <span>Área bloqueada</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Map actions */}
+          <div className="absolute top-4 left-4 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setFitToStoreSeq((v) => v + 1)}
+              className="h-10 px-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 shadow-sm inline-flex items-center gap-2"
+            >
+              <Crosshair className="h-4 w-4" />
+              Centralizar loja
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowMapMobile(false)}
+              className="lg:hidden h-10 px-3 rounded-lg bg-gray-900 text-white text-sm font-black hover:bg-black shadow-sm"
+            >
+              Voltar
+            </button>
+
+            {drawMode === 'drawing' ? (
+              <Badge tone="blue" label="Modo desenho ativo" />
+            ) : null}
+          </div>
+
+          {/* (Legenda movida para fora do MapContainer) */}
+
+          {/* (Editor panel movido para fora do MapContainer — ver abaixo) */}
         </div>
       </div>
 

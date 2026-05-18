@@ -97,119 +97,125 @@ export function OrdersListPage() {
   }
 
   return (
-    <div className="p-6">
-      <header className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-6">
+      <header className="page-header mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Pedidos</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{total} pedidos encontrados</p>
+          <h1 className="page-title">Pedidos</h1>
+          <p className="page-subtitle">{total} pedidos encontrados</p>
         </div>
-        <button 
-          onClick={fetchOrders} 
+        <button
+          onClick={fetchOrders}
           disabled={loading}
-          className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+          className="btn-icon"
           title="Atualizar"
         >
-          <RefreshCw className={`w-5 h-5 text-gray-600 dark:text-gray-400 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </header>
 
-      {/* Error Message */}
+      {/* Error */}
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <span className="text-red-400 text-xl">!</span>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Erro ao carregar pedidos</h3>
-              <div className="mt-2 text-sm text-red-700">{error}</div>
-              <div className="mt-3">
-                <button
-                  onClick={fetchOrders}
-                  className="text-sm font-medium text-red-600 hover:text-red-500 underline"
-                >
-                  Tentar novamente
-                </button>
-              </div>
-            </div>
+        <div className="alert-danger rounded-2xl p-4 mb-4 flex items-start gap-3">
+          <span className="text-lg leading-none font-black">⚠</span>
+          <div className="flex-1">
+            <h3 className="text-sm font-black mb-1">Erro ao carregar pedidos</h3>
+            <p className="text-sm opacity-80">{error}</p>
+            <button
+              onClick={fetchOrders}
+              className="mt-2 text-xs font-black underline opacity-80 hover:opacity-100"
+            >
+              Tentar novamente
+            </button>
           </div>
         </div>
       )}
 
       {/* Status Filter */}
-      <div className="flex gap-2 overflow-x-auto pb-4 mb-4">
-        <button
-          onClick={() => { setStatusFilter(''); setPage(1); }}
-          disabled={loading}
-          className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest border transition-all disabled:opacity-50 ${
-            statusFilter === '' ? 'bg-primary-600 text-white border-primary-600 shadow-md shadow-primary-500/20' : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
-          }`}
-        >
-          Todos
-        </button>
-        {(Object.keys(STATUS_LABELS) as OrderStatus[]).map(status => (
+      <div className="toolbar-bar mb-5">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-0.5">
           <button
-            key={status}
-            onClick={() => { setStatusFilter(status); setPage(1); }}
+            onClick={() => { setStatusFilter(''); setPage(1); }}
             disabled={loading}
-            className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest border transition-all disabled:opacity-50 ${
-              statusFilter === status ? 'bg-primary-600 text-white border-primary-600 shadow-md shadow-primary-500/20' : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+            className={`whitespace-nowrap px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all disabled:opacity-50 ${
+              statusFilter === ''
+                ? 'bg-primary-600 text-white border-primary-600 shadow-sm shadow-primary-500/20'
+                : 'bg-transparent text-slate-500 dark:text-slate-400 border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 hover:bg-slate-50 dark:hover:bg-gray-800'
             }`}
           >
-            {STATUS_LABELS[status]}
+            Todos
           </button>
-        ))}
+          {(Object.keys(STATUS_LABELS) as OrderStatus[]).map((status) => (
+            <button
+              key={status}
+              onClick={() => { setStatusFilter(status); setPage(1); }}
+              disabled={loading}
+              className={`whitespace-nowrap px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all disabled:opacity-50 ${
+                statusFilter === status
+                  ? 'bg-primary-600 text-white border-primary-600 shadow-sm shadow-primary-500/20'
+                  : 'bg-transparent text-slate-500 dark:text-slate-400 border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 hover:bg-slate-50 dark:hover:bg-gray-800'
+              }`}
+            >
+              {STATUS_LABELS[status]}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Loading State */}
+      {/* Loading */}
       {loading && (
-        <div className="flex flex-col items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Carregando pedidos...</p>
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <div className="w-10 h-10 rounded-full border-2 border-primary-600/20 border-t-primary-600 animate-spin" />
+          <p className="text-sm text-slate-500 dark:text-slate-400">Carregando pedidos...</p>
         </div>
       )}
 
-      {/* Orders Table */}
+      {/* Orders List */}
       {!loading && !error && (
         orders.length === 0 ? (
-          <div className="text-center py-12">
-            <Package className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-            <p className="text-gray-500 dark:text-gray-400">Nenhum pedido encontrado.</p>
+          <div className="text-center py-16 card-premium flex flex-col items-center gap-3">
+            <Package className="w-12 h-12 text-slate-300 dark:text-slate-600" />
+            <p className="text-slate-500 dark:text-slate-400 font-medium text-sm">Nenhum pedido encontrado.</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {orders.map(order => (
+          <div className="space-y-2.5">
+            {orders.map((order) => (
               <button
                 key={order.id}
                 onClick={() => setSelectedOrderId(order.id)}
-                className="w-full card-premium p-4 border border-transparent hover:border-primary-100 transition-all flex items-center justify-between text-left group hover:shadow-primary-500/10"
+                className="w-full card-premium-hover p-4 flex items-center justify-between text-left group"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-50 dark:bg-gray-900/50 rounded-xl flex items-center justify-center">
-                    <span className="text-sm font-black text-gray-700 dark:text-gray-300">{order.orderNumber}</span>
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: 'var(--surface-inset)', border: '1px solid var(--border-default)' }}
+                  >
+                    <span className="text-sm font-black text-slate-700 dark:text-slate-300">{order.orderNumber}</span>
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-900 dark:text-gray-100 text-sm">{order.customerName}</h3>
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <span className={`text-[10px] font-black tracking-widest px-2.5 py-0.5 rounded-full uppercase ${STATUS_COLORS[order.status]}`}>
+                    <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm">{order.customerName}</h3>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <span className={`badge-premium ${STATUS_COLORS[order.status]}`}>
                         {STATUS_LABELS[order.status]}
                       </span>
-                      <span className="text-[10px] text-gray-400">{order.fulfillmentType === 'delivery' ? '📦' : '🏪'}</span>
-                      <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-700">
+                      <span className="text-[10px] text-slate-400">{order.fulfillmentType === 'delivery' ? '📦' : '🏪'}</span>
+                      <span
+                        className="text-[10px] px-1.5 py-0.5 rounded font-bold text-slate-500 dark:text-slate-400"
+                        style={{ background: 'var(--surface-inset)', border: '1px solid var(--border-default)' }}
+                      >
                         {CHANNEL_LABELS[order.sourceChannel] || order.sourceChannel}
                       </span>
-                      <span className="text-[10px] text-gray-400 flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> {fmtDate(order.createdAt)}
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />{fmtDate(order.createdAt)}
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <span className="font-black text-gray-900 dark:text-gray-100">{fmt(order.total)}</span>
-                      <p className="text-[10px] text-gray-400">{order.itemCount} {order.itemCount === 1 ? 'item' : 'itens'}</p>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 dark:text-gray-400 transition-colors" />
+                </div>
+                <div className="flex items-center gap-4 shrink-0 ml-3">
+                  <div className="text-right hidden sm:block">
+                    <span className="font-black text-slate-900 dark:text-slate-100 text-sm">{fmt(order.total)}</span>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{order.itemCount} {order.itemCount === 1 ? 'item' : 'itens'}</p>
                   </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-colors" />
                 </div>
               </button>
             ))}
@@ -219,10 +225,22 @@ export function OrdersListPage() {
 
       {/* Pagination */}
       {total > 20 && (
-        <div className="flex justify-center gap-2 mt-6">
-          <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm font-bold disabled:opacity-30 dark:text-gray-200">Anterior</button>
-          <span className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">Página {page}</span>
-          <button disabled={page * 20 >= total} onClick={() => setPage(p => p + 1)} className="px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg text-sm font-bold disabled:opacity-30 dark:text-gray-200">Próxima</button>
+        <div className="flex justify-center items-center gap-2 mt-6">
+          <button
+            disabled={page === 1}
+            onClick={() => setPage((p) => p - 1)}
+            className="btn-secondary px-4 py-2 text-xs disabled:opacity-30"
+          >
+            Anterior
+          </button>
+          <span className="px-4 py-2 text-sm text-slate-500 dark:text-slate-400 font-medium">Página {page}</span>
+          <button
+            disabled={page * 20 >= total}
+            onClick={() => setPage((p) => p + 1)}
+            className="btn-secondary px-4 py-2 text-xs disabled:opacity-30"
+          >
+            Próxima
+          </button>
         </div>
       )}
     </div>

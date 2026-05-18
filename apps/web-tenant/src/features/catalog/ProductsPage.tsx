@@ -243,7 +243,10 @@ export function ProductsPage() {
       const pubLabel = pub ? pub.publicationStatus : null;
       const opLabel = pub ? pub.operationalStatus : null;
       return (
-        <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/40 transition-colors group" style={{ height: 64 }}>
+        <tr key={product.id} className="transition-colors duration-150 group" style={{ height: 64, backgroundColor: 'var(--surface-base)' }}
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--surface-subtle)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--surface-base)'; }}
+        >
           <td className="px-6 py-2">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-12 h-12 rounded-lg bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 overflow-hidden shrink-0">
@@ -369,7 +372,7 @@ export function ProductsPage() {
       const pubLabel = pub ? pub.publicationStatus : null;
       const opLabel = pub ? pub.operationalStatus : null;
       return (
-        <div key={product.id} className="card-premium p-3 md:p-5 border-none shadow-sm hover:shadow-md transition-shadow bg-white dark:bg-gray-900 w-full overflow-hidden">
+        <div key={product.id} className="card-premium p-3 md:p-4 hover:shadow-md transition-all">
           <div className="flex items-start justify-between gap-3">
             <div className="flex gap-3 min-w-0 flex-1">
                <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 overflow-hidden shrink-0 shadow-sm">
@@ -408,7 +411,10 @@ export function ProductsPage() {
             </div>
           </div>
 
-          <div className="mt-3 md:mt-4 flex items-center justify-between pt-3 md:pt-4 border-t border-gray-50 dark:border-gray-800/50">
+          <div
+            className="mt-3 md:mt-4 flex items-center justify-between pt-3 md:pt-4"
+            style={{ borderTop: '1px solid var(--border-subtle)' }}
+          >
              <div className="flex items-center gap-2">
                <span className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${product.isActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
                <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-400">
@@ -496,59 +502,70 @@ export function ProductsPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto text-left">
-      {/* Header Simplificado */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      {/* Header */}
+      <div className="page-header mb-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">Produtos</h1>
-          <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-1">Gerencie seu cardápio de forma simples e intuitiva.</p>
+          <h1 className="page-title">Produtos</h1>
+          <p className="page-subtitle">Gerencie seu cardápio de forma simples e intuitiva.</p>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate('/catalog/simulation')}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-xs font-black uppercase tracking-widest text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all shadow-sm"
+            className="btn-secondary flex items-center gap-2"
             type="button"
           >
             <Search size={14} /> Simulador
           </button>
-          
+
           <button
             onClick={() => navigate('/catalog/products/new/v2')}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md shadow-primary-500/20"
+            className="btn-primary flex items-center gap-2"
             type="button"
           >
-            <Plus size={14} /> Novo
+            <Plus size={14} /> Novo Produto
           </button>
         </div>
       </div>
 
-      {/* Barra de Busca e Filtros Consolidados */}
-      <div className="card-premium p-4 md:p-5 mb-6 border-none shadow-premium bg-white/60 dark:bg-gray-900/60 backdrop-blur-md">
+      {/* Barra de Busca e Filtros */}
+      <div className="toolbar-bar mb-6">
         <div className="flex flex-col gap-4">
           {/* Linha 1: Busca e ViewMode */}
           <div className="flex flex-col lg:flex-row gap-3">
             <div className="relative flex-1">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="input-premium pl-10"
-                placeholder="Buscar produtos..."
+                placeholder="Buscar por nome, descrição ou categoria..."
                 type="text"
               />
             </div>
 
-            <div className="flex items-center bg-gray-100/50 dark:bg-gray-800/50 p-1 rounded-xl w-full lg:w-auto">
+            <div
+              className="flex items-center p-1 rounded-xl w-full lg:w-auto"
+              style={{ background: 'var(--surface-inset)', border: '1px solid var(--border-default)' }}
+            >
               <button
                 onClick={() => setViewMode('all')}
-                className={`flex-1 lg:px-4 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${viewMode === 'all' ? 'bg-white dark:bg-gray-900 text-primary-600 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}
+                className={`flex-1 lg:px-4 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                  viewMode === 'all'
+                    ? 'bg-white dark:bg-gray-900 text-primary-600 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
                 type="button"
               >
                 Lista
               </button>
               <button
                 onClick={() => setViewMode('grouped')}
-                className={`flex-1 lg:px-4 py-2 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${viewMode === 'grouped' ? 'bg-white dark:bg-gray-900 text-primary-600 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}
+                className={`flex-1 lg:px-4 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                  viewMode === 'grouped'
+                    ? 'bg-white dark:bg-gray-900 text-primary-600 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
                 type="button"
               >
                 Categorias
@@ -556,31 +573,38 @@ export function ProductsPage() {
             </div>
           </div>
 
-          {/* Linha 2: Filtros de Tipo e Status */}
-          <div className="flex flex-wrap items-center gap-2 md:gap-3">
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
+          {/* Linha 2: Filtros de Tipo, Status e Categoria */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
               {[
                 { id: 'all', label: 'Todos' },
                 { id: 'simple', label: 'Individuais' },
-                { id: 'configurable', label: 'Personalizados' }
+                { id: 'configurable', label: 'Personalizados' },
               ].map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setTypeFilter(t.id as ProductTypeFilter)}
-                  className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border ${typeFilter === t.id ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800 text-primary-600' : 'bg-transparent border-gray-100 dark:border-gray-800 text-gray-400 hover:text-gray-600'}`}
+                  className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border ${
+                    typeFilter === t.id
+                      ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800 text-primary-600'
+                      : 'bg-transparent border-slate-200 dark:border-gray-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                  }`}
                 >
                   {t.label}
                 </button>
               ))}
             </div>
 
-            <div className="h-4 w-[1px] bg-gray-200 dark:bg-gray-800 hidden md:block" />
+            <div
+              className="h-5 w-px hidden md:block"
+              style={{ background: 'var(--border-default)' }}
+            />
 
-            <div className="flex items-center gap-2 flex-1 min-w-0 md:min-w-fit overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
+            <div className="flex items-center gap-2 flex-1 min-w-0 md:min-w-fit overflow-x-auto no-scrollbar">
               <select
                 value={selectedCategoryId ?? ''}
                 onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : null)}
-                className="h-8 pl-2 pr-6 bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 focus:ring-0 cursor-pointer"
+                className="h-8 pl-2 pr-6 bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 focus:ring-0 cursor-pointer"
               >
                 <option value="">Categorias</option>
                 {categories.map((c) => (
@@ -592,7 +616,7 @@ export function ProductsPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as ProductStatusFilter)}
-                className="h-8 pl-2 pr-6 bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 focus:ring-0 cursor-pointer"
+                className="h-8 pl-2 pr-6 bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 focus:ring-0 cursor-pointer"
               >
                 <option value="all">Status</option>
                 <option value="active">Ativos</option>
@@ -602,7 +626,7 @@ export function ProductsPage() {
               <select
                 value={publicationFilter}
                 onChange={(e) => setPublicationFilter(e.target.value as PublicationFilter)}
-                className="h-8 pl-2 pr-6 bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 focus:ring-0 cursor-pointer"
+                className="h-8 pl-2 pr-6 bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 focus:ring-0 cursor-pointer"
               >
                 <option value="all">Publicação</option>
                 <option value="draft">Rascunho</option>
@@ -633,19 +657,19 @@ export function ProductsPage() {
               </div>
 
 
-              <div className="card-premium hidden md:block">
-                <div ref={tableScrollRef} className="max-h-[70vh] overflow-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-50 dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
+              <div className="card-premium hidden md:block overflow-hidden">
+                <div ref={tableScrollRef} className="max-h-[70vh] overflow-auto custom-scrollbar">
+                  <table className="table-premium">
+                    <thead>
                       <tr>
-                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Produto</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hidden lg:table-cell">Categoria</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Preço</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
+                        <th>Produto</th>
+                        <th className="hidden lg:table-cell">Categoria</th>
+                        <th>Preço</th>
+                        <th>Status</th>
+                        <th className="text-right">Ações</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    <tbody className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
                       {filteredProducts.length > 0 && virtualAll.topSpacer > 0 && (
                         <tr>
                           <td colSpan={5} style={{ height: virtualAll.topSpacer }} className="p-0 border-0" />
