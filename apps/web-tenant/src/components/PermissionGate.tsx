@@ -43,7 +43,7 @@ export function PermissionGate({
   }
 
   if (!hasPermission(user.permissions, permission)) {
-    return fallback ? (
+    return fallback !== undefined ? (
       <>{fallback}</>
     ) : (
       <div className="p-6 text-center">
