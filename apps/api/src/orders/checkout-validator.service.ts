@@ -141,7 +141,7 @@ export class CheckoutValidatorService {
       cashbackUsed = appliedCashback;
     }
 
-    const total = itemsSubtotal - discountTotal;
+    const total = Math.round((itemsSubtotal - discountTotal) * 100) / 100;
 
     // 5. Calcular taxa de entrega apenas se for delivery
     const isDelivery = options?.channel === 'storefront_delivery';
@@ -176,7 +176,7 @@ export class CheckoutValidatorService {
       deliveryFee = deliveryFeeCalculation.fee;
     }
 
-    const finalTotal = total + deliveryFee;
+    const finalTotal = Math.round((total + deliveryFee) * 100) / 100;
 
     // 6. Validar pagamento
     this.validatePayment(options?.payment, finalTotal);
@@ -220,7 +220,7 @@ export class CheckoutValidatorService {
       }
     }
 
-    const itemsSubtotal = validatedLines.reduce((sum, l) => sum + l.lineTotal, 0);
+    const itemsSubtotal = Math.round(validatedLines.reduce((sum, l) => sum + l.lineTotal, 0) * 100) / 100;
 
     let discountTotal = 0;
     let couponId: string | null = null;
@@ -242,13 +242,13 @@ export class CheckoutValidatorService {
         throw new BadRequestException('Saldo de cashback insuficiente.');
       }
       // Cashback also cannot exceed the subtotal minus coupon discount
-      const remainingTotal = itemsSubtotal - discountTotal;
+      const remainingTotal = Math.round((itemsSubtotal - discountTotal) * 100) / 100;
       const appliedCashback = Math.min(options.useCashbackAmount, remainingTotal);
       discountTotal += appliedCashback;
       cashbackUsed = appliedCashback;
     }
 
-    const total = itemsSubtotal - discountTotal;
+    const total = Math.round((itemsSubtotal - discountTotal) * 100) / 100;
 
     // Para POS, taxa de entrega é zero (venda local)
     const deliveryFee = 0;
@@ -258,7 +258,7 @@ export class CheckoutValidatorService {
       tenantId, 
       lines: validatedLines, 
       itemsSubtotal, 
-      discountTotal, 
+      discountTotal: Math.round(discountTotal * 100) / 100,
       deliveryFee,
       total: finalTotal, 
       couponId, 

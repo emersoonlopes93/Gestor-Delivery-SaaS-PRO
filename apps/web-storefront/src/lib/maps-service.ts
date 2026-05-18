@@ -52,12 +52,20 @@ export function loadGoogleMaps(apiKey: string): Promise<void> {
     if (typeof window === 'undefined') return resolve();
     if ((window as any).google?.maps) return resolve();
 
+    const callbackName = `__googleMapsCallback_${Date.now()}`;
+    (window as any)[callbackName] = () => {
+      resolve();
+      delete (window as any)[callbackName];
+    };
+
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&language=pt-BR`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&language=pt-BR&loading=async&callback=${callbackName}`;
     script.async = true;
     script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = (e) => reject(e);
+    script.onerror = (e) => {
+      reject(e);
+      delete (window as any)[callbackName];
+    };
     document.head.appendChild(script);
   });
 

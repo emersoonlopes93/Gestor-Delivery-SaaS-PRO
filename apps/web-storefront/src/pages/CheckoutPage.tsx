@@ -184,14 +184,18 @@ export function CheckoutPage() {
           lng: lng ?? 0,
         } : null;
 
+        // Safe payment for validation: if cash and no/invalid change, use a large dummy value
+        // to avoid validation failure on the backend while just checking delivery fees/items.
+        const validationPayment = { ...payment };
+        if (payment.method === 'cash' && (!payment.changeFor || payment.changeFor < total)) {
+          validationPayment.changeFor = 9999; 
+        }
+
         const { data: result } = await api.post<CheckoutValidationResult>(`/orders/public-checkout/${tenantSlug}/validate`, {
           items: orderItems,
           fulfillmentType,
           deliveryAddress: address,
-          payment: { 
-            ...payment, 
-            changeFor: payment.changeFor || undefined,
-          },
+          payment: validationPayment,
           couponCode: appliedCoupon || undefined,
           useCashbackAmount: usedCashback || undefined,
           customerName: customerName || 'Simulação',
@@ -222,7 +226,7 @@ export function CheckoutPage() {
     validate();
   }, [debouncedAddress, fulfillmentType, items, tenantSlug, payment, appliedCoupon, usedCashback, isScheduled, scheduledFor, timeSlotId]);
 
-  const total = subtotal + deliveryFee - discountTotal;
+  const total = Math.round((subtotal + deliveryFee - discountTotal) * 100) / 100;
 
   const handleAddressSelected = (addr: StructuredAddress) => {
     setStreet(addr.street);
