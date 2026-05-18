@@ -53,10 +53,10 @@ export function DashboardPage() {
   }, []);
 
   return (
-    <div className="p-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-black text-gray-900 dark:text-gray-100 uppercase tracking-tight">Dashboard</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">
+    <div className="p-4 md:p-6">
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-gray-100 uppercase tracking-tight">Dashboard</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
           Bem-vindo de volta, <span className="font-bold text-gray-900 dark:text-gray-100">{user?.name}</span>
         </p>
       </div>

@@ -185,12 +185,12 @@ const OrderCard = memo(function OrderCard(props: {
   return (
     <div className="kanban-card animate-slide-in-up">
       {/* ── Conteúdo principal ── */}
-      <div className={compact ? 'p-3' : 'p-3.5'}>
+      <div className={compact ? 'p-2.5 md:p-3' : 'p-3 md:p-3.5'}>
 
         {/* Linha 1: Número + Timer */}
         <div className="flex items-center justify-between mb-2">
-          <span className={`font-black text-slate-900 dark:text-slate-100 ${compact ? 'text-[13px]' : 'text-sm'}`}>
-            {order.orderNumber}
+          <span className={`font-black text-slate-900 dark:text-slate-100 ${compact ? 'text-[12px] md:text-[13px]' : 'text-sm'}`}>
+            #{order.orderNumber}
           </span>
           <TimerBadge minutes={elapsedMin} compact={compact} />
         </div>
@@ -200,12 +200,12 @@ const OrderCard = memo(function OrderCard(props: {
           <div className="min-w-0 flex-1">
             <h3
               className={`font-bold text-slate-900 dark:text-slate-100 leading-tight line-clamp-1 ${
-                compact ? 'text-[11px]' : 'text-xs'
+                compact ? 'text-[11px]' : 'text-xs md:text-sm'
               }`}
             >
               {order.customerName}
             </h3>
-            <p className={`text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1 ${compact ? 'text-[9px]' : 'text-[10px]'}`}>
+            <p className={`text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1 ${compact ? 'text-[9px]' : 'text-[10px] md:text-[11px]'}`}>
               {order.fulfillmentType === 'delivery' ? 'Entrega' : 'Retirada'}
               {' · '}
               {CHANNEL_LABELS[order.sourceChannel || ''] || order.sourceChannel || 'Online'}
@@ -213,7 +213,7 @@ const OrderCard = memo(function OrderCard(props: {
           </div>
           <div className="shrink-0 flex flex-col items-end gap-1.5">
             <StatusBadge status={order.status as OrderStatus} />
-            <span className={`font-black text-slate-900 dark:text-slate-100 ${compact ? 'text-[11px]' : 'text-xs'}`}>
+            <span className={`font-black text-slate-900 dark:text-slate-100 ${compact ? 'text-[10px] md:text-[11px]' : 'text-xs md:text-sm'}`}>
               {totalLabel}
             </span>
           </div>
@@ -222,10 +222,10 @@ const OrderCard = memo(function OrderCard(props: {
         {/* Resumo de itens (apenas modo standard) */}
         {!compact && (
           <div
-            className="mt-2.5 rounded-lg px-3 py-2"
+            className="mt-2.5 rounded-lg px-2.5 py-1.5 md:px-3 md:py-2"
             style={{ background: 'var(--surface-inset)', border: '1px solid var(--border-subtle)' }}
           >
-            <p className="text-[10px] text-slate-600 dark:text-slate-400 italic line-clamp-2">
+            <p className="text-[10px] md:text-[11px] text-slate-600 dark:text-slate-400 italic line-clamp-2">
               {order.itemsSummary || `${order.itemCount} ${order.itemCount === 1 ? 'item' : 'itens'}`}
             </p>
           </div>
@@ -235,17 +235,19 @@ const OrderCard = memo(function OrderCard(props: {
       {/* ── Botão Avançar (CTA principal) ── */}
       {nextStatus && (
         <div
-          className="px-3 pb-3"
+          className="px-2.5 pb-2.5 md:px-3 md:pb-3"
           style={{ borderTop: compact ? undefined : '1px solid var(--border-subtle)' }}
         >
           <button
             type="button"
             onClick={() => onAdvance(order.id, nextStatus)}
             disabled={updating}
-            className={compact ? 'btn-advance-compact' : 'btn-advance-primary'}
+            className={`w-full flex items-center justify-center gap-2 py-2.5 md:py-2 rounded-xl md:rounded-lg font-black uppercase tracking-wider transition-all duration-200 active:scale-[0.97] ${
+              compact ? 'btn-advance-compact' : 'btn-advance-primary'
+            }`}
           >
-            <ArrowRight className="w-3 h-3" />
-            <span>Avançar — {STATUS_LABELS[nextStatus]}</span>
+            <ArrowRight className="w-3.5 h-3.5 md:w-3 md:h-3" />
+            <span className="text-[11px] md:text-[10px]">Avançar — {STATUS_LABELS[nextStatus]}</span>
           </button>
         </div>
       )}
@@ -338,6 +340,7 @@ export function OperationBoardPage() {
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<BoardViewMode>('standard');
+  const [activeColumn, setActiveColumn] = useState<KanbanColumnSpec['id']>('entry');
 
   const fetchBoard = useCallback(async () => {
     try {
@@ -427,21 +430,37 @@ export function OperationBoardPage() {
   const compact = viewMode === 'compact';
 
   return (
-    <div className="p-4 md:p-6 h-[calc(100vh-64px)] flex flex-col">
+    <div className="p-3 md:p-6 h-screen md:h-[calc(100vh-64px)] flex flex-col overflow-hidden bg-slate-50/50 dark:bg-transparent">
       {/* ── Toolbar / Header ── */}
-      <header className="flex items-center justify-between mb-5 shrink-0 flex-wrap gap-3">
-        <div>
-          <h1 className="page-title">Kanban Operacional</h1>
-          <p className="page-subtitle">
-            Atualizado automaticamente a cada 15s
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <SegmentedControl value={viewMode} onChange={setViewMode} />
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 md:mb-5 shrink-0 gap-4">
+        <div className="flex items-center justify-between sm:block">
+          <div>
+            <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+              Kanban Operacional
+            </h1>
+            <p className="text-[11px] md:text-sm text-slate-500 dark:text-slate-400 font-medium">
+              Atualizado a cada 15s
+            </p>
+          </div>
           <button
             onClick={fetchBoard}
             disabled={loading}
-            className="btn-icon"
+            className="sm:hidden btn-icon w-8 h-8"
+            title="Atualizar agora"
+            type="button"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+          <div className="shrink-0">
+            <SegmentedControl value={viewMode} onChange={setViewMode} />
+          </div>
+          <button
+            onClick={fetchBoard}
+            disabled={loading}
+            className="hidden sm:inline-flex btn-icon"
             title="Atualizar agora"
             type="button"
           >
@@ -449,6 +468,36 @@ export function OperationBoardPage() {
           </button>
         </div>
       </header>
+
+      {/* ── Mobile Tabs Selector ── */}
+      <div className="md:hidden flex items-center gap-1.5 p-1 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl mb-4 shrink-0">
+        {KANBAN_COLUMNS.map((col) => {
+          const isActive = activeColumn === col.id;
+          const count = ordersByColumnId[col.id]?.length || 0;
+          return (
+            <button
+              key={col.id}
+              onClick={() => setActiveColumn(col.id)}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg transition-all duration-200 ${
+                isActive
+                  ? 'bg-white dark:bg-slate-800 shadow-sm text-slate-900 dark:text-white'
+                  : 'text-slate-500 dark:text-slate-400'
+              }`}
+            >
+              <span className={`text-[10px] font-black uppercase tracking-wider ${isActive ? 'opacity-100' : 'opacity-60'}`}>
+                {col.title}
+              </span>
+              {count > 0 && (
+                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${col.countCls}`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Erro ── */}
 
       {/* ── Erro ── */}
       {error && (
@@ -479,9 +528,9 @@ export function OperationBoardPage() {
 
       {/* ── Board ── */}
       {!loading && !error && (
-        <div className="grow min-h-0 overflow-hidden">
+        <div className="grow min-h-0">
           <div
-            className={`h-full grid gap-4 items-start overflow-x-auto ${
+            className={`h-full grid gap-3 md:gap-4 items-start ${
               viewMode === 'focus_production'
                 ? 'lg:grid-cols-[minmax(280px,1fr)_minmax(380px,1.4fr)_minmax(280px,1fr)]'
                 : 'grid-cols-1 md:grid-cols-3'
@@ -491,12 +540,20 @@ export function OperationBoardPage() {
               const colOrders = ordersByColumnId[column.id] ?? [];
               const isEmpty = colOrders.length === 0;
 
+              // No mobile, só renderiza a coluna ativa
+              const isVisibleOnMobile = activeColumn === column.id;
+
               if (viewMode === 'compact' && isEmpty) return null;
               if (viewMode === 'focus_production' && column.id !== 'production' && isEmpty)
                 return null;
 
               return (
-                <div key={column.id} className="h-full min-h-0 flex flex-col">
+                <div
+                  key={column.id}
+                  className={`h-full min-h-0 flex-col ${
+                    isVisibleOnMobile ? 'flex' : 'hidden md:flex'
+                  }`}
+                >
                   <KanbanColumn
                     column={column}
                     orders={colOrders}

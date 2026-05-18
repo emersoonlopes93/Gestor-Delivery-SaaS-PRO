@@ -65,7 +65,7 @@ export function TenantsPage() {
         <p className="text-gray-500 mt-1">Lojas cadastradas na plataforma</p>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -139,6 +139,74 @@ export function TenantsPage() {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile View */}
+      <div className="md:hidden space-y-4">
+        {tenants.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
+            Nenhum tenant encontrado
+          </div>
+        ) : (
+          tenants.map((tenant) => (
+            <div key={tenant.id} className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-bold text-gray-900">{tenant.name}</h3>
+                  <p className="text-xs text-gray-500 font-mono mt-1">{tenant.slug}</p>
+                </div>
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    tenant.status === 'active'
+                      ? 'bg-green-100 text-green-800'
+                      : tenant.status === 'trial'
+                      ? 'bg-blue-100 text-blue-800'
+                      : 'bg-gray-100 text-gray-800'
+                  }`}
+                >
+                  {tenant.status.toUpperCase()}
+                </span>
+              </div>
+              
+              <div className="flex items-center justify-between text-xs text-gray-500 py-2 border-y border-gray-50">
+                <span>Criado em</span>
+                <span className="font-medium text-gray-700">
+                  {new Date(tenant.createdAt).toLocaleDateString('pt-BR')}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={() => handleImpersonate(tenant.id)}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-50 text-green-700 rounded-lg text-xs font-bold"
+                >
+                  <ExternalLink size={14} />
+                  Acessar Loja
+                </button>
+                <button
+                  onClick={() => window.location.href = `/tenants/${tenant.id}/modules`}
+                  className="flex-1 py-2.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold"
+                >
+                  Módulos
+                </button>
+              </div>
+              
+              <div className="pt-2">
+                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Alterar Status</label>
+                <select
+                  value={tenant.status}
+                  onChange={(e) => handleStatusChange(tenant.id, e.target.value)}
+                  className="w-full text-sm border-gray-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50"
+                >
+                  <option value="active">Ativo</option>
+                  <option value="trial">Trial</option>
+                  <option value="suspended">Suspenso</option>
+                  <option value="inactive">Inativo</option>
+                </select>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

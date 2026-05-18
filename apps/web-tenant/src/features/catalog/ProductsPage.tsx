@@ -230,6 +230,93 @@ export function ProductsPage() {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value ?? 0));
   };
 
+  const renderMobileCards = (list: ProductWithPublication[]) => {
+    return (
+      <div className="grid grid-cols-1 gap-3 p-1">
+        {list.map((product) => {
+          const categoryName = product.categoryId ? (categoriesById.get(product.categoryId)?.name ?? 'Sem Categoria') : 'Sem Categoria';
+          const pub = product.publication;
+          const pubLabel = pub ? pub.publicationStatus : null;
+          const opLabel = pub ? pub.operationalStatus : null;
+
+          return (
+            <div key={product.id} className="card-premium p-4 flex flex-col gap-3">
+              <div className="flex gap-3">
+                <div className="w-16 h-16 rounded-lg bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 overflow-hidden shrink-0">
+                  {product.image ? (
+                    <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-300 text-[10px] font-black uppercase tracking-widest">
+                      IMG
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-bold text-gray-900 dark:text-gray-100 text-sm truncate">{product.name}</h3>
+                    <span className="font-black text-gray-900 dark:text-gray-100 text-sm shrink-0">
+                      {formatMoney(product.basePrice)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">
+                    {categoryName}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                    {pubLabel && (
+                      <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
+                        {pubLabel}
+                      </span>
+                    )}
+                    {opLabel && (
+                      <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${opLabel === 'active' ? 'status-badge-success' : 'status-badge-neutral'}`}>
+                        {opLabel}
+                      </span>
+                    )}
+                    <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${product.isActive ? 'status-badge-success' : 'status-badge-danger'}`}>
+                      {product.isActive ? 'Ativo' : 'Inativo'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-gray-800">
+                <button
+                  onClick={() => navigate(`/catalog/products/${product.id}`)}
+                  className="btn-icon w-8 h-8"
+                  title="Editar"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => handleTogglePublication(product)}
+                  className="btn-icon w-8 h-8"
+                  title={pubLabel === 'published' ? 'Desativar publicação' : 'Publicar'}
+                >
+                  {pubLabel === 'published' ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+                <button
+                  onClick={() => handleDuplicate(product.id)}
+                  disabled={savingMap[`duplicate-${product.id}`]}
+                  className="btn-icon w-8 h-8"
+                  title="Duplicar"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => handleDelete(product.id)}
+                  className="btn-icon w-8 h-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  title="Excluir"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const renderRows = (list: ProductWithPublication[]) => {
     return list.map((product) => {
       const categoryName = product.categoryId ? (categoriesById.get(product.categoryId)?.name ?? 'Sem Categoria') : 'Sem Categoria';
@@ -501,56 +588,58 @@ export function ProductsPage() {
   }, [viewMode]);
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto text-left">
+    <div className="p-3 md:p-6 max-w-7xl mx-auto text-left">
       {/* Header */}
-      <div className="page-header mb-6">
+      <div className="page-header mb-5 md:mb-6">
         <div>
-          <h1 className="page-title">Produtos</h1>
-          <p className="page-subtitle">Gerencie seu cardápio de forma simples e intuitiva.</p>
+          <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-gray-100 tracking-tight uppercase">Produtos</h1>
+          <p className="text-[11px] md:text-sm text-gray-500 dark:text-gray-400 font-medium mt-0.5">Gerencie seu cardápio de forma simples.</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full md:w-auto">
           <button
             onClick={() => navigate('/catalog/simulation')}
-            className="btn-secondary flex items-center gap-2"
+            className="btn-secondary flex-1 md:flex-none flex items-center justify-center gap-2 h-10 px-4 text-xs"
             type="button"
           >
-            <Search size={14} /> Simulador
+            <Search size={14} className="hidden sm:block" /> 
+            <span>Simulador</span>
           </button>
 
           <button
             onClick={() => navigate('/catalog/products/new/v2')}
-            className="btn-primary flex items-center gap-2"
+            className="btn-primary flex-1 md:flex-none flex items-center justify-center gap-2 h-10 px-4 text-xs"
             type="button"
           >
-            <Plus size={14} /> Novo Produto
+            <Plus size={14} className="hidden sm:block" />
+            <span>Novo Produto</span>
           </button>
         </div>
       </div>
 
       {/* Barra de Busca e Filtros */}
-      <div className="toolbar-bar mb-6">
-        <div className="flex flex-col gap-4">
+      <div className="toolbar-bar mb-6 p-3 md:p-4">
+        <div className="flex flex-col gap-3 md:gap-4">
           {/* Linha 1: Busca e ViewMode */}
-          <div className="flex flex-col lg:flex-row gap-3">
+          <div className="flex flex-col md:flex-row gap-3">
             <div className="relative flex-1">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="input-premium pl-10"
-                placeholder="Buscar por nome, descrição ou categoria..."
+                className="input-premium pl-10 h-10 md:h-11"
+                placeholder="Buscar produtos..."
                 type="text"
               />
             </div>
 
             <div
-              className="flex items-center p-1 rounded-xl w-full lg:w-auto"
+              className="flex items-center p-1 rounded-xl w-full md:w-auto shrink-0"
               style={{ background: 'var(--surface-inset)', border: '1px solid var(--border-default)' }}
             >
               <button
                 onClick={() => setViewMode('all')}
-                className={`flex-1 lg:px-4 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                className={`flex-1 md:flex-none md:px-6 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
                   viewMode === 'all'
                     ? 'bg-white dark:bg-gray-900 text-primary-600 shadow-sm'
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -561,7 +650,7 @@ export function ProductsPage() {
               </button>
               <button
                 onClick={() => setViewMode('grouped')}
-                className={`flex-1 lg:px-4 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                className={`flex-1 md:flex-none md:px-6 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
                   viewMode === 'grouped'
                     ? 'bg-white dark:bg-gray-900 text-primary-600 shadow-sm'
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
@@ -575,7 +664,7 @@ export function ProductsPage() {
 
           {/* Linha 2: Filtros de Tipo, Status e Categoria */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 -mx-3 px-3 sm:mx-0 sm:px-0">
               {[
                 { id: 'all', label: 'Todos' },
                 { id: 'simple', label: 'Individuais' },
@@ -596,11 +685,11 @@ export function ProductsPage() {
             </div>
 
             <div
-              className="h-5 w-px hidden md:block"
+              className="h-5 w-px hidden lg:block"
               style={{ background: 'var(--border-default)' }}
             />
 
-            <div className="flex items-center gap-2 flex-1 min-w-0 md:min-w-fit overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto no-scrollbar pb-1">
               <select
                 value={selectedCategoryId ?? ''}
                 onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : null)}
