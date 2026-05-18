@@ -114,7 +114,18 @@ export function CheckoutPage() {
   const idempotencyKey = useMemo(() => crypto.randomUUID(), []);
 
   // Real-time server-side validation for delivery fee and address availability
-  const debouncedAddress = useDebounce({ street, number, neighborhood, city, state, zipCode, lat, lng }, 800);
+  const addressObject = useMemo(() => ({
+    street,
+    number,
+    neighborhood,
+    city,
+    state,
+    zipCode,
+    lat,
+    lng
+  }), [street, number, neighborhood, city, state, zipCode, lat, lng]);
+
+  const debouncedAddress = useDebounce(addressObject, 800);
 
   useEffect(() => {
     async function validate() {
@@ -169,8 +180,8 @@ export function CheckoutPage() {
           state,
           zipCode,
           reference: reference || undefined,
-          lat,
-          lng,
+          lat: lat ?? 0,
+          lng: lng ?? 0,
         } : null;
 
         const { data: result } = await api.post<CheckoutValidationResult>(`/orders/public-checkout/${tenantSlug}/validate`, {
@@ -256,7 +267,7 @@ export function CheckoutPage() {
     if (items.length === 0) return false;
     
     if (fulfillmentType === 'delivery') {
-      if (!street.trim() || !number.trim() || !neighborhood.trim() || !city.trim() || !state.trim() || !zipCode.trim() || !lat || !lng) {
+      if (!street.trim() || !number.trim() || !neighborhood.trim() || !city.trim() || !state.trim() || !zipCode.trim()) {
         return false;
       }
     }
@@ -329,8 +340,8 @@ export function CheckoutPage() {
           state,
           zipCode,
           reference: reference || undefined,
-          lat,
-          lng,
+          lat: lat ?? 0,
+          lng: lng ?? 0,
         } : undefined,
         scheduledFor: isScheduled ? scheduledFor : undefined,
         timeSlotId: isScheduled ? timeSlotId : undefined,
@@ -344,7 +355,7 @@ export function CheckoutPage() {
       navigate(`/${tenantSlug}/order/${res.data.id}`, { state: { order: res.data } });
     } catch (err: any) {
       console.error('Card checkout error:', err);
-      setSubmitError(err.response?.data?.message || 'Erro ao processar pagamento com cartão.');
+      setSubmitError(err.message || 'Erro ao processar pagamento com cartão.');
       throw err; // Re-throw to the brick so it can show error
     } finally {
       setIsSubmitting(false);
@@ -412,8 +423,8 @@ export function CheckoutPage() {
           state,
           zipCode,
           reference: reference || undefined,
-          lat,
-          lng,
+          lat: lat ?? 0,
+          lng: lng ?? 0,
         } : undefined,
         scheduledFor: isScheduled ? scheduledFor : undefined,
         timeSlotId: isScheduled ? timeSlotId : undefined,
@@ -439,7 +450,7 @@ export function CheckoutPage() {
       }
     } catch (err: any) {
       console.error('Checkout error:', err);
-      setSubmitError(err.response?.data?.message || 'Erro ao processar pedido. Tente novamente.');
+      setSubmitError(err.message || 'Erro ao processar pedido. Tente novamente.');
     } finally {
       setIsSubmitting(false);
     }

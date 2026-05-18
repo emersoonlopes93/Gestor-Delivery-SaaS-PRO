@@ -130,3 +130,15 @@
   transform: translateY(0);
   transition: opacity 300ms, transform 300ms;
 }
+
+/* Leaflet Dark Mode support */
+.dark .leaflet-container {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
+.dark .leaflet-container .leaflet-tile-container img {
+  filter: brightness(0.8) contrast(1.2);
+}
+.dark .leaflet-container .leaflet-marker-icon,
+.dark .leaflet-container .leaflet-marker-shadow {
+  filter: invert(100%) hue-rotate(-180deg);
+}

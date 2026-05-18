@@ -22,7 +22,6 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
     
     if (!apiKey) {
       setLoading(false);
-      setError('Google Maps API Key não configurada (VITE_GOOGLE_MAPS_KEY)');
       return;
     }
 
@@ -53,6 +52,11 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
         setLoading(false);
       });
   }, [onAddressSelected]);
+
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY;
+  if (!apiKey) {
+    return null;
+  }
 
   return (
     <div className={`relative ${className}`}>

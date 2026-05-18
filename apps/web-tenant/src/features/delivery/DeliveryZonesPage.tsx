@@ -445,6 +445,28 @@ function SectionHeader(props: { title: string; subtitle?: string; right?: React.
   );
 }
 
+async function geocodeNominatim(address: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
+    const response = await fetch(url, {
+      headers: {
+        'Accept-Language': 'pt-BR',
+        'User-Agent': 'Gestor-Delivery-SaaS-PRO-App',
+      },
+    });
+    const data = await response.json();
+    if (data && data.length > 0) {
+      return {
+        lat: parseFloat(data[0].lat),
+        lng: parseFloat(data[0].lon),
+      };
+    }
+  } catch (err) {
+    console.error('Nominatim geocoding error:', err);
+  }
+  return null;
+}
+
 export function DeliveryZonesPage() {
   const [coverage, setCoverage] = useState<CoverageConfig | null>(null);
   const [coverageDraft, setCoverageDraft] = useState({
@@ -539,10 +561,17 @@ export function DeliveryZonesPage() {
         api.get<DeliveryRateRule[]>('/delivery/rates'),
       ]);
 
+      let fetchedLat = -23.55052;
+      let fetchedLng = -46.633308;
+      let hasConfig = false;
+
       if (covRes.success) {
         setCoverage(covRes.data ?? null);
         const cfg = covRes.data;
         if (cfg) {
+          fetchedLat = cfg.storeLat;
+          fetchedLng = cfg.storeLng;
+          hasConfig = true;
           setCoverageDraft({
             isDeliveryEnabled: cfg.isDeliveryEnabled,
             storeLat: cfg.storeLat,
@@ -562,6 +591,31 @@ export function DeliveryZonesPage() {
         setZones(zs.sort((a, b) => a.priority - b.priority));
 
         if (zs.length > 0 && !selectedZoneId) setSelectedZoneId(zs[0].id);
+      }
+
+      // Load tenant profile to get address & check/resolve store location
+      const tenantRes = await api.get<any>('/tenant/me');
+      if (tenantRes.success && tenantRes.data) {
+        const settings = tenantRes.data.settings;
+        if (settings && settings.street) {
+          const addressStr = `${settings.street}, ${settings.number || ''}, ${settings.neighborhood || ''}, ${settings.city || ''} - ${settings.state || ''}, Brasil`;
+          
+          // Geocode if config doesn't exist, OR if config has default coordinates
+          const isDefaultCoords = Math.abs(fetchedLat - (-23.55052)) < 0.0001 && Math.abs(fetchedLng - (-46.633308)) < 0.0001;
+          
+          if (!hasConfig || isDefaultCoords) {
+            const coords = await geocodeNominatim(addressStr);
+            if (coords) {
+              setCoverageDraft((d) => ({
+                ...d,
+                storeLat: coords.lat,
+                storeLng: coords.lng,
+              }));
+              // Auto-center map on resolved location
+              setFitToStoreSeq((v) => v + 1);
+            }
+          }
+        }
       }
 
       setToast(null);
@@ -616,27 +670,7 @@ export function DeliveryZonesPage() {
     }
   }, [coverageDraft]);
 
-  const handleUseCurrentLocation = useCallback(async () => {
-    setError(null);
-    if (!('geolocation' in navigator)) {
-      setError('Seu navegador não suporta geolocalização.');
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        setCoverageDraft((d) => ({ ...d, storeLat: lat, storeLng: lng }));
-        setToast('Localização atual aplicada');
-        setFitToStoreSeq((v) => v + 1);
-      },
-      () => {
-        setError('Não foi possível obter sua localização. Verifique as permissões do navegador.');
-      },
-      { enableHighAccuracy: true, maximumAge: 10_000, timeout: 12_000 },
-    );
-  }, []);
+  // Removed handleUseCurrentLocation to keep code clean and optimal
 
   const openNewZone = useCallback(() => {
     resetZoneForm();
@@ -987,31 +1021,7 @@ export function DeliveryZonesPage() {
               </div>
 
               <div className="p-5 space-y-5">
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
-                  <p className="text-sm text-blue-800 font-medium">
-                    <span className="font-black">Dica:</span> Use os botões abaixo para definir sua localização automaticamente. O sistema usará o endereço cadastrado nas configurações ou sua localização atual.
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setFitToStoreSeq((v) => v + 1)}
-                    className="h-10 px-4 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 hover:border-gray-300 dark:border-gray-700 transition-all duration-200 shadow-md"
-                  >
-                    <Crosshair className="h-4 w-4" />
-                    Centralizar no mapa
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleUseCurrentLocation}
-                    className="h-10 px-4 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 hover:border-gray-300 dark:border-gray-700 transition-all duration-200 shadow-md"
-                  >
-                    <MapPin className="h-4 w-4" />
-                    Usar minha localização
-                  </button>
-                </div>
+                {/* Automatic address geocoding and centering active */}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
