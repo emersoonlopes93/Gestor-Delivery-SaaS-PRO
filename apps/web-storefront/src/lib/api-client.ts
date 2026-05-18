@@ -38,6 +38,7 @@ async function apiFetch<T>(
       response.status,
       errorBody?.error?.message || 'Request failed',
       errorBody?.error?.code,
+      errorBody?.error?.details,
     );
   }
 
@@ -49,6 +50,7 @@ export class ApiError extends Error {
     public status: number,
     message: string,
     public code?: string,
+    public details?: any,
   ) {
     super(message);
     this.name = 'ApiError';

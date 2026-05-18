@@ -41,6 +41,7 @@ export function CheckoutPage() {
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   // Scheduling state
   const [isScheduled, setIsScheduled] = useState(false);
@@ -62,7 +63,8 @@ export function CheckoutPage() {
 
   // Payment state
   const [payment, setPayment] = useState<PaymentInput>({
-    method: PaymentMethod.pix,
+    method: PaymentMethod.cash,
+    changeFor: undefined,
   });
 
   // Coupon and Cashback state
@@ -379,6 +381,7 @@ export function CheckoutPage() {
 
     setIsSubmitting(true);
     setSubmitError(null);
+    setValidationErrors([]);
 
     try {
       const orderItems: CreateOrderItemDTO[] = items.map(item => {
@@ -405,28 +408,31 @@ export function CheckoutPage() {
             itemId: o.itemId,
           })) || [],
         };
-      }) as any;
+      });
 
       const payload: CreateOrderDTO = {
-        customerName,
-        customerPhone,
-        customerEmail: '',
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim().replace(/\D/g, ''),
+        customerEmail: customer.email || undefined,
         fulfillmentType,
         items: orderItems,
         idempotencyKey,
-        notes,
-        payment,
+        notes: notes.trim() || undefined,
+        payment: {
+          ...payment,
+          changeFor: payment.method === 'cash' ? payment.changeFor || undefined : undefined,
+        },
         couponCode: appliedCoupon || undefined,
         useCashbackAmount: usedCashback || undefined,
         deliveryAddress: fulfillmentType === 'delivery' ? {
-          street,
-          number,
-          complement: complement || undefined,
-          neighborhood,
-          city,
-          state,
-          zipCode,
-          reference: reference || undefined,
+          street: street.trim(),
+          number: number.trim(),
+          complement: complement?.trim() || undefined,
+          neighborhood: neighborhood.trim(),
+          city: city.trim(),
+          state: state.trim(),
+          zipCode: zipCode.replace(/\D/g, ''),
+          reference: reference?.trim() || undefined,
           lat: lat ?? 0,
           lng: lng ?? 0,
         } : undefined,
@@ -454,7 +460,13 @@ export function CheckoutPage() {
       }
     } catch (err: any) {
       console.error('Checkout error:', err);
-      setSubmitError(err.message || 'Erro ao processar pedido. Tente novamente.');
+      
+      if (err.details?.validationErrors) {
+        setSubmitError('Erro de validação. Verifique os campos abaixo:');
+        setValidationErrors(err.details.validationErrors);
+      } else {
+        setSubmitError(err.message || 'Erro ao processar pedido. Tente novamente.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -761,9 +773,18 @@ export function CheckoutPage() {
       </section>
 
       {submitError && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 text-red-600 animate-in shake duration-500">
-          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-          <p className="text-sm font-medium leading-tight">{submitError}</p>
+        <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex flex-col gap-2 text-red-600 animate-in shake duration-500">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <p className="text-sm font-medium leading-tight">{submitError}</p>
+          </div>
+          {validationErrors.length > 0 && (
+            <ul className="ml-8 list-disc text-xs space-y-1">
+              {validationErrors.map((err, i) => (
+                <li key={i}>{err}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
