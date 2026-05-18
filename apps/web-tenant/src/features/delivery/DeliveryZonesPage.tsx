@@ -597,23 +597,25 @@ export function DeliveryZonesPage() {
       const tenantRes = await api.get<any>('/tenant/me');
       if (tenantRes.success && tenantRes.data) {
         const settings = tenantRes.data.settings;
-        if (settings && settings.street) {
-          const addressStr = `${settings.street}, ${settings.number || ''}, ${settings.neighborhood || ''}, ${settings.city || ''} - ${settings.state || ''}, Brasil`;
-          
-          // Geocode if config doesn't exist, OR if config has default coordinates
+        if (settings) {
           const isDefaultCoords = Math.abs(fetchedLat - (-23.55052)) < 0.0001 && Math.abs(fetchedLng - (-46.633308)) < 0.0001;
-          
-          if (!hasConfig || isDefaultCoords) {
+
+          if (typeof settings.lat === 'number' && typeof settings.lng === 'number') {
+            setCoverageDraft((d) => ({ ...d, storeLat: settings.lat, storeLng: settings.lng }));
+            setFitToStoreSeq((v) => v + 1);
+          } else if (hasConfig && !isDefaultCoords) {
+            setFitToStoreSeq((v) => v + 1);
+          } else if (settings.street && settings.number && settings.city) {
+            const addressStr = `${settings.street}, ${settings.number}, ${settings.neighborhood || ''}, ${settings.city} - ${settings.state || ''}, Brasil`;
             const coords = await geocodeNominatim(addressStr);
             if (coords) {
-              setCoverageDraft((d) => ({
-                ...d,
-                storeLat: coords.lat,
-                storeLng: coords.lng,
-              }));
-              // Auto-center map on resolved location
+              setCoverageDraft((d) => ({ ...d, storeLat: coords.lat, storeLng: coords.lng }));
               setFitToStoreSeq((v) => v + 1);
+            } else {
+              setToast('Aviso: Não foi possível geocodificar o endereço. Mapa não centralizado com precisão.');
             }
+          } else {
+            setToast('Aviso: Configure o endereço com precisão em Configurações para centralizar o mapa.');
           }
         }
       }

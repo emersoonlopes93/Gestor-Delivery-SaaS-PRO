@@ -12,6 +12,28 @@ interface OperatingHourForm {
 
 import { Clock, Pause, Save, Copy, Calendar, MapPin, Building2 } from 'lucide-react';
 
+async function geocodeNominatim(address: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
+    const response = await fetch(url, {
+      headers: {
+        'Accept-Language': 'pt-BR',
+        'User-Agent': 'Gestor-Delivery-SaaS-PRO-App',
+      },
+    });
+    const data = await response.json();
+    if (data && data.length > 0) {
+      return {
+        lat: parseFloat(data[0].lat),
+        lng: parseFloat(data[0].lon),
+      };
+    }
+  } catch (err) {
+    console.error('Nominatim geocoding error:', err);
+  }
+  return null;
+}
+
 const DAY_NAMES = [
   'Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'
 ];
@@ -128,13 +150,34 @@ export function SettingsPage() {
     e.preventDefault();
     setSaving(true);
     try {
+      let lat = settings.lat ? Number(settings.lat) : undefined;
+      let lng = settings.lng ? Number(settings.lng) : undefined;
+
+      // Geocodifica para garantir a localização correta do tenant
+      if (settings.street && settings.number && settings.city) {
+        const addressStr = `${settings.street}, ${settings.number}, ${settings.neighborhood || ''}, ${settings.city} - ${settings.state || ''}, Brasil`;
+        const coords = await geocodeNominatim(addressStr);
+        if (coords) {
+          lat = coords.lat;
+          lng = coords.lng;
+        } else {
+          alert('Não foi possível geocodificar o endereço automaticamente. O endereço foi salvo, mas o mapa pode não apontar para a localização exata.');
+        }
+      }
+
+      // Deriva o endereço formatado a partir dos campos estruturados para preencher o campo `address` obsoleto, se necessário
+      let derivedAddress = settings.address?.trim() || undefined;
+      if (settings.street && settings.number) {
+        derivedAddress = `${settings.street}, ${settings.number}${settings.complement ? ` - ${settings.complement}` : ''}${settings.neighborhood ? ` - ${settings.neighborhood}` : ''}, ${settings.city || ''} - ${settings.state || ''}`;
+      }
+
       const cleanedSettings = {
         timezone: settings.timezone || undefined,
         currency: settings.currency || undefined,
         language: settings.language || undefined,
         businessPhone: settings.businessPhone?.trim() || undefined,
         businessEmail: settings.businessEmail?.trim() || undefined,
-        address: settings.address?.trim() || undefined,
+        address: derivedAddress,
         street: settings.street?.trim() || undefined,
         number: settings.number?.trim() || undefined,
         complement: settings.complement?.trim() || undefined,
@@ -142,8 +185,8 @@ export function SettingsPage() {
         city: settings.city?.trim() || undefined,
         state: settings.state?.trim() || undefined,
         zipCode: settings.zipCode?.trim() || undefined,
-        lat: settings.lat ? Number(settings.lat) : undefined,
-        lng: settings.lng ? Number(settings.lng) : undefined,
+        lat,
+        lng,
         paymentMethods: settings.paymentMethods || undefined,
         pixKey: settings.pixKey?.trim() || undefined,
         bankName: settings.bankName?.trim() || undefined,
@@ -457,16 +500,6 @@ export function SettingsPage() {
                       onChange={e => setSettings({...settings, complement: e.target.value})}
                       placeholder="Apto, Bloco, etc."
                       className="input-premium"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Endereço</label>
-                    <input
-                      type="text"
-                      value={settings.address || ''}
-                      onChange={e => setSettings({...settings, address: e.target.value})}
-                      placeholder="Ex: Rua das Flores, 123"
-                      className="input-premium opacity-60"
                     />
                   </div>
                 </div>

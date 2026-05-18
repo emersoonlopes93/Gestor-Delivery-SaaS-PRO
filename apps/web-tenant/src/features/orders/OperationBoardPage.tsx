@@ -1,8 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshCw, Clock, ArrowRight } from 'lucide-react';
 import type { OrderBoardItemDTO, OrderStatus, UpdateOrderStatusDTO } from '@gestor/types';
-
-const API_BASE = '/api/v1';
+import { api, ApiError } from '../../lib/api-client';
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
   pending: 'Novos',
@@ -177,42 +176,20 @@ export function OperationBoardPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<BoardViewMode>('standard');
 
-  const token = localStorage.getItem('accessToken');
-
   const fetchBoard = useCallback(async () => {
     try {
-      if (!token) {
-        throw new Error('Token de autenticação não encontrado');
-      }
-
-      console.log('[OperationBoardPage] Buscando board...');
-
-      const res = await fetch(`${API_BASE}/orders/operation/board`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!res.ok) {
-        throw new Error(`Erro ${res.status}: ${res.statusText}`);
-      }
-
-      const json = await res.json();
-      console.log('[OperationBoardPage] Resposta da API:', json);
-
-      // Validar estrutura da resposta
-      if (!json || typeof json !== 'object') {
-        throw new Error('Resposta inválida da API');
-      }
-
-      setOrders(Array.isArray(json) ? json : []);
+      const res = await api.get<OrderBoardItemDTO[]>('/orders/operation/board');
+      setOrders(res.data || []);
       setError(null);
     } catch (err) {
       console.error('[OperationBoardPage] Erro ao buscar board:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao carregar quadro de pedidos');
+      const msg = err instanceof ApiError ? err.message : 'Erro ao carregar quadro de pedidos';
+      setError(msg);
       setOrders([]);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   // Initial load & Polling (cada 15s)
   useEffect(() => {
@@ -226,17 +203,12 @@ export function OperationBoardPage() {
     setUpdatingId(orderId);
     try {
       const body: UpdateOrderStatusDTO = { status: newStatus };
-      const res = await fetch(`${API_BASE}/orders/${orderId}/status`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (res.ok) {
-        // Optimistic local update via fetchBoard right after, or just let polling/fetch handle it
+      const res = await api.patch(`/orders/${orderId}/status`, body);
+      if (res.success) {
         await fetchBoard();
       }
-    } catch {
-      // Ignore
+    } catch (err) {
+      console.error('[OperationBoardPage] Erro ao atualizar status:', err);
     } finally {
       setUpdatingId(null);
     }
