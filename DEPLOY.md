@@ -33,11 +33,11 @@ Como utilizamos um monorepo PNPM, precisamos instruir o Render a instalar as dep
 
 * **Build Command:**
   ```bash
-  pnpm install --frozen-lockfile && pnpm --filter @gestor/api prisma:generate && pnpm --filter @gestor/api build
+  pnpm install --frozen-lockfile --prod=false && pnpm --filter @gestor/api prisma:generate && pnpm --filter @gestor/api... build
   ```
 * **Start Command:**
   ```bash
-  pnpm --filter @gestor/api prisma:migrate && pnpm --filter @gestor/api start:prod
+  pnpm --filter @gestor/api prisma:migrate:deploy && pnpm --filter @gestor/api start:prod
   ```
   *(Nota: O comando de migração executa `npx prisma migrate deploy` automaticamente antes de subir a API, garantindo que o banco de dados esteja sempre sincronizado sem downtime).*
 
@@ -50,15 +50,16 @@ Adicione as variáveis abaixo na seção **Environment** do Render:
 | `PORT` | `3333` | Porta exposta pelo container |
 | `DATABASE_URL` | `postgresql://user:pass@host/db?sslmode=require` | String de conexão do PostgreSQL (Supabase/Neon) |
 | `JWT_SECRET` | `sua-chave-secreta-e-longa` | Chave de assinatura para tokens JWT dos usuários |
+| `JWT_REFRESH_SECRET` | `outra-chave-secreta-e-longa-diferente` | **Obrigatória**. Chave para assinatura do refresh token |
 | `REDIS_HOST` | `sua-instancia.upstash.io` | Host do Redis (Ex: Upstash ou Redis Cloud) |
 | `REDIS_PORT` | `6379` | Porta de conexão do Redis |
 | `REDIS_PASSWORD` | `sua-senha-do-redis` | Senha de autenticação do Redis |
 | `REDIS_TLS` | `true` | **Obrigatório para Produção**. Ativa conexão criptografada SSL/TLS |
-| `STORAGE_PROVIDER` | `r2` | Define o Cloudflare R2 como provedor de uploads |
-| `R2_ENDPOINT` | `https://<account-id>.r2.cloudflarestorage.com` | Endpoint privado da sua conta Cloudflare |
+| `STORAGE_DRIVER` | `r2` | Define o Cloudflare R2 como provedor de uploads |
+| `R2_ACCOUNT_ID` | `sua-cloudflare-account-id` | ID da conta Cloudflare obtido no painel do R2 |
 | `R2_ACCESS_KEY_ID` | `sua-access-key-id` | Chave de acesso gerada no Cloudflare R2 |
 | `R2_SECRET_ACCESS_KEY` | `sua-secret-access-key` | Chave secreta gerada no Cloudflare R2 |
-| `R2_BUCKET_NAME` | `gestor-delivery-uploads` | Nome do bucket criado no R2 |
+| `R2_BUCKET` | `gestor-delivery-uploads` | Nome do bucket criado no R2 |
 | `R2_PUBLIC_BASE_URL` | `https://cdn.seudominio.com` | URL pública da CDN/Bucket R2 para acesso às imagens |
 
 > [!IMPORTANT]
@@ -205,15 +206,16 @@ Utilize esta lista consolidada para preencher os painéis do Render, Vercel ou P
 | **Geral** | `PORT` | `3333` | API |
 | **Banco de Dados** | `DATABASE_URL` | `postgresql://postgres:senha@neon-host.db.neon.tech/main?sslmode=require` | API |
 | **Segurança** | `JWT_SECRET` | `8f5b8210d7a6e191b...` *(gere um hash de 32+ caracteres)* | API |
+| **Segurança** | `JWT_REFRESH_SECRET` | `9b8c7d6e5a4f3e2d1...` *(gere outro hash diferente)* | API |
 | **Mensageria & Fila** | `REDIS_HOST` | `redis-10023.c302.us-east-1-4.ec2.cloud.redislabs.com` | API |
 | **Mensageria & Fila** | `REDIS_PORT` | `10023` | API |
 | **Mensageria & Fila** | `REDIS_PASSWORD` | `sua-senha-segura-redis` | API |
 | **Mensageria & Fila** | `REDIS_TLS` | `true` | API |
-| **Storage (Cloudflare R2)**| `STORAGE_PROVIDER` | `r2` | API |
-| **Storage (Cloudflare R2)**| `R2_ENDPOINT` | `https://a1b2c3d4e5f6.r2.cloudflarestorage.com` | API |
+| **Storage (Cloudflare R2)**| `STORAGE_DRIVER` | `r2` | API |
+| **Storage (Cloudflare R2)**| `R2_ACCOUNT_ID` | `a1b2c3d4e5f6g7h8i9j0` | API |
 | **Storage (Cloudflare R2)**| `R2_ACCESS_KEY_ID` | `28f645baef0745cd12c332` | API |
 | **Storage (Cloudflare R2)**| `R2_SECRET_ACCESS_KEY` | `98d6c54bfaed0234acfe456ef` | API |
-| **Storage (Cloudflare R2)**| `R2_BUCKET_NAME` | `gestor-delivery-uploads` | API |
+| **Storage (Cloudflare R2)**| `R2_BUCKET` | `gestor-delivery-uploads` | API |
 | **Storage (Cloudflare R2)**| `R2_PUBLIC_BASE_URL` | `https://cdn.pizzariademo.com` | API |
 | **Integração Frontend** | `VITE_API_URL` | `https://api.seudominio.com/api/v1` | Frontends |
 
