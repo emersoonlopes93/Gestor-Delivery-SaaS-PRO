@@ -402,6 +402,8 @@ export function AppLayout() {
   useNotificationAudio(tenantData?.id, {
     enabled: tenantData?.settings?.audioNotificationEnabled ?? true,
     volume: tenantData?.settings?.notificationVolume ?? 1.0,
+    newOrderSound: tenantData?.settings?.newOrderSound,
+    cancellationSound: tenantData?.settings?.cancellationSound,
   });
 
   const initialSidebarState = useMemo(() => {

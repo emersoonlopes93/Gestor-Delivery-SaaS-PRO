@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEmail, MaxLength, Matches, IsNumber, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsEmail, MaxLength, Matches, IsNumber, IsArray, IsBoolean } from 'class-validator';
 
 export class UpdateTenantSettingsDto {
   @IsOptional()
@@ -140,4 +140,20 @@ export class UpdateTenantSettingsDto {
 
   @IsOptional()
   notificationTemplates?: any;
+
+  @IsOptional()
+  @IsBoolean()
+  audioNotificationEnabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  newOrderSound?: string;
+
+  @IsOptional()
+  @IsString()
+  cancellationSound?: string;
+
+  @IsOptional()
+  @IsNumber()
+  notificationVolume?: number;
 }

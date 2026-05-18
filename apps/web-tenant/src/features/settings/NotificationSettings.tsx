@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../lib/api-client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNotificationAudio, AVAILABLE_SOUNDS } from '../../hooks/useNotificationAudio';
 
 const DEFAULT_TEMPLATES = {
   confirmed: '✅ Pedido #{{orderNumber}} confirmado! {{restaurantName}} já está preparando seu pedido.',
@@ -26,6 +27,8 @@ export function NotificationSettings() {
   const [enabled, setEnabled] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [volume, setVolume] = useState(1.0);
+  const [newOrderSound, setNewOrderSound] = useState<string>('notification.mp3');
+  const [cancellationSound, setCancellationSound] = useState<string>('notification.mp3');
   const [templates, setTemplates] = useState<Record<string, string>>(DEFAULT_TEMPLATES);
 
   const { data: settings, isLoading } = useQuery({
@@ -44,6 +47,8 @@ export function NotificationSettings() {
       }
       setAudioEnabled(settings.audioNotificationEnabled ?? true);
       setVolume(settings.notificationVolume ?? 1.0);
+      if (settings.newOrderSound) setNewOrderSound(settings.newOrderSound);
+      if (settings.cancellationSound) setCancellationSound(settings.cancellationSound);
     }
   }, [settings]);
 
@@ -63,13 +68,29 @@ export function NotificationSettings() {
       notificationTemplates: templates,
       audioNotificationEnabled: audioEnabled,
       notificationVolume: volume,
+      newOrderSound,
+      cancellationSound,
     });
   };
 
-  const handleTestSound = () => {
-    const audio = new Audio('/sounds/new-order.mp3');
-    audio.volume = volume;
-    audio.play().catch(() => alert('Clique na página primeiro para permitir o áudio!'));
+  // Usa o hook central para testar os sons (mesma lógica do AppLayout, sem duplicar)
+  const { playTestNewOrder, playTestCancellation } = useNotificationAudio(undefined, {
+    enabled: false, // socket desativado nesta instância (apenas para acesso aos helpers de teste)
+    volume,
+    newOrderSound,
+    cancellationSound,
+  });
+
+  const handleTestNewOrder = () => {
+    playTestNewOrder().catch(() =>
+      alert('Clique na página primeiro para permitir o áudio do navegador!')
+    );
+  };
+
+  const handleTestCancellation = () => {
+    playTestCancellation().catch(() =>
+      alert('Clique na página primeiro para permitir o áudio do navegador!')
+    );
   };
 
   if (isLoading) return (
@@ -159,14 +180,53 @@ export function NotificationSettings() {
               />
             </div>
 
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={handleTestSound}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-xs hover:bg-gray-200 transition-all"
-              >
-                <Play className="w-4 h-4" />
-                Testar Som de Novo Pedido
-              </button>
+            {/* Seletor de som — Novo Pedido */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-black uppercase tracking-widest text-gray-400">Som de Novo Pedido</label>
+                <div className="flex gap-2">
+                  <select
+                    value={newOrderSound}
+                    onChange={(e) => setNewOrderSound(e.target.value)}
+                    className="input-premium flex-1"
+                  >
+                    {AVAILABLE_SOUNDS.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleTestNewOrder}
+                    title="Testar som de novo pedido"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-800 rounded-xl font-bold text-xs hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-all"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    Testar
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-black uppercase tracking-widest text-gray-400">Som de Cancelamento</label>
+                <div className="flex gap-2">
+                  <select
+                    value={cancellationSound}
+                    onChange={(e) => setCancellationSound(e.target.value)}
+                    className="input-premium flex-1"
+                  >
+                    {AVAILABLE_SOUNDS.map((s) => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleTestCancellation}
+                    title="Testar som de cancelamento"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-xs hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    Testar
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </section>
