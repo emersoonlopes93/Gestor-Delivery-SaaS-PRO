@@ -21,17 +21,54 @@ export interface StorefrontTenantInfo {
   };
 }
 
+import { PriceImpactType, PricingAxis } from './catalog';
+
+export interface StorefrontOptionItemPayload {
+  id: string;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+  allowQuantity: boolean;
+  priceImpactType: PriceImpactType;
+  priceImpactValue: number;
+}
+
+export interface StorefrontOptionGroupPayload {
+  id: string;
+  name: string;
+  description?: string | null;
+  selectionType: 'single' | 'multiple' | 'quantity';
+  isRequired: boolean;
+  minSelect: number;
+  maxSelect: number;
+  isActive: boolean;
+  items: StorefrontOptionItemPayload[];
+}
+
+export interface StorefrontOptionGroupLinkPayload {
+  id: string;
+  pricingAxis?: PricingAxis;
+  overrideName?: string | null;
+  overrideDescription?: string | null;
+  overrideIsRequired?: boolean | null;
+  overrideMinSelect?: number | null;
+  overrideMaxSelect?: number | null;
+  optionGroup: StorefrontOptionGroupPayload;
+}
+
 // Layer 2: Published entity, Layer 3: Currently available to sell
 export interface StorefrontProductPayload {
   id: string;
   name: string;
   slug: string;
+  type: 'simple' | 'configurable' | 'combo';
   shortDescription?: string | null;
   longDescription?: string | null;
   basePrice: number;
   image?: string | null;
   isAvailable: boolean; // Layer 3 
-  complements: StorefrontComplementGroup[];
+  complements: StorefrontComplementGroup[]; // Legacy
+  optionGroupLinks: StorefrontOptionGroupLinkPayload[]; // V2
   upsells: StorefrontUpsellPayload[];
 }
 
@@ -39,6 +76,7 @@ export interface StorefrontCategoryPayload {
   id: string;
   name: string;
   slug: string;
+  templateType?: string | null;
   products: StorefrontProductPayload[];
 }
 
@@ -159,6 +197,33 @@ export interface CartBundleItemSnapshot {
   subtotal: number;
 }
 
+export interface CartSelectedOptionItem {
+  optionItemId: string;
+  qty?: number;
+  name: string;
+  priceImpactType: PriceImpactType;
+  priceImpactValue: number;
+}
+
+export interface CartSelectedOptionGroup {
+  optionGroupId: string;
+  name: string;
+  items: CartSelectedOptionItem[];
+}
+
+export interface CartSelectedComboSlotItem {
+  productId: string;
+  qty?: number;
+  name: string;
+  additionalPrice: number;
+}
+
+export interface CartSelectedComboSlot {
+  comboSlotId: string;
+  name: string;
+  items: CartSelectedComboSlotItem[];
+}
+
 export interface CartLineItem {
   cartLineId: string; // UUID unique per line
   productId?: string; // either product
@@ -166,10 +231,14 @@ export interface CartLineItem {
   quantity: number;
   notes?: string;
   
-  // Options for single products
+  // Options for single products (Legacy)
   selectedOptions?: CartSelectedComplement[];
   
-  // Options for combos
+  // Options for Catalog V2
+  selections?: CartSelectedOptionGroup[];
+  slots?: CartSelectedComboSlot[];
+
+  // Options for combos (Legacy)
   selectedComboItems?: CartSelectedComboItem[];
   bundleItems?: CartBundleItemSnapshot[];
 

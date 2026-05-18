@@ -139,7 +139,7 @@ export class UpdateTenantSettingsDto {
   whatsappNotificationsEnabled?: boolean;
 
   @IsOptional()
-  notificationTemplates?: any;
+  notificationTemplates?: Record<string, unknown>;
 
   @IsOptional()
   @IsBoolean()

@@ -10,7 +10,7 @@ export interface ProductCategory {
   description?: string | null;
   image?: string | null;
   templateType: CategoryTemplateType;
-  templateConfig?: any | null;
+  templateConfig?: unknown | null;
   isActive: boolean;
   isFeatured: boolean;
   order: number;

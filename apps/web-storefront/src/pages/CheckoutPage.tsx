@@ -11,7 +11,9 @@ import {
   PaymentInput,
   PaymentMethod,
   DeliveryAddressDTO,
-  CheckoutValidationResult
+  CheckoutValidationResult,
+  StorefrontPayload,
+  StorefrontTenantInfo
 } from '@gestor/types';
 import { AddressAutocomplete } from '../components/AddressAutocomplete';
 import { StructuredAddress, fetchAddressByCep, geocodeAddress } from '../lib/maps-service';
@@ -76,19 +78,19 @@ export function CheckoutPage() {
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [discountTotal, setDiscountTotal] = useState(0);
   const [isValidating, setIsValidating] = useState(false);
-  const [tenantInfo, setTenantInfo] = useState<any>(null);
+  const [tenantInfo, setTenantInfo] = useState<StorefrontTenantInfo | null>(null);
 
   useEffect(() => {
     async function loadTenant() {
       if (!tenantSlug) return;
       try {
-        const { data } = await api.get<any>(`/public/storefront/${tenantSlug}`);
+        const { data } = await api.get<StorefrontPayload>(`/public/storefront/${tenantSlug}`);
         setTenantInfo(data.tenant);
         
         // Auto-select first available payment method if current is not available
-        const methods = (data.tenant.paymentMethods as string[]) || [];
+        const methods = (data.tenant.paymentMethods as PaymentMethod[]) || [];
         if (methods.length > 0 && !methods.includes(payment.method)) {
-          setPayment({ method: methods[0] as any });
+          setPayment({ method: methods[0] });
         }
       } catch (err) {
         console.error('Error loading tenant info', err);
@@ -148,29 +150,31 @@ export function CheckoutPage() {
       setIsValidating(true);
       try {
         const orderItems: CreateOrderItemDTO[] = items.map(item => {
-          if (item.comboId) {
-            return {
-              lineType: 'combo' as const,
-              comboId: item.comboId,
-              productId: item.comboId,
-              quantity: item.quantity,
-              notes: item.notes,
-              comboSelections: item.selectedComboItems?.map(s => ({
-                blockId: (s as any).blockId,
-                blockItemId: (s as any).blockItemId,
-              })) || [],
-            };
-          }
-          return {
-            lineType: 'product' as const,
-            productId: item.productId,
+          const itemPayload: CreateOrderItemDTO = {
+            lineType: item.comboId ? 'combo' : 'product',
+            productId: item.productId || item.comboId || '',
             quantity: item.quantity,
             notes: item.notes,
+            selections: item.selections?.map(g => ({
+              optionGroupId: g.optionGroupId,
+              items: g.items.map(i => ({
+                optionItemId: i.optionItemId,
+                qty: i.qty,
+              }))
+            })),
+            slots: item.slots?.map(s => ({
+              comboSlotId: s.comboSlotId,
+              items: s.items.map(i => ({
+                productId: i.productId,
+                qty: i.qty,
+              }))
+            })),
             complements: item.selectedOptions?.map(o => ({
               groupId: o.groupId,
               itemId: o.itemId,
             })) || [],
           };
+          return itemPayload;
         });
 
         const address: DeliveryAddressDTO | null = isDelivery ? {
@@ -210,9 +214,10 @@ export function CheckoutPage() {
         setDeliveryFee(result.deliveryFee || 0);
         setDiscountTotal(result.discountTotal || 0);
         if (isDelivery) setSubmitError(null);
-      } catch (err: any) {
-        console.error('Validation error:', err);
-        const msg = err.message || 'Erro ao validar entrega nesta região.';
+      } catch (err) {
+        const error = err as Error;
+        console.error('Validation error:', error);
+        const msg = error.message || 'Erro ao validar entrega nesta região.';
         const isClosed = msg.toLowerCase().includes('fechada') || msg.toLowerCase().includes('aberta');
         
         if (isDelivery) {
@@ -302,9 +307,23 @@ export function CheckoutPage() {
             productId: item.comboId,
             quantity: item.quantity,
             notes: item.notes,
-            comboSelections: item.selectedComboItems?.map(s => ({
-              blockId: (s as any).blockId,
-              blockItemId: (s as any).blockItemId,
+            selections: item.selections?.map(g => ({
+              optionGroupId: g.optionGroupId,
+              items: g.items.map(i => ({
+                optionItemId: i.optionItemId,
+                qty: i.qty,
+              }))
+            })),
+            slots: item.slots?.map(s => ({
+              comboSlotId: s.comboSlotId,
+              items: s.items.map(i => ({
+                productId: i.productId,
+                qty: i.qty,
+              }))
+            })),
+            complements: item.selectedOptions?.map(o => ({
+              groupId: o.groupId,
+              itemId: o.itemId,
             })) || [],
           };
         }
@@ -313,12 +332,19 @@ export function CheckoutPage() {
           productId: item.productId,
           quantity: item.quantity,
           notes: item.notes,
+          selections: item.selections?.map(g => ({
+            optionGroupId: g.optionGroupId,
+            items: g.items.map(i => ({
+              optionItemId: i.optionItemId,
+              qty: i.qty,
+            }))
+          })),
           complements: item.selectedOptions?.map(o => ({
             groupId: o.groupId,
             itemId: o.itemId,
           })) || [],
         };
-      }) as any;
+      });
 
       const payload: CreateOrderDTO = {
         customerName,
@@ -359,10 +385,11 @@ export function CheckoutPage() {
       
       clearCart();
       navigate(`/${tenantSlug}/order/${res.data.id}`, { state: { order: res.data } });
-    } catch (err: any) {
-      console.error('Card checkout error:', err);
-      setSubmitError(err.message || 'Erro ao processar pagamento com cartão.');
-      throw err; // Re-throw to the brick so it can show error
+    } catch (err) {
+      const error = err as any;
+      console.error('Card checkout error:', error);
+      setSubmitError(error.message || 'Erro ao processar pagamento com cartão.');
+      throw error; // Re-throw to the brick so it can show error
     } finally {
       setIsSubmitting(false);
     }
@@ -392,9 +419,23 @@ export function CheckoutPage() {
             productId: item.comboId,
             quantity: item.quantity,
             notes: item.notes,
-            comboSelections: item.selectedComboItems?.map(s => ({
-              blockId: (s as any).blockId,
-              blockItemId: (s as any).blockItemId,
+            selections: item.selections?.map(g => ({
+              optionGroupId: g.optionGroupId,
+              items: g.items.map(i => ({
+                optionItemId: i.optionItemId,
+                qty: i.qty,
+              }))
+            })),
+            slots: item.slots?.map(s => ({
+              comboSlotId: s.comboSlotId,
+              items: s.items.map(i => ({
+                productId: i.productId,
+                qty: i.qty,
+              }))
+            })),
+            complements: item.selectedOptions?.map(o => ({
+              groupId: o.groupId,
+              itemId: o.itemId,
             })) || [],
           };
         }
@@ -403,6 +444,13 @@ export function CheckoutPage() {
           productId: item.productId,
           quantity: item.quantity,
           notes: item.notes,
+          selections: item.selections?.map(g => ({
+            optionGroupId: g.optionGroupId,
+            items: g.items.map(i => ({
+              optionItemId: i.optionItemId,
+              qty: i.qty,
+            }))
+          })),
           complements: item.selectedOptions?.map(o => ({
             groupId: o.groupId,
             itemId: o.itemId,
@@ -458,14 +506,15 @@ export function CheckoutPage() {
       else {
         navigate(`/${tenantSlug}/order/${res.data.id}`, { state: { order: res.data } });
       }
-    } catch (err: any) {
-      console.error('Checkout error:', err);
+    } catch (err) {
+      const error = err as any;
+      console.error('Checkout error:', error);
       
-      if (err.details?.validationErrors) {
+      if (error.details?.validationErrors) {
         setSubmitError('Erro de validação. Verifique os campos abaixo:');
-        setValidationErrors(err.details.validationErrors);
+        setValidationErrors(error.details.validationErrors);
       } else {
-        setSubmitError(err.message || 'Erro ao processar pedido. Tente novamente.');
+        setSubmitError(error.message || 'Erro ao processar pedido. Tente novamente.');
       }
     } finally {
       setIsSubmitting(false);

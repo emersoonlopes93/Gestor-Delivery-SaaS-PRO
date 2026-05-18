@@ -34,7 +34,7 @@ export function NotificationSettings() {
   const { data: settings, isLoading } = useQuery({
     queryKey: ['tenant-settings-notifications'],
     queryFn: async () => {
-      const res = await api.get<any>('/tenant/me');
+      const res = await api.get<{ settings: any }>('/tenant/me');
       return res.data.settings;
     }
   });
@@ -53,7 +53,7 @@ export function NotificationSettings() {
   }, [settings]);
 
   const mutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       return api.patch('/tenant/settings', data);
     },
     onSuccess: () => {

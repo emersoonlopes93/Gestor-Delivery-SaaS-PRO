@@ -326,7 +326,7 @@ export function AppLayout() {
   const queryClient = useQueryClient();
   const toggleStoreMutation = useMutation({
     mutationFn: async (isPaused: boolean) => {
-      const res = await api.patch<any>('/tenant/store-pause', { 
+      const res = await api.patch<unknown>('/tenant/store-pause', { 
         isStorePaused: isPaused, 
         storePauseReason: '' 
       });
@@ -335,7 +335,7 @@ export function AppLayout() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenant-settings-applayout'] });
     },
-    onError: (err: any) => {
+    onError: (err) => {
       console.error('Erro ao alterar status:', err);
       alert('Erro ao alterar status da loja.');
     }
@@ -378,7 +378,7 @@ export function AppLayout() {
       }));
     }
 
-    const todayRule = rules.find((h: any) => h.dayOfWeek === dayOfWeek);
+    const todayRule = rules.find((h: { dayOfWeek: number; isOpen: boolean; openTime: string | null; closeTime: string | null }) => h.dayOfWeek === dayOfWeek);
 
     if (todayRule?.isOpen && todayRule.openTime && todayRule.closeTime) {
       const [openH, openM] = todayRule.openTime.split(':').map(Number);
@@ -484,7 +484,7 @@ export function AppLayout() {
         .filter((it) => (it.permission ? hasPermission(userPermissions, it.permission) : true))
         .map((it) => it);
 
-      if (items.length) filtered.push({ ...g, items: items as any });
+      if (items.length) filtered.push({ ...g, items });
     }
     return filtered;
   }, [userPermissions]);

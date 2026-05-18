@@ -1,7 +1,7 @@
 import { X, Trash2, ShoppingBag, Plus, Minus, ChevronRight, Sparkles } from 'lucide-react';
 import { useCartStore } from '../store/use-cart-store';
 import { useNavigate, useParams } from 'react-router-dom';
-import { StorefrontUpsellPayload, StorefrontUpsellItemPayload } from '@gestor/types';
+import { StorefrontUpsellPayload, StorefrontUpsellItemPayload, StorefrontProductPayload } from '@gestor/types';
 
 interface CartDrawerProps {
   onClose: () => void;
@@ -19,14 +19,26 @@ export function CartDrawer({ onClose, upsells }: CartDrawerProps) {
   };
 
   const addUpsellItem = (upsell: StorefrontUpsellPayload, item: StorefrontUpsellItemPayload) => {
-    const virtualProduct: any = {
+    const virtualProduct: StorefrontProductPayload = {
       id: item.productId,
       name: item.name,
+      slug: `upsell-${item.productId}`,
       basePrice: item.finalPrice,
       image: item.image,
+      type: 'simple',
+      isAvailable: true,
       complements: [],
+      optionGroupLinks: [],
+      upsells: [],
     };
-    addItem(virtualProduct, 1, [], `Oferta: ${upsell.name}`, upsell.id);
+    addItem({
+      product: virtualProduct,
+      quantity: 1,
+      notes: `Oferta: ${upsell.name}`,
+      sourceUpsellId: upsell.id,
+      computedUnitPrice: item.finalPrice,
+      compositionLabel: 'Oferta Especial'
+    });
   };
 
   if (items.length === 0) {

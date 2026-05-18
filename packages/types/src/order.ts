@@ -400,7 +400,7 @@ export interface ValidatedProductLine {
     snapshotName: string;
     snapshotPrice: number;
   }>;
-  snapshotCatalogV2Json?: any;
+  snapshotCatalogV2Json?: unknown;
 }
 
 export interface ValidatedComboLine {
@@ -422,7 +422,7 @@ export interface ValidatedComboLine {
     snapshotProductName: string;
     snapshotAdditionalPrice: number;
   }>;
-  snapshotCatalogV2Json?: any;
+  snapshotCatalogV2Json?: unknown;
 }
 
 export type ValidatedLine = ValidatedProductLine | ValidatedComboLine;

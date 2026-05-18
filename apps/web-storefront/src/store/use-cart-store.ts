@@ -3,11 +3,11 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import type { 
   CartLineItem, 
   StorefrontProductPayload, 
-  StorefrontComboPayload,
   CartBundleItemSnapshot,
-  CartSelectedComplement,
-  CartSelectedComboItem,
-  CartSnapshot 
+  CartSelectedOptionGroup,
+  CartSelectedComboSlot,
+  CartSnapshot,
+  CartSelectedComplement
 } from '@gestor/types';
 
 interface CartState {
@@ -19,8 +19,21 @@ interface CartState {
   // Actions
   setTenantId: (id: string) => void;
   setTableId: (id: string | null) => void;
-  addItem: (product: StorefrontProductPayload, quantity: number, options: CartSelectedComplement[], notes?: string, sourceUpsellId?: string) => void;
-  addCombo: (combo: StorefrontComboPayload, quantity: number, selectedItems: CartSelectedComboItem[], bundleItems: CartBundleItemSnapshot[], notes?: string) => void;
+  
+  // V2 Compatible Actions
+  addItem: (params: {
+    product: StorefrontProductPayload;
+    quantity: number;
+    notes?: string;
+    selectedOptions?: CartSelectedComplement[];
+    selections?: CartSelectedOptionGroup[];
+    slots?: CartSelectedComboSlot[];
+    bundleItems?: CartBundleItemSnapshot[];
+    sourceUpsellId?: string;
+    computedUnitPrice: number;
+    compositionLabel: string;
+  }) => void;
+
   removeItem: (cartLineId: string) => void;
   updateQuantity: (cartLineId: string, quantity: number) => void;
   clearCart: () => void;
@@ -42,63 +55,41 @@ export const useCartStore = create<CartState>()(
 
       setTableId: (id) => set({ tableId: id }),
 
-      addItem: (product, quantity, options, notes, sourceUpsellId) => {
+      addItem: ({ 
+        product, 
+        quantity, 
+        notes, 
+        selectedOptions, 
+        selections, 
+        slots, 
+        bundleItems, 
+        sourceUpsellId,
+        computedUnitPrice,
+        compositionLabel 
+      }) => {
         if (!product.isAvailable) return;
-        const extrasPrice = options.reduce((sum, opt) => sum + opt.price, 0);
-        const lineSubtotal = (product.basePrice + extrasPrice) * quantity;
         
-        const extrasDescription = options.map(o => o.name).join(', ');
+        const lineSubtotal = computedUnitPrice * quantity;
 
         const snapshot: CartSnapshot = {
           productName: product.name,
           productImage: product.image,
           basePrice: product.basePrice,
           lineSubtotal,
-          extrasDescription,
+          extrasDescription: compositionLabel,
         };
 
         const newItem: CartLineItem = {
           cartLineId: crypto.randomUUID(),
-          productId: product.id,
+          productId: product.type === 'combo' ? undefined : product.id,
+          comboId: product.type === 'combo' ? product.id : undefined,
           quantity,
           notes,
-          selectedOptions: options,
-          sourceUpsellId,
-          snapshot,
-        };
-
-        const newItems = [...get().items, newItem];
-        set({ 
-          items: newItems,
-          subtotal: newItems.reduce((sum, item) => sum + item.snapshot.lineSubtotal, 0)
-        });
-      },
-
-      addCombo: (combo, quantity, selectedItems, bundleItems, notes) => {
-        if (!combo.isAvailable) return;
-        const extrasPrice = selectedItems.reduce((sum, item) => sum + item.price, 0);
-        const lineSubtotal = (combo.basePrice + extrasPrice) * quantity;
-        
-        const extrasDescription =
-          bundleItems.length > 0
-            ? bundleItems.map(i => `${i.productName} x${i.qty}`).join(', ')
-            : selectedItems.map(i => i.productName).join(', ');
-
-        const snapshot: CartSnapshot = {
-          productName: combo.name,
-          productImage: combo.image,
-          basePrice: combo.basePrice,
-          lineSubtotal,
-          extrasDescription,
-        };
-
-        const newItem: CartLineItem = {
-          cartLineId: crypto.randomUUID(),
-          comboId: combo.id,
-          quantity,
-          notes,
-          selectedComboItems: selectedItems,
+          selectedOptions,
+          selections,
+          slots,
           bundleItems,
+          sourceUpsellId,
           snapshot,
         };
 
@@ -125,9 +116,17 @@ export const useCartStore = create<CartState>()(
 
         const newItems = get().items.map(item => {
           if (item.cartLineId === cartLineId) {
-            const unitPrice = item.snapshot.basePrice + 
-              (item.selectedOptions?.reduce((s, o) => s + o.price, 0) || 0) +
+            const legacyExtras = (item.selectedOptions?.reduce((s, o) => s + o.price, 0) || 0) +
               (item.selectedComboItems?.reduce((s, i) => s + i.price, 0) || 0);
+            
+            const v2Extras = (item.selections?.reduce((s, g) => s + g.items.reduce((ss, i) => {
+              if (i.priceImpactType === 'fixed') return ss + (i.priceImpactValue * (i.qty || 1));
+              if (i.priceImpactType === 'percentage') return ss + (item.snapshot.basePrice * (i.priceImpactValue / 100) * (i.qty || 1));
+              return ss;
+            }, 0), 0) || 0) + 
+            (item.slots?.reduce((s, slot) => s + slot.items.reduce((ss, i) => ss + (i.additionalPrice * (i.qty || 1)), 0), 0) || 0);
+
+            const unitPrice = item.snapshot.basePrice + legacyExtras + v2Extras;
 
             const lineSubtotal = unitPrice * quantity;
             return {

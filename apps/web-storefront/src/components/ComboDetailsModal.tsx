@@ -1,7 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { X, Minus, Plus, AlertCircle, Box, Check } from 'lucide-react';
-import type { StorefrontComboPayload, CartSelectedComboItem, CartBundleItemSnapshot } from '@gestor/types';
-import { CartValidator } from '@gestor/core';
+import type { 
+  StorefrontComboPayload, 
+  CartSelectedComboSlot,
+  StorefrontComboBlockItemPayload,
+  StorefrontProductPayload
+} from '@gestor/types';
 import { useCartStore } from '../store/use-cart-store';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -17,58 +21,124 @@ interface ComboDetailsModalProps {
 }
 
 export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetailsModalProps) {
-  const addCombo = useCartStore(s => s.addCombo);
+  const addItem = useCartStore(s => s.addItem);
   const isBundle = (combo.comboMode ?? 'bundle') === 'bundle';
   const [quantity, setQuantity] = useState(1);
-  const [selectedItems, setSelectedItems] = useState<CartSelectedComboItem[]>([]);
-  const [bundleItems] = useState<CartBundleItemSnapshot[]>(combo.bundleItems ?? []);
   const [notes, setNotes] = useState('');
+
+  // V2 State
+  const [slots, setSlots] = useState<CartSelectedComboSlot[]>([]);
+
+  useEffect(() => {
+    if (!isBundle && combo.blocks) {
+      setSlots(combo.blocks.map(b => ({
+        comboSlotId: b.id,
+        name: b.name,
+        items: []
+      })));
+    }
+  }, [combo, isBundle]);
 
   const isComboAvailable = combo.isAvailable && !isStoreClosed;
 
   // Calculate current subtotal for the modal view
-  const currentPrice = useMemo(() => {
-    const extras = selectedItems.reduce((sum, item) => sum + item.price, 0);
-    return (combo.basePrice + extras) * quantity;
-  }, [combo.basePrice, selectedItems, quantity]);
+  const computed = useMemo(() => {
+    let extras = 0;
+    const parts: string[] = [];
+
+    if (isBundle) {
+      (combo.bundleItems ?? []).forEach(i => parts.push(`${i.productName} x${i.qty}`));
+    } else {
+      slots.forEach(slot => {
+        slot.items.forEach(item => {
+          extras += item.additionalPrice * (item.qty || 1);
+          parts.push(item.qty && item.qty > 1 ? `${item.name} x${item.qty}` : item.name);
+        });
+      });
+    }
+
+    return {
+      unitPrice: combo.basePrice + extras,
+      totalPrice: (combo.basePrice + extras) * quantity,
+      compositionLabel: parts.join(', ')
+    };
+  }, [combo, isBundle, slots, quantity]);
 
   // Validation Logic
   const validationError = useMemo(() => {
     if (isBundle) return null;
-    try {
-      CartValidator.validateComboItems(combo, selectedItems);
-      return null;
-    } catch (e: any) {
-      return e.message;
+
+    for (const block of combo.blocks || []) {
+      const state = slots.find(s => s.comboSlotId === block.id);
+      const count = state?.items.length || 0;
+      if (count < block.minSelect) return `Selecione pelo menos ${block.minSelect} em "${block.name}"`;
+      if (count > block.maxSelect) return `Selecione no máximo ${block.maxSelect} em "${block.name}"`;
     }
-  }, [combo, selectedItems]);
 
-  const toggleItem = (blockId: string, blockItemId: string, productId: string, productName: string, price: number, maxSelect: number) => {
-    setSelectedItems(prev => {
-      const alreadySelected = prev.find(i => i.blockItemId === blockItemId);
-      if (alreadySelected) {
-        return prev.filter(i => i.blockItemId !== blockItemId);
+    return null;
+  }, [combo, slots, isBundle]);
+
+  const toggleSlotItem = (blockId: string, item: StorefrontComboBlockItemPayload, maxSelect: number) => {
+    setSlots(prev => {
+      const slot = prev.find(s => s.comboSlotId === blockId);
+      if (!slot) return prev;
+
+      const isSelected = slot.items.some(i => i.productId === item.productId);
+      let newItems = [...slot.items];
+
+      if (isSelected) {
+        newItems = newItems.filter(i => i.productId !== item.productId);
+      } else {
+        if (maxSelect === 1) {
+          newItems = [{ 
+            productId: item.productId, 
+            name: item.productName, 
+            additionalPrice: item.additionalPrice,
+            qty: 1 
+          }];
+        } else if (newItems.length < maxSelect) {
+          newItems.push({ 
+            productId: item.productId, 
+            name: item.productName, 
+            additionalPrice: item.additionalPrice,
+            qty: 1 
+          });
+        }
       }
 
-      const blockSelections = prev.filter(i => i.blockId === blockId);
-      const newItem: CartSelectedComboItem = { blockId, blockItemId, productId, productName, price };
-
-      if (maxSelect === 1) {
-        return [...prev.filter(i => i.blockId !== blockId), newItem];
-      }
-
-      if (blockSelections.length >= maxSelect) {
-        return prev;
-      }
-
-      return [...prev, newItem];
+      return prev.map(s => s.comboSlotId === blockId ? { ...s, items: newItems } : s);
     });
   };
 
   const handleAddToCart = () => {
     if (validationError) return;
     if (!isComboAvailable) return;
-    addCombo(combo, quantity, selectedItems, bundleItems, notes);
+
+    // Map StorefrontComboPayload to StorefrontProductPayload for addItem
+    const comboAsProduct: StorefrontProductPayload = {
+      id: combo.id,
+      name: combo.name,
+      slug: combo.slug,
+      type: 'combo',
+      shortDescription: combo.description,
+      basePrice: combo.basePrice,
+      image: combo.image,
+      isAvailable: combo.isAvailable,
+      complements: [],
+      optionGroupLinks: [],
+      upsells: [],
+    };
+
+    addItem({
+      product: comboAsProduct,
+      quantity,
+      notes: notes.trim() || undefined,
+      slots: !isBundle ? slots : undefined,
+      bundleItems: isBundle ? combo.bundleItems : undefined,
+      computedUnitPrice: computed.unitPrice,
+      compositionLabel: computed.compositionLabel
+    });
+    
     onClose();
   };
 
@@ -124,73 +194,73 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
                     </div>
                   ))}
                 </div>
-                <div className="mt-3 p-3 rounded-xl bg-white border border-orange-100 text-xs text-gray-600">
-                  <div className="flex justify-between"><span>Subtotal dos itens</span><span className="font-bold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(combo.itemsSubtotal ?? 0)}</span></div>
-                  <div className="flex justify-between"><span>Desconto do combo</span><span className="font-bold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(combo.discountTotal ?? 0)}</span></div>
-                  <div className="flex justify-between text-sm text-gray-900 mt-1"><span className="font-bold">Preço final</span><span className="font-black">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(combo.basePrice)}</span></div>
-                </div>
               </div>
-            ) : (combo.blocks ?? []).map((block) => (
-              <div key={block.id} className="bg-orange-50/30 rounded-2xl p-4 border border-orange-100/50">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="font-bold text-gray-900 text-sm uppercase tracking-wider">{block.name}</h3>
-                    <p className="text-[10px] text-orange-600 font-medium mt-0.5">
-                      {block.minSelect === block.maxSelect 
-                         ? `Escolha exatamente ${block.minSelect}` 
-                         : `Escolha de ${block.minSelect} a ${block.maxSelect}`}
-                    </p>
-                  </div>
-                  {block.minSelect > 0 && !selectedItems.some(i => i.blockId === block.id) && (
-                    <span className="bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Obrigatório</span>
-                  )}
-                </div>
+            ) : (combo.blocks ?? []).map((block) => {
+              const state = slots.find(s => s.comboSlotId === block.id);
+              const selectedCount = state?.items.length || 0;
 
-                <div className="space-y-2">
-                  {block.items.map((item) => {
-                    const isSelected = selectedItems.some(i => i.blockItemId === item.id);
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => toggleItem(block.id, item.id, item.productId, item.productName, item.additionalPrice, block.maxSelect)}
-                        className={cn(
-                          "w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left",
-                          isSelected 
-                            ? "bg-white border-orange-200 ring-2 ring-orange-200/50" 
-                            : "bg-white/50 border-gray-100 hover:border-orange-100"
-                        )}
-                      >
-                        <div className="flex-1">
-                          <span className={cn("text-sm font-bold", isSelected ? "text-orange-900" : "text-gray-700")}>
-                            {item.productName}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {item.additionalPrice > 0 && (
-                            <span className="text-xs font-black text-orange-600">
-                              + {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.additionalPrice)}
-                            </span>
+              return (
+                <div key={block.id} className="bg-orange-50/30 rounded-2xl p-4 border border-orange-100/50">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="font-bold text-gray-900 text-sm uppercase tracking-wider">{block.name}</h3>
+                      <p className="text-[10px] text-orange-600 font-medium mt-0.5">
+                        {block.minSelect === block.maxSelect 
+                          ? `Escolha exatamente ${block.minSelect}` 
+                          : `Escolha de ${block.minSelect} a ${block.maxSelect}`}
+                      </p>
+                    </div>
+                    {block.minSelect > 0 && selectedCount < block.minSelect && (
+                      <span className="bg-orange-100 text-orange-700 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Obrigatório</span>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    {block.items.map((item) => {
+                      const isSelected = state?.items.some(i => i.productId === item.productId);
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => toggleSlotItem(block.id, item, block.maxSelect)}
+                          className={cn(
+                            "w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left",
+                            isSelected 
+                              ? "bg-white border-orange-200 ring-2 ring-orange-200/50" 
+                              : "bg-white/50 border-gray-100 hover:border-orange-100"
                           )}
-                          <div className={cn(
-                            "w-5 h-5 rounded-full border flex items-center justify-center transition-colors",
-                            isSelected ? "bg-orange-600 border-orange-600 text-white" : "bg-white border-gray-200"
-                          )}>
-                            {isSelected && <Check className="w-3 h-3 stroke-[4]" />}
+                        >
+                          <div className="flex-1">
+                            <span className={cn("text-sm font-bold", isSelected ? "text-orange-900" : "text-gray-700")}>
+                              {item.productName}
+                            </span>
                           </div>
-                        </div>
-                      </button>
-                    );
-                  })}
+                          <div className="flex items-center gap-3">
+                            {item.additionalPrice > 0 && (
+                              <span className="text-xs font-black text-orange-600">
+                                + R$ {item.additionalPrice.toFixed(2)}
+                              </span>
+                            )}
+                            <div className={cn(
+                              "w-5 h-5 rounded-full border flex items-center justify-center transition-colors",
+                              isSelected ? "bg-orange-600 border-orange-600 text-white" : "bg-white border-gray-200"
+                            )}>
+                              {isSelected && <Check className="w-3 h-3 stroke-[4]" />}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="mt-8">
             <h3 className="font-bold text-gray-900 text-sm uppercase mb-3">Observações do Combo</h3>
             <textarea
-              className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all placeholder:text-gray-300 min-h-[80px]"
-              placeholder="Ex: Mandar talheres, sem catchup..."
+              className="w-full bg-gray-50 border border-gray-100 rounded-2xl p-4 text-sm focus:ring-2 focus:ring-orange-500 outline-none min-h-[80px]"
+              placeholder="Ex: sem catchup..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
@@ -207,17 +277,11 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
 
           <div className="flex items-center gap-4">
             <div className="flex items-center bg-gray-100 rounded-2xl p-1 h-12">
-              <button 
-                onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors"
-              >
+              <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700">
                 <Minus className="w-5 h-5" />
               </button>
               <span className="w-8 text-center font-bold text-gray-900">{quantity}</span>
-              <button 
-                onClick={() => setQuantity(q => q + 1)}
-                className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors"
-                >
+              <button onClick={() => setQuantity(q => q + 1)} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700">
                 <Plus className="w-5 h-5" />
               </button>
             </div>
@@ -227,15 +291,11 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
               disabled={!!validationError || !isComboAvailable}
               className={cn(
                 "flex-1 h-12 rounded-2xl flex items-center justify-between px-6 font-bold transition-all active:scale-[0.98]",
-                (validationError || !isComboAvailable)
-                  ? "bg-gray-200 text-gray-400 cursor-not-allowed" 
-                  : "bg-orange-600 text-white shadow-lg shadow-orange-100 hover:bg-orange-700"
+                (validationError || !isComboAvailable) ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-orange-600 text-white shadow-lg shadow-orange-100"
               )}
             >
-              <span>{isStoreClosed ? 'Loja Fechada' : !combo.isAvailable ? 'Indisponível' : 'Adicionar Combo'}</span>
-              <span className="text-lg">
-                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(currentPrice)}
-              </span>
+              <span>{isStoreClosed ? 'Loja Fechada' : 'Adicionar Combo'}</span>
+              <span className="text-lg">R$ {computed.totalPrice.toFixed(2)}</span>
             </button>
           </div>
         </div>

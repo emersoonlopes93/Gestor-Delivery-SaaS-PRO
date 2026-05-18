@@ -1,11 +1,10 @@
 import { Inject, Injectable, NotFoundException, Logger, UnprocessableEntityException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import type { DeliveryAddressDTO } from '@gestor/types';
-import type { Prisma } from '@prisma/client';
-import type { DeliveryRateRule } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
-type DeliveryRateRuleRepo = any;
-type DeliveryCoverageRepo = any;
+type DeliveryRateRuleRepo = Prisma.DeliveryRateRuleDelegate;
+type DeliveryCoverageRepo = Prisma.DeliveryCoverageConfigDelegate;
 
 export interface DeliveryFeeCalculation {
   fee: number;
@@ -100,7 +99,7 @@ export class DeliveryRateService {
 
   async calculateDeliveryDecision(input: CalculateDeliveryRateInput): Promise<DeliveryDecision> {
     const [cfg, settings] = await Promise.all([
-      this.deliveryCoverageRepo.findUnique({
+      this.prisma.deliveryCoverageConfig.findUnique({
         where: { tenantId: input.tenantId },
       }),
       this.prisma.tenantSettings.findUnique({
@@ -139,13 +138,15 @@ export class DeliveryRateService {
     }
 
     // Use TenantSettings coordinates as priority if available
-    const storeLat = settings?.lat ?? cfg.storeLat;
-    const storeLng = settings?.lng ?? cfg.storeLng;
+    const storeLat = typeof settings?.lat === 'number' ? settings.lat : Number(cfg.storeLat);
+    const storeLng = typeof settings?.lng === 'number' ? settings.lng : Number(cfg.storeLng);
 
     const distanceKm =
       typeof input.distanceKm === 'number' && Number.isFinite(input.distanceKm)
         ? input.distanceKm
         : this.haversineDistanceKm({ lat: storeLat, lng: storeLng }, { lat, lng });
+
+    this.logger.debug(`Calculating decision for tenant ${input.tenantId}. Store: ${storeLat},${storeLng}. Customer: ${lat},${lng}. Distance: ${distanceKm}km. MaxRadius: ${cfg.maxRadiusKm}km`);
 
     const insideRadius = distanceKm <= Number(cfg.maxRadiusKm);
 

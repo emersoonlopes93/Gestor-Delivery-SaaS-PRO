@@ -116,11 +116,12 @@ export class MetaCloudProvider implements IWhatsAppProvider {
       });
       return {
         success: true,
-        messageId: data?.messages?.[0]?.id,
+        messageId: (data as any)?.messages?.[0]?.id,
       };
-    } catch (error: any) {
-      this.logger.error(`sendText failed: ${error.message}`);
-      return { success: false, error: error.message };
+    } catch (error) {
+      const err = error as any;
+      this.logger.error(`sendText failed: ${err.message}`);
+      return { success: false, error: err.message };
     }
   }
 
@@ -145,11 +146,12 @@ export class MetaCloudProvider implements IWhatsAppProvider {
       });
       return {
         success: true,
-        messageId: data?.messages?.[0]?.id,
+        messageId: (data as any)?.messages?.[0]?.id,
       };
-    } catch (error: any) {
-      this.logger.error(`sendMedia failed: ${error.message}`);
-      return { success: false, error: error.message };
+    } catch (error) {
+      const err = error as any;
+      this.logger.error(`sendMedia failed: ${err.message}`);
+      return { success: false, error: err.message };
     }
   }
 
@@ -186,11 +188,12 @@ export class MetaCloudProvider implements IWhatsAppProvider {
       });
       return {
         success: true,
-        messageId: data?.messages?.[0]?.id,
+        messageId: (data as any)?.messages?.[0]?.id,
       };
-    } catch (error: any) {
-      this.logger.error(`sendList failed: ${error.message}`);
-      return { success: false, error: error.message };
+    } catch (error) {
+      const err = error as any;
+      this.logger.error(`sendList failed: ${err.message}`);
+      return { success: false, error: err.message };
     }
   }
 
@@ -222,11 +225,12 @@ export class MetaCloudProvider implements IWhatsAppProvider {
       });
       return {
         success: true,
-        messageId: data?.messages?.[0]?.id,
+        messageId: (data as any)?.messages?.[0]?.id,
       };
-    } catch (error: any) {
-      this.logger.error(`sendButtons failed: ${error.message}`);
-      return { success: false, error: error.message };
+    } catch (error) {
+      const err = error as any;
+      this.logger.error(`sendButtons failed: ${err.message}`);
+      return { success: false, error: err.message };
     }
   }
 
@@ -246,13 +250,14 @@ export class MetaCloudProvider implements IWhatsAppProvider {
           status: 'read',
           message_id: msgId,
         });
-      } catch (error: any) {
-        this.logger.warn(`markAsRead failed for ${msgId}: ${error.message}`);
+      } catch (error) {
+        const err = error as any;
+        this.logger.warn(`markAsRead failed for ${msgId}: ${err.message}`);
       }
     }
   }
 
-  parseWebhook(payload: any, tenantId: string): any {
+  parseWebhook(payload: Record<string, any>, tenantId: string): any {
     // Meta Cloud API Webhook structure: { object: 'whatsapp_business_account', entry: [ { changes: [ { value: { ... } } ] } ] }
     if (payload?.object !== 'whatsapp_business_account') return null;
 

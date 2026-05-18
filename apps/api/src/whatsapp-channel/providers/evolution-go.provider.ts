@@ -211,9 +211,10 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       // O Evolution Go não expõe o número facilmente, então vamos deixar sem telefone
 
       return parsed;
-    } catch (error: any) {
-      this.logger.error(`getConnectionStatus failed: ${error.message}`);
-      console.error(`[Evolution Go] Status error:`, error.response?.data || error.message);
+    } catch (error) {
+      const err = error as any;
+      this.logger.error(`getConnectionStatus failed: ${err.message}`);
+      console.error(`[Evolution Go] Status error:`, err.response?.data || err.message);
       return {
         connected: false,
         state: 'disconnected',
@@ -231,13 +232,14 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       console.log(`[Evolution Go] Getting QR code for instance ${instanceId}`);
       const { data } = await client.get('/instance/qr');
       console.log(`[Evolution Go] QR response:`, data);
-      const responseData = data?.data || data;
+      const responseData = (data as any)?.data || data;
       const qrCode = responseData?.qrCode || responseData?.qr || responseData?.base64 || responseData?.Qrcode || null;
       console.log(`[Evolution Go] Extracted QR code:`, qrCode ? '***FOUND***' : 'NOT FOUND');
       return qrCode;
-    } catch (error: any) {
-      this.logger.warn(`getQrCode failed: ${error.message}`);
-      console.error(`[Evolution Go] QR error:`, error.response?.data || error.message);
+    } catch (error) {
+      const err = error as any;
+      this.logger.warn(`getQrCode failed: ${err.message}`);
+      console.error(`[Evolution Go] QR error:`, err.response?.data || err.message);
       return null;
     }
   }
@@ -261,14 +263,15 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       }
 
       const { data } = await client.post('/send/text', body);
-      const responseData = data?.data || data;
+      const responseData = (data as any)?.data || data;
       return {
         success: true,
         messageId: responseData?.messageId || responseData?.key?.id || responseData?.id,
       };
-    } catch (error: any) {
-      this.logger.error(`sendText failed: ${error.message}`);
-      return { success: false, error: error.message };
+    } catch (error) {
+      const err = error as any;
+      this.logger.error(`sendText failed: ${err.message}`);
+      return { success: false, error: err.message };
     }
   }
 
@@ -290,14 +293,15 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       if (input.delay) body.delay = input.delay;
 
       const { data } = await client.post('/send/media', body);
-      const responseData = data?.data || data;
+      const responseData = (data as any)?.data || data;
       return {
         success: true,
         messageId: responseData?.messageId || responseData?.key?.id || responseData?.id,
       };
-    } catch (error: any) {
-      this.logger.error(`sendMedia failed: ${error.message}`);
-      return { success: false, error: error.message };
+    } catch (error) {
+      const err = error as any;
+      this.logger.error(`sendMedia failed: ${err.message}`);
+      return { success: false, error: err.message };
     }
   }
 
@@ -320,14 +324,15 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       };
 
       const { data } = await client.post('/send/list', body);
-      const responseData = data?.data || data;
+      const responseData = (data as any)?.data || data;
       return {
         success: true,
         messageId: responseData?.messageId || responseData?.key?.id || responseData?.id,
       };
-    } catch (error: any) {
-      this.logger.error(`sendList failed: ${error.message}`);
-      return { success: false, error: error.message };
+    } catch (error) {
+      const err = error as any;
+      this.logger.error(`sendList failed: ${err.message}`);
+      return { success: false, error: err.message };
     }
   }
 
@@ -353,14 +358,15 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       };
 
       const { data } = await client.post('/send/button', body);
-      const responseData = data?.data || data;
+      const responseData = (data as any)?.data || data;
       return {
         success: true,
         messageId: responseData?.messageId || responseData?.key?.id || responseData?.id,
       };
-    } catch (error: any) {
-      this.logger.error(`sendButtons failed: ${error.message}`);
-      return { success: false, error: error.message };
+    } catch (error) {
+      const err = error as any;
+      this.logger.error(`sendButtons failed: ${err.message}`);
+      return { success: false, error: err.message };
     }
   }
 
@@ -377,19 +383,20 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         number: chatId,
         id: messageIds,
       });
-    } catch (error: any) {
-      this.logger.warn(`markAsRead failed: ${error.message}`);
+    } catch (error) {
+      const err = error as any;
+      this.logger.warn(`markAsRead failed: ${err.message}`);
     }
   }
 
-  parseWebhook(payload: any, tenantId: string): any {
+  parseWebhook(payload: Record<string, any>, tenantId: string): any {
     const eventType = payload?.event || payload?.data?.event || payload?.type || 'unknown';
     
     if (eventType === 'messages.upsert') {
       const data = payload?.data || payload;
-      const remoteJid = data?.key?.remoteJid || data?.remoteJid || data?.from;
+      const remoteJid = (data as any)?.key?.remoteJid || (data as any)?.remoteJid || (data as any)?.from;
       if (!remoteJid || remoteJid.includes('@g.us')) return null;
-      if (data?.key?.fromMe) return null;
+      if ((data as any)?.key?.fromMe) return null;
 
       const content = this.extractMessageContent(data);
       if (!content) return null;
@@ -400,7 +407,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         from: remoteJid.replace(/@.*$/, ''),
         content,
         messageType: this.detectMessageType(data),
-        externalId: data?.key?.id || data?.messageId || data?.id,
+        externalId: (data as any)?.key?.id || (data as any)?.messageId || (data as any)?.id,
         raw: payload
       };
     }
@@ -422,8 +429,8 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       return {
         type: 'ack',
         tenantId,
-        externalId: data?.key?.id || data?.messageId || data?.id,
-        status: data?.update?.status || data?.status,
+        externalId: (data as any)?.key?.id || (data as any)?.messageId || (data as any)?.id,
+        status: (data as any)?.update?.status || (data as any)?.status,
         raw: payload
       };
     }
@@ -435,18 +442,18 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
   private extractMessageContent(data: any): string | null {
     const message = data?.message || data;
     if (typeof message === 'string') return message;
-    if (message?.conversation) return message.conversation;
-    if (message?.extendedTextMessage?.text) return message.extendedTextMessage.text;
-    if (message?.imageMessage?.caption) return message.imageMessage.caption;
-    if (message?.videoMessage?.caption) return message.videoMessage.caption;
-    if (message?.buttonsResponseMessage?.selectedDisplayText) return message.buttonsResponseMessage.selectedDisplayText;
-    if (message?.listResponseMessage?.title) return message.listResponseMessage.title;
+    if ((message as any)?.conversation) return (message as any).conversation;
+    if ((message as any)?.extendedTextMessage?.text) return (message as any).extendedTextMessage.text;
+    if ((message as any)?.imageMessage?.caption) return (message as any).imageMessage.caption;
+    if ((message as any)?.videoMessage?.caption) return (message as any).videoMessage.caption;
+    if ((message as any)?.buttonsResponseMessage?.selectedDisplayText) return (message as any).buttonsResponseMessage.selectedDisplayText;
+    if ((message as any)?.listResponseMessage?.title) return (message as any).listResponseMessage.title;
     return null;
   }
 
   private detectMessageType(data: any): string {
     const message = data?.message || data;
-    if (message?.imageMessage) return 'image';
+    if ((message as any)?.imageMessage) return 'image';
     if (message?.videoMessage) return 'video';
     if (message?.audioMessage) return 'audio';
     if (message?.documentMessage) return 'document';

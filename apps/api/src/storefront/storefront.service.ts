@@ -69,10 +69,32 @@ export class StorefrontService {
                 },
               },
             },
+            optionGroupLinks: {
+              include: {
+                optionGroup: {
+                  include: {
+                    items: {
+                      where: { isActive: true },
+                      orderBy: { order: 'asc' },
+                    },
+                  },
+                },
+              },
+            },
             upsellLinks: {
               include: {
                 upsell: {
                   include: { items: { include: { product: true }, orderBy: { sortOrder: 'asc' } } },
+                },
+              },
+            },
+            comboBundleItems: {
+              include: { product: true },
+            },
+            comboSlots: {
+              include: {
+                allowedItems: {
+                  include: { product: true },
                 },
               },
             },
@@ -88,6 +110,9 @@ export class StorefrontService {
             complementGroups: {
               include: { group: { include: { items: true } } };
             };
+            optionGroupLinks: {
+              include: { optionGroup: { include: { items: true } } };
+            };
             upsellLinks: {
               include: {
                 upsell: {
@@ -95,6 +120,8 @@ export class StorefrontService {
                 };
               };
             };
+            comboBundleItems: { include: { product: true } };
+            comboSlots: { include: { allowedItems: { include: { product: true } } } };
           };
         };
       };
@@ -133,8 +160,8 @@ export class StorefrontService {
       };
     }>;
 
-    const categoryRows = categoriesDb as CategoryWithProducts[];
-    const comboRows = combosDb as ComboWithData[];
+    const categoryRows = categoriesDb as unknown as CategoryWithProducts[];
+    const comboRows = combosDb as unknown as ComboWithData[];
     const idsToCheck = new Set<string>();
 
     for (const cat of categoryRows) {
@@ -159,130 +186,184 @@ export class StorefrontService {
         id: cat.id,
         name: cat.name,
         slug: cat.slug,
+        templateType: cat.templateType,
         products: cat.products
-          .map((p: any) => {
+          .map((p) => {
             const canSell = availabilityMap.get(p.id) ?? true;
             const isAvailable = Boolean(p.isAvailable) && canSell;
             return {
               id: p.id,
               name: p.name,
               slug: p.slug,
+              type: p.type as 'simple' | 'configurable' | 'combo',
+              comboMode: p.comboMode ?? undefined,
+              bundleItems: p.comboBundleItems?.map((bi) => ({
+                id: bi.id,
+                productId: bi.productId,
+                productName: bi.product.name,
+                qty: bi.qty,
+                unitPrice: Number(bi.product.basePrice),
+              })),
+              blocks: p.comboSlots?.map((cb) => ({
+                id: cb.id,
+                name: cb.name,
+                minSelect: cb.minSelect,
+                maxSelect: cb.maxSelect,
+                items: cb.allowedItems.map((cbi) => ({
+                  id: cbi.id,
+                  productId: cbi.productId,
+                  productName: cbi.product.name,
+                  additionalPrice: Number(cbi.additionalPrice),
+                })),
+              })),
               shortDescription: p.shortDescription,
               longDescription: p.longDescription,
               basePrice: Number(p.basePrice),
               image: p.image,
               isAvailable,
-              complements: p.complementGroups.map((link: any) => ({
-                id: link.group.id,
-                name: link.group.name,
-                description: link.group.description,
-                minSelect: link.group.minSelect,
-                maxSelect: link.group.maxSelect,
-                isRequired: link.group.isRequired,
-                items: link.group.items.map((item: any) => ({
-                  id: item.id,
-                  name: item.name,
-                  description: item.description,
-                  additionalPrice: Number(item.additionalPrice),
-                  isAvailable: item.isActive,
+              complements: (p.complementGroups || []).map((cg) => ({
+                id: cg.group.id,
+                name: cg.group.name,
+                description: cg.group.description,
+                minSelect: cg.group.minSelect,
+                maxSelect: cg.group.maxSelect,
+                isRequired: cg.group.isRequired,
+                items: cg.group.items.map((ci) => ({
+                  id: ci.id,
+                  name: ci.name,
+                  description: ci.description,
+                  additionalPrice: Number(ci.additionalPrice),
+                  isAvailable: ci.isActive,
                 })),
               })),
-              upsells: p.upsellLinks
-                .filter((link: any) => link.upsell.displayType !== 'cart')
-                .map((link: any) => ({
-                  id: link.upsell.id,
-                  name: link.upsell.name,
-                  description: link.upsell.description,
-                  displayType: link.upsell.displayType as any,
-                  items: link.upsell.items
-                    .filter((i: any) => i.product.isActive && i.product.deletedAt === null)
-                    .map((i: any) => {
-                      const originalPrice = Number(i.product.basePrice);
-                      const finalPrice = this.upsellsService.calculateUpsellPrice(
-                        originalPrice,
-                        link.upsell.pricingType,
-                        Number(link.upsell.pricingValue),
-                      );
-                      return {
-                        productId: i.productId,
-                        name: i.product.name,
-                        image: i.product.image,
-                        originalPrice,
-                        finalPrice,
-                        discountApplied: originalPrice - finalPrice,
-                      };
-                    }),
-                })),
+              optionGroupLinks: (p.optionGroupLinks || []).map((ol) => ({
+                id: ol.id,
+                pricingAxis: ol.pricingAxis,
+                overrideName: ol.overrideName,
+                overrideDescription: ol.overrideDescription,
+                overrideIsRequired: ol.overrideIsRequired,
+                overrideMinSelect: ol.overrideMinSelect,
+                overrideMaxSelect: ol.overrideMaxSelect,
+                optionGroup: {
+                  id: ol.optionGroup.id,
+                  name: ol.optionGroup.name,
+                  description: ol.optionGroup.description,
+                  selectionType: ol.optionGroup.selectionType as any, // Cast because of Prisma enum vs shared type
+                  isRequired: ol.optionGroup.isRequired,
+                  minSelect: ol.optionGroup.minSelect,
+                  maxSelect: ol.optionGroup.maxSelect,
+                  isActive: ol.optionGroup.isActive,
+                  items: ol.optionGroup.items.map((oi) => ({
+                    id: oi.id,
+                    name: oi.name,
+                    description: oi.description,
+                    isActive: oi.isActive,
+                    allowQuantity: oi.allowQuantity,
+                    priceImpactType: oi.priceImpactType as any,
+                    priceImpactValue: Number(oi.priceImpactValue),
+                  })),
+                },
+              })),
+              upsells: (p.upsellLinks || []).map((l) => ({
+                id: l.upsell.id,
+                name: l.upsell.name,
+                description: l.upsell.description,
+                displayType: l.upsell.displayType as any,
+                items: l.upsell.items
+                  .filter((i) => i.product.isActive && i.product.deletedAt === null)
+                  .map((i) => {
+                    const originalPrice = Number(i.product.basePrice);
+                    const finalPrice = this.upsellsService.calculateUpsellPrice(
+                      originalPrice,
+                      l.upsell.pricingType,
+                      Number(l.upsell.pricingValue),
+                    );
+                    return {
+                      productId: i.productId,
+                      name: i.product.name,
+                      image: i.product.image,
+                      originalPrice,
+                      finalPrice,
+                      discountApplied: originalPrice - finalPrice,
+                    };
+                  }),
+              })),
             };
           })
-          .filter((p: any) => p.isAvailable) as StorefrontProductPayload[],
+          .filter((p) => p.isAvailable) as StorefrontProductPayload[],
       }))
-      .filter((cat: any) => cat.products.length > 0);
+      .filter((cat) => cat.products.length > 0);
 
     const combos: StorefrontComboPayload[] = comboRows
       .map((combo) => {
         const canSell = availabilityMap.get(combo.id) ?? true;
         const isAvailable = Boolean(combo.isAvailable) && canSell;
+
+        const basePrice = Number(combo.basePrice);
+        const pricingValue = Number(combo.comboPricingValue || 0);
+
+        let itemsSubtotal = 0;
+        if (combo.comboMode === 'bundle') {
+          itemsSubtotal = combo.comboBundleItems
+            .reduce((sum, item) => sum + (item.product ? Number(item.product.basePrice) * Math.max(1, item.qty) : 0), 0);
+        }
+
+        let discountTotal = 0;
+        if (combo.comboMode === 'bundle' && combo.comboPricingType) {
+          if (combo.comboPricingType === 'fixed_price') {
+            discountTotal = Math.max(0, itemsSubtotal - pricingValue);
+          } else if (combo.comboPricingType === 'discount_percent') {
+            discountTotal = itemsSubtotal * (pricingValue / 100);
+          } else if (combo.comboPricingType === 'discount_amount') {
+            discountTotal = pricingValue;
+          }
+        }
+
         return {
           id: combo.id,
           name: combo.name,
           slug: combo.slug,
           description: combo.shortDescription,
-          basePrice: Number(combo.basePrice),
+          basePrice,
           image: combo.image,
           isAvailable,
-          comboMode: combo.comboMode ?? 'bundle',
-          pricingType: combo.comboPricingType ?? 'fixed_price',
-          pricingValue: Number(combo.comboPricingValue ?? 0),
-          itemsSubtotal: combo.comboMode === 'bundle'
-            ? Number(
-                combo.comboBundleItems
-                  .reduce((sum: number, item: any) => sum + (item.product ? Number(item.product.basePrice) * Math.max(1, item.qty) : 0), 0)
-                  .toFixed(2),
-              )
-            : undefined,
-          discountTotal: combo.comboMode === 'bundle'
-            ? Number(
-                (
-                  combo.comboBundleItems.reduce((sum: number, item: any) => sum + (item.product ? Number(item.product.basePrice) * Math.max(1, item.qty) : 0), 0) -
-                  Number(combo.basePrice)
-                ).toFixed(2),
-              )
-            : undefined,
-          bundleItems:
-            (combo.comboMode ?? 'bundle') === 'bundle'
-              ? combo.comboBundleItems
-                  .filter((item: any) => item.product && item.product.isActive && item.product.deletedAt === null)
-                  .map((item: any) => ({
+          comboMode: combo.comboMode === 'bundle' ? 'bundle' : 'slot',
+          pricingType: combo.comboPricingType as any,
+          pricingValue,
+          itemsSubtotal,
+          discountTotal,
+          bundleItems: combo.comboMode === 'bundle'
+            ? combo.comboBundleItems
+              .filter((item) => item.product && item.product.isActive && item.product.deletedAt === null)
+              .map((item) => ({
+                id: item.id,
+                productId: item.productId,
+                productName: item.product.name,
+                qty: item.qty,
+                unitPrice: Number(item.product.basePrice),
+                subtotal: Number(item.product.basePrice) * item.qty,
+              }))
+            : [],
+          blocks: combo.comboMode === 'slot'
+            ? combo.comboSlots.map((b) => ({
+                id: b.id,
+                name: b.name,
+                description: b.description,
+                minSelect: b.minSelect,
+                maxSelect: b.maxSelect,
+                items: b.allowedItems
+                  .filter((item) => item.product.isActive && item.product.deletedAt === null)
+                  .map((item) => ({
                     id: item.id,
                     productId: item.productId,
-                    productName: item.product!.name,
-                    qty: Math.max(1, item.qty),
-                    unitPrice: Number(item.product!.basePrice),
-                    subtotal: Number((Number(item.product!.basePrice) * Math.max(1, item.qty)).toFixed(2)),
-                  }))
-              : undefined,
-          blocks:
-            (combo.comboMode ?? 'bundle') === 'slot'
-              ? combo.comboSlots.map((b: any) => ({
-                  id: b.id,
-                  name: b.name,
-                  description: b.description,
-                  minSelect: b.minSelect,
-                  maxSelect: b.maxSelect,
-                  items: b.allowedItems
-                    .filter((item: any) => item.product.isActive && item.product.deletedAt === null)
-                    .map((item: any) => ({
-                      id: item.id,
-                      productId: item.productId,
-                      productName: item.product.name,
-                      additionalPrice: Number(item.additionalPrice),
-                    })),
-                }))
-              : undefined,
+                    productName: item.product.name,
+                    additionalPrice: Number(item.additionalPrice),
+                  })),
+              }))
+            : [],
         };
       })
-      .filter((combo) => combo.isAvailable);
+      .filter((c) => c.isAvailable);
 
     const storeStatus = await this.availabilityService.getStoreStatus(tenant.id);
 
@@ -307,6 +388,7 @@ export class StorefrontService {
       } : undefined,
     };
 
+    // 4. Global Upsells
     const globalUpsellRows = await this.prisma.upsell.findMany({
       where: {
         tenantId: tenant.id,
@@ -321,14 +403,14 @@ export class StorefrontService {
       },
     });
 
-    const globalUpsells = globalUpsellRows.map((u: any) => ({
+    const globalUpsells = globalUpsellRows.map((u) => ({
       id: u.id,
       name: u.name,
       description: u.description,
       displayType: u.displayType as any,
       items: u.items
-        .filter((i: any) => i.product.isActive && i.product.deletedAt === null)
-        .map((i: any) => {
+        .filter((i) => i.product.isActive && i.product.deletedAt === null)
+        .map((i) => {
           const originalPrice = Number(i.product.basePrice);
           const finalPrice = this.upsellsService.calculateUpsellPrice(
             originalPrice,

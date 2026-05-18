@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { Prisma, TenantSettings, TenantOperatingHours } from '@prisma/client';
 
 export type SalesChannel = 'storefront_delivery' | 'storefront_pickup' | 'pos';
 
@@ -16,7 +17,7 @@ export class AvailabilityService {
   async getStoreStatus(
     tenantId: string, 
     now?: Date,
-    context?: { settings?: any; operatingHours?: any[] }
+    context?: { settings?: Partial<TenantSettings> | null; operatingHours?: TenantOperatingHours[] }
   ): Promise<{ isOpen: boolean; message: string; reason: string; nextOpenAt?: string | null }> {
     const d = now ?? new Date();
 
@@ -59,8 +60,8 @@ export class AvailabilityService {
         } catch {
           hasPayments = false;
         }
-      } else if (typeof methods === 'object') {
-        hasPayments = Object.keys(methods as any).length > 0;
+      } else if (typeof methods === 'object' && methods !== null) {
+        hasPayments = Object.keys(methods).length > 0;
       }
     }
 
@@ -147,7 +148,7 @@ export class AvailabilityService {
     productId: string;
     channel: SalesChannel;
     now?: Date;
-    context?: { settings?: any; operatingHours?: any[] };
+    context?: { settings?: Partial<TenantSettings> | null; operatingHours?: TenantOperatingHours[] };
   }): Promise<AvailabilityDecision> {
     const now = input.now ?? new Date();
 
@@ -234,7 +235,7 @@ export class AvailabilityService {
     productIds: string[];
     channel: SalesChannel;
     now?: Date;
-    context?: { settings?: any; operatingHours?: any[] };
+    context?: { settings?: Partial<TenantSettings> | null; operatingHours?: TenantOperatingHours[] };
   }): Promise<Map<string, AvailabilityDecision>> {
     const now = input.now ?? new Date();
     const storeStatus = await this.getStoreStatus(input.tenantId, now, input.context);
@@ -296,7 +297,7 @@ export class AvailabilityService {
         continue;
       }
 
-      const matchesAny = pub.rules.some((r: any) => {
+      const matchesAny = pub.rules.some((r) => {
         const days = (r.daysOfWeek || []) as number[];
         if (!days.includes(dayOfWeek)) return false;
         return this.isTimeInRange(timeHHmm, r.startTime, r.endTime);
@@ -317,11 +318,11 @@ export class AvailabilityService {
     productId: string;
     channel: SalesChannel;
     now?: Date;
-    context?: { settings?: any; operatingHours?: any[] };
+    context?: { settings?: Partial<TenantSettings> | null; operatingHours?: TenantOperatingHours[] };
   }): Promise<void> {
     const decision = await this.decide(input);
     if (!decision.canSell) {
-      throw new BadRequestException(decision.reason || 'Produto indisponível.');
+      throw new BadRequestException(decision.reason || 'Este produto não está disponível para venda no momento.');
     }
   }
 

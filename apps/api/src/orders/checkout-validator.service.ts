@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { Prisma } from '@prisma/client';
 import type {
   CreateOrderItemDTO,
   CreateOrderItemComplementDTO,
@@ -280,7 +281,7 @@ export class CheckoutValidatorService {
     const hasNewSelections = Array.isArray(item.selections) && item.selections.length > 0;
 
     // Fetch product with legacy complement groups and/or new option groups
-    const product = await (this.prisma as unknown as Record<string, { findFirst: (...args: unknown[]) => Promise<Record<string, unknown> | null> }>)['product'].findFirst({
+    const product = await this.prisma.product.findFirst({
       where: { id: item.productId, tenantId, deletedAt: null },
       include: {
         complementGroups: {
@@ -306,11 +307,21 @@ export class CheckoutValidatorService {
           select: { id: true, templateType: true, templateConfig: true }
         }
       },
-    }) as Record<string, any> | null;
+    });
 
     if (!product) {
       throw new BadRequestException(`Produto não encontrado ou não pertence a esta loja.`);
     }
+
+    type ProductWithData = Prisma.ProductGetPayload<{
+      include: {
+        complementGroups: { include: { group: { include: { items: true } } } };
+        optionGroupLinks: { include: { optionGroup: { include: { items: true } } } };
+        category: { select: { id: true, templateType: true, templateConfig: true } };
+      };
+    }>;
+
+    const typedProduct = product as unknown as ProductWithData;
 
     const shouldCheckAvailabilityByChannel = channel !== 'pos';
 
@@ -322,28 +333,28 @@ export class CheckoutValidatorService {
         context,
       });
     }
-    if (!(product['isActive'] as boolean)) {
-      throw new BadRequestException(`O produto "${product['name']}" não está ativo.`);
+    if (!typedProduct.isActive) {
+      throw new BadRequestException(`O produto "${typedProduct.name}" não está ativo.`);
     }
-    if (!(product['isAvailable'] as boolean)) {
-      throw new BadRequestException(`O produto "${product['name']}" não está disponível no momento.`);
+    if (!typedProduct.isAvailable) {
+      throw new BadRequestException(`O produto "${typedProduct.name}" não está disponível no momento.`);
     }
-    if (checkSellableOnline && !(product['sellableOnline'] as boolean)) {
-      throw new BadRequestException(`O produto "${product['name']}" não está disponível para venda online.`);
+    if (checkSellableOnline && !typedProduct.sellableOnline) {
+      throw new BadRequestException(`O produto "${typedProduct.name}" não está disponível para venda online.`);
     }
 
-    const basePrice = Number(product['basePrice']);
+    const basePrice = Number(typedProduct.basePrice);
 
     let effectiveBasePrice = basePrice;
 
     // Apply Upsell Discount if applicable
     if (item.sourceUpsellId) {
-      const upsell = await (this.prisma as any).upsell.findFirst({
+      const upsell = await this.prisma.upsell.findFirst({
         where: { id: item.sourceUpsellId, tenantId, isActive: true },
         include: { items: true },
       });
       if (upsell) {
-        const upsellItem = (upsell.items as any[]).find((i) => i.productId === item.productId);
+        const upsellItem = upsell.items.find((i) => i.productId === item.productId);
         if (upsellItem) {
           effectiveBasePrice = this.upsellsService.calculateUpsellPrice(
             basePrice,
@@ -363,8 +374,8 @@ export class CheckoutValidatorService {
     if (hasNewSelections) {
       const pricing = this.validateAndPriceOptionSelections(
         item.selections || [],
-        product['optionGroupLinks'] as Array<Record<string, unknown>>,
-        product['name'] as string,
+        typedProduct.optionGroupLinks as any[],
+        typedProduct.name,
         basePrice,
       );
 
@@ -373,7 +384,7 @@ export class CheckoutValidatorService {
       unitPrice = pricing.unitPrice;
       composition = pricing.composition;
 
-      const category = product['category'];
+      const category = typedProduct.category;
       const isPizzaTemplate = category?.templateType === 'pizza';
 
       if (isPizzaTemplate && item.pizzaComposition) {
@@ -399,8 +410,8 @@ export class CheckoutValidatorService {
         capturedAt: new Date().toISOString(),
         product: {
           id: item.productId,
-          name: product['name'],
-          type: product['type'],
+          name: typedProduct.name,
+          type: typedProduct.type,
           templateType: category?.templateType,
         },
         quantity: item.quantity,
@@ -428,12 +439,12 @@ export class CheckoutValidatorService {
     } else {
       // LEGACY FALLBACK
       const complements = item.complements || [];
-      const complementGroups = product['complementGroups'] as Array<Record<string, unknown>>;
+      const complementGroups = typedProduct.complementGroups as any[];
 
       validatedComplements = this.validateComplements(
         complements,
         complementGroups,
-        product['name'] as string,
+        typedProduct.name,
       );
 
       extrasTotal = validatedComplements.reduce((s, c) => s + c.snapshotPrice, 0);
@@ -446,8 +457,8 @@ export class CheckoutValidatorService {
     return {
       lineType: 'product',
       productId: item.productId,
-      name: product['name'] as string,
-      image: (product['image'] as string | null) || null,
+      name: typedProduct.name,
+      image: typedProduct.image || null,
       basePrice,
       effectiveBasePrice,
       extrasTotal,
@@ -740,7 +751,7 @@ export class CheckoutValidatorService {
         throw new BadRequestException('productId é obrigatório para combos no payload novo.');
       }
 
-      const comboProduct = await (this.prisma as unknown as Record<string, { findFirst: (...args: unknown[]) => Promise<Record<string, unknown> | null> }>)['product'].findFirst({
+      const comboProduct = await this.prisma.product.findFirst({
         where: { id: item.productId, tenantId, deletedAt: null },
         include: {
           comboSlots: {
@@ -752,11 +763,25 @@ export class CheckoutValidatorService {
             orderBy: { order: 'asc' },
           },
         },
-      }) as Record<string, unknown> | null;
+      });
 
       if (!comboProduct) {
         throw new BadRequestException('Combo não encontrado ou não pertence a esta loja.');
       }
+
+      type ComboWithSlots = Prisma.ProductGetPayload<{
+        include: {
+          comboSlots: {
+            include: {
+              allowedItems: {
+                include: { product: true },
+              },
+            },
+          },
+        },
+      }>;
+
+      const typedCombo = comboProduct as unknown as ComboWithSlots;
 
       await this.availabilityService.assertCanSell({
         tenantId,
@@ -764,15 +789,15 @@ export class CheckoutValidatorService {
         channel,
         context,
       });
-      if (!(comboProduct['isActive'] as boolean)) {
-        throw new BadRequestException(`O combo "${comboProduct['name']}" não está ativo.`);
+      if (!typedCombo.isActive) {
+        throw new BadRequestException(`O combo "${typedCombo.name}" não está ativo.`);
       }
 
-      const basePrice = Number(comboProduct['basePrice']);
+      const basePrice = Number(typedCombo.basePrice);
       const validatedSlots = this.validateComboSlots(
         item.slots || [],
-        comboProduct['comboSlots'] as Array<Record<string, unknown>>,
-        comboProduct['name'] as string,
+        typedCombo.comboSlots as any[],
+        typedCombo.name,
       );
 
       const extrasTotal = validatedSlots.reduce((s, c) => s + c.additionalPrice, 0);
@@ -787,8 +812,8 @@ export class CheckoutValidatorService {
       return {
         lineType: 'combo',
         comboId: item.productId,
-        name: comboProduct['name'] as string,
-        image: (comboProduct['image'] as string | null) || null,
+        name: typedCombo.name,
+        image: typedCombo.image || null,
         basePrice,
         effectiveBasePrice: basePrice,
         extrasTotal,
@@ -805,8 +830,8 @@ export class CheckoutValidatorService {
           capturedAt: new Date().toISOString(),
           product: {
             id: item.productId,
-            name: comboProduct['name'],
-            type: comboProduct['type'],
+            name: typedCombo.name,
+            type: typedCombo.type,
           },
           quantity: item.quantity,
           notes: item.notes ?? null,
@@ -823,7 +848,7 @@ export class CheckoutValidatorService {
     }
 
     if (comboProductId) {
-      const comboProduct = await (this.prisma as unknown as Record<string, { findFirst: (...args: unknown[]) => Promise<Record<string, unknown> | null> }>)['product'].findFirst({
+      const comboProduct = await this.prisma.product.findFirst({
         where: { id: comboProductId, tenantId, deletedAt: null, type: 'combo' },
         include: {
           comboBundleItems: {
@@ -831,30 +856,40 @@ export class CheckoutValidatorService {
             orderBy: { sortOrder: 'asc' },
           },
         },
-      }) as Record<string, unknown> | null;
+      });
 
       if (comboProduct) {
+        type ComboWithBundle = Prisma.ProductGetPayload<{
+          include: {
+            comboBundleItems: {
+              include: { product: true },
+            },
+          },
+        }>;
+
+        const typedCombo = comboProduct as unknown as ComboWithBundle;
+
         await this.availabilityService.assertCanSell({
           tenantId,
           productId: comboProductId,
           channel,
         });
 
-        if (!(comboProduct['isActive'] as boolean)) {
-          throw new BadRequestException(`O combo "${comboProduct['name']}" não está ativo.`);
+        if (!typedCombo.isActive) {
+          throw new BadRequestException(`O combo "${typedCombo.name}" não está ativo.`);
         }
 
-        const comboMode = (comboProduct['comboMode'] as 'bundle' | 'slot' | null) ?? 'bundle';
+        const comboMode = typedCombo.comboMode ?? 'bundle';
         if (comboMode === 'bundle') {
-          const bundleItems = (comboProduct['comboBundleItems'] as Array<Record<string, unknown>>) ?? [];
+          const bundleItems = typedCombo.comboBundleItems ?? [];
           const subtotal = bundleItems.reduce((sum, bundleItem) => {
-            const product = bundleItem['product'] as Record<string, unknown> | undefined;
-            if (!product || !(product['isActive'] as boolean) || product['deletedAt'] != null) return sum;
-            return sum + Number(product['basePrice']) * Math.max(1, Number(bundleItem['qty'] ?? 1));
+            const product = bundleItem.product;
+            if (!product || !product.isActive || product.deletedAt != null) return sum;
+            return sum + Number(product.basePrice) * Math.max(1, bundleItem.qty ?? 1);
           }, 0);
 
-          const pricingType = ((comboProduct['comboPricingType'] as string | null) ?? 'fixed_price') as 'fixed_price' | 'discount_percent' | 'discount_amount';
-          const pricingValue = Number(comboProduct['comboPricingValue'] ?? 0);
+          const pricingType = typedCombo.comboPricingType ?? 'fixed_price';
+          const pricingValue = Number(typedCombo.comboPricingValue ?? 0);
           let finalPrice = subtotal;
 
           if (pricingType === 'fixed_price') {
@@ -867,22 +902,22 @@ export class CheckoutValidatorService {
 
           finalPrice = Math.max(0, Number(finalPrice.toFixed(2)));
           const discountTotal = Math.max(0, Number((subtotal - finalPrice).toFixed(2)));
-          const basePrice = Number(comboProduct['basePrice']);
+          const basePrice = Number(typedCombo.basePrice);
           const unitPrice = finalPrice;
           const lineTotal = unitPrice * item.quantity;
           const composition = bundleItems
             .map((bundleItem) => {
-              const product = bundleItem['product'] as Record<string, unknown> | undefined;
-              const qty = Math.max(1, Number(bundleItem['qty'] ?? 1));
-              return `${product?.['name'] ?? 'Item'} x${qty}`;
+              const product = bundleItem.product;
+              const qty = Math.max(1, bundleItem.qty ?? 1);
+              return `${product?.name ?? 'Item'} x${qty}`;
             })
             .join('; ');
 
           return {
             lineType: 'combo',
             comboId: comboProductId,
-            name: comboProduct['name'] as string,
-            image: (comboProduct['image'] as string | null) || null,
+            name: typedCombo.name,
+            image: typedCombo.image || null,
             basePrice,
             effectiveBasePrice: basePrice,
             extrasTotal: 0,
@@ -899,8 +934,8 @@ export class CheckoutValidatorService {
               capturedAt: new Date().toISOString(),
               product: {
                 id: comboProductId,
-                name: comboProduct['name'],
-                type: comboProduct['type'],
+                name: typedCombo.name,
+                type: typedCombo.type,
                 comboMode: 'bundle',
               },
               quantity: item.quantity,
@@ -919,12 +954,12 @@ export class CheckoutValidatorService {
               selections: [],
               slots: [],
               bundleItems: bundleItems.map((bundleItem) => {
-                const product = bundleItem['product'] as Record<string, unknown> | undefined;
-                const qty = Math.max(1, Number(bundleItem['qty'] ?? 1));
-                const unit = Number(product?.['basePrice'] ?? 0);
+                const product = bundleItem.product;
+                const qty = Math.max(1, bundleItem.qty ?? 1);
+                const unit = Number(product?.basePrice ?? 0);
                 return {
-                  productId: bundleItem['productId'],
-                  name: product?.['name'] ?? 'Item',
+                  productId: bundleItem.productId,
+                  name: product?.name ?? 'Item',
                   qty,
                   unitPrice: unit,
                   subtotal: Number((unit * qty).toFixed(2)),
@@ -940,7 +975,7 @@ export class CheckoutValidatorService {
     if (!item.comboId) {
       throw new BadRequestException('comboId é obrigatório para combos legados sem bundle.');
     }
-    const combo = await (this.prisma as unknown as Record<string, { findFirst: (...args: unknown[]) => Promise<Record<string, unknown> | null> }>)['productCombo'].findFirst({
+    const combo = await this.prisma.productCombo.findFirst({
       where: { id: item.comboId, tenantId, deletedAt: null },
       include: {
         blocks: {
@@ -951,23 +986,38 @@ export class CheckoutValidatorService {
           },
         },
       },
-    }) as Record<string, unknown> | null;
+    });
 
     if (!combo) {
       throw new BadRequestException('Combo não encontrado ou não pertence a esta loja.');
     }
-    if (!(combo['isActive'] as boolean)) {
-      throw new BadRequestException(`O combo "${combo['name']}" não está ativo.`);
+
+    type LegacyCombo = Prisma.ProductComboGetPayload<{
+      include: {
+        blocks: {
+          include: {
+            items: {
+              include: { product: true },
+            },
+          },
+        },
+      },
+    }>;
+
+    const typedComboLegacy = combo as unknown as LegacyCombo;
+
+    if (!typedComboLegacy.isActive) {
+      throw new BadRequestException(`O combo "${typedComboLegacy.name}" não está ativo.`);
     }
 
-    const basePrice = Number(combo['basePrice']);
+    const basePrice = Number(typedComboLegacy.basePrice);
     const selections = item.comboSelections || [];
-    const blocks = combo['blocks'] as Array<Record<string, unknown>>;
+    const blocks = typedComboLegacy.blocks as any[];
 
     const validatedSelections = this.validateComboBlocks(
       selections,
       blocks,
-      combo['name'] as string,
+      typedComboLegacy.name,
     );
 
     const extrasTotal = validatedSelections.reduce((s, c) => s + c.snapshotAdditionalPrice, 0);

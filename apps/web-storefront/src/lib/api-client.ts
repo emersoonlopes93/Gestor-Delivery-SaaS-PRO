@@ -50,7 +50,7 @@ export class ApiError extends Error {
     public status: number,
     message: string,
     public code?: string,
-    public details?: any,
+    public details?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -58,7 +58,7 @@ export class ApiError extends Error {
 }
 
 export const api = {
-  get: <T>(endpoint: string, options: RequestInit & { params?: Record<string, any> } = {}) => {
+  get: <T>(endpoint: string, options: RequestInit & { params?: Record<string, string | number | boolean | undefined | null> } = {}) => {
     let url = endpoint;
     if (options.params) {
       const searchParams = new URLSearchParams();
