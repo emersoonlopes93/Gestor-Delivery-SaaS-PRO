@@ -14,7 +14,14 @@ export class StorageService {
     this.driver = this.config.get<'local' | 'r2'>('STORAGE_DRIVER') || 'local';
 
     if (this.driver === 'r2') {
-      const accountId = this.config.get<string>('R2_ACCOUNT_ID');
+      const rawAccountId = this.config.get<string>('R2_ACCOUNT_ID') || '';
+      // Sanitizar R2_ACCOUNT_ID para remover qualquer URL inteira ou sufixos comuns do Cloudflare R2
+      const accountId = rawAccountId
+        .replace(/^https?:\/\//i, '')
+        .replace(/\.r2\.cloudflarestorage\.com\/?$/i, '')
+        .replace(/\/+$/, '')
+        .trim();
+
       const accessKeyId = this.config.get<string>('R2_ACCESS_KEY_ID');
       const secretAccessKey = this.config.get<string>('R2_SECRET_ACCESS_KEY');
       const region = this.config.get<string>('R2_REGION', 'auto');
@@ -22,6 +29,7 @@ export class StorageService {
       this.s3Client = new S3Client({
         region,
         endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+        forcePathStyle: true, // Obrigatório para evitar erros de DNS virtual-host com subdomínios no Cloudflare R2
         credentials: {
           accessKeyId: accessKeyId || '',
           secretAccessKey: secretAccessKey || '',
