@@ -3,12 +3,13 @@ import { io, Socket } from 'socket.io-client';
 import { logger } from '../lib/logger';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3333';
+const socketUrl = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
 
 export function useOrderSocket(token: string | null, onStatusUpdate: (data: any) => void) {
   useEffect(() => {
     if (!token) return;
 
-    const socket: Socket = io(`${API_URL}/orders`, {
+    const socket: Socket = io(`${socketUrl}/orders`, {
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,

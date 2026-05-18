@@ -35,7 +35,8 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
 
     // Conecta ao namespace de pedidos
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3333';
-    const socket = io(`${API_URL}/orders`, {
+    const socketUrl = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
+    const socket = io(`${socketUrl}/orders`, {
       reconnection: true,
       reconnectionAttempts: 10,
     });
