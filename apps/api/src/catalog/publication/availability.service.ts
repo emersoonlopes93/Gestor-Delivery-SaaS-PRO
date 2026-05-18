@@ -20,9 +20,19 @@ export class AvailabilityService {
   ): Promise<{ isOpen: boolean; message: string; reason: string; nextOpenAt?: string | null }> {
     const d = now ?? new Date();
 
-    const settings = context?.settings || await this.prisma.tenantSettings.findUnique({
+    const settings = await this.prisma.tenantSettings.findUnique({
       where: { tenantId },
-      select: { isStorePaused: true, storePauseReason: true, timezone: true },
+      select: { 
+        isStorePaused: true, 
+        storePauseReason: true, 
+        timezone: true,
+        street: true,
+        number: true,
+        neighborhood: true,
+        zipCode: true,
+        pixKey: true,
+        paymentMethods: true
+      },
     });
 
     if (settings?.isStorePaused) {
@@ -34,24 +44,55 @@ export class AvailabilityService {
       };
     }
 
-    const timezone = settings?.timezone || 'America/Sao_Paulo';
-    const localInfo = this.getTenantLocalDayAndTime(d, timezone);
-    const { dayOfWeek, timeHHmm } = localInfo;
-    const currentMinutes = this.timeToMinutes(timeHHmm);
+    // 1. Validar requisitos operacionais mínimos obrigatórios
+    const hasAddress = !!(settings?.street && settings?.number && settings?.neighborhood && settings?.zipCode);
+    
+    let hasPayments = false;
+    if (settings?.pixKey && settings?.paymentMethods) {
+      const methods = settings.paymentMethods;
+      if (Array.isArray(methods)) {
+        hasPayments = methods.length > 0;
+      } else if (typeof methods === 'string') {
+        try {
+          const parsed = JSON.parse(methods);
+          hasPayments = Array.isArray(parsed) && parsed.length > 0;
+        } catch {
+          hasPayments = false;
+        }
+      } else if (typeof methods === 'object') {
+        hasPayments = Object.keys(methods as any).length > 0;
+      }
+    }
+
+    const deliveryCoverage = await this.prisma.deliveryCoverageConfig.findUnique({
+      where: { tenantId }
+    });
+    const hasDelivery = !!deliveryCoverage;
 
     const operatingHours = [...(context?.operatingHours || await this.prisma.tenantOperatingHours.findMany({
       where: { tenantId },
     }))];
+    const hasHours = operatingHours.length > 0;
 
-    if (operatingHours.length === 0) {
-      const mockHours = Array.from({ length: 7 }, (_, i) => ({
-        dayOfWeek: i,
-        isOpen: true,
-        openTime: '08:00',
-        closeTime: '22:00',
-      }));
-      operatingHours.push(...mockHours as any);
+    if (!hasAddress || !hasPayments || !hasDelivery || !hasHours) {
+      const missing = [];
+      if (!hasAddress) missing.push('endereço da loja');
+      if (!hasPayments) missing.push('formas de pagamento');
+      if (!hasDelivery) missing.push('taxa de entrega/cobertura');
+      if (!hasHours) missing.push('horários de funcionamento');
+
+      return {
+        isOpen: false,
+        message: `Loja desativada temporariamente. Configurações pendentes: ${missing.join(', ')}.`,
+        reason: 'CONFIG_PENDING',
+        nextOpenAt: null,
+      };
     }
+
+    const timezone = settings?.timezone || 'America/Sao_Paulo';
+    const localInfo = this.getTenantLocalDayAndTime(d, timezone);
+    const { dayOfWeek, timeHHmm } = localInfo;
+    const currentMinutes = this.timeToMinutes(timeHHmm);
 
     // Sort to make searching for next open easy (0=sun to 6=sat)
     const sortedRules = [...operatingHours].sort((a, b) => a.dayOfWeek - b.dayOfWeek);

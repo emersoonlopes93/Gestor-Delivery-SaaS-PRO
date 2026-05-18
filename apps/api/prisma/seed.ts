@@ -164,10 +164,19 @@ async function seedDemoTenant() {
     });
     console.log(`   ✅ Tenant created: ${tenant.id}`);
 
-    // Create tenant settings
+    // Create tenant settings with full operational configs
     await prisma.tenantSettings.upsert({
       where: { tenantId: tenant.id },
-      update: {},
+      update: {
+        street: 'Av. Paulista',
+        number: '1000',
+        neighborhood: 'Bela Vista',
+        city: 'São Paulo',
+        state: 'SP',
+        zipCode: '01310-100',
+        pixKey: 'contato@pizzariademo.com',
+        paymentMethods: ['pix', 'credit_card', 'cash'],
+      },
       create: {
         tenantId: tenant.id,
         timezone: 'America/Sao_Paulo',
@@ -175,6 +184,14 @@ async function seedDemoTenant() {
         language: 'pt-BR',
         businessPhone: '(11) 99999-0000',
         businessEmail: 'contato@pizzariademo.com',
+        street: 'Av. Paulista',
+        number: '1000',
+        neighborhood: 'Bela Vista',
+        city: 'São Paulo',
+        state: 'SP',
+        zipCode: '01310-100',
+        pixKey: 'contato@pizzariademo.com',
+        paymentMethods: ['pix', 'credit_card', 'cash'],
       },
     });
 
@@ -258,6 +275,46 @@ async function seedDemoTenant() {
 
     console.log(`   ? Demo tenant created: ${tenant.name}`);
     console.log(`   ? Tenant owner: ${ownerEmail}`);
+
+    // Create default delivery coverage config
+    await prisma.deliveryCoverageConfig.upsert({
+      where: { tenantId: tenant.id },
+      update: {},
+      create: {
+        tenantId: tenant.id,
+        storeLat: -23.5614,
+        storeLng: -46.6559,
+        maxRadiusKm: 15.0,
+        defaultPricePerKm: 2.5,
+        minimumFee: 5.0,
+        maximumFee: 20.0,
+        isDeliveryEnabled: true,
+      },
+    });
+
+    // Create default tenant operating hours (08:00 to 22:00 for Sun-Sat)
+    for (let day = 0; day <= 6; day++) {
+      await prisma.tenantOperatingHours.upsert({
+        where: {
+          tenantId_dayOfWeek: {
+            tenantId: tenant.id,
+            dayOfWeek: day,
+          },
+        },
+        update: {
+          isOpen: true,
+          openTime: '08:00',
+          closeTime: '22:00',
+        },
+        create: {
+          tenantId: tenant.id,
+          dayOfWeek: day,
+          isOpen: true,
+          openTime: '08:00',
+          closeTime: '22:00',
+        },
+      });
+    }
 
     // Create delivery rate rules
     await (prisma as any).deliveryRateRule.create({
