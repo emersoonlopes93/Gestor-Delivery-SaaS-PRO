@@ -43,8 +43,18 @@ export function TablesPage() {
     if (envBase) {
       setStorefrontBaseUrl(envBase.replace(/\/+$/, ''));
     } else {
-      // Fallback
-      setStorefrontBaseUrl(window.location.origin.replace('tenant', 'storefront').replace('8081', '3000'));
+      const { origin, hostname } = window.location;
+      if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+        if (hostname.startsWith('app-')) {
+          setStorefrontBaseUrl(origin.replace('app-', ''));
+        } else if (hostname.startsWith('app.')) {
+          setStorefrontBaseUrl(origin.replace('app.', ''));
+        } else {
+          setStorefrontBaseUrl(origin.replace('tenant', 'storefront'));
+        }
+      } else {
+        setStorefrontBaseUrl(origin.replace('tenant', 'storefront').replace('8081', '3000'));
+      }
     }
   }, []);
 

@@ -16,7 +16,7 @@ export class TenantService {
   async findById(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      include: { settings: true },
+      include: { settings: true, operatingHours: true },
     });
     if (!tenant) throw new NotFoundException('Tenant not found');
     return tenant;

@@ -39,12 +39,18 @@ export class AvailabilityService {
     const { dayOfWeek, timeHHmm } = localInfo;
     const currentMinutes = this.timeToMinutes(timeHHmm);
 
-    const operatingHours = context?.operatingHours || await this.prisma.tenantOperatingHours.findMany({
+    const operatingHours = [...(context?.operatingHours || await this.prisma.tenantOperatingHours.findMany({
       where: { tenantId },
-    });
+    }))];
 
     if (operatingHours.length === 0) {
-      return { isOpen: true, message: 'Aberto agora', reason: 'NO_CONFIG' };
+      const mockHours = Array.from({ length: 7 }, (_, i) => ({
+        dayOfWeek: i,
+        isOpen: true,
+        openTime: '08:00',
+        closeTime: '22:00',
+      }));
+      operatingHours.push(...mockHours as any);
     }
 
     // Sort to make searching for next open easy (0=sun to 6=sat)

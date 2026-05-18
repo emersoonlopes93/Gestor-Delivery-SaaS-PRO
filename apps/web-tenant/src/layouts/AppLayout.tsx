@@ -341,11 +341,61 @@ export function AppLayout() {
     }
   });
 
-  const isStorePaused = tenantData?.settings?.isStorePaused ?? false;
-  const storeStatus: 'open' | 'closed' | 'paused' = isStorePaused ? 'paused' : 'open';
+  const storeStatus = useMemo((): 'open' | 'closed' | 'paused' => {
+    if (!tenantData) return 'open';
+    const settings = tenantData.settings;
+    const isPaused = settings?.isStorePaused ?? false;
+    if (isPaused) return 'paused';
+
+    const operatingHours = (tenantData as any).operatingHours || [];
+    const timezone = settings?.timezone || 'America/Sao_Paulo';
+    
+    let localTimeStr: string;
+    let localDayStr: string;
+    try {
+      localTimeStr = new Date().toLocaleTimeString('pt-BR', { timeZone: timezone, hour: '2-digit', minute: '2-digit' });
+      localDayStr = new Date().toLocaleDateString('en-US', { timeZone: timezone, weekday: 'short' }).toLowerCase();
+    } catch {
+      localTimeStr = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      localDayStr = new Date().toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase();
+    }
+
+    const [hh, mm] = localTimeStr.split(':').map(Number);
+    const currentMinutes = hh * 60 + mm;
+
+    const weekdayMap: Record<string, number> = {
+      sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6
+    };
+    const dayOfWeek = weekdayMap[localDayStr] ?? 0;
+
+    let rules = operatingHours;
+    if (rules.length === 0) {
+      rules = Array.from({ length: 7 }, (_, i) => ({
+        dayOfWeek: i,
+        isOpen: true,
+        openTime: '08:00',
+        closeTime: '22:00',
+      }));
+    }
+
+    const todayRule = rules.find((h: any) => h.dayOfWeek === dayOfWeek);
+
+    if (todayRule?.isOpen && todayRule.openTime && todayRule.closeTime) {
+      const [openH, openM] = todayRule.openTime.split(':').map(Number);
+      const [closeH, closeM] = todayRule.closeTime.split(':').map(Number);
+      const openMinutes = openH * 60 + openM;
+      const closeMinutes = closeH * 60 + closeM;
+
+      if (currentMinutes >= openMinutes && currentMinutes <= closeMinutes) {
+        return 'open';
+      }
+    }
+
+    return 'closed';
+  }, [tenantData]);
 
   const handleToggleStore = () => {
-    toggleStoreMutation.mutate(!isStorePaused);
+    toggleStoreMutation.mutate(storeStatus !== 'paused');
   };
 
   // Audio Notifications Integration
@@ -385,7 +435,13 @@ export function AppLayout() {
 
     // Production fallback: same origin. Dev fallback: probe common storefront ports.
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      setStorefrontBaseUrl(origin);
+      if (hostname.startsWith('app-')) {
+        setStorefrontBaseUrl(origin.replace('app-', ''));
+      } else if (hostname.startsWith('app.')) {
+        setStorefrontBaseUrl(origin.replace('app.', ''));
+      } else {
+        setStorefrontBaseUrl(origin.replace('tenant', 'storefront'));
+      }
       return;
     }
 
@@ -530,6 +586,8 @@ export function AppLayout() {
                 className={`w-full flex items-center justify-between p-2.5 rounded-2xl border transition-all duration-300 group hover:shadow-md active:scale-[0.98] ${
                   storeStatus === 'open' 
                     ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-600' 
+                    : storeStatus === 'paused'
+                    ? 'bg-red-500/5 border-red-500/10 text-red-600'
                     : 'bg-amber-500/5 border-amber-500/10 text-amber-600'
                 } ${toggleStoreMutation.isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
@@ -538,13 +596,29 @@ export function AppLayout() {
                     {storeStatus === 'open' && (
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     )}
-                    <span className={`relative inline-flex rounded-full h-2 w-2 ${storeStatus === 'open' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+                    <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                      storeStatus === 'open' 
+                        ? 'bg-emerald-500' 
+                        : storeStatus === 'paused'
+                        ? 'bg-red-500'
+                        : 'bg-amber-500'
+                    }`}></span>
                   </div>
                   <span className="text-[10px] font-black tracking-widest uppercase">
-                    {storeStatus === 'open' ? 'Loja Aberta' : 'Loja Pausada'}
+                    {storeStatus === 'open' 
+                      ? 'Loja Aberta' 
+                      : storeStatus === 'paused'
+                      ? 'Loja Pausada'
+                      : 'Loja Fechada'}
                   </span>
                 </div>
-                <div className={`w-8 h-4 rounded-full relative transition-colors duration-300 ${storeStatus === 'open' ? 'bg-emerald-500' : 'bg-amber-500/40'}`}>
+                <div className={`w-8 h-4 rounded-full relative transition-colors duration-300 ${
+                  storeStatus === 'open' 
+                    ? 'bg-emerald-500' 
+                    : storeStatus === 'paused'
+                    ? 'bg-red-500/40'
+                    : 'bg-amber-500/40'
+                }`}>
                    <div className={`absolute top-1 w-2 h-2 rounded-full bg-white transition-all duration-300 ${storeStatus === 'open' ? 'right-1' : 'left-1'}`} />
                 </div>
               </button>
