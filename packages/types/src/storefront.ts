@@ -9,6 +9,7 @@ export interface StorefrontTenantInfo {
   statusMessage?: string | null;
   nextOpenAt?: string | null;
   paymentMethods?: string[];
+  mercadoPagoPublicKey?: string | null;
   address?: {
     street: string;
     number: string;

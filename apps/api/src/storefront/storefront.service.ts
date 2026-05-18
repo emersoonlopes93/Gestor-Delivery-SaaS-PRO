@@ -327,7 +327,7 @@ export class StorefrontService {
           basePrice,
           image: combo.image,
           isAvailable,
-          comboMode: combo.comboMode === 'bundle' ? 'bundle' : 'slot',
+          comboMode: (combo.comboMode === 'bundle' ? 'bundle' : 'slot') as 'bundle' | 'slot',
           pricingType: combo.comboPricingType as any,
           pricingValue,
           itemsSubtotal,

@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException, Logger, UnprocessableEntityException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import type { DeliveryAddressDTO } from '@gestor/types';
-import { Prisma } from '@prisma/client';
+import { Prisma, DeliveryRateRule } from '@prisma/client';
 
 type DeliveryRateRuleRepo = Prisma.DeliveryRateRuleDelegate;
 type DeliveryCoverageRepo = Prisma.DeliveryCoverageConfigDelegate;

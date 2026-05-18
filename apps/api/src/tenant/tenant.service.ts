@@ -75,13 +75,18 @@ export class TenantService {
    * Update tenant settings.
    */
   async updateSettings(tenantId: string, dto: UpdateTenantSettingsDto) {
+    const data = {
+      ...dto,
+      notificationTemplates: dto.notificationTemplates as any,
+    };
+
     return this.prisma.tenantSettings.upsert({
       where: { tenantId },
       create: {
-        ...dto,
+        ...data,
         tenantId,
-      },
-      update: dto,
+      } as any,
+      update: data as any,
     });
   }
 
