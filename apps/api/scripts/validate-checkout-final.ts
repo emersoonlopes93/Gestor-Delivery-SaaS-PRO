@@ -16,7 +16,7 @@ async function api(method: string, path: string, body?: any, token?: string) {
   
   const rawData = await res.json().catch(() => ({}));
   const data = (rawData as any).data || rawData;
-  return { status: res.status, data };
+  return { status: res.status, data, raw: rawData };
 }
 
 async function getTenantToken() {
@@ -37,18 +37,13 @@ async function runValidation() {
     return;
   }
 
-  // Obter dados do storefront para IDs reais
   const { data: storefront } = await api('GET', `/public/storefront/${TENANT_SLUG}`);
-  if (!storefront || !storefront.categories) {
-    console.error('❌ Falha ao obter dados do storefront');
-    return;
-  }
+  const simpleProduct = storefront.categories[0].products[0];
   
   // 1. Pickup com produto simples
   console.log('--- Cenário 1: Pickup com produto simples ---');
-  const simpleProduct = storefront.categories[0].products[0];
   const payload1 = {
-    idempotencyKey: `val-pickup-simple-${Date.now()}`,
+    idempotencyKey: `val-pickup-${Date.now()}`,
     items: [{ lineType: 'product', productId: simpleProduct.id, quantity: 1, complements: [] }],
     customerName: 'Cliente Pickup',
     customerPhone: '11999991111',
@@ -63,25 +58,26 @@ async function runValidation() {
   // 2. Delivery com produto simples
   console.log('\n--- Cenário 2: Delivery com produto simples ---');
   const payload2 = {
-    idempotencyKey: `val-delivery-simple-${Date.now()}`,
+    idempotencyKey: `val-delivery-${Date.now()}`,
     items: [{ lineType: 'product', productId: simpleProduct.id, quantity: 1, complements: [] }],
     customerName: 'Cliente Delivery',
     customerPhone: '11999992222',
     fulfillmentType: 'delivery',
     deliveryAddress: {
-      street: 'Av Paulista',
-      number: '1000',
-      neighborhood: 'Bela Vista',
+      street: 'Rua Próxima',
+      number: '10',
+      neighborhood: 'Centro',
       city: 'São Paulo',
       state: 'SP',
-      zipCode: '01310100',
-      lat: -23.5614,
-      lng: -46.6559,
+      zipCode: '01001000',
+      lat: -23.5501,
+      lng: -46.6331,
     },
     payment: { method: 'pix' },
   };
   const res2 = await api('POST', `/orders/public-checkout/${TENANT_SLUG}`, payload2);
   console.log(`Status: ${res2.status}`);
+  if (res2.status >= 400) console.log('Erro:', JSON.stringify(res2.raw, null, 2));
   console.log(`Pedido: ${res2.data?.orderNumber || 'ERRO'}`);
 
   // 3. Produto com complemento obrigatório
@@ -96,18 +92,12 @@ async function runValidation() {
     }
     if (productWithReq) break;
   }
-
   if (productWithReq) {
     const group = productWithReq.complements.find((c: any) => c.isRequired);
     const item = group.items[0];
     const payload3 = {
       idempotencyKey: `val-comp-req-${Date.now()}`,
-      items: [{ 
-        lineType: 'product', 
-        productId: productWithReq.id, 
-        quantity: 1, 
-        complements: [{ groupId: group.id, itemId: item.id }] 
-      }],
+      items: [{ lineType: 'product', productId: productWithReq.id, quantity: 1, complements: [{ groupId: group.id, itemId: item.id }] }],
       customerName: 'Cliente Comp Req',
       customerPhone: '11999993333',
       fulfillmentType: 'pickup',
@@ -116,8 +106,6 @@ async function runValidation() {
     const res3 = await api('POST', `/orders/public-checkout/${TENANT_SLUG}`, payload3);
     console.log(`Status: ${res3.status}`);
     console.log(`Pedido: ${res3.data?.orderNumber || 'ERRO'}`);
-  } else {
-    console.log('Pulo: Nenhum produto com complemento obrigatório encontrado');
   }
 
   // 4. Produto com complemento opcional
@@ -134,22 +122,13 @@ async function runValidation() {
   console.log(`Status: ${res4.status}`);
 
   // 5. Combo V2
-  console.log('\n--- Cenário 5: Combo V2 (Slots/Produtos Reais) ---');
-  // Check in the main products list for combos
+  console.log('\n--- Cenário 5: Combo V2 ---');
   const comboV2 = storefront.categories.flatMap((c:any) => c.products).find((p: any) => p.type === 'combo');
   if (comboV2) {
-    console.log(`Testando Combo V2: ${comboV2.name}`);
-    // Assuming it's a bundle or slot combo. For E2E we try to send a valid structure.
-    // If it's a bundle, it doesn't need slots in payload if backend handles it.
     const payload5 = {
-      idempotencyKey: `val-combo-v2-${Date.now()}`,
-      items: [{ 
-        lineType: 'combo', 
-        productId: comboV2.id, 
-        quantity: 1,
-        slots: [] // simplified for bundle
-      }],
-      customerName: 'Cliente Combo V2',
+      idempotencyKey: `val-combo-${Date.now()}`,
+      items: [{ lineType: 'combo', productId: comboV2.id, quantity: 1, slots: [] }],
+      customerName: 'Cliente Combo',
       customerPhone: '11999995555',
       fulfillmentType: 'pickup',
       payment: { method: 'pix' },
@@ -157,16 +136,14 @@ async function runValidation() {
     const res5 = await api('POST', `/orders/public-checkout/${TENANT_SLUG}`, payload5);
     console.log(`Status: ${res5.status}`);
     console.log(`Pedido: ${res5.data?.orderNumber || 'ERRO'}`);
-  } else {
-    console.log('Pulo: Nenhum combo V2 encontrado no storefront');
   }
 
   // 6. PIX
   console.log('\n--- Cenário 6: Pagamento PIX ---');
-  if (order1?.pixPayment) {
-    console.log('✅ PIX gerado com sucesso:', order1.pixPayment.transactionId);
+  if (res1.data?.pixPayment) {
+    console.log('✅ PIX gerado com sucesso:', res1.data.pixPayment.transactionId);
   } else {
-    console.log('❌ PIX não encontrado na resposta');
+    console.log('❌ PIX não gerado. Verifique se o tenant possui chave PIX cadastrada.');
   }
 
   // 7. Dinheiro com troco
@@ -193,17 +170,17 @@ async function runValidation() {
   console.log(`Req 2 ID: ${r8b.data?.id}`);
   console.log(`Mesmo ID? ${r8a.data?.id === r8b.data?.id ? '✅ SIM' : '❌ NÃO'}`);
 
-  // 9. Aparece na Lista de Pedidos
-  console.log('\n--- Cenário 9: Lista de Pedidos (Painel) ---');
+  // 9. Aparece na Lista
+  console.log('\n--- Cenário 9: Lista de Pedidos ---');
   const res9 = await api('GET', '/orders', undefined, token);
-  const foundInList = res9.data?.items?.some((o: any) => o.orderNumber === order1?.orderNumber);
-  console.log(`Pedido ${order1?.orderNumber} encontrado na lista? ${foundInList ? '✅ SIM' : '❌ NÃO'}`);
+  const foundInList = res9.data?.items?.some((o: any) => o.orderNumber === res1.data?.orderNumber);
+  console.log(`Encontrado na lista? ${foundInList ? '✅ SIM' : '❌ NÃO'}`);
 
   // 10. Aparece no Kanban
-  console.log('\n--- Cenário 10: Kanban (Board) ---');
+  console.log('\n--- Cenário 10: Kanban ---');
   const res10 = await api('GET', '/orders/operation/board', undefined, token);
-  const foundInBoard = res10.data?.some((o: any) => o.orderNumber === order1?.orderNumber);
-  console.log(`Pedido ${order1?.orderNumber} encontrado no Kanban? ${foundInBoard ? '✅ SIM' : '❌ NÃO'}`);
+  const foundInBoard = res10.data?.some((o: any) => o.orderNumber === res1.data?.orderNumber);
+  console.log(`Encontrado no Kanban? ${foundInBoard ? '✅ SIM' : '❌ NÃO'}`);
 
   console.log('\n🏁 Validação Finalizada');
 }
