@@ -538,9 +538,9 @@ export function CheckoutPage() {
         </h2>
         <div className="space-y-3">
           <input type="text" placeholder="Seu nome completo" value={customerName} onChange={e => setCustomerName(e.target.value)}
-            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" />
+            className="input-premium" />
           <input type="tel" placeholder="Seu WhatsApp (apenas números)" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
-            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none" />
+            className="input-premium" />
         </div>
 
         {!isLoggedIn && (
@@ -635,7 +635,7 @@ export function CheckoutPage() {
                       }
                       setZipCode(val);
                     }}
-                    className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" 
+                    className="input-premium py-2 text-xs" 
                   />
                   {isFetchingCep && (
                     <div className="absolute right-2 top-1/2 -translate-y-1/2">
@@ -647,7 +647,7 @@ export function CheckoutPage() {
               <div className="col-span-3">
                 <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 ml-1 tracking-wider">Rua</label>
                 <input type="text" placeholder="Rua" value={street} onChange={e => setStreet(e.target.value)}
-                  className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
+                  className="input-premium py-2 text-xs" />
               </div>
             </div>
 
@@ -655,20 +655,20 @@ export function CheckoutPage() {
               <div className="col-span-3">
                 <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 ml-1 tracking-wider">Bairro</label>
                 <input type="text" placeholder="Bairro" value={neighborhood} onChange={e => setNeighborhood(e.target.value)}
-                  className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
+                  className="input-premium py-2 text-xs" />
               </div>
               <div className="col-span-1">
                 <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 ml-1 tracking-wider">Nº</label>
                 <input type="text" placeholder="Nº" value={number} onChange={e => setNumber(e.target.value)}
-                  className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
+                  className="input-premium py-2 text-xs" />
               </div>
             </div>
             
             <div className="grid grid-cols-2 gap-3">
               <input type="text" placeholder="Complemento" value={complement} onChange={e => setComplement(e.target.value)}
-                className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
+                className="input-premium py-2 text-xs" />
               <input type="text" placeholder="Referência" value={reference} onChange={e => setReference(e.target.value)}
-                className="w-full bg-white border border-gray-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" />
+                className="input-premium py-2 text-xs" />
             </div>
             
             {isValidating && (
@@ -729,7 +729,7 @@ export function CheckoutPage() {
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">R$</span>
               <input type="number" placeholder="0,00" value={payment.changeFor || ''} 
                 onChange={e => setPayment({ ...payment, changeFor: Number(e.target.value) })}
-                className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-medium" />
+                className="input-premium pl-10" />
             </div>
             {payment.changeFor !== null && payment.changeFor < total && (
               <p className="mt-2 text-[10px] text-red-500 font-bold uppercase tracking-wider flex items-center gap-1">
@@ -753,7 +753,7 @@ export function CheckoutPage() {
           <FileText className="w-4 h-4" /> Observações
         </h2>
         <textarea placeholder="Ex: Tirar cebola, campainha estragada..." value={notes} onChange={e => setNotes(e.target.value)}
-          className="w-full bg-white border border-gray-200 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none min-h-[100px] resize-none" />
+          className="input-premium min-h-[100px] resize-none" />
       </section>
 
       {submitError && (

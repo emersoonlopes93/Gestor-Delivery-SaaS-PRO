@@ -15,6 +15,13 @@
   html {
     scroll-behavior: smooth;
   }
+
+  /* Reset global inputs para evitar texto invisível */
+  input:not([type="checkbox"]):not([type="radio"]), 
+  textarea, 
+  select {
+    @apply bg-transparent text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500;
+  }
 }
 
 @layer utilities {
@@ -67,7 +74,7 @@
   }
 
   .input-premium {
-    @apply w-full px-4 py-3 bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-2xl text-sm font-bold text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:bg-white dark:focus:bg-gray-900 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all;
+    @apply w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl text-sm font-medium text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:bg-white dark:focus:bg-gray-800 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .badge-premium {

@@ -69,10 +69,10 @@ export function CouponInput({
           onChange={(e) => setCouponCode(e.target.value)}
           onKeyPress={handleKeyPress}
           placeholder="Digite seu cupom"
-          className={`w-full pl-10 pr-20 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+          className={`input-premium pl-10 pr-20 py-2 ${
             error 
-              ? 'border-red-300 text-red-900 placeholder-red-300' 
-              : 'border-gray-300 text-gray-900 placeholder-gray-400'
+              ? 'border-red-300 text-red-900 placeholder-red-300 dark:border-red-500 dark:text-red-400' 
+              : ''
           }`}
           disabled={isLoading}
         />

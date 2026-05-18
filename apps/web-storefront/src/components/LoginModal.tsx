@@ -65,7 +65,7 @@ export function LoginModal({ isOpen, onClose, tenantSlug }: LoginModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden relative">
+      <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden relative">
         <button 
           onClick={onClose}
           className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 transition-colors"
@@ -84,7 +84,7 @@ export function LoginModal({ isOpen, onClose, tenantSlug }: LoginModalProps) {
             </div>
           </div>
 
-          <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">
+          <h2 className="text-2xl font-bold text-center text-gray-800 dark:text-white mb-2">
             {step === 'phone' ? 'Bem-vindo de volta!' : 'Verifique seu telefone'}
           </h2>
           <p className="text-gray-500 text-center mb-8">
@@ -104,7 +104,7 @@ export function LoginModal({ isOpen, onClose, tenantSlug }: LoginModalProps) {
                   placeholder="(00) 00000-0000"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
+                  className="input-premium"
                   autoFocus
                 />
               </div>
@@ -135,7 +135,7 @@ export function LoginModal({ isOpen, onClose, tenantSlug }: LoginModalProps) {
                   maxLength={6}
                   value={otp}
                   onChange={(e) => setOtp(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all text-center tracking-[0.5em] text-xl font-bold"
+                  className="input-premium text-center tracking-[0.5em] text-xl font-bold"
                   autoFocus
                 />
               </div>
