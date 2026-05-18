@@ -39,6 +39,7 @@ export function CheckoutPage() {
   // Form state
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>('delivery');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -104,6 +105,7 @@ export function CheckoutPage() {
     if (isLoggedIn && customer) {
       setCustomerName(prev => prev || customer.name);
       setCustomerPhone(prev => prev || customer.phone);
+      setCustomerEmail(prev => prev || customer?.email || '');
     }
   }, [isLoggedIn, customer]);
 
@@ -275,6 +277,10 @@ export function CheckoutPage() {
 
   const isFormValid = useMemo(() => {
     if (!customerName.trim() || !customerPhone.trim()) return false;
+    
+    // Optional email validation if provided
+    if (customerEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) return false;
+
     if (items.length === 0) return false;
     
     if (fulfillmentType === 'delivery') {
@@ -347,9 +353,9 @@ export function CheckoutPage() {
       });
 
       const payload: CreateOrderDTO = {
-        customerName,
-        customerPhone,
-        customerEmail: formData.payer.email,
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim().replace(/\D/g, ''),
+        customerEmail: formData.payer?.email || customerEmail.trim() || customer?.email || undefined,
         fulfillmentType,
         items: orderItems,
         idempotencyKey,
@@ -461,7 +467,7 @@ export function CheckoutPage() {
       const payload: CreateOrderDTO = {
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim().replace(/\D/g, ''),
-        customerEmail: customer.email || undefined,
+        customerEmail: customerEmail.trim() || customer?.email || undefined,
         fulfillmentType,
         items: orderItems,
         idempotencyKey,
@@ -605,6 +611,8 @@ export function CheckoutPage() {
           <input type="text" placeholder="Seu nome completo" value={customerName} onChange={e => setCustomerName(e.target.value)}
             className="input-premium" />
           <input type="tel" placeholder="Seu WhatsApp (apenas números)" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+            className="input-premium" />
+          <input type="email" placeholder="Seu e-mail (opcional)" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
             className="input-premium" />
         </div>
 
