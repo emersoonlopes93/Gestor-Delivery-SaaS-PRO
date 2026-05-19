@@ -7,7 +7,7 @@ export interface ChatSession {
   tenantId: string;
   customerPhone: string;
   state: ChatState;
-  cartData?: any;
+  cartData?: unknown;
   lastMessageAt: string;
   handoffActive: boolean;
   handoffReason?: string;
@@ -25,8 +25,8 @@ export interface ChatMessage {
   content: string;
   messageType: string;
   externalId?: string;
-  toolCalls?: any;
-  metadata?: any;
+  toolCalls?: unknown;
+  metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 }
@@ -37,8 +37,8 @@ export interface CreateMessageDto {
   content: string;
   messageType?: string;
   externalId?: string;
-  toolCalls?: any;
-  metadata?: any;
+  toolCalls?: unknown;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ChatSessionListItem {

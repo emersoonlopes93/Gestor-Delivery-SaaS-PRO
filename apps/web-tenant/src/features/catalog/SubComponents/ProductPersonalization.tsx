@@ -1,12 +1,17 @@
 import React from 'react';
+import { ProductOptionGroupLink, OptionGroup } from '@gestor/types';
+
+type LinkWithGroup = ProductOptionGroupLink & {
+  optionGroup: OptionGroup;
+};
 
 interface ProductPersonalizationProps {
   isComboMode: boolean;
-  links: any[];
+  links: LinkWithGroup[];
   moveLink: (id: string, direction: -1 | 1) => void;
   openAddGroupModal: () => void;
   setIsCreateComplementModalOpen: (open: boolean) => void;
-  openEditLinkModal: (link: any) => void;
+  openEditLinkModal: (link: LinkWithGroup) => void;
   removeGroupLink: (id: string) => void;
   savingStates: Record<string, boolean>;
   isProductWizard?: boolean;

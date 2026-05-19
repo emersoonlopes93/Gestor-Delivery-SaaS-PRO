@@ -2,19 +2,25 @@ import { useEffect, useRef } from 'react';
 
 declare global {
   interface Window {
-    MercadoPago: any;
+    MercadoPago: {
+      new (publicKey: string, options: { locale: string }): {
+        bricks: () => {
+          create: (type: string, containerId: string, settings: unknown) => Promise<unknown>;
+        };
+      };
+    };
   }
 }
 
 interface CardPaymentProps {
   publicKey: string;
   amount: number;
-  onSubmit: (formData: any) => Promise<void>;
+  onSubmit: (formData: unknown) => Promise<void>;
 }
 
 export function CardPayment({ publicKey, amount, onSubmit }: CardPaymentProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const brickRef = useRef<any>(null);
+  const brickRef = useRef<unknown>(null);
 
   useEffect(() => {
     if (!window.MercadoPago || !containerRef.current) return;
@@ -22,7 +28,7 @@ export function CardPayment({ publicKey, amount, onSubmit }: CardPaymentProps) {
     const mp = new window.MercadoPago(publicKey, { locale: 'pt-BR' });
     const bricksBuilder = mp.bricks();
 
-    const renderCardPaymentBrick = async (builder: any) => {
+    const renderCardPaymentBrick = async (builder: { create: (type: string, containerId: string, settings: unknown) => Promise<unknown> }) => {
       const settings = {
         initialization: {
           amount: amount,
@@ -31,10 +37,10 @@ export function CardPayment({ publicKey, amount, onSubmit }: CardPaymentProps) {
           onReady: () => {
             console.log('Brick is ready');
           },
-          onSubmit: (formData: any) => {
+          onSubmit: (formData: unknown) => {
             return onSubmit(formData);
           },
-          onError: (error: any) => {
+          onError: (error: unknown) => {
             console.error('Brick error', error);
           },
         },

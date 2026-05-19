@@ -42,8 +42,8 @@ export default function IntegrationsPage() {
       if (!response.ok) throw new Error('Falha ao carregar configurações');
       const responseData = await response.json();
       setConfig(responseData.data || responseData);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setLoading(false);
     }
@@ -58,7 +58,15 @@ export default function IntegrationsPage() {
       setError(null);
       setSuccess(false);
 
-      const { id: _id, updatedAt: _updatedAt, createdAt: _createdAt, ...updatePayload } = config as any;
+      const updatePayload = {
+        defaultWhatsAppProvider: config.defaultWhatsAppProvider,
+        defaultAiProvider: config.defaultAiProvider,
+        evolutionUrl: config.evolutionUrl,
+        evolutionGlobalToken: config.evolutionGlobalToken,
+        openaiApiKey: config.openaiApiKey,
+        anthropicApiKey: config.anthropicApiKey,
+        baseAiPrompt: config.baseAiPrompt,
+      };
 
       const response = await fetch('/api/v1/admin/integrations/config', {
         method: 'PATCH',
@@ -73,8 +81,8 @@ export default function IntegrationsPage() {
       
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setSaving(false);
     }
@@ -121,7 +129,7 @@ export default function IntegrationsPage() {
                 <select 
                   className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
                   value={config?.defaultWhatsAppProvider}
-                  onChange={(e) => setConfig(prev => prev ? {...prev, defaultWhatsAppProvider: e.target.value as any} : null)}
+                  onChange={(e) => setConfig(prev => prev ? {...prev, defaultWhatsAppProvider: e.target.value as SystemConfig['defaultWhatsAppProvider']} : null)}
                 >
                   <option value="evolution_go">Evolution Go (Recomendado)</option>
                   <option value="meta_cloud">WhatsApp Business API (Meta)</option>
@@ -176,7 +184,7 @@ export default function IntegrationsPage() {
                 <select 
                   className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
                   value={config?.defaultAiProvider || 'openai'}
-                  onChange={(e) => setConfig(prev => prev ? {...prev, defaultAiProvider: e.target.value as any} : null)}
+                  onChange={(e) => setConfig(prev => prev ? {...prev, defaultAiProvider: e.target.value as SystemConfig['defaultAiProvider']} : null)}
                 >
                   <option value="openai">OpenAI (GPT-4/o)</option>
                   <option value="anthropic">Anthropic (Claude 3.5)</option>

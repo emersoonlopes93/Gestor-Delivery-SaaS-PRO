@@ -83,11 +83,11 @@ export function ProductsPage() {
     }
 
     if (publicationFilter !== 'all') {
-      list = list.filter((p) => (p as any)?.publication?.publicationStatus === publicationFilter);
+      list = list.filter((p) => p.publication?.publicationStatus === publicationFilter);
     }
 
     if (operationalFilter !== 'all') {
-      list = list.filter((p) => (p as any)?.publication?.operationalStatus === operationalFilter);
+      list = list.filter((p) => p.publication?.operationalStatus === operationalFilter);
     }
 
     return [...list].sort((a, b) => {
@@ -228,93 +228,6 @@ export function ProductsPage() {
 
   const formatMoney = (value: unknown) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value ?? 0));
-  };
-
-  const renderMobileCards = (list: ProductWithPublication[]) => {
-    return (
-      <div className="grid grid-cols-1 gap-3 p-1">
-        {list.map((product) => {
-          const categoryName = product.categoryId ? (categoriesById.get(product.categoryId)?.name ?? 'Sem Categoria') : 'Sem Categoria';
-          const pub = product.publication;
-          const pubLabel = pub ? pub.publicationStatus : null;
-          const opLabel = pub ? pub.operationalStatus : null;
-
-          return (
-            <div key={product.id} className="card-premium p-4 flex flex-col gap-3">
-              <div className="flex gap-3">
-                <div className="w-16 h-16 rounded-lg bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 overflow-hidden shrink-0">
-                  {product.image ? (
-                    <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-300 text-[10px] font-black uppercase tracking-widest">
-                      IMG
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-bold text-gray-900 dark:text-gray-100 text-sm truncate">{product.name}</h3>
-                    <span className="font-black text-gray-900 dark:text-gray-100 text-sm shrink-0">
-                      {formatMoney(product.basePrice)}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">
-                    {categoryName}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                    {pubLabel && (
-                      <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
-                        {pubLabel}
-                      </span>
-                    )}
-                    {opLabel && (
-                      <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${opLabel === 'active' ? 'status-badge-success' : 'status-badge-neutral'}`}>
-                        {opLabel}
-                      </span>
-                    )}
-                    <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${product.isActive ? 'status-badge-success' : 'status-badge-danger'}`}>
-                      {product.isActive ? 'Ativo' : 'Inativo'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-gray-800">
-                <button
-                  onClick={() => navigate(`/catalog/products/${product.id}`)}
-                  className="btn-icon w-8 h-8"
-                  title="Editar"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => handleTogglePublication(product)}
-                  className="btn-icon w-8 h-8"
-                  title={pubLabel === 'published' ? 'Desativar publicação' : 'Publicar'}
-                >
-                  {pubLabel === 'published' ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                </button>
-                <button
-                  onClick={() => handleDuplicate(product.id)}
-                  disabled={savingMap[`duplicate-${product.id}`]}
-                  className="btn-icon w-8 h-8"
-                  title="Duplicar"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => handleDelete(product.id)}
-                  className="btn-icon w-8 h-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                  title="Excluir"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
   };
 
   const renderRows = (list: ProductWithPublication[]) => {

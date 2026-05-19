@@ -6,6 +6,16 @@ import { useNavigate } from 'react-router-dom';
 
 type CategoryWithCount = ProductCategory & { productCount: number };
 
+interface CategoryFormData {
+  name: string;
+  description: string;
+  isActive: boolean;
+  isFeatured: boolean;
+  order: number;
+  templateType: 'none' | 'pizza' | 'combo';
+  templateConfig: Record<string, unknown>;
+}
+
 export function CategoriesPage() {
   const [categories, setCategories] = useState<CategoryWithCount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -13,14 +23,14 @@ export function CategoriesPage() {
   const [editingCategory, setEditingCategory] = useState<ProductCategory | null>(null);
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState<any>({
+  const [formData, setFormData] = useState<CategoryFormData>({
     name: '',
     description: '',
     isActive: true,
     isFeatured: false,
     order: 0,
-    templateType: 'none' as any,
-    templateConfig: {} as any,
+    templateType: 'none',
+    templateConfig: {},
   });
 
   useEffect(() => {
@@ -50,8 +60,8 @@ export function CategoriesPage() {
         isActive: category.isActive,
         isFeatured: category.isFeatured,
         order: category.order,
-        templateType: (category as any).templateType || 'none',
-        templateConfig: (category as any).templateConfig || {},
+        templateType: (category as unknown as CategoryFormData).templateType || 'none',
+        templateConfig: (category as unknown as CategoryFormData).templateConfig || {},
       });
     } else {
       setEditingCategory(null);
@@ -338,7 +348,7 @@ export function CategoriesPage() {
                   value={formData.templateType}
                   onChange={(e) => setFormData({ 
                     ...formData, 
-                    templateType: e.target.value,
+                    templateType: e.target.value as 'none' | 'pizza' | 'combo',
                     templateConfig: e.target.value === 'pizza' ? { pricingStrategy: 'highest', allowHalfHalf: true } : {}
                   })}
                   className="input-premium text-sm font-bold"
@@ -352,7 +362,7 @@ export function CategoriesPage() {
                 <div>
                   <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Regra de Preço (Meio a Meio)</label>
                   <select
-                    value={formData.templateConfig?.pricingStrategy || 'highest'}
+                    value={(formData.templateConfig?.pricingStrategy as string) || 'highest'}
                     onChange={(e) => setFormData({ 
                       ...formData, 
                       templateConfig: { ...formData.templateConfig, pricingStrategy: e.target.value }

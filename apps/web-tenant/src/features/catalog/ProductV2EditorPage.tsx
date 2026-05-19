@@ -29,20 +29,26 @@ import {
   UpdateProductOptionGroupLinkDto,
   UpsertPublicationDto,
   Upsell,
+  ProductCategory,
+  CreateProductDto,
+  ProductDetails,
+  OptionItem,
+  ComboPricingType,
 } from '@gestor/types';
 
 
 type TabKey = 'geral' | 'personalizacao' | 'combo' | 'publicacao' | 'vendas';
 
-type ProductDetails = Product & {
-  optionGroupLinks?: Array<ProductOptionGroupLink & { optionGroup: OptionGroup & { items?: any[] } }>;
-  comboSlots?: Array<ComboSlot & { allowedItems?: Array<ComboSlotAllowedItem & { product?: Product }> }>;
-  publication?: (CatalogPublication & { rules?: CatalogAvailabilityRule[] }) | null;
-  optionItemPrices?: Array<{ id: string; optionItemId: string; price: number | string }>;
+type BundleSummary = {
+  subtotal: number;
+  discountTotal: number;
+  finalPrice: number;
+  pricingType: ComboPricingType;
+  pricingValue: number;
 };
 
 type LinkWithGroup = ProductOptionGroupLink & {
-  optionGroup: OptionGroup;
+  optionGroup: OptionGroup & { items?: OptionItem[] };
 };
 
 type SlotWithAllowed = ComboSlot & {
@@ -57,8 +63,6 @@ type BundleItemWithProduct = {
   sortOrder: number;
   product?: Product;
 };
-
-type ComboPricingType = 'fixed_price' | 'discount_percent' | 'discount_amount';
 
 type ProductV2EditorMode = 'product' | 'combo';
 
@@ -102,7 +106,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   const [tab, setTab] = useState<TabKey>(initialTab);
   const [isLoading, setIsLoading] = useState(true);
   const [product, setProduct] = useState<ProductDetails | null>(null);
-  const [categories, setCategories] = useState<any[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [savingStates, setSavingStates] = useState<Record<string, boolean>>({});
   const [pizzaPrices, setPizzaPrices] = useState<Record<string, number>>({});
 
@@ -133,7 +137,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     }
   };
 
-  const [productForm, setProductForm] = useState<any>({
+  const [productForm, setProductForm] = useState<CreateProductDto>({
     name: '',
     categoryId: '',
     type: isComboMode ? 'combo' : 'simple',
@@ -248,7 +252,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     setIsLoading(true);
     try {
       // Carregar categorias sempre
-      const catRes = await api.get<any[]>('/catalog/categories');
+      const catRes = await api.get<ProductCategory[]>('/catalog/categories');
       if (catRes.success) setCategories(catRes.data);
 
       if (isNew) {
@@ -259,8 +263,8 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
       const [prodRes, linksRes, groupsRes, pubRes, rulesRes] = await Promise.all([
         api.get<ProductDetails>(`/catalog/products/${productId}`),
         api.get<LinkWithGroup[]>(`/catalog/products/${productId}/option-groups`),
-        api.get<Array<OptionGroup & { items?: any[] }>>('/catalog/option-groups'),
-        api.get<any>(`/catalog/products/${productId}/publication`),
+        api.get<Array<OptionGroup & { items?: Array<{ id: string; name: string }> }>>('/catalog/option-groups'),
+        api.get<CatalogPublication>(`/catalog/products/${productId}/publication`),
         api.get<CatalogAvailabilityRule[]>(`/catalog/products/${productId}/publication/rules`),
       ]);
 
@@ -271,7 +275,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
         setComboPricingValue(Number(prodRes.data.comboPricingValue ?? prodRes.data.basePrice ?? 0));
         if (prodRes.data.optionItemPrices) {
           const pricesMap: Record<string, number> = {};
-          prodRes.data.optionItemPrices.forEach((p: any) => {
+          prodRes.data.optionItemPrices.forEach((p) => {
             pricesMap[p.optionItemId] = Number(p.price);
           });
           setPizzaPrices(pricesMap);
@@ -314,7 +318,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           try {
             const [bundleRes, summaryRes] = await Promise.all([
               api.get<BundleItemWithProduct[]>(`/catalog/products/${productId}/bundle-items`),
-              api.get<any>(`/catalog/products/${productId}/bundle-items/summary`),
+              api.get<BundleSummary>(`/catalog/products/${productId}/bundle-items/summary`),
             ]);
             if (bundleRes.success) setBundleItems(bundleRes.data);
             if (summaryRes.success) {
@@ -360,7 +364,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
         id && id !== 'new' ? api.get(`/catalog/products/${id}/upsells`) : Promise.resolve({ success: true, data: [] }),
       ]);
       if (allUpsellsRes.success) setAllUpsells(allUpsellsRes.data as Upsell[]);
-      if (prodUpsellsRes.success) setProductUpsells((prodUpsellsRes.data as any[]).map((u: any) => u.id));
+      if (prodUpsellsRes.success) setProductUpsells((prodUpsellsRes.data as Array<{ id: string }>).map((u) => u.id));
     } finally {
       setIsLoading(false);
     }
@@ -844,8 +848,8 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
       }
       setIsBundleItemModalOpen(false);
       await loadAll();
-    } catch (error: any) {
-      const msg = error?.message ?? 'Não foi possível salvar item do combo.';
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Não foi possível salvar item do combo.';
       alert(msg);
     } finally {
       setSavingStates((p) => ({ ...p, saveBundleItem: false }));
@@ -1451,8 +1455,8 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           <div>
             <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Pricing Axis</label>
             <select
-              value={(linkForm.pricingAxis as any) ?? 'secondary'}
-              onChange={(e) => setLinkForm((p) => ({ ...p, pricingAxis: e.target.value as any }))}
+              value={(linkForm.pricingAxis as string) ?? 'secondary'}
+              onChange={(e) => setLinkForm((p) => ({ ...p, pricingAxis: e.target.value as 'primary' | 'secondary' }))}
               className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
             >
               <option value="secondary">secondary</option>
@@ -1660,7 +1664,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             {editingRule ? (
               <select
                 value={ruleForm.channel}
-                onChange={(e) => setRuleForm((p) => ({ ...p, channel: e.target.value as any }))}
+                onChange={(e) => setRuleForm((p) => ({ ...p, channel: e.target.value as CreateAvailabilityRuleDto['channel'] }))}
                 className="input-premium"
               >
                 <option value="storefront_delivery">Delivery</option>

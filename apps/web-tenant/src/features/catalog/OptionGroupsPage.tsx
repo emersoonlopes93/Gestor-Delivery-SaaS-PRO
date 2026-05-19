@@ -373,7 +373,7 @@ export function OptionGroupsPage() {
               <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Tipo</label>
                 <select
                   value={groupForm.selectionType}
-                  onChange={(e) => setGroupForm((p) => ({ ...p, selectionType: e.target.value as any }))}
+                  onChange={(e) => setGroupForm((p) => ({ ...p, selectionType: e.target.value as 'single' | 'multiple' | 'quantity' }))}
                   className="input-premium"
                 >
                   <option value="single">Seleção Única</option>
@@ -473,7 +473,7 @@ export function OptionGroupsPage() {
               <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Impacto</label>
                 <select
                   value={itemForm.priceImpactType ?? 'none'}
-                  onChange={(e) => setItemForm((p) => ({ ...p, priceImpactType: e.target.value as any }))}
+                  onChange={(e) => setItemForm((p) => ({ ...p, priceImpactType: e.target.value as 'none' | 'fixed' | 'replace' | 'percentage' }))}
                   className="input-premium"
                 >
                   <option value="none">Nenhum impacto</option>

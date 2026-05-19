@@ -1,10 +1,11 @@
 import React from 'react';
+import { CatalogPublication, CatalogAvailabilityRule, UpsertPublicationDto } from '@gestor/types';
 
 interface PublicationSettingsProps {
-  publication: any;
-  patchPublication: (payload: any) => void;
-  rules: any[];
-  openRuleModal: (rule?: any) => void;
+  publication: CatalogPublication | null;
+  patchPublication: (payload: UpsertPublicationDto) => void;
+  rules: CatalogAvailabilityRule[];
+  openRuleModal: (rule?: CatalogAvailabilityRule) => void;
   deleteRule: (id: string) => void;
   formatChannelLabel: (channel: string) => string;
   formatDaysLabel: (days: number[]) => string;
@@ -96,8 +97,8 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
         </div>
 
         <div className="mt-4 text-sm font-bold text-gray-700 dark:text-gray-300">
-          Status atual: <span className="font-black">{(publication as any)?.publicationStatus === 'published' ? 'Publicado' : 'Rascunho'}</span>
-          {' | '}Operação: <span className="font-black">{(publication as any)?.operationalStatus === 'active' ? 'Ativo' : ((publication as any)?.operationalStatus === 'inactive' ? 'Inativo' : ((publication as any)?.operationalStatus === 'sold_out_manual' ? 'Esgotado' : 'Oculto'))}</span>
+          Status atual: <span className="font-black">{publication?.publicationStatus === 'published' ? 'Publicado' : 'Rascunho'}</span>
+          {' | '}Operação: <span className="font-black">{publication?.operationalStatus === 'active' ? 'Ativo' : (publication?.operationalStatus === 'inactive' ? 'Inativo' : (publication?.operationalStatus === 'sold_out_manual' ? 'Esgotado' : 'Oculto'))}</span>
         </div>
       </div>
 

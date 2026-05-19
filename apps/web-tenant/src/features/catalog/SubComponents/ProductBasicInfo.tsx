@@ -1,13 +1,21 @@
 import React from 'react';
-import { ProductCategory, ProductDetails } from '@gestor/types';
+import { ProductCategory, ProductDetails, CreateProductDto, CatalogProductType } from '@gestor/types';
+
+type BundleSummary = {
+  subtotal: number;
+  discountTotal: number;
+  finalPrice: number;
+  pricingType: 'fixed_price' | 'discount_percent' | 'discount_amount';
+  pricingValue: number;
+};
 
 interface ProductBasicInfoProps {
   product: ProductDetails | null;
-  productForm: any; // Will be typed later
-  setProductForm: (form: any) => void;
+  productForm: CreateProductDto;
+  setProductForm: (form: CreateProductDto) => void;
   categories: ProductCategory[];
   isComboMode: boolean;
-  bundleSummary: any;
+  bundleSummary: BundleSummary | null;
   imagePreviewUrl: string | null;
   handleSelectImageFile: (file: File | null) => void;
   setImageFile: (file: File | null) => void;
@@ -139,7 +147,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Tipo de Produto</label>
                 <select
                   value={productForm.type}
-                  onChange={(e) => setProductForm({ ...productForm, type: e.target.value })}
+                  onChange={(e) => setProductForm({ ...productForm, type: e.target.value as CatalogProductType })}
                   className="input-premium"
                 >
                   <option value="simple">Produto Simples</option>

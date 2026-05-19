@@ -1,26 +1,48 @@
 import React from 'react';
+import { CreateProductDto, ComboSlot, ComboSlotAllowedItem, Product, ComboPricingType } from '@gestor/types';
+
+type BundleItemWithProduct = {
+  id: string;
+  comboProductId: string;
+  productId: string;
+  qty: number;
+  sortOrder: number;
+  product?: Product;
+};
+
+type BundleSummary = {
+  subtotal: number;
+  discountTotal: number;
+  finalPrice: number;
+  pricingType: 'fixed_price' | 'discount_percent' | 'discount_amount';
+  pricingValue: number;
+};
+
+type SlotWithAllowed = ComboSlot & {
+  allowedItems?: Array<ComboSlotAllowedItem & { product?: Product }>;
+};
 
 interface ComboBuilderProps {
-  productForm: any;
-  bundleItems: any[];
-  bundleSummary: any;
-  comboModeState: string;
-  comboPricingType: string;
-  setComboPricingType: (val: any) => void;
+  productForm: CreateProductDto;
+  bundleItems: BundleItemWithProduct[];
+  bundleSummary: BundleSummary | null;
+  comboModeState: 'bundle' | 'slot';
+  comboPricingType: ComboPricingType;
+  setComboPricingType: (val: ComboPricingType) => void;
   comboPricingValue: number;
   setComboPricingValue: (val: number) => void;
   updateComboPricing: () => void;
-  openBundleItemModal: (item?: any) => void;
+  openBundleItemModal: (item?: BundleItemWithProduct) => void;
   deleteBundleItem: (id: string) => void;
   convertComboToBundle: () => void;
   isComboWizard: boolean;
   goNextWizardStep: () => void;
-  slots: any[];
+  slots: SlotWithAllowed[];
   moveSlot: (id: string, dir: -1 | 1) => void;
-  openAllowedModal: (slotId: string, item?: any) => void;
-  openSlotModal: (slot?: any) => void;
+  openAllowedModal: (slotId: string, item?: ComboSlotAllowedItem & { product?: Product }) => void;
+  openSlotModal: (slot?: SlotWithAllowed) => void;
   deleteSlot: (id: string) => void;
-  moveAllowed: (slot: any, id: string, dir: -1 | 1) => void;
+  moveAllowed: (slot: SlotWithAllowed, id: string, dir: -1 | 1) => void;
   deleteAllowed: (slotId: string, id: string) => void;
   savingStates: Record<string, boolean>;
 }
@@ -102,7 +124,7 @@ export const ComboBuilder: React.FC<ComboBuilderProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <select
                 value={comboPricingType}
-                onChange={(e) => setComboPricingType(e.target.value)}
+                onChange={(e) => setComboPricingType(e.target.value as ComboPricingType)}
                 className="input-premium"
               >
                 <option value="fixed_price">Preço fixo</option>

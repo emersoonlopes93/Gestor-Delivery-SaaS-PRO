@@ -18,7 +18,7 @@ export function TenantsPage() {
     try {
       await api.patch(`/admin/tenants/${tenantId}/status`, { status: newStatus });
       setTenants(prev => 
-        prev.map(t => t.id === tenantId ? { ...t, status: newStatus as any } : t)
+        prev.map(t => t.id === tenantId ? { ...t, status: newStatus as Tenant['status'] } : t)
       );
     } catch (error) {
       console.error('Erro ao atualizar status:', error);

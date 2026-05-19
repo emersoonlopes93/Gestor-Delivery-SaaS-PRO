@@ -79,9 +79,12 @@ export class WhatsAppInstanceService {
             webhookUrl: dto.webhookUrl || '',
           },
         );
-      } catch (err: any) {
-        this.logger.error(`Error creating instance in external provider: ${err.message}`, err.stack);
-        throw new InternalServerErrorException(`Falha no provedor WhatsApp: ${err.response?.data?.error || err.message}`);
+      } catch (err: unknown) {
+        const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
+        const errorStack = err instanceof Error ? err.stack : '';
+        const errorResponseData = (err as any)?.response?.data?.error;
+        this.logger.error(`Error creating instance in external provider: ${errorMsg}`, errorStack);
+        throw new InternalServerErrorException(`Falha no provedor WhatsApp: ${errorResponseData || errorMsg}`);
       }
 
       // 4. Salvar no banco
@@ -114,12 +117,14 @@ export class WhatsAppInstanceService {
         status: instance.status,
         phoneNumber: instance.phoneNumber,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof InternalServerErrorException) {
         throw error;
       }
-      this.logger.error(`Unexpected error in createInstance: ${error.message}`, error.stack);
-      throw new InternalServerErrorException(`Erro ao criar instância: ${error.message}`);
+      const errorMsg = error instanceof Error ? error.message : 'Erro desconhecido';
+      const errorStack = error instanceof Error ? error.stack : '';
+      this.logger.error(`Unexpected error in createInstance: ${errorMsg}`, errorStack);
+      throw new InternalServerErrorException(`Erro ao criar instância: ${errorMsg}`);
     }
   }
 

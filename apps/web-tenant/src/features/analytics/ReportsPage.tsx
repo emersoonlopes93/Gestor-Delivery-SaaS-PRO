@@ -216,7 +216,15 @@ export function ReportsPage() {
   );
 }
 
-function MetricCard({ title, value, icon, trend, trendUp }: any) {
+interface MetricCardProps {
+  title: string;
+  value: string;
+  icon: React.ReactNode;
+  trend: string;
+  trendUp: boolean;
+}
+
+function MetricCard({ title, value, icon, trend, trendUp }: MetricCardProps) {
   return (
     <div className="bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
       <div className="flex items-center justify-between mb-4">

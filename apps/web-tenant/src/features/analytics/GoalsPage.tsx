@@ -171,7 +171,7 @@ function GoalFormModal({ onClose }: { onClose: () => void }) {
   });
 
   const mutation = useMutation({
-    mutationFn: (data: any) => api.post('/goals', data),
+    mutationFn: (data: Partial<GoalDTO>) => api.post('/goals', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goals'] });
       onClose();
@@ -210,7 +210,7 @@ function GoalFormModal({ onClose }: { onClose: () => void }) {
               <select 
                 className="w-full border border-gray-200 dark:border-gray-800 p-2 rounded-lg"
                 value={formData.type}
-                onChange={e => setFormData({...formData, type: e.target.value as any})}
+                onChange={e => setFormData({...formData, type: e.target.value as GoalType})}
               >
                 <option value={GoalType.REVENUE}>Faturamento (R$)</option>
                 <option value={GoalType.ORDERS}>Volume de Pedidos</option>
