@@ -56,11 +56,14 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
     },
   });
 
-  const updateFormData = (field: keyof CreateCampaignDto, value: any) => {
+  const updateFormData = <K extends keyof CreateCampaignDto>(field: K, value: CreateCampaignDto[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const updateSegmentRules = (field: string, value: any) => {
+  const updateSegmentRules = <K extends keyof CreateCampaignDto['segmentRules']>(
+    field: K, 
+    value: CreateCampaignDto['segmentRules'][K]
+  ) => {
     setFormData(prev => ({
       ...prev,
       segmentRules: { ...prev.segmentRules, [field]: value }

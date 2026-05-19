@@ -4,6 +4,7 @@ import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { StockMovementService } from './stock-movement.service';
 import { CreateStockMovementDTO, StockMovementDTO } from '@gestor/types';
+import { AuthenticatedRequest } from '../common/interfaces/request.interface';
 
 @Controller('inventory/movements')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -15,7 +16,7 @@ export class StockMovementsController {
   async findAll(
     @CurrentTenant() tenantId: string,
     @Query('ingredientId') ingredientId?: string
-  ): Promise<StockMovementDTO[]> {
+  ): Promise<Array<StockMovementDTO & { ingredient?: { name: string } }>> {
     return this.movementService.findAll(tenantId, ingredientId);
   }
 
@@ -23,7 +24,7 @@ export class StockMovementsController {
   @RequirePermissions('inventory.update')
   async createManual(
     @CurrentTenant() tenantId: string,
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Body() dto: CreateStockMovementDTO
   ): Promise<StockMovementDTO> {
     const userId = req.user.id;

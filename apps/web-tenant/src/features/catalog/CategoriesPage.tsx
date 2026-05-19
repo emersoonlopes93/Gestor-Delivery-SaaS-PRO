@@ -60,8 +60,8 @@ export function CategoriesPage() {
         isActive: category.isActive,
         isFeatured: category.isFeatured,
         order: category.order,
-        templateType: (category as unknown as CategoryFormData).templateType || 'none',
-        templateConfig: (category as unknown as CategoryFormData).templateConfig || {},
+        templateType: category.templateType || 'none',
+        templateConfig: category.templateConfig || {},
       });
     } else {
       setEditingCategory(null);

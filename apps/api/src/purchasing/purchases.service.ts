@@ -10,7 +10,7 @@ import {
   FinancialStatus,
   UnitType
 } from '@gestor/types';
-import type { Prisma } from '@prisma/client';
+import { Prisma, UnitType as PrismaUnitType } from '@prisma/client';
 
 @Injectable()
 export class PurchasesService {
@@ -145,6 +145,17 @@ export class PurchasesService {
     });
   }
 
+  private mapUnit(unit: PrismaUnitType): UnitType {
+    const map: Record<PrismaUnitType, UnitType> = {
+      [PrismaUnitType.un]: UnitType.UN,
+      [PrismaUnitType.g]: UnitType.G,
+      [PrismaUnitType.kg]: UnitType.KG,
+      [PrismaUnitType.ml]: UnitType.ML,
+      [PrismaUnitType.l]: UnitType.L,
+    };
+    return map[unit];
+  }
+
   private mapToDTO(p: Prisma.PurchaseGetPayload<{ include: { supplier: true, items: { include: { ingredient: true } } } }>): PurchaseDTO {
     return {
       ...p,
@@ -159,7 +170,7 @@ export class PurchasesService {
         unitCost: Number(item.unitCost),
         totalCost: Number(item.totalCost),
         ingredientName: item.ingredient?.name,
-        ingredientUnit: item.ingredient?.unit as unknown as UnitType
+        ingredientUnit: item.ingredient?.unit ? this.mapUnit(item.ingredient.unit) : undefined
       }))
     };
   }

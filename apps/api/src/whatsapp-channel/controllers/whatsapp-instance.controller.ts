@@ -15,14 +15,7 @@ import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions as Permissions } from '../../common/decorators';
 
 import { Request as ExpressRequest } from 'express';
-
-interface AuthenticatedRequest extends ExpressRequest {
-  user: {
-    tenantId: string;
-    id: string;
-    [key: string]: any;
-  };
-}
+import { AuthenticatedRequest } from '../../common/interfaces/request.interface';
 
 @Controller('whatsapp/instance')
 @UseGuards(JwtAuthGuard, PermissionsGuard)

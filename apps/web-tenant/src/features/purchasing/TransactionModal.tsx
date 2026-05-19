@@ -4,7 +4,8 @@ import { api } from '../../lib/api-client';
 import { 
   FinancialAccountDTO,
   FinancialTransactionType,
-  FinancialStatus
+  FinancialStatus,
+  CreateFinancialTransactionDTO
 } from '@gestor/types';
 import { DollarSign, Loader2 } from 'lucide-react';
 
@@ -19,11 +20,10 @@ import { Modal } from '../../components/Modal';
 export function TransactionModal({ isOpen, onClose, onSave }: TransactionModalProps) {
   const [accounts, setAccounts] = useState<FinancialAccountDTO[]>([]);
 
-  const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<any>({
+  const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<CreateFinancialTransactionDTO>({
     defaultValues: {
       type: FinancialTransactionType.EXPENSE,
       status: FinancialStatus.PAID,
-      paymentDate: new Date().toISOString().split('T')[0],
     }
   });
 
@@ -42,7 +42,7 @@ export function TransactionModal({ isOpen, onClose, onSave }: TransactionModalPr
     }
   };
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: CreateFinancialTransactionDTO) => {
     try {
       const res = await api.post('/finance/transactions', {
         ...data,

@@ -5,9 +5,10 @@ import {
   CreateInventoryCountDTO, 
   InventoryCountStatus, 
   StockMovementType,
-  UnitType
+  UnitType,
+  UnitType as PrismaUnitType
 } from '@gestor/types';
-import type { Prisma } from '@prisma/client';
+import { Prisma, UnitType as PrismaClientUnitType } from '@prisma/client';
 
 @Injectable()
 export class InventoryCountService {
@@ -102,6 +103,17 @@ export class InventoryCountService {
     });
   }
 
+  private mapUnit(unit: PrismaClientUnitType): UnitType {
+    const map: Record<PrismaClientUnitType, UnitType> = {
+      [PrismaClientUnitType.un]: UnitType.UN,
+      [PrismaClientUnitType.g]: UnitType.G,
+      [PrismaClientUnitType.kg]: UnitType.KG,
+      [PrismaClientUnitType.ml]: UnitType.ML,
+      [PrismaClientUnitType.l]: UnitType.L,
+    };
+    return map[unit];
+  }
+
   private mapToDTO(c: Prisma.InventoryCountGetPayload<{ include: { items: { include: { ingredient: true } } } }>): InventoryCountDTO {
     return {
       ...c,
@@ -114,7 +126,7 @@ export class InventoryCountService {
         physicalStock: Number(item.physicalStock),
         adjustedQuantity: Number(item.adjustedQuantity),
         ingredientName: item.ingredient?.name,
-        ingredientUnit: item.ingredient?.unit as unknown as UnitType
+        ingredientUnit: item.ingredient?.unit ? this.mapUnit(item.ingredient.unit) : undefined
       }))
     };
   }

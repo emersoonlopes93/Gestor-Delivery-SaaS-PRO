@@ -25,7 +25,7 @@ export class CampaignProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<CampaignJobData, any, string>): Promise<any> {
+  async process(job: Job<CampaignJobData, { success: boolean; messageId?: string; skipped?: boolean; reason?: string }, string>): Promise<{ success: boolean; messageId?: string; skipped?: boolean; reason?: string }> {
     const { campaignId, dispatchId, tenantId, phone, customerName, messageTemplate, mediaUrl } = job.data;
 
     this.logger.log(`Processing campaign dispatch ${dispatchId} for phone ${phone}`);
@@ -49,7 +49,7 @@ export class CampaignProcessor extends WorkerHost {
           failReason: 'Opt-out: Cliente solicitou não receber mensagens.' 
         },
       });
-      return { skipped: true, reason: 'opt-out' };
+      return { success: false, skipped: true, reason: 'opt-out' };
     }
 
     // 2. Personalize Message
@@ -97,13 +97,19 @@ export class CampaignProcessor extends WorkerHost {
 
       return { success: result.success, messageId: result.messageId };
 
-    } catch (error: any) {
-      this.logger.error(`Failed to send dispatch ${dispatchId}: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error processing dispatch ${dispatchId}: ${message}`);
+      
       await this.prisma.campaignDispatch.update({
         where: { id: dispatchId },
-        data: { status: 'failed', failReason: error.message },
+        data: {
+          status: 'failed',
+          failReason: message,
+        },
       });
-      throw error; // Re-throw to allow BullMQ to handle retries
+
+      throw error;
     }
   }
 

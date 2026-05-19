@@ -73,14 +73,16 @@ export class StockMovementService {
     });
   }
 
-  async findAll(tenantId: string, ingredientId?: string): Promise<StockMovementDTO[]> {
+  async findAll(tenantId: string, ingredientId?: string): Promise<Array<StockMovementDTO & { ingredient?: { name: string } }>> {
     const movements = await this.prisma.stockMovement.findMany({
       where: { 
         tenantId,
         ...(ingredientId ? { ingredientId } : {}),
       },
       include: {
-        ingredient: true,
+        ingredient: {
+          select: { name: true }
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: 100, // Safety limit
@@ -89,7 +91,7 @@ export class StockMovementService {
     return movements.map(m => this.mapToDTO(m));
   }
 
-  private mapToDTO(m: StockMovement): StockMovementDTO {
+  private mapToDTO(m: StockMovement & { ingredient?: { name: string } }): StockMovementDTO & { ingredient?: { name: string } } {
     return {
       ...m,
       type: this.mapType(m.type),
@@ -98,6 +100,7 @@ export class StockMovementService {
       notes: m.notes ?? undefined,
       quantity: Number(m.quantity),
       unitCost: m.unitCost ? Number(m.unitCost) : undefined,
+      ingredient: m.ingredient,
     };
   }
 }

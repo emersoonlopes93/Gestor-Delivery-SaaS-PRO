@@ -24,21 +24,9 @@ import type {
 
 import { PosFulfillmentType } from '@gestor/types';
 
-  private mapPaymentMethod(p: PrismaPaymentMethod): SharedPaymentMethod {
-    const map: Record<PrismaPaymentMethod, SharedPaymentMethod> = {
-      cash: SharedPaymentMethod.cash,
-      credit_card: SharedPaymentMethod.credit_card,
-      debit_card: SharedPaymentMethod.debit_card,
-      pix: SharedPaymentMethod.pix,
-      online: SharedPaymentMethod.online,
-      other: SharedPaymentMethod.other,
-    };return map[p];
-  }
-
-  private mapPosFulfillment(f: string | undefined): FulfillmentType {
-    if (f === 'pickup') return FulfillmentType.pickup;
-    return FulfillmentType.delivery;
-  }  constructor(
+@Injectable()
+export class PosService {
+  constructor(
     private readonly prisma: PrismaService,
     private readonly checkoutValidator: CheckoutValidatorService,
     private readonly cashService: CashService,
@@ -47,6 +35,23 @@ import { PosFulfillmentType } from '@gestor/types';
     private readonly theoreticalStockService: TheoreticalStockService,
     private readonly kdsService: KdsService,
   ) {}
+
+  private mapPaymentMethod(p: PrismaPaymentMethod): SharedPaymentMethod {
+    const map: Record<PrismaPaymentMethod, SharedPaymentMethod> = {
+      cash: SharedPaymentMethod.cash,
+      credit_card: SharedPaymentMethod.credit_card,
+      debit_card: SharedPaymentMethod.debit_card,
+      pix: SharedPaymentMethod.pix,
+      card_on_delivery: SharedPaymentMethod.card_on_delivery,
+      other: SharedPaymentMethod.other,
+    };
+    return map[p];
+  }
+
+  private mapPosFulfillment(f: string | undefined): FulfillmentType {
+    if (f === 'pickup') return FulfillmentType.pickup;
+    return FulfillmentType.delivery;
+  }
 
   // ----------------------------------------------------------------
   // CREATE POS SALE (Finalize)
@@ -475,10 +480,10 @@ import { PosFulfillmentType } from '@gestor/types';
     const data: PosOrderListItemDTO[] = orders.map((o) => ({
       id: o.id,
       orderNumber: o.orderNumber,
-      status: o.status as string,
-      fulfillmentType: o.fulfillmentType as string,
+      status: o.status as OrderStatus,
+      fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
       customerName: o.customerName,
-      paymentMethod: (o.paymentMethod as string) || '',
+      paymentMethod: o.paymentMethod ? this.mapPaymentMethod(o.paymentMethod) : SharedPaymentMethod.other,
       total: Number(o.total),
       discountTotal: Number(o.discountTotal),
       sourceChannel: o.sourceChannel,
@@ -603,9 +608,9 @@ import { PosFulfillmentType } from '@gestor/types';
       serviceFee: Number(order.serviceFee),
       total: Number(order.total),
       sourceChannel: order.sourceChannel,
-        notes: order.notes,
-        paymentMethod: this.mapPaymentMethod(order.paymentMethod),
-        changeFor: order.changeFor ? Number(order.changeFor) : null,
+      notes: order.notes,
+      paymentMethod: order.paymentMethod ? this.mapPaymentMethod(order.paymentMethod) : SharedPaymentMethod.other,
+      changeFor: order.changeFor ? Number(order.changeFor) : null,
       customerId: order.customerId,
       waiterId: order.waiterId,
       tableNumber: order.tableNumber,

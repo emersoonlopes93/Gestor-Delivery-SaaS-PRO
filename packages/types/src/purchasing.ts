@@ -4,28 +4,34 @@ export interface SupplierDTO {
   id: string;
   tenantId: string;
   name: string;
-  cnpj: string | null;
-  email: string | null;
-  phone: string | null;
-  active: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  cnpj?: string;
+  email?: string;
+  phone?: string;
+  contactName?: string;
+  category?: string;
+  isActive: boolean;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export interface CreateSupplierDTO {
   name: string;
-  cnpj?: string | null;
-  email?: string | null;
-  phone?: string | null;
-  active?: boolean;
+  cnpj?: string;
+  email?: string;
+  phone?: string;
+  contactName?: string;
+  category?: string;
+  isActive?: boolean;
 }
 
 export interface UpdateSupplierDTO {
   name?: string;
-  cnpj?: string | null;
-  email?: string | null;
-  phone?: string | null;
-  active?: boolean;
+  cnpj?: string;
+  email?: string;
+  phone?: string;
+  contactName?: string;
+  category?: string;
+  isActive?: boolean;
 }
 
 export interface PurchaseDTO {

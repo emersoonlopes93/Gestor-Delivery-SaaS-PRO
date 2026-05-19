@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export type CategoryTemplateType = 'none' | 'pizza';
+export type CategoryTemplateType = 'none' | 'pizza' | 'combo';
 
 export interface ProductCategory {
   id: string;
@@ -10,7 +10,7 @@ export interface ProductCategory {
   description?: string | null;
   image?: string | null;
   templateType: CategoryTemplateType;
-  templateConfig?: unknown | null;
+  templateConfig?: Record<string, unknown> | null;
   isActive: boolean;
   isFeatured: boolean;
   order: number;

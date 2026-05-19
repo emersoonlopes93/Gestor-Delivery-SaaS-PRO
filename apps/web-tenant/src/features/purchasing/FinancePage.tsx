@@ -2,12 +2,31 @@ import { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
 import { Wallet, ArrowUpCircle, ArrowDownCircle, Plus, Calendar, MoreVertical, Banknote, Building, Download, Share2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { FinancialTransactionDTO } from '@gestor/types';
 
 import { TransactionModal } from './TransactionModal';
 
+interface DashboardMetrics {
+  financial: {
+    cashBalance: number;
+    totalIncome: number;
+    totalExpenses: number;
+  };
+  commercial: {
+    totalRevenue: number;
+    totalOrders: number;
+    averageTicket: number;
+  };
+  costs: {
+    estimatedCMV: number;
+    estimatedGrossMargin: number;
+    grossMarginPercentage: number;
+  };
+}
+
 export function FinancePage() {
-  const [metrics, setMetrics] = useState<any>(null);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [transactions, setTransactions] = useState<FinancialTransactionDTO[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -21,8 +40,8 @@ export function FinancePage() {
       const today = format(new Date(), 'yyyy-MM-dd');
       // Fetch metrics and transactions in parallel
       const [metricsRes, transRes] = await Promise.all([
-        api.get<any>(`/analytics/dashboard?startDate=${today}&endDate=${today}`),
-        api.get<any[]>('/finance/transactions')
+        api.get<DashboardMetrics>(`/analytics/dashboard?startDate=${today}&endDate=${today}`),
+        api.get<FinancialTransactionDTO[]>('/finance/transactions')
       ]);
 
       if (metricsRes.success) setMetrics(metricsRes.data);
@@ -121,7 +140,11 @@ export function FinancePage() {
         <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 bg-primary-600 border-none">
           <div className="text-xs font-bold text-primary-200 uppercase mb-1">Lucro Operacional</div>
           <div className="text-2xl font-black text-white">R$ {( (metrics?.financial?.totalIncome || 0) - (metrics?.financial?.totalExpenses || 0) ).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-          <div className="mt-3 text-xs text-primary-200">Margem: {metrics?.financial?.totalIncome > 0 ? (( (metrics?.financial?.totalIncome - metrics?.financial?.totalExpenses) / metrics?.financial?.totalIncome ) * 100).toFixed(1) : 0}%</div>
+          <div className="mt-3 text-xs text-primary-200">
+            Margem: {metrics?.financial && metrics.financial.totalIncome > 0 
+              ? (((metrics.financial.totalIncome - metrics.financial.totalExpenses) / metrics.financial.totalIncome) * 100).toFixed(1) 
+              : 0}%
+          </div>
         </div>
       </div>
 

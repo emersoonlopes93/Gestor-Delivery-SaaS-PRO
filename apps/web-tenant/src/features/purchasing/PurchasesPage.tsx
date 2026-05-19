@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
-import { PurchaseDTO, PurchaseStatus, PaymentStatus } from '@gestor/types';
+import { PurchaseDTO, PurchaseStatus, PaymentStatus, CreatePurchaseDTO } from '@gestor/types';
 import { PurchaseModal } from './PurchaseModal';
-import { ShoppingCart, Plus, Search, Package, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { LucideIcon, ShoppingCart, Plus, Search, Package, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -30,7 +30,7 @@ export function PurchasesPage() {
     }
   };
 
-  const handleSave = async (data: any) => {
+  const handleSave = async (data: CreatePurchaseDTO) => {
     try {
       await api.post('/purchasing/purchases', data);
       loadPurchases();
@@ -41,7 +41,7 @@ export function PurchasesPage() {
     }
   };
 
-  const statusMap: Record<PurchaseStatus, { label: string, color: string, icon: any }> = {
+  const statusMap: Record<PurchaseStatus, { label: string, color: string, icon: LucideIcon }> = {
     [PurchaseStatus.DRAFT]: { label: 'Rascunho', color: 'bg-gray-100 text-gray-700 dark:text-gray-300', icon: Clock },
     [PurchaseStatus.PENDING]: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-700', icon: AlertCircle },
     [PurchaseStatus.RECEIVED]: { label: 'Recebido', color: 'bg-green-100 text-green-700', icon: CheckCircle2 },

@@ -1,25 +1,34 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { UpdateIngredientDTO, IngredientDTO, UnitType } from '@gestor/types';
-import { UnitType as PrismaUnitType } from '@prisma/client';
+import { UpdateIngredientDTO, IngredientDTO, UnitType, CreateIngredientDTO } from '@gestor/types';
+import { UnitType as PrismaUnitType, Prisma } from '@prisma/client';
+
+type IngredientWithRelations = Prisma.IngredientGetPayload<{}>;
 
 @Injectable()
 export class IngredientsService {
   constructor(private prisma: PrismaService) {}
 
   private mapUnit(unit: PrismaUnitType): UnitType {
-    switch (unit) {
-      case PrismaUnitType.un:
-        return UnitType.UN;
-      case PrismaUnitType.g:
-        return UnitType.G;
-      case PrismaUnitType.kg:
-        return UnitType.KG;
-      case PrismaUnitType.ml:
-        return UnitType.ML;
-      case PrismaUnitType.l:
-        return UnitType.L;
-    }
+    const map: Record<PrismaUnitType, UnitType> = {
+      [PrismaUnitType.un]: UnitType.UN,
+      [PrismaUnitType.g]: UnitType.G,
+      [PrismaUnitType.kg]: UnitType.KG,
+      [PrismaUnitType.ml]: UnitType.ML,
+      [PrismaUnitType.l]: UnitType.L,
+    };
+    return map[unit];
+  }
+
+  private mapPrismaUnit(unit: UnitType): PrismaUnitType {
+    const map: Record<UnitType, PrismaUnitType> = {
+      [UnitType.UN]: PrismaUnitType.un,
+      [UnitType.G]: PrismaUnitType.g,
+      [UnitType.KG]: PrismaUnitType.kg,
+      [UnitType.ML]: PrismaUnitType.ml,
+      [UnitType.L]: PrismaUnitType.l,
+    };
+    return map[unit];
   }
 
   async findAll(tenantId: string): Promise<IngredientDTO[]> {
@@ -42,7 +51,7 @@ export class IngredientsService {
     return this.mapToDTO(ingredient);
   }
 
-  async create(tenantId: string, dto: any): Promise<IngredientDTO> {
+  async create(tenantId: string, dto: CreateIngredientDTO): Promise<IngredientDTO> {
     const safeSku = dto.sku && dto.sku.trim() !== '' ? dto.sku.trim() : null;
 
     if (safeSku) {
@@ -64,8 +73,8 @@ export class IngredientsService {
           name: ingredientData.name,
           sku: safeSku,
           description: ingredientData.description,
-          unit: ingredientData.unit as PrismaUnitType,
-          purchaseUnit: ingredientData.purchaseUnit as PrismaUnitType,
+          unit: this.mapPrismaUnit(ingredientData.unit),
+          purchaseUnit: ingredientData.purchaseUnit ? this.mapPrismaUnit(ingredientData.purchaseUnit) : this.mapPrismaUnit(ingredientData.unit),
           conversionFactor: ingredientData.conversionFactor || 1,
           category: ingredientData.category,
           minStock: ingredientData.minStock,
@@ -73,7 +82,7 @@ export class IngredientsService {
           currentStock: 0,
           currentCost: 0,
         },
-      }) as any;
+      });
 
       // 2. Handle Initial Purchase if provided
       if (initialPurchase && initialPurchase.quantity > 0) {
@@ -128,7 +137,9 @@ export class IngredientsService {
         where: { id: ingredient.id }
       });
 
-      return this.mapToDTO(finalIngredient!);
+      if (!finalIngredient) throw new Error('Falha ao recuperar ingrediente criado');
+
+      return this.mapToDTO(finalIngredient);
     });
   }
 
@@ -155,14 +166,14 @@ export class IngredientsService {
         name: updateData.name,
         sku: safeSku,
         description: updateData.description,
-        unit: updateData.unit as PrismaUnitType,
-        purchaseUnit: updateData.purchaseUnit as PrismaUnitType,
+        unit: updateData.unit ? this.mapPrismaUnit(updateData.unit) : undefined,
+        purchaseUnit: updateData.purchaseUnit ? this.mapPrismaUnit(updateData.purchaseUnit) : undefined,
         conversionFactor: updateData.conversionFactor,
         category: updateData.category,
         minStock: updateData.minStock,
         isActive: updateData.isActive,
       },
-    }) as any;
+    });
 
     return this.mapToDTO(updated);
   }
@@ -192,7 +203,7 @@ export class IngredientsService {
     };
   }
 
-  private mapToDTO(ing: any): IngredientDTO {
+  private mapToDTO(ing: IngredientWithRelations): IngredientDTO {
     return {
       id: ing.id,
       tenantId: ing.tenantId,

@@ -96,11 +96,10 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const payload = { ...formData };
-      if (!payload.initialPurchaseActive) {
+      const { initialPurchaseActive: _, ...payload } = formData;
+      if (!formData.initialPurchaseActive) {
         delete payload.initialPurchase;
       }
-      delete (payload as any).initialPurchaseActive;
       
       await onSave(payload);
       onClose();

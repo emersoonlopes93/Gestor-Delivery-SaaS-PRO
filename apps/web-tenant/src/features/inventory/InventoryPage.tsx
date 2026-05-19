@@ -7,10 +7,17 @@ import { Package, RefreshCcw, TrendingDown, DollarSign, Search, Filter, AlertTri
 
 type InventoryTab = 'ingredients' | 'movements' | 'losses' | 'counts';
 
+interface InventorySummary {
+  totalValue: number;
+  lowStockItems: number;
+  outOfStockItems: number;
+  totalActiveItems: number;
+}
+
 export function InventoryPage() {
   const [activeTab, setActiveTab] = useState<InventoryTab>('ingredients');
   const [ingredients, setIngredients] = useState<IngredientDTO[]>([]);
-  const [summary, setSummary] = useState<any>(null);
+  const [summary, setSummary] = useState<InventorySummary | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState<IngredientDTO | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -23,7 +30,7 @@ export function InventoryPage() {
     try {
       const [ingRes, summaryRes] = await Promise.all([
         api.get<IngredientDTO[]>('/inventory/ingredients'),
-        api.get<any>('/inventory/ingredients/summary'),
+        api.get<InventorySummary>('/inventory/ingredients/summary'),
       ]);
       if (ingRes.success) setIngredients(ingRes.data);
       if (summaryRes.success) setSummary(summaryRes.data);
@@ -93,12 +100,12 @@ export function InventoryPage() {
           </div>
         </div>
 
-        <div className={`card-premium p-4 flex flex-col justify-between border-l-4 ${summary?.lowStockItems > 0 ? 'border-l-amber-500' : 'border-l-green-500'}`}>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Estoque Baixo</span>
-            <AlertTriangle size={16} className={summary?.lowStockItems > 0 ? 'text-amber-500' : 'text-gray-300'} />
+        <div className={`card-premium p-4 flex flex-col justify-between border-l-4 ${(summary?.lowStockItems || 0) > 0 ? 'border-l-amber-500' : 'border-l-green-500'}`}>
+          <div className="flex items-start justify-between mb-2">
+            <span className="text-sm font-medium text-gray-500">Insumos Críticos</span>
+            <AlertTriangle size={16} className={(summary?.lowStockItems || 0) > 0 ? 'text-amber-500' : 'text-gray-300'} />
           </div>
-          <div className="text-xl font-bold text-gray-900 dark:text-gray-100">{summary?.lowStockItems || 0} itens</div>
+          <div className="text-2xl font-black text-gray-900 dark:text-gray-100">{summary?.lowStockItems || 0}</div>
         </div>
 
         <div className="card-premium p-4 flex flex-col justify-between border-l-4 border-l-red-500">

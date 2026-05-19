@@ -30,7 +30,7 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
   });
 
   const items = watch("items");
-  const totalValue = items.reduce((acc: number, item: any) => acc + (Number(item.quantity) * Number(item.unitCost)), 0);
+  const totalValue = items.reduce((acc: number, item) => acc + (Number(item.quantity) * Number(item.unitCost)), 0);
 
   useEffect(() => {
     if (isOpen) {
@@ -138,7 +138,7 @@ export function PurchaseModal({ isOpen, onClose, onSave }: PurchaseModalProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {fields.map((field: any, index: number) => (
+                {fields.map((field, index) => (
                   <tr key={field.id} className="group">
                     <td className="py-3 px-2">
                       <select

@@ -1,16 +1,18 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { SupplierDTO, CreateSupplierDTO, UpdateSupplierDTO } from '@gestor/types';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class SuppliersService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(tenantId: string): Promise<SupplierDTO[]> {
-    return this.prisma.supplier.findMany({
+    const suppliers = await this.prisma.supplier.findMany({
       where: { tenantId },
       orderBy: { name: 'asc' },
-    }) as unknown as Promise<SupplierDTO[]>;
+    });
+    return suppliers.map(s => this.mapToDTO(s));
   }
 
   async findOne(tenantId: string, id: string): Promise<SupplierDTO> {
@@ -22,7 +24,7 @@ export class SuppliersService {
       throw new NotFoundException('Fornecedor não encontrado');
     }
 
-    return supplier as unknown as SupplierDTO;
+    return this.mapToDTO(supplier);
   }
 
   async create(tenantId: string, dto: CreateSupplierDTO): Promise<SupplierDTO> {
@@ -36,12 +38,19 @@ export class SuppliersService {
       }
     }
 
-    return this.prisma.supplier.create({
+    const supplier = await this.prisma.supplier.create({
       data: {
-        ...dto,
+        name: dto.name,
+        cnpj: dto.cnpj,
+        email: dto.email,
+        phone: dto.phone,
+        contactName: dto.contactName,
+        category: dto.category,
+        isActive: true,
         tenantId,
       },
-    }) as unknown as Promise<SupplierDTO>;
+    });
+    return this.mapToDTO(supplier);
   }
 
   async update(tenantId: string, id: string, dto: UpdateSupplierDTO): Promise<SupplierDTO> {
@@ -57,10 +66,35 @@ export class SuppliersService {
       }
     }
 
-    return this.prisma.supplier.update({
+    const updated = await this.prisma.supplier.update({
       where: { id },
-      data: dto as any,
-    }) as unknown as Promise<SupplierDTO>;
+      data: {
+        name: dto.name,
+        cnpj: dto.cnpj,
+        email: dto.email,
+        phone: dto.phone,
+        contactName: dto.contactName,
+        category: dto.category,
+        isActive: dto.isActive,
+      },
+    });
+    return this.mapToDTO(updated);
+  }
+
+  private mapToDTO(s: Prisma.SupplierGetPayload<{}>): SupplierDTO {
+    return {
+      id: s.id,
+      tenantId: s.tenantId,
+      name: s.name,
+      cnpj: s.cnpj ?? undefined,
+      email: s.email ?? undefined,
+      phone: s.phone ?? undefined,
+      contactName: s.contactName ?? undefined,
+      category: s.category ?? undefined,
+      isActive: s.isActive,
+      createdAt: s.createdAt,
+      updatedAt: s.updatedAt,
+    };
   }
 
   async remove(tenantId: string, id: string): Promise<void> {

@@ -28,13 +28,17 @@ import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
 import { OrdersGateway } from './orders.gateway';
 
+@Injectable()
+export class OrdersService {
+  private readonly logger = new Logger('OrdersService');
+
   private mapPaymentMethod(p: PrismaPaymentMethod): SharedPaymentMethod {
     const map: Record<PrismaPaymentMethod, SharedPaymentMethod> = {
       cash: SharedPaymentMethod.cash,
       credit_card: SharedPaymentMethod.credit_card,
       debit_card: SharedPaymentMethod.debit_card,
       pix: SharedPaymentMethod.pix,
-      online: SharedPaymentMethod.online,
+      card_on_delivery: SharedPaymentMethod.card_on_delivery,
       other: SharedPaymentMethod.other,
     };
     return map[p];
@@ -44,7 +48,6 @@ import { OrdersGateway } from './orders.gateway';
     if (f === 'pickup') return 'pickup';
     return 'delivery';
   }
-  private readonly logger = new Logger('OrdersService');
 
   constructor(
     private readonly prisma: PrismaService,

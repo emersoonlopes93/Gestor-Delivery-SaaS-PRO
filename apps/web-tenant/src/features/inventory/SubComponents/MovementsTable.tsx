@@ -3,10 +3,10 @@ import { api } from '../../../lib/api-client';
 import { StockMovementDTO, StockMovementType } from '@gestor/types';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ArrowUpCircle, ArrowDownCircle, RefreshCcw, Trash2, ShoppingCart, ClipboardList } from 'lucide-react';
+import { LucideIcon, ArrowUpCircle, ArrowDownCircle, RefreshCcw, Trash2, ShoppingCart, ClipboardList } from 'lucide-react';
 
 export function MovementsTable() {
-  const [movements, setMovements] = useState<StockMovementDTO[]>([]);
+  const [movements, setMovements] = useState<Array<StockMovementDTO & { ingredient?: { name: string } }>>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export function MovementsTable() {
     }
   };
 
-  const typeMap: Record<StockMovementType, { label: string, color: string, icon: any }> = {
+  const typeMap: Record<StockMovementType, { label: string, color: string, icon: LucideIcon }> = {
     [StockMovementType.IN]: { label: 'Entrada', color: 'text-green-600 bg-green-50', icon: ArrowUpCircle },
     [StockMovementType.OUT]: { label: 'Saída', color: 'text-red-600 bg-red-50', icon: ArrowDownCircle },
     [StockMovementType.ADJUST]: { label: 'Ajuste', color: 'text-blue-600 bg-blue-50', icon: RefreshCcw },
@@ -68,7 +68,7 @@ export function MovementsTable() {
                   </span>
                 </td>
                 <td className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-gray-100">
-                  {(m as any).ingredient?.name || 'Insumo #'+m.ingredientId.slice(0,4)}
+                  {m.ingredient?.name || 'Insumo #'+m.ingredientId.slice(0,4)}
                 </td>
                 <td className={`px-6 py-4 text-sm font-black text-right ${['out', 'waste', 'theoretical_depletion'].includes(m.type) ? 'text-red-500' : 'text-green-500'}`}>
                   {['out', 'waste', 'theoretical_depletion'].includes(m.type) ? '-' : '+'}{m.quantity}

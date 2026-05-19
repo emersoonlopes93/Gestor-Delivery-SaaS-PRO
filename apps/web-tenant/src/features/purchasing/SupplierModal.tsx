@@ -22,7 +22,7 @@ export function SupplierModal({ isOpen, onClose, onSave, editingSupplier }: Supp
         cnpj: editingSupplier.cnpj || '',
         email: editingSupplier.email || '',
         phone: editingSupplier.phone || '',
-        active: editingSupplier.active,
+        isActive: editingSupplier.isActive,
       });
     } else {
       reset({
@@ -30,7 +30,7 @@ export function SupplierModal({ isOpen, onClose, onSave, editingSupplier }: Supp
         cnpj: '',
         email: '',
         phone: '',
-        active: true,
+        isActive: true,
       });
     }
   }, [editingSupplier, reset]);
@@ -103,7 +103,7 @@ export function SupplierModal({ isOpen, onClose, onSave, editingSupplier }: Supp
           <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-950 rounded-xl border border-gray-100 dark:border-gray-800">
             <input
               type="checkbox"
-              {...register('active')}
+              {...register('isActive')}
               className="w-4 h-4 text-primary-600 rounded border-gray-300 dark:border-gray-700 focus:ring-primary-500"
             />
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Fornecedor Ativo</label>

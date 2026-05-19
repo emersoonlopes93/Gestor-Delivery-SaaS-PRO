@@ -5,7 +5,7 @@ import { PaymentTxStatus, PaymentMethod, OrderStatus, Prisma } from '@prisma/cli
 import { ConfigService } from '@nestjs/config';
 import { WebhookDto } from './dto/create-pix-payment.dto';
 import { createHmac, timingSafeEqual } from 'crypto';
-import { MercadoPagoPaymentSchema, MercadoPagoWebhookSchema, MercadoPagoPayment } from './schemas/mercadopago.schema';
+import { MercadoPagoPaymentSchema, MercadoPagoPayment } from './schemas/mercadopago.schema';
 
 interface MercadoPagoConfig {
   accessToken: string;
@@ -50,7 +50,7 @@ interface MercadoPagoPreferenceRequest {
   notification_url?: string;
 }
 
-interface MercadoPagoPixResponse extends Record<string, Prisma.JsonValue | undefined> {
+interface MercadoPagoPixResponse {
   id: string;
   status: string;
   status_detail: string;
@@ -79,6 +79,15 @@ interface PaymentMetadata {
   error?: string;
 }
 
+@Injectable()
+export class PaymentGatewayService {
+  private readonly logger = new Logger(PaymentGatewayService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tenantContext: TenantContextService,
+    private readonly configService: ConfigService,
+  ) {}
 
   private mergeMetadata(current: Prisma.JsonValue, update: Partial<PaymentMetadata>): Prisma.InputJsonValue {
     const base = (current && typeof current === 'object' && !Array.isArray(current)) 
@@ -90,13 +99,6 @@ interface PaymentMetadata {
       ...update,
     } as Prisma.InputJsonObject;
   }
-  private readonly logger = new Logger(PaymentGatewayService.name);
-
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly tenantContext: TenantContextService,
-    private readonly configService: ConfigService,
-  ) {}
 
   private async getMercadoPagoConfig(tenantId: string): Promise<MercadoPagoConfig> {
     const settings = await this.prisma.tenantSettings.findUnique({
@@ -126,7 +128,6 @@ interface PaymentMetadata {
       throw new Error('Tenant context not found');
     }
     
-    // Buscar pedido
     const order = await this.prisma.tenantClient.order.findUnique({
       where: { id: orderId },
       include: { customer: true },
@@ -144,13 +145,12 @@ interface PaymentMetadata {
       throw new BadRequestException('Order is not in pending status');
     }
 
-    // Criar transação de pagamento
     const paymentTransaction = await this.prisma.tenantClient.paymentTransaction.create({
       data: {
         tenantId,
         orderId,
         gatewayName: 'mercadopago',
-        gatewayTxId: '', // Será preenchido após resposta do Mercado Pago
+        gatewayTxId: '',
         method: PaymentMethod.pix,
         amount: order.total,
         status: PaymentTxStatus.pending,
@@ -162,7 +162,6 @@ interface PaymentMetadata {
       },
     });
 
-    // Preparar requisição para Mercado Pago
     const config = await this.getMercadoPagoConfig(tenantId);
     const payload: MercadoPagoPixRequest = {
       transaction_amount: Number(order.total),
@@ -177,7 +176,6 @@ interface PaymentMetadata {
     };
 
     try {
-      // Fazer requisição para Mercado Pago API
       const response = await fetch('https://api.mercadopago.com/v1/payments', {
         method: 'POST',
         headers: {
@@ -195,7 +193,6 @@ interface PaymentMetadata {
 
       const mpResponse: MercadoPagoPixResponse = await response.json();
 
-      // Atualizar transação com ID do gateway
       await this.prisma.tenantClient.paymentTransaction.update({
         where: { id: paymentTransaction.id },
         data: {
@@ -206,7 +203,6 @@ interface PaymentMetadata {
         },
       });
 
-      // Calcular data de expiração (30 minutos para PIX)
       const expiresAt = new Date();
       expiresAt.setMinutes(expiresAt.getMinutes() + 30);
 
@@ -221,7 +217,6 @@ interface PaymentMetadata {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Error creating PIX payment: ${message}`);
       
-      // Marcar transação como falha
       await this.prisma.tenantClient.paymentTransaction.update({
         where: { id: paymentTransaction.id },
         data: {
@@ -312,7 +307,6 @@ interface PaymentMetadata {
         },
       });
 
-      // Se aprovado, atualizar pedido
       if (mpResponse.status === 'approved') {
         await this.prisma.order.update({
           where: { id: orderId },
@@ -379,7 +373,6 @@ interface PaymentMetadata {
 
     const config = await this.getMercadoPagoConfig(tenantId);
     
-    // Configura os URLs integrando com o ID do pedido para a view de /order/:id do storefront
     const checkoutSuccessUrl = `${returnUrl}/order/${order.publicTrackingToken}?payment=success`;
     const checkoutFailureUrl = `${returnUrl}/order/${order.publicTrackingToken}?payment=failure`;
     const checkoutPendingUrl = `${returnUrl}/order/${order.publicTrackingToken}?payment=pending`;
@@ -428,7 +421,7 @@ interface PaymentMetadata {
       await this.prisma.tenantClient.paymentTransaction.update({
         where: { id: paymentTransaction.id },
         data: {
-          gatewayTxId: mpResponse.id, // Para preference, salvamos o id da preference por enquanto
+          gatewayTxId: mpResponse.id,
           metadata: this.mergeMetadata(paymentTransaction.metadata, {
             preferenceId: mpResponse.id,
             initPoint: mpResponse.init_point,
@@ -487,10 +480,6 @@ interface PaymentMetadata {
     }
 
     const config = await this.getMercadoPagoConfig(transaction.tenantId);
-
-    if (transaction.tenantId) {
-      this.logger.log(`Processing secured payment update for tenant ${transaction.tenantId}`);
-    }
 
     try {
       const response = await fetch(`https://api.mercadopago.com/v1/payments/${payload.data.id}`, {
@@ -572,7 +561,6 @@ interface PaymentMetadata {
   }
 
   private async processPaymentUpdate(payment: MercadoPagoPayment): Promise<void> {
-    // Buscar transação pelo external_reference (que usamos para o Transaction ID do sistema)
     if (!payment.external_reference) {
       this.logger.warn(`No external_reference found for payment ${payment.id}`);
       return;
@@ -584,7 +572,6 @@ interface PaymentMetadata {
     });
 
     if (!transaction) {
-      // Fallback para quem salvou gatewayTxId = payment.id no Pix
       const fallbackTx = await this.prisma.paymentTransaction.findFirst({
         where: { gatewayTxId: payment.id.toString() },
         include: { order: true },
@@ -601,7 +588,6 @@ interface PaymentMetadata {
   }
 
   private async updateTransactionRecord(transaction: Prisma.PaymentTransactionGetPayload<{ include: { order: true } }>, payment: MercadoPagoPayment): Promise<void> {
-
     let newStatus: PaymentTxStatus;
     let orderStatus: OrderStatus;
 
@@ -624,7 +610,6 @@ interface PaymentMetadata {
         return;
     }
 
-    // Atualizar transação
     await this.prisma.paymentTransaction.update({
       where: { id: transaction.id },
       data: {
@@ -635,13 +620,10 @@ interface PaymentMetadata {
       },
     });
 
-    // Atualizar status do pedido se confirmado
     if (newStatus === PaymentTxStatus.confirmed && transaction.orderId) {
       await this.prisma.order.update({
         where: { id: transaction.orderId },
-        data: {
-          status: orderStatus,
-        },
+        data: { status: orderStatus },
       });
 
       this.logger.log(`Payment confirmed for order ${transaction.orderId}`);
@@ -665,7 +647,7 @@ interface PaymentMetadata {
       ? (transaction.metadata as Record<string, Prisma.JsonValue>)
       : {};
 
-    const mpPayment = metadata.mercadoPagoPayment as Record<string, Prisma.JsonValue> | undefined;
+    const mpPayment = (metadata.mercadoPagoPayment || metadata.mercadoPagoResponse) as Record<string, Prisma.JsonValue> | undefined;
 
     return {
       status: transaction.status,
@@ -691,7 +673,6 @@ interface PaymentMetadata {
     const config = await this.getMercadoPagoConfig(transaction.tenantId);
 
     try {
-      // Cancelar pagamento no Mercado Pago
       const response = await fetch(`https://api.mercadopago.com/v1/payments/${transaction.gatewayTxId}`, {
         method: 'PUT',
         headers: {
@@ -707,16 +688,17 @@ interface PaymentMetadata {
         throw new Error('Failed to cancel payment');
       }
 
-      // Atualizar status localmente
       await this.prisma.paymentTransaction.update({
         where: { id: transactionId },
         data: { status: PaymentTxStatus.failed },
       });
 
-      await this.prisma.order.update({
-        where: transaction.orderId ? { id: transaction.orderId } : { id: '' }, // Fallback vazio se null
-        data: { status: OrderStatus.cancelled },
-      });
+      if (transaction.orderId) {
+        await this.prisma.order.update({
+          where: { id: transaction.orderId },
+          data: { status: OrderStatus.cancelled },
+        });
+      }
 
       this.logger.log(`Payment cancelled: ${transactionId}`);
     } catch (error: unknown) {
