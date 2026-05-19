@@ -103,7 +103,7 @@ export class OpenAiProvider implements IAiProvider {
       const message = choice?.message;
 
       const toolCalls: AiToolCall[] = (message?.tool_calls || []).map(
-        (tc: any) => ({
+        (tc: { id: string; function: { name: string; arguments: string } }) => ({
           id: tc.id,
           name: tc.function.name,
           arguments: this.safeParseJson(tc.function.arguments),
@@ -127,11 +127,11 @@ export class OpenAiProvider implements IAiProvider {
             }
           : undefined,
       };
-    } catch (error: any) {
-      this.logger.error(`OpenAI completion failed: ${error.message}`);
-      const errorData = error.response?.data;
-      if (errorData) {
-        this.logger.error(`OpenAI error details: ${JSON.stringify(errorData)}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`OpenAI completion failed: ${message}`);
+      if (axios.isAxiosError(error) && error.response?.data) {
+        this.logger.error(`OpenAI error details: ${JSON.stringify(error.response.data)}`);
       }
       return {
         content: null,

@@ -18,13 +18,13 @@ export class AiAgentController {
 
   @Get()
   @Permissions('settings.manage')
-  async getConfig(@Request() req: any) {
+  async getConfig(@Request() req: { user: { tenantId: string } }) {
     return this.configService.getConfig(req.user.tenantId);
   }
 
   @Patch()
   @Permissions('settings.manage')
-  async updateConfig(@Request() req: any, @Body() dto: UpdateAiAgentConfigDto) {
+  async updateConfig(@Request() req: { user: { tenantId: string } }, @Body() dto: UpdateAiAgentConfigDto) {
     return this.configService.updateConfig(req.user.tenantId, dto);
   }
 }

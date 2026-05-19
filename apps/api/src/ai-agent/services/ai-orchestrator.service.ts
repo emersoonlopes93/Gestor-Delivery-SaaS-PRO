@@ -8,6 +8,8 @@ import type { AiMessage } from '../interfaces/ai-provider.interface';
 
 import { PrismaService } from '../../database/prisma.service';
 
+import { Prisma } from '@prisma/client';
+
 @Injectable()
 export class AiOrchestratorService {
   private readonly logger = new Logger('AiOrchestratorService');
@@ -73,7 +75,16 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
         messages.push({
           role: msg.direction === 'inbound' ? 'user' : 'assistant',
           content: msg.content,
-          ...(msg.toolCalls ? { toolCalls: msg.toolCalls as any } : {}),
+          ...(msg.toolCalls && Array.isArray(msg.toolCalls) ? { 
+            toolCalls: msg.toolCalls.map(tc => {
+              const obj = tc as Record<string, unknown>;
+              return {
+                id: String(obj.id),
+                name: String(obj.name),
+                arguments: obj.arguments as Record<string, unknown>
+              };
+            })
+          } : {}),
         });
       }
 
@@ -91,7 +102,7 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
       });
 
       // Se o LLM resolveu chamar Tools
-      if (completion.finishReason === 'tool_calls' && completion.toolCalls.length > 0) {
+      if (completion.finishReason === 'tool_calls' && completion.toolCalls && completion.toolCalls.length > 0) {
         await this.handleToolCalls(tenantId, session.id, customerPhone, messages, completion.toolCalls, tools);
         return;
       }
@@ -101,8 +112,9 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
         await this.sendFinalResponse(tenantId, session.id, customerPhone, completion.content);
       }
 
-    } catch (error: any) {
-      this.logger.error(`Error handling inbound message: ${error.message}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error handling inbound message: ${message}`);
       // Fallback
       try {
         const config = await this.configService.getConfig(tenantId);
@@ -118,8 +130,8 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
     sessionId: string, 
     customerPhone: string,
     historyMessages: AiMessage[],
-    toolCalls: any[],
-    tools: any[]
+    toolCalls: NonNullable<AiMessage['toolCalls']>,
+    tools: ReturnType<AgentToolsService['getAvailableTools']>
   ) {
     this.logger.log(`Handling ${toolCalls.length} tool calls for session ${sessionId}`);
 
@@ -135,7 +147,11 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
       sessionId,
       direction: 'outbound',
       content: '', // Sem texto visível
-      toolCalls: toolCalls,
+      toolCalls: toolCalls.map(tc => ({ 
+        id: tc.id, 
+        name: tc.name, 
+        arguments: tc.arguments as Prisma.InputJsonObject 
+      })) as Prisma.InputJsonArray,
       metadata: { type: 'tool_call' }
     });
 
@@ -144,7 +160,10 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
     for (const toolCall of toolCalls) {
       // Verifica se é handoff
       if (toolCall.name === 'transferir_atendimento_humano') {
-        await this.conversationService.activateHandoff(sessionId, toolCall.arguments?.motivo);
+        const motivo = typeof toolCall.arguments === 'object' && toolCall.arguments !== null && 'motivo' in toolCall.arguments 
+          ? String(toolCall.arguments.motivo) 
+          : undefined;
+        await this.conversationService.activateHandoff(sessionId, motivo);
         await this.sendFinalResponse(tenantId, sessionId, customerPhone, "Certo, estou transferindo você para um de nossos atendentes. Por favor, aguarde um momento.");
         return; // Interrompe o fluxo da IA
       }

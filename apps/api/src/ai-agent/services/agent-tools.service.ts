@@ -11,6 +11,67 @@ import { CreateOrderDTO } from '@gestor/types';
 
 import { PrismaService } from '../../database/prisma.service';
 import { StorefrontService } from '../../storefront/storefront.service';
+import { z } from 'zod';
+import { PaymentMethod } from '@gestor/types';
+
+export interface AgentSessionContext {
+  customerId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  sessionId?: string;
+  [key: string]: unknown;
+}
+
+const ConsultarCardapioSchema = z.object({
+  categoria: z.string().optional(),
+  busca: z.string().optional(),
+});
+
+const ConsultarTaxaEntregaSchema = z.object({
+  enderecoCompleto: z.string(),
+  cep: z.string().optional(),
+});
+
+const CriarPedidoSchema = z.object({
+  itens: z.array(z.object({
+    productId: z.string(),
+    quantity: z.number().int(),
+    notes: z.string().optional(),
+  })),
+  endereco: z.object({
+    street: z.string(),
+    number: z.string(),
+    neighborhood: z.string(),
+    city: z.string(),
+    state: z.string().optional(),
+    zipCode: z.string().optional(),
+  }),
+  formaPagamento: z.enum(['pix', 'credit_card', 'cash']),
+  scheduledFor: z.string().optional(),
+  timeSlotId: z.string().optional(),
+});
+
+const TransferirAtendimentoSchema = z.object({
+  motivo: z.string().optional(),
+});
+
+const AplicarCupomSchema = z.object({
+  cupom: z.string(),
+  valorCarrinho: z.number(),
+});
+
+const ConsultarTempoEsperaSchema = z.object({
+  tipo: z.enum(['delivery', 'pickup']).optional(),
+});
+
+const VerificarIngredienteSchema = z.object({
+  productId: z.string(),
+  ingrediente: z.string(),
+});
+
+const ConsultarSlotsSchema = z.object({
+  data: z.string().optional(),
+});
 
 @Injectable()
 export class AgentToolsService {
@@ -203,24 +264,32 @@ export class AgentToolsService {
   async executeTool(
     tenantId: string,
     toolName: string,
-    args: Record<string, any>,
-    sessionContext?: any,
-  ): Promise<any> {
+    args: unknown,
+    sessionContext?: AgentSessionContext,
+  ): Promise<unknown> {
     this.logger.log(`Executing tool ${toolName} with args: ${JSON.stringify(args)}`);
 
     try {
       switch (toolName) {
-        case 'consultar_cardapio':
-          return await this.executeConsultarCardapio(tenantId, args);
+        case 'consultar_cardapio': {
+          const parsedArgs = ConsultarCardapioSchema.parse(args || {});
+          return await this.executeConsultarCardapio(tenantId, parsedArgs);
+        }
 
-        case 'consultar_taxa_entrega':
-          return await this.executeConsultarTaxaEntrega(tenantId, args);
+        case 'consultar_taxa_entrega': {
+          const parsedArgs = ConsultarTaxaEntregaSchema.parse(args || {});
+          return await this.executeConsultarTaxaEntrega(tenantId, parsedArgs);
+        }
 
-        case 'criar_pedido':
-          return await this.executeCriarPedido(tenantId, args, sessionContext);
+        case 'criar_pedido': {
+          const parsedArgs = CriarPedidoSchema.parse(args || {});
+          return await this.executeCriarPedido(tenantId, parsedArgs, sessionContext);
+        }
 
-        case 'transferir_atendimento_humano':
+        case 'transferir_atendimento_humano': {
+          TransferirAtendimentoSchema.parse(args || {});
           return { status: 'success', message: 'Transferência solicitada, aguardando operador humano.' };
+        }
 
         case 'consultar_horario_atendimento':
           return await this.executeConsultarHorarioAtendimento(tenantId);
@@ -234,20 +303,28 @@ export class AgentToolsService {
         case 'repetir_ultimo_pedido':
           return await this.executeRepetirUltimoPedido(tenantId, sessionContext);
 
-        case 'aplicar_cupom_desconto':
-          return await this.executeAplicarCupom(tenantId, args);
+        case 'aplicar_cupom_desconto': {
+          const parsedArgs = AplicarCupomSchema.parse(args || {});
+          return await this.executeAplicarCupom(tenantId, parsedArgs);
+        }
 
-        case 'consultar_tempo_espera':
-          return await this.executeConsultarTempoEspera(tenantId, args);
+        case 'consultar_tempo_espera': {
+          const parsedArgs = ConsultarTempoEsperaSchema.parse(args || {});
+          return await this.executeConsultarTempoEspera(tenantId, parsedArgs);
+        }
 
         case 'obter_link_rastreamento':
           return await this.executeObterLinkRastreamento(tenantId, sessionContext);
 
-        case 'verificar_disponibilidade_ingrediente':
-          return await this.executeVerificarIngrediente(tenantId, args);
+        case 'verificar_disponibilidade_ingrediente': {
+          const parsedArgs = VerificarIngredienteSchema.parse(args || {});
+          return await this.executeVerificarIngrediente(tenantId, parsedArgs);
+        }
 
-        case 'consultar_slots_agendamento':
-          return await this.executeConsultarSlots(tenantId, args);
+        case 'consultar_slots_agendamento': {
+          const parsedArgs = ConsultarSlotsSchema.parse(args || {});
+          return await this.executeConsultarSlots(tenantId, parsedArgs);
+        }
 
         case 'consultar_ofertas_checkout':
           return await this.executeConsultarOfertasCheckout(tenantId);
@@ -255,29 +332,30 @@ export class AgentToolsService {
         default:
           throw new Error(`Tool desconhecida: ${toolName}`);
       }
-    } catch (error: any) {
-      this.logger.error(`Error executing tool ${toolName}: ${error.message}`);
-      return { status: 'error', message: error.message };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error executing tool ${toolName}: ${message}`);
+      return { status: 'error', message };
     }
   }
 
-  private async executeConsultarCardapio(tenantId: string, args: any) {
+  private async executeConsultarCardapio(tenantId: string, args: z.infer<typeof ConsultarCardapioSchema>) {
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) throw new Error('Loja não encontrada');
 
     const payload = await this.storefrontService.getStorefrontPayload(tenant.slug);
     
     // Simplificamos o retorno para não estourar os tokens do LLM
-    let result = payload.categories.map((cat: any) => ({
+    let result = payload.categories.map((cat) => ({
       categoria: cat.name,
-      produtos: cat.products.map((p: any) => ({
+      produtos: cat.products.map((p) => ({
         id: p.id,
         nome: p.name,
         preco: Number(p.basePrice),
-        descricao: p.description,
-        sugestoesAdicionais: p.upsells?.map((u: any) => ({
+        descricao: 'description' in p ? String((p as { description?: string }).description) : '',
+        sugestoesAdicionais: p.upsells?.map((u) => ({
           nome: u.name,
-          itens: u.items.map((i: any) => ({
+          itens: u.items.map((i) => ({
             nome: i.name,
             preco: i.finalPrice
           }))
@@ -287,25 +365,26 @@ export class AgentToolsService {
 
     if (args.categoria) {
       const search = args.categoria.toLowerCase();
-      result = result.filter((c: any) => c.categoria.toLowerCase().includes(search));
+      result = result.filter((c) => c.categoria.toLowerCase().includes(search));
     }
 
     if (args.busca) {
       const search = args.busca.toLowerCase();
-      result.forEach((c: any) => {
-        c.produtos = c.produtos.filter((p: any) => 
+      result.forEach((c) => {
+        c.produtos = c.produtos.filter((p) => 
           p.nome.toLowerCase().includes(search) || 
           (p.descricao && p.descricao.toLowerCase().includes(search))
         );
       });
-      // Remove categorias vazias após o filtro
-      result = result.filter((c: any) => c.produtos.length > 0);
     }
+
+    // Remove categorias vazias após o filtro
+    result = result.filter((c) => c.produtos.length > 0);
 
     return result;
   }
 
-  private async executeConsultarTaxaEntrega(tenantId: string, args: any) {
+  private async executeConsultarTaxaEntrega(tenantId: string, args: z.infer<typeof ConsultarTaxaEntregaSchema>) {
     if (!args.enderecoCompleto) {
       return { disponivel: false, mensagem: 'Por favor, informe o endereço completo para calcularmos a taxa de entrega.' };
     }
@@ -333,7 +412,7 @@ export class AgentToolsService {
           return { disponivel: false, mensagem: 'Não conseguimos localizar este endereço com precisão. Poderia confirmar o nome da rua e o bairro?' };
         }
       } catch (err) {
-        this.logger.error(`Geocoding error: ${(err as any).message}`);
+        this.logger.error(`Geocoding error: ${err instanceof Error ? err.message : 'Unknown error'}`);
         return { disponivel: false, mensagem: 'Tivemos um problema temporário ao consultar o endereço. Deseja falar com um atendente?' };
       }
     } else {
@@ -364,7 +443,7 @@ export class AgentToolsService {
     }
   }
 
-  private async executeCriarPedido(tenantId: string, args: any, sessionContext: any) {
+  private async executeCriarPedido(tenantId: string, args: z.infer<typeof CriarPedidoSchema>, sessionContext?: AgentSessionContext) {
     if (!sessionContext?.customerId) {
       return { status: 'error', message: 'Cliente não identificado no sistema. Necessário cadastro prévio.' };
     }
@@ -375,7 +454,7 @@ export class AgentToolsService {
 
       const orderDto: CreateOrderDTO = {
         idempotencyKey: Math.random().toString(36).substring(7),
-        items: args.itens.map((i: any) => ({
+        items: args.itens.map((i) => ({
           lineType: 'product',
           productId: i.productId,
           quantity: i.quantity,
@@ -384,9 +463,16 @@ export class AgentToolsService {
         customerName: sessionContext?.customerName || 'Cliente WhatsApp',
         customerPhone: sessionContext?.customerPhone || '00000000000',
         fulfillmentType: 'delivery',
-        deliveryAddress: args.endereco,
+        deliveryAddress: {
+          street: args.endereco.street,
+          number: args.endereco.number,
+          neighborhood: args.endereco.neighborhood,
+          city: args.endereco.city,
+          state: args.endereco.state || '',
+          zipCode: args.endereco.zipCode || '',
+        },
         payment: {
-          method: args.formaPagamento,
+          method: args.formaPagamento.toUpperCase() as PaymentMethod,
         },
         scheduledFor: args.scheduledFor,
         timeSlotId: args.timeSlotId,
@@ -405,8 +491,9 @@ export class AgentToolsService {
         totalAmount: Number(order.total),
         message: `Pedido #${order.orderNumber} criado com sucesso! O total é R$ ${order.total}.`,
       };
-    } catch (error: any) {
-      return { status: 'error', message: `Erro ao criar pedido: ${error.message}` };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { status: 'error', message: `Erro ao criar pedido: ${message}` };
     }
   }
 
@@ -433,13 +520,13 @@ export class AgentToolsService {
     };
   }
 
-  private async executeConsultarStatusPedido(tenantId: string, sessionContext: any) {
+  private async executeConsultarStatusPedido(tenantId: string, sessionContext?: AgentSessionContext) {
     if (!sessionContext?.customerId) return { status: 'error', message: 'Cliente não identificado.' };
     
     const order = await this.ordersService.getLatestCustomerOrder(tenantId, sessionContext.customerId);
     if (!order) return { message: 'Você ainda não possui pedidos realizados.' };
 
-    const statusLabels: any = {
+    const statusLabels: Record<string, string> = {
       pending: 'Aguardando confirmação',
       confirmed: 'Confirmado e em fila',
       preparing: 'Sendo preparado com carinho',
@@ -458,7 +545,7 @@ export class AgentToolsService {
     };
   }
 
-  private async executeConsultarFidelidade(tenantId: string, sessionContext: any) {
+  private async executeConsultarFidelidade(tenantId: string, sessionContext?: AgentSessionContext) {
     if (!sessionContext?.customerId) return { status: 'error', message: 'Cliente não identificado.' };
     
     const balance = await this.cashbackService.getCashbackBalance(tenantId, sessionContext.customerId);
@@ -470,7 +557,7 @@ export class AgentToolsService {
     };
   }
 
-  private async executeRepetirUltimoPedido(tenantId: string, sessionContext: any) {
+  private async executeRepetirUltimoPedido(tenantId: string, sessionContext?: AgentSessionContext) {
     if (!sessionContext?.customerId) return { status: 'error', message: 'Cliente não identificado.' };
     
     const order = await this.ordersService.getLatestCustomerOrder(tenantId, sessionContext.customerId);
@@ -487,7 +574,7 @@ export class AgentToolsService {
     };
   }
 
-  private async executeAplicarCupom(tenantId: string, args: any) {
+  private async executeAplicarCupom(tenantId: string, args: z.infer<typeof AplicarCupomSchema>) {
     try {
       const result = await this.couponsService.validateCouponForTotal(tenantId, args.cupom, args.valorCarrinho);
       return {
@@ -495,12 +582,12 @@ export class AgentToolsService {
         desconto: result.discountAmount,
         mensagem: `Cupom ${args.cupom} aplicado! Desconto de R$ ${result.discountAmount.toFixed(2)}.`
       };
-    } catch (error: any) {
-      return { status: 'error', message: error.message };
+    } catch (error) {
+      return { status: 'error', message: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 
-  private async executeConsultarTempoEspera(tenantId: string, args: any) {
+  private async executeConsultarTempoEspera(tenantId: string, args: z.infer<typeof ConsultarTempoEsperaSchema>) {
     const orders = await this.prisma.order.count({
       where: {
         tenantId,
@@ -520,7 +607,7 @@ export class AgentToolsService {
     };
   }
 
-  private async executeObterLinkRastreamento(tenantId: string, sessionContext: any) {
+  private async executeObterLinkRastreamento(tenantId: string, sessionContext?: AgentSessionContext) {
     if (!sessionContext?.customerId) return { status: 'error', message: 'Cliente não identificado.' };
     
     const order = await this.ordersService.getLatestCustomerOrder(tenantId, sessionContext.customerId);
@@ -537,7 +624,7 @@ export class AgentToolsService {
     };
   }
 
-  private async executeVerificarIngrediente(tenantId: string, args: any) {
+  private async executeVerificarIngrediente(tenantId: string, args: z.infer<typeof VerificarIngredienteSchema>) {
     const productId = args.productId;
     const term = args.ingrediente.toLowerCase();
 
@@ -558,7 +645,7 @@ export class AgentToolsService {
     };
   }
 
-  private async executeConsultarSlots(tenantId: string, args: any) {
+  private async executeConsultarSlots(tenantId: string, args: z.infer<typeof ConsultarSlotsSchema>) {
     const date = args.data ? new Date(args.data) : new Date();
     const slots = await this.schedulingService.getAvailableTimeSlots(date, tenantId);
 
@@ -582,10 +669,10 @@ export class AgentToolsService {
     const payload = await this.storefrontService.getStorefrontPayload(tenant.slug);
     
     return {
-      ofertas: payload.upsells.map((u: any) => ({
+      ofertas: payload.upsells.map((u: { name: string, description?: string | null, items: { productId: string, name: string, finalPrice: number }[] }) => ({
         titulo: u.name,
-        descricao: u.description,
-        opcoes: u.items.map((i: any) => ({
+        descricao: u.description || '',
+        opcoes: u.items.map((i) => ({
           productId: i.productId,
           nome: i.name,
           preco: i.finalPrice

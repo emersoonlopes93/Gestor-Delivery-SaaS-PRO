@@ -2,14 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { ChatState, MessageDirection } from '@prisma/client';
 
+import { Prisma } from '@prisma/client';
+
 export interface CreateMessageDto {
   sessionId: string;
   direction: MessageDirection;
   content: string;
   messageType?: string;
   externalId?: string;
-  toolCalls?: any;
-  metadata?: any;
+  toolCalls?: Prisma.InputJsonValue;
+  metadata?: Prisma.InputJsonValue;
 }
 
 @Injectable()
@@ -72,7 +74,7 @@ export class ConversationService {
   /**
    * Atualiza o estado da conversa (ex: de browsing_menu para checkout).
    */
-  async updateSessionState(sessionId: string, state: ChatState, cartData?: any) {
+  async updateSessionState(sessionId: string, state: ChatState, cartData?: Prisma.InputJsonValue) {
     return this.prisma.chatSession.update({
       where: { id: sessionId },
       data: {

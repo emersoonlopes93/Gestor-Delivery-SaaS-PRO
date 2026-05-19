@@ -106,10 +106,10 @@ export class AnthropicProvider implements IAiProvider {
       );
 
       const content = data.content || [];
-      const textBlock = content.find((c: any) => c.type === 'text');
-      const toolBlocks = content.filter((c: any) => c.type === 'tool_use');
+      const textBlock = content.find((c: { type: string; text?: string }) => c.type === 'text');
+      const toolBlocks = content.filter((c: { type: string; id: string; name: string; input: unknown }) => c.type === 'tool_use');
 
-      const toolCalls: AiToolCall[] = toolBlocks.map((tb: any) => ({
+      const toolCalls: AiToolCall[] = toolBlocks.map((tb: { id: string; name: string; input: unknown }) => ({
         id: tb.id,
         name: tb.name,
         arguments: tb.input,
@@ -129,8 +129,9 @@ export class AnthropicProvider implements IAiProvider {
           totalTokens: data.usage.input_tokens + data.usage.output_tokens,
         } : undefined,
       };
-    } catch (error: any) {
-      this.logger.error(`Anthropic completion failed: ${error.message}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Anthropic completion failed: ${message}`);
       return {
         content: null,
         toolCalls: [],

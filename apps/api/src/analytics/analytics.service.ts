@@ -214,7 +214,7 @@ export class AnalyticsService {
       },
     });
 
-    const realCMV = movements.reduce((acc: number, m: any) => acc + (Number(m.quantity) * Number(m.unitCost || 0)), 0);
+    const realCMV = movements.reduce((acc: number, m) => acc + (Number(m.quantity) * Number(m.unitCost || 0)), 0);
 
     // 2. Calculate Gross Revenue from Completed Orders
     const completedOrdersValue = await this.prisma.order.aggregate({
@@ -443,12 +443,12 @@ export class AnalyticsService {
     });
 
     const income = transactions
-      .filter((t: any) => t.type === 'income')
-      .reduce((acc: number, t: any) => acc + Number(t.amount), 0);
+      .filter((t) => t.type === 'income')
+      .reduce((acc: number, t) => acc + Number(t.amount), 0);
     
     const expenses = transactions
-      .filter((t: any) => t.type === 'expense')
-      .reduce((acc: number, t: any) => acc + Number(t.amount), 0);
+      .filter((t) => t.type === 'expense')
+      .reduce((acc: number, t) => acc + Number(t.amount), 0);
 
     const accounts = await this.prisma.financialAccount.aggregate({
       where: { tenantId },
