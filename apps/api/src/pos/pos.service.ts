@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   ConflictException,
 } from '@nestjs/common';
-import { OrderStatus, FulfillmentType } from '@prisma/client';
+import { OrderStatus, FulfillmentType, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
 import { PaymentMethod as SharedPaymentMethod } from '@gestor/types';
 import { CashService } from '../cash/cash.service';
 import { CustomerService } from '../crm/customer.service';
@@ -24,9 +24,21 @@ import type {
 
 import { PosFulfillmentType } from '@gestor/types';
 
-@Injectable()
-export class PosService {
-  constructor(
+  private mapPaymentMethod(p: PrismaPaymentMethod): SharedPaymentMethod {
+    const map: Record<PrismaPaymentMethod, SharedPaymentMethod> = {
+      cash: SharedPaymentMethod.cash,
+      credit_card: SharedPaymentMethod.credit_card,
+      debit_card: SharedPaymentMethod.debit_card,
+      pix: SharedPaymentMethod.pix,
+      online: SharedPaymentMethod.online,
+      other: SharedPaymentMethod.other,
+    };return map[p];
+  }
+
+  private mapPosFulfillment(f: string | undefined): FulfillmentType {
+    if (f === 'pickup') return FulfillmentType.pickup;
+    return FulfillmentType.delivery;
+  }  constructor(
     private readonly prisma: PrismaService,
     private readonly checkoutValidator: CheckoutValidatorService,
     private readonly cashService: CashService,
@@ -267,7 +279,7 @@ export class PosService {
             customerPhone: dto.customerPhone || '',
             notes: dto.notes || null,
             tableNumber: dto.tableNumber || undefined,
-            fulfillmentType: (dto.fulfillmentType as unknown as FulfillmentType) || undefined,
+            fulfillmentType: this.mapPosFulfillment(dto.fulfillmentType),
           }
         });
       } else {
@@ -591,9 +603,9 @@ export class PosService {
       serviceFee: Number(order.serviceFee),
       total: Number(order.total),
       sourceChannel: order.sourceChannel,
-      notes: order.notes,
-      paymentMethod: order.paymentMethod as unknown as SharedPaymentMethod,
-      changeFor: order.changeFor ? Number(order.changeFor) : null,
+        notes: order.notes,
+        paymentMethod: this.mapPaymentMethod(order.paymentMethod),
+        changeFor: order.changeFor ? Number(order.changeFor) : null,
       customerId: order.customerId,
       waiterId: order.waiterId,
       tableNumber: order.tableNumber,

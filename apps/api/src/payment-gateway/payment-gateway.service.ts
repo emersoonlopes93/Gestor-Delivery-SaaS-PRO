@@ -80,8 +80,16 @@ interface PaymentMetadata {
 }
 
 
-@Injectable()
-export class PaymentGatewayService {
+  private mergeMetadata(current: Prisma.JsonValue, update: Partial<PaymentMetadata>): Prisma.InputJsonValue {
+    const base = (current && typeof current === 'object' && !Array.isArray(current)) 
+      ? (current as Record<string, Prisma.JsonValue>) 
+      : {};
+    
+    return {
+      ...base,
+      ...update,
+    } as Prisma.InputJsonObject;
+  }
   private readonly logger = new Logger(PaymentGatewayService.name);
 
   constructor(
@@ -150,7 +158,7 @@ export class PaymentGatewayService {
           customerEmail,
           customerName,
           orderNumber: order.orderNumber,
-        } as unknown as Prisma.InputJsonValue,
+        } as Prisma.InputJsonObject,
       },
     });
 
@@ -192,10 +200,9 @@ export class PaymentGatewayService {
         where: { id: paymentTransaction.id },
         data: {
           gatewayTxId: mpResponse.id,
-          metadata: {
-            ...paymentTransaction.metadata as unknown as PaymentMetadata,
+          metadata: this.mergeMetadata(paymentTransaction.metadata, {
             mercadoPagoResponse: mpResponse,
-          } as unknown as Prisma.InputJsonValue,
+          }),
         },
       });
 
@@ -219,10 +226,9 @@ export class PaymentGatewayService {
         where: { id: paymentTransaction.id },
         data: {
           status: PaymentTxStatus.failed,
-          metadata: {
-            ...paymentTransaction.metadata as unknown as PaymentMetadata,
+          metadata: this.mergeMetadata(paymentTransaction.metadata, {
             error: message,
-          } as unknown as Prisma.InputJsonValue,
+          }),
         },
       });
 
@@ -257,7 +263,7 @@ export class PaymentGatewayService {
         method: PaymentMethod.credit_card,
         amount: order.total,
         status: PaymentTxStatus.pending,
-        metadata: { customerEmail, customerName, orderNumber: order.orderNumber } as unknown as Prisma.InputJsonValue,
+        metadata: { customerEmail, customerName, orderNumber: order.orderNumber } as Prisma.InputJsonObject,
       },
     });
 
@@ -300,10 +306,9 @@ export class PaymentGatewayService {
         data: {
           gatewayTxId: mpResponse.id.toString(),
           status: mpResponse.status === 'approved' ? PaymentTxStatus.confirmed : PaymentTxStatus.pending,
-          metadata: {
-            ...paymentTransaction.metadata as unknown as PaymentMetadata,
+          metadata: this.mergeMetadata(paymentTransaction.metadata, {
             mercadoPagoResponse: mpResponse,
-          } as unknown as Prisma.InputJsonValue,
+          }),
         },
       });
 
@@ -323,7 +328,7 @@ export class PaymentGatewayService {
         where: { id: paymentTransaction.id },
         data: {
           status: PaymentTxStatus.failed,
-          metadata: { ...paymentTransaction.metadata as unknown as PaymentMetadata, error: message } as unknown as Prisma.InputJsonValue,
+          metadata: this.mergeMetadata(paymentTransaction.metadata, { error: message }),
         },
       });
       throw error;
@@ -368,7 +373,7 @@ export class PaymentGatewayService {
           customerEmail,
           customerName,
           orderNumber: order.orderNumber,
-        } as unknown as Prisma.InputJsonValue,
+        } as Prisma.InputJsonObject,
       },
     });
 
@@ -424,11 +429,10 @@ export class PaymentGatewayService {
         where: { id: paymentTransaction.id },
         data: {
           gatewayTxId: mpResponse.id, // Para preference, salvamos o id da preference por enquanto
-          metadata: {
-            ...paymentTransaction.metadata as unknown as PaymentMetadata,
+          metadata: this.mergeMetadata(paymentTransaction.metadata, {
             preferenceId: mpResponse.id,
             initPoint: mpResponse.init_point,
-          } as unknown as Prisma.InputJsonValue,
+          }),
         },
       });
 
@@ -443,10 +447,9 @@ export class PaymentGatewayService {
         where: { id: paymentTransaction.id },
         data: {
           status: PaymentTxStatus.failed,
-          metadata: {
-            ...paymentTransaction.metadata as unknown as PaymentMetadata,
+          metadata: this.mergeMetadata(paymentTransaction.metadata, {
             error: message,
-          } as unknown as Prisma.InputJsonValue,
+          }),
         },
       });
       throw error;
@@ -626,10 +629,9 @@ export class PaymentGatewayService {
       where: { id: transaction.id },
       data: {
         status: newStatus,
-        metadata: {
-          ...transaction.metadata as unknown as PaymentMetadata,
+        metadata: this.mergeMetadata(transaction.metadata, {
           mercadoPagoPayment: payment,
-        } as unknown as Prisma.InputJsonValue,
+        }),
       },
     });
 
@@ -659,9 +661,15 @@ export class PaymentGatewayService {
       throw new NotFoundException('Transaction not found');
     }
 
+    const metadata = (transaction.metadata && typeof transaction.metadata === 'object' && !Array.isArray(transaction.metadata))
+      ? (transaction.metadata as Record<string, Prisma.JsonValue>)
+      : {};
+
+    const mpPayment = metadata.mercadoPagoPayment as Record<string, Prisma.JsonValue> | undefined;
+
     return {
       status: transaction.status,
-      gatewayStatus: (transaction.metadata as unknown as PaymentMetadata)?.mercadoPagoPayment?.status,
+      gatewayStatus: mpPayment?.status as string | undefined,
       confirmedAt: transaction.confirmedAt,
     };
   }

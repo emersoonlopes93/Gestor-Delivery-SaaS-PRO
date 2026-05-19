@@ -28,8 +28,22 @@ import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
 import { OrdersGateway } from './orders.gateway';
 
-@Injectable()
-export class OrdersService {
+  private mapPaymentMethod(p: PrismaPaymentMethod): SharedPaymentMethod {
+    const map: Record<PrismaPaymentMethod, SharedPaymentMethod> = {
+      cash: SharedPaymentMethod.cash,
+      credit_card: SharedPaymentMethod.credit_card,
+      debit_card: SharedPaymentMethod.debit_card,
+      pix: SharedPaymentMethod.pix,
+      online: SharedPaymentMethod.online,
+      other: SharedPaymentMethod.other,
+    };
+    return map[p];
+  }
+
+  private mapFulfillmentType(f: string | null): 'delivery' | 'pickup' {
+    if (f === 'pickup') return 'pickup';
+    return 'delivery';
+  }
   private readonly logger = new Logger('OrdersService');
 
   constructor(
@@ -293,8 +307,9 @@ export class OrdersService {
           notes: `Agendado para pedido ${order.orderNumber}`,
         });
         this.logger.log(`Scheduled order ${order.id} for ${dto.scheduledFor}`);
-      } catch (error) {
-        this.logger.error(`Error creating scheduled order: ${(error as any).message}`);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(`Error creating scheduled order: ${message}`);
         // Não falhar o pedido, apenas logar erro
       }
     }
@@ -313,12 +328,10 @@ export class OrdersService {
           dto.customerName
         );
         
-        return {
-          ...orderDetail,
-          pixPayment,
-        } as any; // Type assertion para incluir campo opcional
-      } catch (error) {
-        this.logger.error(`Error creating PIX payment: ${(error as any).message}`);
+        return Object.assign(orderDetail, { pixPayment }) as OrderResponseDTO;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(`Error creating PIX payment: ${message}`);
         // Não falhar o pedido, apenas logar erro
       }
     } else if (dto.payment.method === 'credit_card' || dto.payment.method === 'debit_card') {
@@ -331,12 +344,10 @@ export class OrdersService {
           dto.payment.method
         );
 
-        return {
-          ...orderDetail,
-          preferencePayment,
-        } as any;
-      } catch (error) {
-        this.logger.error(`Error creating Preference/Card payment: ${(error as any).message}`);
+        return Object.assign(orderDetail, { preferencePayment }) as OrderResponseDTO;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(`Error creating Preference/Card payment: ${message}`);
         // Não falhar o pedido, logar erro
       }
     }
@@ -404,12 +415,12 @@ export class OrdersService {
           id: o.id,
           orderNumber: o.orderNumber,
           status: o.status as OrderStatus,
-          fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+          fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
           customerName: o.customerName,
           customerPhone: o.customerPhone,
           total: Number(o.total),
           itemCount: o._count.items,
-          paymentMethod: o.paymentMethod as unknown as SharedPaymentMethod,
+          paymentMethod: this.mapPaymentMethod(o.paymentMethod),
           sourceChannel: o.sourceChannel,
           createdAt: o.createdAt.toISOString(),
         })),
@@ -467,12 +478,12 @@ export class OrdersService {
           id: o.id,
           orderNumber: o.orderNumber,
           status: o.status as OrderStatus,
-          fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+          fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
           customerName: o.customerName,
           customerPhone: o.customerPhone,
           total: Number(o.total),
           itemCount: o._count.items,
-          paymentMethod: o.paymentMethod as unknown as SharedPaymentMethod,
+          paymentMethod: this.mapPaymentMethod(o.paymentMethod),
           sourceChannel: o.sourceChannel,
           createdAt: o.createdAt.toISOString(),
         })),
@@ -521,7 +532,7 @@ export class OrdersService {
         customerPhone: o.customerPhone,
         total: Number(o.total),
         itemCount: o._count.items,
-        paymentMethod: o.paymentMethod as unknown as SharedPaymentMethod,
+        paymentMethod: this.mapPaymentMethod(o.paymentMethod),
         sourceChannel: o.sourceChannel,
         createdAt: o.createdAt.toISOString(),
       })),
@@ -642,9 +653,9 @@ export class OrdersService {
       total: Number(order.total),
       sourceChannel: order.sourceChannel,
       notes: order.notes,
-      publicTrackingToken: order.publicTrackingToken,
-      paymentMethod: order.paymentMethod as unknown as SharedPaymentMethod,
-      changeFor: order.changeFor ? Number(order.changeFor) : null,
+        publicTrackingToken: order.publicTrackingToken,
+        paymentMethod: this.mapPaymentMethod(order.paymentMethod),
+        changeFor: order.changeFor ? Number(order.changeFor) : null,
       customerId: order.customerId,
       couponId: order.couponId,
       cashbackUsed: order.cashbackUsed ? Number(order.cashbackUsed) : null,
