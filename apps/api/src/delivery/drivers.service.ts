@@ -3,6 +3,7 @@ import { PrismaService } from '../database/prisma.service';
 import { CreateDriverDTO, UpdateDriverDTO } from '@gestor/types';
 import { UpdateDriverLocationDTO } from './dto/update-driver-location.dto';
 import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class DriversService {
@@ -10,14 +11,6 @@ export class DriversService {
     private readonly prisma: PrismaService,
     private readonly trackingGateway: DeliveryTrackingGateway,
   ) {}
-
-  private asRecord(value: unknown): Record<string, unknown> | null {
-    return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
-  }
-
-  private pickDate(value: unknown): Date | null {
-    return value instanceof Date ? value : null;
-  }
 
   private shouldWriteLocationHistory(now: Date, last: Date | null): boolean {
     if (!last) return true;
@@ -35,8 +28,7 @@ export class DriversService {
   async updateDriverLocation(tenantId: string, id: string, data: UpdateDriverLocationDTO) {
     const driver = await this.getDriver(tenantId, id);
 
-    const driverRec = this.asRecord(driver);
-    const lastLocationAt = driverRec ? this.pickDate(driverRec.lastLocationAt) : null;
+    const lastLocationAt = driver.lastLocationAt;
 
     const now = new Date();
     const shouldWriteHistory = this.shouldWriteLocationHistory(now, lastLocationAt);

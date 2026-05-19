@@ -82,7 +82,19 @@ export class WhatsAppInstanceService {
       } catch (err: unknown) {
         const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
         const errorStack = err instanceof Error ? err.stack : '';
-        const errorResponseData = (err as any)?.response?.data?.error;
+        
+        // Narrowing for Axios/Fetch style errors without using 'any'
+        let errorResponseData: string | undefined;
+        if (err && typeof err === 'object' && 'response' in err) {
+          const resp = (err as { response: unknown }).response;
+          if (resp && typeof resp === 'object' && 'data' in resp) {
+            const data = (resp as { data: unknown }).data;
+            if (data && typeof data === 'object' && 'error' in data) {
+              errorResponseData = String((data as { error: unknown }).error);
+            }
+          }
+        }
+
         this.logger.error(`Error creating instance in external provider: ${errorMsg}`, errorStack);
         throw new InternalServerErrorException(`Falha no provedor WhatsApp: ${errorResponseData || errorMsg}`);
       }

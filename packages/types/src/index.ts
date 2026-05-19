@@ -37,6 +37,7 @@ export type * from './analytics';
 export type * from './goals';
 export type * from './campaigns';
 export type * from './chat';
+export type * from './realtime';
 
 // Modules with classes or constants (explicit values)
 export type { 

@@ -45,7 +45,7 @@ export class PublicOrdersController {
       throw new NotFoundException('Pedido não encontrado');
     }
 
-    const orderRaw: any = await this.prisma.order.findUnique({
+    const order = await this.prisma.order.findUnique({
       where: {
         publicTrackingToken: token,
       },
@@ -65,12 +65,12 @@ export class PublicOrdersController {
       },
     });
 
-    if (!orderRaw) {
+    if (!order) {
       throw new NotFoundException('Pedido não encontrado');
     }
 
-    const isInRoute = orderRaw.status === 'out_for_delivery';
-    const deliveryDriver = orderRaw.deliveryDriver;
+    const isInRoute = order.status === 'out_for_delivery';
+    const deliveryDriver = order.deliveryDriver;
 
     const driverId = deliveryDriver ? deliveryDriver.id : null;
     const driverName = deliveryDriver ? deliveryDriver.name : null;
@@ -80,8 +80,8 @@ export class PublicOrdersController {
     const lastLocationAt = deliveryDriver ? deliveryDriver.lastLocationAt : null;
 
     return {
-      orderId: orderRaw.id,
-      status: orderRaw.status,
+      orderId: order.id,
+      status: order.status,
       driver: driverId && driverName ? { id: driverId, name: driverName } : null,
       driverLocation:
         isInRoute && currentLat != null && currentLng != null

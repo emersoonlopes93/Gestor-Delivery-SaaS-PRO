@@ -9,6 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
+import { DriverLocationUpdatedEvent } from '@gestor/types';
 
 @WebSocketGateway({
   cors: true,
@@ -45,7 +46,14 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
    * Emit driver location update to everyone tracking a specific order.
    */
   emitLocationUpdate(orderToken: string, location: { lat: number; lng: number; driverId: string }) {
-    this.server.to(`order:${orderToken}`).emit('locationUpdate', location);
+    const event: DriverLocationUpdatedEvent = {
+      driverId: location.driverId,
+      tenantId: '', // Não temos o tenantId aqui mas o room é por orderToken
+      lat: location.lat,
+      lng: location.lng,
+      lastLocationAt: new Date().toISOString(),
+    };
+    this.server.to(`order:${orderToken}`).emit('locationUpdate', event);
   }
 
   /**
@@ -68,12 +76,15 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
   async handleUpdateDriverLocation(
     @MessageBody() data: { driverId: string; tenantId: string; lat: number; lng: number },
   ) {
-    // Fire it to any tenant tracking UI open.
-    this.server.to(`tenant:${data.tenantId}`).emit('driverLocationUpdated', {
+    const event: DriverLocationUpdatedEvent = {
       driverId: data.driverId,
+      tenantId: data.tenantId,
       lat: data.lat,
       lng: data.lng,
-      timestamp: new Date().toISOString()
-    });
+      lastLocationAt: new Date().toISOString(),
+    };
+
+    // Fire it to any tenant tracking UI open.
+    this.server.to(`tenant:${data.tenantId}`).emit('driverLocationUpdated', event);
   }
 }

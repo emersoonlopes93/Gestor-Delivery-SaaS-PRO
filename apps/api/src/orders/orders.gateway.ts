@@ -9,6 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
+import { OrderListItemDTO, OrderStatusUpdatedEvent, OrderStatus } from '@gestor/types';
 
 @WebSocketGateway({
   cors: true,
@@ -50,18 +51,21 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { event: 'joinedTenant', data: { tenantId: data.tenantId } };
   }
 
-  emitOrderStatusUpdated(token: string, status: string, note?: string) {
-    this.server.to(`order:${token}`).emit('statusUpdated', { 
-      status, 
-      note, 
-      timestamp: new Date().toISOString() 
-    });
+  emitOrderStatusUpdated(token: string, orderNumber: string, status: OrderStatus, note?: string) {
+    const event: OrderStatusUpdatedEvent = {
+      orderId: '', // Não temos o ID aqui mas o token/number bastam para o front
+      orderNumber,
+      status,
+      publicTrackingToken: token,
+      note,
+    };
+    this.server.to(`order:${token}`).emit('statusUpdated', event);
   }
 
-  emitNewOrder(tenantId: string, order: any) {
+  emitNewOrder(tenantId: string, order: OrderListItemDTO) {
     this.server.to(`tenant:${tenantId}`).emit('newOrder', {
       order,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   }
 }

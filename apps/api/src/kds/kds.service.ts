@@ -1,8 +1,36 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
-import { PrintJobStatus, PrintType } from '@prisma/client';
+import { Prisma, PrintJob, PrintJobStatus, PrintType, OrderItem } from '@prisma/client';
 import { PrinterService } from '../pos/printer.service';
+import { OrderResponseDTO } from '@gestor/types';
+
+type OrderWithItems = Prisma.OrderGetPayload<{
+  include: {
+    items: {
+      include: {
+        product: {
+          include: {
+            category: true;
+          };
+        };
+        complements: true;
+      };
+    };
+    customer: true;
+  };
+}>;
+
+type PrintJobWithOrder = Prisma.PrintJobGetPayload<{
+  include: {
+    order: {
+      include: {
+        items: true;
+        customer: true;
+      };
+    };
+  };
+}>;
 
 @Injectable()
 export class KdsService {
@@ -47,13 +75,13 @@ export class KdsService {
   /**
    * Busca o próximo job pendente para o spooler, marcando-o como 'printing' atomicamente.
    */
-  async getNextPrintJobForSpooler(station: string) {
+  async getNextPrintJobForSpooler(station: string): Promise<PrintJob | null> {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) throw new Error('Tenant context not found');
 
     return this.prisma.$transaction(async (tx) => {
       // Usando queryRaw para garantir lock atômico no PostgreSQL (SKIP LOCKED evita espera entre workers)
-      const jobs = await tx.$queryRaw<any[]>`
+      const jobs = await tx.$queryRaw<Array<{ id: string }>>`
         SELECT id FROM print_jobs 
         WHERE tenant_id = ${tenantId} 
           AND station = ${station} 
@@ -84,7 +112,7 @@ export class KdsService {
     status?: PrintJobStatus,
     page = 1,
     limit = 20,
-  ) {
+  ): Promise<{ items: PrintJobWithOrder[]; total: number; page: number; limit: number }> {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) {
       throw new Error('Tenant context not found');
@@ -92,7 +120,7 @@ export class KdsService {
 
     const skip = (page - 1) * limit;
 
-    const where: any = {
+    const where: Prisma.PrintJobWhereInput = {
       tenantId,
       station,
     };
@@ -390,15 +418,15 @@ export class KdsService {
     if (!order) throw new NotFoundException('Order not found');
 
     // Agrupar itens por estação
-    const stationGroups: Record<string, any[]> = {};
+    const stationGroups: Record<string, OrderItem[]> = {};
     
-    for (const item of order.items) {
+    for (const item of (order as OrderWithItems).items) {
       const category = item.product?.category;
       let station = 'GERAL';
       
       if (category) {
-        const config = category.templateConfig as any;
-        station = config?.station || category.name;
+        const config = category.templateConfig as Record<string, unknown> | null;
+        station = (config?.station as string) || category.name;
       }
       
       if (!stationGroups[station]) stationGroups[station] = [];
@@ -410,15 +438,16 @@ export class KdsService {
     for (const [station, items] of Object.entries(stationGroups)) {
       const pseudoOrder = {
         ...order,
-        items: items as any,
+        items: items,
         total: Number(order.total),
         itemsSubtotal: Number(order.itemsSubtotal),
         discountTotal: Number(order.discountTotal),
         deliveryFee: Number(order.deliveryFee),
         serviceFee: Number(order.serviceFee),
-      } as any;
+        timeline: [],
+      };
 
-      const content = await this.printerService.formatTicket(pseudoOrder, 'kitchen', station);
+      const content = await this.printerService.formatTicket(pseudoOrder as unknown as OrderResponseDTO, 'kitchen', station);
 
       const job = await this.prisma.printJob.create({
         data: {
@@ -456,7 +485,7 @@ export class KdsService {
   /**
    * Cria um job de impressão incremental (legado/compatibilidade)
    */
-  async createIncrementalPrintJob(data: any) {
+  async createIncrementalPrintJob(data: { orderId: string; station: string; content: string }) {
     const tenantId = this.tenantContext.getTenantId();
     return this.prisma.printJob.create({
       data: {
@@ -473,7 +502,7 @@ export class KdsService {
   /**
    * Cria múltiplos jobs incrementais (legado/compatibilidade)
    */
-  async createIncrementalPrintJobsForOrder(data: any) {
+  async createIncrementalPrintJobsForOrder(data: { orderId: string; station: string; items: Array<{ content: string }> }) {
     const tenantId = this.tenantContext.getTenantId();
     const results = [];
     for (const item of data.items) {

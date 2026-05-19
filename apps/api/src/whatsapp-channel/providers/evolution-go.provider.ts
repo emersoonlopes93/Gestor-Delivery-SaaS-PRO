@@ -11,6 +11,7 @@ import type {
   WhatsAppSendListInput,
   WhatsAppSendButtonInput,
   WhatsAppSendResult,
+  WhatsAppWebhookEvent,
 } from '../interfaces/whatsapp-provider.interface';
 
 /**
@@ -60,16 +61,19 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         token: token,
       });
 
-      const responseData = data?.data || data;
+      const responseData = (data && typeof data === 'object' && 'data' in data) 
+        ? (data as { data: Record<string, unknown> }).data 
+        : (data as Record<string, unknown>);
 
       this.logger.log(`Instance created: ${input.instanceName}`);
       return {
-        instanceId: responseData?.instanceId || responseData?.id || input.instanceName,
-        instanceName: responseData?.name || input.instanceName,
-        token: responseData?.token || token,
+        instanceId: String(responseData?.instanceId || responseData?.id || input.instanceName),
+        instanceName: String(responseData?.name || input.instanceName),
+        token: String(responseData?.token || token),
       };
-    } catch (error: any) {
-      this.logger.error(`createInstance failed: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`createInstance failed: ${message}`);
       throw error;
     }
   }
@@ -82,29 +86,26 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
   ): Promise<WhatsAppConnectionStatus> {
     const client = this.buildClient(apiUrl, apiKey);
     try {
-      console.log(`[Evolution Go] Connecting instance ${instanceId} with webhook: ${input.webhookUrl}`);
+      this.logger.debug(`Connecting instance ${instanceId} with webhook: ${input.webhookUrl}`);
       
-      // Primeiro, buscar o QR code diretamente
-      console.log(`[Evolution Go] Fetching QR code first...`);
       try {
         const qrResponse = await client.get('/instance/qr');
-        console.log(`[Evolution Go] QR response:`, qrResponse.data);
-        const qrData = qrResponse.data?.data || qrResponse.data;
-        const qrCode = qrData?.qrCode || qrData?.qr || qrData?.base64 || qrData?.Qrcode;
+        const data = qrResponse.data as Record<string, unknown>;
+        const qrData = (data?.data || data) as Record<string, unknown>;
+        const qrCode = (qrData?.qrCode || qrData?.qr || qrData?.base64 || qrData?.Qrcode) as string | undefined;
         
         if (qrCode) {
-          console.log(`[Evolution Go] QR code found directly:`, qrCode ? 'YES' : 'NO');
           return {
             connected: false,
             state: 'qr_pending',
             qrCode: qrCode,
           };
         }
-      } catch (qrError: any) {
-        console.warn(`[Evolution Go] Failed to get QR code first: ${qrError.message}`);
+      } catch (qrError: unknown) {
+        const message = qrError instanceof Error ? qrError.message : 'Unknown error';
+        this.logger.warn(`Failed to get QR code first: ${message}`);
       }
 
-      // Se não tiver QR, tentar conectar
       const requestBody = {
         webhookUrl: input.webhookUrl,
         subscribe: input.subscribe || [
@@ -114,16 +115,12 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         ],
       };
 
-      console.log(`[Evolution Go] Request body:`, requestBody);
-      
       const { data } = await client.post('/instance/connect', requestBody);
-      
-      console.log(`[Evolution Go] Connect response:`, data);
-
-      return this.parseConnectionStatus(data?.data || data);
-    } catch (error: any) {
-      this.logger.error(`connect failed: ${error.message}`);
-      console.error(`[Evolution Go] Connect error:`, error.response?.data || error.message);
+      const dataRec = data as Record<string, unknown>;
+      return this.parseConnectionStatus((dataRec?.data || dataRec) as Record<string, unknown>);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`connect failed: ${message}`);
       throw error;
     }
   }
@@ -137,8 +134,9 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     try {
       await client.post('/instance/disconnect');
       this.logger.log('Instance disconnected');
-    } catch (error: any) {
-      this.logger.error(`disconnect failed: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`disconnect failed: ${message}`);
       throw error;
     }
   }
@@ -151,7 +149,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
   ): Promise<{ pairingCode: string }> {
     const client = this.buildClient(apiUrl, apiKey);
     try {
-      this.logger.log(`[Evolution Go] Generating pairing code for instance: ${instanceId}, phone: ${phone}`);
+      this.logger.log(`Generating pairing code for instance: ${instanceId}, phone: ${phone}`);
       
       const cleanPhone = phone?.replace(/\D/g, '');
       if (!cleanPhone) {
@@ -163,34 +161,21 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         phone: cleanPhone
       };
 
-      this.logger.debug(`[Evolution Go] Simple Pair Request Body: ${JSON.stringify(requestBody)}`);
-
       const { data } = await client.post('/instance/pair', requestBody);
-      this.logger.debug(`[Evolution Go] Pair Response: ${JSON.stringify(data)}`);
+      const dataRec = data as Record<string, unknown>;
+      const responseData = (dataRec?.data || dataRec) as Record<string, unknown>;
       
-      const responseData = data?.data || data;
       const pairingCode = 
         responseData?.PairingCode || 
         responseData?.pairingCode || 
         responseData?.code || 
         responseData?.pairing_code;
-      
-      if (!pairingCode) {
-        this.logger.error(`[Evolution Go] No pairing code in response: ${JSON.stringify(data)}`);
-        throw new Error('Provedor não retornou o código de pareamento. O servidor da Evolution pode precisar de um restart.');
-      }
 
-      this.logger.log(`[Evolution Go] Pairing code generated successfully: ${pairingCode}`);
-      return { pairingCode };
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message;
-      this.logger.error(`[Evolution Go] generatePairingCode failed: ${errorMsg}`);
-      
-      if (error.response?.data) {
-        this.logger.error(`[Evolution Go] Error data: ${JSON.stringify(error.response.data)}`);
-      }
-      
-      throw new Error(`Falha ao gerar código de pareamento: ${errorMsg}`);
+      return { pairingCode: String(pairingCode) };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`generatePairingCode failed: ${message}`);
+      throw error;
     }
   }
 
@@ -263,15 +248,18 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       }
 
       const { data } = await client.post('/send/text', body);
-      const responseData = (data as any)?.data || data;
+      const responseData = (data && typeof data === 'object' && 'data' in data) 
+        ? (data as { data: Record<string, unknown> }).data 
+        : (data as Record<string, unknown>);
+      
       return {
         success: true,
-        messageId: responseData?.messageId || responseData?.key?.id || responseData?.id,
+        messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id),
       };
-    } catch (error) {
-      const err = error as any;
-      this.logger.error(`sendText failed: ${err.message}`);
-      return { success: false, error: err.message };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`sendText failed: ${message}`);
+      return { success: false, error: message };
     }
   }
 
@@ -293,15 +281,17 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       if (input.delay) body.delay = input.delay;
 
       const { data } = await client.post('/send/media', body);
-      const responseData = (data as any)?.data || data;
+      const dataRec = data as Record<string, unknown>;
+      const responseData = (dataRec?.data || dataRec) as Record<string, unknown>;
+      
       return {
         success: true,
-        messageId: responseData?.messageId || responseData?.key?.id || responseData?.id,
+        messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id),
       };
-    } catch (error) {
-      const err = error as any;
-      this.logger.error(`sendMedia failed: ${err.message}`);
-      return { success: false, error: err.message };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`sendMedia failed: ${message}`);
+      return { success: false, error: message };
     }
   }
 
@@ -324,15 +314,17 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       };
 
       const { data } = await client.post('/send/list', body);
-      const responseData = (data as any)?.data || data;
+      const dataRec = data as Record<string, unknown>;
+      const responseData = (dataRec?.data || dataRec) as Record<string, unknown>;
+
       return {
         success: true,
-        messageId: responseData?.messageId || responseData?.key?.id || responseData?.id,
+        messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id),
       };
-    } catch (error) {
-      const err = error as any;
-      this.logger.error(`sendList failed: ${err.message}`);
-      return { success: false, error: err.message };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`sendList failed: ${message}`);
+      return { success: false, error: message };
     }
   }
 
@@ -358,15 +350,17 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       };
 
       const { data } = await client.post('/send/button', body);
-      const responseData = (data as any)?.data || data;
+      const dataRec = data as Record<string, unknown>;
+      const responseData = (dataRec?.data || dataRec) as Record<string, unknown>;
+
       return {
         success: true,
-        messageId: responseData?.messageId || responseData?.key?.id || responseData?.id,
+        messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id),
       };
-    } catch (error) {
-      const err = error as any;
-      this.logger.error(`sendButtons failed: ${err.message}`);
-      return { success: false, error: err.message };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`sendButtons failed: ${message}`);
+      return { success: false, error: message };
     }
   }
 
@@ -383,20 +377,22 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         number: chatId,
         id: messageIds,
       });
-    } catch (error) {
-      const err = error as any;
-      this.logger.warn(`markAsRead failed: ${err.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`markAsRead failed: ${message}`);
     }
   }
 
-  parseWebhook(payload: Record<string, any>, tenantId: string): any {
-    const eventType = payload?.event || payload?.data?.event || payload?.type || 'unknown';
+  parseWebhook(payload: Record<string, unknown>, tenantId: string): WhatsAppWebhookEvent | null {
+    const eventType = (payload?.event || (payload?.data as Record<string, unknown>)?.event || payload?.type || 'unknown') as string;
     
     if (eventType === 'messages.upsert') {
-      const data = payload?.data || payload;
-      const remoteJid = (data as any)?.key?.remoteJid || (data as any)?.remoteJid || (data as any)?.from;
+      const data = (payload?.data || payload) as Record<string, unknown>;
+      const key = data?.key as Record<string, unknown> | undefined;
+      const remoteJid = (key?.remoteJid || data?.remoteJid || data?.from) as string | undefined;
+      
       if (!remoteJid || remoteJid.includes('@g.us')) return null;
-      if ((data as any)?.key?.fromMe) return null;
+      if (key?.fromMe) return null;
 
       const content = this.extractMessageContent(data);
       if (!content) return null;
@@ -407,13 +403,13 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         from: remoteJid.replace(/@.*$/, ''),
         content,
         messageType: this.detectMessageType(data),
-        externalId: (data as any)?.key?.id || (data as any)?.messageId || (data as any)?.id,
+        externalId: String(key?.id || data?.messageId || data?.id),
         raw: payload
       };
     }
 
     if (eventType === 'connection.update') {
-      const data = payload?.data || payload;
+      const data = (payload?.data || payload) as Record<string, unknown>;
       const status = this.parseConnectionStatus(data);
       return {
         type: 'connection',
@@ -425,12 +421,15 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     }
 
     if (eventType === 'messages.update') {
-      const data = payload?.data || payload;
+      const data = (payload?.data || payload) as Record<string, unknown>;
+      const update = data?.update as Record<string, unknown> | undefined;
+      const key = data?.key as Record<string, unknown> | undefined;
+
       return {
         type: 'ack',
         tenantId,
-        externalId: (data as any)?.key?.id || (data as any)?.messageId || (data as any)?.id,
-        status: (data as any)?.update?.status || (data as any)?.status,
+        externalId: String(key?.id || data?.messageId || data?.id),
+        status: String(update?.status || data?.status),
         raw: payload
       };
     }
@@ -439,21 +438,21 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
   }
 
 
-  private extractMessageContent(data: any): string | null {
-    const message = data?.message || data;
+  private extractMessageContent(data: Record<string, unknown>): string | null {
+    const message = (data?.message || data) as Record<string, unknown>;
     if (typeof message === 'string') return message;
-    if ((message as any)?.conversation) return (message as any).conversation;
-    if ((message as any)?.extendedTextMessage?.text) return (message as any).extendedTextMessage.text;
-    if ((message as any)?.imageMessage?.caption) return (message as any).imageMessage.caption;
-    if ((message as any)?.videoMessage?.caption) return (message as any).videoMessage.caption;
-    if ((message as any)?.buttonsResponseMessage?.selectedDisplayText) return (message as any).buttonsResponseMessage.selectedDisplayText;
-    if ((message as any)?.listResponseMessage?.title) return (message as any).listResponseMessage.title;
+    if (message?.conversation) return String(message.conversation);
+    if ((message?.extendedTextMessage as Record<string, unknown>)?.text) return String((message.extendedTextMessage as Record<string, unknown>).text);
+    if ((message?.imageMessage as Record<string, unknown>)?.caption) return String((message.imageMessage as Record<string, unknown>).caption);
+    if ((message?.videoMessage as Record<string, unknown>)?.caption) return String((message.videoMessage as Record<string, unknown>).caption);
+    if ((message?.buttonsResponseMessage as Record<string, unknown>)?.selectedDisplayText) return String((message.buttonsResponseMessage as Record<string, unknown>).selectedDisplayText);
+    if ((message?.listResponseMessage as Record<string, unknown>)?.title) return String((message.listResponseMessage as Record<string, unknown>).title);
     return null;
   }
 
-  private detectMessageType(data: any): string {
-    const message = data?.message || data;
-    if ((message as any)?.imageMessage) return 'image';
+  private detectMessageType(data: Record<string, unknown>): string {
+    const message = (data?.message || data) as Record<string, unknown>;
+    if (message?.imageMessage) return 'image';
     if (message?.videoMessage) return 'video';
     if (message?.audioMessage) return 'audio';
     if (message?.documentMessage) return 'document';
@@ -463,7 +462,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     return 'text';
   }
 
-  private parseConnectionStatus(data: any): WhatsAppConnectionStatus {
+  private parseConnectionStatus(data: Record<string, unknown>): WhatsAppConnectionStatus {
     if (!data) {
       return { connected: false, state: 'disconnected' };
     }
@@ -471,8 +470,8 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     console.log(`[Evolution Go] Parsing status from:`, data);
 
     const rawState = (
-      data?.state || data?.status || data?.connectionStatus || ''
-    ).toString().toLowerCase();
+      String(data?.state || data?.status || data?.connectionStatus || '')
+    ).toLowerCase();
 
     let state: WhatsAppConnectionStatus['state'] = 'disconnected';
     
@@ -495,8 +494,8 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     const result = {
       connected: state === 'connected',
       state,
-      phoneNumber: data?.phoneNumber || data?.phone || data?.jid || data?.number,
-      qrCode: data?.qrCode || data?.qr || data?.base64 || data?.Qrcode,
+      phoneNumber: (data?.phoneNumber || data?.phone || data?.jid || data?.number) as string | undefined,
+      qrCode: (data?.qrCode || data?.qr || data?.base64 || data?.Qrcode) as string | undefined,
     };
 
     console.log(`[Evolution Go] Parsed result:`, result);

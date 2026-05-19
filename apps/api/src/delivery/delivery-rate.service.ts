@@ -316,21 +316,11 @@ export class DeliveryRateService {
   }
 
   private isDistanceRuleMatch(
-    rule: { minDistanceKm: unknown; maxDistanceKm: unknown; minKm: unknown; maxKm: unknown },
+    rule: { minDistanceKm: number | null; maxDistanceKm: number | null; minKm: number | null; maxKm: number | null },
     distanceKm: number,
   ): boolean {
-    const min =
-      typeof rule.minDistanceKm === 'number'
-        ? rule.minDistanceKm
-        : typeof rule.minKm === 'number'
-          ? rule.minKm
-          : null;
-    const max =
-      typeof rule.maxDistanceKm === 'number'
-        ? rule.maxDistanceKm
-        : typeof rule.maxKm === 'number'
-          ? rule.maxKm
-          : null;
+    const min = rule.minDistanceKm ?? rule.minKm;
+    const max = rule.maxDistanceKm ?? rule.maxKm;
 
     if (min != null && distanceKm < min) return false;
     if (max != null && distanceKm > max) return false;
@@ -479,19 +469,9 @@ export class DeliveryRateService {
         } else if (engineType === 'DISTANCE') {
           if (typeof distanceKm === 'number' && Number.isFinite(distanceKm)) {
             const distanceKmValue = distanceKm;
+            const r = (rule as unknown) as { minDistanceKm: number | null; maxDistanceKm: number | null; minKm: number | null; maxKm: number | null };
             isMatch = this.isDistanceRuleMatch(
-              {
-                minDistanceKm:
-                  'minDistanceKm' in rule && (rule as { minDistanceKm?: unknown }).minDistanceKm != null
-                    ? Number((rule as { minDistanceKm?: unknown }).minDistanceKm)
-                    : null,
-                maxDistanceKm:
-                  'maxDistanceKm' in rule && (rule as { maxDistanceKm?: unknown }).maxDistanceKm != null
-                    ? Number((rule as { maxDistanceKm?: unknown }).maxDistanceKm)
-                    : null,
-                minKm: rule.minKm != null ? Number(rule.minKm) : null,
-                maxKm: rule.maxKm != null ? Number(rule.maxKm) : null,
-              },
+              r,
               distanceKmValue,
             );
           }
@@ -564,23 +544,29 @@ export class DeliveryRateService {
   }
 
   async calculateRate(input: CalculateDeliveryRateInput): Promise<DeliveryFeeCalculation> {
-    const cfg = await this.deliveryCoverageRepo.findUnique({
-      where: { tenantId: input.tenantId },
-    });
+    try {
+      const cfg = await this.deliveryCoverageRepo.findUnique({
+        where: { tenantId: input.tenantId },
+      });
 
-    if (!cfg) {
-      return this.calculateRateLegacy(input);
+      if (!cfg) {
+        return this.calculateRateLegacy(input);
+      }
+
+      const decision = await this.calculateDeliveryDecision(input);
+      return {
+        fee: decision.fee,
+        rule: {
+          id: decision.matchedZoneId ?? 'base',
+          type: decision.matchedStrategy,
+          description: decision.reason,
+        },
+      };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error calculating delivery rate: ${message}`);
+      throw error;
     }
-
-    const decision = await this.calculateDeliveryDecision(input);
-    return {
-      fee: decision.fee,
-      rule: {
-        id: decision.matchedZoneId ?? 'base',
-        type: decision.matchedStrategy,
-        description: decision.reason,
-      },
-    };
   }
 
   /**
@@ -694,7 +680,7 @@ export class DeliveryRateService {
         );
       }
 
-      ruleData.geoJson = data.geoJson ?? (null as any);
+      ruleData.geoJson = (data.geoJson as unknown as Prisma.InputJsonValue) ?? Prisma.JsonNull;
       const polygonJson = this.toInputJsonValue(normalizedCoords);
       if (!polygonJson) {
         throw new UnprocessableEntityException('polygonCoordinates inválido');

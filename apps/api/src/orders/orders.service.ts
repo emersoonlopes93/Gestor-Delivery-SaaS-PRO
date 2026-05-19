@@ -320,7 +320,10 @@ export class OrdersService {
     const orderDetail = await this.getOrderDetail(order.id, tenantId);
     
     // Emitir via Socket para o painel administrativo (tempo real)
-    this.ordersGateway.emitNewOrder(tenantId, orderDetail);
+    this.ordersGateway.emitNewOrder(tenantId, {
+      ...orderDetail,
+      itemCount: orderDetail.items.length,
+    });
     
     // Se pagamento for PIX, gerar QR code
     if (dto.payment.method === 'pix') {
@@ -748,12 +751,12 @@ export class OrdersService {
 
       // Emitir via Socket para o storefront (tempo real)
       if (order.publicTrackingToken) {
-        this.ordersGateway.emitOrderStatusUpdated(order.publicTrackingToken, nextStatus, dto.note);
+        this.ordersGateway.emitOrderStatusUpdated(order.publicTrackingToken, order.orderNumber, nextStatus, dto.note);
       }
 
       // Se for cancelamento, emitir evento específico para o painel administrativo
       if (nextStatus === 'cancelled') {
-        this.ordersGateway.emitOrderStatusUpdated(order.publicTrackingToken || '', 'cancelled', dto.note);
+        this.ordersGateway.emitOrderStatusUpdated(order.publicTrackingToken || '', order.orderNumber, OrderStatus.cancelled, dto.note);
         // Também emitimos para o tenant room caso o painel administrativo queira ouvir por lá
         this.ordersGateway.server.to(`tenant:${tenantId}`).emit('orderCancelled', { 
           orderId: id, 

@@ -5,6 +5,7 @@ import { RequirePermissions } from '../common/decorators';
 import { CreateDriverDTO, UpdateDriverDTO } from '@gestor/types';
 import { DriversService } from './drivers.service';
 import { UpdateDriverLocationDTO } from './dto/update-driver-location.dto';
+import { AuthenticatedRequest } from '../common/interfaces/request.interface';
 
 @Controller('delivery/drivers')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -13,14 +14,14 @@ export class DriversController {
 
   @Get()
   @RequirePermissions('delivery.read', 'delivery.manage_drivers', 'delivery.dispatch')
-  async list(@Request() req: { user: { tenantId: string } }) {
+  async list(@Request() req: AuthenticatedRequest) {
     return this.driversService.listDrivers(req.user.tenantId);
   }
 
   @Get(':id')
   @RequirePermissions('delivery.read', 'delivery.manage_drivers', 'delivery.dispatch')
   async get(
-    @Request() req: { user: { tenantId: string } },
+    @Request() req: AuthenticatedRequest,
     @Param('id') id: string,
   ) {
     return this.driversService.getDriver(req.user.tenantId, id);
@@ -29,7 +30,7 @@ export class DriversController {
   @Post()
   @RequirePermissions('delivery.manage_drivers')
   async create(
-    @Request() req: { user: { tenantId: string } },
+    @Request() req: AuthenticatedRequest,
     @Body() data: CreateDriverDTO,
   ) {
     return this.driversService.createDriver(req.user.tenantId, data);
@@ -38,7 +39,7 @@ export class DriversController {
   @Patch(':id')
   @RequirePermissions('delivery.manage_drivers', 'delivery.dispatch')
   async update(
-    @Request() req: { user: { tenantId: string } },
+    @Request() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body() data: UpdateDriverDTO,
   ) {
@@ -48,7 +49,7 @@ export class DriversController {
   @Post(':id/location')
   @RequirePermissions('delivery.dispatch', 'delivery.manage_drivers')
   async updateLocation(
-    @Request() req: { user: { tenantId: string } },
+    @Request() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body() data: UpdateDriverLocationDTO,
   ) {
@@ -58,7 +59,7 @@ export class DriversController {
   @Delete(':id')
   @RequirePermissions('delivery.manage_drivers')
   async remove(
-    @Request() req: { user: { tenantId: string } },
+    @Request() req: AuthenticatedRequest,
     @Param('id') id: string,
   ) {
     await this.driversService.deleteDriver(req.user.tenantId, id);

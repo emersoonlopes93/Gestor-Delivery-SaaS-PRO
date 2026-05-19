@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, Product, ProductCategory, ProductOptionGroupLink, ProductComplementGroupLink, ProductComplementGroup, ProductComplementItem, ProductComboBlock, ProductComboBlockItem } from '@prisma/client';
 import type {
   CreateOrderItemDTO,
   CreateOrderItemComplementDTO,
@@ -20,6 +20,34 @@ import { DeliveryRateService } from '../delivery/delivery-rate.service';
 import { AvailabilityService } from '../catalog/publication/availability.service';
 import { UpsellsService } from '../catalog/upsells.service';
 import { PizzaEngineService } from '../catalog/pizza-engine.service';
+
+type ProductWithData = Prisma.ProductGetPayload<{
+  include: {
+    complementGroups: { include: { group: { include: { items: true } } } };
+    optionGroupLinks: { include: { optionGroup: { include: { items: true } } } };
+    category: { select: { id: true, templateType: true, templateConfig: true } };
+  };
+}>;
+
+type OptionGroupLinkWithData = Prisma.ProductOptionGroupLinkGetPayload<{
+  include: { optionGroup: { include: { items: true } } };
+}>;
+
+type ComplementGroupWithItems = Prisma.ProductComplementGroupGetPayload<{
+  include: { items: true };
+}>;
+
+type ComplementGroupLinkWithData = Prisma.ProductComplementGroupLinkGetPayload<{
+  include: { group: { include: { items: true } } };
+}>;
+
+type ComboSlotWithItems = Prisma.ComboSlotGetPayload<{
+  include: { allowedItems: { include: { product: true } } };
+}>;
+
+type ProductComboBlockWithItems = Prisma.ProductComboBlockGetPayload<{
+  include: { items: { include: { product: true } } };
+}>;
 
 @Injectable()
 export class CheckoutValidatorService {
@@ -272,13 +300,13 @@ export class CheckoutValidatorService {
     item: CreateOrderItemDTO,
     checkSellableOnline: boolean = true,
     channel: 'storefront_delivery' | 'storefront_pickup' | 'pos' = 'storefront_delivery',
-    context?: { settings?: any; operatingHours?: any[] },
+    context?: { settings?: Prisma.TenantSettingsGetPayload<{ select: { isStorePaused: true, storePauseReason: true, timezone: true } }> | null; operatingHours?: Prisma.TenantOperatingHoursGetPayload<{}>[] },
   ): Promise<ValidatedProductLine> {
     if (!item.productId) {
       throw new BadRequestException('productId é obrigatório para linhas do tipo product.');
     }
 
-    const hasNewSelections = Array.isArray(item.selections) && item.selections.length > 0;
+    const hasNewSelections = item.selections && item.selections.length > 0;
 
     // Fetch product with legacy complement groups and/or new option groups
     const product = await this.prisma.product.findFirst({
@@ -313,15 +341,7 @@ export class CheckoutValidatorService {
       throw new BadRequestException(`Produto não encontrado ou não pertence a esta loja.`);
     }
 
-    type ProductWithData = Prisma.ProductGetPayload<{
-      include: {
-        complementGroups: { include: { group: { include: { items: true } } } };
-        optionGroupLinks: { include: { optionGroup: { include: { items: true } } } };
-        category: { select: { id: true, templateType: true, templateConfig: true } };
-      };
-    }>;
-
-    const typedProduct = product as unknown as ProductWithData;
+    const typedProduct = (product as unknown) as ProductWithData;
 
     const shouldCheckAvailabilityByChannel = channel !== 'pos';
 
@@ -374,7 +394,7 @@ export class CheckoutValidatorService {
     if (hasNewSelections) {
       const pricing = this.validateAndPriceOptionSelections(
         item.selections || [],
-        typedProduct.optionGroupLinks as any[],
+        typedProduct.optionGroupLinks,
         typedProduct.name,
         basePrice,
       );
@@ -439,7 +459,7 @@ export class CheckoutValidatorService {
     } else {
       // LEGACY FALLBACK
       const complements = item.complements || [];
-      const complementGroups = typedProduct.complementGroups as any[];
+      const complementGroups = typedProduct.complementGroups;
 
       validatedComplements = this.validateComplements(
         complements,
@@ -475,7 +495,7 @@ export class CheckoutValidatorService {
 
   private validateAndPriceOptionSelections(
     selections: CreateOrderItemSelectionGroupDTO[],
-    optionGroupLinks: Array<Record<string, unknown>>,
+    optionGroupLinks: OptionGroupLinkWithData[],
     productName: string,
     basePrice: number,
   ): {
@@ -503,11 +523,11 @@ export class CheckoutValidatorService {
     }>;
   } {
     // Build lookup of groups available to this product (respect active group)
-    const groupLinkMap = new Map<string, Record<string, unknown>>();
+    const groupLinkMap = new Map<string, OptionGroupLinkWithData>();
     for (const link of optionGroupLinks) {
-      const group = link['optionGroup'] as Record<string, unknown>;
-      if (group && (group['isActive'] as boolean)) {
-        groupLinkMap.set(group['id'] as string, link);
+      const group = link.optionGroup;
+      if (group && group.isActive) {
+        groupLinkMap.set(group.id, link);
       }
     }
 
@@ -520,15 +540,14 @@ export class CheckoutValidatorService {
 
     // Validate min/max per group (using overrides if present)
     for (const [groupId, link] of groupLinkMap.entries()) {
-      const group = link['optionGroup'] as Record<string, unknown>;
+      const group = link.optionGroup;
       const selectedGroup = selections.find((s) => s.optionGroupId === groupId);
       const selectedCount = selectedGroup ? selectedGroup.items.length : 0;
 
-      const minSelect = (link['overrideMinSelect'] as number | null | undefined) ?? (group['minSelect'] as number);
-      const maxSelect = (link['overrideMaxSelect'] as number | null | undefined) ?? (group['maxSelect'] as number);
-      const isRequired = (link['overrideIsRequired'] as boolean | null | undefined) ?? (group['isRequired'] as boolean);
-      const groupName =
-        (link['overrideName'] as string | null | undefined) ?? (group['name'] as string);
+      const minSelect = link.overrideMinSelect ?? group.minSelect;
+      const maxSelect = link.overrideMaxSelect ?? group.maxSelect;
+      const isRequired = link.overrideIsRequired ?? group.isRequired;
+      const groupName = link.overrideName ?? group.name;
 
       const effectiveMin = isRequired ? Math.max(1, minSelect) : minSelect;
 
@@ -574,17 +593,16 @@ export class CheckoutValidatorService {
     for (const selGroup of selections) {
       const link = groupLinkMap.get(selGroup.optionGroupId);
       if (!link) continue;
-      const group = link['optionGroup'] as Record<string, unknown>;
-      const groupName =
-        (link['overrideName'] as string | null | undefined) ?? (group['name'] as string);
-      const pricingAxis = (link['pricingAxis'] as 'primary' | 'secondary') || 'secondary';
+      const group = link.optionGroup;
+      const groupName = link.overrideName ?? group.name;
+      const pricingAxis = link.pricingAxis || 'secondary';
 
-      const selectionType = group['selectionType'] as string;
-      const isRequired = ((link['overrideIsRequired'] as boolean | null | undefined) ?? (group['isRequired'] as boolean)) || false;
-      const minSelect = Number(((link['overrideMinSelect'] as number | null | undefined) ?? (group['minSelect'] as number)) ?? 0);
-      const maxSelect = Number(((link['overrideMaxSelect'] as number | null | undefined) ?? (group['maxSelect'] as number)) ?? 0);
+      const selectionType = group.selectionType;
+      const isRequired = (link.overrideIsRequired ?? group.isRequired) || false;
+      const minSelect = Number((link.overrideMinSelect ?? group.minSelect) ?? 0);
+      const maxSelect = Number((link.overrideMaxSelect ?? group.maxSelect) ?? 0);
 
-      const groupItems = group['items'] as Array<Record<string, unknown>>;
+      const groupItems = group.items;
       const chosenNames: string[] = [];
       let groupAllowQuantity = false;
       const groupSnapshotItems: Array<{
@@ -597,22 +615,22 @@ export class CheckoutValidatorService {
       }> = [];
 
       for (const chosen of selGroup.items) {
-        const itemRecord = groupItems.find((i) => (i['id'] as string) === chosen.optionItemId);
+        const itemRecord = groupItems.find((i) => i.id === chosen.optionItemId);
         if (!itemRecord) {
           throw new BadRequestException(`Opção não encontrada no grupo "${groupName}".`);
         }
-        if (!(itemRecord['isActive'] as boolean)) {
-          throw new BadRequestException(`A opção "${itemRecord['name']}" não está disponível.`);
+        if (!itemRecord.isActive) {
+          throw new BadRequestException(`A opção "${itemRecord.name}" não está disponível.`);
         }
 
-        const allowQuantity = (itemRecord['allowQuantity'] as boolean) || false;
+        const allowQuantity = itemRecord.allowQuantity || false;
         if (allowQuantity) {
           groupAllowQuantity = true;
         }
         const qty = allowQuantity ? Math.max(1, Number(chosen.qty ?? 1)) : 1;
 
-        const impactType = itemRecord['priceImpactType'] as 'none' | 'fixed' | 'replace' | 'percentage';
-        const impactValue = Number(itemRecord['priceImpactValue']);
+        const impactType = itemRecord.priceImpactType as 'none' | 'fixed' | 'replace' | 'percentage';
+        const impactValue = Number(itemRecord.priceImpactValue);
 
         let appliedAmount = 0;
 
@@ -640,14 +658,14 @@ export class CheckoutValidatorService {
 
         groupSnapshotItems.push({
           itemId: chosen.optionItemId,
-          name: itemRecord['name'] as string,
+          name: itemRecord.name,
           qty,
           priceImpactType: impactType,
           priceImpactValue: impactValue,
           appliedAmount,
         });
 
-        chosenNames.push(allowQuantity && qty > 1 ? `${itemRecord['name']} x${qty}` : (itemRecord['name'] as string));
+        chosenNames.push(allowQuantity && qty > 1 ? `${itemRecord.name} x${qty}` : itemRecord.name);
       }
 
       if (chosenNames.length > 0) {
@@ -677,26 +695,26 @@ export class CheckoutValidatorService {
 
   private validateComplements(
     selected: CreateOrderItemComplementDTO[],
-    productGroups: Array<Record<string, unknown>>,
+    productGroups: ComplementGroupLinkWithData[],
     productName: string,
   ): Array<{ complementItemId: string; snapshotName: string; snapshotPrice: number }> {
     const result: Array<{ complementItemId: string; snapshotName: string; snapshotPrice: number }> = [];
 
     // Build lookup of groups available to this product
-    const groupMap = new Map<string, Record<string, unknown>>();
+    const groupMap = new Map<string, ComplementGroupWithItems>();
     for (const link of productGroups) {
-      const group = link['group'] as Record<string, unknown>;
-      if (group['isActive'] as boolean) {
-        groupMap.set(group['id'] as string, group);
+      const group = link.group;
+      if (group.isActive) {
+        groupMap.set(group.id, group);
       }
     }
 
     // Check each group for min/max
     for (const [groupId, group] of groupMap.entries()) {
       const selectedForGroup = selected.filter(s => s.groupId === groupId);
-      const minSelect = group['minSelect'] as number;
-      const maxSelect = group['maxSelect'] as number;
-      const groupName = group['name'] as string;
+      const minSelect = group.minSelect;
+      const maxSelect = group.maxSelect;
+      const groupName = group.name;
 
       if (selectedForGroup.length < minSelect) {
         throw new BadRequestException(
@@ -709,20 +727,20 @@ export class CheckoutValidatorService {
         );
       }
 
-      const groupItems = group['items'] as Array<Record<string, unknown>>;
+      const groupItems = group.items;
 
       for (const sel of selectedForGroup) {
-        const compItem = groupItems.find(i => (i['id'] as string) === sel.itemId);
+        const compItem = groupItems.find(i => i.id === sel.itemId);
         if (!compItem) {
           throw new BadRequestException(`Complemento não encontrado no grupo "${groupName}".`);
         }
-        if (!(compItem['isActive'] as boolean)) {
-          throw new BadRequestException(`O complemento "${compItem['name']}" não está disponível.`);
+        if (!compItem.isActive) {
+          throw new BadRequestException(`O complemento "${compItem.name}" não está disponível.`);
         }
         result.push({
           complementItemId: sel.itemId,
-          snapshotName: compItem['name'] as string,
-          snapshotPrice: Number(compItem['additionalPrice']),
+          snapshotName: compItem.name,
+          snapshotPrice: Number(compItem.additionalPrice),
         });
       }
     }
@@ -741,7 +759,7 @@ export class CheckoutValidatorService {
     tenantId: string,
     item: CreateOrderItemDTO,
     channel: 'storefront_delivery' | 'storefront_pickup' | 'pos' = 'storefront_delivery',
-    context?: { settings?: any; operatingHours?: any[] },
+    context?: { settings?: Prisma.TenantSettingsGetPayload<{ select: { isStorePaused: true, storePauseReason: true, timezone: true } }> | null; operatingHours?: Prisma.TenantOperatingHoursGetPayload<{}>[] },
   ): Promise<ValidatedComboLine> {
     const hasNewSlots = Array.isArray(item.slots) && item.slots.length > 0;
     const comboProductId = item.productId || item.comboId;
@@ -781,7 +799,7 @@ export class CheckoutValidatorService {
         },
       }>;
 
-      const typedCombo = comboProduct as unknown as ComboWithSlots;
+      const typedCombo = (comboProduct as unknown) as ComboWithSlots;
 
       await this.availabilityService.assertCanSell({
         tenantId,
@@ -796,7 +814,7 @@ export class CheckoutValidatorService {
       const basePrice = Number(typedCombo.basePrice);
       const validatedSlots = this.validateComboSlots(
         item.slots || [],
-        typedCombo.comboSlots as any[],
+        typedCombo.comboSlots,
         typedCombo.name,
       );
 
@@ -867,7 +885,7 @@ export class CheckoutValidatorService {
           },
         }>;
 
-        const typedCombo = comboProduct as unknown as ComboWithBundle;
+        const typedCombo = (comboProduct as unknown) as ComboWithBundle;
 
         await this.availabilityService.assertCanSell({
           tenantId,
@@ -1004,7 +1022,7 @@ export class CheckoutValidatorService {
       },
     }>;
 
-    const typedComboLegacy = combo as unknown as LegacyCombo;
+    const typedComboLegacy = (combo as unknown) as LegacyCombo;
 
     if (!typedComboLegacy.isActive) {
       throw new BadRequestException(`O combo "${typedComboLegacy.name}" não está ativo.`);
@@ -1012,7 +1030,7 @@ export class CheckoutValidatorService {
 
     const basePrice = Number(typedComboLegacy.basePrice);
     const selections = item.comboSelections || [];
-    const blocks = typedComboLegacy.blocks as any[];
+    const blocks = typedComboLegacy.blocks;
 
     const validatedSelections = this.validateComboBlocks(
       selections,
@@ -1094,7 +1112,7 @@ export class CheckoutValidatorService {
 
   private validateComboSlots(
     selected: CreateOrderItemComboSlotSelectionDTO[],
-    slots: Array<Record<string, unknown>>,
+    slots: ComboSlotWithItems[],
     comboName: string,
   ): Array<{
     slotId: string;
@@ -1119,9 +1137,9 @@ export class CheckoutValidatorService {
       additionalPrice: number;
     }> = [];
 
-    const slotMap = new Map<string, Record<string, unknown>>();
+    const slotMap = new Map<string, ComboSlotWithItems>();
     for (const slot of slots) {
-      slotMap.set(slot['id'] as string, slot);
+      slotMap.set(slot.id, slot);
     }
 
     for (const sel of selected) {
@@ -1134,10 +1152,10 @@ export class CheckoutValidatorService {
       const selectedForSlot = selected.find((s) => s.comboSlotId === slotId);
       const items = selectedForSlot ? selectedForSlot.items : [];
 
-      const minSelect = Number(slot['minSelect'] as number);
-      const maxSelect = Number(slot['maxSelect'] as number);
-      const isRequired = Boolean(slot['isRequired'] as boolean);
-      const slotName = slot['name'] as string;
+      const minSelect = Number(slot.minSelect);
+      const maxSelect = Number(slot.maxSelect);
+      const isRequired = Boolean(slot.isRequired);
+      const slotName = slot.name;
 
       const effectiveMin = isRequired ? Math.max(1, minSelect) : minSelect;
 
@@ -1160,19 +1178,19 @@ export class CheckoutValidatorService {
         );
       }
 
-      const allowedItems = slot['allowedItems'] as Array<Record<string, unknown>>;
+      const allowedItems = slot.allowedItems;
 
       for (const [productId, qty] of normalizedItems.entries()) {
         const allowed = allowedItems.find(
-          (a) => (a['productId'] as string) === productId,
+          (a) => a.productId === productId,
         );
         if (!allowed) {
           throw new BadRequestException(`Item não permitido no slot "${slotName}".`);
         }
-        const product = allowed['product'] as Record<string, unknown>;
-        if (!(product['isActive'] as boolean) || product['deletedAt'] !== null) {
+        const product = allowed.product;
+        if (!product.isActive || product.deletedAt !== null) {
           throw new BadRequestException(
-            `O produto "${product['name']}" do slot "${slotName}" não está disponível.`,
+            `O produto "${product.name}" do slot "${slotName}" não está disponível.`,
           );
         }
 
@@ -1189,9 +1207,9 @@ export class CheckoutValidatorService {
           minSelect: effectiveMin,
           maxSelect,
           productId,
-          productName: product['name'] as string,
+          productName: product.name,
           qty,
-          additionalPrice: Number(allowed['additionalPrice']) * qty,
+          additionalPrice: Number(allowed.additionalPrice) * qty,
         });
       }
     }
@@ -1201,7 +1219,7 @@ export class CheckoutValidatorService {
 
   private validateComboBlocks(
     selected: CreateOrderItemComboSelectionDTO[],
-    blocks: Array<Record<string, unknown>>,
+    blocks: ProductComboBlockWithItems[],
     comboName: string,
   ): Array<{
     comboBlockItemId: string;
@@ -1216,16 +1234,16 @@ export class CheckoutValidatorService {
       snapshotAdditionalPrice: number;
     }> = [];
 
-    const blockMap = new Map<string, Record<string, unknown>>();
+    const blockMap = new Map<string, ProductComboBlockWithItems>();
     for (const block of blocks) {
-      blockMap.set(block['id'] as string, block);
+      blockMap.set(block.id, block);
     }
 
     for (const [blockId, block] of blockMap.entries()) {
       const selectedForBlock = selected.filter(s => s.blockId === blockId);
-      const minSelect = block['minSelect'] as number;
-      const maxSelect = block['maxSelect'] as number;
-      const blockName = block['name'] as string;
+      const minSelect = block.minSelect;
+      const maxSelect = block.maxSelect;
+      const blockName = block.name;
 
       if (selectedForBlock.length < minSelect) {
         throw new BadRequestException(
@@ -1238,24 +1256,24 @@ export class CheckoutValidatorService {
         );
       }
 
-      const blockItems = block['items'] as Array<Record<string, unknown>>;
+      const blockItems = block.items;
 
       for (const sel of selectedForBlock) {
-        const blockItem = blockItems.find(i => (i['id'] as string) === sel.blockItemId);
+        const blockItem = blockItems.find(i => i.id === sel.blockItemId);
         if (!blockItem) {
           throw new BadRequestException(`Item não reconhecido no bloco "${blockName}".`);
         }
 
-        const product = blockItem['product'] as Record<string, unknown>;
-        if (!(product['isActive'] as boolean) || product['deletedAt'] !== null) {
-          throw new BadRequestException(`O produto "${product['name']}" do bloco "${blockName}" não está disponível.`);
+        const product = blockItem.product;
+        if (!product.isActive || product.deletedAt !== null) {
+          throw new BadRequestException(`O produto "${product.name}" do bloco "${blockName}" não está disponível.`);
         }
 
         result.push({
           comboBlockItemId: sel.blockItemId,
           snapshotBlockName: blockName,
-          snapshotProductName: product['name'] as string,
-          snapshotAdditionalPrice: Number(blockItem['additionalPrice']),
+          snapshotProductName: product.name,
+          snapshotAdditionalPrice: Number(blockItem.additionalPrice),
         });
       }
     }
@@ -1285,5 +1303,15 @@ export class CheckoutValidatorService {
         );
       }
     }
+  }
+
+  private isDistanceRuleMatch(
+    rule: { minDistanceKm?: number | null; maxDistanceKm?: number | null; minKm?: number | null; maxKm?: number | null },
+    distanceKm: number,
+  ): boolean {
+    const min = rule.minDistanceKm ?? rule.minKm;
+    const max = rule.maxDistanceKm ?? rule.maxKm;
+
+    return (min == null || distanceKm >= min) && (max == null || distanceKm <= max);
   }
 }
