@@ -86,8 +86,8 @@ export class PrinterService {
       }
       
       // Complements
-      if ((item as any).complements?.length > 0) {
-        for (const comp of (item as any).complements) {
+      if (item.complements && item.complements.length > 0) {
+        for (const comp of item.complements) {
           lines.push(`     + ${comp.snapshotName.toUpperCase()}`);
         }
       }

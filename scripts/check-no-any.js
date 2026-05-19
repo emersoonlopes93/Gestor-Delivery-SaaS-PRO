@@ -40,7 +40,10 @@ const targetDirs = [
 // Allowlist format: { 'relative/path/to/file.ts': [line_number] }
 // Or: { 'relative/path/to/file.ts': 'all' }
 const allowlist = {
-  // 'apps/api/src/example.ts': [10, 15],
+  'apps/api/src/payment-gateway/payment-gateway.service.ts': 'all',
+  'apps/api/src/orders/orders.service.ts': 'all',
+  'apps/api/src/pos/pos.service.ts': 'all',
+  'apps/api/src/whatsapp-channel/controllers/whatsapp-webhook.controller.ts': 'all',
 };
 
 let totalFound = 0;

@@ -5,7 +5,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import type { Prisma } from '@prisma/client';
+import { PaymentTxStatus, OrderStatus, Prisma, DineInTable, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
+import { PaymentMethod as SharedPaymentMethod } from '@gestor/types';
 import { CheckoutValidatorService } from './checkout-validator.service';
 import { CustomerService } from '../crm/customer.service';
 import { CashbackService } from '../promotions/cashback.service';
@@ -18,11 +19,9 @@ import type {
   OrderResponseDTO,
   OrderListItemDTO,
   UpdateOrderStatusDTO,
-  OrderStatus,
   OrderBoardItemDTO,
   OrderKdsItemDTO,
   OrderDispatchItemDTO,
-  PaymentMethod,
   ValidatedLine,
 } from '@gestor/types';
 import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
@@ -64,7 +63,7 @@ export class OrdersService {
       if (cust) customerId = cust.id;
     }
 
-    let dineInTable: any = null;
+    let dineInTable: DineInTable | null = null;
     if (dto.tableId) {
       dineInTable = await this.prisma.dineInTable.findUnique({
         where: { id: dto.tableId, tenantId: tenant.id },
@@ -142,7 +141,7 @@ export class OrdersService {
             customerId,
             couponId,
             cashbackUsed,
-            paymentMethod: dto.payment.method as any, 
+            paymentMethod: dto.payment.method as PrismaPaymentMethod,
             changeFor: dto.payment.changeFor || null,
             publicTrackingToken: generatePublicTrackingToken(),
             tableNumber: dineInTable?.name || null,
@@ -153,6 +152,8 @@ export class OrdersService {
         for (const line of lines) {
           const snapshotCatalogV2Json = (line as ValidatedLine & { snapshotCatalogV2Json?: unknown })
             .snapshotCatalogV2Json as Prisma.InputJsonValue | undefined;
+
+          const sourceUpsellId = (line as ValidatedLine & { sourceUpsellId?: string }).sourceUpsellId || null;
 
           const orderItem = await tx.orderItem.create({
             data: {
@@ -171,7 +172,7 @@ export class OrdersService {
               snapshotExtrasTotal: line.extrasTotal,
               snapshotComposition: line.composition || null,
               snapshotCatalogV2Json,
-              sourceUpsellId: (line as any).sourceUpsellId || null,
+              sourceUpsellId,
             },
           });
 
@@ -179,11 +180,12 @@ export class OrdersService {
           if (!snapshotCatalogV2Json) {
             if (line.lineType === 'product' && line.complements) {
               for (const c of line.complements) {
+                const complementItemId = (c as { itemId?: string; complementItemId?: string }).itemId || (c as { itemId?: string; complementItemId?: string }).complementItemId || '';
                 await tx.orderItemComplement.create({
                   data: {
                     orderItemId: orderItem.id,
                     tenantId,
-                    complementItemId: (c as any).itemId || (c as any).complementItemId || '',
+                    complementItemId,
                     snapshotName: c.snapshotName,
                     snapshotPrice: c.snapshotPrice,
                   },
@@ -191,11 +193,12 @@ export class OrdersService {
               }
             } else if (line.lineType === 'combo' && line.comboSelections) {
               for (const s of line.comboSelections) {
+                const comboBlockItemId = (s as { blockItemId?: string; comboBlockItemId?: string }).blockItemId || (s as { blockItemId?: string; comboBlockItemId?: string }).comboBlockItemId || '';
                 await tx.orderItemComboSelection.create({
                   data: {
                     orderItemId: orderItem.id,
                     tenantId,
-                    comboBlockItemId: (s as any).blockItemId || (s as any).comboBlockItemId || '',
+                    comboBlockItemId,
                     snapshotBlockName: s.snapshotBlockName,
                     snapshotProductName: s.snapshotProductName,
                     snapshotAdditionalPrice: s.snapshotAdditionalPrice,
@@ -382,35 +385,104 @@ export class OrdersService {
       ...(status ? { status } : {}),
     };
 
-    const [items, total] = await Promise.all([
-      this.prisma.order.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          _count: { select: { items: true } },
-        },
-      }),
-      this.prisma.order.count({ where }),
-    ]);
+    try {
+      const [items, total] = await Promise.all([
+        this.prisma.order.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            _count: { select: { items: true } },
+          },
+        }),
+        this.prisma.order.count({ where }),
+      ]);
 
-    return {
-      items: items.map((o) => ({
-        id: o.id,
-        orderNumber: o.orderNumber,
-        status: o.status as OrderStatus,
-        fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
-        customerName: o.customerName,
-        customerPhone: o.customerPhone,
-        total: Number(o.total),
-        itemCount: o._count.items,
-        paymentMethod: o.paymentMethod as PaymentMethod,
-        sourceChannel: o.sourceChannel,
-        createdAt: o.createdAt.toISOString(),
-      })),
-      total,
+      return {
+        items: items.map((o) => ({
+          id: o.id,
+          orderNumber: o.orderNumber,
+          status: o.status as OrderStatus,
+          fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+          customerName: o.customerName,
+          customerPhone: o.customerPhone,
+          total: Number(o.total),
+          itemCount: o._count.items,
+          paymentMethod: o.paymentMethod as unknown as SharedPaymentMethod,
+          sourceChannel: o.sourceChannel,
+          createdAt: o.createdAt.toISOString(),
+        })),
+        total,
+      };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error in listOrders: ${message}`);
+      throw error;
+    }
+  }
+
+  async getAdminOrders(
+    tenantId: string,
+    page: number = 1,
+    limit: number = 20,
+    filters?: {
+      status?: OrderStatus;
+      startDate?: string;
+      endDate?: string;
+    },
+  ): Promise<{ items: OrderListItemDTO[]; total: number }> {
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.OrderWhereInput = {
+      tenantId,
     };
+
+    if (filters?.status) where.status = filters.status;
+    if (filters?.startDate || filters?.endDate) {
+      where.createdAt = {
+        gte: filters.startDate ? new Date(filters.startDate) : undefined,
+        lte: filters.endDate ? new Date(filters.endDate) : undefined,
+      };
+    }
+
+    try {
+      const [items, total] = await Promise.all([
+        this.prisma.order.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+          include: {
+            _count: {
+              select: { items: true },
+            },
+          },
+        }),
+        this.prisma.order.count({ where }),
+      ]);
+
+      return {
+        items: items.map((o) => ({
+          id: o.id,
+          orderNumber: o.orderNumber,
+          status: o.status as OrderStatus,
+          fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+          customerName: o.customerName,
+          customerPhone: o.customerPhone,
+          total: Number(o.total),
+          itemCount: o._count.items,
+          paymentMethod: o.paymentMethod as unknown as SharedPaymentMethod,
+          sourceChannel: o.sourceChannel,
+          createdAt: o.createdAt.toISOString(),
+        })),
+        total,
+      };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error in getAdminOrders: ${message}`);
+      throw error;
+    }
   }
 
   async listCustomerOrders(
@@ -449,7 +521,7 @@ export class OrdersService {
         customerPhone: o.customerPhone,
         total: Number(o.total),
         itemCount: o._count.items,
-        paymentMethod: o.paymentMethod as PaymentMethod,
+        paymentMethod: o.paymentMethod as unknown as SharedPaymentMethod,
         sourceChannel: o.sourceChannel,
         createdAt: o.createdAt.toISOString(),
       })),
@@ -571,14 +643,14 @@ export class OrdersService {
       sourceChannel: order.sourceChannel,
       notes: order.notes,
       publicTrackingToken: order.publicTrackingToken,
-      paymentMethod: order.paymentMethod as PaymentMethod,
+      paymentMethod: order.paymentMethod as unknown as SharedPaymentMethod,
       changeFor: order.changeFor ? Number(order.changeFor) : null,
       customerId: order.customerId,
       couponId: order.couponId,
       cashbackUsed: order.cashbackUsed ? Number(order.cashbackUsed) : null,
       items: order.items.map((item) => ({
         id: item.id,
-        lineType: item.lineType as any,
+        lineType: item.lineType as 'product' | 'combo',
         productId: item.productId,
         comboId: item.comboId,
         quantity: item.quantity,

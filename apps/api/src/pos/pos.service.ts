@@ -4,8 +4,8 @@ import {
   ForbiddenException,
   ConflictException,
 } from '@nestjs/common';
-import { PrismaService } from '../database/prisma.service';
-import {} from '@prisma/client';
+import { OrderStatus, FulfillmentType } from '@prisma/client';
+import { PaymentMethod as SharedPaymentMethod } from '@gestor/types';
 import { CashService } from '../cash/cash.service';
 import { CustomerService } from '../crm/customer.service';
 import { CashbackService } from '../promotions/cashback.service';
@@ -13,13 +13,12 @@ import { TheoreticalStockService } from '../inventory/theoretical-stock.service'
 import { CheckoutValidatorService } from '../orders/checkout-validator.service';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
 import { KdsService } from '../kds/kds.service';
+import { PrismaService } from '../database/prisma.service';
 
 import type {
   CreatePosOrderDTO,
   OrderResponseDTO,
   PosOrderListItemDTO,
-  OrderStatus,
-  PaymentMethod,
   ValidatedLine,
 } from '@gestor/types';
 
@@ -268,7 +267,7 @@ export class PosService {
             customerPhone: dto.customerPhone || '',
             notes: dto.notes || null,
             tableNumber: dto.tableNumber || undefined,
-            fulfillmentType: (dto.fulfillmentType as any) || undefined,
+            fulfillmentType: (dto.fulfillmentType as unknown as FulfillmentType) || undefined,
           }
         });
       } else {
@@ -593,7 +592,7 @@ export class PosService {
       total: Number(order.total),
       sourceChannel: order.sourceChannel,
       notes: order.notes,
-      paymentMethod: order.paymentMethod as PaymentMethod,
+      paymentMethod: order.paymentMethod as unknown as SharedPaymentMethod,
       changeFor: order.changeFor ? Number(order.changeFor) : null,
       customerId: order.customerId,
       waiterId: order.waiterId,

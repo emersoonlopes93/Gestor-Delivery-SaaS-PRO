@@ -10,6 +10,7 @@ import {
 import { PrismaService } from '../../database/prisma.service';
 import { WhatsAppProviderRegistryService } from '../services/whatsapp-provider-registry.service';
 import type { WhatsAppWebhookEvent } from '../interfaces/whatsapp-provider.interface';
+import { WhatsAppInstanceStatus } from '@prisma/client';
 
 
 /**
@@ -39,7 +40,7 @@ export class WhatsAppWebhookController {
   @HttpCode(200)
   async handleWebhook(
     @Param('tenantId') tenantId: string,
-    @Body() body: any,
+    @Body() body: unknown,
     @Headers('x-webhook-secret') _webhookSecret?: string,
   ) {
     this.logger.log(`Webhook received for tenant ${tenantId}`);
@@ -69,9 +70,10 @@ export class WhatsAppWebhookController {
       }
 
       return { received: true, processed: true };
-    } catch (error: any) {
-      this.logger.error(`Webhook processing failed: ${error.message}`);
-      return { received: true, processed: false, error: error.message };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Webhook processing failed: ${message}`);
+      return { received: true, processed: false, error: message };
     }
   }
 
@@ -131,7 +133,7 @@ export class WhatsAppWebhookController {
       await this.prisma.whatsAppInstance.update({
         where: { id: instance.id },
         data: {
-          status: state as any,
+          status: state as WhatsAppInstanceStatus,
           phoneNumber: phoneNumber || instance.phoneNumber,
         },
       });

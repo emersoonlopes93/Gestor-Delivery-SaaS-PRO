@@ -1,10 +1,11 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
-import { PaymentTxStatus, PaymentMethod, OrderStatus } from '@prisma/client';
+import { PaymentTxStatus, PaymentMethod, OrderStatus, Prisma } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { WebhookDto } from './dto/create-pix-payment.dto';
 import { createHmac, timingSafeEqual } from 'crypto';
+import { MercadoPagoPaymentSchema, MercadoPagoWebhookSchema, MercadoPagoPayment } from './schemas/mercadopago.schema';
 
 interface MercadoPagoConfig {
   accessToken: string;
@@ -49,7 +50,7 @@ interface MercadoPagoPreferenceRequest {
   notification_url?: string;
 }
 
-interface MercadoPagoPixResponse {
+interface MercadoPagoPixResponse extends Record<string, Prisma.JsonValue | undefined> {
   id: string;
   status: string;
   status_detail: string;
@@ -67,6 +68,17 @@ interface WebhookHeadersInput {
   webhookSecret?: string;
 }
 
+interface PaymentMetadata {
+  customerEmail: string;
+  customerName?: string;
+  orderNumber: string;
+  preferenceId?: string;
+  initPoint?: string;
+  mercadoPagoResponse?: MercadoPagoPixResponse | MercadoPagoPayment;
+  mercadoPagoPayment?: MercadoPagoPayment;
+  error?: string;
+}
+
 
 @Injectable()
 export class PaymentGatewayService {
@@ -79,9 +91,9 @@ export class PaymentGatewayService {
   ) {}
 
   private async getMercadoPagoConfig(tenantId: string): Promise<MercadoPagoConfig> {
-    const settings = (await this.prisma.tenantSettings.findUnique({
+    const settings = await this.prisma.tenantSettings.findUnique({
       where: { tenantId },
-    })) as any;
+    });
 
     const accessToken = settings?.mercadoPagoAccessToken || this.configService.get<string>('MERCADO_PAGO_ACCESS_TOKEN');
     const publicKey = settings?.mercadoPagoPublicKey || this.configService.get<string>('MERCADO_PAGO_PUBLIC_KEY');
@@ -138,7 +150,7 @@ export class PaymentGatewayService {
           customerEmail,
           customerName,
           orderNumber: order.orderNumber,
-        } as any,
+        } as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -181,9 +193,9 @@ export class PaymentGatewayService {
         data: {
           gatewayTxId: mpResponse.id,
           metadata: {
-            ...paymentTransaction.metadata as any,
+            ...paymentTransaction.metadata as unknown as PaymentMetadata,
             mercadoPagoResponse: mpResponse,
-          },
+          } as unknown as Prisma.InputJsonValue,
         },
       });
 
@@ -198,8 +210,9 @@ export class PaymentGatewayService {
         ticketUrl: mpResponse.point_of_interaction.transaction_data.ticket_url,
         expiresAt,
       };
-    } catch (error) {
-      this.logger.error(`Error creating PIX payment: ${(error as any).message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error creating PIX payment: ${message}`);
       
       // Marcar transação como falha
       await this.prisma.tenantClient.paymentTransaction.update({
@@ -207,9 +220,9 @@ export class PaymentGatewayService {
         data: {
           status: PaymentTxStatus.failed,
           metadata: {
-            ...paymentTransaction.metadata as any,
-            error: (error as any).message,
-          },
+            ...paymentTransaction.metadata as unknown as PaymentMetadata,
+            error: message,
+          } as unknown as Prisma.InputJsonValue,
         },
       });
 
@@ -225,7 +238,7 @@ export class PaymentGatewayService {
     installments: number,
     customerEmail: string,
     customerName?: string
-  ): Promise<any> {
+  ): Promise<MercadoPagoPayment> {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) throw new Error('Tenant context not found');
 
@@ -244,7 +257,7 @@ export class PaymentGatewayService {
         method: PaymentMethod.credit_card,
         amount: order.total,
         status: PaymentTxStatus.pending,
-        metadata: { customerEmail, customerName, orderNumber: order.orderNumber } as any,
+        metadata: { customerEmail, customerName, orderNumber: order.orderNumber } as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -274,11 +287,12 @@ export class PaymentGatewayService {
         body: JSON.stringify(payload),
       });
 
-      const mpResponse = await response.json();
+      const mpRawResponse = await response.json();
+      const mpResponse = MercadoPagoPaymentSchema.parse(mpRawResponse);
 
       if (!response.ok) {
-        this.logger.error(`Mercado Pago API error: ${JSON.stringify(mpResponse)}`);
-        throw new Error(mpResponse.message || 'Failed to process card payment');
+        this.logger.error(`Mercado Pago API error: ${JSON.stringify(mpRawResponse)}`);
+        throw new Error((mpRawResponse as { message?: string }).message || 'Failed to process card payment');
       }
 
       await this.prisma.tenantClient.paymentTransaction.update({
@@ -287,9 +301,9 @@ export class PaymentGatewayService {
           gatewayTxId: mpResponse.id.toString(),
           status: mpResponse.status === 'approved' ? PaymentTxStatus.confirmed : PaymentTxStatus.pending,
           metadata: {
-            ...paymentTransaction.metadata as any,
+            ...paymentTransaction.metadata as unknown as PaymentMetadata,
             mercadoPagoResponse: mpResponse,
-          },
+          } as unknown as Prisma.InputJsonValue,
         },
       });
 
@@ -302,13 +316,14 @@ export class PaymentGatewayService {
       }
 
       return mpResponse;
-    } catch (error: any) {
-      this.logger.error(`Error processing card payment: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error processing card payment: ${message}`);
       await this.prisma.tenantClient.paymentTransaction.update({
         where: { id: paymentTransaction.id },
         data: {
           status: PaymentTxStatus.failed,
-          metadata: { ...paymentTransaction.metadata as any, error: error.message },
+          metadata: { ...paymentTransaction.metadata as unknown as PaymentMetadata, error: message } as unknown as Prisma.InputJsonValue,
         },
       });
       throw error;
@@ -353,7 +368,7 @@ export class PaymentGatewayService {
           customerEmail,
           customerName,
           orderNumber: order.orderNumber,
-        } as any,
+        } as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -403,17 +418,17 @@ export class PaymentGatewayService {
         throw new Error('Failed to create Preference Checkout');
       }
 
-      const mpResponse = await response.json();
+      const mpResponse = await response.json() as { id: string; init_point: string };
 
       await this.prisma.tenantClient.paymentTransaction.update({
         where: { id: paymentTransaction.id },
         data: {
           gatewayTxId: mpResponse.id, // Para preference, salvamos o id da preference por enquanto
           metadata: {
-            ...paymentTransaction.metadata as any,
+            ...paymentTransaction.metadata as unknown as PaymentMetadata,
             preferenceId: mpResponse.id,
             initPoint: mpResponse.init_point,
-          },
+          } as unknown as Prisma.InputJsonValue,
         },
       });
 
@@ -421,16 +436,17 @@ export class PaymentGatewayService {
         preferenceId: mpResponse.id,
         initPoint: mpResponse.init_point,
       };
-    } catch (error) {
-      this.logger.error(`Error creating Preference checkout: ${(error as any).message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error creating Preference checkout: ${message}`);
       await this.prisma.tenantClient.paymentTransaction.update({
         where: { id: paymentTransaction.id },
         data: {
           status: PaymentTxStatus.failed,
           metadata: {
-            ...paymentTransaction.metadata as any,
-            error: (error as any).message,
-          },
+            ...paymentTransaction.metadata as unknown as PaymentMetadata,
+            error: message,
+          } as unknown as Prisma.InputJsonValue,
         },
       });
       throw error;
@@ -485,10 +501,12 @@ export class PaymentGatewayService {
         return;
       }
 
-      const payment = await response.json();
+      const mpRawPayment = await response.json();
+      const payment = MercadoPagoPaymentSchema.parse(mpRawPayment);
       await this.processPaymentUpdate(payment);
-    } catch (error) {
-      this.logger.error(`Error processing webhook: ${(error as any).message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error processing webhook: ${message}`);
     }
   }
 
@@ -550,8 +568,13 @@ export class PaymentGatewayService {
     return globalSecret || undefined;
   }
 
-  private async processPaymentUpdate(payment: any): Promise<void> {
+  private async processPaymentUpdate(payment: MercadoPagoPayment): Promise<void> {
     // Buscar transação pelo external_reference (que usamos para o Transaction ID do sistema)
+    if (!payment.external_reference) {
+      this.logger.warn(`No external_reference found for payment ${payment.id}`);
+      return;
+    }
+
     const transaction = await this.prisma.paymentTransaction.findFirst({
       where: { id: payment.external_reference },
       include: { order: true },
@@ -568,14 +591,13 @@ export class PaymentGatewayService {
         this.logger.warn(`Transaction not found for payment ${payment.id}`);
         return;
       }
-      Object.assign(transaction || {}, fallbackTx); // Trick typescript se precisasse
       return this.updateTransactionRecord(fallbackTx, payment);
     }
     
     return this.updateTransactionRecord(transaction, payment);
   }
 
-  private async updateTransactionRecord(transaction: any, payment: any): Promise<void> {
+  private async updateTransactionRecord(transaction: Prisma.PaymentTransactionGetPayload<{ include: { order: true } }>, payment: MercadoPagoPayment): Promise<void> {
 
     let newStatus: PaymentTxStatus;
     let orderStatus: OrderStatus;
@@ -605,9 +627,9 @@ export class PaymentGatewayService {
       data: {
         status: newStatus,
         metadata: {
-          ...transaction.metadata as any,
+          ...transaction.metadata as unknown as PaymentMetadata,
           mercadoPagoPayment: payment,
-        },
+        } as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -639,7 +661,7 @@ export class PaymentGatewayService {
 
     return {
       status: transaction.status,
-      gatewayStatus: (transaction.metadata as any)?.mercadoPagoPayment?.status,
+      gatewayStatus: (transaction.metadata as unknown as PaymentMetadata)?.mercadoPagoPayment?.status,
       confirmedAt: transaction.confirmedAt,
     };
   }
@@ -689,8 +711,9 @@ export class PaymentGatewayService {
       });
 
       this.logger.log(`Payment cancelled: ${transactionId}`);
-    } catch (error) {
-      this.logger.error(`Error cancelling payment: ${(error as any).message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error cancelling payment: ${message}`);
       throw error;
     }
   }
