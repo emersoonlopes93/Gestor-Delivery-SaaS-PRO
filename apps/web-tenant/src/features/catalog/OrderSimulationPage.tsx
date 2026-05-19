@@ -44,7 +44,7 @@ export function OrderSimulationPage() {
         api.get<OptionGroup[]>('/catalog/option-groups'),
       ]);
 
-      if (catRes.success) setCategories(catRes.data.filter(c => (c as any).templateType === 'pizza'));
+      if (catRes.success) setCategories(catRes.data.filter(c => c.templateType === 'pizza'));
       if (prodRes.success) setProducts(prodRes.data);
       if (groupRes.success) setAllGroups(groupRes.data);
     } catch (err) {
@@ -70,7 +70,7 @@ export function OrderSimulationPage() {
   );
 
   const sizes = useMemo(() => 
-    (pizzaSizeGroup as any)?.items || [],
+    pizzaSizeGroup?.items || [],
     [pizzaSizeGroup]
   );
 
@@ -114,8 +114,9 @@ export function OrderSimulationPage() {
       if (res.success) {
         setResult(res.data);
       }
-    } catch (err: any) {
-      setError(err.message || 'Erro na simulação');
+    } catch (err: unknown) {
+      const error = err as Error;
+      setError(error.message || 'Erro na simulação');
     }
   };
 
@@ -169,7 +170,7 @@ export function OrderSimulationPage() {
                 </select>
                 {selectedCategory && (
                   <div className="mt-2 text-[10px] font-black text-primary-600 uppercase">
-                    Estratégia Atual: {getStrategyLabel((selectedCategory as any).templateConfig?.pricingStrategy)}
+                    Estratégia Atual: {getStrategyLabel((selectedCategory.templateConfig as Record<string, unknown>)?.pricingStrategy as string)}
                   </div>
                 )}
               </div>
@@ -177,7 +178,7 @@ export function OrderSimulationPage() {
               <div>
                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tamanho</label>
                 <div className="grid grid-cols-3 gap-2">
-                  {sizes.map((s: any) => (
+                  {sizes.map((s) => (
                     <button
                       key={s.id}
                       onClick={() => setSelectedSizeId(s.id)}

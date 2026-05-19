@@ -3,6 +3,7 @@ import { X, Phone, ShieldCheck, ArrowRight, Loader2 } from 'lucide-react';
 import { api } from '../lib/api-client';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useToast } from './Toast';
+import { CustomerDTO } from '@gestor/types';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -32,8 +33,9 @@ export function LoginModal({ isOpen, onClose, tenantSlug }: LoginModalProps) {
       await api.post(`/public/auth/${tenantSlug}/otp/send`, { phone });
       setStep('otp');
       showToast({ title: 'Código enviado!', type: 'success' });
-    } catch (error: any) {
-      showToast({ title: error.message || 'Erro ao enviar código', type: 'error' });
+    } catch (error: unknown) {
+      const err = error as Error;
+      showToast({ title: err.message || 'Erro ao enviar código', type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -48,7 +50,7 @@ export function LoginModal({ isOpen, onClose, tenantSlug }: LoginModalProps) {
 
     setIsLoading(true);
     try {
-      const response: any = await api.post(`/public/auth/${tenantSlug}/otp/validate`, { 
+      const response = await api.post<{ customer: CustomerDTO, accessToken: string }>(`/public/auth/${tenantSlug}/otp/validate`, { 
         phone, 
         code: otp 
       });
@@ -56,8 +58,9 @@ export function LoginModal({ isOpen, onClose, tenantSlug }: LoginModalProps) {
       setCustomer(response.data.customer, response.data.accessToken);
       showToast({ title: 'Bem-vindo!', type: 'success' });
       onClose();
-    } catch (error: any) {
-      showToast({ title: error.message || 'Código inválido ou expirado', type: 'error' });
+    } catch (error: unknown) {
+      const err = error as Error;
+      showToast({ title: err.message || 'Código inválido ou expirado', type: 'error' });
     } finally {
       setIsLoading(false);
     }

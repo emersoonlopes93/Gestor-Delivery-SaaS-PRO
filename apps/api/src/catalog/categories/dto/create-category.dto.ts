@@ -30,5 +30,5 @@ export class CreateCategoryDto implements ICreateCategoryDto {
   templateType?: 'none' | 'pizza';
 
   @IsOptional()
-  templateConfig?: any;
+  templateConfig?: Record<string, unknown>;
 }

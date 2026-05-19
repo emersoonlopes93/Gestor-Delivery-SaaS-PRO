@@ -19,10 +19,11 @@ export function PaymentPage() {
   const [paymentData, setPaymentData] = useState<PixPaymentData | null>(null);
   const [status, setStatus] = useState<'loading' | 'pending' | 'confirmed' | 'expired' | 'error'>('loading');
   const [timeLeft, setTimeLeft] = useState<string>('');
-  const [pollingInterval, setPollingInterval] = useState<ReturnType<typeof setInterval> | null>(null);
+  const [pollingInterval, setPollingInterval] = useState<number | null>(null);
 
   useEffect(() => {
-    const pixPayment = (location.state as any)?.pixPayment;
+    const state = location.state as { pixPayment?: PixPaymentData } | null;
+    const pixPayment = state?.pixPayment;
     if (pixPayment) {
       setPaymentData(pixPayment);
       setStatus('pending');
@@ -46,7 +47,7 @@ export function PaymentPage() {
   useEffect(() => {
     if (status === 'pending' && paymentData) {
       // Iniciar polling para verificar status do pagamento
-      const interval = setInterval(async () => {
+      const interval = window.setInterval(async () => {
         try {
           const response = await api.get<PixPaymentData>(`/public/payment-gateway/pix/${transactionId}`);
           const updatedStatus = response.data.status;
@@ -77,7 +78,7 @@ export function PaymentPage() {
 
       // Limpar polling quando o componente for desmontado
       return () => {
-        if (interval) clearInterval(interval);
+        if (interval) window.clearInterval(interval);
       };
     }
   }, [status, paymentData, tenantSlug, transactionId]);

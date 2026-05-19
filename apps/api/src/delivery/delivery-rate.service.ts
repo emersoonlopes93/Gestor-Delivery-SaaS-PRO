@@ -680,7 +680,7 @@ export class DeliveryRateService {
         );
       }
 
-      ruleData.geoJson = (data.geoJson as unknown as Prisma.InputJsonValue) ?? Prisma.JsonNull;
+      ruleData.geoJson = (data.geoJson as Prisma.InputJsonValue) ?? Prisma.JsonNull;
       const polygonJson = this.toInputJsonValue(normalizedCoords);
       if (!polygonJson) {
         throw new UnprocessableEntityException('polygonCoordinates inválido');

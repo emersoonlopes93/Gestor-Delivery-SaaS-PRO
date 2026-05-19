@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { z } from 'zod';
 import type { 
   CartLineItem, 
   StorefrontProductPayload, 
@@ -9,6 +10,20 @@ import type {
   CartSnapshot,
   CartSelectedComplement
 } from '@gestor/types';
+
+// Schema for basic validation of persisted cart items
+const CartItemSchema = z.object({
+  cartLineId: z.string(),
+  productId: z.string().optional(),
+  comboId: z.string().optional(),
+  quantity: z.number().min(1),
+  notes: z.string().optional(),
+  snapshot: z.object({
+    productName: z.string(),
+    basePrice: z.number(),
+    lineSubtotal: z.number(),
+  }).passthrough(),
+}).passthrough();
 
 interface CartState {
   tenantId: string | null;
@@ -150,6 +165,23 @@ export const useCartStore = create<CartState>()(
       name: 'gestor_cart_temp',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ items: state.items, subtotal: state.subtotal, tableId: state.tableId }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        
+        // Validate persisted items to ensure they match current schema
+        const validItems = (state.items || []).filter(item => {
+          const result = CartItemSchema.safeParse(item);
+          if (!result.success) {
+            console.warn('Removing invalid cart item from persistence', result.error);
+          }
+          return result.success;
+        });
+
+        if (validItems.length !== (state.items || []).length) {
+          state.items = validItems;
+          state.subtotal = validItems.reduce((sum, item) => sum + item.snapshot.lineSubtotal, 0);
+        }
+      }
     }
   )
 );

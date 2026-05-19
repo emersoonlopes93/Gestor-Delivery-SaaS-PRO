@@ -101,14 +101,14 @@ export class ProductsService {
     const tenantId = this.getRequiredTenantId();
     const slug = slugify(createProductDto.name);
 
-    const type = (createProductDto as unknown as { type?: 'simple' | 'configurable' | 'combo' }).type ?? 'simple';
+    const type = createProductDto.type ?? 'simple';
     const isCombo = type === 'combo';
-    const comboMode = isCombo ? ((createProductDto as unknown as { comboMode?: 'bundle' | 'slot' }).comboMode ?? 'bundle') : undefined;
+    const comboMode = isCombo ? (createProductDto.comboMode ?? 'bundle') : undefined;
     const comboPricingType = isCombo && comboMode === 'bundle'
-      ? ((createProductDto as unknown as { comboPricingType?: 'fixed_price' | 'discount_percent' | 'discount_amount' }).comboPricingType ?? 'fixed_price')
+      ? (createProductDto.comboPricingType ?? 'fixed_price')
       : undefined;
     const comboPricingValue = isCombo && comboMode === 'bundle'
-      ? Number((createProductDto as unknown as { comboPricingValue?: number }).comboPricingValue ?? createProductDto.basePrice ?? 0)
+      ? Number(createProductDto.comboPricingValue ?? createProductDto.basePrice ?? 0)
       : undefined;
     const initialBasePrice = isCombo && comboMode === 'bundle'
       ? (comboPricingType === 'fixed_price' ? comboPricingValue : 0)
@@ -223,7 +223,7 @@ export class ProductsService {
 
     // If channel is provided, filter using AvailabilityService
     if (channel) {
-      const filtered: any[] = [];
+      const filtered: typeof products = [];
       for (const p of products) {
         const decision = await this.availabilityService.decide({
           tenantId,
@@ -280,15 +280,15 @@ export class ProductsService {
       select: { id: true, type: true, comboMode: true, comboPricingType: true, comboPricingValue: true },
     });
 
-    const nextType = ((updateProductDto as unknown as { type?: 'simple' | 'configurable' | 'combo' }).type ?? previous?.type ?? 'simple');
+    const nextType = (updateProductDto.type ?? previous?.type ?? 'simple');
     const nextComboMode = nextType === 'combo'
-      ? ((updateProductDto as unknown as { comboMode?: 'bundle' | 'slot' }).comboMode ?? previous?.comboMode ?? 'bundle')
+      ? (updateProductDto.comboMode ?? previous?.comboMode ?? 'bundle')
       : null;
     const nextPricingType = nextType === 'combo' && nextComboMode === 'bundle'
-      ? ((updateProductDto as unknown as { comboPricingType?: 'fixed_price' | 'discount_percent' | 'discount_amount' }).comboPricingType ?? previous?.comboPricingType ?? 'fixed_price')
+      ? (updateProductDto.comboPricingType ?? previous?.comboPricingType ?? 'fixed_price')
       : null;
     const nextPricingValue = nextType === 'combo' && nextComboMode === 'bundle'
-      ? Number((updateProductDto as unknown as { comboPricingValue?: number }).comboPricingValue ?? previous?.comboPricingValue ?? 0)
+      ? Number(updateProductDto.comboPricingValue ?? previous?.comboPricingValue ?? 0)
       : null;
 
     if (slug) {
@@ -402,7 +402,11 @@ export class ProductsService {
 
     return links
       .map((l) => l.upsell)
-      .filter((u): u is NonNullable<typeof u> => Boolean(u)) as unknown as Upsell[];
+      .filter((u): u is NonNullable<typeof u> => Boolean(u))
+      .map((u) => ({
+        ...u,
+        pricingValue: Number(u.pricingValue),
+      })) as Upsell[];
   }
 
   async duplicate(id: string) {
@@ -451,7 +455,7 @@ export class ProductsService {
           sku: source.sku ? `${source.sku}-COPY` : null,
           order: (source.order ?? 0) + 1,
           recipeIngredients: {
-            create: (source.recipeIngredients || []).map((ri: any) => ({
+            create: (source.recipeIngredients || []).map((ri) => ({
               tenantId,
               ingredientId: ri.ingredientId,
               quantity: ri.quantity,
@@ -481,7 +485,7 @@ export class ProductsService {
       // Duplicate Complement Group Links
       if (source.complementGroups && source.complementGroups.length > 0) {
         await tx.productComplementGroupLink.createMany({
-          data: source.complementGroups.map((l: any) => ({
+          data: source.complementGroups.map((l) => ({
             tenantId,
             productId: duplicate.id,
             complementGroupId: l.complementGroupId,
@@ -493,7 +497,7 @@ export class ProductsService {
       // Duplicate Option Item Prices
       if (source.optionItemPrices && source.optionItemPrices.length > 0) {
         await tx.productOptionItemPrice.createMany({
-          data: source.optionItemPrices.map((p: any) => ({
+          data: source.optionItemPrices.map((p) => ({
             tenantId,
             productId: duplicate.id,
             optionItemId: p.optionItemId,
@@ -505,7 +509,7 @@ export class ProductsService {
       // Duplicate Upsell Links
       if (source.upsellLinks && source.upsellLinks.length > 0) {
         await tx.productUpsell.createMany({
-          data: source.upsellLinks.map((l: any) => ({
+          data: source.upsellLinks.map((l) => ({
             tenantId,
             productId: duplicate.id,
             upsellId: l.upsellId,

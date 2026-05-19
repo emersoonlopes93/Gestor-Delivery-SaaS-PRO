@@ -15,6 +15,7 @@ import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
 import { CreateUpsellDto, UpdateUpsellDto } from '@gestor/types';
+import { AuthenticatedRequest } from '../common/interfaces/request.interface';
 
 @Controller('upsells')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -23,26 +24,26 @@ export class UpsellsController {
 
   @Get()
   @RequirePermissions('catalog.read')
-  async list(@Request() req: any) {
+  async list(@Request() req: AuthenticatedRequest) {
     return this.upsellsService.listUpsells(req.user.tenantId);
   }
 
   @Get(':id')
   @RequirePermissions('catalog.read')
-  async getDetail(@Request() req: any, @Param('id') id: string) {
+  async getDetail(@Request() req: AuthenticatedRequest, @Param('id') id: string) {
     return this.upsellsService.getUpsellDetail(req.user.tenantId, id);
   }
 
   @Post()
   @RequirePermissions('catalog.create')
-  async create(@Request() req: any, @Body() dto: CreateUpsellDto) {
+  async create(@Request() req: AuthenticatedRequest, @Body() dto: CreateUpsellDto) {
     return this.upsellsService.createUpsell(req.user.tenantId, dto);
   }
 
   @Patch(':id')
   @RequirePermissions('catalog.update')
   async update(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body() dto: UpdateUpsellDto,
   ) {
@@ -51,14 +52,14 @@ export class UpsellsController {
 
   @Delete(':id')
   @RequirePermissions('catalog.delete')
-  async delete(@Request() req: any, @Param('id') id: string) {
+  async delete(@Request() req: AuthenticatedRequest, @Param('id') id: string) {
     return this.upsellsService.deleteUpsell(req.user.tenantId, id);
   }
 
   @Put(':id/items')
   @RequirePermissions('catalog.update')
   async setItems(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body() dto: { productIds: string[] },
   ) {
@@ -68,7 +69,7 @@ export class UpsellsController {
   @Post(':id/link/:productId')
   @RequirePermissions('catalog.update')
   async link(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Param('productId') productId: string,
   ) {
@@ -78,7 +79,7 @@ export class UpsellsController {
   @Delete(':id/link/:productId')
   @RequirePermissions('catalog.update')
   async unlink(
-    @Request() req: any,
+    @Request() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Param('productId') productId: string,
   ) {

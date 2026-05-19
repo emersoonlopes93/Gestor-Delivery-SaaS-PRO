@@ -14,6 +14,7 @@ import {
   UpsellWithItems,
   CreateUpsellDto,
   Product,
+  UpsellPricingType,
 } from '@gestor/types';
 
 export function UpsellsPage() {
@@ -73,9 +74,9 @@ export function UpsellsPage() {
     setFormData({
       name: upsell.name,
       description: upsell.description || '',
-      pricingType: upsell.pricingType as any,
+      pricingType: upsell.pricingType,
       pricingValue: Number(upsell.pricingValue),
-      displayType: upsell.displayType as any,
+      displayType: upsell.displayType,
       isActive: upsell.isActive,
     });
     setIsModalOpen(true);
@@ -295,7 +296,7 @@ export function UpsellsPage() {
               <select
                 className="input-premium"
                 value={formData.pricingType}
-                onChange={(e) => setFormData({ ...formData, pricingType: e.target.value as any })}
+                onChange={(e) => setFormData({ ...formData, pricingType: e.target.value as UpsellPricingType })}
               >
                 <option value="normal">Preço Normal</option>
                 <option value="fixed_price">Preço Fixo (Promocional)</option>

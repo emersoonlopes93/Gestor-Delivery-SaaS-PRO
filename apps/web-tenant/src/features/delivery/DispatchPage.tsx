@@ -22,16 +22,18 @@ export function DispatchPage() {
     }
     try {
       await assignDriver(orderId, driverId);
-    } catch (e: any) {
-      alert(e?.response?.data?.message || 'Erro ao assinalar entregador');
+    } catch (e: unknown) {
+      const error = e as Error & { response?: { data?: { message?: string } } };
+      alert(error?.response?.data?.message || 'Erro ao assinalar entregador');
     }
   };
 
   const handleDispatch = async (orderId: string) => {
     try {
       await dispatchOrder(orderId);
-    } catch (e: any) {
-      alert(e?.response?.data?.message || 'Erro ao despachar pedido');
+    } catch (e: unknown) {
+      const error = e as Error & { response?: { data?: { message?: string } } };
+      alert(error?.response?.data?.message || 'Erro ao despachar pedido');
     }
   };
 
@@ -40,8 +42,9 @@ export function DispatchPage() {
       if (confirm('Tem certeza que este pedido já foi entregue ao cliente?')) {
         await completeOrder(orderId);
       }
-    } catch (e: any) {
-      alert(e?.response?.data?.message || 'Erro ao finalizar pedido');
+    } catch (e: unknown) {
+      const error = e as Error & { response?: { data?: { message?: string } } };
+      alert(error?.response?.data?.message || 'Erro ao finalizar pedido');
     }
   };
 

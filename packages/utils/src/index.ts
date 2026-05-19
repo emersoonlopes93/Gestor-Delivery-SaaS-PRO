@@ -40,3 +40,10 @@ export function buildPagination(total: number, page: number, pageSize: number) {
     hasPrevious: page > 1,
   };
 }
+
+/**
+ * Generates a random ID for temporary objects (cart lines, etc).
+ */
+export function generateId(): string {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+}

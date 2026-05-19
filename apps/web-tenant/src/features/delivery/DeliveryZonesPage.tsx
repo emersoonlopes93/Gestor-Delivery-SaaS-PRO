@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api-client';
 import type { LatLngExpression } from 'leaflet';
+import { Tenant } from '@gestor/types';
 
 type CoverageConfig = {
   id: string;
@@ -389,8 +390,7 @@ const ZoneDrawLayer = memo(function ZoneDrawLayer(props: {
       return;
     }
 
-    const drawMap = map as unknown as L.DrawMap;
-    const drawer = new L.Draw.Polygon(drawMap, {
+    const drawer = new L.Draw.Polygon(map as any, {
       allowIntersection: false,
       showArea: true,
       shapeOptions: {
@@ -594,14 +594,14 @@ export function DeliveryZonesPage() {
       }
 
       // Load tenant profile to get address & check/resolve store location
-      const tenantRes = await api.get<any>('/tenant/me');
+      const tenantRes = await api.get<Tenant>('/tenant/me');
       if (tenantRes.success && tenantRes.data) {
         const settings = tenantRes.data.settings;
         if (settings) {
           const isDefaultCoords = Math.abs(fetchedLat - (-23.55052)) < 0.0001 && Math.abs(fetchedLng - (-46.633308)) < 0.0001;
 
           if (typeof settings.lat === 'number' && typeof settings.lng === 'number') {
-            setCoverageDraft((d) => ({ ...d, storeLat: settings.lat, storeLng: settings.lng }));
+            setCoverageDraft((d) => ({ ...d, storeLat: settings.lat ?? 0, storeLng: settings.lng ?? 0 }));
             setFitToStoreSeq((v) => v + 1);
           } else if (hasConfig && !isDefaultCoords) {
             setFitToStoreSeq((v) => v + 1);

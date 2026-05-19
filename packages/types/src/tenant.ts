@@ -10,6 +10,7 @@ export interface Tenant {
   name: string;
   slug: string;
   status: TenantStatus;
+  settings?: TenantSettings;
   createdAt: string;
   updatedAt: string;
 }

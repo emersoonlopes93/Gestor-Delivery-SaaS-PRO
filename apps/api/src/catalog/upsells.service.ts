@@ -12,7 +12,7 @@ export class UpsellsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listUpsells(tenantId: string): Promise<Upsell[]> {
-    return this.prisma.upsell.findMany({
+    const upsells = await this.prisma.upsell.findMany({
       where: { tenantId },
       include: {
         _count: {
@@ -20,7 +20,12 @@ export class UpsellsService {
         },
       },
       orderBy: { createdAt: 'desc' },
-    }) as unknown as Upsell[];
+    });
+
+    return upsells.map((u) => ({
+      ...u,
+      pricingValue: Number(u.pricingValue),
+    })) as Upsell[];
   }
 
   async getUpsellDetail(tenantId: string, id: string): Promise<UpsellWithItems> {
@@ -38,29 +43,49 @@ export class UpsellsService {
       throw new NotFoundException('Upsell não encontrado.');
     }
 
-    return upsell as unknown as UpsellWithItems;
+    return {
+      ...upsell,
+      pricingValue: Number(upsell.pricingValue),
+      items: upsell.items.map((it) => ({
+        ...it,
+        product: {
+          ...it.product,
+          basePrice: Number(it.product.basePrice),
+          costPrice: it.product.costPrice ? Number(it.product.costPrice) : null,
+          comboPricingValue: it.product.comboPricingValue ? Number(it.product.comboPricingValue) : null,
+        },
+      })),
+    } as UpsellWithItems;
   }
 
   async createUpsell(tenantId: string, dto: CreateUpsellDto): Promise<Upsell> {
-    return this.prisma.upsell.create({
+    const created = await this.prisma.upsell.create({
       data: {
         ...dto,
         tenantId,
         pricingValue: dto.pricingValue ?? 0,
       },
-    }) as unknown as Upsell;
+    });
+    return {
+      ...created,
+      pricingValue: Number(created.pricingValue),
+    } as Upsell;
   }
 
   async updateUpsell(tenantId: string, id: string, dto: UpdateUpsellDto): Promise<Upsell> {
     const upsell = await this.prisma.upsell.findFirst({ where: { id, tenantId } });
     if (!upsell) throw new NotFoundException('Upsell não encontrado.');
 
-    return this.prisma.upsell.update({
+    const updated = await this.prisma.upsell.update({
       where: { id },
       data: {
         ...dto,
       },
-    }) as unknown as Upsell;
+    });
+    return {
+      ...updated,
+      pricingValue: Number(updated.pricingValue),
+    } as Upsell;
   }
 
   async deleteUpsell(tenantId: string, id: string): Promise<void> {

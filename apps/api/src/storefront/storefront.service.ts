@@ -35,7 +35,7 @@ export class StorefrontService {
 
     // 1. Resolve Tenant
     const tenant = await this.prisma.tenant.findFirst({
-      where: { slug, status: TenantStatus.ACTIVE as any }, // only active tenants
+      where: { slug, status: 'active' }, // only active tenants
       include: { settings: true },
     });
 
@@ -160,8 +160,8 @@ export class StorefrontService {
       };
     }>;
 
-    const categoryRows = categoriesDb as unknown as CategoryWithProducts[];
-    const comboRows = combosDb as unknown as ComboWithData[];
+    const categoryRows = categoriesDb as CategoryWithProducts[];
+    const comboRows = combosDb as ComboWithData[];
     const idsToCheck = new Set<string>();
 
     for (const cat of categoryRows) {
@@ -248,7 +248,7 @@ export class StorefrontService {
                   id: ol.optionGroup.id,
                   name: ol.optionGroup.name,
                   description: ol.optionGroup.description,
-                  selectionType: ol.optionGroup.selectionType as any, // Cast because of Prisma enum vs shared type
+                  selectionType: ol.optionGroup.selectionType as 'single' | 'multiple' | 'quantity',
                   isRequired: ol.optionGroup.isRequired,
                   minSelect: ol.optionGroup.minSelect,
                   maxSelect: ol.optionGroup.maxSelect,
@@ -259,7 +259,7 @@ export class StorefrontService {
                     description: oi.description,
                     isActive: oi.isActive,
                     allowQuantity: oi.allowQuantity,
-                    priceImpactType: oi.priceImpactType as any,
+                    priceImpactType: oi.priceImpactType as 'none' | 'fixed' | 'replace' | 'percentage',
                     priceImpactValue: Number(oi.priceImpactValue),
                   })),
                 },
@@ -268,7 +268,7 @@ export class StorefrontService {
                 id: l.upsell.id,
                 name: l.upsell.name,
                 description: l.upsell.description,
-                displayType: l.upsell.displayType as any,
+                displayType: l.upsell.displayType as 'inline' | 'cart' | 'both',
                 items: l.upsell.items
                   .filter((i) => i.product.isActive && i.product.deletedAt === null)
                   .map((i) => {
@@ -328,7 +328,7 @@ export class StorefrontService {
           image: combo.image,
           isAvailable,
           comboMode: (combo.comboMode === 'bundle' ? 'bundle' : 'slot') as 'bundle' | 'slot',
-          pricingType: combo.comboPricingType as any,
+          pricingType: combo.comboPricingType as 'fixed_price' | 'discount_percent' | 'discount_amount' | null,
           pricingValue,
           itemsSubtotal,
           discountTotal,
@@ -407,7 +407,7 @@ export class StorefrontService {
       id: u.id,
       name: u.name,
       description: u.description,
-      displayType: u.displayType as any,
+      displayType: u.displayType as 'inline' | 'cart' | 'both',
       items: u.items
         .filter((i) => i.product.isActive && i.product.deletedAt === null)
         .map((i) => {

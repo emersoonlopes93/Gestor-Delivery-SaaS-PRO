@@ -221,6 +221,7 @@ export interface OptionGroup {
   maxSelect: number;
   isActive: boolean;
   order: number;
+  items?: OptionItem[];
   createdAt: Date | string;
   updatedAt: Date | string;
 }
@@ -416,7 +417,7 @@ export const PizzaTemplateConfigSchema = z.object({
 
 export type PizzaTemplateConfig = z.infer<typeof PizzaTemplateConfigSchema>;
 
-export const CategoryTemplateConfigSchema = z.record(z.any()).optional();
+export const CategoryTemplateConfigSchema = z.record(z.unknown()).optional();
 
 // ============================================
 // SHARED TYPES FOR CATALOG V2

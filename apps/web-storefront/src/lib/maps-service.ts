@@ -50,12 +50,18 @@ export function loadGoogleMaps(apiKey: string): Promise<void> {
 
   loadPromise = new Promise((resolve, reject) => {
     if (typeof window === 'undefined') return resolve();
-    if ((window as any).google?.maps) return resolve();
+    
+    const win = window as unknown as Window & { 
+      google?: { maps?: { Geocoder: any } }; 
+      [key: string]: any 
+    };
+    
+    if (win.google?.maps) return resolve();
 
     const callbackName = `__googleMapsCallback_${Date.now()}`;
-    (window as any)[callbackName] = () => {
+    win[callbackName] = () => {
       resolve();
-      delete (window as any)[callbackName];
+      delete win[callbackName];
     };
 
     const script = document.createElement('script');
@@ -81,11 +87,12 @@ export async function geocodeAddress(address: string): Promise<{ lat: number; ln
 
   try {
     await loadGoogleMaps(apiKey);
-    const geocoder = new (window as any).google.maps.Geocoder();
+    const win = window as any;
+    const geocoder = new win.google.maps.Geocoder();
     
     return new Promise((resolve) => {
-      geocoder.geocode({ address, componentRestrictions: { country: 'BR' } }, (results: any, status: any) => {
-        if (status === 'OK' && results[0]) {
+      geocoder.geocode({ address, componentRestrictions: { country: 'BR' } }, (results: google.maps.GeocoderResult[] | null, status: google.maps.GeocoderStatus) => {
+        if (status === 'OK' && results && results[0]) {
           const loc = results[0].geometry.location;
           resolve({ lat: loc.lat(), lng: loc.lng() });
         } else {

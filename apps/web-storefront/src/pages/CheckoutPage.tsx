@@ -25,6 +25,16 @@ import { CashbackSelector } from '../components/CashbackSelector';
 import { SchedulingSelector } from '../components/SchedulingSelector';
 import { CardPayment } from '../components/CardPayment';
 
+interface MercadoPagoCardFormData {
+  token: string;
+  payment_method_id: string;
+  issuer_id: string;
+  installments: number;
+  payer?: {
+    email?: string;
+  };
+}
+
 export function CheckoutPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
@@ -299,7 +309,7 @@ export function CheckoutPage() {
     return true;
   }, [customerName, customerPhone, items, fulfillmentType, street, number, neighborhood, city, state, zipCode, lat, lng, payment, total, isScheduled, timeSlotId]);
 
-  const handleCardSubmit = async (formData: any) => {
+  const handleCardSubmit = async (formData: MercadoPagoCardFormData) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     setSubmitError(null);
@@ -391,8 +401,8 @@ export function CheckoutPage() {
       
       clearCart();
       navigate(`/${tenantSlug}/order/${res.data.id}`, { state: { order: res.data } });
-    } catch (err) {
-      const error = err as any;
+    } catch (err: unknown) {
+      const error = err as Error & { details?: { validationErrors?: string[] } };
       console.error('Card checkout error:', error);
       setSubmitError(error.message || 'Erro ao processar pagamento com cartão.');
       throw error; // Re-throw to the brick so it can show error
@@ -512,8 +522,8 @@ export function CheckoutPage() {
       else {
         navigate(`/${tenantSlug}/order/${res.data.id}`, { state: { order: res.data } });
       }
-    } catch (err) {
-      const error = err as any;
+    } catch (err: unknown) {
+      const error = err as Error & { details?: { validationErrors?: string[] } };
       console.error('Checkout error:', error);
       
       if (error.details?.validationErrors) {

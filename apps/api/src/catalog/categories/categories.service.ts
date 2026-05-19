@@ -4,6 +4,7 @@ import { TenantContextService } from '../../common/context/tenant-context.servic
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { slugify } from '@gestor/utils';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class CategoriesService {
@@ -65,7 +66,7 @@ export class CategoriesService {
         isFeatured: createCategoryDto.isFeatured ?? false,
         order: createCategoryDto.order ?? 0,
         templateType: createCategoryDto.templateType ?? 'none',
-        templateConfig: createCategoryDto.templateConfig ?? null,
+        templateConfig: createCategoryDto.templateConfig as Prisma.InputJsonValue ?? null,
       },
     });
   }
@@ -148,7 +149,7 @@ export class CategoriesService {
         isFeatured: updateCategoryDto.isFeatured,
         order: updateCategoryDto.order,
         templateType: updateCategoryDto.templateType,
-        templateConfig: updateCategoryDto.templateConfig,
+        templateConfig: updateCategoryDto.templateConfig as Prisma.InputJsonValue,
         ...(slug ? { slug } : {}),
       },
     });

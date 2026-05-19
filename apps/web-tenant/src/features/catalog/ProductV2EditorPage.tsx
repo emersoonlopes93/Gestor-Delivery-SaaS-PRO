@@ -270,8 +270,8 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
 
       if (prodRes.success) {
         setProduct(prodRes.data);
-        setComboModeState(((prodRes.data.comboMode as 'bundle' | 'slot' | null) ?? 'bundle'));
-        setComboPricingType((prodRes.data.comboPricingType as ComboPricingType) ?? 'fixed_price');
+        setComboModeState(prodRes.data.comboMode ?? 'bundle');
+        setComboPricingType(prodRes.data.comboPricingType ?? 'fixed_price');
         setComboPricingValue(Number(prodRes.data.comboPricingValue ?? prodRes.data.basePrice ?? 0));
         if (prodRes.data.optionItemPrices) {
           const pricesMap: Record<string, number> = {};
@@ -306,7 +306,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
 
       // Carregar combo-slots apenas se o produto for do tipo combo
       if (prodRes.success && (isComboMode || prodRes.data.type === 'combo')) {
-        const isBundleCombo = ((prodRes.data.comboMode as 'bundle' | 'slot' | null) ?? 'bundle') === 'bundle';
+        const isBundleCombo = (prodRes.data.comboMode ?? 'bundle') === 'bundle';
         try {
           const slotsRes = await api.get<SlotWithAllowed[]>(`/catalog/products/${productId}/combo-slots`);
           if (slotsRes.success) setSlots(slotsRes.data);
@@ -326,10 +326,10 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                 subtotal: Number(summaryRes.data.subtotal ?? 0),
                 discountTotal: Number(summaryRes.data.discountTotal ?? 0),
                 finalPrice: Number(summaryRes.data.finalPrice ?? 0),
-                pricingType: (summaryRes.data.pricingType ?? 'fixed_price') as ComboPricingType,
+                pricingType: summaryRes.data.pricingType ?? 'fixed_price',
                 pricingValue: Number(summaryRes.data.pricingValue ?? 0),
               });
-              setComboPricingType((summaryRes.data.pricingType ?? 'fixed_price') as ComboPricingType);
+              setComboPricingType(summaryRes.data.pricingType ?? 'fixed_price');
               setComboPricingValue(Number(summaryRes.data.pricingValue ?? 0));
             }
           } catch (error) {
@@ -354,17 +354,16 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
       }
 
       if (pubRes.success) {
-        const pub = pubRes.data as CatalogPublication;
-        setPublication(pub);
+        setPublication(pubRes.data);
       }
       if (rulesRes.success) setRules(rulesRes.data);
 
       const [allUpsellsRes, prodUpsellsRes] = await Promise.all([
-        api.get('/upsells'),
-        id && id !== 'new' ? api.get(`/catalog/products/${id}/upsells`) : Promise.resolve({ success: true, data: [] }),
+        api.get<Upsell[]>('/upsells'),
+        id && id !== 'new' ? api.get<Upsell[]>(`/catalog/products/${id}/upsells`) : Promise.resolve({ success: true, data: [] as Upsell[] }),
       ]);
-      if (allUpsellsRes.success) setAllUpsells(allUpsellsRes.data as Upsell[]);
-      if (prodUpsellsRes.success) setProductUpsells((prodUpsellsRes.data as Array<{ id: string }>).map((u) => u.id));
+      if (allUpsellsRes.success) setAllUpsells(allUpsellsRes.data);
+      if (prodUpsellsRes.success) setProductUpsells(prodUpsellsRes.data.map((u) => u.id));
     } finally {
       setIsLoading(false);
     }
@@ -433,9 +432,9 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           }
         }
       } else {
-        const res = await api.patch<Product>(`/catalog/products/${productId}`, payload);
+        const res = await api.patch<ProductDetails>(`/catalog/products/${productId}`, payload);
         if (res.success) {
-          setProduct(res.data as ProductDetails);
+          setProduct(res.data);
           if (isComboMode) {
             navigate('/catalog/combos');
           } else {

@@ -28,11 +28,32 @@ export class CatalogMigrationV2Service {
   private async migrateComplementsToOptionGroups() {
     this.logger.log('Migrating Complements to OptionGroups...');
     
-    const legacyGroups = await this.prisma.tenantClient.$queryRaw`
-      SELECT id, name, "minItems", "maxItems" FROM "ComplementGroup" WHERE "tenantId" = ${this.tenantId}
+    interface LegacyComplementGroup {
+      id: string;
+      tenantId: string;
+      name: string;
+      description?: string;
+      minSelect: number;
+      maxSelect: number;
+      isRequired: boolean;
+      isActive: boolean;
+      order: number;
+      items: Array<{
+        tenantId: string;
+        name: string;
+        description?: string;
+        sku?: string;
+        isActive: boolean;
+        order: number;
+        additionalPrice: number;
+      }>;
+    }
+
+    const legacyGroups = await this.prisma.tenantClient.$queryRaw<LegacyComplementGroup[]>`
+      SELECT id, name, "minItems" as "minSelect", "maxItems" as "maxSelect", "isRequired", "isActive", "order", "tenantId" FROM "ComplementGroup" WHERE "tenantId" = ${this.tenantId}
     `;
 
-    for (const lg of legacyGroups as any[]) {
+    for (const lg of legacyGroups) {
       const existing = await this.prisma.optionGroup.findFirst({
         where: {
           tenantId: lg.tenantId,
@@ -59,7 +80,7 @@ export class CatalogMigrationV2Service {
           order: lg.order,
           selectionType: lg.maxSelect > 1 ? 'multiple' : 'single',
           items: {
-            create: lg.items.map((item: any) => ({
+            create: lg.items.map((item) => ({
               tenantId: item.tenantId,
               name: item.name,
               description: item.description,

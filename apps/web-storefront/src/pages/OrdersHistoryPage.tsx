@@ -13,7 +13,8 @@ import {
 import { useCustomerStore } from '../store/useCustomerStore';
 import { useCartStore } from '../store/use-cart-store';
 import { useToast } from '../components/Toast';
-import type { OrderListItemDTO, OrderResponseDTO, StorefrontPayload } from '@gestor/types';
+import type { OrderListItemDTO, OrderResponseDTO, StorefrontPayload, CartLineItem } from '@gestor/types';
+import { generateId } from '@gestor/utils';
 
 export function OrdersHistoryPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -95,7 +96,7 @@ export function OrdersHistoryPage() {
 
           // Map to CartLineItem snapshot format, using CURRENT prices
           const cartItem = {
-            cartLineId: crypto.randomUUID(),
+            cartLineId: generateId(),
             productId: item.productId,
             quantity: item.quantity,
             notes: item.notes || undefined,
@@ -115,7 +116,7 @@ export function OrdersHistoryPage() {
           };
           
           useCartStore.setState((state) => {
-            const newItems = [...state.items, cartItem as any];
+            const newItems = [...state.items, cartItem as CartLineItem];
             return {
               items: newItems,
               subtotal: newItems.reduce((sum, i) => sum + i.snapshot.lineSubtotal, 0)
@@ -135,8 +136,9 @@ export function OrdersHistoryPage() {
       } else {
         showToast({ title: 'Erro ao repetir', message: 'Nenhum dos itens está disponível no momento.', type: 'error' });
       }
-    } catch (e: any) {
-      showToast({ title: 'Erro ao repetir pedido', message: e.message, type: 'error' });
+    } catch (e: unknown) {
+      const error = e as Error;
+      showToast({ title: 'Erro ao repetir pedido', message: error.message, type: 'error' });
     }
   };
 
