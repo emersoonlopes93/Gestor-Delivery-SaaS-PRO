@@ -41,6 +41,16 @@ export interface CreateMessageDto {
   metadata?: Record<string, unknown>;
 }
 
+export interface AiToolFailureSummary {
+  toolName: string;
+  count: number;
+  lastAt: string;
+  lastErrorCode?: string;
+  lastSignatureHash?: string;
+  isRecent: boolean;
+  wouldBlock: boolean;
+}
+
 export interface ChatSessionListItem {
   id: string;
   customerPhone: string;
@@ -48,6 +58,10 @@ export interface ChatSessionListItem {
   lastMessageAt: string;
   lastMessage: string | null;
   handoffActive: boolean;
+  aiAttentionRequired?: boolean;
+  aiBlockedTools?: string[];
+  aiLastFailureAt?: string | null;
+  aiToolFailures?: AiToolFailureSummary[];
   // Campos para UI (calculados)
   name?: string;
   status?: 'handoff' | 'bot';

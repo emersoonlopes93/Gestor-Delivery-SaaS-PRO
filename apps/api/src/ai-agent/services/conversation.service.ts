@@ -21,6 +21,8 @@ type AiToolFailureEntry = {
   lastErrorCode?: string;
 };
 
+type AiToolFailuresMap = Record<string, AiToolFailureEntry>;
+
 @Injectable()
 export class ConversationService {
   private readonly logger = new Logger('ConversationService');
@@ -202,6 +204,53 @@ export class ConversationService {
         data: { metadata: metadata as Prisma.InputJsonObject },
       });
     }
+  }
+
+  async clearAllAiToolFailures(sessionId: string): Promise<void> {
+    const session = await this.prisma.chatSession.findUnique({
+      where: { id: sessionId },
+      select: { metadata: true },
+    });
+
+    const metadata = this.asJsonObject(session?.metadata);
+    const ai = this.asJsonObject(metadata.ai);
+
+    if (ai.toolFailures) {
+      delete ai.toolFailures;
+      metadata.ai = ai;
+      await this.prisma.chatSession.update({
+        where: { id: sessionId },
+        data: { metadata: metadata as Prisma.InputJsonObject },
+      });
+    }
+  }
+
+  async getAiToolFailures(sessionId: string): Promise<AiToolFailuresMap> {
+    const session = await this.prisma.chatSession.findUnique({
+      where: { id: sessionId },
+      select: { metadata: true },
+    });
+
+    const metadata = this.asJsonObject(session?.metadata);
+    const ai = this.asJsonObject(metadata.ai);
+    const toolFailures = this.asJsonObject(ai.toolFailures);
+
+    const out: AiToolFailuresMap = {};
+    for (const key of Object.keys(toolFailures)) {
+      const entry = this.asJsonObject(toolFailures[key]);
+      const count = typeof entry.count === 'number' ? entry.count : null;
+      const lastAt = typeof entry.lastAt === 'string' ? entry.lastAt : null;
+      if (count === null || lastAt === null) continue;
+
+      out[key] = {
+        count,
+        lastAt,
+        lastSignatureHash: typeof entry.lastSignatureHash === 'string' ? entry.lastSignatureHash : undefined,
+        lastErrorCode: typeof entry.lastErrorCode === 'string' ? entry.lastErrorCode : undefined,
+      };
+    }
+
+    return out;
   }
 
   async shouldBlockAiToolCall(input: {
