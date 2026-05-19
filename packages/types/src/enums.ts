@@ -186,3 +186,16 @@ export enum FinancialStatus {
   CANCELLED = 'cancelled',
   OVERDUE = 'overdue',
 }
+
+export enum OrderSplitStatus {
+  pending = 'pending',
+  confirmed = 'confirmed',
+  cancelled = 'cancelled',
+}
+
+export enum PaymentTxStatus {
+  pending = 'pending',
+  success = 'success',
+  failed = 'failed',
+  refunded = 'refunded',
+}

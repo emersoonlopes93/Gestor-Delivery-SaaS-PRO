@@ -18,7 +18,7 @@ interface PaymentModalProps {
   total: number;
   subtotal: number;
   discount: number;
-  onConfirm: (method: PaymentMethod, details?: any) => void;
+  onConfirm: (method: PaymentMethod, details?: { cashAmount?: number }) => void;
   isPending: boolean;
 }
 

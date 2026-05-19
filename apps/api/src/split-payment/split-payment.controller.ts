@@ -23,11 +23,27 @@ import {
   SplitByItemsDTO,
   SplitByPeopleDTO,
 } from './dto/create-split.dto';
+import { OrderSplitStatus as PrismaOrderSplitStatus, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
+import { OrderSplitStatus, PaymentMethod } from '@gestor/types';
 
 @Controller('split-payment')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class SplitPaymentController {
   constructor(private readonly splitPaymentService: SplitPaymentService) {}
+
+  private parseOrderSplitStatus(value?: string): OrderSplitStatus | undefined {
+    if (!value) return undefined;
+    switch (value) {
+      case PrismaOrderSplitStatus.pending:
+        return OrderSplitStatus.pending;
+      case PrismaOrderSplitStatus.confirmed:
+        return OrderSplitStatus.confirmed;
+      case PrismaOrderSplitStatus.cancelled:
+        return OrderSplitStatus.cancelled;
+      default:
+        return undefined;
+    }
+  }
 
   @Post('splits')
   @RequirePermissions('orders.create')
@@ -65,7 +81,7 @@ export class SplitPaymentController {
     @Query('limit') limit?: string,
   ) {
     return this.splitPaymentService.getAllOrderSplits(
-      status as any,
+      this.parseOrderSplitStatus(status),
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 20,
     );
@@ -100,11 +116,31 @@ export class SplitPaymentController {
     return { success: true };
   }
 
+  private parsePaymentMethod(method: PrismaPaymentMethod): PaymentMethod {
+    switch (method) {
+      case 'cash':
+        return PaymentMethod.cash;
+      case 'pix':
+        return PaymentMethod.pix;
+      case 'credit_card':
+        return PaymentMethod.credit_card;
+      case 'debit_card':
+        return PaymentMethod.debit_card;
+      case 'card_on_delivery':
+        return PaymentMethod.card_on_delivery;
+      case 'other':
+        return PaymentMethod.other;
+    }
+  }
+
   @Post('splits/payments')
   @RequirePermissions('orders.update')
   @HttpCode(HttpStatus.CREATED)
   async addPaymentToSplit(@Body() data: AddPaymentToSplitDTO) {
-    return this.splitPaymentService.addPaymentToSplit(data);
+    return this.splitPaymentService.addPaymentToSplit({
+      ...data,
+      paymentMethod: this.parsePaymentMethod(data.paymentMethod),
+    });
   }
 
   @Post('splits/payments/:id/confirm')

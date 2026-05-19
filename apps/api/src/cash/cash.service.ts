@@ -5,15 +5,37 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import type {
+import {
   CashSessionDTO,
   CashSessionDetailDTO,
   CashMovementDTO,
+  CashSessionStatus,
+  CashMovementType,
 } from '@gestor/types';
+import { PaymentMethod as PrismaPaymentMethod, Prisma } from '@prisma/client';
 
 @Injectable()
 export class CashService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private parsePaymentMethod(value: string): PrismaPaymentMethod | null {
+    switch (value) {
+      case 'cash':
+        return PrismaPaymentMethod.cash;
+      case 'pix':
+        return PrismaPaymentMethod.pix;
+      case 'credit_card':
+        return PrismaPaymentMethod.credit_card;
+      case 'debit_card':
+        return PrismaPaymentMethod.debit_card;
+      case 'card_on_delivery':
+        return PrismaPaymentMethod.card_on_delivery;
+      case 'other':
+        return PrismaPaymentMethod.other;
+      default:
+        return null;
+    }
+  }
 
   /**
    * Open a new cash session for an operator.
@@ -251,13 +273,14 @@ export class CashService {
     amount: number,
     paymentMethod: string,
   ): Promise<void> {
+    const parsedPaymentMethod = this.parsePaymentMethod(paymentMethod);
     await this.prisma.cashMovement.create({
       data: {
         tenantId,
         cashSessionId,
         type: 'sale',
         amount,
-        paymentMethod: paymentMethod as any, // Enum type checking via cast if necessary
+        ...(parsedPaymentMethod ? { paymentMethod: parsedPaymentMethod } : {}),
         orderId,
         description: 'Venda PDV',
       },
@@ -315,13 +338,15 @@ export class CashService {
   /**
    * Mapper for Session DTO.
    */
-  private mapSessionToDTO(session: any): CashSessionDTO {
+  private mapSessionToDTO(
+    session: Prisma.CashSessionGetPayload<{ include: { operator: { select: { name: true } } } }>,
+  ): CashSessionDTO {
     return {
       id: session.id,
       tenantId: session.tenantId,
       operatorId: session.operatorId,
       operatorName: session.operator?.name || 'Operador Desconhecido',
-      status: session.status,
+      status: session.status as CashSessionStatus,
       openingAmount: Number(session.openingAmount),
       openedAt: session.openedAt.toISOString(),
       closedAt: session.closedAt?.toISOString() || null,
@@ -335,27 +360,36 @@ export class CashService {
   /**
    * Mapper for Detailed Session DTO.
    */
-  private mapSessionDetailToDTO(session: any): CashSessionDetailDTO {
+  private mapSessionDetailToDTO(
+    session: Prisma.CashSessionGetPayload<{
+      include: {
+        operator: { select: { name: true } };
+        movements: { include: { order: { select: { orderNumber: true } } } };
+      };
+    }>,
+  ): CashSessionDetailDTO {
     const base = this.mapSessionToDTO(session);
-    const movements = (session.movements || []).map((m: any) => this.mapMovementToDTO(m));
+    const movements = (session.movements || []).map((m) => this.mapMovementToDTO(m));
 
     return {
       ...base,
       movements,
-      totalSales: movements.filter((m: any) => m.type === 'sale').reduce((s: number, m: any) => s + m.amount, 0),
-      totalWithdrawals: movements.filter((m: any) => m.type === 'withdrawal').reduce((s: number, m: any) => s + m.amount, 0),
-      totalSupplies: movements.filter((m: any) => m.type === 'supply').reduce((s: number, m: any) => s + m.amount, 0),
-      totalRefunds: movements.filter((m: any) => m.type === 'refund').reduce((s: number, m: any) => s + m.amount, 0),
+      totalSales: movements.filter((m) => m.type === 'sale').reduce((s, m) => s + m.amount, 0),
+      totalWithdrawals: movements.filter((m) => m.type === 'withdrawal').reduce((s, m) => s + m.amount, 0),
+      totalSupplies: movements.filter((m) => m.type === 'supply').reduce((s, m) => s + m.amount, 0),
+      totalRefunds: movements.filter((m) => m.type === 'refund').reduce((s, m) => s + m.amount, 0),
     };
   }
 
   /**
    * Mapper for Movement DTO.
    */
-  private mapMovementToDTO(m: any): CashMovementDTO {
+  private mapMovementToDTO(
+    m: Prisma.CashMovementGetPayload<{ include: { order: { select: { orderNumber: true } } } }>,
+  ): CashMovementDTO {
     return {
       id: m.id,
-      type: m.type,
+      type: m.type as CashMovementType,
       amount: Number(m.amount),
       paymentMethod: m.paymentMethod || null,
       orderId: m.orderId || null,
@@ -365,4 +399,3 @@ export class CashService {
     };
   }
 }
-

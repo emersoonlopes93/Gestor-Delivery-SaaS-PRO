@@ -7,7 +7,9 @@ import {
   FinancialAccountDTO,
   CreateFinancialTransactionDTO,
   UpdateFinancialTransactionDTO,
-  FinancialTransactionDTO
+  FinancialTransactionDTO,
+  FinancialStatus,
+  FinancialTransactionType,
 } from '@gestor/types';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { CurrentTenant } from '../common/decorators';
@@ -47,9 +49,11 @@ export class FinanceController {
   @Get('transactions')
   async findAllTransactions(
     @CurrentTenant() tenantId: string,
-    @Query() query: any,
+    @Query('accountId') accountId?: string,
+    @Query('type') type?: FinancialTransactionType,
+    @Query('status') status?: FinancialStatus,
   ): Promise<FinancialTransactionDTO[]> {
-    return this.transactionsService.findAll(tenantId, query);
+    return this.transactionsService.findAll(tenantId, { accountId, type, status });
   }
 
   @Post('transactions')

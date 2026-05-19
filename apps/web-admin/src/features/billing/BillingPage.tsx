@@ -1,18 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api-client';
 import { CreditCard, TrendingUp, Plus, Edit2, CheckCircle2, XCircle, Save, X } from 'lucide-react';
-
-interface Plan {
-  id: string;
-  name: string;
-  slug: string;
-  price: number;
-  billingCycle: 'monthly' | 'yearly';
-  features: Record<string, any> | null;
-  isActive: boolean;
-  createdAt: string;
-  _count?: { subscriptions: number };
-}
+import { PlanDTO } from '@gestor/types';
 
 const AVAILABLE_FEATURES = [
   { id: 'max_orders', name: 'Pedidos Ilimitados', type: 'boolean' },
@@ -31,16 +20,16 @@ const AVAILABLE_FEATURES = [
 ];
 
 export function BillingPage() {
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plans, setPlans] = useState<PlanDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<Partial<Plan> | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<Partial<PlanDTO> | null>(null);
   const [saving, setSaving] = useState(false);
 
   const fetchPlans = async () => {
     try {
       setLoading(true);
-      const res = await api.get<any>('/admin/billing/plans');
+      const res = await api.get<PlanDTO[] | { items: PlanDTO[] }>('/admin/billing/plans');
       const data = Array.isArray(res.data) ? res.data : res.data?.items || [];
       setPlans(data);
     } catch (err) {
@@ -54,7 +43,7 @@ export function BillingPage() {
     fetchPlans();
   }, []);
 
-  const handleOpenModal = (plan: Partial<Plan> | null = null) => {
+  const handleOpenModal = (plan: Partial<PlanDTO> | null = null) => {
     setSelectedPlan(plan || {
       name: '',
       slug: '',
@@ -79,9 +68,9 @@ export function BillingPage() {
       }
       setIsModalOpen(false);
       fetchPlans();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Erro ao salvar plano:', err);
-      const message = err.response?.data?.message || err.message || 'Verifique se o slug é único.';
+      const message = err instanceof Error ? err.message : 'Verifique se o slug é único.';
       alert(`Erro ao salvar o plano: ${message}`);
     } finally {
       setSaving(false);
@@ -90,7 +79,7 @@ export function BillingPage() {
 
   const handleToggleFeature = (featureId: string) => {
     if (!selectedPlan) return;
-    const currentFeatures = { ...(selectedPlan.features || {}) };
+    const currentFeatures = { ...(selectedPlan.features || {}) } as Record<string, boolean | string | number>;
     currentFeatures[featureId] = !currentFeatures[featureId];
     setSelectedPlan({ ...selectedPlan, features: currentFeatures });
   };
@@ -273,7 +262,7 @@ export function BillingPage() {
                   <label className="text-xs font-black text-slate-500 uppercase">Ciclo</label>
                   <select
                     value={selectedPlan.billingCycle}
-                    onChange={(e) => setSelectedPlan({ ...selectedPlan, billingCycle: e.target.value as any })}
+                    onChange={(e) => setSelectedPlan({ ...selectedPlan, billingCycle: e.target.value as 'monthly' | 'yearly' })}
                     className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="monthly">Mensal</option>

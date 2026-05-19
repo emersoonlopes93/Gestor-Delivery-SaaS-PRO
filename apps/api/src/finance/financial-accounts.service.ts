@@ -1,10 +1,33 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { FinancialAccountDTO, CreateFinancialAccountDTO, UpdateFinancialAccountDTO } from '@gestor/types';
+import { FinancialAccountDTO, CreateFinancialAccountDTO, UpdateFinancialAccountDTO, FinancialAccountType } from '@gestor/types';
+import { FinancialAccountType as PrismaFinancialAccountType, Prisma } from '@prisma/client';
 
 @Injectable()
 export class FinancialAccountsService {
   constructor(private prisma: PrismaService) {}
+
+  private toPrismaType(type: FinancialAccountType): PrismaFinancialAccountType {
+    switch (type) {
+      case FinancialAccountType.CASH:
+        return PrismaFinancialAccountType.cash;
+      case FinancialAccountType.BANK:
+        return PrismaFinancialAccountType.bank;
+      case FinancialAccountType.DIGITAL_WALLET:
+        return PrismaFinancialAccountType.digital_wallet;
+    }
+  }
+
+  private toDtoType(type: PrismaFinancialAccountType): FinancialAccountType {
+    switch (type) {
+      case PrismaFinancialAccountType.cash:
+        return FinancialAccountType.CASH;
+      case PrismaFinancialAccountType.bank:
+        return FinancialAccountType.BANK;
+      case PrismaFinancialAccountType.digital_wallet:
+        return FinancialAccountType.DIGITAL_WALLET;
+    }
+  }
 
   async findAll(tenantId: string): Promise<FinancialAccountDTO[]> {
     const accounts = await this.prisma.financialAccount.findMany({
@@ -32,19 +55,19 @@ export class FinancialAccountsService {
       data: {
         tenantId,
         name: dto.name,
-        type: dto.type as any, // Cast para Prisma enum
-        balance: dto.initialBalance || 0,
+        type: this.toPrismaType(dto.type),
+        balance: dto.initialBalance ?? 0,
       },
     });
 
     return this.mapToDTO(account);
   }
 
-  private mapToDTO(acc: any): FinancialAccountDTO {
+  private mapToDTO(acc: Prisma.FinancialAccountGetPayload<{}>): FinancialAccountDTO {
     return {
       ...acc,
-      type: acc.type as any, // Cast para DTO enum (mesmos valores string)
-      balance: Number(acc.balance)
+      type: this.toDtoType(acc.type),
+      balance: Number(acc.balance),
     };
   }
 

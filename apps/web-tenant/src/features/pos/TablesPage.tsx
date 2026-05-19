@@ -12,6 +12,7 @@ import {
   LayoutGrid
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { Tenant } from '@gestor/types';
 
 interface Table {
   id: string;
@@ -32,7 +33,7 @@ export function TablesPage() {
   // Fetch tenant info for slug and storefront URL
   useEffect(() => {
     const loadTenantInfo = async () => {
-      const res = await api.get<any>('/tenant/me');
+      const res = await api.get<Tenant>('/tenant/me');
       if (res.success) {
         setTenantSlug(res.data.slug);
       }

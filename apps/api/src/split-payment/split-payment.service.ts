@@ -1,7 +1,19 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
-import { OrderSplitStatus, PaymentMethod, PaymentTxStatus } from '@prisma/client';
+import { 
+  OrderSplitStatus as PrismaOrderSplitStatus, 
+  PaymentMethod as PrismaPaymentMethod, 
+  PaymentTxStatus as PrismaPaymentTxStatus, 
+  Prisma 
+} from '@prisma/client';
+import { 
+  OrderSplitDTO, 
+  SplitPaymentDTO, 
+  OrderSplitStatus, 
+  PaymentMethod, 
+  PaymentTxStatus 
+} from '@gestor/types';
 
 @Injectable()
 export class SplitPaymentService {
@@ -11,6 +23,33 @@ export class SplitPaymentService {
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
   ) {}
+
+  private mapSplitToDTO(
+    s: Prisma.OrderSplitGetPayload<{ include: { payments: true } }>,
+  ): OrderSplitDTO {
+    return {
+      ...s,
+      splitType: s.splitType as 'items' | 'people' | 'custom',
+      status: s.status as OrderSplitStatus,
+      subtotalAmount: Number(s.subtotalAmount),
+      discountAmount: Number(s.discountAmount),
+      serviceFeeAmount: Number(s.serviceFeeAmount),
+      deliveryFeeAmount: Number(s.deliveryFeeAmount),
+      totalAmount: Number(s.totalAmount),
+      confirmedAt: s.confirmedAt || undefined,
+      cancelledAt: s.cancelledAt || undefined,
+      payments: s.payments.map(p => this.mapPaymentToDTO(p)),
+    };
+  }
+
+  private mapPaymentToDTO(p: Prisma.SplitPaymentGetPayload<{}>): SplitPaymentDTO {
+    return {
+      ...p,
+      paymentMethod: p.paymentMethod as PaymentMethod,
+      amount: Number(p.amount),
+      changeFor: p.changeFor ? Number(p.changeFor) : undefined,
+    };
+  }
 
   /**
    * Cria uma divisão de conta para um pedido
@@ -27,7 +66,7 @@ export class SplitPaymentService {
     responsiblePerson?: string;
     responsiblePhone?: string;
     notes?: string;
-  }) {
+  }): Promise<OrderSplitDTO> {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) {
       throw new Error('Tenant context not found');
@@ -60,17 +99,16 @@ export class SplitPaymentService {
         responsiblePerson: data.responsiblePerson,
         responsiblePhone: data.responsiblePhone,
         notes: data.notes,
-        status: OrderSplitStatus.pending,
+        status: PrismaOrderSplitStatus.pending,
       },
       include: {
-        order: true,
         payments: true,
       },
     });
 
     this.logger.log(`Created order split ${orderSplit.id} for order ${data.orderId}`);
     
-    return orderSplit;
+    return this.mapSplitToDTO(orderSplit);
   }
 
   /**
@@ -96,7 +134,6 @@ export class SplitPaymentService {
       },
       include: {
         payments: true,
-        order: true,
       },
     });
 
@@ -104,14 +141,14 @@ export class SplitPaymentService {
       throw new NotFoundException('Order split not found');
     }
 
-    if (orderSplit.status !== OrderSplitStatus.pending) {
+    if (orderSplit.status !== PrismaOrderSplitStatus.pending) {
       throw new BadRequestException('Order split is not in pending status');
     }
 
     // Calcular total já pago
     const paidAmount = orderSplit.payments
-      .filter((p: any) => p.isPaid)
-      .reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+      .filter((p) => p.isPaid)
+      .reduce((sum, p) => sum + Number(p.amount), 0);
 
     // Validar valor
     if (paidAmount + data.amount > Number(orderSplit.totalAmount)) {
@@ -123,7 +160,7 @@ export class SplitPaymentService {
       data: {
         tenantId,
         orderSplitId: data.orderSplitId,
-        paymentMethod: data.paymentMethod,
+        paymentMethod: data.paymentMethod as PrismaPaymentMethod,
         amount: data.amount,
         changeFor: data.changeFor,
         notes: data.notes,
@@ -135,19 +172,20 @@ export class SplitPaymentService {
     // Se for PIX, criar transação de pagamento
     let paymentTransaction = null;
     if (data.paymentMethod === PaymentMethod.pix) {
+      const metadata: Prisma.InputJsonObject = {
+        orderSplitId: data.orderSplitId,
+        splitPaymentId: splitPayment.id,
+      };
       paymentTransaction = await this.prisma.paymentTransaction.create({
         data: {
           tenantId,
           orderId: orderSplit.orderId,
           gatewayName: 'mercadopago',
           gatewayTxId: '',
-          method: PaymentMethod.pix,
+          method: PrismaPaymentMethod.pix,
           amount: data.amount,
-          status: PaymentTxStatus.pending,
-          metadata: {
-            orderSplitId: data.orderSplitId,
-            splitPaymentId: splitPayment.id,
-          } as any,
+          status: PrismaPaymentTxStatus.pending,
+          metadata,
         },
       });
 
@@ -161,7 +199,7 @@ export class SplitPaymentService {
     this.logger.log(`Added payment ${splitPayment.id} to split ${data.orderSplitId}`);
 
     return {
-      splitPayment,
+      splitPayment: this.mapPaymentToDTO(splitPayment),
       paymentTransaction,
     };
   }
@@ -169,7 +207,7 @@ export class SplitPaymentService {
   /**
    * Confirma um pagamento em dinheiro
    */
-  async confirmCashPayment(splitPaymentId: string) {
+  async confirmCashPayment(splitPaymentId: string): Promise<SplitPaymentDTO> {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) {
       throw new Error('Tenant context not found');
@@ -179,9 +217,6 @@ export class SplitPaymentService {
       where: {
         id: splitPaymentId,
         tenantId,
-      },
-      include: {
-        orderSplit: true,
       },
     });
 
@@ -193,7 +228,7 @@ export class SplitPaymentService {
       throw new BadRequestException('Payment is already confirmed');
     }
 
-    if (splitPayment.paymentMethod !== PaymentMethod.cash) {
+    if (splitPayment.paymentMethod !== PrismaPaymentMethod.cash) {
       throw new BadRequestException('Only cash payments can be confirmed manually');
     }
 
@@ -211,13 +246,13 @@ export class SplitPaymentService {
 
     this.logger.log(`Confirmed cash payment ${splitPaymentId}`);
 
-    return updated;
+    return this.mapPaymentToDTO(updated);
   }
 
   /**
    * Divide um pedido igualmente por um número de pessoas
    */
-  async splitByPeople(orderId: string, numberOfPeople: number) {
+  async splitByPeople(orderId: string, numberOfPeople: number): Promise<OrderSplitDTO[]> {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) throw new Error('Tenant context not found');
 
@@ -249,7 +284,7 @@ export class SplitPaymentService {
   /**
    * Divide um pedido por itens específicos
    */
-  async splitByItems(orderId: string, items: { orderItemId: string, quantity: number }[]) {
+  async splitByItems(orderId: string, items: { orderItemId: string, quantity: number }[]): Promise<OrderSplitDTO> {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) throw new Error('Tenant context not found');
 
@@ -273,21 +308,19 @@ export class SplitPaymentService {
     // Criar o split para esses itens
     // Nota: Simplificado para considerar apenas o subtotal por enquanto.
     // Em uma versão real, ratearíamos taxas e descontos do pedido original.
-    const split = await this.createOrderSplit({
+    return this.createOrderSplit({
       orderId,
       splitType: 'items',
       description: 'Divisão por itens',
       totalAmount: subtotal,
       subtotalAmount: subtotal,
     });
-
-    return split;
   }
 
   /**
    * Cancela uma divisão de conta
    */
-  async cancelOrderSplit(orderSplitId: string, reason?: string) {
+  async cancelOrderSplit(orderSplitId: string, reason?: string): Promise<boolean> {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) {
       throw new Error('Tenant context not found');
@@ -311,7 +344,7 @@ export class SplitPaymentService {
       throw new NotFoundException('Order split not found');
     }
 
-    if (orderSplit.status === OrderSplitStatus.cancelled) {
+    if (orderSplit.status === PrismaOrderSplitStatus.cancelled) {
       throw new BadRequestException('Order split is already cancelled');
     }
 
@@ -323,7 +356,7 @@ export class SplitPaymentService {
     for (const transaction of pendingTransactions) {
       await this.prisma.paymentTransaction.update({
         where: { id: transaction.id },
-        data: { status: PaymentTxStatus.failed },
+        data: { status: PrismaPaymentTxStatus.failed },
       });
     }
 
@@ -331,7 +364,7 @@ export class SplitPaymentService {
     await this.prisma.orderSplit.update({
       where: { id: orderSplitId },
       data: {
-        status: OrderSplitStatus.cancelled,
+        status: PrismaOrderSplitStatus.cancelled,
         cancelledAt: new Date(),
         notes: reason ? `${orderSplit.notes || ''}\nCancelado: ${reason}`.trim() : orderSplit.notes,
       },
@@ -345,28 +378,26 @@ export class SplitPaymentService {
   /**
    * Lista divisões de um pedido
    */
-  async getOrderSplits(orderId: string) {
+  async getOrderSplits(orderId: string): Promise<OrderSplitDTO[]> {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) {
       throw new Error('Tenant context not found');
     }
 
-    return this.prisma.orderSplit.findMany({
+    const splits = await this.prisma.orderSplit.findMany({
       where: {
         orderId,
         tenantId,
       },
       include: {
-        payments: {
-          include: {
-            paymentTransaction: true,
-          },
-        },
+        payments: true,
       },
       orderBy: {
         createdAt: 'asc',
       },
     });
+
+    return splits.map(s => this.mapSplitToDTO(s));
   }
 
   /**
@@ -376,7 +407,7 @@ export class SplitPaymentService {
     status?: OrderSplitStatus,
     page = 1,
     limit = 20,
-  ) {
+  ): Promise<{ items: OrderSplitDTO[]; total: number; page: number; limit: number }> {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) {
       throw new Error('Tenant context not found');
@@ -384,22 +415,17 @@ export class SplitPaymentService {
 
     const skip = (page - 1) * limit;
 
-    const where: any = { tenantId };
+    const where: Prisma.OrderSplitWhereInput = { tenantId };
     
     if (status) {
-      where.status = status;
+      where.status = status as PrismaOrderSplitStatus;
     }
 
     const [items, total] = await Promise.all([
       this.prisma.orderSplit.findMany({
         where,
         include: {
-          order: true,
-          payments: {
-            include: {
-              paymentTransaction: true,
-            },
-          },
+          payments: true,
         },
         orderBy: {
           createdAt: 'desc',
@@ -411,7 +437,7 @@ export class SplitPaymentService {
     ]);
 
     return {
-      items,
+      items: items.map(s => this.mapSplitToDTO(s)),
       total,
       page,
       limit,
@@ -437,11 +463,11 @@ export class SplitPaymentService {
       .filter(p => p.isPaid)
       .reduce((sum, p) => sum + Number(p.amount), 0);
 
-    if (totalPaid >= Number(orderSplit.totalAmount) && orderSplit.status === OrderSplitStatus.pending) {
+    if (totalPaid >= Number(orderSplit.totalAmount) && orderSplit.status === PrismaOrderSplitStatus.pending) {
       await this.prisma.orderSplit.update({
         where: { id: orderSplitId },
         data: {
-          status: OrderSplitStatus.confirmed,
+          status: PrismaOrderSplitStatus.confirmed,
           confirmedAt: new Date(),
         },
       });
@@ -453,7 +479,19 @@ export class SplitPaymentService {
   /**
    * Calcula resumo dos pagamentos de uma divisão
    */
-  async getSplitSummary(orderSplitId: string) {
+  async getSplitSummary(orderSplitId: string): Promise<{
+    split: OrderSplitDTO;
+    summary: {
+      totalAmount: number;
+      totalPaid: number;
+      remainingAmount: number;
+      isFullyPaid: boolean;
+      paymentCount: number;
+      paidCount: number;
+      pendingCount: number;
+    };
+    payments: SplitPaymentDTO[];
+  }> {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) {
       throw new Error('Tenant context not found');
@@ -465,12 +503,7 @@ export class SplitPaymentService {
         tenantId,
       },
       include: {
-        payments: {
-          include: {
-            paymentTransaction: true,
-          },
-        },
-        order: true,
+        payments: true,
       },
     });
 
@@ -486,7 +519,7 @@ export class SplitPaymentService {
     const remainingAmount = Number(orderSplit.totalAmount) - totalPaid;
 
     return {
-      split: orderSplit,
+      split: this.mapSplitToDTO(orderSplit),
       summary: {
         totalAmount: Number(orderSplit.totalAmount),
         totalPaid,
@@ -496,14 +529,14 @@ export class SplitPaymentService {
         paidCount: orderSplit.payments.filter(p => p.isPaid).length,
         pendingCount: pendingPayments.length,
       },
-      payments: orderSplit.payments,
+      payments: orderSplit.payments.map(p => this.mapPaymentToDTO(p)),
     };
   }
 
   /**
    * Remove um pagamento de uma divisão (se não estiver confirmado)
    */
-  async removePaymentFromSplit(splitPaymentId: string) {
+  async removePaymentFromSplit(splitPaymentId: string): Promise<boolean> {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) {
       throw new Error('Tenant context not found');
@@ -516,7 +549,6 @@ export class SplitPaymentService {
       },
       include: {
         paymentTransaction: true,
-        orderSplit: true,
       },
     });
 
@@ -532,7 +564,7 @@ export class SplitPaymentService {
     if (splitPayment.paymentTransaction) {
       await this.prisma.paymentTransaction.update({
         where: { id: splitPayment.paymentTransaction.id },
-        data: { status: PaymentTxStatus.failed },
+        data: { status: PrismaPaymentTxStatus.failed },
       });
     }
 

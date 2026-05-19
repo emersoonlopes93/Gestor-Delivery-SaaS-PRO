@@ -7,7 +7,7 @@ export function useDraftSale() {
 
   return useMutation({
     mutationFn: async (payload: PosCreateSalePayload & { id?: string }) => {
-      const res = await api.post<any>('/pos/draft', payload);
+      const res = await api.post<{ id: string }>('/pos/draft', payload);
       if (!res.success) {
         throw new Error('Erro ao salvar comanda');
       }

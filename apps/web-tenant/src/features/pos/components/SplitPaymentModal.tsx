@@ -11,7 +11,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { api } from '@/lib/api-client';
-import { PaymentMethod } from '@gestor/types';
+import { PaymentMethod, OrderSplitDTO } from '@gestor/types';
 
 interface OrderItem {
   id: string;
@@ -41,7 +41,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
   const [mode, setMode] = useState<'menu' | 'people' | 'items' | 'splits'>('menu');
   const [numberOfPeople, setNumberOfPeople] = useState(2);
   const [itemSelections, setItemSelections] = useState<Record<string, number>>({});
-  const [splits, setSplits] = useState<any[]>([]);
+  const [splits, setSplits] = useState<OrderSplitDTO[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingSplits, setIsLoadingSplits] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +49,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
   const fetchSplits = React.useCallback(async () => {
     setIsLoadingSplits(true);
     try {
-      const res = await api.get(`/split-payment/orders/${orderId}/splits`);
+      const res = await api.get<OrderSplitDTO[]>(`/split-payment/orders/${orderId}/splits`);
       const data = Array.isArray(res.data) ? res.data : [];
       setSplits(data);
       if (data.length > 0 && mode === 'menu') {
@@ -81,8 +81,9 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
       setIsSubmitting(false);
       onComplete(); // Recarregar dados no pai
       onClose();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Erro ao dividir conta por pessoas.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro ao dividir conta por pessoas.';
+      setError(message);
       setIsSubmitting(false);
     }
   };
@@ -107,8 +108,9 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
       setIsSubmitting(false);
       fetchSplits();
       setMode('splits');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Erro ao dividir conta por itens.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro ao dividir conta por itens.';
+      setError(message);
       setIsSubmitting(false);
     }
   };
@@ -123,8 +125,9 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
       });
       await fetchSplits();
       onComplete();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Erro ao processar pagamento do split.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro ao processar pagamento do split.';
+      setError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -135,7 +138,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
       await api.post(`/split-payment/splits/payments/${paymentId}/confirm`);
       await fetchSplits();
       onComplete();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError('Erro ao confirmar pagamento em dinheiro.');
     }
   };
@@ -282,7 +285,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
     <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-2">
       {splits.map((split) => {
         const isPaid = split.status === 'confirmed';
-        const pendingPayment = split.payments.find((p: any) => !p.isPaid);
+        const pendingPayment = split.payments?.find((p) => !p.isPaid);
         
         return (
           <div key={split.id} className={`p-5 rounded-3xl border-2 transition-all ${isPaid ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
@@ -330,8 +333,8 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
             )}
             
             {isPaid && (
-              <div className="flex items-center gap-2 text-emerald-500 text-[10px] font-black uppercase">
-                 <CheckCircle2 size={14} /> Pago em {new Date(split.confirmedAt).toLocaleDateString()}
+              <div className="flex items-center gap-1.5 mt-2 text-emerald-500/70 text-[10px] font-black uppercase">
+                 <CheckCircle2 size={14} /> Pago em {split.confirmedAt ? new Date(split.confirmedAt).toLocaleDateString() : '---'}
               </div>
             )}
           </div>

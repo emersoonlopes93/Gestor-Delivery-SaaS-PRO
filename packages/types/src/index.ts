@@ -19,10 +19,13 @@ export {
   FinancialAccountType,
   FinancialTransactionType,
   FinancialStatus,
+  OrderSplitStatus,
+  PaymentTxStatus,
 } from './enums';
 
 export type * from './auth';
 export type * from './tenant';
+export type * from './billing';
 export type * from './purchasing';
 export type * from './finance';
 export type * from './rbac';
@@ -38,6 +41,7 @@ export type * from './goals';
 export type * from './campaigns';
 export type * from './chat';
 export type * from './realtime';
+export type * from './split-payment';
 
 // Modules with classes or constants (explicit values)
 export type { 

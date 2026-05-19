@@ -21,7 +21,7 @@ const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   draft: ['confirmed', 'cancelled'],
 };
 
-const STATUS_LABELS: Record<string, string> = {
+const STATUS_LABELS: Record<OrderStatus, string> = {
   pending: 'Pendente',
   confirmed: 'Confirmado',
   preparing: 'Preparando',
@@ -31,7 +31,7 @@ const STATUS_LABELS: Record<string, string> = {
   completed: 'Concluído',
   cancelled: 'Cancelado',
   draft: 'Rascunho',
-} as any;
+};
 
 const CHANNEL_LABELS: Record<string, string> = {
   storefront: 'Loja Online',
@@ -41,7 +41,7 @@ const CHANNEL_LABELS: Record<string, string> = {
   ifood: 'iFood',
 };
 
-const STATUS_COLORS: Record<string, string> = {
+const STATUS_COLORS: Record<OrderStatus, string> = {
   pending: 'status-badge-pending',
   confirmed: 'status-badge-confirmed',
   preparing: 'status-badge-preparing',
@@ -51,7 +51,7 @@ const STATUS_COLORS: Record<string, string> = {
   completed: 'status-badge-neutral',
   cancelled: 'status-badge-danger',
   draft: 'status-badge-neutral',
-} as any;
+};
 
 export function OrdersListPage() {
   const [orders, setOrders] = useState<OrderListItemDTO[]>([]);

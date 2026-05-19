@@ -2,6 +2,7 @@ import { Controller, Post, Body, Headers, Logger, BadRequestException } from '@n
 import { PrismaService } from '../database/prisma.service';
 import { SubscriptionStatus } from '@prisma/client';
 import { Public } from '../common/decorators';
+import { AsaasWebhookSchema } from './dto/asaas.dto';
 
 @Controller('billing/webhooks')
 export class BillingWebhookController {
@@ -12,7 +13,7 @@ export class BillingWebhookController {
   @Public()
   @Post('asaas')
   async handleAsaasWebhook(
-    @Body() body: any,
+    @Body() body: unknown,
     @Headers('asaas-access-token') token?: string,
   ) {
     const asaasWebhookToken = process.env.ASAAS_WEBHOOK_TOKEN;
@@ -20,8 +21,18 @@ export class BillingWebhookController {
       throw new BadRequestException('Token de webhook inválido');
     }
 
-    const { event, subscription } = body;
-    this.logger.log(`Received Asaas webhook event: ${event}`);
+    const parsed = AsaasWebhookSchema.safeParse(body);
+    if (!parsed.success) {
+      const issues = parsed.error.issues.map((i) => ({
+        path: i.path.join('.'),
+        code: i.code,
+      }));
+      this.logger.warn(`Invalid Asaas webhook payload: ${JSON.stringify(issues)}`);
+      return { received: true };
+    }
+
+    const { event, subscription } = parsed.data;
+    this.logger.log(`Received Asaas webhook event: ${event}${subscription?.id ? ` (subscriptionId=${subscription.id})` : ''}`);
 
     if (!subscription || !subscription.id) {
       return { received: true };

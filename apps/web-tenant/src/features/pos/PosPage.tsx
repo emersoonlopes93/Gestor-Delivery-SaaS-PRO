@@ -4,7 +4,7 @@ import { api } from '@/lib/api-client';
 import { useActiveSession } from '../cash/hooks/useCashSession';
 import { useCreatePosSale, type PosCreateSalePayload } from './hooks/usePosSale';
 import { useDraftSale } from './hooks/useDraftSale';
-import { PosFulfillmentType, PaymentMethod } from '@gestor/types';
+import { PosFulfillmentType, PaymentMethod, OrderResponseDTO } from '@gestor/types';
 import { 
   Search, 
   ShoppingCart, 
@@ -148,7 +148,7 @@ export default function PosPage() {
   // Printing Utility
   const handlePrint = async (orderId: string, type: 'customer' | 'kitchen') => {
     try {
-      const res = await api.get<any>(`/pos/sales/${orderId}/print?type=${type}`);
+      const res = await api.get<{ content: string }>(`/pos/sales/${orderId}/print?type=${type}`);
       if (res.success && res.data.content) {
         const printWindow = window.open('', '_blank');
         if (printWindow) {
@@ -209,9 +209,13 @@ export default function PosPage() {
     queryKey: ['posCustomers', customerSearchTerm],
     queryFn: async () => {
       if (customerSearchTerm.length < 2) return [];
-      const res = await api.get(`/crm/customers?search=${customerSearchTerm}&limit=5`);
-      const data = res.data as { data: Array<Record<string, any>> };
-      return (data.data || []).map(c => ({ id: c.id, name: c.fullName || c.name, phone: c.phone || '' }));
+      const res = await api.get<{ data: Array<Record<string, unknown>> }>(`/crm/customers?search=${customerSearchTerm}&limit=5`);
+      const data = res.data;
+      return (data.data || []).map(c => ({ 
+        id: c['id'] as string, 
+        name: (c['fullName'] as string) || (c['name'] as string), 
+        phone: (c['phone'] as string) || '' 
+      }));
     },
     enabled: customerSearchTerm.length >= 2,
   });
@@ -263,19 +267,19 @@ export default function PosPage() {
      setTableNumber(table.name);
      
      if (table.activeOrderId) {
-        const res = await api.get<any>(`/orders/${table.activeOrderId}`);
+        const res = await api.get<OrderResponseDTO>(`/orders/${table.activeOrderId}`);
         if (res.success && res.data) {
            const order = res.data;
            setCurrentOrderId(order.id);
            setCustomerName(order.customerName);
            setCustomerPhone(order.customerPhone);
-           setCart(order.items.map((it: any) => ({
+           setCart(order.items.map((it) => ({
              cartLineId: generateId(),
-             lineType: it.lineType,
-             productId: it.productId,
-             comboId: it.comboId,
+             lineType: it.lineType as 'product' | 'combo',
+             productId: it.productId || undefined,
+             comboId: it.comboId || undefined,
              name: it.snapshotName,
-             basePrice: it.unitPrice,
+             basePrice: Number(it.unitPrice),
              quantity: it.quantity,
              notes: it.notes || ''
            })));

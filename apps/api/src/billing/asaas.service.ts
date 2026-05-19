@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
+import { AsaasCustomerResponse, AsaasSubscriptionResponse, AsaasDeleteResponse } from './dto/asaas.dto';
 
 export interface AsaasCustomerInput {
   name: string;
@@ -36,46 +37,69 @@ export class AsaasService {
     };
   }
 
-  async createCustomer(data: AsaasCustomerInput) {
+  async createCustomer(data: AsaasCustomerInput): Promise<AsaasCustomerResponse> {
     if (!this.apiKey) {
       this.logger.warn('ASAAS_API_KEY not configured. Mocking customer creation.');
-      return { id: `cus_mock_${Date.now()}` };
+      return { 
+        id: `cus_mock_${Date.now()}`,
+        name: data.name,
+        email: data.email,
+        cpfCnpj: data.cpfCnpj
+      };
     }
 
     try {
-      const response = await axios.post(`${this.apiUrl}/customers`, data, { headers: this.headers });
+      const response = await axios.post<AsaasCustomerResponse>(`${this.apiUrl}/customers`, data, { headers: this.headers });
       return response.data;
-    } catch (error: any) {
-      this.logger.error(`Error creating Asaas customer: ${error.response?.data?.errors?.[0]?.description || error.message}`);
+    } catch (error: unknown) {
+      const description = axios.isAxiosError(error)
+        ? (error.response?.data && typeof error.response.data === 'object' && 'errors' in error.response.data
+            ? String((error.response.data as { errors?: Array<{ description?: unknown }> }).errors?.[0]?.description ?? '')
+            : '')
+        : '';
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error creating Asaas customer: ${description || message}`);
       throw new Error('Falha ao criar cliente no gateway de pagamento (Asaas).');
     }
   }
 
-  async createSubscription(data: AsaasSubscriptionInput) {
+  async createSubscription(data: AsaasSubscriptionInput): Promise<AsaasSubscriptionResponse> {
     if (!this.apiKey) {
       this.logger.warn('ASAAS_API_KEY not configured. Mocking subscription creation.');
-      return { id: `sub_mock_${Date.now()}` };
+      return { 
+        id: `sub_mock_${Date.now()}`,
+        status: 'ACTIVE',
+        value: data.value,
+        nextDueDate: data.nextDueDate
+      };
     }
 
     try {
-      const response = await axios.post(`${this.apiUrl}/subscriptions`, data, { headers: this.headers });
+      const response = await axios.post<AsaasSubscriptionResponse>(`${this.apiUrl}/subscriptions`, data, { headers: this.headers });
       return response.data;
-    } catch (error: any) {
-      this.logger.error(`Error creating Asaas subscription: ${error.response?.data?.errors?.[0]?.description || error.message}`);
+    } catch (error: unknown) {
+      const description = axios.isAxiosError(error)
+        ? (error.response?.data && typeof error.response.data === 'object' && 'errors' in error.response.data
+            ? String((error.response.data as { errors?: Array<{ description?: unknown }> }).errors?.[0]?.description ?? '')
+            : '')
+        : '';
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error creating Asaas subscription: ${description || message}`);
       throw new Error('Falha ao criar assinatura no gateway de pagamento (Asaas).');
     }
   }
 
-  async cancelSubscription(subscriptionId: string) {
+  async cancelSubscription(subscriptionId: string): Promise<AsaasDeleteResponse> {
     if (!this.apiKey || subscriptionId.startsWith('sub_mock')) {
-      return { deleted: true };
+      return { deleted: true, id: subscriptionId };
     }
 
     try {
-      const response = await axios.delete(`${this.apiUrl}/subscriptions/${subscriptionId}`, { headers: this.headers });
+      const response = await axios.delete<AsaasDeleteResponse>(`${this.apiUrl}/subscriptions/${subscriptionId}`, { headers: this.headers });
       return response.data;
-    } catch (error: any) {
-      this.logger.error(`Error canceling Asaas subscription: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error canceling Asaas subscription: ${message}`);
       throw new Error('Falha ao cancelar assinatura no Asaas.');
     }
   }

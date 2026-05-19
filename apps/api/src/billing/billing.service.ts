@@ -1,13 +1,20 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
-import { BillingCycle, SubscriptionStatus } from '@prisma/client';
+import { BillingCycle, Prisma, SubscriptionStatus } from '@prisma/client';
 import type { CreatePlanDto, UpdatePlanDto, CreateSubscriptionDto, UpdateSubscriptionDto } from './dto/create-plan.dto';
 import { AsaasService } from './asaas.service';
 
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
+
+  private asJsonObject(value: unknown): Record<string, unknown> {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+    return {};
+  }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -156,8 +163,8 @@ export class BillingService {
       throw new NotFoundException('Assinatura não encontrada.');
     }
 
-    const updateData: any = {};
-    if (dto.status) updateData.status = dto.status;
+    const updateData: Prisma.TenantSubscriptionUpdateArgs['data'] = {};
+    if (dto.status) updateData.status = dto.status as SubscriptionStatus;
     if (dto.planId) updateData.planId = dto.planId;
 
     // If upgrading/downgrading plan, reset period
@@ -191,14 +198,15 @@ export class BillingService {
       return false;
     }
 
-    const features = subscription.plan?.features as Record<string, boolean> | undefined;
-    return features?.[feature] ?? false;
+    const featuresObj = this.asJsonObject(subscription.plan?.features);
+    const value = featuresObj[feature];
+    return typeof value === 'boolean' ? value : false;
   }
 
   async checkAccess(tenantId: string): Promise<{
     canAccess: boolean;
     reason?: string;
-    subscription?: any;
+    subscription?: Prisma.TenantSubscriptionGetPayload<{ include: { plan: true } }>;
   }> {
     const subscription = await this.getCurrentSubscription(tenantId);
     
