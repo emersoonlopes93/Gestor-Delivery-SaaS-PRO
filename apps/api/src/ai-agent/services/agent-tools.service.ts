@@ -11,7 +11,7 @@ import { CreateOrderDTO } from '@gestor/types';
 
 import { PrismaService } from '../../database/prisma.service';
 import { StorefrontService } from '../../storefront/storefront.service';
-import { z } from 'zod';
+import { ZodError, z } from 'zod';
 import { PaymentMethod } from '@gestor/types';
 
 export interface AgentSessionContext {
@@ -267,7 +267,11 @@ export class AgentToolsService {
     args: unknown,
     sessionContext?: AgentSessionContext,
   ): Promise<unknown> {
-    this.logger.log(`Executing tool ${toolName} with args: ${JSON.stringify(args)}`);
+    const argKeys = args && typeof args === 'object' && !Array.isArray(args)
+      ? Object.keys(args as Record<string, unknown>)
+      : [];
+    const sessionId = typeof sessionContext?.sessionId === 'string' ? sessionContext.sessionId : undefined;
+    this.logger.log(`Executing tool ${toolName} (tenantId=${tenantId}${sessionId ? `, sessionId=${sessionId}` : ''}, argKeys=${argKeys.join(',')})`);
 
     try {
       switch (toolName) {
@@ -333,9 +337,26 @@ export class AgentToolsService {
           throw new Error(`Tool desconhecida: ${toolName}`);
       }
     } catch (error) {
+      if (error instanceof ZodError) {
+        const issues = error.issues.map((i) => ({
+          path: i.path.join('.'),
+          code: i.code,
+        }));
+        this.logger.warn(`Invalid tool args (tenantId=${tenantId}, tool=${toolName}): ${JSON.stringify(issues)}`);
+        return {
+          status: 'error',
+          code: 'INVALID_TOOL_ARGS',
+          message: 'Parâmetros inválidos para executar a ferramenta.',
+        };
+      }
+
       const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Error executing tool ${toolName}: ${message}`);
-      return { status: 'error', message };
+      this.logger.error(`Error executing tool (tenantId=${tenantId}, tool=${toolName}): ${message}`);
+      return {
+        status: 'error',
+        code: 'TOOL_EXECUTION_ERROR',
+        message,
+      };
     }
   }
 

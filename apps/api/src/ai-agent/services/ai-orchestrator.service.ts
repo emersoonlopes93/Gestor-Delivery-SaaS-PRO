@@ -9,6 +9,7 @@ import type { AiMessage } from '../interfaces/ai-provider.interface';
 import { PrismaService } from '../../database/prisma.service';
 
 import { Prisma } from '@prisma/client';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class AiOrchestratorService {
@@ -158,6 +159,8 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
     const newMessages = [...historyMessages, assistantToolMessage];
 
     for (const toolCall of toolCalls) {
+      const signatureHash = this.hashToolArgs(toolCall.arguments);
+
       // Verifica se é handoff
       if (toolCall.name === 'transferir_atendimento_humano') {
         const motivo = typeof toolCall.arguments === 'object' && toolCall.arguments !== null && 'motivo' in toolCall.arguments 
@@ -168,6 +171,39 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
         return; // Interrompe o fluxo da IA
       }
 
+      const shouldBlock = await this.conversationService.shouldBlockAiToolCall({
+        sessionId,
+        toolName: toolCall.name,
+        signatureHash,
+        maxFailures: 2,
+        windowMs: 5 * 60 * 1000,
+      });
+
+      if (shouldBlock) {
+        this.logger.warn(`AI tool call blocked to avoid loop (tenantId=${tenantId}, sessionId=${sessionId}, tool=${toolCall.name}, signature=${signatureHash})`);
+        const blockedResult = { status: 'error', code: 'TOOL_LOOP_BLOCKED', message: 'Tool call blocked to avoid loop.' };
+        await this.conversationService.addMessage({
+          sessionId,
+          direction: 'inbound',
+          content: JSON.stringify(blockedResult),
+          messageType: 'tool_result',
+          metadata: {
+            type: 'tool_result',
+            toolName: toolCall.name,
+            status: 'error',
+            code: 'TOOL_LOOP_BLOCKED',
+            signatureHash,
+          },
+        });
+        await this.sendFinalResponse(
+          tenantId,
+          sessionId,
+          customerPhone,
+          'Tive um problema ao processar essa solicitação automaticamente. Pode reformular a mensagem com mais detalhes, por favor?',
+        );
+        return;
+      }
+
       // Executa a tool
       const result = await this.toolsService.executeTool(
         tenantId, 
@@ -175,6 +211,9 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
         toolCall.arguments, 
         { sessionId } // Contexto injetado
       );
+
+      const toolStatus = this.getToolResultStatus(result);
+      const toolCode = this.getToolResultCode(result);
 
       // Adiciona o resultado
       newMessages.push({
@@ -189,7 +228,36 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
         direction: 'inbound', // Tratamos o retorno da tool como input pro LLM ler
         content: JSON.stringify(result),
         messageType: 'tool_result',
+        metadata: {
+          type: 'tool_result',
+          toolName: toolCall.name,
+          status: toolStatus,
+          code: toolCode,
+          signatureHash,
+        },
       });
+
+      if (toolStatus === 'success') {
+        await this.conversationService.clearAiToolFailures(sessionId, toolCall.name);
+      } else if (toolStatus === 'error') {
+        await this.conversationService.recordAiToolFailure({
+          sessionId,
+          toolName: toolCall.name,
+          signatureHash,
+          errorCode: toolCode || 'UNKNOWN',
+        });
+
+        if (toolCode === 'INVALID_TOOL_ARGS') {
+          this.logger.warn(`Invalid tool args (tenantId=${tenantId}, sessionId=${sessionId}, tool=${toolCall.name}, signature=${signatureHash})`);
+          await this.sendFinalResponse(
+            tenantId,
+            sessionId,
+            customerPhone,
+            'Não consegui entender alguns dados necessários para continuar. Pode enviar novamente com as informações completas (ex: itens, endereço e forma de pagamento), por favor?',
+          );
+          return;
+        }
+      }
     }
 
     // Chama o LLM novamente com os resultados
@@ -204,6 +272,52 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
     if (finalCompletion.content) {
       await this.sendFinalResponse(tenantId, sessionId, customerPhone, finalCompletion.content);
     }
+  }
+
+  private stableStringify(value: unknown): string {
+    const visit = (v: unknown): unknown => {
+      if (v === null) return null;
+      const t = typeof v;
+      if (t === 'string' || t === 'number' || t === 'boolean') return v;
+      if (Array.isArray(v)) return v.map(visit);
+      if (t === 'object') {
+        const obj = v as Record<string, unknown>;
+        const keys = Object.keys(obj).sort();
+        const out: Record<string, unknown> = {};
+        for (const k of keys) {
+          out[k] = visit(obj[k]);
+        }
+        return out;
+      }
+      return String(v);
+    };
+
+    try {
+      return JSON.stringify(visit(value));
+    } catch {
+      return '"<unstringifiable>"';
+    }
+  }
+
+  private hashToolArgs(args: unknown): string {
+    const payload = this.stableStringify(args);
+    return createHash('sha256').update(payload).digest('hex').slice(0, 16);
+  }
+
+  private getToolResultStatus(result: unknown): 'success' | 'error' | 'unknown' {
+    if (!result || typeof result !== 'object') return 'unknown';
+    if (!('status' in result)) return 'unknown';
+    const status = (result as Record<string, unknown>).status;
+    if (status === 'success') return 'success';
+    if (status === 'error') return 'error';
+    return 'unknown';
+  }
+
+  private getToolResultCode(result: unknown): string | null {
+    if (!result || typeof result !== 'object') return null;
+    if (!('code' in result)) return null;
+    const code = (result as Record<string, unknown>).code;
+    return typeof code === 'string' ? code : null;
   }
 
   private async sendFinalResponse(tenantId: string, sessionId: string, customerPhone: string, content: string) {

@@ -14,6 +14,13 @@ export interface CreateMessageDto {
   metadata?: Prisma.InputJsonValue;
 }
 
+type AiToolFailureEntry = {
+  count: number;
+  lastAt: string;
+  lastSignatureHash?: string;
+  lastErrorCode?: string;
+};
+
 @Injectable()
 export class ConversationService {
   private readonly logger = new Logger('ConversationService');
@@ -130,5 +137,105 @@ export class ConversationService {
     });
     this.logger.log(`Session ${sessionId} closed.`);
     return session;
+  }
+
+  private asJsonObject(value: unknown): Record<string, unknown> {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+    return {};
+  }
+
+  async recordAiToolFailure(input: {
+    sessionId: string;
+    toolName: string;
+    signatureHash: string;
+    errorCode: string;
+  }): Promise<AiToolFailureEntry> {
+    const session = await this.prisma.chatSession.findUnique({
+      where: { id: input.sessionId },
+      select: { metadata: true },
+    });
+
+    const metadata = this.asJsonObject(session?.metadata);
+    const ai = this.asJsonObject(metadata.ai);
+    const toolFailures = this.asJsonObject(ai.toolFailures);
+    const existing = this.asJsonObject(toolFailures[input.toolName]);
+
+    const count = typeof existing.count === 'number' ? existing.count : 0;
+    const updated: AiToolFailureEntry = {
+      count: count + 1,
+      lastAt: new Date().toISOString(),
+      lastSignatureHash: input.signatureHash,
+      lastErrorCode: input.errorCode,
+    };
+
+    toolFailures[input.toolName] = updated;
+    ai.toolFailures = toolFailures;
+    metadata.ai = ai;
+
+    await this.prisma.chatSession.update({
+      where: { id: input.sessionId },
+      data: { metadata: metadata as Prisma.InputJsonObject },
+    });
+
+    return updated;
+  }
+
+  async clearAiToolFailures(sessionId: string, toolName: string): Promise<void> {
+    const session = await this.prisma.chatSession.findUnique({
+      where: { id: sessionId },
+      select: { metadata: true },
+    });
+
+    const metadata = this.asJsonObject(session?.metadata);
+    const ai = this.asJsonObject(metadata.ai);
+    const toolFailures = this.asJsonObject(ai.toolFailures);
+
+    if (toolFailures[toolName]) {
+      delete toolFailures[toolName];
+      ai.toolFailures = toolFailures;
+      metadata.ai = ai;
+
+      await this.prisma.chatSession.update({
+        where: { id: sessionId },
+        data: { metadata: metadata as Prisma.InputJsonObject },
+      });
+    }
+  }
+
+  async shouldBlockAiToolCall(input: {
+    sessionId: string;
+    toolName: string;
+    signatureHash: string;
+    maxFailures: number;
+    windowMs: number;
+  }): Promise<boolean> {
+    const session = await this.prisma.chatSession.findUnique({
+      where: { id: input.sessionId },
+      select: { metadata: true },
+    });
+
+    const metadata = this.asJsonObject(session?.metadata);
+    const ai = this.asJsonObject(metadata.ai);
+    const toolFailures = this.asJsonObject(ai.toolFailures);
+    const entry = this.asJsonObject(toolFailures[input.toolName]);
+
+    const count = typeof entry.count === 'number' ? entry.count : 0;
+    const lastAt = typeof entry.lastAt === 'string' ? entry.lastAt : null;
+    const lastSignatureHash = typeof entry.lastSignatureHash === 'string' ? entry.lastSignatureHash : null;
+
+    if (!lastAt || !lastSignatureHash) {
+      return false;
+    }
+
+    const lastAtMs = Date.parse(lastAt);
+    if (!Number.isFinite(lastAtMs)) {
+      return false;
+    }
+
+    const withinWindow = Date.now() - lastAtMs <= input.windowMs;
+    const sameSignature = lastSignatureHash === input.signatureHash;
+    return withinWindow && sameSignature && count >= input.maxFailures;
   }
 }
