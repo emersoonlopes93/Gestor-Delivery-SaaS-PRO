@@ -46,6 +46,15 @@ export class DriversController {
     return this.driversService.updateDriver(req.user.tenantId, id, data);
   }
 
+  @Post(':id/reset-pin')
+  @RequirePermissions('delivery.manage_drivers')
+  async resetPin(
+    @Request() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
+    return this.driversService.resetDriverPin(req.user.tenantId, id);
+  }
+
   @Post(':id/location')
   @RequirePermissions('delivery.dispatch', 'delivery.manage_drivers')
   async updateLocation(

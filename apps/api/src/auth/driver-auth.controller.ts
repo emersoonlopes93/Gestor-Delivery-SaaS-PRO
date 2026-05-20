@@ -17,7 +17,7 @@ export class DriverAuthController {
 
   @Post('login')
   async login(@Body() body: DriverLoginRequest) {
-    return this.driverAuthService.login(body.phone, body.pin);
+    return this.driverAuthService.login(body.phone, body.pin, body.tenantSlug);
   }
 
   @Post('refresh')

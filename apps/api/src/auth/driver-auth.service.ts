@@ -20,38 +20,45 @@ export class DriverAuthService {
   ) {}
 
   /**
-   * Authenticate a driver by phone + PIN.
+   * Authenticate a driver by phone + PIN + tenantSlug.
    */
-  async login(phone: string, pin: string) {
-    this.logger.debug(`Login attempt for driver phone: ${phone}`);
+  async login(phone: string, pin: string, tenantSlug: string) {
+    this.logger.debug(`Login attempt for driver phone: ${phone} in tenant: ${tenantSlug}`);
 
-    const driver = await this.prisma.deliveryDriver.findFirst({
-      where: { phone },
+    const normalizedPhone = phone.replace(/\D/g, '');
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+    });
+
+    if (!tenant) {
+      this.logger.warn(`Login failed: Tenant not found with slug: ${tenantSlug}`);
+      throw new UnauthorizedException('Credenciais inválidas.');
+    }
+
+    const driver = await this.prisma.deliveryDriver.findUnique({
+      where: {
+        tenantId_phone: {
+          tenantId: tenant.id,
+          phone: normalizedPhone,
+        },
+      },
       include: {
         tenant: true,
       },
     });
 
     if (!driver || !driver.isActive) {
-      this.logger.warn(`Login failed: Driver not found or inactive for phone: ${phone}`);
-      throw new UnauthorizedException('Credenciais inválidas ou motorista inativo.');
+      this.logger.warn(`Login failed: Driver not found or inactive for phone: ${normalizedPhone} in tenant: ${tenant.id}`);
+      throw new UnauthorizedException('Credenciais inválidas.');
     }
 
     if (!driver.pin) {
-      this.logger.warn(`Login failed: Driver has no PIN set: ${phone}`);
-      throw new UnauthorizedException('Acesso negado. PIN não configurado para este entregador.');
+      this.logger.warn(`Login failed: Driver has no PIN set: ${normalizedPhone}`);
+      throw new UnauthorizedException('Credenciais inválidas.');
     }
 
-    // Usually, you should use bcrypt to verify a pinned hash.
-    // For raw backwards-compatibility or easy testing we accept plain or bcrypt.
-    let isPinValid = false;
-    
-    // Check if it's a hash or plain string
-    if (driver.pin.startsWith('$2a$') || driver.pin.startsWith('$2b$')) {
-      isPinValid = await bcrypt.compare(pin, driver.pin);
-    } else {
-      isPinValid = (pin === driver.pin);
-    }
+    const isPinValid = await bcrypt.compare(pin, driver.pin);
 
     if (!isPinValid) {
       throw new UnauthorizedException('Credenciais inválidas.');

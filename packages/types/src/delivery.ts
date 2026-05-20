@@ -62,4 +62,5 @@ export interface DriverDTO {
   lastLocationAt?: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
+  pin?: string; // Temporário para exibir uma vez após criação/reset
 }

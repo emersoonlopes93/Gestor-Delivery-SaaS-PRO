@@ -932,6 +932,7 @@ model DeliveryDriver {
   tenant         Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orders         Order[]
 
+  @@unique([tenantId, phone])
   @@index([tenantId])
   @@map("delivery_drivers")
 }

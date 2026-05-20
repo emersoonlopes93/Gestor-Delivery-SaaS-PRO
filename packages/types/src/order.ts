@@ -335,6 +335,9 @@ export interface OrderBoardItemDTO {
   itemsSummary: string; // Ex: "1x Pizza Calabresa, 2x Coca Cola"
   sourceChannel?: string;
   createdAt: string;
+  deliveryDriverId?: string;
+  deliveryDriverName?: string;
+  deliveryDriverStatus?: string;
 }
 
 export interface OrderKdsItemDTO {

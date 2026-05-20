@@ -564,6 +564,7 @@ export class OrdersService {
       },
       include: {
         items: true,
+        deliveryDriver: true,
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -579,6 +580,9 @@ export class OrdersService {
       itemsSummary: o.items.map((i) => `${i.quantity}x ${i.snapshotName}`).join(', '),
       sourceChannel: o.sourceChannel,
       createdAt: o.createdAt.toISOString(),
+      deliveryDriverId: o.deliveryDriverId || undefined,
+      deliveryDriverName: o.deliveryDriver?.name || undefined,
+      deliveryDriverStatus: o.deliveryDriver?.status || undefined,
     }));
   }
 
@@ -718,9 +722,9 @@ export class OrdersService {
     };
   }
 
-  async updateOrderStatus(id: string, tenantId: string, dto: UpdateOrderStatusDTO) {
+  async updateOrderStatus(orderId: string, tenantId: string, dto: UpdateOrderStatusDTO, actorId?: string) {
     const order = await this.prisma.order.findFirst({
-      where: { id, tenantId },
+      where: { id: orderId, tenantId },
     });
 
     if (!order) throw new NotFoundException('Pedido não encontrado.');
@@ -734,18 +738,34 @@ export class OrdersService {
       );
     }
 
+    // Validation: if delivery and going out_for_delivery, must have driver
+    if (order.fulfillmentType === 'delivery' && nextStatus === 'out_for_delivery' && !order.deliveryDriverId) {
+      throw new BadRequestException('Não é possível despachar um pedido de entrega sem um entregador atribuído.');
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.order.update({
-        where: { id },
+        where: { id: orderId },
         data: { status: nextStatus },
       });
 
+      // Status side effects
+      if (nextStatus === 'completed' || nextStatus === 'cancelled') {
+        if (order.deliveryDriverId) {
+          await tx.deliveryDriver.update({
+            where: { id: order.deliveryDriverId },
+            data: { status: 'available' },
+          });
+        }
+      }
+
       await tx.orderTimeline.create({
         data: {
-          orderId: id,
+          orderId,
           tenantId,
           status: nextStatus,
-          note: dto.note || `Status atualizado para ${nextStatus}`,
+          note: dto.note || `Status alterado para ${nextStatus}.`,
+          actorId,
         },
       });
 
@@ -759,13 +779,13 @@ export class OrdersService {
         this.ordersGateway.emitOrderStatusUpdated(order.publicTrackingToken || '', order.orderNumber, OrderStatus.cancelled, dto.note);
         // Também emitimos para o tenant room caso o painel administrativo queira ouvir por lá
         this.ordersGateway.server.to(`tenant:${tenantId}`).emit('orderCancelled', { 
-          orderId: id, 
+          orderId, 
           orderNumber: order.orderNumber 
         });
 
         // Reverter estoque teórico
-        await this.inventoryService.reverseOrderDepletion(tenantId, id).catch(e => {
-          this.logger.error(`Erro ao reverter estoque para pedido cancelado ${id}: ${e.message}`);
+        await this.inventoryService.reverseOrderDepletion(tenantId, orderId).catch(e => {
+          this.logger.error(`Erro ao reverter estoque para pedido cancelado ${orderId}: ${e.message}`);
         });
       }
 
@@ -832,11 +852,33 @@ export class OrdersService {
 
     if (!order) throw new NotFoundException('Pedido não encontrado.');
 
+    if (driverId) {
+      const driver = await this.prisma.deliveryDriver.findUnique({
+        where: { id: driverId, tenantId },
+      });
+
+      if (!driver) {
+        throw new BadRequestException('Entregador não encontrado ou não pertence a esta loja.');
+      }
+
+      if (!driver.isActive || driver.status === 'offline') {
+        throw new BadRequestException('O entregador selecionado está offline ou inativo.');
+      }
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.order.update({
         where: { id: orderId },
         data: { deliveryDriverId: driverId },
       });
+
+      // Update driver status if needed
+      if (driverId) {
+        await tx.deliveryDriver.update({
+          where: { id: driverId },
+          data: { status: 'busy' },
+        });
+      }
 
       await tx.orderTimeline.create({
         data: {

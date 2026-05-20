@@ -140,6 +140,7 @@ export interface CustomerLoginResponse {
 export interface DriverLoginRequest {
   phone: string;
   pin: string; // Senha ou PIN de 4/6 dígitos usado por entregadores
+  tenantSlug: string; // Necessário para multi-tenant aware login
 }
 
 /** Driver Login Response */

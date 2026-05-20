@@ -62,6 +62,12 @@ export class DriverOperationsController {
       data: { status: 'completed' }
     });
 
+    // Back to available
+    await this.prisma.deliveryDriver.update({
+      where: { id: user.id },
+      data: { status: 'available' }
+    });
+
     return updatedOrder;
   }
 }

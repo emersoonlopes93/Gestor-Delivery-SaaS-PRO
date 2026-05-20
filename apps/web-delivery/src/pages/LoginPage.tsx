@@ -1,17 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Lock, Phone } from 'lucide-react';
+import { Package, Lock, Phone, Globe } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 
 export function LoginPage() {
   const [phone, setPhone] = useState('');
   const [pin, setPin] = useState('');
+  const [tenantSlug, setTenantSlug] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
+
+  // Auto-detect tenant slug from subdomain if present
+  useEffect(() => {
+    const hostname = window.location.hostname;
+    const parts = hostname.split('.');
+    if (parts.length > 2 && parts[0] !== 'www') {
+      setTenantSlug(parts[0]);
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,7 +29,11 @@ export function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await api.post('/auth/driver/login', { phone, pin });
+      const response = await api.post('/auth/driver/login', { 
+        phone, 
+        pin,
+        tenantSlug 
+      });
       const { accessToken, refreshToken, driver } = response.data;
       
       setAuth(accessToken, refreshToken, driver);
@@ -54,6 +68,23 @@ export function LoginPage() {
           )}
 
           <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Identificador da Loja (Slug)</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Globe className="h-5 w-5 text-slate-400" />
+              </div>
+              <input
+                type="text"
+                required
+                className="w-full pl-10 pr-3 py-3 rounded-xl border border-slate-200 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                placeholder="ex: pizzaria-do-joao"
+                value={tenantSlug}
+                onChange={(e) => setTenantSlug(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -71,7 +102,7 @@ export function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">PIN / Senha</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">PIN / Código de Acesso</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Lock className="h-5 w-5 text-slate-400" />

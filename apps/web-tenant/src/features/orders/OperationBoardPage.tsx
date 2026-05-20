@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Clock, ArrowRight, LayoutGrid, Package, Truck } from 'lucide-react';
-import type { OrderBoardItemDTO, OrderStatus, UpdateOrderStatusDTO } from '@gestor/types';
+import { RefreshCw, Clock, ArrowRight, LayoutGrid, Package, Truck, User, X } from 'lucide-react';
+import type { OrderBoardItemDTO, OrderStatus, UpdateOrderStatusDTO, DriverDTO } from '@gestor/types';
 import { api, ApiError } from '../../lib/api-client';
 
 /* ─── Labels ────────────────────────────────────────────────── */
@@ -24,6 +24,79 @@ const CHANNEL_LABELS: Record<string, string> = {
   whatsapp: 'WhatsApp',
   ifood: 'iFood',
 };
+
+/* ─── Driver Selection Modal ────────────────────────────────── */
+
+const DriverSelectionModal = memo(function DriverSelectionModal(props: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelect: (driverId: string) => void;
+  drivers: DriverDTO[];
+  isSubmitting: boolean;
+}) {
+  const { isOpen, onClose, onSelect, drivers, isSubmitting } = props;
+
+  if (!isOpen) return null;
+
+  const availableDrivers = drivers.filter(d => d.isActive && d.status === 'available');
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800">
+        <header className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
+          <div>
+            <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Atribuir Entregador</h2>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">Selecione quem fará a entrega</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors">
+            <X className="w-5 h-5 text-slate-500" />
+          </button>
+        </header>
+
+        <div className="p-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+          {availableDrivers.length === 0 ? (
+            <div className="py-10 text-center">
+              <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <User className="w-6 h-6 text-slate-400" />
+              </div>
+              <p className="text-sm font-bold text-slate-900 dark:text-white">Nenhum entregador disponível</p>
+              <p className="text-xs text-slate-500 mt-1 px-6">Todos os entregadores estão offline ou ocupados no momento.</p>
+            </div>
+          ) : (
+            <div className="grid gap-2">
+              {availableDrivers.map((d) => (
+                <button
+                  key={d.id}
+                  disabled={isSubmitting}
+                  onClick={() => onSelect(d.id)}
+                  className="flex items-center gap-4 p-4 rounded-2xl hover:bg-primary-50 dark:hover:bg-primary-900/20 border border-transparent hover:border-primary-100 dark:hover:border-primary-800 transition-all text-left active:scale-[0.98] group"
+                >
+                  <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/40 text-primary-600 rounded-xl flex items-center justify-center font-black group-hover:bg-primary-600 group-hover:text-white transition-colors">
+                    {d.name.substring(0, 1).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-slate-900 dark:text-white truncate">{d.name}</p>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">{d.vehicleType}</p>
+                  </div>
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <footer className="p-4 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-100 dark:border-slate-800">
+          <button
+            onClick={onClose}
+            className="w-full py-3 text-sm font-black text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors uppercase tracking-widest"
+          >
+            Cancelar
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+});
 
 /* ─── Badge de status — usa classes do design system ────────── */
 
@@ -219,6 +292,21 @@ const OrderCard = memo(function OrderCard(props: {
           </div>
         </div>
 
+        {/* Linha 3: Entregador (Se houver) */}
+        {order.fulfillmentType === 'delivery' && (
+          <div className="mt-2.5 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold">
+            <div className={`shrink-0 w-5 h-5 rounded-md flex items-center justify-center ${order.deliveryDriverName ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400' : 'bg-slate-100 text-slate-400 dark:bg-slate-800'}`}>
+              <User className="w-3 h-3" />
+            </div>
+            <span className={order.deliveryDriverName ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 italic'}>
+              {order.deliveryDriverName || 'Sem entregador atribuído'}
+            </span>
+            {order.deliveryDriverStatus === 'busy' && (
+              <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50" title="Entregador em rota" />
+            )}
+          </div>
+        )}
+
         {/* Resumo de itens (apenas modo standard) */}
         {!compact && (
           <div
@@ -342,6 +430,10 @@ export function OperationBoardPage() {
   const [viewMode, setViewMode] = useState<BoardViewMode>('standard');
   const [activeColumn, setActiveColumn] = useState<KanbanColumnSpec['id']>('entry');
 
+  const [drivers, setDrivers] = useState<DriverDTO[]>([]);
+  const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
+  const [orderToDispatch, setOrderToDispatch] = useState<string | null>(null);
+
   const fetchBoard = useCallback(async () => {
     try {
       const res = await api.get<OrderBoardItemDTO[]>('/orders/operation/board');
@@ -357,25 +449,63 @@ export function OperationBoardPage() {
     }
   }, []);
 
+  const fetchDrivers = useCallback(async () => {
+    try {
+      const res = await api.get<DriverDTO[]>('/delivery/drivers');
+      setDrivers(res.data || []);
+    } catch (err) {
+      console.error('[OperationBoardPage] Erro ao buscar entregadores:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchBoard();
-    const interval = setInterval(fetchBoard, 15000);
+    fetchDrivers();
+    const interval = setInterval(() => {
+      fetchBoard();
+      fetchDrivers();
+    }, 15000);
     return () => clearInterval(interval);
-  }, [fetchBoard]);
+  }, [fetchBoard, fetchDrivers]);
 
-  const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus) => {
+  const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus, driverId?: string) => {
     if (updatingId) return;
+    
+    // If delivery and going to out_for_delivery, check if driver is assigned
+    if (newStatus === 'out_for_delivery') {
+      const order = orders.find(o => o.id === orderId);
+      if (order?.fulfillmentType === 'delivery' && !order.deliveryDriverId && !driverId) {
+        setOrderToDispatch(orderId);
+        setIsDriverModalOpen(true);
+        return;
+      }
+    }
+
     setUpdatingId(orderId);
     try {
+      if (driverId) {
+        await api.post(`/orders/${orderId}/assign-driver`, { driverId });
+      }
+
       const body: UpdateOrderStatusDTO = { status: newStatus };
       const res = await api.patch(`/orders/${orderId}/status`, body);
       if (res.success) {
         await fetchBoard();
+        setIsDriverModalOpen(false);
+        setOrderToDispatch(null);
       }
     } catch (err) {
       console.error('[OperationBoardPage] Erro ao atualizar status:', err);
+      const msg = err instanceof ApiError ? err.message : 'Erro ao atualizar pedido';
+      alert(msg);
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const handleDriverSelect = (driverId: string) => {
+    if (orderToDispatch) {
+      handleStatusUpdate(orderToDispatch, 'out_for_delivery', driverId);
     }
   };
 
@@ -572,6 +702,17 @@ export function OperationBoardPage() {
           </div>
         </div>
       )}
+
+      <DriverSelectionModal
+        isOpen={isDriverModalOpen}
+        onClose={() => {
+          setIsDriverModalOpen(false);
+          setOrderToDispatch(null);
+        }}
+        onSelect={handleDriverSelect}
+        drivers={drivers}
+        isSubmitting={!!updatingId}
+      />
     </div>
   );
 }

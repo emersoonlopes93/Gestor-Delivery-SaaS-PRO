@@ -43,6 +43,16 @@ export function useDrivers() {
     },
   });
 
+  const resetPin = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.post(`/delivery/drivers/${id}/reset-pin`);
+      return res.data as DriverDTO;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['drivers'] });
+    },
+  });
+
   return {
     drivers: query.data || [],
     isLoading: query.isLoading,
@@ -50,5 +60,6 @@ export function useDrivers() {
     createDriver: createDriver.mutateAsync,
     updateDriver: (id: string, payload: UpdateDriverDTO) => updateDriver.mutateAsync({ id, payload }),
     deleteDriver: deleteDriver.mutateAsync,
+    resetPin: resetPin.mutateAsync,
   };
 }
