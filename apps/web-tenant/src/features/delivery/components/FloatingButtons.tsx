@@ -1,5 +1,5 @@
 import React from 'react';
-import { Crosshair, Plus, Target, Save, X } from 'lucide-react';
+import { Crosshair, Plus, Target } from 'lucide-react';
 
 interface FloatingButtonsProps {
   onCenterStore: () => void;

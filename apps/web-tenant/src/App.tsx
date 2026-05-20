@@ -20,7 +20,7 @@ import { OperationBoardPage } from './features/orders/OperationBoardPage';
 import { KdsPage } from './features/orders/KdsPage';
 import { DriversListPage } from './features/delivery/DriversListPage';
 import { DispatchPage } from './features/delivery/DispatchPage';
-import { DeliveryZonesPage } from './features/delivery/DeliveryZonesPage';
+import { DeliveryZonesPageRefactored } from './features/delivery/DeliveryZonesPageRefactored';
 import { DeliveryMapPage } from './features/delivery/DeliveryMapPage';
 import CashPage from './features/cash/CashPage';
 import PosPage from './features/pos/PosPage';
@@ -212,7 +212,7 @@ export function App() {
           path="/delivery/rates"
           element={
             <PermissionGate permission="delivery.manage">
-              <DeliveryZonesPage />
+              <DeliveryZonesPageRefactored />
             </PermissionGate>
           }
         />
