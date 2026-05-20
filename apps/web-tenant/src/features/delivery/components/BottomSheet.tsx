@@ -7,8 +7,9 @@ interface BottomSheetProps {
   defaultState?: BottomSheetState;
   minHeight?: number;
   peekHeight?: number;
-  maxHeight?: number;
+  maxHeight?: number | string;
   onStateChange?: (state: BottomSheetState) => void;
+  forceState?: BottomSheetState;
 }
 
 export const BottomSheet: React.FC<BottomSheetProps> = ({
@@ -18,7 +19,15 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   peekHeight = 200,
   maxHeight = 500,
   onStateChange,
+  forceState,
 }) => {
+  const getMaxHeight = useCallback(() => {
+    if (typeof maxHeight === 'string' && maxHeight.endsWith('vh')) {
+      return (window.innerHeight * parseInt(maxHeight, 10)) / 100;
+    }
+    return Number(maxHeight) || 500;
+  }, [maxHeight]);
+
   const [state, setState] = useState<BottomSheetState>(defaultState);
   const [currentHeight, setCurrentHeight] = useState(minHeight);
   const [startY, setStartY] = useState(0);
@@ -26,15 +35,22 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   const sheetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (forceState) {
+      setState(forceState);
+    }
+  }, [forceState]);
+
+  useEffect(() => {
     let targetHeight = minHeight;
     if (state === 'peeking') targetHeight = peekHeight;
-    if (state === 'expanded') targetHeight = maxHeight;
+    if (state === 'expanded') targetHeight = getMaxHeight();
     setCurrentHeight(targetHeight);
     onStateChange?.(state);
-  }, [state, minHeight, peekHeight, maxHeight, onStateChange]);
+  }, [state, minHeight, peekHeight, getMaxHeight, onStateChange]);
 
   const getStateFromHeight = (height: number): BottomSheetState => {
-    const midPeekExpanded = (peekHeight + maxHeight) / 2;
+    const mh = getMaxHeight();
+    const midPeekExpanded = (peekHeight + mh) / 2;
     const midCollapsedPeek = (minHeight + peekHeight) / 2;
     if (height > midPeekExpanded) return 'expanded';
     if (height > midCollapsedPeek) return 'peeking';
@@ -47,12 +63,13 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   };
 
   const handleTouchMove = useCallback((e: TouchEvent) => {
+    const mh = getMaxHeight();
     const deltaY = startY - e.touches[0].clientY;
     let newHeight = startHeight + deltaY;
     if (newHeight < minHeight) newHeight = minHeight;
-    if (newHeight > maxHeight) newHeight = maxHeight;
+    if (newHeight > mh) newHeight = mh;
     setCurrentHeight(newHeight);
-  }, [startY, startHeight, minHeight, maxHeight]);
+  }, [startY, startHeight, minHeight, getMaxHeight]);
 
   const handleTouchEnd = useCallback(() => {
     const newState = getStateFromHeight(currentHeight);
@@ -74,7 +91,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   return (
     <div
       ref={sheetRef}
-      className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-40 flex flex-col"
+      className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-[1000] flex flex-col"
       style={{
         height: currentHeight,
         transition: 'height 0.3s cubic-bezier(0.25, 1, 0.5, 1)',

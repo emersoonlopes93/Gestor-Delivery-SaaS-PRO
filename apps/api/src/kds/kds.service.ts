@@ -6,6 +6,7 @@ import {
   Order, 
   OrderItem, 
   PrintJob, 
+  Customer,
   PrintJobStatus as PrismaPrintJobStatus,
   PrintType as PrismaPrintType
 } from '@prisma/client';
@@ -30,7 +31,7 @@ type OrderWithItems = Order & {
 type PrintJobWithOrder = PrintJob & {
   order: Order & {
     items: OrderItem[];
-    customer: Record<string, unknown> | null;
+    customer: Customer | null;
   };
 };
 
@@ -129,7 +130,7 @@ export class KdsService {
     };
 
     if (status) {
-      where.status = status as string as PrismaPrintJobStatus; // Compatibilidade de string entre enums DTO e Prisma
+      where.status = mapPrintJobStatus(status);
     }
 
     const [items, total] = await Promise.all([
@@ -155,7 +156,7 @@ export class KdsService {
     // Usando cast seguro via narrowing estrutural se necessário, mas aqui o Prisma já retorna o formato esperado
     // pelo tipo PrintJobWithOrder definido localmente.
     return {
-      items: items as unknown as PrintJobWithOrder[],
+      items,
       total,
       page,
       limit,
@@ -260,7 +261,7 @@ export class KdsService {
         tenantId,
         orderId: data.orderId,
         station: data.station || 'GERAL',
-        type: (data.type || PrintType.kitchen) as string as PrismaPrintType, // Mapeamento de enum DTO para Prisma via string
+        type: mapPrintType(data.type || PrintType.kitchen),
         content: data.content,
         status: PrismaPrintJobStatus.pending,
       },
@@ -510,4 +511,23 @@ export class KdsService {
 
     return Promise.all(jobs);
   }
+}
+
+function mapPrintJobStatus(status: PrintJobStatus): PrismaPrintJobStatus {
+  const mapping: Record<PrintJobStatus, PrismaPrintJobStatus> = {
+    [PrintJobStatus.pending]: PrismaPrintJobStatus.pending,
+    [PrintJobStatus.printing]: PrismaPrintJobStatus.printing,
+    [PrintJobStatus.completed]: PrismaPrintJobStatus.completed,
+    [PrintJobStatus.failed]: PrismaPrintJobStatus.failed,
+  };
+  return mapping[status];
+}
+
+function mapPrintType(type: PrintType): PrismaPrintType {
+  const mapping: Record<PrintType, PrismaPrintType> = {
+    [PrintType.kitchen]: PrismaPrintType.kitchen,
+    [PrintType.customer]: PrismaPrintType.customer,
+    [PrintType.summary]: PrismaPrintType.summary,
+  };
+  return mapping[type];
 }

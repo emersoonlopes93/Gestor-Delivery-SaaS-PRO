@@ -65,6 +65,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Check No Any (Type Safety)
+        run: pnpm check:no-any
+
       - name: Generate Prisma Client
         run: pnpm db:generate
 

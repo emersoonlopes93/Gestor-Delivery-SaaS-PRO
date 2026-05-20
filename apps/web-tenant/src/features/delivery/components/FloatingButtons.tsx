@@ -17,7 +17,7 @@ export const FloatingButtons: React.FC<FloatingButtonsProps> = ({
   editorOpen,
 }) => {
   return (
-    <div className="lg:hidden absolute bottom-32 right-4 flex flex-col gap-3 z-30">
+    <div className="lg:hidden absolute bottom-32 right-4 flex flex-col gap-3 z-[500]">
       <button
         onClick={onCenterStore}
         className="w-12 h-12 rounded-full bg-white dark:bg-gray-900 shadow-lg border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-800 dark:text-gray-100 hover:scale-105 transition-transform active:scale-95"

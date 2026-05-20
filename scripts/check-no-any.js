@@ -41,7 +41,6 @@ const targetDirs = [
 // Or: { 'relative/path/to/file.ts': 'all' }
 // Use apenas para exceções técnicas inevitáveis ou código legado em transição.
 const allowlist = {
-  'apps/api/src/kds/kds.service.ts': [132, 158, 263], // Mapeamento de enums string-compatíveis entre DTO e Prisma
   'apps/web-tenant/src/lib/leaflet-draw-helper.ts': [30], // Narrowing centralizado para Leaflet.DrawMap
   'apps/web-storefront/src/lib/window-helper.ts': [9, 17, 28], // Manipulação isolada do objeto window para integrações externas
 };

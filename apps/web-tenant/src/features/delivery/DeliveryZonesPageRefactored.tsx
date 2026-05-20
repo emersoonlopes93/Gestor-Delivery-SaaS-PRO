@@ -906,6 +906,257 @@ export function DeliveryZonesPageRefactored() {
     [coverage?.storeLat, coverage?.storeLng, coverage?.tenantId],
   );
 
+  const renderEditorForm = (isMobile: boolean) => (
+    <div className={isMobile ? 'flex flex-col h-full' : ''}>
+      {!isMobile && (
+        <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-sm font-black text-gray-900 dark:text-gray-100">
+              {zoneForm.id ? 'Editar zona' : 'Nova zona'}
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              {drawMode === 'drawing'
+                ? 'Desenhe no mapa e depois complete os detalhes aqui.'
+                : 'Ajuste os detalhes e salve.'}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={closeEditor}
+            className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+            title="Fechar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {isMobile && (
+        <div className="mb-4">
+          <h2 className="text-xl font-black text-gray-900 dark:text-gray-100">
+            {zoneForm.id ? 'Editar zona' : 'Nova zona'}
+          </h2>
+          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            {drawMode === 'drawing'
+              ? 'Desenhe no mapa e depois complete os detalhes aqui.'
+              : 'Ajuste os detalhes e salve.'}
+          </div>
+        </div>
+      )}
+
+      <div className={isMobile ? 'space-y-4 pb-4' : 'p-4 space-y-4 max-h-[calc(100vh-120px)] overflow-auto'}>
+        <div>
+          <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            Nome
+          </label>
+          <input
+            value={zoneForm.name}
+            onChange={(e) => setZoneForm((z) => ({ ...z, name: e.target.value }))}
+            className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            placeholder="Ex: Centro, Condomínios, Área restrita"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Cor
+            </label>
+            <input
+              type="color"
+              value={zoneForm.color}
+              onChange={(e) => setZoneForm((z) => ({ ...z, color: e.target.value }))}
+              className="mt-1 w-full h-10 px-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Prioridade
+            </label>
+            <input
+              type="number"
+              min={0}
+              value={zoneForm.priority}
+              onChange={(e) => setZoneForm((z) => ({ ...z, priority: Number(e.target.value) }))}
+              className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Tipo
+            </label>
+            <select
+              value={zoneForm.zoneKind}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === 'blocked_zone' || v === 'custom_zone') {
+                  setZoneForm((z) => ({ ...z, zoneKind: v }));
+                }
+              }}
+              className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            >
+              <option value="blocked_zone">Área bloqueada</option>
+              <option value="custom_zone">Zona personalizada</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Status
+            </label>
+            <button
+              type="button"
+              onClick={() => setZoneForm((z) => ({ ...z, isActive: !z.isActive }))}
+              className={
+                'mt-1 w-full h-10 px-3 rounded-lg border text-sm font-black inline-flex items-center justify-center gap-2 ' +
+                (zoneForm.isActive
+                  ? 'border-green-200 bg-green-50 text-green-800'
+                  : 'border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 text-gray-700 dark:text-gray-300')
+              }
+            >
+              {zoneForm.isActive ? 'Ativa' : 'Inativa'}
+            </button>
+          </div>
+        </div>
+
+        {zoneForm.zoneKind !== 'blocked_zone' ? (
+          <div>
+            <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Política de cobrança
+            </label>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {([
+                { mode: 'fixed' as const, label: 'Fixa' },
+                { mode: 'distance' as const, label: 'Por km' },
+                { mode: 'free' as const, label: 'Grátis' },
+              ] as const).map((o) => (
+                <button
+                  key={o.mode}
+                  type="button"
+                  onClick={() => setZoneForm((z) => ({ ...z, pricingMode: o.mode }))}
+                  className={
+                    'h-10 rounded-lg border text-sm font-black transition-colors ' +
+                    (zoneForm.pricingMode === o.mode
+                      ? 'border-primary-300 bg-primary-50 text-primary-800'
+                      : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800')
+                  }
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+            Esta zona bloqueia entregas. Campos de cobrança ficam ocultos.
+          </div>
+        )}
+
+        {zoneForm.zoneKind !== 'blocked_zone' && zoneForm.pricingMode === 'fixed' ? (
+          <div>
+            <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Valor fixo (R$)
+            </label>
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              value={zoneForm.fixedFee ?? ''}
+              onChange={(e) =>
+                setZoneForm((z) => ({
+                  ...z,
+                  fixedFee: e.target.value.trim() === '' ? null : Number(e.target.value),
+                }))
+              }
+              className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+              placeholder="0,00"
+            />
+          </div>
+        ) : null}
+
+        {zoneForm.zoneKind !== 'blocked_zone' && zoneForm.pricingMode === 'distance' ? (
+          <div>
+            <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Valor por km (R$)
+            </label>
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              value={zoneForm.pricePerKm ?? ''}
+              onChange={(e) =>
+                setZoneForm((z) => ({
+                  ...z,
+                  pricePerKm: e.target.value.trim() === '' ? null : Number(e.target.value),
+                }))
+              }
+              className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+              placeholder="0,00"
+            />
+          </div>
+        ) : null}
+
+        {zoneForm.zoneKind !== 'blocked_zone' && zoneForm.pricingMode === 'free' ? (
+          <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-800">
+            Entrega grátis nesta zona.
+          </div>
+        ) : null}
+
+        <div className="rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 p-3">
+          <div className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            Resumo
+          </div>
+          <div className="mt-2 text-sm text-gray-900 dark:text-gray-100 font-semibold">
+            {zoneForm.zoneKind === 'blocked_zone'
+              ? 'Bloqueia entrega'
+              : zoneForm.pricingMode === 'free'
+                ? 'Entrega grátis'
+                : zoneForm.pricingMode === 'distance'
+                  ? `Cobrança por km: ${fmtMoney(zoneForm.pricePerKm)}/km`
+                  : `Cobrança fixa: ${fmtMoney(zoneForm.fixedFee)}`}
+          </div>
+          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Prioridade {zoneForm.priority} • {zoneForm.isActive ? 'Ativa' : 'Inativa'}
+          </div>
+        </div>
+
+        <div className={isMobile ? "sticky bottom-0 bg-white dark:bg-gray-900 pt-4 pb-2 -mx-4 px-4 border-t border-gray-100 dark:border-gray-800 z-10 space-y-3" : "space-y-4"}>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setDrawMode((m) => (m === 'drawing' ? 'idle' : 'drawing'))}
+              className="h-10 px-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 inline-flex items-center gap-2"
+            >
+              <Pencil className="h-4 w-4" />
+              {drawMode === 'drawing' ? 'Parar desenho' : 'Desenhar'}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSaveZone}
+              disabled={savingZone}
+              className="h-10 flex-1 px-3 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-black hover:bg-black dark:hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 shadow-sm"
+            >
+              {savingZone ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={closeEditor}
+            className="h-10 w-full px-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="p-6">
@@ -1424,235 +1675,7 @@ export function DeliveryZonesPageRefactored() {
             className="absolute top-4 right-4 w-[380px] max-w-[calc(100vw-32px)] bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-xl overflow-hidden"
             style={{ zIndex: 2000 }}
           >
-            <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-sm font-black text-gray-900 dark:text-gray-100">
-                  {zoneForm.id ? 'Editar zona' : 'Nova zona'}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  {drawMode === 'drawing'
-                    ? 'Desenhe no mapa e depois complete os detalhes aqui.'
-                    : 'Ajuste os detalhes e salve.'}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={closeEditor}
-                className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
-                title="Fechar"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="p-4 space-y-4 max-h-[calc(100vh-120px)] overflow-auto">
-              <div>
-                <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Nome
-                </label>
-                <input
-                  value={zoneForm.name}
-                  onChange={(e) => setZoneForm((z) => ({ ...z, name: e.target.value }))}
-                  className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  placeholder="Ex: Centro, Condomínios, Área restrita"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Cor
-                  </label>
-                  <input
-                    type="color"
-                    value={zoneForm.color}
-                    onChange={(e) => setZoneForm((z) => ({ ...z, color: e.target.value }))}
-                    className="mt-1 w-full h-10 px-2 rounded-lg border border-gray-200 dark:border-gray-800"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Prioridade
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={zoneForm.priority}
-                    onChange={(e) => setZoneForm((z) => ({ ...z, priority: Number(e.target.value) }))}
-                    className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Tipo
-                  </label>
-                  <select
-                    value={zoneForm.zoneKind}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === 'blocked_zone' || v === 'custom_zone') {
-                        setZoneForm((z) => ({ ...z, zoneKind: v }));
-                      }
-                    }}
-                    className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  >
-                    <option value="blocked_zone">Área bloqueada</option>
-                    <option value="custom_zone">Zona personalizada</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Status
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setZoneForm((z) => ({ ...z, isActive: !z.isActive }))}
-                    className={
-                      'mt-1 w-full h-10 px-3 rounded-lg border text-sm font-black inline-flex items-center justify-center gap-2 ' +
-                      (zoneForm.isActive
-                        ? 'border-green-200 bg-green-50 text-green-800'
-                        : 'border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 text-gray-700 dark:text-gray-300')
-                    }
-                  >
-                    {zoneForm.isActive ? 'Ativa' : 'Inativa'}
-                  </button>
-                </div>
-              </div>
-
-              {zoneForm.zoneKind !== 'blocked_zone' ? (
-                <div>
-                  <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Política de cobrança
-                  </label>
-                  <div className="mt-2 grid grid-cols-3 gap-2">
-                    {([
-                      { mode: 'fixed' as const, label: 'Fixa' },
-                      { mode: 'distance' as const, label: 'Por km' },
-                      { mode: 'free' as const, label: 'Grátis' },
-                    ] as const).map((o) => (
-                      <button
-                        key={o.mode}
-                        type="button"
-                        onClick={() => setZoneForm((z) => ({ ...z, pricingMode: o.mode }))}
-                        className={
-                          'h-10 rounded-lg border text-sm font-black transition-colors ' +
-                          (zoneForm.pricingMode === o.mode
-                            ? 'border-primary-300 bg-primary-50 text-primary-800'
-                            : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800')
-                        }
-                      >
-                        {o.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
-                  Esta zona bloqueia entregas. Campos de cobrança ficam ocultos.
-                </div>
-              )}
-
-              {zoneForm.zoneKind !== 'blocked_zone' && zoneForm.pricingMode === 'fixed' ? (
-                <div>
-                  <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Valor fixo (R$)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    value={zoneForm.fixedFee ?? ''}
-                    onChange={(e) =>
-                      setZoneForm((z) => ({
-                        ...z,
-                        fixedFee: e.target.value.trim() === '' ? null : Number(e.target.value),
-                      }))
-                    }
-                    className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    placeholder="0,00"
-                  />
-                </div>
-              ) : null}
-
-              {zoneForm.zoneKind !== 'blocked_zone' && zoneForm.pricingMode === 'distance' ? (
-                <div>
-                  <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Valor por km (R$)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    value={zoneForm.pricePerKm ?? ''}
-                    onChange={(e) =>
-                      setZoneForm((z) => ({
-                        ...z,
-                        pricePerKm: e.target.value.trim() === '' ? null : Number(e.target.value),
-                      }))
-                    }
-                    className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    placeholder="0,00"
-                  />
-                </div>
-              ) : null}
-
-              {zoneForm.zoneKind !== 'blocked_zone' && zoneForm.pricingMode === 'free' ? (
-                <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-800">
-                  Entrega grátis nesta zona.
-                </div>
-              ) : null}
-
-              <div className="rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 p-3">
-                <div className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Resumo
-                </div>
-                <div className="mt-2 text-sm text-gray-900 dark:text-gray-100 font-semibold">
-                  {zoneForm.zoneKind === 'blocked_zone'
-                    ? 'Bloqueia entrega'
-                    : zoneForm.pricingMode === 'free'
-                      ? 'Entrega grátis'
-                      : zoneForm.pricingMode === 'distance'
-                        ? `Cobrança por km: ${fmtMoney(zoneForm.pricePerKm)}/km`
-                        : `Cobrança fixa: ${fmtMoney(zoneForm.fixedFee)}`}
-                </div>
-                <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Prioridade {zoneForm.priority} • {zoneForm.isActive ? 'Ativa' : 'Inativa'}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDrawMode((m) => (m === 'drawing' ? 'idle' : 'drawing'))}
-                  className="h-10 px-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 inline-flex items-center gap-2"
-                >
-                  <Pencil className="h-4 w-4" />
-                  {drawMode === 'drawing' ? 'Parar desenho' : 'Desenhar/ajustar'}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSaveZone}
-                  disabled={savingZone}
-                  className="h-10 flex-1 px-3 rounded-lg bg-gray-900 text-white text-sm font-black hover:bg-black disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
-                >
-                  {savingZone ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  Salvar zona
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={closeEditor}
-                className="h-10 w-full px-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-              >
-                Cancelar
-              </button>
-            </div>
+            {renderEditorForm(false)}
           </div>
         )}
 
@@ -1781,103 +1804,110 @@ export function DeliveryZonesPageRefactored() {
 
       <BottomSheet
         defaultState="peeking"
+        forceState={editorOpen ? 'expanded' : undefined}
         minHeight={80}
         peekHeight={200}
-        maxHeight={500}
+        maxHeight="85vh"
       >
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl flex items-center justify-between gap-3 mb-4">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" />
-              <span className="text-sm font-medium">{error}</span>
-            </div>
-            <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-
-        <div className="mb-4">
-          <h2 className="text-xl font-black text-gray-900 dark:text-gray-100">Zonas de Entrega</h2>
-        </div>
-
-        {visibleZones.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-              <MapPin className="h-6 w-6 text-gray-400" />
-            </div>
-            <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
-              Nenhuma zona personalizada ainda
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-6">
-              Sua cobertura padrão (raio base) já está funcionando.
-            </div>
-            <button
-              type="button"
-              onClick={openNewZone}
-              className="w-full h-11 px-4 rounded-xl bg-primary-600 text-white text-sm font-black hover:bg-primary-700 transition-all duration-200 shadow-sm inline-flex items-center justify-center gap-2"
-            >
-              <Plus className="h-5 w-5" />
-              Criar primeira zona
-            </button>
-          </div>
+        {editorOpen ? (
+          renderEditorForm(true)
         ) : (
-          <div className="space-y-3">
-            {visibleZones.map((z) => {
-              return (
-                <div
-                  key={z.id}
-                  className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <div
-                          className="w-3.5 h-3.5 rounded-full border border-white shadow-sm"
-                          style={{ backgroundColor: z.color ?? defaultZoneColor() }}
-                        />
-                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-                          {z.name || `Zona ${visibleZones.indexOf(z) + 1}`}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {z.zoneKind === 'blocked_zone' ? 'Bloqueada' : z.pricingMode === 'free' ? 'Grátis' : 'Taxa aplicada'}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedZoneId(z.id);
-                          fitSelectedZone(z.id);
-                        }}
-                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                      >
-                        <Crosshair className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedZoneId(z.id);
-                          setEditorOpen(true);
-                        }}
-                        className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                      >
-                        <Edit2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteZone(z)}
-                        className="p-2 rounded-lg hover:bg-red-50 transition-colors"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </button>
-                    </div>
-                  </div>
+          <>
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl flex items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="text-sm font-medium">{error}</span>
                 </div>
-              );
-            })}
-          </div>
+                <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            <div className="mb-4">
+              <h2 className="text-xl font-black text-gray-900 dark:text-gray-100">Zonas de Entrega</h2>
+            </div>
+
+            {visibleZones.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                  <MapPin className="h-6 w-6 text-gray-400" />
+                </div>
+                <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                  Nenhuma zona personalizada ainda
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-6">
+                  Sua cobertura padrão (raio base) já está funcionando.
+                </div>
+                <button
+                  type="button"
+                  onClick={openNewZone}
+                  className="w-full h-11 px-4 rounded-xl bg-primary-600 text-white text-sm font-black hover:bg-primary-700 transition-all duration-200 shadow-sm inline-flex items-center justify-center gap-2"
+                >
+                  <Plus className="h-5 w-5" />
+                  Criar primeira zona
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {visibleZones.map((z) => {
+                  return (
+                    <div
+                      key={z.id}
+                      className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div
+                              className="w-3.5 h-3.5 rounded-full border border-white shadow-sm"
+                              style={{ backgroundColor: z.color ?? defaultZoneColor() }}
+                            />
+                            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                              {z.name || `Zona ${visibleZones.indexOf(z) + 1}`}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {z.zoneKind === 'blocked_zone' ? 'Bloqueada' : z.pricingMode === 'free' ? 'Grátis' : 'Taxa aplicada'}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedZoneId(z.id);
+                              fitSelectedZone(z.id);
+                            }}
+                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                          >
+                            <Crosshair className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedZoneId(z.id);
+                              setEditorOpen(true);
+                            }}
+                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                          >
+                            <Edit2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteZone(z)}
+                            className="p-2 rounded-lg hover:bg-red-50 transition-colors"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </BottomSheet>
     </div>
