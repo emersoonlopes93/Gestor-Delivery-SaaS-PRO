@@ -10,6 +10,7 @@ interface BottomSheetProps {
   maxHeight?: number | string;
   onStateChange?: (state: BottomSheetState) => void;
   forceState?: BottomSheetState;
+  noPadding?: boolean;
 }
 
 export const BottomSheet: React.FC<BottomSheetProps> = ({
@@ -20,6 +21,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   maxHeight = 500,
   onStateChange,
   forceState,
+  noPadding = false,
 }) => {
   const getMaxHeight = useCallback(() => {
     if (typeof maxHeight === 'string' && maxHeight.endsWith('vh')) {
@@ -109,8 +111,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
           {state === 'collapsed' ? 'Arraste para abrir' : state === 'peeking' ? 'Arraste para expandir' : 'Arraste para recolher'}
         </div>
       </div>
-      <div className="flex-1 overflow-hidden">
-        <div className="h-full overflow-y-auto p-4">
+      <div className="flex-1 overflow-hidden flex flex-col">
+        <div className={`flex-1 overflow-y-auto ${noPadding ? '' : 'p-4'}`}>
           {children}
         </div>
       </div>

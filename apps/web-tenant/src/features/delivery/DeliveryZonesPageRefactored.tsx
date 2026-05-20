@@ -7,7 +7,6 @@ import {
   Ban,
   CheckCircle,
   Crosshair,
-  DollarSign,
   Edit2,
   Loader2,
   MapPin,
@@ -15,7 +14,6 @@ import {
   Plus,
   Target,
   Save,
-  TrendingUp,
   Trash2,
   X,
 } from 'lucide-react';
@@ -208,25 +206,6 @@ function zoneNameById(zones: DeliveryRateRule[], id: string | null): string | nu
   return zone.name && zone.name.trim() !== '' ? zone.name : null;
 }
 
-function Badge(props: { tone: 'gray' | 'red' | 'green' | 'amber' | 'blue'; label: string }) {
-  const { tone, label } = props;
-  const cls =
-    tone === 'red'
-      ? 'bg-red-50 text-red-700 ring-red-200'
-      : tone === 'green'
-        ? 'bg-green-50 text-green-700 ring-green-200'
-        : tone === 'amber'
-          ? 'bg-amber-50 text-amber-800 ring-amber-200'
-          : tone === 'blue'
-            ? 'bg-blue-50 text-blue-700 ring-blue-200'
-            : 'bg-gray-50 dark:bg-gray-900/50 text-gray-700 dark:text-gray-300 ring-gray-200';
-
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-black ring-1 ${cls}`}>
-      {label}
-    </span>
-  );
-}
 
 function SectionHeader(props: { title: string; subtitle?: string; right?: React.ReactNode }) {
   return (
@@ -906,71 +885,56 @@ export function DeliveryZonesPageRefactored() {
     [coverage?.storeLat, coverage?.storeLng, coverage?.tenantId],
   );
 
-  const renderEditorForm = (isMobile: boolean) => (
-    <div className={isMobile ? 'flex flex-col h-full' : ''}>
-      {!isMobile && (
-        <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-sm font-black text-gray-900 dark:text-gray-100">
-              {zoneForm.id ? 'Editar zona' : 'Nova zona'}
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              {drawMode === 'drawing'
-                ? 'Desenhe no mapa e depois complete os detalhes aqui.'
-                : 'Ajuste os detalhes e salve.'}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={closeEditor}
-            className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
-            title="Fechar"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      {isMobile && (
-        <div className="mb-4">
-          <h2 className="text-xl font-black text-gray-900 dark:text-gray-100">
+  const renderEditorForm = () => (
+    <div className="flex flex-col h-full bg-white dark:bg-gray-900">
+      <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-start justify-between gap-3 shrink-0">
+        <div className="min-w-0">
+          <div className="text-lg font-black text-gray-900 dark:text-gray-100">
             {zoneForm.id ? 'Editar zona' : 'Nova zona'}
-          </h2>
-          <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          </div>
+          <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
             {drawMode === 'drawing'
-              ? 'Desenhe no mapa e depois complete os detalhes aqui.'
+              ? 'Desenhe no mapa e depois ajuste os detalhes.'
               : 'Ajuste os detalhes e salve.'}
           </div>
         </div>
-      )}
+        <button
+          type="button"
+          onClick={closeEditor}
+          className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          title="Fechar"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
 
-      <div className={isMobile ? 'space-y-4 pb-4' : 'p-4 space-y-4 max-h-[calc(100vh-120px)] overflow-auto'}>
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
         <div>
-          <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Nome
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+            Nome da zona
           </label>
           <input
             value={zoneForm.name}
             onChange={(e) => setZoneForm((z) => ({ ...z, name: e.target.value }))}
-            className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-            placeholder="Ex: Centro, Condomínios, Área restrita"
+            className="w-full h-11 px-3 rounded-xl border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-all shadow-sm"
+            placeholder="Ex: Centro, Condomínios..."
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Cor
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+              Cor no mapa
             </label>
             <input
               type="color"
               value={zoneForm.color}
               onChange={(e) => setZoneForm((z) => ({ ...z, color: e.target.value }))}
-              className="mt-1 w-full h-10 px-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
+              className="w-full h-11 px-1 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 cursor-pointer shadow-sm"
             />
           </div>
           <div>
-            <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
               Prioridade
             </label>
             <input
@@ -978,15 +942,15 @@ export function DeliveryZonesPageRefactored() {
               min={0}
               value={zoneForm.priority}
               onChange={(e) => setZoneForm((z) => ({ ...z, priority: Number(e.target.value) }))}
-              className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+              className="w-full h-11 px-3 rounded-xl border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-all shadow-sm"
             />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Tipo
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+              Finalidade
             </label>
             <select
               value={zoneForm.zoneKind}
@@ -996,38 +960,38 @@ export function DeliveryZonesPageRefactored() {
                   setZoneForm((z) => ({ ...z, zoneKind: v }));
                 }
               }}
-              className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+              className="w-full h-11 px-3 rounded-xl border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-all shadow-sm"
             >
+              <option value="custom_zone">Zona de entrega</option>
               <option value="blocked_zone">Área bloqueada</option>
-              <option value="custom_zone">Zona personalizada</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
               Status
             </label>
             <button
               type="button"
               onClick={() => setZoneForm((z) => ({ ...z, isActive: !z.isActive }))}
               className={
-                'mt-1 w-full h-10 px-3 rounded-lg border text-sm font-black inline-flex items-center justify-center gap-2 ' +
+                'w-full h-11 px-3 rounded-xl border text-sm font-bold inline-flex items-center justify-center gap-2 transition-all shadow-sm ' +
                 (zoneForm.isActive
-                  ? 'border-green-200 bg-green-50 text-green-800'
-                  : 'border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 text-gray-700 dark:text-gray-300')
+                  ? 'border-green-500 bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400'
+                  : 'border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 text-gray-600 dark:text-gray-400')
               }
             >
-              {zoneForm.isActive ? 'Ativa' : 'Inativa'}
+              {zoneForm.isActive ? 'Ativada' : 'Desativada'}
             </button>
           </div>
         </div>
 
         {zoneForm.zoneKind !== 'blocked_zone' ? (
           <div>
-            <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Política de cobrança
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+              Regra de cobrança
             </label>
-            <div className="mt-2 grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {([
                 { mode: 'fixed' as const, label: 'Fixa' },
                 { mode: 'distance' as const, label: 'Por km' },
@@ -1038,10 +1002,10 @@ export function DeliveryZonesPageRefactored() {
                   type="button"
                   onClick={() => setZoneForm((z) => ({ ...z, pricingMode: o.mode }))}
                   className={
-                    'h-10 rounded-lg border text-sm font-black transition-colors ' +
+                    'h-10 rounded-xl border text-sm font-bold transition-all ' +
                     (zoneForm.pricingMode === o.mode
-                      ? 'border-primary-300 bg-primary-50 text-primary-800'
-                      : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800')
+                      ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-400 shadow-sm'
+                      : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800')
                   }
                 >
                   {o.label}
@@ -1050,15 +1014,19 @@ export function DeliveryZonesPageRefactored() {
             </div>
           </div>
         ) : (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
-            Esta zona bloqueia entregas. Campos de cobrança ficam ocultos.
+          <div className="rounded-xl border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-500/10 p-4 text-sm text-red-800 dark:text-red-400 flex items-center gap-3">
+            <Ban className="h-5 w-5 shrink-0" />
+            <div>
+              <div className="font-bold">Entrega bloqueada</div>
+              <div className="opacity-80">Pedidos com destino a esta área serão negados.</div>
+            </div>
           </div>
         )}
 
         {zoneForm.zoneKind !== 'blocked_zone' && zoneForm.pricingMode === 'fixed' ? (
           <div>
-            <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Valor fixo (R$)
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+              Valor da taxa (R$)
             </label>
             <input
               type="number"
@@ -1071,7 +1039,7 @@ export function DeliveryZonesPageRefactored() {
                   fixedFee: e.target.value.trim() === '' ? null : Number(e.target.value),
                 }))
               }
-              className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+              className="w-full h-11 px-3 rounded-xl border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-all shadow-sm"
               placeholder="0,00"
             />
           </div>
@@ -1079,8 +1047,8 @@ export function DeliveryZonesPageRefactored() {
 
         {zoneForm.zoneKind !== 'blocked_zone' && zoneForm.pricingMode === 'distance' ? (
           <div>
-            <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Valor por km (R$)
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+              Valor por km percorrido (R$)
             </label>
             <input
               type="number"
@@ -1093,66 +1061,56 @@ export function DeliveryZonesPageRefactored() {
                   pricePerKm: e.target.value.trim() === '' ? null : Number(e.target.value),
                 }))
               }
-              className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+              className="w-full h-11 px-3 rounded-xl border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-all shadow-sm"
               placeholder="0,00"
             />
           </div>
         ) : null}
 
         {zoneForm.zoneKind !== 'blocked_zone' && zoneForm.pricingMode === 'free' ? (
-          <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-xs text-green-800">
-            Entrega grátis nesta zona.
+          <div className="rounded-xl border border-green-200 dark:border-green-900/30 bg-green-50 dark:bg-green-500/10 p-4 text-sm text-green-800 dark:text-green-400 flex items-center gap-3">
+            <CheckCircle className="h-5 w-5 shrink-0" />
+            <div>
+              <div className="font-bold">Entrega grátis</div>
+              <div className="opacity-80">Nenhuma taxa será cobrada nesta área.</div>
+            </div>
           </div>
         ) : null}
 
-        <div className="rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 p-3">
-          <div className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-            Resumo
-          </div>
-          <div className="mt-2 text-sm text-gray-900 dark:text-gray-100 font-semibold">
-            {zoneForm.zoneKind === 'blocked_zone'
-              ? 'Bloqueia entrega'
-              : zoneForm.pricingMode === 'free'
-                ? 'Entrega grátis'
-                : zoneForm.pricingMode === 'distance'
-                  ? `Cobrança por km: ${fmtMoney(zoneForm.pricePerKm)}/km`
-                  : `Cobrança fixa: ${fmtMoney(zoneForm.fixedFee)}`}
-          </div>
-          <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Prioridade {zoneForm.priority} • {zoneForm.isActive ? 'Ativa' : 'Inativa'}
-          </div>
-        </div>
+      </div>
 
-        <div className={isMobile ? "sticky bottom-0 bg-white dark:bg-gray-900 pt-4 pb-2 -mx-4 px-4 border-t border-gray-100 dark:border-gray-800 z-10 space-y-3" : "space-y-4"}>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setDrawMode((m) => (m === 'drawing' ? 'idle' : 'drawing'))}
-              className="h-10 px-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 inline-flex items-center gap-2"
-            >
-              <Pencil className="h-4 w-4" />
-              {drawMode === 'drawing' ? 'Parar desenho' : 'Desenhar'}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSaveZone}
-              disabled={savingZone}
-              className="h-10 flex-1 px-3 rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-black hover:bg-black dark:hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 shadow-sm"
-            >
-              {savingZone ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Salvar
-            </button>
-          </div>
+      <div className="shrink-0 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 p-4 space-y-3 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setDrawMode((m) => (m === 'drawing' ? 'idle' : 'drawing'))}
+            className={'h-12 flex-1 rounded-xl text-sm font-black transition-all inline-flex items-center justify-center gap-2 ' +
+              (drawMode === 'drawing'
+                 ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400'
+                 : 'bg-primary-50 text-primary-700 hover:bg-primary-100 dark:bg-primary-500/10 dark:text-primary-400')}
+          >
+            {drawMode === 'drawing' ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+            {drawMode === 'drawing' ? 'Parar desenho' : 'Editar área'}
+          </button>
 
           <button
             type="button"
-            onClick={closeEditor}
-            className="h-10 w-full px-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+            onClick={handleSaveZone}
+            disabled={savingZone}
+            className="h-12 flex-1 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-black hover:bg-black dark:hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 shadow-md transition-all"
           >
-            Cancelar
+            {savingZone ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+            Salvar
           </button>
         </div>
+
+        <button
+          type="button"
+          onClick={closeEditor}
+          className="h-12 w-full rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
+        >
+          Cancelar
+        </button>
       </div>
     </div>
   );
@@ -1169,9 +1127,16 @@ export function DeliveryZonesPageRefactored() {
   }
 
   const renderDesktopContent = () => (
-    <div className="h-full grid grid-cols-1 lg:grid-cols-[420px_1fr]">
-      <div className="h-full border-r border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-auto">
-        <div className="p-6 space-y-6">
+    <div className="h-full flex overflow-hidden bg-gray-50 dark:bg-gray-900/50">
+      <div className="w-[420px] shrink-0 h-full border-r border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex flex-col z-10 shadow-sm relative">
+        <div className="p-6 pb-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
+          <h1 className="text-2xl font-black text-gray-900 dark:text-gray-100">Zonas de Entrega</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Configure seu mapa de entregas.
+          </p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -1184,15 +1149,26 @@ export function DeliveryZonesPageRefactored() {
             </div>
           )}
 
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-black text-gray-900 dark:text-gray-100">Zonas de Entrega</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Defina sua cobertura base e desenhe zonas no mapa.
-              </p>
-            </div>
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={openNewZone}
+              className="h-12 w-full rounded-xl bg-primary-600 text-white text-sm font-black hover:bg-primary-700 transition-all shadow-md inline-flex items-center justify-center gap-2"
+            >
+              <Plus className="h-5 w-5" />
+              Desenhar nova zona
+            </button>
 
-            <div className="flex items-center gap-2">
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setFitToStoreSeq((v) => v + 1)}
+                className="h-10 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 inline-flex items-center justify-center gap-2 transition-all shadow-sm"
+              >
+                <Crosshair className="h-4 w-4" />
+                Localizar loja
+              </button>
+              
               <button
                 type="button"
                 onClick={() => {
@@ -1203,197 +1179,93 @@ export function DeliveryZonesPageRefactored() {
                   });
                 }}
                 className={
-                  'h-10 px-3 rounded-lg border text-sm font-black transition-all duration-200 inline-flex items-center gap-2 ' +
+                  'h-10 rounded-xl border text-sm font-bold transition-all inline-flex items-center justify-center gap-2 shadow-sm ' +
                   (simulationOn
-                    ? 'bg-gray-900 text-white border-gray-900 hover:bg-black'
-                    : 'bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50')
+                    ? 'bg-gray-900 text-white border-gray-900 hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100'
+                    : 'bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800')
                 }
-                title="Clique no mapa para simular"
               >
                 <Target className="h-4 w-4" />
-                Simular entrega
+                Simular CEP
               </button>
-
-              {simulationOn && (simulationPoint || simulationDecision || simulationError) ? (
-                <button
-                  type="button"
-                  onClick={clearSimulation}
-                  className="h-10 px-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 transition-all duration-200"
-                >
-                  Limpar
-                </button>
-              ) : null}
             </div>
           </div>
 
-          <section className="rounded-2xl border border-gray-100 dark:border-gray-800 shadow-md bg-white dark:bg-gray-900 p-6 mt-6">
-            <div className="p-4 border-b border-gray-100 dark:border-gray-800">
-              <SectionHeader
-                title="Configuração rápida"
-                subtitle="Configure em poucos minutos. Isso define sua cobertura base."
-                right={
-                  <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">Entrega</span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCoverageDraft((d) => ({ ...d, isDeliveryEnabled: !d.isDeliveryEnabled }))
-                      }
-                      className={
-                        'relative inline-flex h-6 w-11 items-center rounded-full transition-colors ' +
-                        (coverageDraft.isDeliveryEnabled ? 'bg-primary-600' : 'bg-gray-200')
-                      }
-                      aria-pressed={coverageDraft.isDeliveryEnabled}
-                    >
-                      <span
-                        className={
-                          'inline-block h-5 w-5 transform rounded-full bg-white dark:bg-gray-900 transition-transform ' +
-                          (coverageDraft.isDeliveryEnabled ? 'translate-x-5' : 'translate-x-1')
-                        }
-                      />
-                    </button>
-                  </label>
-                }
-              />
-            </div>
-
-            <div className="p-5 space-y-5">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Raio máximo (km)
-                  </label>
+          <div className="space-y-4">
+            <SectionHeader
+              title="Cobertura Base (Raio)"
+              subtitle="Configuração padrão sem zonas."
+              right={
+                <label className="inline-flex items-center gap-2 cursor-pointer">
                   <input
-                    type="number"
-                    min={0}
-                    step={0.1}
-                    value={coverageDraft.maxRadiusKm}
-                    onChange={(e) => setCoverageDraft((d) => ({ ...d, maxRadiusKm: Number(e.target.value) }))}
-                    className="mt-2 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all duration-200"
+                    type="checkbox"
+                    className="sr-only"
+                    checked={coverageDraft.isDeliveryEnabled}
+                    onChange={() => setCoverageDraft((d) => ({ ...d, isDeliveryEnabled: !d.isDeliveryEnabled }))}
                   />
-                  <div className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
-                    Até onde você entrega na cobertura base.
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Preço por km (R$)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    value={coverageDraft.defaultPricePerKm}
-                    onChange={(e) =>
-                      setCoverageDraft((d) => ({ ...d, defaultPricePerKm: Number(e.target.value) }))
-                    }
-                    className="mt-2 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all duration-200"
-                  />
-                  <div className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">
-                    Valor padrão aplicado dentro do raio.
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Taxa mínima (opcional)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    value={coverageDraft.minimumFee ?? ''}
-                    onChange={(e) =>
-                      setCoverageDraft((d) => ({
-                        ...d,
-                        minimumFee: e.target.value.trim() === '' ? null : Number(e.target.value),
-                      }))
-                    }
-                    className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    placeholder="—"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Taxa máxima (opcional)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    value={coverageDraft.maximumFee ?? ''}
-                    onChange={(e) =>
-                      setCoverageDraft((d) => ({
-                        ...d,
-                        maximumFee: e.target.value.trim() === '' ? null : Number(e.target.value),
-                      }))
-                    }
-                    className="mt-1 w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    placeholder="—"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {coverage ? `Última atualização: ${new Date(coverage.updatedAt).toLocaleString()}` : 'Ainda não configurado'}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleSaveCoverage}
-                  disabled={savingCoverage}
-                  className="h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-black hover:bg-primary-700 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
-                >
-                  {savingCoverage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  Salvar
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900">
-            <div className="p-4 border-b border-gray-100 dark:border-gray-800">
-              <SectionHeader
-                title="Zonas personalizadas"
-                subtitle="Desenhe áreas com regras específicas (ex: entrega grátis, bloqueio, taxa fixa)."
-                right={
-                  <button
-                    type="button"
-                    onClick={openNewZone}
-                    className="h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-black hover:bg-primary-700 transition-all duration-200 shadow-sm inline-flex items-center gap-2"
+                  <div
+                    className={`w-11 h-6 rounded-full transition-colors relative ${coverageDraft.isDeliveryEnabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}
                   >
-                    <Plus className="h-4 w-4" />
-                    Nova zona
-                  </button>
-                }
-              />
-            </div>
+                    <div
+                      className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${coverageDraft.isDeliveryEnabled ? 'translate-x-5' : 'translate-x-0'}`}
+                    />
+                  </div>
+                </label>
+              }
+            />
 
-            <div className="p-5">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                  Raio Max (km)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.1}
+                  value={coverageDraft.maxRadiusKm}
+                  onChange={(e) => setCoverageDraft((d) => ({ ...d, maxRadiusKm: Number(e.target.value) }))}
+                  className="w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                  Preço/km (R$)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={coverageDraft.defaultPricePerKm}
+                  onChange={(e) =>
+                    setCoverageDraft((d) => ({ ...d, defaultPricePerKm: Number(e.target.value) }))
+                  }
+                  className="w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveCoverage}
+              disabled={savingCoverage}
+              className="w-full h-10 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all inline-flex items-center justify-center gap-2"
+            >
+              {savingCoverage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar cobertura base
+            </button>
+          </div>
+
+          <div className="border-t border-gray-100 dark:border-gray-800 pt-6">
+            <SectionHeader
+              title="Zonas Mapeadas"
+              subtitle="Áreas desenhadas com regras exclusivas."
+            />
+            
+            <div className="mt-4">
               {visibleZones.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
-                    <MapPin className="h-8 w-8 text-gray-400" />
-                  </div>
-                  <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                    Nenhuma zona personalizada ainda
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-6 max-w-sm mx-auto">
-                    Sua cobertura padrão (raio base) já está funcionando. Zonas são úteis para criar exceções como
-                    entrega grátis em bairros próximos ou bloquear áreas muito distantes.
-                  </div>
-                  <button
-                    type="button"
-                    onClick={openNewZone}
-                    className="h-10 px-5 rounded-lg bg-primary-600 text-white text-sm font-black hover:bg-primary-700 transition-all duration-200 shadow-sm inline-flex items-center gap-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Desenhar primeira zona
-                  </button>
+                <div className="text-center py-8 rounded-xl border border-dashed border-gray-200 dark:border-gray-800">
+                  <MapPin className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                  <div className="text-sm font-semibold text-gray-500">Sem zonas criadas</div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1403,59 +1275,33 @@ export function DeliveryZonesPageRefactored() {
                     return (
                       <div
                         key={z.id}
-                        className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 ${
+                        className={`p-3 rounded-xl border cursor-pointer transition-all ${
                           isSelected
-                            ? 'border-primary-500 bg-primary-50/50 shadow-sm border-l-4 border-l-primary-500'
+                            ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-500/10 shadow-sm ring-1 ring-primary-500'
                             : isHovered
-                              ? 'border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50'
+                              ? 'border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800'
                               : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'
                         }`}
                         onClick={() => setSelectedZoneId(z.id)}
                         onMouseEnter={() => setHoveredZoneId(z.id)}
                         onMouseLeave={() => setHoveredZoneId(null)}
                       >
-                        <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <div
-                                className="w-3 h-3 rounded-full border border-white shadow-sm"
+                                className="w-3 h-3 rounded-full shrink-0"
                                 style={{ backgroundColor: z.color ?? defaultZoneColor() }}
                               />
-                              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                              <span className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">
                                 {z.name || `Zona ${visibleZones.indexOf(z) + 1}`}
                               </span>
-                              {isSelected && <Badge tone="blue" label="Ativo" />}
                             </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                              <div>
-                                {z.zoneKind === 'blocked_zone' && (
-                                  <span className="inline-flex items-center gap-1">
-                                    <Ban className="h-3 w-3" />
-                                    Entrega bloqueada
-                                  </span>
-                                )}
-                                {z.zoneKind === 'custom_zone' && z.pricingMode === 'free' && (
-                                  <span className="inline-flex items-center gap-1">
-                                    <CheckCircle className="h-3 w-3" />
-                                    Entrega grátis
-                                  </span>
-                                )}
-                                {z.zoneKind === 'custom_zone' && z.pricingMode === 'fixed' && (
-                                  <span className="inline-flex items-center gap-1">
-                                    <DollarSign className="h-3 w-3" />
-                                    Taxa fixa: {fmtMoney(z.fixedFee != null ? Number(z.fixedFee) : null)}
-                                  </span>
-                                )}
-                                {z.zoneKind === 'custom_zone' && z.pricingMode === 'distance' && (
-                                  <span className="inline-flex items-center gap-1">
-                                    <TrendingUp className="h-3 w-3" />
-                                    {fmtMoney(z.pricePerKm != null ? Number(z.pricePerKm) : null)}/km
-                                  </span>
-                                )}
-                              </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {z.zoneKind === 'blocked_zone' ? 'Bloqueada' : z.pricingMode === 'free' ? 'Entrega grátis' : 'Com taxa'}
                             </div>
                           </div>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               type="button"
                               onClick={(e) => {
@@ -1463,9 +1309,9 @@ export function DeliveryZonesPageRefactored() {
                                 setSelectedZoneId(z.id);
                                 setEditorOpen(true);
                               }}
-                              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
                             >
-                              <Edit2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                              <Edit2 className="h-4 w-4" />
                             </button>
                             <button
                               type="button"
@@ -1473,9 +1319,9 @@ export function DeliveryZonesPageRefactored() {
                                 e.stopPropagation();
                                 handleDeleteZone(z);
                               }}
-                              className="p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                              className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"
                             >
-                              <Trash2 className="h-4 w-4 text-red-500" />
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
                         </div>
@@ -1485,10 +1331,6 @@ export function DeliveryZonesPageRefactored() {
                 </div>
               )}
             </div>
-          </section>
-
-          <div className="text-xs text-gray-400">
-            Dica: você pode usar zonas para "exceções" e manter a cobertura base como padrão.
           </div>
         </div>
       </div>
@@ -1671,45 +1513,39 @@ export function DeliveryZonesPageRefactored() {
         </div>
 
         {editorOpen && (
-          <div
-            className="absolute top-4 right-4 w-[380px] max-w-[calc(100vw-32px)] bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-xl overflow-hidden"
-            style={{ zIndex: 2000 }}
-          >
-            {renderEditorForm(false)}
-          </div>
+          <>
+            <div 
+              className="absolute inset-0 bg-gray-900/10 dark:bg-black/30 backdrop-blur-[1px] z-[1900] transition-opacity" 
+              onClick={closeEditor}
+            />
+            <div
+              className="absolute top-0 right-0 h-full w-[400px] bg-white dark:bg-gray-900 shadow-2xl z-[2000] border-l border-gray-200 dark:border-gray-800 flex flex-col transition-transform"
+            >
+              {renderEditorForm()}
+            </div>
+          </>
         )}
 
-        <div className="absolute bottom-4 right-4 z-[1000] pointer-events-none hidden lg:block">
-          <div className="bg-white dark:bg-gray-900/70 backdrop-blur-md border border-gray-200 dark:border-gray-800 rounded-xl shadow-md p-3 space-y-2">
-            <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Legenda</div>
-            <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-              <div className="w-3 h-3 rounded-full bg-blue-500 border border-blue-600" />
+        <div className="hidden lg:block absolute bottom-6 right-6 z-[1000] pointer-events-none">
+          <div className="bg-white dark:bg-gray-900/90 backdrop-blur-md border border-gray-200 dark:border-gray-800 rounded-xl shadow-lg p-4 space-y-3">
+            <div className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wider">Legenda</div>
+            <div className="flex items-center gap-3 text-xs font-semibold text-gray-600 dark:text-gray-400">
+              <div className="w-3.5 h-3.5 rounded-full bg-blue-500 border border-blue-600" />
               <span>Cobertura padrão</span>
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-              <div className="w-3 h-3 rounded-full bg-green-500 border border-green-600" />
+            <div className="flex items-center gap-3 text-xs font-semibold text-gray-600 dark:text-gray-400">
+              <div className="w-3.5 h-3.5 rounded-full bg-green-500 border border-green-600" />
               <span>Entrega grátis</span>
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-              <div className="w-3 h-3 rounded-full bg-yellow-500 border border-yellow-600" />
-              <span>Zona personalizada</span>
+            <div className="flex items-center gap-3 text-xs font-semibold text-gray-600 dark:text-gray-400">
+              <div className="w-3.5 h-3.5 rounded-full bg-yellow-500 border border-yellow-600" />
+              <span>Zona com taxa</span>
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-              <div className="w-3 h-3 rounded-full bg-red-500 border border-red-600" />
+            <div className="flex items-center gap-3 text-xs font-semibold text-gray-600 dark:text-gray-400">
+              <div className="w-3.5 h-3.5 rounded-full bg-red-500 border border-red-600" />
               <span>Área bloqueada</span>
             </div>
           </div>
-        </div>
-
-        <div className="absolute top-4 left-4 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setFitToStoreSeq((v) => v + 1)}
-            className="h-10 px-3 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 shadow-sm inline-flex items-center gap-2"
-          >
-            <Crosshair className="h-4 w-4" />
-            Centralizar loja
-          </button>
         </div>
       </div>
     </div>
@@ -1808,9 +1644,10 @@ export function DeliveryZonesPageRefactored() {
         minHeight={80}
         peekHeight={200}
         maxHeight="85vh"
+        noPadding={editorOpen}
       >
         {editorOpen ? (
-          renderEditorForm(true)
+          renderEditorForm()
         ) : (
           <>
             {error && (
