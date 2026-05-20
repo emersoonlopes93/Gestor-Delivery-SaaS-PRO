@@ -1387,7 +1387,7 @@ export function DeliveryZonesPageRefactored() {
                     return (
                       <div
                         key={z.id}
-                        className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                        className={`group p-3 rounded-xl border cursor-pointer transition-all ${
                           isSelected
                             ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-500/10 shadow-sm ring-1 ring-primary-500'
                             : isHovered
@@ -1496,7 +1496,7 @@ export function DeliveryZonesPageRefactored() {
                     className: 'delivery-sim-marker',
                     html:
                       '<div class="w-9 h-9 rounded-full bg-white dark:bg-gray-900 shadow-md border border-gray-200 dark:border-gray-800 flex items-center justify-center">' +
-                      '<div class="w-3 h-3 rounded-full bg-gray-900"></div>' +
+                      '<div class="w-3 h-3 rounded-full bg-gray-900 dark:bg-white"></div>' +
                       '</div>',
                     iconSize: [36, 36],
                     iconAnchor: [18, 18],
@@ -1515,8 +1515,8 @@ export function DeliveryZonesPageRefactored() {
                       'w-[260px] rounded-xl border p-3 shadow-md backdrop-blur-md ' +
                       (simulationDecision
                         ? simulationDecision.canDeliver
-                          ? 'bg-green-50/90 border-green-300'
-                          : 'bg-red-50/90 border-red-300'
+                          ? 'bg-green-50/90 dark:bg-green-900/80 border-green-300 dark:border-green-700'
+                          : 'bg-red-50/90 dark:bg-red-900/80 border-red-300 dark:border-red-700'
                         : 'bg-white dark:bg-gray-900/85 border-gray-200 dark:border-gray-800')
                     }
                   >
@@ -1538,7 +1538,7 @@ export function DeliveryZonesPageRefactored() {
                         <div
                           className={
                             'flex items-center gap-2 text-base font-black ' +
-                            (simulationDecision.canDeliver ? 'text-green-700' : 'text-red-700')
+                            (simulationDecision.canDeliver ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400')
                           }
                         >
                           {simulationDecision.canDeliver ? (
@@ -1625,17 +1625,11 @@ export function DeliveryZonesPageRefactored() {
         </div>
 
         {editorOpen && (
-          <>
-            <div 
-              className="absolute inset-0 bg-gray-900/10 dark:bg-black/30 backdrop-blur-[1px] z-[1900] transition-opacity" 
-              onClick={closeEditor}
-            />
-            <div
-              className="absolute top-0 right-0 h-full w-[400px] bg-white dark:bg-gray-900 shadow-2xl z-[2000] border-l border-gray-200 dark:border-gray-800 flex flex-col transition-transform"
-            >
-              {renderEditorForm()}
-            </div>
-          </>
+          <div
+            className="absolute top-0 right-0 h-full w-[400px] bg-white dark:bg-gray-900 shadow-2xl z-[2000] border-l border-gray-200 dark:border-gray-800 flex flex-col transition-transform"
+          >
+            {renderEditorForm()}
+          </div>
         )}
 
         <div className="hidden lg:block absolute bottom-6 right-6 z-[1000] pointer-events-none">
