@@ -1552,8 +1552,8 @@ export function DeliveryZonesPageRefactored() {
   );
 
   const renderMobileContent = () => (
-    <div className="h-[calc(100vh-64px)] relative">
-      <div className="absolute inset-0 pb-32">
+    <div className="h-[calc(100vh-64px)] relative" style={{ isolation: 'isolate' }}>
+      <div className="absolute inset-0 pb-32 z-0">
         <MapContainer
           center={mapCenter}
           zoom={14}
