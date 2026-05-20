@@ -19,6 +19,7 @@ export type DeliveryMatchedStrategy =
   | 'blocked_zone'
   | 'custom_zone_fixed'
   | 'custom_zone_distance'
+  | 'custom_zone_tiers'
   | 'custom_zone_free'
   | 'base_radius'
   | 'out_of_coverage'
@@ -150,11 +151,16 @@ export class DeliveryRateService {
 
     const insideRadius = distanceKm <= Number(cfg.maxRadiusKm);
 
-    const zones = await this.deliveryRateRuleRepo.findMany({
+    const zones = await this.prisma.deliveryRateRule.findMany({
       where: {
         tenantId: input.tenantId,
         isActive: true,
         type: 'polygon',
+      },
+      include: {
+        distanceTiers: {
+          orderBy: { sortOrder: 'asc' },
+        },
       },
       orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }],
     });
@@ -194,6 +200,27 @@ export class DeliveryRateService {
       if (!this.isPointInsidePolygon(point, poly)) continue;
 
       const pricingMode = z.pricingMode;
+
+      if (pricingMode === 'tiers') {
+        const tier = (z.distanceTiers || []).find((t) => {
+          const min = Number(t.minDistanceKm);
+          const max = Number(t.maxDistanceKm);
+          return distanceKm >= min && distanceKm <= max;
+        });
+
+        if (tier) {
+          return {
+            canDeliver: true,
+            matchedStrategy: 'custom_zone_tiers',
+            matchedZoneId: z.id,
+            fee: Number(tier.fee),
+            distanceKm,
+            reason: `Taxa por faixa de distância (${Number(tier.minDistanceKm).toFixed(1)} a ${Number(tier.maxDistanceKm).toFixed(1)} km)`,
+          };
+        } else {
+          continue; // Não achou faixa, tenta próxima zona ou fallback
+        }
+      }
 
       if (pricingMode === 'free') {
         return {
@@ -618,10 +645,17 @@ export class DeliveryRateService {
       name?: string;
       color?: string;
       zoneKind?: 'blocked_zone' | 'custom_zone';
-      pricingMode?: 'fixed' | 'distance' | 'free';
+      pricingMode?: 'fixed' | 'distance' | 'free' | 'tiers';
       blocksDelivery?: boolean;
       fixedFee?: number;
       pricePerKm?: number;
+      distanceTiers?: Array<{
+        id?: string;
+        minDistanceKm: number;
+        maxDistanceKm: number;
+        fee: number;
+        sortOrder?: number;
+      }>;
     },
   ) {
     const ruleData: Prisma.DeliveryRateRuleUncheckedCreateInput = {
@@ -705,16 +739,41 @@ export class DeliveryRateService {
       }
     }
 
-    if (data.id) {
-      return this.deliveryRateRuleRepo.update({
-        where: { id: data.id },
+    let ruleId = data.id;
+
+    if (ruleId) {
+      await this.deliveryRateRuleRepo.update({
+        where: { id: ruleId },
         data: ruleData,
       });
     } else {
-      return this.deliveryRateRuleRepo.create({
+      const created = await this.deliveryRateRuleRepo.create({
         data: ruleData,
       });
+      ruleId = created.id;
     }
+
+    if (data.type === 'polygon' && ruleId && data.distanceTiers) {
+      // Limpa faixas existentes e recria
+      await this.prisma.deliveryRateDistanceTier.deleteMany({
+        where: { deliveryRateRuleId: ruleId },
+      });
+
+      if (data.distanceTiers.length > 0) {
+        await this.prisma.deliveryRateDistanceTier.createMany({
+          data: data.distanceTiers.map((t, idx) => ({
+            tenantId,
+            deliveryRateRuleId: ruleId!,
+            minDistanceKm: t.minDistanceKm,
+            maxDistanceKm: t.maxDistanceKm,
+            fee: t.fee,
+            sortOrder: t.sortOrder ?? idx,
+          })),
+        });
+      }
+    }
+
+    return this.deliveryRateRuleRepo.findUnique({ where: { id: ruleId } });
   }
 
   /**

@@ -39,8 +39,12 @@ class CreateDeliveryRateRuleDto {
   zoneKind?: 'blocked_zone' | 'custom_zone';
 
   @IsOptional()
-  @IsEnum(['fixed', 'distance', 'free'])
-  pricingMode?: 'fixed' | 'distance' | 'free';
+  @IsEnum(['fixed', 'distance', 'free', 'tiers'])
+  pricingMode?: 'fixed' | 'distance' | 'free' | 'tiers';
+
+  @IsOptional()
+  @IsArray()
+  distanceTiers?: any[];
 
   @IsOptional()
   @IsBoolean()

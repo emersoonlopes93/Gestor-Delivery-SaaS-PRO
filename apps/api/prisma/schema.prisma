@@ -92,11 +92,12 @@ model Tenant {
   businessGroup               BusinessGroup?               @relation(fields: [businessGroupId], references: [id])
   onboarding                  TenantOnboarding?
   auditLogs                   AuditLog[]
-  whatsappInstance             WhatsAppInstance?
+  whatsappInstance            WhatsAppInstance?
   chatSessions                ChatSession[]
   aiAgentConfig               AiAgentConfig?
   campaigns                   Campaign[]
   customerOptOuts             CustomerOptOut[]
+  DeliveryRateDistanceTier    DeliveryRateDistanceTier[]
 
   @@map("tenants")
 }
@@ -120,27 +121,25 @@ model AuditLog {
 }
 
 model TenantOnboarding {
-  id              String   @id @default(uuid())
-  tenantId        String   @unique @map("tenant_id")
-  stepBasicInfo   Boolean  @default(false) @map("step_basic_info")
-  stepOperatingHours Boolean @default(false) @map("step_operating_hours")
-  stepLogo        Boolean  @default(false) @map("step_logo")
-  stepAddress     Boolean  @default(false) @map("step_address")
-  stepDelivery    Boolean  @default(false) @map("step_delivery")
-  stepPayments    Boolean  @default(false) @map("step_payments")
-  stepWhatsapp    Boolean  @default(false) @map("step_whatsapp")
-  stepMenu        Boolean  @default(false) @map("step_menu")
-  stepCatalog     Boolean  @default(false) @map("step_catalog")
-  stepFirstOrder  Boolean  @default(false) @map("step_first_order")
-  completedAt     DateTime? @map("completed_at")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id                 String    @id @default(uuid())
+  tenantId           String    @unique @map("tenant_id")
+  stepBasicInfo      Boolean   @default(false) @map("step_basic_info")
+  stepOperatingHours Boolean   @default(false) @map("step_operating_hours")
+  stepLogo           Boolean   @default(false) @map("step_logo")
+  stepAddress        Boolean   @default(false) @map("step_address")
+  stepDelivery       Boolean   @default(false) @map("step_delivery")
+  stepPayments       Boolean   @default(false) @map("step_payments")
+  stepWhatsapp       Boolean   @default(false) @map("step_whatsapp")
+  stepMenu           Boolean   @default(false) @map("step_menu")
+  stepCatalog        Boolean   @default(false) @map("step_catalog")
+  stepFirstOrder     Boolean   @default(false) @map("step_first_order")
+  completedAt        DateTime? @map("completed_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_onboardings")
 }
-
-
 
 model OptionGroup {
   id            String                   @id @default(uuid())
@@ -308,49 +307,49 @@ model ComboSlotAllowedItem {
 }
 
 model TenantSettings {
-  id                String   @id @default(uuid())
-  tenantId          String   @unique @map("tenant_id")
-  timezone          String   @default("America/Sao_Paulo") @db.VarChar(50)
-  currency          String   @default("BRL") @db.VarChar(10)
-  language          String   @default("pt-BR") @db.VarChar(10)
-  businessPhone     String?  @map("business_phone") @db.VarChar(20)
-  businessEmail     String?  @map("business_email") @db.VarChar(255)
-  address           String?
-  logoUrl           String?  @map("logo_url") @db.VarChar(500)
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
-  isStorePaused     Boolean  @default(false) @map("is_store_paused")
-  storePauseReason  String?  @map("store_pause_reason")
-  bankAccount       String?  @map("bank_account") @db.VarChar(50)
-  bankAgency        String?  @map("bank_agency") @db.VarChar(20)
-  bankName          String?  @map("bank_name") @db.VarChar(100)
-  city              String?  @db.VarChar(100)
-  cnpj              String?  @db.VarChar(18)
-  complement        String?  @db.VarChar(255)
-  inscricaoEstadual String?  @map("inscricao_estadual") @db.VarChar(20)
-  lat               Float?
-  lng               Float?
-  neighborhood      String?  @db.VarChar(100)
-  number            String?  @db.VarChar(20)
-  paymentMethods    Json?    @map("payment_methods")
-  pixKey            String?  @map("pix_key") @db.VarChar(255)
-  razaoSocial       String?  @map("razao_social") @db.VarChar(255)
-  state             String?  @db.VarChar(2)
-  street            String?  @db.VarChar(255)
-  zipCode           String?  @map("zip_code") @db.VarChar(10)
-  taxRegime         String?  @map("tax_regime") @db.VarChar(20) // ex: Simples Nacional, Lucro Real
-  mercadoPagoAccessToken String? @map("mercado_pago_access_token") @db.VarChar(500)
-  mercadoPagoPublicKey   String? @map("mercado_pago_public_key") @db.VarChar(255)
-  mercadoPagoWebhookSecret String? @map("mercado_pago_webhook_secret") @db.VarChar(255)
-  standardCfop      String?  @map("standard_cfop") @db.VarChar(10)
-  standardNcm       String?  @map("standard_ncm") @db.VarChar(10)
-  whatsappNotificationsEnabled Boolean @default(false) @map("whatsapp_notifications_enabled")
-  notificationTemplates        Json?   @map("notification_templates")
-  audioNotificationEnabled     Boolean @default(true) @map("audio_notification_enabled")
-  newOrderSound                String  @default("default") @map("new_order_sound")
-  cancellationSound            String  @default("default") @map("cancellation_sound")
-  notificationVolume           Float   @default(1.0) @map("notification_volume")
-  tenant            Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id                           String   @id @default(uuid())
+  tenantId                     String   @unique @map("tenant_id")
+  timezone                     String   @default("America/Sao_Paulo") @db.VarChar(50)
+  currency                     String   @default("BRL") @db.VarChar(10)
+  language                     String   @default("pt-BR") @db.VarChar(10)
+  businessPhone                String?  @map("business_phone") @db.VarChar(20)
+  businessEmail                String?  @map("business_email") @db.VarChar(255)
+  address                      String?
+  logoUrl                      String?  @map("logo_url") @db.VarChar(500)
+  createdAt                    DateTime @default(now()) @map("created_at")
+  updatedAt                    DateTime @updatedAt @map("updated_at")
+  isStorePaused                Boolean  @default(false) @map("is_store_paused")
+  storePauseReason             String?  @map("store_pause_reason")
+  bankAccount                  String?  @map("bank_account") @db.VarChar(50)
+  bankAgency                   String?  @map("bank_agency") @db.VarChar(20)
+  bankName                     String?  @map("bank_name") @db.VarChar(100)
+  city                         String?  @db.VarChar(100)
+  cnpj                         String?  @db.VarChar(18)
+  complement                   String?  @db.VarChar(255)
+  inscricaoEstadual            String?  @map("inscricao_estadual") @db.VarChar(20)
+  lat                          Float?
+  lng                          Float?
+  neighborhood                 String?  @db.VarChar(100)
+  number                       String?  @db.VarChar(20)
+  paymentMethods               Json?    @map("payment_methods")
+  pixKey                       String?  @map("pix_key") @db.VarChar(255)
+  razaoSocial                  String?  @map("razao_social") @db.VarChar(255)
+  state                        String?  @db.VarChar(2)
+  street                       String?  @db.VarChar(255)
+  zipCode                      String?  @map("zip_code") @db.VarChar(10)
+  taxRegime                    String?  @map("tax_regime") @db.VarChar(20) // ex: Simples Nacional, Lucro Real
+  mercadoPagoAccessToken       String?  @map("mercado_pago_access_token") @db.VarChar(500)
+  mercadoPagoPublicKey         String?  @map("mercado_pago_public_key") @db.VarChar(255)
+  mercadoPagoWebhookSecret     String?  @map("mercado_pago_webhook_secret") @db.VarChar(255)
+  standardCfop                 String?  @map("standard_cfop") @db.VarChar(10)
+  standardNcm                  String?  @map("standard_ncm") @db.VarChar(10)
+  whatsappNotificationsEnabled Boolean  @default(false) @map("whatsapp_notifications_enabled")
+  notificationTemplates        Json?    @map("notification_templates")
+  audioNotificationEnabled     Boolean  @default(true) @map("audio_notification_enabled")
+  newOrderSound                String   @default("default") @map("new_order_sound")
+  cancellationSound            String   @default("default") @map("cancellation_sound")
+  notificationVolume           Float    @default(1.0) @map("notification_volume")
+  tenant                       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_settings")
 }
@@ -953,18 +952,18 @@ model DeliveryDriverLocation {
 }
 
 model Plan {
-  id            String               @id @default(uuid())
-  name          String               @db.VarChar(100)
-  slug          String               @unique @db.VarChar(60)
-  price         Decimal              @db.Decimal(10, 2)
-  billingCycle  BillingCycle         @default(monthly)
-  features      Json?
-  isActive      Boolean              @default(true)
-  asaasId       String?              @map("asaas_id")
-  mpPreapprovalPlanId String?        @map("mp_preapproval_plan_id")
-  createdAt     DateTime             @default(now()) @map("created_at")
-  updatedAt     DateTime             @updatedAt @map("updated_at")
-  subscriptions TenantSubscription[]
+  id                  String               @id @default(uuid())
+  name                String               @db.VarChar(100)
+  slug                String               @unique @db.VarChar(60)
+  price               Decimal              @db.Decimal(10, 2)
+  billingCycle        BillingCycle         @default(monthly)
+  features            Json?
+  isActive            Boolean              @default(true)
+  asaasId             String?              @map("asaas_id")
+  mpPreapprovalPlanId String?              @map("mp_preapproval_plan_id")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  subscriptions       TenantSubscription[]
 }
 
 model TenantSubscription {
@@ -987,19 +986,19 @@ model TenantSubscription {
 }
 
 model PaymentTransaction {
-  id          String          @id @default(uuid())
-  tenantId    String          @map("tenant_id")
-  orderId     String?         @map("order_id")
-  gatewayName String          @map("gateway_name") @db.VarChar(50)
-  gatewayTxId String          @map("gateway_tx_id") @db.VarChar(255)
-  method      PaymentMethod   @map("method")
-  amount      Decimal         @db.Decimal(10, 2)
-  status      PaymentTxStatus @default(pending) @map("status")
-  metadata    Json?
-  confirmedAt DateTime?       @map("confirmed_at")
-  createdAt   DateTime        @default(now()) @map("created_at")
-  order       Order?          @relation(fields: [orderId], references: [id])
-  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id            String          @id @default(uuid())
+  tenantId      String          @map("tenant_id")
+  orderId       String?         @map("order_id")
+  gatewayName   String          @map("gateway_name") @db.VarChar(50)
+  gatewayTxId   String          @map("gateway_tx_id") @db.VarChar(255)
+  method        PaymentMethod   @map("method")
+  amount        Decimal         @db.Decimal(10, 2)
+  status        PaymentTxStatus @default(pending) @map("status")
+  metadata      Json?
+  confirmedAt   DateTime?       @map("confirmed_at")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  order         Order?          @relation(fields: [orderId], references: [id])
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   splitPayments SplitPayment[]
 
   @@index([tenantId, status])
@@ -1083,19 +1082,19 @@ model CashMovement {
 }
 
 model Customer {
-  id              String                @id @default(uuid())
-  tenantId        String                @map("tenant_id")
-  name            String                @db.VarChar(150)
-  phone           String                @db.VarChar(30)
-  email           String?               @db.VarChar(255)
-  notes           String?
-  totalOrders     Int                   @default(0) @map("total_orders")
-  totalSpent      Decimal               @default(0) @map("total_spent") @db.Decimal(10, 2)
-  lastOrderDate   DateTime?             @map("last_order_date")
-  loyaltyPoints   Int                   @default(0) @map("loyalty_points")
-  cashbackBalance Decimal               @default(0) @map("cashback_balance") @db.Decimal(10, 2)
-  createdAt       DateTime              @default(now()) @map("created_at")
-  updatedAt       DateTime              @updatedAt @map("updated_at")
+  id                 String                @id @default(uuid())
+  tenantId           String                @map("tenant_id")
+  name               String                @db.VarChar(150)
+  phone              String                @db.VarChar(30)
+  email              String?               @db.VarChar(255)
+  notes              String?
+  totalOrders        Int                   @default(0) @map("total_orders")
+  totalSpent         Decimal               @default(0) @map("total_spent") @db.Decimal(10, 2)
+  lastOrderDate      DateTime?             @map("last_order_date")
+  loyaltyPoints      Int                   @default(0) @map("loyalty_points")
+  cashbackBalance    Decimal               @default(0) @map("cashback_balance") @db.Decimal(10, 2)
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
   cashbackHistory    CashbackTransaction[]
   tenant             Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orders             Order[]
@@ -1128,27 +1127,27 @@ model CashbackTransaction {
 }
 
 model Ingredient {
-  id                String                       @id @default(uuid())
-  tenantId          String                       @map("tenant_id")
-  name              String                       @db.VarChar(150)
-  sku               String?                      @db.VarChar(50)
-  description       String?
-  unit              UnitType
-  purchaseUnit      UnitType?                    @map("purchase_unit")
-  conversionFactor  Decimal                      @default(1) @map("conversion_factor") @db.Decimal(10, 4)
-  category          String?                      @db.VarChar(50)
-  currentCost       Decimal                      @default(0) @map("current_cost") @db.Decimal(10, 4)
-  currentStock      Decimal                      @default(0) @map("current_stock") @db.Decimal(10, 4)
-  minStock          Decimal?                     @map("min_stock") @db.Decimal(10, 4)
-  isActive          Boolean                      @default(true) @map("is_active")
-  createdAt         DateTime                     @default(now()) @map("created_at")
-  updatedAt         DateTime                     @updatedAt @map("updated_at")
-  comboRecipes      ComboRecipeIngredient[]
-  complementRecipes ComplementRecipeIngredient[]
-  tenant            Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  productRecipes    ProductRecipeIngredient[]
-  movements         StockMovement[]
-  purchaseItems     PurchaseItem[]
+  id                  String                       @id @default(uuid())
+  tenantId            String                       @map("tenant_id")
+  name                String                       @db.VarChar(150)
+  sku                 String?                      @db.VarChar(50)
+  description         String?
+  unit                UnitType
+  purchaseUnit        UnitType?                    @map("purchase_unit")
+  conversionFactor    Decimal                      @default(1) @map("conversion_factor") @db.Decimal(10, 4)
+  category            String?                      @db.VarChar(50)
+  currentCost         Decimal                      @default(0) @map("current_cost") @db.Decimal(10, 4)
+  currentStock        Decimal                      @default(0) @map("current_stock") @db.Decimal(10, 4)
+  minStock            Decimal?                     @map("min_stock") @db.Decimal(10, 4)
+  isActive            Boolean                      @default(true) @map("is_active")
+  createdAt           DateTime                     @default(now()) @map("created_at")
+  updatedAt           DateTime                     @updatedAt @map("updated_at")
+  comboRecipes        ComboRecipeIngredient[]
+  complementRecipes   ComplementRecipeIngredient[]
+  tenant              Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  productRecipes      ProductRecipeIngredient[]
+  movements           StockMovement[]
+  purchaseItems       PurchaseItem[]
   inventoryCountItems InventoryCountItem[]
 
   @@unique([tenantId, sku])
@@ -1240,38 +1239,59 @@ model DeliveryCoverageConfig {
 }
 
 model DeliveryRateRule {
-  id                 String               @id @default(uuid())
-  tenantId           String               @map("tenant_id")
+  id                 String                     @id @default(uuid())
+  tenantId           String                     @map("tenant_id")
   type               RateType
-  isActive           Boolean              @default(true) @map("is_active")
-  neighborhood       String?              @db.VarChar(100)
-  rate               Decimal?             @map("rate") @db.Decimal(10, 2)
-  minKm              Decimal?             @map("min_km") @db.Decimal(5, 2)
-  maxKm              Decimal?             @map("max_km") @db.Decimal(5, 2)
-  ratePerKm          Decimal?             @map("rate_per_km") @db.Decimal(10, 2)
-  fixedRate          Decimal?             @map("fixed_rate") @db.Decimal(10, 2)
-  createdAt          DateTime             @default(now()) @map("created_at")
-  updatedAt          DateTime             @updatedAt @map("updated_at")
-  geoJson            Json?                @map("geo_json")
-  isFallback         Boolean              @default(false) @map("is_fallback")
-  maxDistanceKm      Decimal?             @map("max_distance_km") @db.Decimal(5, 2)
-  minDistanceKm      Decimal?             @map("min_distance_km") @db.Decimal(5, 2)
-  polygonCoordinates Json?                @map("polygon_coordinates")
-  priority           Int                  @default(1000) @map("priority")
-  blocksDelivery     Boolean              @default(false) @map("blocks_delivery")
-  color              String?              @db.VarChar(16)
-  fixedFee           Decimal?             @map("fixed_fee") @db.Decimal(10, 2)
-  name               String?              @db.VarChar(120)
-  pricePerKm         Decimal?             @map("price_per_km") @db.Decimal(10, 2)
-  pricingMode        DeliveryPricingMode? @map("pricing_mode")
-  zoneKind           DeliveryZoneKind?    @map("zone_kind")
-  tenant             Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  isActive           Boolean                    @default(true) @map("is_active")
+  neighborhood       String?                    @db.VarChar(100)
+  rate               Decimal?                   @map("rate") @db.Decimal(10, 2)
+  minKm              Decimal?                   @map("min_km") @db.Decimal(5, 2)
+  maxKm              Decimal?                   @map("max_km") @db.Decimal(5, 2)
+  ratePerKm          Decimal?                   @map("rate_per_km") @db.Decimal(10, 2)
+  fixedRate          Decimal?                   @map("fixed_rate") @db.Decimal(10, 2)
+  createdAt          DateTime                   @default(now()) @map("created_at")
+  updatedAt          DateTime                   @updatedAt @map("updated_at")
+  geoJson            Json?                      @map("geo_json")
+  isFallback         Boolean                    @default(false) @map("is_fallback")
+  maxDistanceKm      Decimal?                   @map("max_distance_km") @db.Decimal(5, 2)
+  minDistanceKm      Decimal?                   @map("min_distance_km") @db.Decimal(5, 2)
+  polygonCoordinates Json?                      @map("polygon_coordinates")
+  priority           Int                        @default(1000) @map("priority")
+  blocksDelivery     Boolean                    @default(false) @map("blocks_delivery")
+  color              String?                    @db.VarChar(16)
+  fixedFee           Decimal?                   @map("fixed_fee") @db.Decimal(10, 2)
+  name               String?                    @db.VarChar(120)
+  pricePerKm         Decimal?                   @map("price_per_km") @db.Decimal(10, 2)
+  pricingMode        DeliveryPricingMode?       @map("pricing_mode")
+  zoneKind           DeliveryZoneKind?          @map("zone_kind")
+  tenant             Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  distanceTiers      DeliveryRateDistanceTier[]
 
   @@index([tenantId])
   @@index([tenantId, type])
   @@index([tenantId, priority])
   @@index([tenantId, type, neighborhood])
   @@map("delivery_rate_rules")
+}
+
+model DeliveryRateDistanceTier {
+  id                 String   @id @default(uuid())
+  tenantId           String   @map("tenant_id")
+  deliveryRateRuleId String   @map("delivery_rate_rule_id")
+  minDistanceKm      Decimal  @map("min_distance_km") @db.Decimal(5, 2)
+  maxDistanceKm      Decimal  @map("max_distance_km") @db.Decimal(5, 2)
+  fee                Decimal  @map("fee") @db.Decimal(10, 2)
+  sortOrder          Int      @default(0) @map("sort_order")
+  isActive           Boolean  @default(true) @map("is_active")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  deliveryRateRule DeliveryRateRule @relation(fields: [deliveryRateRuleId], references: [id], onDelete: Cascade)
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([deliveryRateRuleId])
+  @@map("delivery_rate_distance_tiers")
 }
 
 model TenantModuleAccess {
@@ -1438,16 +1458,16 @@ model Supplier {
 }
 
 model Purchase {
-  id              String         @id @default(uuid())
-  tenantId        String         @map("tenant_id")
-  supplierId      String         @map("supplier_id")
-  number          String?        @db.VarChar(50)
-  totalValue      Decimal        @map("total_value") @db.Decimal(10, 2)
-  status          PurchaseStatus @default(draft)
-  paymentStatus   PaymentStatus  @default(pending) @map("payment_status")
-  purchaseDate    DateTime       @default(now()) @map("purchase_date")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
+  id            String         @id @default(uuid())
+  tenantId      String         @map("tenant_id")
+  supplierId    String         @map("supplier_id")
+  number        String?        @db.VarChar(50)
+  totalValue    Decimal        @map("total_value") @db.Decimal(10, 2)
+  status        PurchaseStatus @default(draft)
+  paymentStatus PaymentStatus  @default(pending) @map("payment_status")
+  purchaseDate  DateTime       @default(now()) @map("purchase_date")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
 
   tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   supplier Supplier       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
@@ -1459,13 +1479,13 @@ model Purchase {
 }
 
 model PurchaseItem {
-  id           String   @id @default(uuid())
-  tenantId     String   @map("tenant_id")
-  purchaseId   String   @map("purchase_id")
-  ingredientId String   @map("ingredient_id")
-  quantity     Decimal  @db.Decimal(10, 4)
-  unitCost     Decimal  @map("unit_cost") @db.Decimal(10, 4)
-  totalCost    Decimal  @map("total_cost") @db.Decimal(10, 4)
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  purchaseId   String    @map("purchase_id")
+  ingredientId String    @map("ingredient_id")
+  quantity     Decimal   @db.Decimal(10, 4)
+  unitCost     Decimal   @map("unit_cost") @db.Decimal(10, 4)
+  totalCost    Decimal   @map("total_cost") @db.Decimal(10, 4)
   expiryDate   DateTime? @map("expiry_date")
 
   purchase   Purchase   @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
@@ -1478,14 +1498,14 @@ model PurchaseItem {
 }
 
 model InventoryCount {
-  id          String               @id @default(uuid())
-  tenantId    String               @map("tenant_id")
-  status      InventoryCountStatus @default(open)
-  note        String?
-  openedAt    DateTime             @default(now()) @map("opened_at")
-  closedAt    DateTime?            @map("closed_at")
-  createdAt   DateTime             @default(now()) @map("created_at")
-  updatedAt   DateTime             @updatedAt @map("updated_at")
+  id        String               @id @default(uuid())
+  tenantId  String               @map("tenant_id")
+  status    InventoryCountStatus @default(open)
+  note      String?
+  openedAt  DateTime             @default(now()) @map("opened_at")
+  closedAt  DateTime?            @map("closed_at")
+  createdAt DateTime             @default(now()) @map("created_at")
+  updatedAt DateTime             @updatedAt @map("updated_at")
 
   tenant Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items  InventoryCountItem[]
@@ -1495,13 +1515,13 @@ model InventoryCount {
 }
 
 model InventoryCountItem {
-  id               String   @id @default(uuid())
-  tenantId         String   @map("tenant_id")
-  inventoryCountId String   @map("inventory_count_id")
-  ingredientId     String   @map("ingredient_id")
-  theoreticalStock Decimal  @map("theoretical_stock") @db.Decimal(10, 4)
-  physicalStock    Decimal  @map("physical_stock") @db.Decimal(10, 4)
-  adjustedQuantity Decimal  @map("adjusted_quantity") @db.Decimal(10, 4)
+  id               String  @id @default(uuid())
+  tenantId         String  @map("tenant_id")
+  inventoryCountId String  @map("inventory_count_id")
+  ingredientId     String  @map("ingredient_id")
+  theoreticalStock Decimal @map("theoretical_stock") @db.Decimal(10, 4)
+  physicalStock    Decimal @map("physical_stock") @db.Decimal(10, 4)
+  adjustedQuantity Decimal @map("adjusted_quantity") @db.Decimal(10, 4)
 
   inventoryCount InventoryCount @relation(fields: [inventoryCountId], references: [id], onDelete: Cascade)
   ingredient     Ingredient     @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
@@ -1513,14 +1533,14 @@ model InventoryCountItem {
 }
 
 model FinancialAccount {
-  id        String             @id @default(uuid())
-  tenantId  String             @map("tenant_id")
-  name      String             @db.VarChar(100)
+  id        String               @id @default(uuid())
+  tenantId  String               @map("tenant_id")
+  name      String               @db.VarChar(100)
   type      FinancialAccountType @default(cash)
-  balance   Decimal            @default(0) @db.Decimal(10, 2)
-  active    Boolean            @default(true)
-  createdAt DateTime           @default(now()) @map("created_at")
-  updatedAt DateTime           @updatedAt @map("updated_at")
+  balance   Decimal              @default(0) @db.Decimal(10, 2)
+  active    Boolean              @default(true)
+  createdAt DateTime             @default(now()) @map("created_at")
+  updatedAt DateTime             @updatedAt @map("updated_at")
 
   tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   transactions FinancialTransaction[]
@@ -1530,23 +1550,23 @@ model FinancialAccount {
 }
 
 model FinancialTransaction {
-  id                String                   @id @default(uuid())
-  tenantId          String                   @map("tenant_id")
-  accountId         String?                  @map("account_id")
-  type              FinancialTransactionType
-  category          String                   @db.VarChar(50)
-  amount            Decimal                  @db.Decimal(10, 2)
-  status            FinancialStatus          @default(pending)
-  dueDate           DateTime?                @map("due_date")
-  paymentDate       DateTime?                @map("payment_date")
-  description       String?
-  referenceId       String?                  @map("reference_id")
-  referenceType     String?                  @map("reference_type")
-  createdAt         DateTime                 @default(now()) @map("created_at")
-  updatedAt         DateTime                 @updatedAt @map("updated_at")
+  id            String                   @id @default(uuid())
+  tenantId      String                   @map("tenant_id")
+  accountId     String?                  @map("account_id")
+  type          FinancialTransactionType
+  category      String                   @db.VarChar(50)
+  amount        Decimal                  @db.Decimal(10, 2)
+  status        FinancialStatus          @default(pending)
+  dueDate       DateTime?                @map("due_date")
+  paymentDate   DateTime?                @map("payment_date")
+  description   String?
+  referenceId   String?                  @map("reference_id")
+  referenceType String?                  @map("reference_type")
+  createdAt     DateTime                 @default(now()) @map("created_at")
+  updatedAt     DateTime                 @updatedAt @map("updated_at")
 
   account FinancialAccount? @relation(fields: [accountId], references: [id])
-  tenant  Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant  Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([accountId])
@@ -1584,21 +1604,21 @@ model OrderSplit {
 }
 
 model SplitPayment {
-  id                 String             @id @default(uuid())
-  tenantId           String             @map("tenant_id")
-  orderSplitId       String             @map("order_split_id")
-  paymentMethod      PaymentMethod      @map("payment_method")
-  amount             Decimal            @db.Decimal(10, 2)
-  changeFor          Decimal?           @map("change_for") @db.Decimal(10, 2)
+  id                 String              @id @default(uuid())
+  tenantId           String              @map("tenant_id")
+  orderSplitId       String              @map("order_split_id")
+  paymentMethod      PaymentMethod       @map("payment_method")
+  amount             Decimal             @db.Decimal(10, 2)
+  changeFor          Decimal?            @map("change_for") @db.Decimal(10, 2)
   notes              String?
-  isPaid             Boolean            @default(false) @map("is_paid")
-  paidAt             DateTime?          @map("paid_at")
-  paymentTxId        String?            @map("payment_tx_id")
-  createdAt          DateTime           @default(now()) @map("created_at")
-  updatedAt          DateTime           @updatedAt @map("updated_at")
-  orderSplit         OrderSplit         @relation(fields: [orderSplitId], references: [id], onDelete: Cascade)
+  isPaid             Boolean             @default(false) @map("is_paid")
+  paidAt             DateTime?           @map("paid_at")
+  paymentTxId        String?             @map("payment_tx_id")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  orderSplit         OrderSplit          @relation(fields: [orderSplitId], references: [id], onDelete: Cascade)
   paymentTransaction PaymentTransaction? @relation(fields: [paymentTxId], references: [id])
-  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([orderSplitId])
@@ -1840,6 +1860,7 @@ enum DeliveryPricingMode {
   fixed
   distance
   free
+  tiers
 }
 
 enum GoalType {
@@ -1962,19 +1983,19 @@ enum CampaignDispatchStatus {
 }
 
 model WhatsAppInstance {
-  id             String                @id @default(uuid())
-  tenantId       String                @unique @map("tenant_id")
-  providerType   WhatsAppProviderType  @default(evolution_go) @map("provider_type")
-  instanceName   String                @unique @map("instance_name") @db.VarChar(100)
-  apiUrl         String                @map("api_url") @db.VarChar(500)
-  apiKey         String                @map("api_key") @db.VarChar(500)
-  phoneNumber    String?               @map("phone_number") @db.VarChar(30)
-  status         WhatsAppInstanceStatus @default(disconnected)
-  webhookSecret  String?               @map("webhook_secret") @db.VarChar(255)
-  evolutionInstanceId String?           @map("evolution_instance_id") @db.VarChar(100)
-  createdAt      DateTime              @default(now()) @map("created_at")
-  updatedAt      DateTime              @updatedAt @map("updated_at")
-  tenant         Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id                  String                 @id @default(uuid())
+  tenantId            String                 @unique @map("tenant_id")
+  providerType        WhatsAppProviderType   @default(evolution_go) @map("provider_type")
+  instanceName        String                 @unique @map("instance_name") @db.VarChar(100)
+  apiUrl              String                 @map("api_url") @db.VarChar(500)
+  apiKey              String                 @map("api_key") @db.VarChar(500)
+  phoneNumber         String?                @map("phone_number") @db.VarChar(30)
+  status              WhatsAppInstanceStatus @default(disconnected)
+  webhookSecret       String?                @map("webhook_secret") @db.VarChar(255)
+  evolutionInstanceId String?                @map("evolution_instance_id") @db.VarChar(100)
+  createdAt           DateTime               @default(now()) @map("created_at")
+  updatedAt           DateTime               @updatedAt @map("updated_at")
+  tenant              Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("whatsapp_instances")
 }
@@ -2006,16 +2027,16 @@ model ChatSession {
 }
 
 model ChatMessage {
-  id            String           @id @default(uuid())
-  sessionId     String           @map("session_id")
-  direction     MessageDirection
-  content       String
-  messageType   String           @default("text") @map("message_type") @db.VarChar(30)
-  externalId    String?          @unique @map("external_id") @db.VarChar(100)
-  toolCalls     Json?            @map("tool_calls")
-  metadata      Json?
-  createdAt     DateTime         @default(now()) @map("created_at")
-  session       ChatSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  id          String           @id @default(uuid())
+  sessionId   String           @map("session_id")
+  direction   MessageDirection
+  content     String
+  messageType String           @default("text") @map("message_type") @db.VarChar(30)
+  externalId  String?          @unique @map("external_id") @db.VarChar(100)
+  toolCalls   Json?            @map("tool_calls")
+  metadata    Json?
+  createdAt   DateTime         @default(now()) @map("created_at")
+  session     ChatSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId])
   @@index([externalId])
@@ -2023,74 +2044,74 @@ model ChatMessage {
 }
 
 model SystemConfig {
-  id                    String             @id @default("global")
+  id                      String               @id @default("global")
   defaultWhatsAppProvider WhatsAppProviderType @default(evolution_go) @map("default_whatsapp_provider")
-  defaultAiProvider     AiProviderType     @default(openai) @map("default_ai_provider")
-  
+  defaultAiProvider       AiProviderType       @default(openai) @map("default_ai_provider")
+
   // WhatsApp Infrastructure
-  evolutionUrl          String?            @map("evolution_url") @db.VarChar(500)
-  evolutionGlobalToken  String?            @map("evolution_global_token") @db.VarChar(500)
-  
+  evolutionUrl         String? @map("evolution_url") @db.VarChar(500)
+  evolutionGlobalToken String? @map("evolution_global_token") @db.VarChar(500)
+
   // AI Infrastructure
-  openaiApiKey         String?            @map("openai_api_key")
-  anthropicApiKey      String?            @map("anthropic_api_key")
-  baseAiPrompt         String?            @map("base_ai_prompt") @db.Text
-  
-  updatedAt            DateTime           @updatedAt @map("updated_at")
+  openaiApiKey    String? @map("openai_api_key")
+  anthropicApiKey String? @map("anthropic_api_key")
+  baseAiPrompt    String? @map("base_ai_prompt") @db.Text
+
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("system_configs")
 }
 
 model AiAgentConfig {
-  id                String        @id @default(uuid())
-  tenantId          String        @unique @map("tenant_id")
-  isEnabled         Boolean       @default(false) @map("is_enabled")
-  agentName         String?       @map("agent_name") @db.VarChar(100)
-  greetingMessage   String?       @map("greeting_message") @db.Text
-  tone              String        @default("friendly") @db.VarChar(30)
-  
+  id              String  @id @default(uuid())
+  tenantId        String  @unique @map("tenant_id")
+  isEnabled       Boolean @default(false) @map("is_enabled")
+  agentName       String? @map("agent_name") @db.VarChar(100)
+  greetingMessage String? @map("greeting_message") @db.Text
+  tone            String  @default("friendly") @db.VarChar(30)
+
   // Personalização adicional (instruções específicas do restaurante)
-  customInstructions String?       @map("custom_instructions") @db.Text
-  
-  operatingMode     String        @default("always") @map("operating_mode") @db.VarChar(30)
-  handoffPolicy     String        @default("on_request") @map("handoff_policy") @db.VarChar(30)
-  fallbackMessage   String?       @map("fallback_message")
-  maxRetries        Int           @default(3) @map("max_retries")
-  sessionTimeoutMin Int           @default(120) @map("session_timeout_min")
-  dailyMessageLimit Int           @default(1000) @map("daily_message_limit")
-  customerCooldownMin Int         @default(5) @map("customer_cooldown_min")
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
-  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customInstructions String? @map("custom_instructions") @db.Text
+
+  operatingMode       String   @default("always") @map("operating_mode") @db.VarChar(30)
+  handoffPolicy       String   @default("on_request") @map("handoff_policy") @db.VarChar(30)
+  fallbackMessage     String?  @map("fallback_message")
+  maxRetries          Int      @default(3) @map("max_retries")
+  sessionTimeoutMin   Int      @default(120) @map("session_timeout_min")
+  dailyMessageLimit   Int      @default(1000) @map("daily_message_limit")
+  customerCooldownMin Int      @default(5) @map("customer_cooldown_min")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("ai_agent_configs")
 }
 
 model Campaign {
-  id               String             @id @default(uuid())
-  tenantId         String             @map("tenant_id")
-  name             String             @db.VarChar(200)
-  objective        String?            @db.VarChar(100)
-  status           CampaignStatus     @default(draft)
-  messageTemplate  String             @map("message_template")
-  mediaUrl         String?            @map("media_url") @db.VarChar(500)
-  segmentRules     Json               @map("segment_rules")
-  scheduledAt      DateTime?          @map("scheduled_at")
-  startedAt        DateTime?          @map("started_at")
-  completedAt      DateTime?          @map("completed_at")
-  cancelledAt      DateTime?          @map("cancelled_at")
-  totalAudience    Int                @default(0) @map("total_audience")
-  totalSent        Int                @default(0) @map("total_sent")
-  totalDelivered   Int                @default(0) @map("total_delivered")
-  totalRead        Int                @default(0) @map("total_read")
-  totalReplied     Int                @default(0) @map("total_replied")
-  totalConverted   Int                @default(0) @map("total_converted")
-  totalOptOut      Int                @default(0) @map("total_opt_out")
-  maxDispatches    Int                @default(500) @map("max_dispatches")
-  createdAt        DateTime           @default(now()) @map("created_at")
-  updatedAt        DateTime           @updatedAt @map("updated_at")
-  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  dispatches       CampaignDispatch[]
+  id              String             @id @default(uuid())
+  tenantId        String             @map("tenant_id")
+  name            String             @db.VarChar(200)
+  objective       String?            @db.VarChar(100)
+  status          CampaignStatus     @default(draft)
+  messageTemplate String             @map("message_template")
+  mediaUrl        String?            @map("media_url") @db.VarChar(500)
+  segmentRules    Json               @map("segment_rules")
+  scheduledAt     DateTime?          @map("scheduled_at")
+  startedAt       DateTime?          @map("started_at")
+  completedAt     DateTime?          @map("completed_at")
+  cancelledAt     DateTime?          @map("cancelled_at")
+  totalAudience   Int                @default(0) @map("total_audience")
+  totalSent       Int                @default(0) @map("total_sent")
+  totalDelivered  Int                @default(0) @map("total_delivered")
+  totalRead       Int                @default(0) @map("total_read")
+  totalReplied    Int                @default(0) @map("total_replied")
+  totalConverted  Int                @default(0) @map("total_converted")
+  totalOptOut     Int                @default(0) @map("total_opt_out")
+  maxDispatches   Int                @default(500) @map("max_dispatches")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dispatches      CampaignDispatch[]
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -2098,20 +2119,20 @@ model Campaign {
 }
 
 model CampaignDispatch {
-  id            String                 @id @default(uuid())
-  campaignId    String                 @map("campaign_id")
-  customerId    String                 @map("customer_id")
-  phone         String                 @db.VarChar(30)
-  status        CampaignDispatchStatus @default(queued)
-  sentAt        DateTime?              @map("sent_at")
-  deliveredAt   DateTime?              @map("delivered_at")
-  readAt        DateTime?              @map("read_at")
-  repliedAt     DateTime?              @map("replied_at")
-  failReason    String?                @map("fail_reason")
-  externalId    String?                @map("external_id") @db.VarChar(100)
-  createdAt     DateTime               @default(now()) @map("created_at")
-  campaign      Campaign               @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  customer      Customer               @relation(fields: [customerId], references: [id])
+  id          String                 @id @default(uuid())
+  campaignId  String                 @map("campaign_id")
+  customerId  String                 @map("customer_id")
+  phone       String                 @db.VarChar(30)
+  status      CampaignDispatchStatus @default(queued)
+  sentAt      DateTime?              @map("sent_at")
+  deliveredAt DateTime?              @map("delivered_at")
+  readAt      DateTime?              @map("read_at")
+  repliedAt   DateTime?              @map("replied_at")
+  failReason  String?                @map("fail_reason")
+  externalId  String?                @map("external_id") @db.VarChar(100)
+  createdAt   DateTime               @default(now()) @map("created_at")
+  campaign    Campaign               @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customer    Customer               @relation(fields: [customerId], references: [id])
 
   @@index([campaignId])
   @@index([customerId])

@@ -39,7 +39,7 @@ type CoverageConfig = {
 };
 
 type DeliveryZoneKind = 'blocked_zone' | 'custom_zone';
-type DeliveryPricingMode = 'fixed' | 'distance' | 'free';
+type DeliveryPricingMode = 'fixed' | 'distance' | 'free' | 'tiers';
 
 type PolygonCoordinates = ReadonlyArray<readonly [number, number]>; // [[lng,lat],...]
 
@@ -81,6 +81,12 @@ type DeliveryRateRule = {
   fixedFee: string | null;
   pricePerKm: string | null;
   blocksDelivery: boolean;
+  distanceTiers?: Array<{
+    id: string;
+    minDistanceKm: string;
+    maxDistanceKm: string;
+    fee: string;
+  }>;
 
   createdAt: string;
   updatedAt: string;
@@ -97,6 +103,12 @@ type ZoneForm = {
   blocksDelivery: boolean;
   fixedFee: number | null;
   pricePerKm: number | null;
+  distanceTiers: Array<{
+    id?: string;
+    minDistanceKm: number;
+    maxDistanceKm: number;
+    fee: number;
+  }>;
   polygonCoordinates: PolygonCoordinates | null;
 };
 
@@ -192,6 +204,7 @@ function strategyLabel(v: string): string {
   if (v === 'custom_zone_free') return 'Zona personalizada';
   if (v === 'custom_zone_fixed') return 'Zona personalizada';
   if (v === 'custom_zone_distance') return 'Zona personalizada';
+  if (v === 'custom_zone_tiers') return 'Faixas de distância';
   if (v === 'blocked_zone') return 'Área bloqueada';
   if (v === 'out_of_coverage') return 'Fora da área de entrega';
   if (v === 'delivery_disabled') return 'Entrega desativada';
@@ -505,6 +518,7 @@ export function DeliveryZonesPageRefactored() {
     blocksDelivery: false,
     fixedFee: 10,
     pricePerKm: 2.5,
+    distanceTiers: [],
     polygonCoordinates: null,
   }));
 
@@ -520,6 +534,7 @@ export function DeliveryZonesPageRefactored() {
       blocksDelivery: false,
       fixedFee: 10,
       pricePerKm: 2.5,
+      distanceTiers: [],
       polygonCoordinates: null,
     });
   }, []);
@@ -724,6 +739,7 @@ export function DeliveryZonesPageRefactored() {
         blocksDelivery,
         fixedFee: fixedFee ?? undefined,
         pricePerKm: pricePerKm ?? undefined,
+        distanceTiers: pricingMode === 'tiers' && zoneKind !== 'blocked_zone' ? zoneForm.distanceTiers : undefined,
         fixedRate: pricingMode === 'fixed' && zoneKind !== 'blocked_zone' ? fixedFee ?? undefined : undefined,
         ratePerKm: pricingMode === 'distance' && zoneKind !== 'blocked_zone' ? pricePerKm ?? undefined : undefined,
         rate: pricingMode === 'free' && zoneKind !== 'blocked_zone' ? 0 : undefined,
@@ -991,10 +1007,11 @@ export function DeliveryZonesPageRefactored() {
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
               Regra de cobrança
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {([
                 { mode: 'fixed' as const, label: 'Fixa' },
                 { mode: 'distance' as const, label: 'Por km' },
+                { mode: 'tiers' as const, label: 'Faixas' },
                 { mode: 'free' as const, label: 'Grátis' },
               ] as const).map((o) => (
                 <button
@@ -1073,6 +1090,101 @@ export function DeliveryZonesPageRefactored() {
             <div>
               <div className="font-bold">Entrega grátis</div>
               <div className="opacity-80">Nenhuma taxa será cobrada nesta área.</div>
+            </div>
+          </div>
+        ) : null}
+
+        {zoneForm.zoneKind !== 'blocked_zone' && zoneForm.pricingMode === 'tiers' ? (
+          <div className="space-y-4 border-t border-gray-100 dark:border-gray-800 pt-4 mt-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                Faixas de Distância
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setZoneForm((z) => {
+                    const lastMax = z.distanceTiers.length > 0 ? z.distanceTiers[z.distanceTiers.length - 1].maxDistanceKm : 0;
+                    return {
+                      ...z,
+                      distanceTiers: [...z.distanceTiers, { minDistanceKm: lastMax, maxDistanceKm: lastMax + 1, fee: 5 }]
+                    };
+                  });
+                }}
+                className="text-xs font-bold text-primary-600 dark:text-primary-400 hover:underline flex items-center gap-1"
+              >
+                <Plus className="h-3 w-3" /> Adicionar faixa
+              </button>
+            </div>
+
+            {zoneForm.distanceTiers.length === 0 && (
+              <div className="text-sm text-gray-500 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-100 dark:border-gray-800">
+                Nenhuma faixa configurada. Adicione faixas para cobrar.
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {zoneForm.distanceTiers.map((tier, idx) => (
+                <div key={idx} className="flex flex-wrap sm:flex-nowrap items-center gap-2 bg-gray-50 dark:bg-gray-800/30 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800 relative">
+                  <div className="flex-1 min-w-[80px]">
+                    <label className="block text-[10px] uppercase font-bold text-gray-500 mb-1">De (km)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      value={tier.minDistanceKm}
+                      onChange={(e) => {
+                        const newTiers = [...zoneForm.distanceTiers];
+                        newTiers[idx].minDistanceKm = Number(e.target.value);
+                        setZoneForm((z) => ({ ...z, distanceTiers: newTiers }));
+                      }}
+                      className="w-full h-9 px-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[80px]">
+                    <label className="block text-[10px] uppercase font-bold text-gray-500 mb-1">Até (km)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.1}
+                      value={tier.maxDistanceKm}
+                      onChange={(e) => {
+                        const newTiers = [...zoneForm.distanceTiers];
+                        newTiers[idx].maxDistanceKm = Number(e.target.value);
+                        setZoneForm((z) => ({ ...z, distanceTiers: newTiers }));
+                      }}
+                      className="w-full h-9 px-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[90px]">
+                    <label className="block text-[10px] uppercase font-bold text-gray-500 mb-1">Valor (R$)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      value={tier.fee}
+                      onChange={(e) => {
+                        const newTiers = [...zoneForm.distanceTiers];
+                        newTiers[idx].fee = Number(e.target.value);
+                        setZoneForm((z) => ({ ...z, distanceTiers: newTiers }));
+                      }}
+                      className="w-full h-9 px-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div className="flex items-end pb-[2px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newTiers = zoneForm.distanceTiers.filter((_, i) => i !== idx);
+                        setZoneForm((z) => ({ ...z, distanceTiers: newTiers }));
+                      }}
+                      className="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors h-9 flex items-center justify-center"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ) : null}
