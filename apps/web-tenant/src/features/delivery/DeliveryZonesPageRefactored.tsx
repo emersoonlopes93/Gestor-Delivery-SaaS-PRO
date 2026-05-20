@@ -1335,7 +1335,7 @@ export function DeliveryZonesPageRefactored() {
         </div>
       </div>
 
-      <div className="h-full bg-gray-50 dark:bg-gray-900/50 relative" style={{ isolation: 'isolate' }}>
+      <div className="flex-1 min-w-0 h-full bg-gray-50 dark:bg-gray-900/50 relative" style={{ isolation: 'isolate' }}>
         <div className="absolute inset-0">
           <MapContainer
             center={mapCenter}
