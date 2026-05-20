@@ -266,7 +266,7 @@ export class MetaCloudProvider implements IWhatsAppProvider {
     }
   }
 
-  parseWebhook(_payload: Record<string, unknown>, _tenantId: string): WhatsAppWebhookEvent | null {
+  parseWebhook(_payload: unknown, _tenantId: string): WhatsAppWebhookEvent | null {
     // Implementação simplificada para Meta Cloud
     return null;
   }

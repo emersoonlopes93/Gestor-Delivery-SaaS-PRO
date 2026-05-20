@@ -27,8 +27,13 @@ interface FranchiseStats {
   }>;
 }
 
+interface FranchiseGroup {
+  id: string;
+  name: string;
+}
+
 export function FranchiseDashboard() {
-  const [groups, setGroups] = useState<any[]>([]);
+  const [groups, setGroups] = useState<FranchiseGroup[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [stats, setStats] = useState<FranchiseStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -36,7 +41,7 @@ export function FranchiseDashboard() {
   useEffect(() => {
     const fetchGroups = async () => {
       try {
-        const res = await api.get<any[]>('/admin/franchises');
+        const res = await api.get<FranchiseGroup[]>('/admin/franchises');
         setGroups(res.data);
         if (res.data.length > 0) {
           setSelectedGroupId(res.data[0].id);

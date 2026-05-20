@@ -70,7 +70,7 @@ export class TenantUserService {
 
         if (roles.length > 0) {
           await tx.tenantUserRole.createMany({
-            data: roles.map((role: any) => ({
+            data: roles.map((role) => ({
               userId: user.id,
               roleId: role.id,
             })),
@@ -117,7 +117,7 @@ export class TenantUserService {
           });
 
           await tx.tenantUserRole.createMany({
-            data: roles.map((role: any) => ({
+            data: roles.map((role) => ({
               userId: id,
               roleId: role.id,
             })),

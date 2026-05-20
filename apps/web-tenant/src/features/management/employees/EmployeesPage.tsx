@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useEmployees } from './hooks/useEmployees';
 import { Modal } from '../../../components/Modal';
 import { EmployeeForm } from './components/EmployeeForm';
-import { TenantUser } from '@gestor/types';
+import { TenantUser, CreateEmployeeDTO } from '@gestor/types';
 
 export function EmployeesPage() {
   const { employees, roles, isLoading, error, createEmployee, updateEmployee, deleteEmployee } = useEmployees();
@@ -14,7 +14,7 @@ export function EmployeesPage() {
     setIsModalOpen(true);
   };
 
-  const handleSave = async (data: any) => {
+  const handleSave = async (data: CreateEmployeeDTO) => {
     try {
       if (editingEmployee) {
         await updateEmployee(editingEmployee.id, data);
@@ -22,8 +22,9 @@ export function EmployeesPage() {
         await createEmployee(data);
       }
       setIsModalOpen(false);
-    } catch (err: any) {
-      alert(err.message || 'Erro ao salvar funcionário');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro ao salvar funcionário';
+      alert(message);
     }
   };
 
@@ -31,8 +32,9 @@ export function EmployeesPage() {
     if (!window.confirm('Tem certeza que deseja excluir este funcionário?')) return;
     try {
       await deleteEmployee(id);
-    } catch (err: any) {
-      alert(err.message || 'Erro ao excluir funcionário');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro ao excluir funcionário';
+      alert(message);
     }
   };
 

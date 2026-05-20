@@ -35,8 +35,9 @@ export class WhatsappService {
     try {
       const result = await this.whatsappSender.sendText(tenantId, { to, text: body });
       return result.success;
-    } catch (error: any) {
-      this.logger.error(`Failed to send WhatsApp message to ${to}: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to send WhatsApp message to ${to}: ${message}`);
       return false;
     }
   }

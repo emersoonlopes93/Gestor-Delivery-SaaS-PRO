@@ -15,7 +15,7 @@ export class PrismaService
    */
   public readonly tenantClient: PrismaClient;
 
-  constructor(private readonly tenantContext: TenantContextService) {
+  constructor(public readonly tenantContext: TenantContextService) {
     const options: Prisma.PrismaClientOptions = {
       log: [
         { level: 'error', emit: 'stdout' },

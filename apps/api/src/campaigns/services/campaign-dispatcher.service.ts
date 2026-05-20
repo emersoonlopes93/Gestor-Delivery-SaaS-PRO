@@ -103,8 +103,9 @@ export class CampaignDispatcherService implements OnModuleInit, OnModuleDestroy 
         
         this.logger.log(`Added ${dispatches.length} jobs to queue for campaign ${campaign.id}`);
       }
-    } catch (error: any) {
-      this.logger.error(`Error in feedQueue: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error in feedQueue: ${message}`);
     }
   }
 }

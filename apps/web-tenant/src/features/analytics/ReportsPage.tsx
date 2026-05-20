@@ -44,7 +44,8 @@ export function ReportsPage() {
     queryFn: async () => {
       const dates = getDates();
       const res = await api.get<DashboardStatsDTO>(`/analytics/dashboard?startDate=${dates.startDate}&endDate=${dates.endDate}`);
-      return res.data;
+      if (res.success) return res.data;
+      throw new Error('Erro ao carregar dados');
     }
   });
 

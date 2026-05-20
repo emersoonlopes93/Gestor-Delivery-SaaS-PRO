@@ -9,6 +9,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { Tenant } from '@gestor/types';
 
 export function QrCodesPage() {
   const [tenantSlug, setTenantSlug] = useState('');
@@ -18,7 +19,7 @@ export function QrCodesPage() {
 
   useEffect(() => {
     const loadTenantInfo = async () => {
-      const res = await api.get<any>('/tenant/me');
+      const res = await api.get<Tenant>('/tenant/me');
       if (res.success) {
         setTenantSlug(res.data.slug);
         setTenantName(res.data.name);

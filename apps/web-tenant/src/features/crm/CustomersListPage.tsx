@@ -48,8 +48,10 @@ export function CustomersListPage() {
     try {
       setIsLoading(true);
       setError(null);
-      const res = await api.get('/crm/customers');
-      setCustomers(res.data as CustomerListItem[]);
+      const res = await api.get<CustomerListItem[]>('/crm/customers');
+      if (res.success) {
+        setCustomers(res.data);
+      }
     } catch (err) {
       console.error(err);
       setError('Erro ao carregar clientes. Verifique sua conexão.');

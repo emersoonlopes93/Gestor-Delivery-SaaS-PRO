@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
-import { ScheduledOrderStatus, TimeSlotStatus } from '@prisma/client';
+import { ScheduledOrderStatus, TimeSlotStatus, Prisma } from '@prisma/client';
 
 @Injectable()
 export class SchedulingService {
@@ -359,7 +359,7 @@ export class SchedulingService {
 
     const skip = (page - 1) * limit;
 
-    const where: any = { tenantId };
+    const where: Prisma.ScheduledOrderWhereInput = { tenantId };
     
     if (date) {
       const startOfDay = new Date(date);
@@ -470,7 +470,7 @@ export class SchedulingService {
       throw new Error('Tenant context not found');
     }
 
-    const updateData: any = { status };
+    const updateData: Prisma.ScheduledOrderUpdateInput = { status };
 
     if (status === ScheduledOrderStatus.confirmed) {
       updateData.confirmedAt = new Date();

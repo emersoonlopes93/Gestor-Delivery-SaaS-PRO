@@ -1,3 +1,5 @@
+import { registerGlobalCallback, removeGlobalCallback, isGoogleMapsLoaded } from './window-helper';
+
 /**
  * Interface para os dados estruturados de endereço retornados pelo Google Places
  */
@@ -51,18 +53,13 @@ export function loadGoogleMaps(apiKey: string): Promise<void> {
   loadPromise = new Promise((resolve, reject) => {
     if (typeof window === 'undefined') return resolve();
     
-    const win = window as unknown as Window & { 
-      google?: { maps?: { Geocoder: any } }; 
-      [key: string]: any 
-    };
-    
-    if (win.google?.maps) return resolve();
+    if (isGoogleMapsLoaded()) return resolve();
 
     const callbackName = `__googleMapsCallback_${Date.now()}`;
-    win[callbackName] = () => {
+    registerGlobalCallback(callbackName, () => {
       resolve();
-      delete win[callbackName];
-    };
+      removeGlobalCallback(callbackName);
+    });
 
     const script = document.createElement('script');
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&language=pt-BR&loading=async&callback=${callbackName}`;
@@ -70,7 +67,7 @@ export function loadGoogleMaps(apiKey: string): Promise<void> {
     script.defer = true;
     script.onerror = (e) => {
       reject(e);
-      delete (window as any)[callbackName];
+      removeGlobalCallback(callbackName);
     };
     document.head.appendChild(script);
   });
@@ -87,8 +84,8 @@ export async function geocodeAddress(address: string): Promise<{ lat: number; ln
 
   try {
     await loadGoogleMaps(apiKey);
-    const win = window as any;
-    const geocoder = new win.google.maps.Geocoder();
+    const google = window.google;
+    const geocoder = new google.maps.Geocoder();
     
     return new Promise((resolve) => {
       geocoder.geocode({ address, componentRestrictions: { country: 'BR' } }, (results: google.maps.GeocoderResult[] | null, status: google.maps.GeocoderStatus) => {

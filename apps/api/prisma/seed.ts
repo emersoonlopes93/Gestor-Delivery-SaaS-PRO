@@ -317,7 +317,7 @@ async function seedDemoTenant() {
     }
 
     // Create delivery rate rules
-    await (prisma as any).deliveryRateRule.create({
+    await prisma.deliveryRateRule.create({
       data: {
         tenantId: tenant.id,
         type: 'neighborhood',
@@ -326,7 +326,7 @@ async function seedDemoTenant() {
       },
     });
 
-    await (prisma as any).deliveryRateRule.create({
+    await prisma.deliveryRateRule.create({
       data: {
         tenantId: tenant.id,
         type: 'neighborhood',
@@ -335,7 +335,7 @@ async function seedDemoTenant() {
       },
     });
 
-    await (prisma as any).deliveryRateRule.create({
+    await prisma.deliveryRateRule.create({
       data: {
         tenantId: tenant.id,
         type: 'fixed',
@@ -496,7 +496,7 @@ async function seedDineInTables() {
 
   for (let i = 1; i <= 12; i++) {
     const tableName = `Mesa ${i.toString().padStart(2, '0')}`;
-    await (prisma as any).dineInTable.upsert({
+    await prisma.dineInTable.upsert({
       where: { tenantId_name: { tenantId: tenant.id, name: tableName } },
       update: {},
       create: {
@@ -527,7 +527,6 @@ async function main() {
 main()
   .catch((e) => {
     console.error('❌ Seed failed:', e);
-    // @ts-ignore
     process.exit(1);
   })
   .finally(async () => {

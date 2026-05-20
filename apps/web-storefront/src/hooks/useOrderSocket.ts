@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { logger } from '../lib/logger';
+import { OrderStatusUpdatedEvent } from '@gestor/types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3333';
 const socketUrl = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
 
-export function useOrderSocket(token: string | null, onStatusUpdate: (data: any) => void) {
+export function useOrderSocket(token: string | null, onStatusUpdate: (data: OrderStatusUpdatedEvent) => void) {
   useEffect(() => {
     if (!token) return;
 

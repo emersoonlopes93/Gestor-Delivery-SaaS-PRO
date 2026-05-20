@@ -21,6 +21,7 @@ import {
   CreateScheduledOrderDTO,
   CancelScheduledOrderDTO,
 } from './dto/create-scheduled-order.dto';
+import { ScheduledOrderStatus } from '@prisma/client';
 
 @Controller('scheduling')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -90,13 +91,13 @@ export class SchedulingController {
   @RequirePermissions('scheduling.view')
   async getAllScheduledOrders(
     @Query('date') date?: string,
-    @Query('status') status?: string,
+    @Query('status') status?: ScheduledOrderStatus,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     return this.schedulingService.getAllScheduledOrders(
       date ? new Date(date) : undefined,
-      status as any,
+      status,
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 20,
     );
@@ -142,20 +143,20 @@ export class SchedulingController {
   @RequirePermissions('scheduling.update')
   async updateScheduledOrderStatus(
     @Param('id') id: string,
-    @Body() data: { status: string },
+    @Body() data: { status: ScheduledOrderStatus },
   ) {
-    return this.schedulingService.updateScheduledOrderStatus(id, data.status as any);
+    return this.schedulingService.updateScheduledOrderStatus(id, data.status);
   }
 
   @Get('customers/:customerId/scheduled-orders')
   @RequirePermissions('scheduling.view')
   async getCustomerScheduledOrders(
     @Param('customerId') customerId: string,
-    @Query('status') status?: string,
+    @Query('status') status?: ScheduledOrderStatus,
   ) {
     return this.schedulingService.getCustomerScheduledOrders(
       customerId,
-      status as any,
+      status,
     );
   }
 }

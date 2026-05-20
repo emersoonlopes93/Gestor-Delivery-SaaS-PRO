@@ -196,10 +196,9 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       // O Evolution Go não expõe o número facilmente, então vamos deixar sem telefone
 
       return parsed;
-    } catch (error) {
-      const err = error as any;
-      this.logger.error(`getConnectionStatus failed: ${err.message}`);
-      console.error(`[Evolution Go] Status error:`, err.response?.data || err.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`getConnectionStatus failed: ${message}`);
       return {
         connected: false,
         state: 'disconnected',
@@ -217,14 +216,15 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       console.log(`[Evolution Go] Getting QR code for instance ${instanceId}`);
       const { data } = await client.get('/instance/qr');
       console.log(`[Evolution Go] QR response:`, data);
-      const responseData = (data as any)?.data || data;
-      const qrCode = responseData?.qrCode || responseData?.qr || responseData?.base64 || responseData?.Qrcode || null;
+      const responseData = (data && typeof data === 'object' && 'data' in data) 
+        ? (data as { data: Record<string, unknown> }).data 
+        : (data as Record<string, unknown>);
+      const qrCode = (responseData?.qrCode || responseData?.qr || responseData?.base64 || responseData?.Qrcode || null) as string | null;
       console.log(`[Evolution Go] Extracted QR code:`, qrCode ? '***FOUND***' : 'NOT FOUND');
       return qrCode;
-    } catch (error) {
-      const err = error as any;
-      this.logger.warn(`getQrCode failed: ${err.message}`);
-      console.error(`[Evolution Go] QR error:`, err.response?.data || err.message);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`getQrCode failed: ${message}`);
       return null;
     }
   }
@@ -383,11 +383,13 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     }
   }
 
-  parseWebhook(payload: Record<string, unknown>, tenantId: string): WhatsAppWebhookEvent | null {
-    const eventType = (payload?.event || (payload?.data as Record<string, unknown>)?.event || payload?.type || 'unknown') as string;
+  parseWebhook(payload: unknown, tenantId: string): WhatsAppWebhookEvent | null {
+    if (!payload || typeof payload !== 'object') return null;
+    const dataRec = payload as Record<string, unknown>;
+    const eventType = (dataRec.event || (dataRec.data as Record<string, unknown>)?.event || dataRec.type || 'unknown') as string;
     
     if (eventType === 'messages.upsert') {
-      const data = (payload?.data || payload) as Record<string, unknown>;
+      const data = (dataRec.data || dataRec) as Record<string, unknown>;
       const key = data?.key as Record<string, unknown> | undefined;
       const remoteJid = (key?.remoteJid || data?.remoteJid || data?.from) as string | undefined;
       
@@ -409,7 +411,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     }
 
     if (eventType === 'connection.update') {
-      const data = (payload?.data || payload) as Record<string, unknown>;
+      const data = (dataRec.data || dataRec) as Record<string, unknown>;
       const status = this.parseConnectionStatus(data);
       return {
         type: 'connection',
@@ -421,7 +423,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     }
 
     if (eventType === 'messages.update') {
-      const data = (payload?.data || payload) as Record<string, unknown>;
+      const data = (dataRec.data || dataRec) as Record<string, unknown>;
       const update = data?.update as Record<string, unknown> | undefined;
       const key = data?.key as Record<string, unknown> | undefined;
 

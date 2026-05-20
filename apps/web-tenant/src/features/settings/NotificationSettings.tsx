@@ -12,6 +12,7 @@ import {
 import { api } from '../../lib/api-client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNotificationAudio, AVAILABLE_SOUNDS } from '../../hooks/useNotificationAudio';
+import { Tenant, TenantSettings } from '@gestor/types';
 
 const DEFAULT_TEMPLATES = {
   confirmed: '✅ Pedido #{{orderNumber}} confirmado! {{restaurantName}} já está preparando seu pedido.',
@@ -34,7 +35,7 @@ export function NotificationSettings() {
   const { data: settings, isLoading } = useQuery({
     queryKey: ['tenant-settings-notifications'],
     queryFn: async () => {
-      const res = await api.get<{ settings: any }>('/tenant/me');
+      const res = await api.get<Tenant & { settings: TenantSettings }>('/tenant/me');
       return res.data.settings;
     }
   });

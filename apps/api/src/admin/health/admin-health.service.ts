@@ -31,7 +31,7 @@ export class AdminHealthService {
     }
 
     const hasPayment = settings?.pixKey || settings?.mercadoPagoAccessToken || 
-                      (settings?.paymentMethods && (settings.paymentMethods as any).length > 0);
+                      (settings?.paymentMethods && (settings.paymentMethods as string[]).length > 0);
     
     if (!hasPayment) {
       issues.push({ code: 'NO_PAYMENT_CONFIG', severity: 'critical', message: 'Nenhum método de pagamento configurado.' });
@@ -46,7 +46,7 @@ export class AdminHealthService {
     };
   }
 
-  private calculateScore(issues: any[]) {
+  private calculateScore(issues: Array<{ severity: string }>) {
     let base = 100;
     issues.forEach(issue => {
       if (issue.severity === 'critical') base -= 40;

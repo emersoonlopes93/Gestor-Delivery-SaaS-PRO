@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { Prisma, WhatsAppProviderType, AiProviderType } from '@prisma/client';
 
 @Injectable()
 export class SystemConfigService implements OnModuleInit {
@@ -11,8 +12,8 @@ export class SystemConfigService implements OnModuleInit {
       where: { id: 'global' },
       create: {
         id: 'global',
-        defaultWhatsAppProvider: 'evolution_go',
-        defaultAiProvider: 'openai',
+        defaultWhatsAppProvider: WhatsAppProviderType.evolution_go,
+        defaultAiProvider: AiProviderType.openai,
       },
       update: {},
     });
@@ -24,24 +25,25 @@ export class SystemConfigService implements OnModuleInit {
     });
   }
 
-  async updateConfig(data: any) {
+  async updateConfig(data: Record<string, unknown>) {
     // Removemos campos que não devem ser atualizados manualmente
     const { id: _id, updatedAt: _updatedAt, createdAt: _createdAt, ...updateData } = data;
 
     try {
       return await this.prisma.systemConfig.upsert({
         where: { id: 'global' },
-        update: updateData,
+        update: updateData as Prisma.SystemConfigUpdateInput,
         create: {
           id: 'global',
-          ...updateData,
-          defaultWhatsAppProvider: updateData.defaultWhatsAppProvider || 'evolution_go',
-          defaultAiProvider: updateData.defaultAiProvider || 'openai',
+          ...(updateData as Prisma.SystemConfigCreateInput),
+          defaultWhatsAppProvider: (updateData.defaultWhatsAppProvider as WhatsAppProviderType) || WhatsAppProviderType.evolution_go,
+          defaultAiProvider: (updateData.defaultAiProvider as AiProviderType) || AiProviderType.openai,
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       console.error('Error in SystemConfigService.updateConfig:', error);
-      throw new InternalServerErrorException(`Database error: ${error.message}`);
+      throw new InternalServerErrorException(`Database error: ${message}`);
     }
   }
 }

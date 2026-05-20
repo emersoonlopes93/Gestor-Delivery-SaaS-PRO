@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { Prisma } from '@prisma/client';
 
 export interface AuditLogFilters {
   tenantId?: string;
@@ -20,7 +21,7 @@ export class AdminAuditLogsService {
     const pageSize = filters.pageSize || 25;
     const skip = (page - 1) * pageSize;
 
-    const where: any = {};
+    const where: Prisma.AuditLogWhereInput = {};
 
     if (filters.tenantId) {
       where.tenantId = filters.tenantId;

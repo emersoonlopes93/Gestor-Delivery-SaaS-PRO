@@ -8,7 +8,7 @@ type LogLevel = 'info' | 'warn' | 'error';
 class Logger {
   private isProd = import.meta.env.PROD;
 
-  log(message: string, data?: any, level: LogLevel = 'info') {
+  log(message: string, data?: unknown, level: LogLevel = 'info') {
     if (!this.isProd) {
       const colors = {
         info: '#2563eb',
@@ -30,11 +30,11 @@ class Logger {
     }
   }
 
-  error(message: string, error?: any) {
+  error(message: string, error?: unknown) {
     this.log(message, error, 'error');
   }
 
-  warn(message: string, data?: any) {
+  warn(message: string, data?: unknown) {
     this.log(message, data, 'warn');
   }
 }

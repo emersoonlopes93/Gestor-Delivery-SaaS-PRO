@@ -4,6 +4,7 @@
 
 import { TenantStatus } from './enums';
 import { TenantRole } from './rbac';
+export type { TenantRole };
 
 export interface Tenant {
   id: string;

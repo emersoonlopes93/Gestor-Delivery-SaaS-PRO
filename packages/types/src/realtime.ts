@@ -7,13 +7,6 @@ export interface OrderBoardUpdatedEvent {
   updatedAt: string;
 }
 
-export interface KdsOrderUpdatedEvent {
-  tenantId: string;
-  orderId: string;
-  kitchenStatus: string;
-  updatedAt: string;
-}
-
 export interface DriverLocationUpdatedEvent {
   tenantId: string;
   driverId: string;

@@ -59,9 +59,10 @@ export function PromotionsPage() {
       await api.post('/promotions/coupons', payload);
       setShowModal(false);
       loadCoupons();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      alert(err.response?.data?.message || 'Erro ao criar cupom');
+      const message = err instanceof Error ? err.message : 'Erro ao criar cupom';
+      alert(message);
     }
   };
 

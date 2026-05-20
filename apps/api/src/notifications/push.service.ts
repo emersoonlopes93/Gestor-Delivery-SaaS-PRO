@@ -64,7 +64,7 @@ export class PushService {
     subscription: PushSubscriptionPayload,
     title: string,
     _body: string,
-    _data?: Record<string, any>,
+    _data?: Record<string, unknown>,
   ): Promise<boolean> {
     if (!this.isConfigured) {
       this.logger.warn('VAPID keys not configured. Skipping push notification.');
@@ -75,8 +75,9 @@ export class PushService {
       // Em produção, usar: await webpush.sendNotification(subscription, JSON.stringify({title, body, data}));
       this.logger.log(`Push notification sent: "${title}" -> ${subscription.endpoint.substring(0, 60)}...`);
       return true;
-    } catch (error: any) {
-      this.logger.error(`Failed to send push notification: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to send push notification: ${message}`);
       return false;
     }
   }

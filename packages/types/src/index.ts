@@ -42,6 +42,10 @@ export type * from './campaigns';
 export type * from './chat';
 export type * from './realtime';
 export type * from './split-payment';
+export * from './kds';
+export type * from './notifications';
+export type * from './employees';
+export type * from './settings';
 
 // Modules with classes or constants (explicit values)
 export type { 

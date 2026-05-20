@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class OnboardingService {
@@ -20,21 +21,24 @@ export class OnboardingService {
   }
 
   async updateStep(tenantId: string, step: string, completed: boolean = true) {
-    const data: any = {};
-    
     // Mapeamento de nomes de passos para campos no banco (caso não sigam o padrão simples)
-    const stepMapping: Record<string, string> = {
+    const stepMapping: Record<string, keyof Prisma.TenantOnboardingUpdateInput> = {
       'payment': 'stepPayments',
       'payments': 'stepPayments',
     };
 
-    const fieldName = stepMapping[step] || `step${step.charAt(0).toUpperCase()}${step.slice(1)}`;
-    data[fieldName] = completed;
+    const fieldName = (stepMapping[step] || `step${step.charAt(0).toUpperCase()}${step.slice(1)}`) as keyof Prisma.TenantOnboardingUpdateInput;
+    const updateData: Prisma.TenantOnboardingUpdateInput = {
+      [fieldName]: completed
+    };
 
     const onboarding = await this.prisma.tenantOnboarding.upsert({
       where: { tenantId },
-      create: { ...data, tenantId },
-      update: data,
+      create: { 
+        tenantId,
+        [fieldName]: completed
+      } as Prisma.TenantOnboardingUncheckedCreateInput,
+      update: updateData,
     });
 
     // Check if all essential steps are completed

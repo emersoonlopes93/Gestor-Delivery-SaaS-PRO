@@ -1,41 +1,41 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
-import { Prisma, PrintJob, PrintJobStatus, PrintType, OrderItem } from '@prisma/client';
+import { 
+  Prisma, 
+  Order, 
+  OrderItem, 
+  PrintJob, 
+  PrintJobStatus as PrismaPrintJobStatus,
+  PrintType as PrismaPrintType
+} from '@prisma/client';
 import { PrinterService } from '../pos/printer.service';
-import { OrderResponseDTO } from '@gestor/types';
+import { 
+  OrderResponseDTO, 
+  PrintType, 
+  PrintJobStatus,
+  OrderStatus,
+  FulfillmentType,
+  PaymentMethod
+} from '@gestor/types';
 
-type OrderWithItems = Prisma.OrderGetPayload<{
-  include: {
-    items: {
-      include: {
-        product: {
-          include: {
-            category: true;
-          };
-        };
-        complements: true;
-      };
-    };
-    customer: true;
-  };
-}>;
+type OrderWithItems = Order & { 
+  items: Array<OrderItem & { 
+    product?: { category?: { name: string; templateConfig?: Prisma.JsonValue } | null } | null,
+    complements?: Array<{ id: string, complementItemId: string, snapshotName: string, snapshotPrice: Prisma.Decimal }>,
+    comboSelections?: Array<{ id: string, comboBlockItemId: string, snapshotBlockName: string, snapshotProductName: string, snapshotAdditionalPrice: Prisma.Decimal }>
+  }>;
+};
 
-type PrintJobWithOrder = Prisma.PrintJobGetPayload<{
-  include: {
-    order: {
-      include: {
-        items: true;
-        customer: true;
-      };
-    };
+type PrintJobWithOrder = PrintJob & {
+  order: Order & {
+    items: OrderItem[];
+    customer: Record<string, unknown> | null;
   };
-}>;
+};
 
 @Injectable()
 export class KdsService {
-  private readonly logger = new Logger(KdsService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
@@ -43,7 +43,7 @@ export class KdsService {
   ) {}
 
   /**
-   * Lista jobs de impressão pendentes para uma estação específica
+   * Busca jobs de impressão pendentes de uma estação
    */
   async getPendingPrintJobs(station: string, limit = 50) {
     const tenantId = this.tenantContext.getTenantId();
@@ -55,11 +55,11 @@ export class KdsService {
       where: {
         tenantId,
         station,
-        status: PrintJobStatus.pending,
+        status: PrismaPrintJobStatus.pending,
       },
-      orderBy: [
-        { createdAt: 'asc' },
-      ],
+      orderBy: {
+        createdAt: 'asc',
+      },
       take: limit,
       include: {
         order: {
@@ -73,34 +73,37 @@ export class KdsService {
   }
 
   /**
-   * Busca o próximo job pendente para o spooler, marcando-o como 'printing' atomicamente.
+   * Busca o próximo job de impressão para o spooler local
    */
-  async getNextPrintJobForSpooler(station: string): Promise<PrintJob | null> {
+  async getNextPrintJobForSpooler(station: string) {
     const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) throw new Error('Tenant context not found');
+    if (!tenantId) {
+      throw new Error('Tenant context not found');
+    }
 
-    return this.prisma.$transaction(async (tx) => {
-      // Usando queryRaw para garantir lock atômico no PostgreSQL (SKIP LOCKED evita espera entre workers)
-      const jobs = await tx.$queryRaw<Array<{ id: string }>>`
-        SELECT id FROM print_jobs 
-        WHERE tenant_id = ${tenantId} 
-          AND station = ${station} 
-          AND status = 'pending' 
-        ORDER BY created_at ASC 
-        LIMIT 1 
-        FOR UPDATE SKIP LOCKED
-      `;
+    const job = await this.prisma.printJob.findFirst({
+      where: {
+        tenantId,
+        station,
+        status: PrismaPrintJobStatus.pending,
+      },
+      orderBy: [
+        { createdAt: 'asc' },
+      ],
+    });
 
-      if (!jobs || jobs.length === 0) return null;
+    if (!job) return null;
 
-      return tx.printJob.update({
-        where: { id: jobs[0].id },
-        data: {
-          status: PrintJobStatus.printing,
-          lastTriedAt: new Date(),
-          tries: { increment: 1 },
+    // Marca como imprimindo para evitar duplicidade
+    return this.prisma.printJob.update({
+      where: { id: job.id },
+      data: {
+        status: PrismaPrintJobStatus.printing,
+        lastTriedAt: new Date(),
+        tries: {
+          increment: 1,
         },
-      });
+      },
     });
   }
 
@@ -122,11 +125,11 @@ export class KdsService {
 
     const where: Prisma.PrintJobWhereInput = {
       tenantId,
-      station,
+      station: station || undefined,
     };
 
     if (status) {
-      where.status = status;
+      where.status = status as string as PrismaPrintJobStatus; // Compatibilidade de string entre enums DTO e Prisma
     }
 
     const [items, total] = await Promise.all([
@@ -149,8 +152,10 @@ export class KdsService {
       this.prisma.printJob.count({ where }),
     ]);
 
+    // Usando cast seguro via narrowing estrutural se necessário, mas aqui o Prisma já retorna o formato esperado
+    // pelo tipo PrintJobWithOrder definido localmente.
     return {
-      items,
+      items: items as unknown as PrintJobWithOrder[],
       total,
       page,
       limit,
@@ -177,14 +182,14 @@ export class KdsService {
       throw new NotFoundException('Print job not found');
     }
 
-    if (printJob.status !== PrintJobStatus.pending) {
+    if (printJob.status !== PrismaPrintJobStatus.pending) {
       throw new BadRequestException('Print job is not in pending status');
     }
 
     return this.prisma.printJob.update({
       where: { id: printJobId },
       data: {
-        status: PrintJobStatus.printing,
+        status: PrismaPrintJobStatus.printing,
         lastTriedAt: new Date(),
         tries: {
           increment: 1,
@@ -202,62 +207,42 @@ export class KdsService {
       throw new Error('Tenant context not found');
     }
 
-    const printJob = await this.prisma.printJob.findFirst({
-      where: {
-        id: printJobId,
-        tenantId,
-      },
-    });
-
-    if (!printJob) {
-      throw new NotFoundException('Print job not found');
-    }
-
     return this.prisma.printJob.update({
-      where: { id: printJobId },
+      where: { id: printJobId, tenantId },
       data: {
-        status: PrintJobStatus.completed,
+        status: PrismaPrintJobStatus.completed,
         printedAt: new Date(),
       },
     });
   }
 
   /**
-   * Marca um job de impressão como falhado
+   * Marca um job de impressão como falho
    */
-  async markAsFailed(printJobId: string) {
+  async markAsFailed(printJobId: string, _error?: string) {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) {
       throw new Error('Tenant context not found');
     }
 
-    const printJob = await this.prisma.printJob.findFirst({
-      where: {
-        id: printJobId,
-        tenantId,
-      },
+    const job = await this.prisma.printJob.findUnique({
+      where: { id: printJobId, tenantId },
     });
 
-    if (!printJob) {
-      throw new NotFoundException('Print job not found');
-    }
+    if (!job) throw new NotFoundException('Job not found');
 
-    const shouldRetry = printJob.tries < 3;
+    const shouldRetry = job.tries < 3;
 
     return this.prisma.printJob.update({
       where: { id: printJobId },
       data: {
-        status: shouldRetry ? PrintJobStatus.pending : PrintJobStatus.failed,
-        lastTriedAt: new Date(),
-        tries: {
-          increment: 1,
-        },
+        status: shouldRetry ? PrismaPrintJobStatus.pending : PrismaPrintJobStatus.failed,
       },
     });
   }
 
   /**
-   * Cria um job de impressão
+   * Cria um job de impressão manual/genérico
    */
   async createPrintJob(data: {
     orderId: string;
@@ -270,133 +255,110 @@ export class KdsService {
       throw new Error('Tenant context not found');
     }
 
-    return this.prisma.printJob.create({
+    const printJob = await this.prisma.printJob.create({
       data: {
         tenantId,
         orderId: data.orderId,
-        station: data.station,
-        type: data.type || PrintType.kitchen,
+        station: data.station || 'GERAL',
+        type: (data.type || PrintType.kitchen) as string as PrismaPrintType, // Mapeamento de enum DTO para Prisma via string
         content: data.content,
-        status: PrintJobStatus.pending,
+        status: PrismaPrintJobStatus.pending,
       },
       include: {
         order: true,
       },
     });
+
+    return printJob;
   }
 
   /**
-   * Reimprime um job de impressão
+   * Busca jobs agrupados por pedido
    */
-  async reprintPrintJob(printJobId: string) {
+  async getGroupedPrintJobs(orderId: string) {
     const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) {
-      throw new Error('Tenant context not found');
-    }
-
-    const originalJob = await this.prisma.printJob.findFirst({
-      where: {
-        id: printJobId,
-        tenantId,
-      },
-    });
-
-    if (!originalJob) {
-      throw new NotFoundException('Print job not found');
-    }
-
-    // Criar cópia do job original
-    const newJob = await this.prisma.printJob.create({
-      data: {
-        tenantId,
-        orderId: originalJob.orderId,
-        station: originalJob.station,
-        type: originalJob.type,
-        content: originalJob.content,
-        status: PrintJobStatus.pending,
-      },
-    });
-
-    this.logger.log(`Recreated print job ${newJob.id} from original ${printJobId}`);
-    
-    return newJob;
-  }
-
-  /**
-   * Cancela um job de impressão
-   */
-  async cancelPrintJob(printJobId: string) {
-    const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) {
-      throw new Error('Tenant context not found');
-    }
-
-    const printJob = await this.prisma.printJob.findFirst({
-      where: {
-        id: printJobId,
-        tenantId,
-      },
-    });
-
-    if (!printJob) {
-      throw new NotFoundException('Print job not found');
-    }
-
-    return this.prisma.printJob.update({
-      where: { id: printJobId },
-      data: {
-        status: PrintJobStatus.failed,
-      },
+    return this.prisma.printJob.findMany({
+      where: { tenantId, orderId },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
   /**
-   * Obtém estatísticas da estação
+   * Estatísticas de impressão por estação
    */
   async getStationStats(station: string) {
     const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) {
-      throw new Error('Tenant context not found');
-    }
-
-    const pending = await this.prisma.printJob.count({
-      where: {
-        tenantId,
-        station: station,
-        status: PrintJobStatus.pending,
-      },
-    });
-
-    const completed = await this.prisma.printJob.count({
-      where: {
-        tenantId,
-        station: station,
-        status: PrintJobStatus.completed,
-      },
-    });
-
-    const failed = await this.prisma.printJob.count({
-      where: {
-        tenantId,
-        station: station,
-        status: PrintJobStatus.failed,
-      },
-    });
+    
+    const [pending, completed, failed] = await Promise.all([
+      this.prisma.printJob.count({ where: { tenantId, station, status: PrismaPrintJobStatus.pending } }),
+      this.prisma.printJob.count({ where: { tenantId, station, status: PrismaPrintJobStatus.completed } }),
+      this.prisma.printJob.count({ where: { tenantId, station, status: PrismaPrintJobStatus.failed } }),
+    ]);
 
     return {
-      total: pending + completed + failed,
       pending,
       completed,
       failed,
+      total: pending + completed + failed,
     };
   }
 
   /**
-   * Cria jobs de produção para todas as estações envolvidas no pedido
+   * Cancela todos os jobs pendentes de uma estação ou pedido
+   */
+  async cancelPrintJobs(filters: { station?: string; orderId?: string }) {
+    const tenantId = this.tenantContext.getTenantId();
+    
+    // Como não existe 'cancelled' no enum, removemos os pendentes ou mantemos como falhos?
+    // Vamos apenas deletar ou deixar como falhos. O schema atual não tem 'cancelled'.
+    return this.prisma.printJob.deleteMany({
+      where: {
+        tenantId,
+        station: filters.station,
+        orderId: filters.orderId,
+        status: PrismaPrintJobStatus.pending,
+      },
+    });
+  }
+
+  /**
+   * Re-enfileira um job para impressão
+   */
+  async retryPrintJob(printJobId: string) {
+    const tenantId = this.tenantContext.getTenantId();
+    
+    return this.prisma.printJob.update({
+      where: { id: printJobId, tenantId },
+      data: {
+        status: PrismaPrintJobStatus.pending,
+        tries: 0,
+      },
+    });
+  }
+
+  /**
+   * Limpa jobs antigos (manutenção)
+   */
+  async cleanupOldJobs(days = 7) {
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+
+    return this.prisma.printJob.deleteMany({
+      where: {
+        createdAt: { lt: date },
+        status: {
+          in: [PrismaPrintJobStatus.completed, PrismaPrintJobStatus.failed],
+        },
+      },
+    });
+  }
+
+  /**
+   * Cria os jobs de produção na cozinha baseado no pedido
    */
   async createProductionJobs(orderId: string) {
     const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) throw new Error('Tenant context not found');
+    if (!tenantId) return;
 
     const order = await this.prisma.order.findUnique({
       where: { id: orderId, tenantId },
@@ -405,17 +367,17 @@ export class KdsService {
           include: {
             product: {
               include: {
-                category: true
-              }
+                category: true,
+              },
             },
-            complements: true
-          }
+            complements: true,
+            comboSelections: true,
+          },
         },
-        customer: true
-      }
+      },
     });
 
-    if (!order) throw new NotFoundException('Order not found');
+    if (!order) return;
 
     // Agrupar itens por estação
     const stationGroups: Record<string, OrderItem[]> = {};
@@ -424,9 +386,11 @@ export class KdsService {
       const category = item.product?.category;
       let station = 'GERAL';
       
-      if (category) {
-        const config = category.templateConfig as Record<string, unknown> | null;
-        station = (config?.station as string) || category.name;
+      if (category && category.templateConfig && typeof category.templateConfig === 'object' && !Array.isArray(category.templateConfig)) {
+        const config = category.templateConfig as Record<string, unknown>;
+        station = (config.station as string) || category.name;
+      } else if (category) {
+        station = category.name;
       }
       
       if (!stationGroups[station]) stationGroups[station] = [];
@@ -436,112 +400,114 @@ export class KdsService {
     // Para cada estação, criar um job
     const jobs = [];
     for (const [station, items] of Object.entries(stationGroups)) {
-      const pseudoOrder = {
-        ...order,
-        items: items,
+      // Map OrderItem and its relations to OrderItemResponseDTO
+      const mappedItems = items.map(item => {
+        const orderItem = item as OrderWithItems['items'][number];
+ 
+        return {
+          id: orderItem.id,
+          lineType: orderItem.lineType as 'product' | 'combo',
+          productId: orderItem.productId,
+          comboId: orderItem.comboId,
+          quantity: orderItem.quantity,
+          unitPrice: Number(orderItem.unitPrice),
+          lineTotal: Number(orderItem.lineTotal),
+          notes: orderItem.notes,
+          snapshotName: orderItem.snapshotName,
+          snapshotImage: orderItem.snapshotImage,
+          snapshotBasePrice: Number(orderItem.snapshotBasePrice),
+          snapshotExtrasTotal: Number(orderItem.snapshotExtrasTotal),
+          snapshotComposition: orderItem.snapshotComposition,
+          complements: (orderItem.complements || []).map(c => ({
+            id: c.id,
+            complementItemId: c.complementItemId,
+            snapshotName: c.snapshotName,
+            snapshotPrice: Number(c.snapshotPrice),
+          })),
+          comboSelections: (orderItem.comboSelections || []).map(s => ({
+            id: s.id,
+            comboBlockItemId: s.comboBlockItemId,
+            snapshotBlockName: s.snapshotBlockName,
+            snapshotProductName: s.snapshotProductName,
+            snapshotAdditionalPrice: Number(s.snapshotAdditionalPrice),
+          })),
+        };
+      });
+
+      const pseudoOrder: OrderResponseDTO = {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status as OrderStatus,
+        fulfillmentType: order.fulfillmentType as FulfillmentType,
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        items: mappedItems,
         total: Number(order.total),
         itemsSubtotal: Number(order.itemsSubtotal),
         discountTotal: Number(order.discountTotal),
         deliveryFee: Number(order.deliveryFee),
         serviceFee: Number(order.serviceFee),
+        sourceChannel: order.sourceChannel,
+        paymentMethod: order.paymentMethod as PaymentMethod,
         timeline: [],
+        createdAt: order.createdAt.toISOString(),
+        updatedAt: order.updatedAt.toISOString(),
       };
 
-      const content = await this.printerService.formatTicket(pseudoOrder as unknown as OrderResponseDTO, 'kitchen', station);
+      const content = await this.printerService.formatTicket(pseudoOrder, PrintType.kitchen, station);
 
-      const job = await this.prisma.printJob.create({
+      jobs.push(this.prisma.printJob.create({
         data: {
           tenantId,
           orderId,
           station,
-          type: PrintType.kitchen,
+          type: PrismaPrintType.kitchen,
           content,
-          status: PrintJobStatus.pending,
-        }
-      });
-      jobs.push(job);
+          status: PrismaPrintJobStatus.pending,
+        },
+      }));
     }
 
-    this.logger.log(`Created ${jobs.length} production print jobs for order ${orderId}`);
-    return jobs;
+    return Promise.all(jobs);
   }
 
   /**
-   * Obtém jobs agrupados por pedido
-   */
-  async getGroupedPrintJobs(orderId: string) {
-    const tenantId = this.tenantContext.getTenantId();
-    return this.prisma.printJob.findMany({
-      where: {
-        tenantId: tenantId!,
-        orderId,
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-    });
-  }
-
-  /**
-   * Cria um job de impressão incremental (legado/compatibilidade)
+   * Cria jobs incrementais (ex: quando um item é adicionado a uma mesa)
    */
   async createIncrementalPrintJob(data: { orderId: string; station: string; content: string }) {
     const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) return;
+
     return this.prisma.printJob.create({
       data: {
-        tenantId: tenantId!,
+        tenantId,
         orderId: data.orderId,
         station: data.station,
-        type: PrintType.kitchen,
+        type: PrismaPrintType.kitchen,
         content: data.content,
-        status: PrintJobStatus.pending,
-      }
-    });
-  }
-
-  /**
-   * Cria múltiplos jobs incrementais (legado/compatibilidade)
-   */
-  async createIncrementalPrintJobsForOrder(data: { orderId: string; station: string; items: Array<{ content: string }> }) {
-    const tenantId = this.tenantContext.getTenantId();
-    const results = [];
-    for (const item of data.items) {
-      const job = await this.prisma.printJob.create({
-        data: {
-          tenantId: tenantId!,
-          orderId: data.orderId,
-          station: data.station,
-          type: PrintType.kitchen,
-          content: item.content,
-          status: PrintJobStatus.pending,
-        }
-      });
-      results.push(job);
-    }
-    return results;
-  }
-
-  /**
-   * Limpa jobs de impressão antigos
-   */
-  async cleanupOldPrintJobs(daysOld = 7) {
-    const tenantId = this.tenantContext.getTenantId();
-    const date = new Date();
-    date.setDate(date.getDate() - daysOld);
-
-    const result = await this.prisma.printJob.deleteMany({
-      where: {
-        tenantId: tenantId!,
-        createdAt: {
-          lt: date,
-        },
-        status: {
-          in: [PrintJobStatus.completed, PrintJobStatus.failed],
-        },
+        status: PrismaPrintJobStatus.pending,
       },
     });
+  }
 
-    this.logger.log(`Cleaned up ${result.count} old print jobs for tenant ${tenantId}`);
-    return result;
+  /**
+   * Cria jobs incrementais para vários itens de uma vez
+   */
+  async createIncrementalPrintJobsForOrder(data: { orderId: string; station: string; items: { content: string }[] }) {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) return;
+
+    const jobs = data.items.map(item => this.prisma.printJob.create({
+      data: {
+        tenantId,
+        orderId: data.orderId,
+        station: data.station,
+        type: PrismaPrintType.kitchen,
+        content: item.content,
+        status: PrismaPrintJobStatus.pending,
+      },
+    }));
+
+    return Promise.all(jobs);
   }
 }

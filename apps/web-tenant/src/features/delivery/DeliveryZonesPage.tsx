@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api-client';
+import { createPolygonDrawer } from '@/lib/leaflet-draw-helper';
 import type { LatLngExpression } from 'leaflet';
 import { Tenant } from '@gestor/types';
 
@@ -390,7 +391,7 @@ const ZoneDrawLayer = memo(function ZoneDrawLayer(props: {
       return;
     }
 
-    const drawer = new L.Draw.Polygon(map as any, {
+    const drawer = createPolygonDrawer(map, {
       allowIntersection: false,
       showArea: true,
       shapeOptions: {

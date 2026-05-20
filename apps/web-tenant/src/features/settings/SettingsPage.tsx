@@ -85,12 +85,12 @@ export function SettingsPage() {
   const loadSettings = async () => {
     setLoading(true);
     try {
-      const response = await api.get<Tenant & { settings: TenantSettings }>('/tenant/me');
+      const response = await api.get<Tenant & { settings: TenantSettings; businessGroupId?: string | null }>('/tenant/me');
       if (response.success) {
         if (response.data.settings) {
           setSettings({
             ...response.data.settings,
-            businessGroupId: (response.data as any).businessGroupId
+            businessGroupId: response.data.businessGroupId
           });
         }
       }
@@ -103,7 +103,7 @@ export function SettingsPage() {
 
   const loadOperatingHours = async () => {
     try {
-      const response = await api.get<any[]>('/tenant/operating-hours');
+      const response = await api.get<OperatingHourForm[]>('/tenant/operating-hours');
       if (response.success) {
         if (response.data.length === 0) {
           // Initialize with 7 days
@@ -248,9 +248,10 @@ export function SettingsPage() {
       if (response.success) {
         setSettings({ ...settings, logoUrl: response.data.url });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro no upload:', error);
-      alert(error.message || 'Erro ao fazer upload da imagem.');
+      const message = error instanceof Error ? error.message : 'Erro ao fazer upload da imagem.';
+      alert(message);
     } finally {
       setUploading(false);
     }
@@ -263,16 +264,17 @@ export function SettingsPage() {
       if (res.success) {
         alert('Horários de funcionamento atualizados!');
       }
-    } catch (error: any) {
-      alert(error.message || 'Erro ao salvar horários.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro ao salvar horários.';
+      alert(message);
     } finally {
       setSaving(false);
     }
   };
 
-  const updateDay = (index: number, field: string, value: any) => {
+  const updateDay = (index: number, field: keyof OperatingHourForm, value: string | boolean) => {
     const newHours = [...hours];
-    newHours[index] = { ...newHours[index], [field]: value };
+    newHours[index] = { ...newHours[index], [field]: value } as OperatingHourForm;
     setHours(newHours);
   };
 

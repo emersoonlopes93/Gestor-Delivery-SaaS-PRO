@@ -11,6 +11,17 @@ import { api } from '../../lib/api-client';
 import { useQuery } from '@tanstack/react-query';
 
 
+import { 
+  PrintJobDTO,
+} from '@gestor/types';
+
+interface StationStats {
+  pending: number;
+  completed: number;
+  failed: number;
+  total: number;
+}
+
 export function PrinterSettings() {
 
   const [isSpoolerRunning, setIsSpoolerRunning] = useState(false);
@@ -19,10 +30,10 @@ export function PrinterSettings() {
   const [pollingInterval, setPollingInterval] = useState<number>(3000);
 
   // Stats
-  const { data: stats } = useQuery<any>({
+  const { data: stats } = useQuery<StationStats>({
     queryKey: ['printer-stats', selectedStation],
     queryFn: async () => {
-      const res = await api.get(`/kds/stations/${selectedStation}/stats`);
+      const res = await api.get<StationStats>(`/kds/stations/${selectedStation}/stats`);
       return res.data;
     },
     refetchInterval: 10000,
@@ -34,14 +45,14 @@ export function PrinterSettings() {
 
   // Lógica do Spooler Local (Simulado via Browser)
   useEffect(() => {
-    let timeoutId: any;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const poll = async () => {
       if (!isSpoolerRunning) return;
 
       try {
-        const res = await api.post('/kds/spooler/next', { station: selectedStation });
-        const job = res.data as any;
+        const res = await api.post<PrintJobDTO>('/kds/spooler/next', { station: selectedStation });
+        const job = res.data;
 
         if (job && job.id) {
           addLog(`Job #${job.id} recebido. Imprimindo...`);
@@ -76,7 +87,9 @@ export function PrinterSettings() {
       addLog('Spooler parado.');
     }
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [isSpoolerRunning, selectedStation, pollingInterval]);
 
   return (

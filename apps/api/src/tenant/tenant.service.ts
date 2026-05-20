@@ -3,6 +3,7 @@ import { PrismaService } from '../database/prisma.service';
 import { TenantStatus } from '@gestor/core';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import type { TenantOperatingHours } from '@gestor/types';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class TenantService {
@@ -75,18 +76,19 @@ export class TenantService {
    * Update tenant settings.
    */
   async updateSettings(tenantId: string, dto: UpdateTenantSettingsDto) {
-    const data = {
+    const data: Prisma.TenantSettingsUpdateInput = {
       ...dto,
-      notificationTemplates: dto.notificationTemplates as any,
+      notificationTemplates: dto.notificationTemplates as Prisma.InputJsonValue,
     };
 
     return this.prisma.tenantSettings.upsert({
       where: { tenantId },
       create: {
-        ...data,
+        ...dto,
         tenantId,
-      } as any,
-      update: data as any,
+        notificationTemplates: dto.notificationTemplates as Prisma.InputJsonValue,
+      } as Prisma.TenantSettingsUncheckedCreateInput,
+      update: data,
     });
   }
 

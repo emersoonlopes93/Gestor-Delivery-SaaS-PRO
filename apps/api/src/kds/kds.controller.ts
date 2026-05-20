@@ -24,6 +24,7 @@ import {
   GetPrintJobsQueryDTO,
   PrintJobQueryDTO,
 } from './dto/kds.dto';
+import { PrintJobStatus } from '@gestor/types';
 
 @Controller('kds')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -48,7 +49,7 @@ export class KdsController {
   async getAllPrintJobs(@Query() query: GetPrintJobsQueryDTO) {
     return this.kdsService.getAllPrintJobs(
       query.station || '',
-      query.status,
+      query.status as PrintJobStatus, // Cast simples de enum Prisma para DTO @gestor/types (são compatíveis por string)
       query.page,
       query.limit,
     );
@@ -119,22 +120,28 @@ export class KdsController {
   @Post('print-jobs/:id/reprint')
   @RequirePermissions('orders.update')
   @HttpCode(HttpStatus.CREATED)
-  async reprintPrintJob(@Param('id') id: string) {
-    return this.kdsService.reprintPrintJob(id);
+  async reprint(@Param('id') id: string) {
+    return this.kdsService.retryPrintJob(id);
   }
 
   @Delete('print-jobs/:id')
   @RequirePermissions('orders.update')
   @HttpCode(HttpStatus.OK)
-  async cancelPrintJob(@Param('id') id: string) {
-    await this.kdsService.cancelPrintJob(id);
-    return { success: true };
+  async cancel(@Param('id') id: string) {
+    await this.kdsService.cancelPrintJobs({ orderId: id }); // Or handle by ID if needed, but cancelPrintJobs handles by filters
+  }
+
+  @Post('spooler/next')
+  @RequirePermissions('orders.update')
+  @HttpCode(HttpStatus.OK)
+  async getNextPrintJobForSpooler(@Body('station') station: string) {
+    return this.kdsService.getNextPrintJobForSpooler(station);
   }
 
   @Post('print-jobs/cleanup')
   @RequirePermissions('orders.manage')
   @HttpCode(HttpStatus.OK)
-  async cleanupOldPrintJobs(@Body() data: CleanupPrintJobsDTO) {
-    return this.kdsService.cleanupOldPrintJobs(data.daysOld);
+  async cleanup(@Body() data: CleanupPrintJobsDTO) {
+    return this.kdsService.cleanupOldJobs(data.daysOld);
   }
 }

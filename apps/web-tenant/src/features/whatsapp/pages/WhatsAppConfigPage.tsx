@@ -20,6 +20,12 @@ interface AiAgentConfig {
   customInstructions: string;
 }
 
+interface WhatsAppStatusResponse {
+  status: string;
+  qrCode?: string;
+  pairingCode?: string;
+}
+
 export function WhatsAppConfigPage() {
   const queryClient = useQueryClient();
   const [qrCode, setQrCode] = useState<string | null>(null);
@@ -45,7 +51,7 @@ export function WhatsAppConfigPage() {
   // Fetch Status/QR
   const fetchStatus = async () => {
     try {
-      const res = await api.get<any>('/whatsapp/instance/status');
+      const res = await api.get<WhatsAppStatusResponse>('/whatsapp/instance/status');
       console.log('[Frontend] Status response:', res.data);
       
       // Se conectou, limpar QR code
@@ -88,12 +94,12 @@ export function WhatsAppConfigPage() {
   const connectMutation = useMutation({
     mutationFn: async () => {
       // No evolution-go, o webhookUrl pode vir da config global, mas enviamos o relativo ao tenant
-      const res = await api.post('/whatsapp/instance/connect', { 
+      const res = await api.post<WhatsAppStatusResponse>('/whatsapp/instance/connect', { 
         webhookUrl: `${window.location.origin}/api/webhooks/whatsapp/` 
       });
       return res.data;
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       console.log('[Frontend] Connect response:', data);
       if (data.qrCode) {
         console.log('[Frontend] QR Code found in connect response');
@@ -113,12 +119,14 @@ export function WhatsAppConfigPage() {
 
   const generatePairingCodeMutation = useMutation({
     mutationFn: async (phone?: string) => {
-      const res = await api.post('/whatsapp/instance/pair', phone ? { phone } : {});
+      const res = await api.post<WhatsAppStatusResponse>('/whatsapp/instance/pair', phone ? { phone } : {});
       return res.data;
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       console.log('[Frontend] Pairing code response:', data);
-      setPairingCode(data.pairingCode);
+      if (data.pairingCode) {
+        setPairingCode(data.pairingCode);
+      }
     },
   });
 

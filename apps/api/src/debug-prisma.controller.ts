@@ -31,7 +31,7 @@ export class DebugPrismaController {
         tenantSlug: directUser.tenant?.slug,
         isActive: directUser.isActive
       } : null,
-      contextTenantId: (this.prisma as any).tenantContext.getTenantId()
+      contextTenantId: this.prisma.tenantContext?.getTenantId()
     };
   }
 
@@ -52,6 +52,15 @@ export class DebugPrismaController {
       pass,
       hash: user.passwordHash,
       match
+    };
+  }
+
+  @Public()
+  @Get('context')
+  async getContext() {
+    this.ensureDebugEnabled();
+    return {
+      contextTenantId: this.prisma.tenantContext?.getTenantId(),
     };
   }
 }

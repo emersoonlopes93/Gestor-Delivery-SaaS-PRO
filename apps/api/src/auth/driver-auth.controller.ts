@@ -28,7 +28,7 @@ export class DriverAuthController {
   @Get('me')
   @UseGuards(DriverAuthGuard)
   async me(@Req() req: Request) {
-    const user = req.user as any;
+    const user = req.user as { sub: string };
     // user.sub é o driverId do payload Jwt
     return this.driverAuthService.getSession(user.sub);
   }

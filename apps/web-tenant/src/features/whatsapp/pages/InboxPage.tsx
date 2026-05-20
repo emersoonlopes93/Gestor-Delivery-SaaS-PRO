@@ -16,9 +16,15 @@ export function InboxPage() {
     },
   });
 
-  const handleSessionSelect = (session: ChatSessionListItem) => {
-    // Buscar sessão completa
-    setSelectedSession(session as unknown as ChatSession);
+  const handleSessionSelect = async (session: ChatSessionListItem) => {
+    try {
+      const res = await api.get<ChatSession>(`/chat/sessions/${session.id}`);
+      if (res.success) {
+        setSelectedSession(res.data);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar detalhes da sessão:', err);
+    }
   };
 
   const handleSessionUpdate = (updatedSession: ChatSession) => {

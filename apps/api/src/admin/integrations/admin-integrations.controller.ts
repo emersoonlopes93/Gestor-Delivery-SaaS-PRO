@@ -14,6 +14,8 @@ import { RequireAdminPermissions as Permissions } from '../../common/decorators'
 import { WhatsAppProviderType, AiProviderType } from '@prisma/client';
 
 export class UpdateIntegrationsConfigDto {
+  [key: string]: unknown;
+
   @IsOptional()
   @IsEnum(WhatsAppProviderType)
   defaultWhatsAppProvider?: WhatsAppProviderType;
@@ -52,10 +54,10 @@ export class UpdateIntegrationsConfigDto {
   id?: string;
 
   @IsOptional()
-  updatedAt?: any;
+  updatedAt?: string | Date;
 
   @IsOptional()
-  createdAt?: any;
+  createdAt?: string | Date;
 }
 
 @Controller('admin/integrations')

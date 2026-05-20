@@ -40,7 +40,7 @@ import { useAuthStore } from '../stores/auth.store';
 import { useThemeStore } from '../stores/theme.store';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api-client';
-import type { Tenant, TenantSettings } from '@gestor/types';
+import type { Tenant, TenantSettings, TenantOperatingHours } from '@gestor/types';
 import { useNotificationAudio } from '../hooks/useNotificationAudio';
 
 type SidebarItem = {
@@ -317,7 +317,7 @@ export function AppLayout() {
   const { data: tenantData } = useQuery({
     queryKey: ['tenant-settings-applayout'],
     queryFn: async () => {
-      const res = await api.get<Tenant & { settings: TenantSettings }>('/tenant/me');
+      const res = await api.get<Tenant & { settings: TenantSettings, operatingHours: TenantOperatingHours[] }>('/tenant/me');
       return res.data;
     },
     staleTime: 1000 * 60 * 5,
@@ -347,7 +347,7 @@ export function AppLayout() {
     const isPaused = settings?.isStorePaused ?? false;
     if (isPaused) return 'paused';
 
-    const operatingHours = (tenantData as any).operatingHours || [];
+    const operatingHours = tenantData.operatingHours || [];
     const timezone = settings?.timezone || 'America/Sao_Paulo';
     
     let localTimeStr: string;
@@ -371,11 +371,13 @@ export function AppLayout() {
     let rules = operatingHours;
     if (rules.length === 0) {
       rules = Array.from({ length: 7 }, (_, i) => ({
+        id: `mock-${i}`,
+        tenantId: tenantData.id,
         dayOfWeek: i,
         isOpen: true,
         openTime: '08:00',
-        closeTime: '22:00',
-      }));
+        closeTime: '23:00',
+      } as TenantOperatingHours));
     }
 
     const todayRule = rules.find((h: { dayOfWeek: number; isOpen: boolean; openTime: string | null; closeTime: string | null }) => h.dayOfWeek === dayOfWeek);

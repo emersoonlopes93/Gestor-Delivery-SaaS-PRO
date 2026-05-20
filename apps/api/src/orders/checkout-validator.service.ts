@@ -341,7 +341,7 @@ export class CheckoutValidatorService {
       throw new BadRequestException(`Produto não encontrado ou não pertence a esta loja.`);
     }
 
-    const typedProduct = (product as unknown) as ProductWithData;
+    const typedProduct = product as ProductWithData;
 
     const shouldCheckAvailabilityByChannel = channel !== 'pos';
 
@@ -799,7 +799,7 @@ export class CheckoutValidatorService {
         },
       }>;
 
-      const typedCombo = (comboProduct as unknown) as ComboWithSlots;
+      const typedCombo = comboProduct as ComboWithSlots;
 
       await this.availabilityService.assertCanSell({
         tenantId,
@@ -885,7 +885,7 @@ export class CheckoutValidatorService {
           },
         }>;
 
-        const typedCombo = (comboProduct as unknown) as ComboWithBundle;
+        const typedCombo = comboProduct as ComboWithBundle;
 
         await this.availabilityService.assertCanSell({
           tenantId,

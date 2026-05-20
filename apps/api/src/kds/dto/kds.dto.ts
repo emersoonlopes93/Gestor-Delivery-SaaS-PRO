@@ -52,7 +52,7 @@ export class CreateMultipleIncrementalPrintJobsDTO {
   items!: Array<{
     sequenceNumber: number;
     content: string;
-    metadata?: any;
+    metadata?: Record<string, unknown>;
   }>;
 
   @IsString() @IsOptional()

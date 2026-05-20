@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, Clock, CheckCircle2, ChefHat } from 'lucide-react';
+import { 
+  KdsPrintJobDTO 
+} from '@gestor/types';
 
 
 const API_BASE = '/api/v1';
 
 export function KdsPage() {
   const [stationId, setStationId] = useState<string>(localStorage.getItem('kds_station') || 'GERAL');
-  const [printJobs, setPrintJobs] = useState<any[]>([]);
+  const [printJobs, setPrintJobs] = useState<KdsPrintJobDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -135,7 +138,7 @@ export function KdsPage() {
         <div className="flex gap-4 overflow-x-auto overflow-y-hidden pb-4 grow items-start snap-x">
           {printJobs.map(job => {
             const order = job.order;
-            const elapsed = getElapsedMin(job.createdAt);
+            const elapsed = getElapsedMin(job.createdAt.toString());
             const isUrgent = elapsed > 15;
 
             return (

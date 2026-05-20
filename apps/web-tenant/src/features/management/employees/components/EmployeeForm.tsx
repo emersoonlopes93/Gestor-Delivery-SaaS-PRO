@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { TenantUser, TenantRole } from '@gestor/types';
+import { TenantUser, TenantRole, CreateEmployeeDTO } from '@gestor/types';
 
 interface EmployeeFormProps {
   employee: TenantUser | null;
   roles: TenantRole[];
-  onSave: (data: any) => Promise<void>;
+  onSave: (data: CreateEmployeeDTO) => Promise<void>;
   onCancel: () => void;
 }
 
@@ -38,9 +38,15 @@ export function EmployeeForm({ employee, roles, onSave, onCancel }: EmployeeForm
       return;
     }
 
-    const data: any = { ...formData };
-    if (employee && !data.password) {
-      delete data.password;
+    const data: CreateEmployeeDTO = {
+      name: formData.name,
+      email: formData.email,
+      isActive: formData.isActive,
+      roles: formData.roles,
+    };
+    
+    if (formData.password) {
+      data.password = formData.password;
     }
 
     await onSave(data);

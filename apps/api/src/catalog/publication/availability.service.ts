@@ -254,7 +254,7 @@ export class AvailabilityService {
       include: { rules: { where: { isActive: true, channel: input.channel } } }
     });
 
-    const pubMap = new Map<string, any>(publications.map(p => [p.productId, p]));
+    const pubMap = new Map<string, typeof publications[number]>(publications.map(p => [p.productId, p]));
 
     const settings = input.context?.settings || await this.prisma.tenantSettings.findUnique({
       where: { tenantId: input.tenantId },

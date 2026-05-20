@@ -14,7 +14,8 @@ export function GoalsPage() {
     queryKey: ['goals'],
     queryFn: async () => {
       const res = await api.get<GoalDTO[]>('/goals');
-      return res.data;
+      if (res.success) return res.data;
+      return [];
     }
   });
 

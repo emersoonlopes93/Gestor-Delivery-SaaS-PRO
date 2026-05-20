@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import { useDraftSale } from './hooks/useDraftSale';
-import { PosFulfillmentType } from '@gestor/types';
+import { PosFulfillmentType, OrderResponseDTO, PaymentMethod } from '@gestor/types';
 import { 
   ShoppingCart, 
   Plus, 
@@ -133,15 +133,15 @@ export default function WaiterPage() {
      setSelectedTableId(table.id);
      
      if (table.activeOrderId) {
-        const res = await api.get<any>(`/orders/${table.activeOrderId}`);
+        const res = await api.get<OrderResponseDTO>(`/orders/${table.activeOrderId}`);
         if (res.success && res.data) {
            const order = res.data;
            setCurrentOrderId(order.id);
-           setCart(order.items.map((it: any) => ({
+           setCart(order.items.map((it) => ({
              cartLineId: generateId(),
              lineType: it.lineType,
-             productId: it.productId,
-             comboId: it.comboId,
+             productId: it.productId || undefined,
+             comboId: it.comboId || undefined,
              name: it.snapshotName,
              basePrice: it.unitPrice,
              quantity: it.quantity,
@@ -168,7 +168,7 @@ export default function WaiterPage() {
         })),
         fulfillmentType: PosFulfillmentType.TABLE,
         tableNumber,
-        paymentMethod: 'cash' as any, // Placeholder for draft
+        paymentMethod: PaymentMethod.cash, // Placeholder for draft
         waiterId: undefined // Let server handle current operator
     };
 

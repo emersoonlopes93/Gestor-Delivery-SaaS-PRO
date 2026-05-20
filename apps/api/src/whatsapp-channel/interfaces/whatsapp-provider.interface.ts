@@ -213,5 +213,5 @@ export interface IWhatsAppProvider {
   /**
    * Faz o parsing de um payload de webhook específico do provider
    */
-  parseWebhook(payload: any, tenantId: string): WhatsAppWebhookEvent | null;
+  parseWebhook(payload: unknown, tenantId: string): WhatsAppWebhookEvent | null;
 }

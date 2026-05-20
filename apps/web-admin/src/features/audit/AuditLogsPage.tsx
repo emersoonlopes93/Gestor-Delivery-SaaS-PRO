@@ -9,7 +9,7 @@ interface AuditLogItem {
   userType: string;
   action: string;
   resource: string | null;
-  details: any;
+  details: Record<string, unknown> | null;
   ip: string | null;
   createdAt: string;
   tenant: { id: string; name: string; slug: string };
