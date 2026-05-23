@@ -20,7 +20,12 @@ export function useDispatch() {
       return res.data;
     },
     onSuccess: () => {
+      // Invalidate all related queries so every view updates immediately
       queryClient.invalidateQueries({ queryKey: ['dispatchOrders'] });
+      queryClient.invalidateQueries({ queryKey: ['boardOrders'] });
+      queryClient.invalidateQueries({ queryKey: ['drivers'] });
+      queryClient.invalidateQueries({ queryKey: ['delivery-map', 'drivers'] });
+      queryClient.invalidateQueries({ queryKey: ['delivery-map', 'orders'] });
     },
   });
 

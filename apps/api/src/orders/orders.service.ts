@@ -1032,6 +1032,8 @@ export class OrdersService {
       deliveryLng: o.deliveryAddress?.lng ?? undefined,
       deliveryDriverId: o.deliveryDriverId || undefined,
       deliveryDriverName: o.deliveryDriver?.name || undefined,
+      deliveryDriverStatus: o.deliveryDriver?.status || undefined,
+      deliveryDriverPhone: o.deliveryDriver?.phone || undefined,
       total: Number(o.total),
       createdAt: o.createdAt.toISOString(),
     }));
@@ -1058,7 +1060,7 @@ export class OrdersService {
       }
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.order.update({
         where: { id: orderId },
         data: { deliveryDriverId: driverId },
@@ -1084,6 +1086,13 @@ export class OrdersService {
 
       return updated;
     });
+
+    this.ordersGateway.server.to(`tenant:${tenantId}`).emit('driverAssigned', {
+      orderId,
+      driverId
+    });
+
+    return result;
   }
 
   async getLatestCustomerOrder(tenantId: string, customerId: string) {

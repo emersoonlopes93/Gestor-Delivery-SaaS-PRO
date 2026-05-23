@@ -120,6 +120,16 @@ function normalizeDriverMarkers(drivers: DriverDTO[]): DriverMarker[] {
   return out;
 }
 
+/** Drivers that are busy/available but have no GPS position yet */
+function normalizeDriversWithoutLocation(drivers: DriverDTO[]): DriverDTO[] {
+  return drivers.filter(
+    (d) =>
+      d.isActive &&
+      d.status !== 'offline' &&
+      (typeof d.currentLat !== 'number' || typeof d.currentLng !== 'number'),
+  );
+}
+
 function normalizeOrderMarkers(orders: OrderDispatchItemDTO[]): OrderMarker[] {
   const out: OrderMarker[] = [];
   for (const o of orders) {
@@ -285,6 +295,11 @@ export function DeliveryMapPage() {
     [driversQuery.data],
   );
 
+  const driversWithoutLocation = useMemo(
+    () => normalizeDriversWithoutLocation(driversQuery.data ?? []),
+    [driversQuery.data],
+  );
+
   const orderMarkers = useMemo(
     () => normalizeOrderMarkers(ordersQuery.data ?? []),
     [ordersQuery.data],
@@ -332,6 +347,7 @@ export function DeliveryMapPage() {
 
   const isLoading = driversQuery.isLoading || ordersQuery.isLoading;
   const isError = driversQuery.isError || ordersQuery.isError;
+  const totalDriversVisible = driverMarkers.length + driversWithoutLocation.length;
 
   return (
     <div className="h-full w-full">
@@ -363,7 +379,7 @@ export function DeliveryMapPage() {
         {isLoading ? <div className="text-sm text-gray-500 dark:text-gray-400">Carregando dados do mapa...</div> : null}
         {isError ? <div className="text-sm text-red-600">Erro ao carregar dados do mapa.</div> : null}
 
-        {driverMarkers.length === 0 && outForDeliveryOrders.length === 0 && !isLoading ? (
+        {driverMarkers.length === 0 && outForDeliveryOrders.length === 0 && driversWithoutLocation.length === 0 && !isLoading ? (
           <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             Nenhum driver com localização disponível e nenhum pedido em rota.
           </div>
@@ -395,7 +411,7 @@ export function DeliveryMapPage() {
                 <section>
                   <div className="flex items-center justify-between mb-2">
                     <h2 className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Drivers</h2>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">{driverMarkers.length}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">{totalDriversVisible}</div>
                   </div>
                   <div className="space-y-2">
                     {driverMarkers.map((d) => (
@@ -426,8 +442,26 @@ export function DeliveryMapPage() {
                         <div className="text-xs text-gray-500 dark:text-gray-400">Último update: {fmtRelativeTime(d.lastLocationAt)}</div>
                       </button>
                     ))}
-                    {driverMarkers.length === 0 ? (
-                      <div className="text-xs text-gray-400">Sem drivers com localização.</div>
+
+                    {/* BUG 2 FIX: Drivers busy but without GPS position */}
+                    {driversWithoutLocation.map((d) => (
+                      <div
+                        key={`panel-driver-noloc-${d.id}`}
+                        className="w-full text-left rounded-lg border border-dashed border-orange-200 dark:border-orange-900/40 px-3 py-2 bg-orange-50/50 dark:bg-orange-900/10"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">{d.name}</div>
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-500">
+                            <span className="inline-block w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
+                            {d.status === 'busy' ? 'Em rota' : 'Disponível'}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-orange-500 font-medium mt-0.5">⚠ Aguardando localização do entregador</div>
+                      </div>
+                    ))}
+
+                    {driverMarkers.length === 0 && driversWithoutLocation.length === 0 ? (
+                      <div className="text-xs text-gray-400">Sem drivers ativos.</div>
                     ) : null}
                   </div>
                 </section>
@@ -512,7 +546,7 @@ export function DeliveryMapPage() {
         </div>
 
         <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          Drivers no mapa: {driverMarkers.length} | Pedidos em rota: {outForDeliveryOrders.length}
+          Drivers no mapa: {driverMarkers.length} | Sem GPS: {driversWithoutLocation.length} | Pedidos em rota: {outForDeliveryOrders.length}
         </div>
       </div>
     </div>

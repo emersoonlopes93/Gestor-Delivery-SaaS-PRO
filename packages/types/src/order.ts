@@ -391,6 +391,8 @@ export interface OrderDispatchItemDTO {
   
   deliveryDriverId?: string;
   deliveryDriverName?: string;
+  deliveryDriverStatus?: string;
+  deliveryDriverPhone?: string;
   
   total: number;
   createdAt?: string;

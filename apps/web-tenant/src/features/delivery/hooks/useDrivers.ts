@@ -11,6 +11,7 @@ export function useDrivers() {
       const res = await api.get('/delivery/drivers');
       return res.data as DriverDTO[];
     },
+    refetchInterval: 30000, // Poll every 30s to keep driver statuses fresh
   });
 
   const createDriver = useMutation({

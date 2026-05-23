@@ -31,6 +31,6 @@ import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
     },
     DeliveryRateService,
   ],
-  exports: [DeliveryRateService],
+  exports: [DeliveryRateService, DriversService],
 })
 export class DeliveryModule {}

@@ -8,8 +8,9 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger } from '@nestjs/common';
+import { Logger, Inject, forwardRef } from '@nestjs/common';
 import { DriverLocationUpdatedEvent } from '@gestor/types';
+import { DriversService } from './drivers.service';
 
 @WebSocketGateway({
   cors: true,
@@ -20,6 +21,11 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
 
   @WebSocketServer()
   server!: Server;
+
+  constructor(
+    @Inject(forwardRef(() => DriversService))
+    private readonly driversService: DriversService,
+  ) {}
 
   handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);
@@ -48,7 +54,7 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
   emitLocationUpdate(orderToken: string, location: { lat: number; lng: number; driverId: string }) {
     const event: DriverLocationUpdatedEvent = {
       driverId: location.driverId,
-      tenantId: '', // Não temos o tenantId aqui mas o room é por orderToken
+      tenantId: '',
       lat: location.lat,
       lng: location.lng,
       lastLocationAt: new Date().toISOString(),
@@ -70,12 +76,27 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
   }
 
   /**
-   * Driver sends location updates continuously.
+   * Driver sends location updates — persists to DB AND broadcasts to tenant UI.
+   * BUG 4 FIX: previously only emitted via WS without persisting to DB.
+   * Now calls DriversService.updateDriverLocation() so the polling-based map
+   * always has fresh coordinates.
    */
   @SubscribeMessage('updateDriverLocation')
   async handleUpdateDriverLocation(
     @MessageBody() data: { driverId: string; tenantId: string; lat: number; lng: number },
   ) {
+    // Persist to DB so polling-based map always has fresh coords
+    try {
+      await this.driversService.updateDriverLocation(data.tenantId, data.driverId, {
+        lat: data.lat,
+        lng: data.lng,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Failed to persist location for driver ${data.driverId}: ${(err as Error).message}`,
+      );
+    }
+
     const event: DriverLocationUpdatedEvent = {
       driverId: data.driverId,
       tenantId: data.tenantId,
@@ -84,7 +105,7 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
       lastLocationAt: new Date().toISOString(),
     };
 
-    // Fire it to any tenant tracking UI open.
+    // Fire to tenant tracking UI
     this.server.to(`tenant:${data.tenantId}`).emit('driverLocationUpdated', event);
   }
 }
