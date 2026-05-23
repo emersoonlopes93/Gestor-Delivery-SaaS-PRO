@@ -1,7 +1,7 @@
 import { memo, useEffect, useState } from 'react';
 import { X, Trash2, Plus, Minus, Save } from 'lucide-react';
-import type { OrderResponseDTO, CreateOrderItemDTO, OrderItemResponseDTO } from '@gestor/types';
-import { api } from '../../../../lib/api-client';
+import type { OrderResponseDTO, OrderItemResponseDTO } from '@gestor/types';
+import { api } from '../../../lib/api-client';
 
 export interface EditOrderModalProps {
   order: OrderResponseDTO | null;
@@ -9,8 +9,19 @@ export interface EditOrderModalProps {
   onSaved: () => void;
 }
 
-interface EditableItem extends CreateOrderItemDTO {
-  _localId: string; // apenas para key no react
+// Interface própria para itens editáveis no modal — sem estender CreateOrderItemDTO
+// pois precisamos de campos de snapshot (name, unitPrice) que não existem no DTO de entrada
+interface EditableItem {
+  _localId: string;
+  lineType: 'product' | 'combo';
+  productId?: string;
+  comboId?: string;
+  quantity: number;
+  unitPrice: number;
+  basePrice: number;
+  name: string;
+  image?: string;
+  notes?: string;
   lineTotal: number;
 }
 
@@ -22,22 +33,11 @@ const mapItemToEditable = (item: OrderItemResponseDTO): EditableItem => {
     comboId: item.comboId || undefined,
     quantity: item.quantity,
     unitPrice: item.unitPrice,
-    notes: item.notes || undefined,
+    basePrice: item.snapshotBasePrice,
     name: item.snapshotName,
     image: item.snapshotImage || undefined,
-    basePrice: item.snapshotBasePrice,
+    notes: item.notes || undefined,
     lineTotal: item.lineTotal,
-    complements: item.complements?.map(c => ({
-      complementItemId: c.complementItemId,
-      snapshotName: c.snapshotName,
-      snapshotPrice: c.snapshotPrice
-    })),
-    comboSelections: item.comboSelections?.map(s => ({
-      comboBlockItemId: s.comboBlockItemId,
-      snapshotBlockName: s.snapshotBlockName,
-      snapshotProductName: s.snapshotProductName,
-      snapshotAdditionalPrice: s.snapshotAdditionalPrice
-    })),
   };
 };
 
@@ -83,16 +83,17 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
     try {
       setIsSaving(true);
       setError('');
-      // Envia DTO compatível com EditOrderDTO
+      // Envia apenas campos que o EditOrderDTO / CreateOrderItemDTO aceita
       const payload = {
-        items: validItems.map(({ _localId, lineTotal, ...rest }) => rest)
+        items: validItems.map(({ _localId: _l, lineTotal: _t, name: _n, image: _i, basePrice: _b, unitPrice: _u, ...rest }) => rest)
       };
       
       await api.patch(`/orders/${order.id}/edit`, payload);
       onSaved();
       onClose();
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Erro ao salvar pedido');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      setError(e.response?.data?.message || e.message || 'Erro ao salvar pedido');
     } finally {
       setIsSaving(false);
     }

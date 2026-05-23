@@ -1,7 +1,7 @@
 import { memo, useEffect, useState } from 'react';
-import { X, MapPin, Phone, MessageSquare, Printer, Edit2, Ban, Truck, Clock, CheckCircle } from 'lucide-react';
-import type { OrderResponseDTO, OrderStatus, OrderTimelineEntryDTO } from '@gestor/types';
-import { api } from '../../../../lib/api-client';
+import { X, MapPin, Phone, MessageSquare, Printer, Edit2, Ban, CheckCircle } from 'lucide-react';
+import type { OrderResponseDTO, OrderTimelineEntryDTO } from '@gestor/types';
+import { api } from '../../../lib/api-client';
 import { StatusBadge } from './OrderCard';
 import { EditOrderModal } from './EditOrderModal';
 
@@ -43,7 +43,7 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
     onUpdated(); // Refresh the board
     // Refresh the local drawer data too
     if (orderId) {
-      api.get<OrderResponseDTO>(`/orders/${orderId}`).then(res => {
+      api.get<OrderResponseDTO>(`/orders/${orderId}`).then((res: { data: OrderResponseDTO }) => {
         if (res.data) setOrder(res.data);
       });
     }

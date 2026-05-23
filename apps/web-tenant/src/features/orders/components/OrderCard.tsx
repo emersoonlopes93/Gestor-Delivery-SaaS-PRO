@@ -107,7 +107,7 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
       ref={setNodeRef}
       style={style}
       className={`kanban-card ${isDragging ? 'opacity-50 z-50 ring-2 ring-primary-500 scale-105 cursor-grabbing' : 'cursor-grab hover:ring-1 hover:ring-primary-500/50'} relative transition-shadow animate-slide-in-up`}
-      onClick={(e) => {
+      onClick={() => {
         // Ignorar click se estiver arrastando
         if (isDragging) return;
         onClick(order.id);

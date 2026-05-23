@@ -55,6 +55,7 @@ export type {
   CheckoutValidationResult,
   OrderResponseDTO,
   OrderItemResponseDTO,
+  OrderTimelineEntryDTO,
   FulfillmentType,
   OrderStatus,
   OrderKdsItemDTO,
