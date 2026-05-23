@@ -25,7 +25,7 @@ import type {
   EditOrderDTO,
   UpdateOrderNotesDTO,
 } from '@gestor/types';
-import { ORDER_STATUS_TRANSITIONS } from '@gestor/types';
+import { ORDER_STATUS_TRANSITIONS, UpdateOrderStatusDTO } from '@gestor/types';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
 import { OrdersGateway } from './orders.gateway';
 
