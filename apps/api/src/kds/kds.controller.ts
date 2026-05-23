@@ -32,20 +32,20 @@ export class KdsController {
   constructor(private readonly kdsService: KdsService) {}
 
   @Get('print-jobs/pending')
-  @RequirePermissions('orders.view')
+  @RequirePermissions('kds.use')
   async getPendingPrintJobs(@Query() query: PrintJobQueryDTO) {
     return this.kdsService.getPendingPrintJobs(query.station || 'GERAL', query.limit);
   }
 
   @Post('spooler/next')
-  @RequirePermissions('orders.view')
+  @RequirePermissions('kds.use')
   @HttpCode(HttpStatus.OK)
   async getNextPrintJob(@Body() body: { station: string }) {
     return this.kdsService.getNextPrintJobForSpooler(body.station || 'GERAL');
   }
 
   @Get('print-jobs')
-  @RequirePermissions('orders.view')
+  @RequirePermissions('kds.use')
   async getAllPrintJobs(@Query() query: GetPrintJobsQueryDTO) {
     return this.kdsService.getAllPrintJobs(
       query.station || '',
@@ -56,19 +56,19 @@ export class KdsController {
   }
 
   @Get('print-jobs/:id')
-  @RequirePermissions('orders.view')
+  @RequirePermissions('kds.use')
   async getPrintJob() {
     throw new NotImplementedException('Not implemented yet');
   }
 
   @Get('print-jobs/order/:orderId')
-  @RequirePermissions('orders.view')
+  @RequirePermissions('kds.use')
   async getGroupedPrintJobs(@Param('orderId') orderId: string) {
     return this.kdsService.getGroupedPrintJobs(orderId);
   }
 
   @Get('stations/:station/stats')
-  @RequirePermissions('orders.view')
+  @RequirePermissions('kds.use')
   async getStationStats(@Param('station') station: string) {
     return this.kdsService.getStationStats(station);
   }
@@ -95,21 +95,21 @@ export class KdsController {
   }
 
   @Put('print-jobs/:id/printing')
-  @RequirePermissions('orders.update')
+  @RequirePermissions('kds.use')
   @HttpCode(HttpStatus.OK)
   async markAsPrinting(@Param('id') id: string) {
     return this.kdsService.markAsPrinting(id);
   }
 
   @Put('print-jobs/:id/completed')
-  @RequirePermissions('orders.update')
+  @RequirePermissions('kds.use')
   @HttpCode(HttpStatus.OK)
   async markAsCompleted(@Param('id') id: string) {
     return this.kdsService.markAsCompleted(id);
   }
 
   @Put('print-jobs/:id/failed')
-  @RequirePermissions('orders.update')
+  @RequirePermissions('kds.use')
   @HttpCode(HttpStatus.OK)
   async markAsFailed(
     @Param('id') id: string,
@@ -132,14 +132,14 @@ export class KdsController {
   }
 
   @Post('spooler/next')
-  @RequirePermissions('orders.update')
+  @RequirePermissions('kds.use')
   @HttpCode(HttpStatus.OK)
   async getNextPrintJobForSpooler(@Body('station') station: string) {
     return this.kdsService.getNextPrintJobForSpooler(station);
   }
 
   @Post('print-jobs/cleanup')
-  @RequirePermissions('orders.manage')
+  @RequirePermissions('kds.manage')
   @HttpCode(HttpStatus.OK)
   async cleanup(@Body() data: CleanupPrintJobsDTO) {
     return this.kdsService.cleanupOldJobs(data.daysOld);
