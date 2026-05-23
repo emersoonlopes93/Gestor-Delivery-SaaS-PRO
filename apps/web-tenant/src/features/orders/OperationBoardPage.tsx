@@ -1,29 +1,12 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Clock, ArrowRight, LayoutGrid, Package, Truck, User, X } from 'lucide-react';
+import { RefreshCw, LayoutGrid, Package, Truck, User, X } from 'lucide-react';
 import type { OrderBoardItemDTO, OrderStatus, UpdateOrderStatusDTO, DriverDTO } from '@gestor/types';
 import { api, ApiError } from '../../lib/api-client';
-
-/* ─── Labels ────────────────────────────────────────────────── */
-
-const STATUS_LABELS: Record<OrderStatus, string> = {
-  pending: 'Novo',
-  confirmed: 'Confirmado',
-  preparing: 'Em Preparo',
-  ready_for_pickup: 'Pronto / Retirada',
-  ready_for_delivery: 'Pronto / Entrega',
-  out_for_delivery: 'Em Rota',
-  completed: 'Concluído',
-  cancelled: 'Cancelado',
-  draft: 'Rascunho',
-};
-
-const CHANNEL_LABELS: Record<string, string> = {
-  storefront: 'Online',
-  pos: 'PDV',
-  whatsapp_ai: 'IA',
-  whatsapp: 'WhatsApp',
-  ifood: 'iFood',
-};
+import { DndContext, DragOverlay, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { OrderCard } from './components/OrderCard';
+import { KanbanColumn, KanbanColumnSpec, BoardViewMode } from './components/KanbanColumn';
+import { OrderDrawer } from './components/OrderDrawer';
 
 /* ─── Driver Selection Modal ────────────────────────────────── */
 
@@ -98,41 +81,7 @@ const DriverSelectionModal = memo(function DriverSelectionModal(props: {
   );
 });
 
-/* ─── Badge de status — usa classes do design system ────────── */
-
-type StatusTone = {
-  cls: string;      // classe .status-badge-* ou classes compostas
-  dot?: string;     // cor do dot indicador
-};
-
-const STATUS_TONE: Record<OrderStatus, StatusTone> = {
-  pending:            { cls: 'status-badge-pending',  dot: 'bg-amber-400' },
-  confirmed:          { cls: 'status-badge-confirmed', dot: 'bg-blue-400' },
-  preparing:          { cls: 'status-badge-preparing', dot: 'bg-orange-400' },
-  ready_for_pickup:   { cls: 'status-badge-success',  dot: 'bg-emerald-400' },
-  ready_for_delivery: { cls: 'status-badge-success',  dot: 'bg-emerald-400' },
-  out_for_delivery:   { cls: 'status-badge-indigo',   dot: 'bg-violet-400' },
-  completed:          { cls: 'status-badge-neutral',  dot: 'bg-slate-400' },
-  cancelled:          { cls: 'status-badge-danger',   dot: 'bg-red-400' },
-  draft:              { cls: 'status-badge-neutral',  dot: 'bg-slate-300' },
-};
-
 /* ─── Kanban columns spec ───────────────────────────────────── */
-
-type BoardViewMode = 'compact' | 'standard' | 'focus_production';
-
-type KanbanColumnSpec = {
-  id: 'entry' | 'production' | 'delivery';
-  title: string;
-  subtitle: string;
-  statuses: OrderStatus[];
-  icon: typeof LayoutGrid;
-  accentCol: string;
-  headerCol: string;
-  countCls: string;
-  colCls: string;
-  headerBorder: string;
-};
 
 const KANBAN_COLUMNS: KanbanColumnSpec[] = [
   {
@@ -213,213 +162,6 @@ const SegmentedControl = memo(function SegmentedControl(props: {
   );
 });
 
-/* ─── Status badge ──────────────────────────────────────────── */
-
-const StatusBadge = memo(function StatusBadge({ status }: { status: OrderStatus }) {
-  const tone = STATUS_TONE[status];
-  return (
-    <span className={`badge-premium ${tone.cls}`}>
-      {STATUS_LABELS[status]}
-    </span>
-  );
-});
-
-/* ─── Timer badge ───────────────────────────────────────────── */
-
-const TimerBadge = memo(function TimerBadge({ minutes, compact }: { minutes: number; compact: boolean }) {
-  const urgent = minutes > 30;
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black ring-1 ${
-        urgent
-          ? 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-900/30 dark:text-red-400 dark:ring-red-800/50'
-          : 'bg-slate-50 text-slate-600 ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700'
-      }`}
-    >
-      <Clock className={compact ? 'w-2.5 h-2.5' : 'w-3 h-3'} />
-      {minutes}m
-    </span>
-  );
-});
-
-/* ─── Order Card ────────────────────────────────────────────── */
-
-const OrderCard = memo(function OrderCard(props: {
-  order: OrderBoardItemDTO;
-  compact: boolean;
-  updating: boolean;
-  onAdvance: (orderId: string, nextStatus: OrderStatus) => void;
-  nextStatus: OrderStatus | null;
-  elapsedMin: number;
-  totalLabel: string;
-}) {
-  const { order, compact, updating, onAdvance, nextStatus, elapsedMin, totalLabel } = props;
-
-  return (
-    <div className="kanban-card animate-slide-in-up">
-      {/* ── Conteúdo principal ── */}
-      <div className={compact ? 'p-2.5 md:p-3' : 'p-3 md:p-3.5'}>
-
-        {/* Linha 1: Número + Timer */}
-        <div className="flex items-center justify-between mb-2">
-          <span className={`font-black text-slate-900 dark:text-slate-100 ${compact ? 'text-[12px] md:text-[13px]' : 'text-sm'}`}>
-            #{order.orderNumber}
-          </span>
-          <TimerBadge minutes={elapsedMin} compact={compact} />
-        </div>
-
-        {/* Linha 2: Cliente + Status + Valor */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h3
-              className={`font-bold text-slate-900 dark:text-slate-100 leading-tight line-clamp-1 ${
-                compact ? 'text-[11px]' : 'text-xs md:text-sm'
-              }`}
-            >
-              {order.customerName}
-            </h3>
-            <p className={`text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1 ${compact ? 'text-[9px]' : 'text-[10px] md:text-[11px]'}`}>
-              {order.fulfillmentType === 'delivery' ? 'Entrega' : 'Retirada'}
-              {' · '}
-              {CHANNEL_LABELS[order.sourceChannel || ''] || order.sourceChannel || 'Online'}
-            </p>
-          </div>
-          <div className="shrink-0 flex flex-col items-end gap-1.5">
-            <StatusBadge status={order.status as OrderStatus} />
-            <span className={`font-black text-slate-900 dark:text-slate-100 ${compact ? 'text-[10px] md:text-[11px]' : 'text-xs md:text-sm'}`}>
-              {totalLabel}
-            </span>
-          </div>
-        </div>
-
-        {/* Linha 3: Entregador (Se houver) */}
-        {order.fulfillmentType === 'delivery' && (
-          <div className="mt-2.5 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold">
-            <div className={`shrink-0 w-5 h-5 rounded-md flex items-center justify-center ${order.deliveryDriverName ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400' : 'bg-slate-100 text-slate-400 dark:bg-slate-800'}`}>
-              <User className="w-3 h-3" />
-            </div>
-            <span className={order.deliveryDriverName ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 italic'}>
-              {order.deliveryDriverName || 'Sem entregador atribuído'}
-            </span>
-            {order.deliveryDriverStatus === 'busy' && (
-              <span className="ml-auto w-1.5 h-1.5 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50" title="Entregador em rota" />
-            )}
-          </div>
-        )}
-
-        {/* Resumo de itens (apenas modo standard) */}
-        {!compact && (
-          <div
-            className="mt-2.5 rounded-lg px-2.5 py-1.5 md:px-3 md:py-2"
-            style={{ background: 'var(--surface-inset)', border: '1px solid var(--border-subtle)' }}
-          >
-            <p className="text-[10px] md:text-[11px] text-slate-600 dark:text-slate-400 italic line-clamp-2">
-              {order.itemsSummary || `${order.itemCount} ${order.itemCount === 1 ? 'item' : 'itens'}`}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* ── Botão Avançar (CTA principal) ── */}
-      {nextStatus && (
-        <div
-          className="px-2.5 pb-2.5 md:px-3 md:pb-3"
-          style={{ borderTop: compact ? undefined : '1px solid var(--border-subtle)' }}
-        >
-          <button
-            type="button"
-            onClick={() => onAdvance(order.id, nextStatus)}
-            disabled={updating}
-            className={`w-full flex items-center justify-center gap-2 py-2.5 md:py-2 rounded-xl md:rounded-lg font-black uppercase tracking-wider transition-all duration-200 active:scale-[0.97] ${
-              compact ? 'btn-advance-compact' : 'btn-advance-primary'
-            }`}
-          >
-            <ArrowRight className="w-3.5 h-3.5 md:w-3 md:h-3" />
-            <span className="text-[11px] md:text-[10px]">Avançar — {STATUS_LABELS[nextStatus]}</span>
-          </button>
-        </div>
-      )}
-    </div>
-  );
-});
-
-/* ─── Coluna do Kanban ──────────────────────────────────────── */
-
-const KanbanColumn = memo(function KanbanColumn(props: {
-  column: KanbanColumnSpec;
-  orders: OrderBoardItemDTO[];
-  compact: boolean;
-  updatingId: string | null;
-  elapsedMinById: Map<string, number>;
-  onAdvance: (orderId: string, nextStatus: OrderStatus) => void;
-  getNextAction: (status: OrderStatus, fulfillmentType: string) => OrderStatus | null;
-  fmt: (v: number) => string;
-  getElapsedMin: (createdAt: string) => number;
-  viewMode: BoardViewMode;
-}) {
-  const {
-    column, orders, compact, updatingId, elapsedMinById,
-    onAdvance, getNextAction, fmt, getElapsedMin, viewMode,
-  } = props;
-
-  const Icon = column.icon;
-  const isEmpty = orders.length === 0;
-
-  return (
-    <section className={`kanban-col ${column.colCls} ${column.accentCol}`}>
-      {/* ── Header da coluna ── */}
-      <header className={`flex items-start justify-between shrink-0 px-4 py-3 border-b ${column.headerBorder}`}>
-        <div className="min-w-0 flex items-center gap-2.5">
-          <Icon className={`shrink-0 opacity-60 ${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} text-slate-600 dark:text-slate-400`} />
-          <div className="min-w-0">
-            <h2 className={`font-black text-slate-900 dark:text-slate-100 uppercase tracking-wide ${compact ? 'text-[11px]' : 'text-[13px]'}`}>
-              {column.title}
-            </h2>
-            {!compact && (
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
-                {column.subtitle}
-              </p>
-            )}
-          </div>
-        </div>
-        <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${column.countCls} ml-2 shrink-0`}>
-          {orders.length}
-        </span>
-      </header>
-
-      {/* ── Cards ── */}
-      <div className={`${compact ? 'p-2' : 'p-3'} overflow-y-auto space-y-2.5 grow min-h-0 custom-scrollbar`}>
-        {isEmpty ? (
-          viewMode === 'standard' ? (
-            <div className="h-16 flex items-center justify-center">
-              <span className="text-[11px] font-bold text-slate-400 dark:text-slate-600">
-                Sem pedidos
-              </span>
-            </div>
-          ) : null
-        ) : (
-          orders.map((order) => {
-            const nextActionStatus = getNextAction(order.status as OrderStatus, order.fulfillmentType);
-            const elapsed = elapsedMinById.get(order.id) ?? getElapsedMin(order.createdAt);
-            return (
-              <OrderCard
-                key={order.id}
-                order={order}
-                compact={compact}
-                updating={updatingId === order.id}
-                onAdvance={onAdvance}
-                nextStatus={nextActionStatus as OrderStatus | null}
-                elapsedMin={elapsed}
-                totalLabel={fmt(order.total)}
-              />
-            );
-          })
-        )}
-      </div>
-    </section>
-  );
-});
-
 /* ─── Page ──────────────────────────────────────────────────── */
 
 export function OperationBoardPage() {
@@ -433,6 +175,20 @@ export function OperationBoardPage() {
   const [drivers, setDrivers] = useState<DriverDTO[]>([]);
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
   const [orderToDispatch, setOrderToDispatch] = useState<string | null>(null);
+  
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [activeDragOrder, setActiveDragOrder] = useState<OrderBoardItemDTO | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const fetchBoard = useCallback(async () => {
     try {
@@ -559,6 +315,37 @@ export function OperationBoardPage() {
 
   const compact = viewMode === 'compact';
 
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const order = orders.find(o => o.id === active.id);
+    if (order) setActiveDragOrder(order);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDragOrder(null);
+
+    if (!over) return;
+
+    const orderId = active.id as string;
+    const targetColId = over.id as KanbanColumnSpec['id'];
+
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    // Discover the mapped status for the target column
+    let newStatus: OrderStatus | null = null;
+    if (targetColId === 'entry') newStatus = 'confirmed';
+    else if (targetColId === 'production') newStatus = 'preparing';
+    else if (targetColId === 'delivery') {
+      newStatus = order.fulfillmentType === 'delivery' ? 'out_for_delivery' : 'ready_for_pickup';
+    }
+
+    if (newStatus && newStatus !== order.status) {
+      handleStatusUpdate(orderId, newStatus);
+    }
+  };
+
   return (
     <div className="p-3 md:p-6 h-screen md:h-[calc(100vh-64px)] flex flex-col overflow-hidden bg-slate-50/50 dark:bg-transparent">
       {/* ── Toolbar / Header ── */}
@@ -647,7 +434,7 @@ export function OperationBoardPage() {
       )}
 
       {/* ── Loading ── */}
-      {loading && (
+      {loading && orders.length === 0 && (
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
           <div className="w-12 h-12 rounded-full border-2 border-primary-600/20 border-t-primary-600 animate-spin" />
           <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
@@ -657,8 +444,14 @@ export function OperationBoardPage() {
       )}
 
       {/* ── Board ── */}
-      {!loading && !error && (
-        <div className="grow min-h-0">
+      <DndContext 
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        {!error && (
+          <div className="grow min-h-0">
           <div
             className={`h-full grid gap-3 md:gap-4 items-start ${
               viewMode === 'focus_production'
@@ -691,6 +484,7 @@ export function OperationBoardPage() {
                     updatingId={updatingId}
                     elapsedMinById={elapsedMinById}
                     onAdvance={handleStatusUpdate}
+                    onClickCard={setActiveOrderId}
                     getNextAction={getNextAction}
                     fmt={fmt}
                     getElapsedMin={getElapsedMin}
@@ -702,6 +496,21 @@ export function OperationBoardPage() {
           </div>
         </div>
       )}
+        <DragOverlay>
+          {activeDragOrder ? (
+            <OrderCard
+              order={activeDragOrder}
+              compact={compact}
+              updating={false}
+              onAdvance={handleStatusUpdate}
+              onClick={() => {}}
+              nextStatus={getNextAction(activeDragOrder.status as OrderStatus, activeDragOrder.fulfillmentType)}
+              elapsedMin={elapsedMinById.get(activeDragOrder.id) ?? 0}
+              totalLabel={fmt(activeDragOrder.total)}
+            />
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       <DriverSelectionModal
         isOpen={isDriverModalOpen}
@@ -712,6 +521,12 @@ export function OperationBoardPage() {
         onSelect={handleDriverSelect}
         drivers={drivers}
         isSubmitting={!!updatingId}
+      />
+      
+      <OrderDrawer 
+        orderId={activeOrderId} 
+        onClose={() => setActiveOrderId(null)} 
+        onUpdated={fetchBoard}
       />
     </div>
   );

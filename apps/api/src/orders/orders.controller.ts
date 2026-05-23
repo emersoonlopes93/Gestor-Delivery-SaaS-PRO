@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import type { Request as ExpressRequest } from 'express';
 import { OrdersService } from './orders.service';
-import { CreateOrderDTO, UpdateOrderStatusDTO, OrderStatus } from '@gestor/types';
+import { CreateOrderDTO, UpdateOrderStatusDTO, OrderStatus, EditOrderDTO, UpdateOrderNotesDTO } from '@gestor/types';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions, Public } from '../common/decorators';
@@ -113,6 +113,33 @@ export class OrdersController {
   ) {
     const tenantId = req.user.tenantId;
     return this.ordersService.updateOrderStatus(id, tenantId, dto);
+  }
+
+  // ----------------------------------------------------------------
+  // TENANT INTERNAL: Edit order
+  // ----------------------------------------------------------------
+  @Patch(':id/edit')
+  @RequirePermissions('orders.edit_items')
+  async editOrder(
+    @Request() req: TenantRequest,
+    @Param('id') id: string,
+    @Body() dto: EditOrderDTO,
+  ) {
+    const tenantId = req.user.tenantId;
+    const actorId = req.user.sub;
+    return this.ordersService.editOrder(id, tenantId, dto, actorId);
+  }
+
+  @Patch(':id/notes')
+  @RequirePermissions('orders.edit_items')
+  async updateOrderNotes(
+    @Request() req: TenantRequest,
+    @Param('id') id: string,
+    @Body() dto: UpdateOrderNotesDTO,
+  ) {
+    const tenantId = req.user.tenantId;
+    const actorId = req.user.sub;
+    return this.ordersService.updateOrderNotes(id, tenantId, dto, actorId);
   }
 
   // ----------------------------------------------------------------

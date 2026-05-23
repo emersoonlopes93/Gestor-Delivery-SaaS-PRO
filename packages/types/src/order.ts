@@ -209,6 +209,18 @@ export class CreateOrderDTO {
   @IsNumber() @IsOptional() estimatedDuration?: number;
 }
 
+export class EditOrderDTO {
+  @IsArray()
+  @IsNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => CreateOrderItemDTO)
+  items!: CreateOrderItemDTO[];
+}
+
+export class UpdateOrderNotesDTO {
+  @IsString() @IsOptional() notes?: string;
+}
+
 // --- DTOs de Saída ---
 
 export interface OrderItemComplementResponseDTO {
