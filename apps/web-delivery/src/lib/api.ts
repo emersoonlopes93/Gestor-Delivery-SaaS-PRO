@@ -28,7 +28,8 @@ api.interceptors.response.use(
         const refreshTokenStr = useAuthStore.getState().refreshToken;
         if (!refreshTokenStr) throw new Error('No refresh token');
         
-        const { data } = await axios.post(`${API_BASE_URL}/auth/driver/refresh`, {
+        const baseUrl = API_BASE_URL.replace(/\/+$/, '');
+        const { data } = await axios.post(`${baseUrl}/auth/driver/refresh`, {
           refreshToken: refreshTokenStr,
         });
 

@@ -34,7 +34,9 @@ export function LoginPage() {
         pin,
         tenantSlug 
       });
-      const { accessToken, refreshToken, driver } = response.data;
+      // TransformInterceptor na API envelopa tudo em { success: true, data: { ... } }
+      const responseData = response.data.success ? response.data.data : response.data;
+      const { accessToken, refreshToken, driver } = responseData;
       
       setAuth(accessToken, refreshToken, driver);
       navigate('/');

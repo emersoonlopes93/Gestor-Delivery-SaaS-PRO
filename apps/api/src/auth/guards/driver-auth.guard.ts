@@ -34,8 +34,11 @@ export class DriverAuthGuard implements CanActivate {
       }
 
       // Assigning payload to request.user so controllers can access it
-      const req = request as Request & { user: unknown; tenantId: string };
-      req.user = payload;
+      const req = request as Request & { user: any; tenantId: string };
+      req.user = {
+        ...payload,
+        id: payload.sub, // Injetar 'id' para os controllers que esperam user.id
+      };
       req.tenantId = payload.tenantId;
 
       return true;

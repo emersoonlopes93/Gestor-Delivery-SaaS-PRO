@@ -51,7 +51,8 @@ export function ActiveDeliveryPage() {
     try {
       setLoadingRuns(true);
       const res = await api.get('/delivery/driver/active-runs');
-      setRuns(res.data);
+      const data = res.data.success ? res.data.data : res.data;
+      setRuns(data);
     } catch (err) {
       console.error('Failed to load active runs:', err);
     } finally {
