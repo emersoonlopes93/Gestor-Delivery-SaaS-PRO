@@ -59,7 +59,6 @@ export type {
   FulfillmentType,
   OrderStatus,
   OrderKdsItemDTO,
-  UpdateOrderStatusDTO,
   OrderBoardItemDTO,
   OrderListItemDTO,
   OrderDispatchItemDTO,
@@ -78,6 +77,9 @@ export {
   PizzaCompositionDTO,
   CreateOrderItemDTO, 
   CreateOrderDTO,
+  EditOrderDTO,
+  UpdateOrderNotesDTO,
+  UpdateOrderStatusDTO,
   PaymentInput,
 } from './order';
 

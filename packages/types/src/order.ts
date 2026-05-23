@@ -329,9 +329,9 @@ export interface OrderListItemDTO {
   createdAt: string;
 }
 
-export interface UpdateOrderStatusDTO {
-  status: OrderStatus;
-  note?: string;
+export class UpdateOrderStatusDTO {
+  @IsString() @IsNotEmpty() status!: OrderStatus;
+  @IsString() @IsOptional() note?: string;
 }
 
 // --- Operation (Phase 5) DTOs ---

@@ -857,7 +857,7 @@ export class OrdersService {
 
     const customerId = order.customerId;
     const paymentInfo = {
-      method: order.paymentMethod,
+      method: this.mapPaymentMethod(order.paymentMethod),
       changeFor: order.changeFor ? Number(order.changeFor) : undefined,
     };
 
