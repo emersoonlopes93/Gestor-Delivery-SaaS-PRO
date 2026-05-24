@@ -120,6 +120,27 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
                 </section>
               )}
 
+              {/* Entregador */}
+              {order.fulfillmentType === 'delivery' && order.deliveryDriverId && (
+                <section>
+                  <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-3">Entregador</h3>
+                  <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex flex-col gap-2">
+                    <p className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      🏍️ {order.deliveryDriverName}
+                      {order.deliveryDriverStatus === 'busy' && (
+                        <span className="text-[9px] font-bold bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full uppercase">Em Rota</span>
+                      )}
+                    </p>
+                    {order.deliveryDriverPhone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="text-sm text-slate-600 dark:text-slate-300">{order.deliveryDriverPhone}</span>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
+
               {/* Itens */}
               <section>
                 <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-3 flex justify-between items-center">

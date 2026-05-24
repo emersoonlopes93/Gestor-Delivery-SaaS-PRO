@@ -60,9 +60,12 @@ export class OrdersController {
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Query('status') status?: OrderStatus,
+    @Query('channel') channel?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
     const tenantId = req.user.tenantId;
-    return this.ordersService.listOrders(tenantId, page, limit, status);
+    return this.ordersService.listOrders(tenantId, page, limit, status, channel, startDate, endDate);
   }
 
   // ----------------------------------------------------------------

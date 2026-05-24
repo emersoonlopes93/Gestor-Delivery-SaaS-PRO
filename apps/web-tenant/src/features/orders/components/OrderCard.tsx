@@ -190,7 +190,14 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
             }`}
           >
             <ArrowRight className="w-3.5 h-3.5 md:w-3 md:h-3" />
-            <span className="text-[11px] md:text-[10px]">Avançar — {STATUS_LABELS[nextStatus]}</span>
+            <span className="text-[11px] md:text-[10px]">
+              {nextStatus === 'confirmed' ? 'Confirmar Pedido' :
+               nextStatus === 'preparing' ? 'Enviar para Cozinha' :
+               nextStatus === 'ready_for_delivery' ? 'Pronto (Aguardar Despacho)' :
+               nextStatus === 'ready_for_pickup' ? 'Pronto p/ Retirada' :
+               nextStatus === 'out_for_delivery' ? 'Despachar Agora' :
+               `Avançar — ${STATUS_LABELS[nextStatus]}`}
+            </span>
           </button>
         </div>
       )}

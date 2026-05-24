@@ -395,12 +395,24 @@ export class OrdersService {
     page = 1,
     limit = 20,
     status?: OrderStatus,
+    channel?: string,
+    startDate?: string,
+    endDate?: string,
   ): Promise<{ items: OrderListItemDTO[]; total: number }> {
     const skip = (page - 1) * limit;
 
     const where: Prisma.OrderWhereInput = {
       tenantId,
       ...(status ? { status } : {}),
+      ...(channel ? { sourceChannel: channel } : {}),
+      ...(startDate || endDate
+        ? {
+            createdAt: {
+              ...(startDate ? { gte: new Date(startDate) } : {}),
+              ...(endDate ? { lte: new Date(endDate) } : {}),
+            },
+          }
+        : {}),
     };
 
     try {
@@ -643,6 +655,7 @@ export class OrdersService {
           },
         },
         deliveryAddress: true,
+        deliveryDriver: true,
         timeline: { orderBy: { createdAt: 'asc' } },
       },
     });
@@ -670,6 +683,12 @@ export class OrdersService {
       customerId: order.customerId,
       couponId: order.couponId,
       cashbackUsed: order.cashbackUsed ? Number(order.cashbackUsed) : null,
+      
+      deliveryDriverId: order.deliveryDriverId,
+      deliveryDriverName: order.deliveryDriver?.name,
+      deliveryDriverPhone: order.deliveryDriver?.phone,
+      deliveryDriverStatus: order.deliveryDriver?.status,
+
       items: order.items.map((item) => ({
         id: item.id,
         lineType: item.lineType as 'product' | 'combo',

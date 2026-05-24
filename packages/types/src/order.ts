@@ -307,6 +307,11 @@ export interface OrderResponseDTO {
   couponId?: string | null;
   cashbackUsed?: number | null;
 
+  deliveryDriverId?: string | null;
+  deliveryDriverName?: string | null;
+  deliveryDriverPhone?: string | null;
+  deliveryDriverStatus?: string | null;
+
   pixPayment?: PixPaymentDTO;
   preferencePayment?: PreferencePaymentDTO;
 

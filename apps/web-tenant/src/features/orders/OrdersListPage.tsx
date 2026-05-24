@@ -58,6 +58,8 @@ export function OrdersListPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<OrderStatus | ''>('');
+  const [channelFilter, setChannelFilter] = useState<string>('');
+  const [dateFilter, setDateFilter] = useState<'hoje' | 'ontem' | 'ultimos7' | 'todos'>('hoje');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -69,6 +71,21 @@ export function OrdersListPage() {
     try {
       const params = new URLSearchParams({ page: String(page), limit: '20' });
       if (statusFilter) params.set('status', statusFilter);
+      if (channelFilter) params.set('channel', channelFilter);
+
+      const now = new Date();
+      if (dateFilter === 'hoje') {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        params.set('startDate', start.toISOString());
+      } else if (dateFilter === 'ontem') {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        params.set('startDate', start.toISOString());
+        params.set('endDate', end.toISOString());
+      } else if (dateFilter === 'ultimos7') {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+        params.set('startDate', start.toISOString());
+      }
 
       const res = await api.get<{ items: OrderListItemDTO[]; total: number }>(
         `/orders?${params.toString()}`
@@ -85,7 +102,7 @@ export function OrdersListPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, channelFilter, dateFilter]);
 
   useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
@@ -158,6 +175,38 @@ export function OrdersListPage() {
               {STATUS_LABELS[status]}
             </button>
           ))}
+        </div>
+        
+        {/* Additional Filters */}
+        <div className="flex gap-4 mt-4 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+          <div className="flex-1">
+            <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Período</label>
+            <select
+              value={dateFilter}
+              onChange={(e) => { setDateFilter(e.target.value as any); setPage(1); }}
+              disabled={loading}
+              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-primary-500"
+            >
+              <option value="hoje">Hoje</option>
+              <option value="ontem">Ontem</option>
+              <option value="ultimos7">Últimos 7 dias</option>
+              <option value="todos">Todo período</option>
+            </select>
+          </div>
+          <div className="flex-1">
+            <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Canal de Venda</label>
+            <select
+              value={channelFilter}
+              onChange={(e) => { setChannelFilter(e.target.value); setPage(1); }}
+              disabled={loading}
+              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-primary-500"
+            >
+              <option value="">Todos os canais</option>
+              {Object.entries(CHANNEL_LABELS).map(([val, label]) => (
+                <option key={val} value={val}>{label}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
