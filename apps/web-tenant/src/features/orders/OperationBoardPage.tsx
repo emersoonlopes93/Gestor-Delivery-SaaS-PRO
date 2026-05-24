@@ -336,9 +336,16 @@ export function OperationBoardPage() {
     // Discover the mapped status for the target column
     let newStatus: OrderStatus | null = null;
     if (targetColId === 'entry') newStatus = 'confirmed';
-    else if (targetColId === 'production') newStatus = 'preparing';
+    else if (targetColId === 'production') {
+      if (order.status === 'pending') {
+        alert('O pedido está pendente! Por favor, confirme-o primeiro antes de enviar para a produção.');
+        return;
+      }
+      newStatus = 'preparing';
+    }
     else if (targetColId === 'delivery') {
-      newStatus = order.fulfillmentType === 'delivery' ? 'out_for_delivery' : 'ready_for_pickup';
+      // Fix: delivery orders should go to ready_for_delivery to await dispatch, not out_for_delivery immediately
+      newStatus = order.fulfillmentType === 'delivery' ? 'ready_for_delivery' : 'ready_for_pickup';
     }
 
     if (newStatus && newStatus !== order.status) {
