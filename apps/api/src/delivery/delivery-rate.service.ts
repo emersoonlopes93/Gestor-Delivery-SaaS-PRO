@@ -1,6 +1,6 @@
 import { Inject, Injectable, NotFoundException, Logger, UnprocessableEntityException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import type { DeliveryAddressDTO } from '@gestor/types';
+import type { DeliveryAddressDTO, UpsertDeliveryRateRuleInput } from '@gestor/types';
 import { Prisma, DeliveryRateRule } from '@prisma/client';
 
 type DeliveryRateRuleRepo = Prisma.DeliveryRateRuleDelegate;
@@ -622,42 +622,7 @@ export class DeliveryRateService {
   /**
    * Cria ou atualiza uma regra de entrega.
    */
-  async upsertRule(
-    tenantId: string,
-    data: {
-      id?: string;
-      type: 'neighborhood' | 'distance' | 'fixed' | 'polygon';
-      neighborhood?: string;
-      rate?: number;
-      minKm?: number;
-      maxKm?: number;
-      ratePerKm?: number;
-      fixedRate?: number;
-      isActive?: boolean;
-      priority?: number;
-      isFallback?: boolean;
-      minDistanceKm?: number;
-      maxDistanceKm?: number;
-      geoJson?: Prisma.InputJsonValue;
-      polygonCoordinates?: Prisma.InputJsonValue;
-
-      // Campos evoluídos para engine híbrida (zonas)
-      name?: string;
-      color?: string;
-      zoneKind?: 'blocked_zone' | 'custom_zone';
-      pricingMode?: 'fixed' | 'distance' | 'free' | 'tiers';
-      blocksDelivery?: boolean;
-      fixedFee?: number;
-      pricePerKm?: number;
-      distanceTiers?: Array<{
-        id?: string;
-        minDistanceKm: number;
-        maxDistanceKm: number;
-        fee: number;
-        sortOrder?: number;
-      }>;
-    },
-  ) {
+  async upsertRule(tenantId: string, data: UpsertDeliveryRateRuleInput) {
     const ruleData: Prisma.DeliveryRateRuleUncheckedCreateInput = {
       tenantId,
       type: data.type,

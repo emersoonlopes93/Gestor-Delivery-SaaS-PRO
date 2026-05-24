@@ -85,6 +85,11 @@ export {
 
 export type * from './delivery';
 export { CreateDriverDTO, UpdateDriverDTO } from './delivery';
+export type * from './delivery-rate';
+export {
+  CreateDeliveryRateRuleDTO,
+  DeliveryRateDistanceTierDTO,
+} from './delivery-rate';
 
 export type * from './cash';
 export { OpenCashSessionDTO, CloseCashSessionDTO, CreateCashMovementDTO } from './cash';
