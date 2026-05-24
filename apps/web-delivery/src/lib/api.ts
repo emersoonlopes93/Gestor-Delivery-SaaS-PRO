@@ -29,12 +29,21 @@ api.interceptors.response.use(
         if (!refreshTokenStr) throw new Error('No refresh token');
         
         const baseUrl = API_BASE_URL.replace(/\/+$/, '');
-        const { data } = await axios.post(`${baseUrl}/auth/driver/refresh`, {
+        const { data: raw } = await axios.post(`${baseUrl}/auth/driver/refresh`, {
           refreshToken: refreshTokenStr,
         });
 
-        useAuthStore.getState().setTokens(data.accessToken, refreshTokenStr);
-        originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+        const payload =
+          raw && typeof raw === 'object' && 'success' in raw && raw.success && 'data' in raw
+            ? (raw as { data: { accessToken: string } }).data
+            : (raw as { accessToken: string });
+
+        if (!payload?.accessToken) {
+          throw new Error('Invalid refresh response');
+        }
+
+        useAuthStore.getState().setTokens(payload.accessToken, refreshTokenStr);
+        originalRequest.headers.Authorization = `Bearer ${payload.accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
         useAuthStore.getState().logout();

@@ -22,10 +22,15 @@ export class DriversService {
   }
 
   async listDrivers(tenantId: string) {
-    return this.prisma.deliveryDriver.findMany({
+    const drivers = await this.prisma.deliveryDriver.findMany({
       where: { tenantId },
       orderBy: { name: 'asc' },
     });
+
+    return drivers.map(({ pin: _pin, ...driver }) => ({
+      ...driver,
+      lastLocationAt: driver.lastLocationAt?.toISOString() ?? null,
+    }));
   }
 
   async getDriver(tenantId: string, id: string) {

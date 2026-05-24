@@ -1,37 +1,46 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import type { OrderDispatchItemDTO } from '@gestor/types';
+import { invalidateLogisticsQueries, LOGISTICS_QUERY_KEYS } from '../lib/invalidate-logistics';
 
 export function useDispatch() {
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ['dispatchOrders'],
+    queryKey: LOGISTICS_QUERY_KEYS.dispatchOrders,
     queryFn: async (): Promise<OrderDispatchItemDTO[]> => {
-      const res = await api.get('/orders/operation/dispatch');
-      return res.data as OrderDispatchItemDTO[];
+      const res = await api.get<OrderDispatchItemDTO[]>('/orders/operation/dispatch');
+      return res.data ?? [];
     },
-    refetchInterval: 15000, // Poll every 15s to see new ready orders
+    refetchInterval: 15000,
+    staleTime: 0,
   });
 
   const assignDriver = useMutation({
     mutationFn: async ({ orderId, driverId }: { orderId: string; driverId: string | null }) => {
-      const res = await api.post(`/orders/${orderId}/assign-driver`, { driverId });
+      const res = await api.post<OrderDispatchItemDTO>(`/orders/${orderId}/assign-driver`, { driverId });
       return res.data;
     },
-    onSuccess: () => {
-      // Invalidate all related queries so every view updates immediately
-      queryClient.invalidateQueries({ queryKey: ['dispatchOrders'] });
-      queryClient.invalidateQueries({ queryKey: ['boardOrders'] });
-      queryClient.invalidateQueries({ queryKey: ['drivers'] });
-      queryClient.invalidateQueries({ queryKey: ['delivery-map', 'drivers'] });
-      queryClient.invalidateQueries({ queryKey: ['delivery-map', 'orders'] });
+    onSuccess: (updated) => {
+      invalidateLogisticsQueries(queryClient);
+      if (updated) {
+        queryClient.setQueryData<OrderDispatchItemDTO[]>(
+          LOGISTICS_QUERY_KEYS.dispatchOrders,
+          (current) => {
+            if (!current) return [updated];
+            const idx = current.findIndex((o) => o.id === updated.id);
+            if (idx === -1) return [...current, updated];
+            const next = [...current];
+            next[idx] = updated;
+            return next;
+          },
+        );
+      }
     },
   });
 
   const dispatchOrder = useMutation({
     mutationFn: async (orderId: string) => {
-      // Transition from ready_for_delivery to out_for_delivery
       const res = await api.patch(`/orders/${orderId}/status`, {
         status: 'out_for_delivery',
         note: 'Despachado para entrega.',
@@ -39,13 +48,12 @@ export function useDispatch() {
       return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dispatchOrders'] });
+      invalidateLogisticsQueries(queryClient);
     },
   });
 
   const completeOrder = useMutation({
     mutationFn: async (orderId: string) => {
-      // Transition from out_for_delivery to completed
       const res = await api.patch(`/orders/${orderId}/status`, {
         status: 'completed',
         note: 'Entrega finalizada com sucesso.',
@@ -53,7 +61,7 @@ export function useDispatch() {
       return res.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dispatchOrders'] });
+      invalidateLogisticsQueries(queryClient);
     },
   });
 

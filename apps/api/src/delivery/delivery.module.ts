@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
+import { OrdersModule } from '../orders/orders.module';
 import { PrismaService } from '../database/prisma.service';
 import { DatabaseModule } from '../database/database.module';
 import { AuthModule } from '../auth/auth.module';
@@ -13,7 +14,7 @@ import { DeliveryRateService, DELIVERY_COVERAGE_REPO, DELIVERY_RATE_RULE_REPO } 
 import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, RbacModule],
+  imports: [DatabaseModule, AuthModule, RbacModule, forwardRef(() => OrdersModule)],
   controllers: [DriversController, DriverOperationsController, DeliveryRateController, DeliveryCoverageController],
   providers: [
     DriversService,

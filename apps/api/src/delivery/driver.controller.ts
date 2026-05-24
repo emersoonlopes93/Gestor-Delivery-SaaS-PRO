@@ -8,12 +8,15 @@ import {
   UseGuards,
   Req,
   NotFoundException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { DriverAuthGuard } from '../auth/guards/driver-auth.guard';
 import { PrismaService } from '../database/prisma.service';
 import { DriversService } from './drivers.service';
 import { UpdateDriverLocationDTO } from './dto/update-driver-location.dto';
 import { AuthenticatedRequest } from '../common/interfaces/request.interface';
+import { OrdersService } from '../orders/orders.service';
 
 @Controller('delivery/driver')
 @UseGuards(DriverAuthGuard)
@@ -21,6 +24,8 @@ export class DriverOperationsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly driversService: DriversService,
+    @Inject(forwardRef(() => OrdersService))
+    private readonly ordersService: OrdersService,
   ) {}
 
   @Get('active-runs')
@@ -89,27 +94,9 @@ export class DriverOperationsController {
       throw new NotFoundException('Delivery not found or not currently active for you.');
     }
 
-    const updatedOrder = await this.prisma.order.update({
-      where: { id: order.id },
-      data: { status: 'completed' },
+    return this.ordersService.updateOrderStatus(orderId, user.tenantId, {
+      status: 'completed',
+      note: 'Entrega concluída pelo entregador.',
     });
-
-    // Back to available
-    await this.prisma.deliveryDriver.update({
-      where: { id: user.id },
-      data: { status: 'available' },
-    });
-
-    // Timeline entry
-    await this.prisma.orderTimeline.create({
-      data: {
-        orderId: order.id,
-        tenantId: user.tenantId,
-        status: 'completed',
-        note: 'Entrega concluída pelo entregador.',
-      },
-    });
-
-    return updatedOrder;
   }
 }

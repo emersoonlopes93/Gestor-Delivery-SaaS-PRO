@@ -42,6 +42,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api-client';
 import type { Tenant, TenantSettings, TenantOperatingHours } from '@gestor/types';
 import { useNotificationAudio } from '../hooks/useNotificationAudio';
+import { useLogisticsSocket } from '../features/delivery/hooks/useLogisticsSocket';
 import { Toaster } from 'react-hot-toast';
 
 type SidebarItem = {
@@ -408,6 +409,8 @@ export function AppLayout() {
     newOrderSound: tenantData?.settings?.newOrderSound,
     cancellationSound: tenantData?.settings?.cancellationSound,
   });
+
+  useLogisticsSocket(tenantData?.id);
 
   const initialSidebarState = useMemo(() => {
     const saved = safeParseSidebarState(localStorage.getItem(SIDEBAR_STORAGE_KEY));

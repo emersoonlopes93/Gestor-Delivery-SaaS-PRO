@@ -1012,29 +1012,14 @@ export class OrdersService {
     return orderDetail;
   }
 
-  async getDispatchOrders(tenantId: string): Promise<OrderDispatchItemDTO[]> {
-    const dispatchStatuses: OrderStatus[] = [
-      'ready_for_delivery',
-      'out_for_delivery',
-    ];
-
-    const orders = await this.prisma.order.findMany({
-      where: {
-        tenantId,
-        fulfillmentType: 'delivery',
-        status: { in: dispatchStatuses },
-      },
-      include: {
-        deliveryAddress: true,
-        deliveryDriver: true,
-      },
-    });
-
-    return orders.map((o) => ({
+  private mapOrderToDispatchItem(
+    o: Prisma.OrderGetPayload<{ include: { deliveryAddress: true; deliveryDriver: true } }>,
+  ): OrderDispatchItemDTO {
+    return {
       id: o.id,
       orderNumber: o.orderNumber,
       customerName: o.customerName,
-      customerPhone: o.customerPhone,
+      customerPhone: o.customerPhone ?? undefined,
       fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
       status: o.status as OrderStatus,
       deliveryAddress: o.deliveryAddress
@@ -1055,15 +1040,72 @@ export class OrdersService {
       deliveryDriverPhone: o.deliveryDriver?.phone || undefined,
       total: Number(o.total),
       createdAt: o.createdAt.toISOString(),
-    }));
+    };
   }
 
-  async assignDriver(tenantId: string, orderId: string, driverId: string | null, actorId?: string) {
+  private async releaseDriverIfIdle(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    driverId: string,
+    excludeOrderId?: string,
+  ): Promise<void> {
+    const activeDeliveries = await tx.order.count({
+      where: {
+        tenantId,
+        deliveryDriverId: driverId,
+        status: { in: ['ready_for_delivery', 'out_for_delivery'] },
+        ...(excludeOrderId ? { id: { not: excludeOrderId } } : {}),
+      },
+    });
+
+    if (activeDeliveries === 0) {
+      await tx.deliveryDriver.update({
+        where: { id: driverId },
+        data: { status: 'available' },
+      });
+    }
+  }
+
+  async getDispatchOrders(tenantId: string): Promise<OrderDispatchItemDTO[]> {
+    const dispatchStatuses: OrderStatus[] = [
+      'ready_for_delivery',
+      'out_for_delivery',
+    ];
+
+    const orders = await this.prisma.order.findMany({
+      where: {
+        tenantId,
+        fulfillmentType: 'delivery',
+        status: { in: dispatchStatuses },
+      },
+      include: {
+        deliveryAddress: true,
+        deliveryDriver: true,
+      },
+      orderBy: [{ status: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    return orders.map((o) => this.mapOrderToDispatchItem(o));
+  }
+
+  async assignDriver(
+    tenantId: string,
+    orderId: string,
+    driverId: string | null,
+    actorId?: string,
+  ): Promise<OrderDispatchItemDTO> {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },
+      include: { deliveryDriver: true },
     });
 
     if (!order) throw new NotFoundException('Pedido não encontrado.');
+
+    if (driverId && order.fulfillmentType !== 'delivery') {
+      throw new BadRequestException('Somente pedidos de entrega podem receber entregador.');
+    }
+
+    const previousDriverId = order.deliveryDriverId;
 
     if (driverId) {
       const driver = await this.prisma.deliveryDriver.findUnique({
@@ -1077,20 +1119,41 @@ export class OrdersService {
       if (!driver.isActive || driver.status === 'offline') {
         throw new BadRequestException('O entregador selecionado está offline ou inativo.');
       }
+
+      if (driver.status === 'busy' && previousDriverId !== driverId) {
+        const otherActive = await this.prisma.order.count({
+          where: {
+            tenantId,
+            deliveryDriverId: driverId,
+            id: { not: orderId },
+            status: { in: ['ready_for_delivery', 'out_for_delivery'] },
+          },
+        });
+        if (otherActive > 0) {
+          throw new BadRequestException(
+            'Este entregador já possui outra entrega em andamento.',
+          );
+        }
+      }
     }
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.order.update({
+    await this.prisma.$transaction(async (tx) => {
+      await tx.order.update({
         where: { id: orderId },
         data: { deliveryDriverId: driverId },
       });
 
-      // Update driver status if needed
+      if (previousDriverId && previousDriverId !== driverId) {
+        await this.releaseDriverIfIdle(tx, tenantId, previousDriverId, orderId);
+      }
+
       if (driverId) {
         await tx.deliveryDriver.update({
           where: { id: driverId },
           data: { status: 'busy' },
         });
+      } else if (previousDriverId) {
+        await this.releaseDriverIfIdle(tx, tenantId, previousDriverId, orderId);
       }
 
       await tx.orderTimeline.create({
@@ -1098,20 +1161,35 @@ export class OrdersService {
           orderId,
           tenantId,
           status: order.status as OrderStatus,
-          note: driverId ? `Entregador atribuído.` : `Entregador removido do pedido.`,
+          note: driverId
+            ? `Entregador atribuído: ${(await tx.deliveryDriver.findUnique({ where: { id: driverId } }))?.name ?? driverId}.`
+            : `Entregador removido do pedido.`,
           actorId,
         },
       });
-
-      return updated;
     });
+
+    const refreshed = await this.prisma.order.findFirst({
+      where: { id: orderId, tenantId },
+      include: { deliveryAddress: true, deliveryDriver: true },
+    });
+
+    if (!refreshed) {
+      throw new NotFoundException('Pedido não encontrado após atribuição.');
+    }
 
     this.ordersGateway.server.to(`tenant:${tenantId}`).emit('driverAssigned', {
       orderId,
-      driverId
+      driverId,
+      orderNumber: refreshed.orderNumber,
     });
 
-    return result;
+    this.ordersGateway.server.to(`tenant:${tenantId}`).emit('orderUpdated', {
+      orderId,
+      orderNumber: refreshed.orderNumber,
+    });
+
+    return this.mapOrderToDispatchItem(refreshed);
   }
 
   async getLatestCustomerOrder(tenantId: string, customerId: string) {

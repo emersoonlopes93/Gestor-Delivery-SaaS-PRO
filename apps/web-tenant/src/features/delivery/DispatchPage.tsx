@@ -46,9 +46,25 @@ export function DispatchPage() {
     }
   };
 
-  const handleDispatch = async (orderId: string) => {
+  const handleDispatch = async (order: OrderDispatchItemDTO) => {
+    const pendingDriverId = selectedDriverForOrder[order.id];
+    const effectiveDriverId = order.deliveryDriverId || pendingDriverId;
+
+    if (!effectiveDriverId) {
+      alert('Atribua um entregador antes de despachar o pedido.');
+      return;
+    }
+
     try {
-      await dispatchOrder(orderId);
+      if (!order.deliveryDriverId && pendingDriverId) {
+        await assignDriver(order.id, pendingDriverId);
+      }
+      await dispatchOrder(order.id);
+      setSelectedDriverForOrder((prev) => {
+        const next = { ...prev };
+        delete next[order.id];
+        return next;
+      });
     } catch (e: unknown) {
       const error = e as Error & { response?: { data?: { message?: string } } };
       alert(error?.response?.data?.message || 'Erro ao despachar pedido');
@@ -152,7 +168,7 @@ export function DispatchPage() {
                   </div>
 
                   <button
-                    onClick={() => handleDispatch(o.id)}
+                    onClick={() => handleDispatch(o)}
                     disabled={!o.deliveryDriverId && !selectedDriverForOrder[o.id]}
                     className={`w-full py-2 rounded text-sm font-bold text-white transition-colors ${
                       o.deliveryDriverId || selectedDriverForOrder[o.id]

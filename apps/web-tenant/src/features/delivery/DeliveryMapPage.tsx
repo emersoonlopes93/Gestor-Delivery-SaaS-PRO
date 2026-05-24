@@ -309,6 +309,16 @@ export function DeliveryMapPage() {
     return orderMarkers.filter((o) => o.status === 'out_for_delivery');
   }, [orderMarkers]);
 
+  const waitingDispatchOrders = useMemo(() => {
+    return (ordersQuery.data ?? []).filter((o) => o.status === 'ready_for_delivery');
+  }, [ordersQuery.data]);
+
+  const waitingDispatchMarkers = useMemo(() => {
+    return normalizeOrderMarkers(
+      (ordersQuery.data ?? []).filter((o) => o.status === 'ready_for_delivery'),
+    );
+  }, [ordersQuery.data]);
+
   const defaultCenter: LatLngExpression = [-23.55052, -46.633308];
 
   const selectedPosition = useMemo<LatLngExpression | null>(() => {
@@ -468,6 +478,38 @@ export function DeliveryMapPage() {
 
                 <section>
                   <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Aguardando despacho</h2>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">{waitingDispatchOrders.length}</div>
+                  </div>
+                  <div className="space-y-2 mb-4">
+                    {waitingDispatchOrders.map((o) => (
+                      <div
+                        key={`panel-waiting-${o.id}`}
+                        className="w-full text-left rounded-lg border border-dashed border-yellow-200 dark:border-yellow-900/40 px-3 py-2 bg-yellow-50/50 dark:bg-yellow-900/10"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="font-semibold text-sm text-gray-900 dark:text-gray-100">{o.orderNumber}</div>
+                          <div className="text-[11px] font-black text-yellow-700">PRONTO</div>
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400 truncate">Cliente: {o.customerName}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          Entregador: {o.deliveryDriverName ?? 'Não atribuído'}
+                        </div>
+                        {!o.deliveryDriverName ? (
+                          <div className="text-[10px] text-orange-600 font-medium mt-0.5">
+                            Atribua um entregador no Despacho
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                    {waitingDispatchOrders.length === 0 ? (
+                      <div className="text-xs text-gray-400">Nenhum pedido aguardando despacho.</div>
+                    ) : null}
+                  </div>
+                </section>
+
+                <section>
+                  <div className="flex items-center justify-between mb-2">
                     <h2 className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Pedidos em rota</h2>
                     <div className="text-xs text-gray-500 dark:text-gray-400">{outForDeliveryOrders.length}</div>
                   </div>
@@ -522,7 +564,7 @@ export function DeliveryMapPage() {
               />
 
               <DriverMarkersLayer drivers={driverMarkers} selected={selected} onSelect={handleSelect} />
-              <OrderMarkersLayer orders={outForDeliveryOrders} selected={selected} onSelect={handleSelect} />
+              <OrderMarkersLayer orders={[...waitingDispatchMarkers, ...outForDeliveryOrders]} selected={selected} onSelect={handleSelect} />
 
               {/* Linha simples driver -> destino (opcional) */}
               {outForDeliveryOrders
@@ -546,7 +588,8 @@ export function DeliveryMapPage() {
         </div>
 
         <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          Drivers no mapa: {driverMarkers.length} | Sem GPS: {driversWithoutLocation.length} | Pedidos em rota: {outForDeliveryOrders.length}
+          Drivers no mapa: {driverMarkers.length} | Sem GPS: {driversWithoutLocation.length} | Aguardando despacho:{' '}
+          {waitingDispatchOrders.length} | Em rota: {outForDeliveryOrders.length}
         </div>
       </div>
     </div>

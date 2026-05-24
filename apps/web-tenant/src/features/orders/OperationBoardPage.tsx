@@ -1,7 +1,9 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, LayoutGrid, Package, Truck, User, X } from 'lucide-react';
 import type { OrderBoardItemDTO, OrderStatus, UpdateOrderStatusDTO, DriverDTO } from '@gestor/types';
 import { api, ApiError } from '../../lib/api-client';
+import { invalidateLogisticsQueries } from '../delivery/lib/invalidate-logistics';
 import { DndContext, DragOverlay, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { OrderCard } from './components/OrderCard';
@@ -22,7 +24,7 @@ const DriverSelectionModal = memo(function DriverSelectionModal(props: {
 
   if (!isOpen) return null;
 
-  const availableDrivers = drivers.filter(d => d.isActive && d.status === 'available');
+  const availableDrivers = drivers.filter((d) => d.isActive && d.status !== 'offline');
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -166,6 +168,7 @@ const SegmentedControl = memo(function SegmentedControl(props: {
 /* ─── Page ──────────────────────────────────────────────────── */
 
 export function OperationBoardPage() {
+  const queryClient = useQueryClient();
   const [orders, setOrders] = useState<OrderBoardItemDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -288,6 +291,8 @@ export function OperationBoardPage() {
       const res = await api.patch(`/orders/${orderId}/status`, body);
       if (res.success) {
         await fetchBoard();
+        await fetchDrivers();
+        invalidateLogisticsQueries(queryClient);
         setIsDriverModalOpen(false);
         setOrderToDispatch(null);
         toast.success(`Status atualizado para ${newStatus.replace(/_/g, ' ')}`, { duration: 3000 });

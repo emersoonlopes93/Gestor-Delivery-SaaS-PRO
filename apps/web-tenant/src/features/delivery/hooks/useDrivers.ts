@@ -6,7 +6,7 @@ export function useDrivers() {
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ['drivers'],
+    queryKey: ['drivers'] as const,
     queryFn: async (): Promise<DriverDTO[]> => {
       const res = await api.get('/delivery/drivers');
       return res.data as DriverDTO[];
