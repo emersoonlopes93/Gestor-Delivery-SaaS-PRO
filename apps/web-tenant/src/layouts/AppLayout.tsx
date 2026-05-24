@@ -42,6 +42,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api-client';
 import type { Tenant, TenantSettings, TenantOperatingHours } from '@gestor/types';
 import { useNotificationAudio } from '../hooks/useNotificationAudio';
+import { Toaster } from 'react-hot-toast';
 
 type SidebarItem = {
   id: string;
@@ -551,6 +552,20 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen flex transition-colors" style={{ backgroundColor: 'var(--surface-page)' }}>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          className: 'font-bold text-sm',
+          success: {
+            style: { background: '#10b981', color: '#fff', borderRadius: '12px' },
+            iconTheme: { primary: '#fff', secondary: '#10b981' },
+          },
+          error: {
+            style: { background: '#ef4444', color: '#fff', borderRadius: '12px' },
+            iconTheme: { primary: '#fff', secondary: '#ef4444' },
+          },
+        }}
+      />
       {isMobileOpen ? (
         <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={closeMobile} />
       ) : null}

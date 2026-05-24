@@ -29,8 +29,9 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
       try {
         const res = await api.get<OrderResponseDTO>(`/orders/${orderId}`);
         if (res.data) setOrder(res.data);
-      } catch (err: any) {
-        setError(err.message || 'Erro ao carregar detalhes');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Erro ao carregar detalhes';
+        setError(msg);
       } finally {
         setLoading(false);
       }

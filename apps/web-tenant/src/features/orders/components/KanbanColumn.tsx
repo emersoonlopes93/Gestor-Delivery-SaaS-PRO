@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import type { LucideIcon } from 'lucide-react';
 import type { OrderBoardItemDTO, OrderStatus } from '@gestor/types';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -11,7 +12,7 @@ export type KanbanColumnSpec = {
   title: string;
   subtitle: string;
   statuses: OrderStatus[];
-  icon: any;
+  icon: LucideIcon;
   accentCol: string;
   headerCol: string;
   countCls: string;

@@ -183,7 +183,7 @@ export function OrdersListPage() {
             <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Período</label>
             <select
               value={dateFilter}
-              onChange={(e) => { setDateFilter(e.target.value as any); setPage(1); }}
+              onChange={(e) => { setDateFilter(e.target.value as 'hoje' | 'ontem' | 'ultimos7' | 'todos'); setPage(1); }}
               disabled={loading}
               className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-primary-500"
             >

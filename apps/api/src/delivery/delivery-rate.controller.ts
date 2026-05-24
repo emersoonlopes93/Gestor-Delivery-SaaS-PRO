@@ -44,7 +44,7 @@ class CreateDeliveryRateRuleDto {
 
   @IsOptional()
   @IsArray()
-  distanceTiers?: any[];
+  distanceTiers?: unknown[];
 
   @IsOptional()
   @IsBoolean()

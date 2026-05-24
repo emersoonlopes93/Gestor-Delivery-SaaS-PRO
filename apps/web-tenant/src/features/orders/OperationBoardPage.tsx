@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshCw, LayoutGrid, Package, Truck, User, X } from 'lucide-react';
 import type { OrderBoardItemDTO, OrderStatus, UpdateOrderStatusDTO, DriverDTO } from '@gestor/types';
 import { api, ApiError } from '../../lib/api-client';
@@ -7,6 +7,7 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { OrderCard } from './components/OrderCard';
 import { KanbanColumn, KanbanColumnSpec, BoardViewMode } from './components/KanbanColumn';
 import { OrderDrawer } from './components/OrderDrawer';
+import toast from 'react-hot-toast';
 
 /* ─── Driver Selection Modal ────────────────────────────────── */
 
@@ -179,6 +180,9 @@ export function OperationBoardPage() {
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [activeDragOrder, setActiveDragOrder] = useState<OrderBoardItemDTO | null>(null);
 
+  // Track which orders have already triggered the "delayed" alert to avoid spamming
+  const alreadyAlertedDelayed = useRef<Set<string>>(new Set());
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -224,6 +228,43 @@ export function OperationBoardPage() {
     return () => clearInterval(interval);
   }, [fetchBoard, fetchDrivers]);
 
+  // Delayed order detection — checks every 60 seconds
+  useEffect(() => {
+    const DELAY_THRESHOLD_MIN = 30;
+    const ACTIVE_STATUSES: OrderStatus[] = ['pending', 'confirmed', 'preparing'];
+
+    const check = () => {
+      const now = Date.now();
+      for (const order of orders) {
+        if (!ACTIVE_STATUSES.includes(order.status as OrderStatus)) continue;
+        const elapsedMin = Math.floor((now - new Date(order.createdAt).getTime()) / 60000);
+        if (elapsedMin >= DELAY_THRESHOLD_MIN && !alreadyAlertedDelayed.current.has(order.id)) {
+          alreadyAlertedDelayed.current.add(order.id);
+          toast(`⏰ Pedido #${order.orderNumber} está atrasado (${elapsedMin}m)`, {
+            duration: 10000,
+            icon: '⚠️',
+            style: {
+              background: '#f59e0b',
+              color: '#fff',
+              fontWeight: 'bold',
+              borderRadius: '12px',
+              maxWidth: '340px',
+            },
+          });
+        }
+      }
+      // Clear alerts for orders that are no longer active (completed / cancelled)
+      for (const id of alreadyAlertedDelayed.current) {
+        const stillActive = orders.some(o => o.id === id && ACTIVE_STATUSES.includes(o.status as OrderStatus));
+        if (!stillActive) alreadyAlertedDelayed.current.delete(id);
+      }
+    };
+
+    check(); // Run immediately when orders change
+    const interval = setInterval(check, 60000);
+    return () => clearInterval(interval);
+  }, [orders]);
+
   const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus, driverId?: string) => {
     if (updatingId) return;
     
@@ -249,11 +290,12 @@ export function OperationBoardPage() {
         await fetchBoard();
         setIsDriverModalOpen(false);
         setOrderToDispatch(null);
+        toast.success(`Status atualizado para ${newStatus.replace(/_/g, ' ')}`, { duration: 3000 });
       }
     } catch (err) {
       console.error('[OperationBoardPage] Erro ao atualizar status:', err);
       const msg = err instanceof ApiError ? err.message : 'Erro ao atualizar pedido';
-      alert(msg);
+      toast.error(msg, { duration: 5000 });
     } finally {
       setUpdatingId(null);
     }

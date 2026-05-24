@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
+import toast from 'react-hot-toast';
 
 /** Sons disponíveis (devem existir em public/sounds/) */
 export const AVAILABLE_SOUNDS = [
@@ -68,7 +69,7 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
       socket.emit('joinTenant', { tenantId });
     });
 
-    socket.on('newOrder', (data) => {
+    socket.on('newOrder', (data: { order: { orderNumber: string; customerName: string; total: number } }) => {
       console.log('[Websocket] Novo pedido recebido!', data);
 
       if (settingsRef.current.enabled) {
@@ -77,21 +78,31 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
         });
       }
 
+      const totalFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.order.total);
+      toast.success(`🛵 Novo Pedido #${data.order.orderNumber}\n${data.order.customerName} — ${totalFmt}`, {
+        duration: 8000,
+        style: { fontWeight: 'bold', maxWidth: '340px' },
+      });
+
       if (Notification.permission === 'granted') {
         new Notification(`Novo Pedido ${data.order.orderNumber}`, {
-          body: `Cliente: ${data.order.customerName}\nTotal: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.order.total)}`,
+          body: `Cliente: ${data.order.customerName}\nTotal: ${totalFmt}`,
           icon: '/favicon.ico',
         });
       }
     });
 
-    socket.on('orderCancelled', (data) => {
+    socket.on('orderCancelled', (data: { orderNumber?: string }) => {
       console.log('[Websocket] Pedido cancelado!', data);
       if (settingsRef.current.enabled) {
         playAudio(cancelledUrlRef.current, settingsRef.current.volume).catch((err) => {
           console.warn('[Audio] Falha ao reproduzir som de cancelamento:', err);
         });
       }
+      toast.error(`❌ Pedido${data.orderNumber ? ` #${data.orderNumber}` : ''} cancelado!`, {
+        duration: 7000,
+        style: { fontWeight: 'bold' },
+      });
     });
 
     socketRef.current = socket;
