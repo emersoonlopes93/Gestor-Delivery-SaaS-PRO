@@ -1192,6 +1192,26 @@ export class OrdersService {
     return this.mapOrderToDispatchItem(refreshed);
   }
 
+  async logPrint(orderId: string, tenantId: string, actorId?: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, tenantId },
+    });
+
+    if (!order) throw new NotFoundException('Pedido não encontrado.');
+
+    await this.prisma.orderTimeline.create({
+      data: {
+        orderId,
+        tenantId,
+        status: order.status,
+        note: `Pedido impresso.`,
+        actorId,
+      },
+    });
+
+    return { success: true };
+  }
+
   async getLatestCustomerOrder(tenantId: string, customerId: string) {
     return this.prisma.order.findFirst({
       where: { tenantId, customerId },

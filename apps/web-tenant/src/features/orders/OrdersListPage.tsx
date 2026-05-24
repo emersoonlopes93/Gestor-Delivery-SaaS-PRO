@@ -1,25 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Package, Clock, ChevronRight, RefreshCw } from 'lucide-react';
 import { api, ApiError } from '../../lib/api-client';
-import type { 
-  OrderListItemDTO, 
-  OrderResponseDTO, 
-  UpdateOrderStatusDTO 
-} from '@gestor/types';
+import type { OrderListItemDTO } from '@gestor/types';
+import { OrderDrawer } from './components/OrderDrawer';
 
 // Bypass persistent build error by defining locally
 type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'ready_for_pickup' | 'ready_for_delivery' | 'out_for_delivery' | 'completed' | 'cancelled' | 'draft';
-const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pending: ['confirmed', 'cancelled'],
-  confirmed: ['preparing', 'cancelled'],
-  preparing: ['ready_for_pickup', 'ready_for_delivery', 'cancelled'],
-  ready_for_pickup: ['completed'],
-  ready_for_delivery: ['out_for_delivery'],
-  out_for_delivery: ['completed'],
-  completed: [],
-  cancelled: [],
-  draft: ['confirmed', 'cancelled'],
-};
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
   pending: 'Pendente',
@@ -108,10 +94,6 @@ export function OrdersListPage() {
 
   const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
   const fmtDate = (d: string) => new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-
-  if (selectedOrderId) {
-    return <OrderDetailPanel orderId={selectedOrderId} onBack={() => { setSelectedOrderId(null); fetchOrders(); }} />;
-  }
 
   return (
     <div className="p-4 md:p-6">
@@ -292,194 +274,12 @@ export function OrdersListPage() {
           </button>
         </div>
       )}
-    </div>
-  );
-}
 
-// ----------------------------------------------------------------
-// ORDER DETAIL PANEL (inline for now)
-// ----------------------------------------------------------------
-
-
-
-function OrderDetailPanel({ orderId, onBack }: { orderId: string; onBack: () => void }) {
-  const [order, setOrder] = useState<OrderResponseDTO | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
-
-  const fetchOrder = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await api.get<OrderResponseDTO>(`/orders/${orderId}`);
-      if (res.success) {
-        setOrder(res.data);
-      }
-    } catch (err) {
-       console.error('[OrderDetailPanel] Erro ao buscar pedido:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [orderId]);
-
-  useEffect(() => { fetchOrder(); }, [fetchOrder]);
-
-  const handleStatusUpdate = async (newStatus: OrderStatus) => {
-    if (updating) return;
-    setUpdating(true);
-    try {
-      const body: UpdateOrderStatusDTO = { status: newStatus };
-      const res = await api.patch<OrderResponseDTO>(`/orders/${orderId}/status`, body);
-      
-      if (res.success) {
-        // O backend retorna o Order atualizado, mas precisamos garantir tipagem
-        // Na verdade o OrdersService.updateOrderStatus hoje retorna o prisma object,
-        // mas o Interceptor vai envolver em { success, data }.
-        // O ideal é que o data seja o OrderResponseDTO.
-        // Vamos forçar um refresh para garantir a consistência total do DTO de detalhe.
-        await fetchOrder();
-      }
-    } catch (err) {
-      console.error('[OrderDetailPanel] Erro ao atualizar status:', err);
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
-
-  if (loading || !order) {
-    return <div className="p-6 text-center text-gray-400">Carregando pedido...</div>;
-  }
-
-  const validTransitions = ORDER_STATUS_TRANSITIONS[order.status];
-
-  return (
-    <div className="p-6 max-w-2xl">
-      <button onClick={onBack} className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-1">
-        ← Voltar aos pedidos
-      </button>
-
-      <header className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{order.orderNumber}</h1>
-          <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase mt-2 inline-block ${STATUS_COLORS[order.status]}`}>
-            {STATUS_LABELS[order.status]}
-          </span>
-        </div>
-        <div className="text-right">
-          <span className="text-2xl font-black text-gray-900 dark:text-gray-100">{fmt(order.total)}</span>
-          <p className="text-xs text-gray-400 mt-1">{order.fulfillmentType === 'delivery' ? '📦 Entrega' : '🏪 Retirada'}</p>
-          <div className="mt-1">
-            <span className="text-[10px] font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full border border-blue-100 dark:border-blue-800">
-              Canal: {CHANNEL_LABELS[order.sourceChannel] || order.sourceChannel}
-            </span>
-          </div>
-        </div>
-      </header>
-
-      {/* Status Actions */}
-      {validTransitions.length > 0 && (
-        <div className="bg-primary-500/5 border border-primary-500/20 rounded-2xl p-5 mb-6">
-          <p className="text-[10px] font-black text-primary-600 dark:text-primary-400 uppercase tracking-widest mb-4">Ações Disponíveis</p>
-          <div className="flex gap-2 flex-wrap">
-            {validTransitions.map(status => (
-              <button
-                key={status}
-                onClick={() => handleStatusUpdate(status)}
-                disabled={updating}
-                className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 ${
-                  status === 'cancelled'
-                    ? 'bg-red-600 text-white hover:bg-red-700 shadow-red-900/10'
-                    : 'bg-primary-600 text-white hover:bg-primary-700 shadow-primary-900/10'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                {STATUS_LABELS[status]}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Customer */}
-      <section className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800 mb-4">
-        <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Cliente</h3>
-        <p className="font-bold text-gray-900 dark:text-gray-100">{order.customerName}</p>
-        <p className="text-sm text-gray-500 dark:text-gray-400">{order.customerPhone}</p>
-        {order.customerEmail && <p className="text-sm text-gray-500 dark:text-gray-400">{order.customerEmail}</p>}
-      </section>
-
-      {/* Delivery Address */}
-      {order.deliveryAddress && (
-        <section className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800 mb-4">
-          <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Endereço</h3>
-          <p className="text-sm text-gray-700 dark:text-gray-300">
-            {order.deliveryAddress.street}, {order.deliveryAddress.number}
-            {order.deliveryAddress.complement ? ` - ${order.deliveryAddress.complement}` : ''}
-          </p>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {order.deliveryAddress.neighborhood} — {order.deliveryAddress.city}/{order.deliveryAddress.state} — CEP {order.deliveryAddress.zipCode}
-          </p>
-          {order.deliveryAddress.reference && (
-            <p className="text-xs text-gray-400 mt-1 italic">Ref: {order.deliveryAddress.reference}</p>
-          )}
-        </section>
-      )}
-
-      {/* Items */}
-      <section className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800 mb-4">
-        <h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Itens</h3>
-        <div className="space-y-3">
-          {order.items.map(item => (
-            <div key={item.id} className="flex justify-between text-sm">
-              <div>
-                <span className="font-bold text-gray-800 dark:text-gray-200">{item.quantity}x</span>{' '}
-                <span className="text-gray-700 dark:text-gray-300">{item.snapshotName}</span>
-                <span className="text-[10px] text-gray-400 ml-1 uppercase">[{item.lineType}]</span>
-                {item.snapshotComposition && (
-                  <p className="text-[11px] text-gray-400 italic">{item.snapshotComposition}</p>
-                )}
-              </div>
-              <span className="font-bold text-gray-800 dark:text-gray-200 ml-4">{fmt(item.lineTotal)}</span>
-            </div>
-          ))}
-        </div>
-        <div className="border-t mt-4 pt-3 space-y-1 text-sm">
-          <div className="flex justify-between text-gray-500 dark:text-gray-400"><span>Subtotal itens</span><span>{fmt(order.itemsSubtotal)}</span></div>
-          {order.discountTotal > 0 && <div className="flex justify-between text-green-600"><span>Desconto</span><span>-{fmt(order.discountTotal)}</span></div>}
-          {order.deliveryFee > 0 && <div className="flex justify-between text-gray-500 dark:text-gray-400"><span>Entrega</span><span>{fmt(order.deliveryFee)}</span></div>}
-          {order.serviceFee > 0 && <div className="flex justify-between text-gray-500 dark:text-gray-400"><span>Taxa de serviço</span><span>{fmt(order.serviceFee)}</span></div>}
-          <div className="flex justify-between font-black text-gray-900 dark:text-gray-100 pt-2 border-t"><span>Total</span><span>{fmt(order.total)}</span></div>
-        </div>
-      </section>
-
-      {/* Notes */}
-      {order.notes && (
-        <section className="bg-amber-500/5 dark:bg-amber-500/10 rounded-2xl p-5 border border-amber-500/10 dark:border-amber-500/20 mb-4">
-          <h3 className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-2">Observações do Pedido</h3>
-          <p className="text-sm text-amber-900 dark:text-amber-200 font-medium italic">"{order.notes}"</p>
-        </section>
-      )}
-
-      {/* Timeline */}
-      <section className="bg-white dark:bg-gray-900 rounded-xl p-4 border border-gray-100 dark:border-gray-800">
-        <h3 className="text-xs font-bold text-gray-400 uppercase mb-3">Timeline</h3>
-        <div className="space-y-3">
-          {order.timeline.map(entry => (
-            <div key={entry.id} className="flex items-start gap-3">
-              <div className="w-2 h-2 rounded-full bg-gray-300 mt-1.5 shrink-0" />
-              <div>
-                <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase ${STATUS_COLORS[entry.status]}`}>
-                  {STATUS_LABELS[entry.status]}
-                </span>
-                <p className="text-[11px] text-gray-400 mt-0.5">
-                  {new Date(entry.createdAt).toLocaleString('pt-BR')}
-                </p>
-                {entry.note && <p className="text-xs text-gray-500 dark:text-gray-400 italic mt-0.5">{entry.note}</p>}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      <OrderDrawer 
+        orderId={selectedOrderId} 
+        onClose={() => setSelectedOrderId(null)} 
+        onUpdated={fetchOrders}
+      />
     </div>
   );
 }

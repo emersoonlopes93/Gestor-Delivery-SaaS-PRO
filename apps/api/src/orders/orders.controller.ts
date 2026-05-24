@@ -166,4 +166,15 @@ export class OrdersController {
     const actorId = req.user.sub; // User performing the action
     return this.ordersService.assignDriver(tenantId, id, dto.driverId, actorId);
   }
+
+  @Post(':id/print-log')
+  @RequirePermissions('orders.read')
+  async logPrint(
+    @Request() req: TenantRequest,
+    @Param('id') id: string,
+  ) {
+    const tenantId = req.user.tenantId;
+    const actorId = req.user.sub;
+    return this.ordersService.logPrint(id, tenantId, actorId);
+  }
 }
