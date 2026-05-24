@@ -14,6 +14,7 @@
     "smoke:delivery-rate": "ts-node scripts/smoke-test-delivery-rate.ts",
     "smoke:inventory": "ts-node scripts/smoke-test-inventory.ts",
     "smoke:orders": "ts-node scripts/smoke-test-orders.ts",
+    "smoke:logistics": "ts-node -r tsconfig-paths/register scripts/smoke-test-logistics-flow.ts",
     "smoke:all": "pnpm smoke:auth && pnpm smoke:combos && pnpm smoke:delivery-rate && pnpm smoke:inventory && pnpm smoke:orders",
     "test:delivery-rate-engine": "ts-node scripts/unit-test-delivery-rate-engine.ts",
     "prisma:generate": "prisma generate",
