@@ -141,6 +141,14 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
 
       // Resolve o provider (dinâmico por tenant/global)
       const aiProvider = await this.aiRegistry.resolveProvider(tenantId);
+      const providerAvailable = await aiProvider.isAvailable();
+      if (!providerAvailable) {
+        this.logger.error(`AI Provider unavailable for tenant ${tenantId} (missing credentials/env).`);
+        if (config.fallbackMessage) {
+          await this.sendFinalResponse(tenantId, session.id, customerPhone, config.fallbackMessage);
+        }
+        return;
+      }
 
       // Simulação de digitando (se habilitado)
       if (config.simulateTyping) {
@@ -153,6 +161,14 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
         tools,
         temperature: 0.3, // Menos alucinação
       });
+
+      if (completion.finishReason === 'error' || (!completion.content && (!completion.toolCalls || completion.toolCalls.length === 0))) {
+        this.logger.error(`AI completion produced no response (finishReason=${completion.finishReason}).`);
+        if (config.fallbackMessage) {
+          await this.sendFinalResponse(tenantId, session.id, customerPhone, config.fallbackMessage);
+        }
+        return;
+      }
 
       // Se o LLM resolveu chamar Tools
       if (completion.finishReason === 'tool_calls' && completion.toolCalls && completion.toolCalls.length > 0) {

@@ -152,8 +152,15 @@ export class ChatController {
 
   @Get('sessions/:id/messages')
   @Permissions('orders.read')
-  async getMessages(@Param('id') sessionId: string) {
-    const messages = await this.conversationService.getRecentHistory(sessionId, 50);
+  async getMessages(@Request() req: TenantRequest, @Param('id') sessionId: string) {
+    const messages = await this.prisma.chatMessage.findMany({
+      where: {
+        sessionId,
+        session: { tenantId: req.user.tenantId },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 50,
+    });
     return messages;
   }
 
