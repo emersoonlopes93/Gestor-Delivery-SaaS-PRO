@@ -36,6 +36,14 @@ export class AiFlowLogger {
     this.logger.error(this.format('[AI_FLOW_ERROR]', `step=${step}`, ctx, extra));
   }
 
+  static warn(
+    step: string,
+    ctx: AiFlowContext,
+    extra?: Record<string, FlowFieldValue>,
+  ): void {
+    this.logger.warn(this.format('[AI_FLOW_WARN]', step, ctx, extra));
+  }
+
   static config(message: string, extra?: Record<string, FlowFieldValue>): void {
     const parts = ['[AI_CONFIG]', message];
     if (extra) {

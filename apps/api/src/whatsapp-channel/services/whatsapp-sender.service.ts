@@ -95,22 +95,43 @@ export class WhatsAppSenderService {
   }
 
   /**
-   * Simula presença (digitando...)
+   * Simula presença (digitando...) — best-effort, nunca lança erro.
    */
   async sendPresence(
     tenantId: string,
     to: string,
     presence: 'composing' | 'recording' | 'paused',
   ): Promise<void> {
-    const { provider, instance } = await this.resolveProvider(tenantId);
+    const ctx: { tenantId: string; phone: string; instanceId?: string } = {
+      tenantId,
+      phone: to,
+    };
 
-    await provider.sendPresence(
-      instance.apiUrl,
-      instance.apiKey,
-      instance.evolutionInstanceId || instance.instanceName,
-      to,
-      presence,
-    );
+    AiFlowLogger.flow('typing_presence_start', ctx, { state: presence });
+
+    try {
+      const { provider, instance } = await this.resolveProvider(tenantId);
+      const instanceId =
+        instance.evolutionInstanceId || instance.instanceName;
+
+      ctx.instanceId = instanceId;
+
+      await provider.sendPresence(
+        instance.apiUrl,
+        instance.apiKey,
+        instanceId,
+        to,
+        presence,
+      );
+
+      AiFlowLogger.flow('typing_presence_success', ctx, { state: presence });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      AiFlowLogger.warn('typing_presence_failed', ctx, {
+        state: presence,
+        error: message,
+      });
+    }
   }
 
   /**

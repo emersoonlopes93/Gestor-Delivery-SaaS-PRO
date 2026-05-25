@@ -31,6 +31,7 @@ import type {
  * - POST /send/list
  * - POST /send/button
  * - POST /message/markread
+ * - POST /message/presence (state: composing|paused, isAudio opcional)
  */
 @Injectable()
 export class EvolutionGoProvider implements IWhatsAppProvider {
@@ -431,14 +432,32 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     presence: 'composing' | 'recording' | 'paused',
   ): Promise<void> {
     const client = this.buildInstanceClient(apiUrl, apiKey, instanceId);
+    const number = normalizeWhatsAppSendNumber(to);
+
+    const state =
+      presence === 'paused'
+        ? 'paused'
+        : 'composing';
+    const isAudio = presence === 'recording';
+
     try {
-      await client.post('/chat/presence', {
-        number: normalizeWhatsAppSendNumber(to),
-        presence: presence,
+      await client.post('/message/presence', {
+        number,
+        state,
+        isAudio,
       });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.warn(`sendPresence failed: ${message}`);
+      const status = isAxiosError(error) ? error.response?.status : undefined;
+      const body = isAxiosError(error)
+        ? JSON.stringify(error.response?.data)
+        : undefined;
+      this.logger.warn(
+        `sendPresence failed (Evolution-Go /message/presence): ${message} status=${status ?? 'n/a'}`,
+      );
+      if (body) {
+        this.logger.warn(`sendPresence response body: ${body}`);
+      }
     }
   }
 

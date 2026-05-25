@@ -7,6 +7,7 @@ import { AiProviderRegistryService } from './ai-provider-registry.service';
 import { AdminModulesService } from '../../admin/modules/admin-modules.service';
 import type { AiMessage } from '../interfaces/ai-provider.interface';
 import { AiFlowLogger, createAiTrace, type AiFlowContext } from '../../common/logging/ai-flow-logger';
+import { shouldSimulateTyping } from '../utils/simulate-typing.util';
 
 import { PrismaService } from '../../database/prisma.service';
 
@@ -323,18 +324,20 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
             customerPhone,
             config.fallbackMessage,
             trace,
+            config.simulateTyping,
           );
         }
         return;
       }
 
-      if (config.simulateTyping && !dryRun) {
-        await this.whatsappSender.sendPresence(
-          tenantId,
-          customerPhone,
-          'composing',
-        );
-      }
+      await this.trySimulateTyping(
+        tenantId,
+        customerPhone,
+        config.simulateTyping,
+        trace,
+        dryRun,
+        'composing',
+      );
 
       const llmStartedAt = Date.now();
       AiFlowLogger.flow('llm_request_start', trace, {
@@ -365,6 +368,7 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
             customerPhone,
             config.fallbackMessage,
             trace,
+            config.simulateTyping,
           );
         }
         return;
@@ -392,6 +396,7 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
             customerPhone,
             config.fallbackMessage,
             trace,
+            config.simulateTyping,
           );
         }
         return;
@@ -436,6 +441,7 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
           customerPhone,
           completion.content,
           trace,
+          config.simulateTyping,
         );
         return { contentPreview: completion.content.slice(0, 200) };
       }
@@ -451,6 +457,7 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
             customerPhone,
             config.fallbackMessage,
             trace,
+            config.simulateTyping,
           );
         } catch {
           /* fallback send failed */
@@ -508,6 +515,7 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
           customerPhone,
           'Certo, estou transferindo você para um de nossos atendentes. Por favor, aguarde um momento.',
           trace,
+          config.simulateTyping,
         );
         return;
       }
@@ -528,6 +536,7 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
           customerPhone,
           'Tive um problema ao processar essa solicitação automaticamente. Pode reformular a mensagem com mais detalhes, por favor?',
           trace,
+          config.simulateTyping,
         );
         return;
       }
@@ -582,6 +591,7 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
             customerPhone,
             'Não consegui entender alguns dados necessários para continuar. Pode enviar novamente com as informações completas (ex: itens, endereço e forma de pagamento), por favor?',
             trace,
+            config.simulateTyping,
           );
           return;
         }
@@ -590,13 +600,14 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
 
     const aiProvider = await this.aiRegistry.resolveProvider(tenantId);
 
-    if (config.simulateTyping) {
-      await this.whatsappSender.sendPresence(
-        tenantId,
-        customerPhone,
-        'composing',
-      );
-    }
+    await this.trySimulateTyping(
+      tenantId,
+      customerPhone,
+      config.simulateTyping,
+      trace,
+      false,
+      'composing',
+    );
 
     AiFlowLogger.flow('llm_request_start', trace, {
       provider: aiProvider.providerType,
@@ -623,6 +634,7 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
         customerPhone,
         finalCompletion.content,
         trace,
+        config.simulateTyping,
       );
     }
   }
@@ -673,37 +685,67 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
     return typeof code === 'string' ? code : null;
   }
 
+  /**
+   * Presença/digitação — best-effort; falha não interrompe o fluxo da IA.
+   */
+  private async trySimulateTyping(
+    tenantId: string,
+    customerPhone: string,
+    tenantSimulateTyping: boolean,
+    trace: AiFlowContext,
+    dryRun: boolean | undefined,
+    state: 'composing' | 'recording' | 'paused',
+  ): Promise<void> {
+    if (dryRun || !shouldSimulateTyping(tenantSimulateTyping)) {
+      return;
+    }
+
+    await this.whatsappSender.sendPresence(tenantId, customerPhone, state);
+  }
+
   private async sendFinalResponse(
     tenantId: string,
     sessionId: string,
     customerPhone: string,
     content: string,
     trace: AiFlowContext,
+    tenantSimulateTyping = false,
   ): Promise<void> {
     AiFlowLogger.flow('whatsapp_send_start', trace, {
       textLength: content.length,
     });
 
-    const result = await this.whatsappSender.sendText(tenantId, {
-      to: customerPhone,
-      text: content,
-    });
-
-    if (!result.success) {
-      AiFlowLogger.error('whatsapp_send', trace, { error: result.error });
-      throw new Error(result.error || 'WhatsApp send failed');
-    }
-
-    AiFlowLogger.flow('whatsapp_send_success', trace, {
-      messageId: result.messageId,
-    });
-
-    if (sessionId !== 'error-fallback') {
-      await this.conversationService.addMessage({
-        sessionId,
-        direction: 'outbound',
-        content,
+    try {
+      const result = await this.whatsappSender.sendText(tenantId, {
+        to: customerPhone,
+        text: content,
       });
+
+      if (!result.success) {
+        AiFlowLogger.error('whatsapp_send', trace, { error: result.error });
+        throw new Error(result.error || 'WhatsApp send failed');
+      }
+
+      AiFlowLogger.flow('whatsapp_send_success', trace, {
+        messageId: result.messageId,
+      });
+
+      if (sessionId !== 'error-fallback') {
+        await this.conversationService.addMessage({
+          sessionId,
+          direction: 'outbound',
+          content,
+        });
+      }
+    } finally {
+      await this.trySimulateTyping(
+        tenantId,
+        customerPhone,
+        tenantSimulateTyping,
+        trace,
+        false,
+        'paused',
+      );
     }
   }
 }
