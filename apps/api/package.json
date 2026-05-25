@@ -21,6 +21,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "ts-node -r tsconfig-paths/register prisma/seed.ts",
+    "enable:ai-agent-demo": "ts-node -r tsconfig-paths/register scripts/enable-ai-agent-demo.ts",
     "prisma:studio": "prisma studio",
     "clean": "pnpm exec rimraf dist"
   },

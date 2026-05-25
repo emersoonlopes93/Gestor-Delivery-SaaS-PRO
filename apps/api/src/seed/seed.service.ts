@@ -8,6 +8,7 @@ import {
   ADMIN_ROLE_PERMISSIONS,
 } from '@gestor/core';
 import { TenantDefaultRole, AdminDefaultRole } from '@gestor/core';
+import { seedDemoAiAgentAccess } from './demo-ai-agent.seed';
 
 @Injectable()
 export class SeedService {
@@ -151,6 +152,9 @@ export class SeedService {
       },
     });
     console.log(`   Tenant created: ${tenant.id}`);
+
+    await seedDemoAiAgentAccess(this.prisma, tenant.id);
+    console.log('   Demo modules (ai_agent, whatsapp, ...) and AI config enabled');
 
     // Create tenant settings
     await this.prisma.tenantSettings.upsert({

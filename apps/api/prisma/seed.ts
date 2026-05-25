@@ -8,6 +8,7 @@ import {
   ADMIN_ROLE_PERMISSIONS,
 } from '@gestor/core';
 import { TenantDefaultRole, AdminDefaultRole } from '@gestor/core';
+import { seedDemoAiAgentAccess } from '../src/seed/demo-ai-agent.seed';
 
 const prisma = new PrismaClient();
 
@@ -163,6 +164,9 @@ async function seedDemoTenant() {
       },
     });
     console.log(`   ✅ Tenant created: ${tenant.id}`);
+
+    await seedDemoAiAgentAccess(prisma, tenant.id);
+    console.log('   ✅ Demo modules (ai_agent, whatsapp) + AI agent isEnabled=true');
 
     // Create tenant settings with full operational configs
     await prisma.tenantSettings.upsert({
