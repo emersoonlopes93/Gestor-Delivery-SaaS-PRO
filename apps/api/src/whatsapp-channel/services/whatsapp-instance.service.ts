@@ -100,6 +100,8 @@ export class WhatsAppInstanceService {
       }
 
       // 4. Salvar no banco
+      const webhookSecret = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      
       const instance = await this.prisma.whatsAppInstance.upsert({
         where: { tenantId },
         create: {
@@ -110,6 +112,7 @@ export class WhatsAppInstanceService {
           apiKey: externalResult.token || apiKey!,
           status: 'disconnected',
           evolutionInstanceId: externalResult.instanceId,
+          webhookSecret,
         },
         update: {
           providerType,

@@ -8,6 +8,7 @@ import {
   Param,
   Inject,
   forwardRef,
+  Query,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { WhatsAppProviderRegistryService } from '../services/whatsapp-provider-registry.service';
@@ -46,22 +47,40 @@ export class WhatsAppWebhookController {
   async handleWebhook(
     @Param('tenantId') tenantId: string,
     @Body() body: unknown,
-    @Headers('x-webhook-secret') _webhookSecret?: string,
+    @Headers('x-webhook-secret') webhookSecretHeader?: string,
+    @Query('secret') webhookSecretQuery?: string,
   ) {
     this.logger.log(`Webhook received for tenant ${tenantId}`);
 
     try {
-      // 1. Resolver o provider do tenant
-      const provider = await this.providerRegistry.resolveProvider(tenantId);
+      // 1. Resolver a instância e validar secret
+      const instance = await this.prisma.whatsAppInstance.findUnique({
+        where: { tenantId },
+      });
+
+      if (!instance) {
+        this.logger.warn(`No instance found for tenant ${tenantId}`);
+        return { received: true, processed: false, error: 'Instance not found' };
+      }
+
+      // Validar secret se configurado
+      const providedSecret = webhookSecretHeader || webhookSecretQuery;
+      if (instance.webhookSecret && instance.webhookSecret !== providedSecret) {
+        this.logger.warn(`Invalid webhook secret for tenant ${tenantId}`);
+        return { received: true, processed: false, error: 'Invalid secret' };
+      }
+
+      // 2. Resolver o provider
+      const provider = this.providerRegistry.getProvider(instance.providerType);
       
-      // 2. Tentar o parsing do evento
+      // 3. Tentar o parsing do evento
       const event = provider.parseWebhook(body, tenantId);
       if (!event) {
         this.logger.debug(`Unhandled event or invalid payload from ${provider.providerType}`);
         return { received: true, processed: false };
       }
 
-      // 3. Processar baseado no tipo normalizado
+      // 4. Processar baseado no tipo normalizado
       switch (event.type) {
         case 'message':
           await this.handleNormalizedMessage(event);

@@ -33,10 +33,18 @@ export class AiOrchestratorService {
    * Deve ser chamado pelo event listener do webhook.
    */
   async handleInboundMessage(tenantId: string, customerPhone: string, content: string) {
+    this.logger.log(`Handling inbound message from ${customerPhone} for tenant ${tenantId}`);
+    
     // 1. Verificar se o tenant tem acesso ao módulo de IA
     const hasModuleAccess = await this.adminModulesService.hasModuleAccess(tenantId, 'ai_agent');
     if (!hasModuleAccess) {
       this.logger.debug(`Tenant ${tenantId} does not have access to ai_agent module. Skipping.`);
+      return;
+    }
+
+    const config = await this.configService.getConfig(tenantId);
+    if (!config.isEnabled) {
+      this.logger.debug(`Agent is disabled for tenant ${tenantId}. Ignoring.`);
       return;
     }
 
@@ -47,7 +55,6 @@ export class AiOrchestratorService {
       clearTimeout(this.debounceTimers.get(debounceKey));
     }
 
-    const config = await this.configService.getConfig(tenantId);
     const debounceMs = config.debounceMs || 1000;
 
     // Define novo timer
@@ -66,7 +73,9 @@ export class AiOrchestratorService {
     _content: string, 
     config: Awaited<ReturnType<AiAgentConfigService['getConfig']>>
   ) {
+    this.logger.log(`Processing message for ${customerPhone} (Tenant: ${tenantId})`);
     try {
+      // Re-verificar isEnabled dentro do processo de debounce
       if (!config.isEnabled) {
         this.logger.debug(`Agent is disabled for tenant ${tenantId}. Ignoring.`);
         return;

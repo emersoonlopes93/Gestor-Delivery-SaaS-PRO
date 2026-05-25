@@ -26,12 +26,16 @@ export class WhatsAppInstanceController {
     private readonly prisma: PrismaService,
   ) {}
 
-  private buildWebhookUrl(req: AuthenticatedRequest, tenantId: string): string {
+  private async buildWebhookUrl(req: AuthenticatedRequest, tenantId: string): Promise<string> {
     const prefix = this.configService.get<string>('API_PREFIX', '/api/v1');
     const host = req?.get?.('host') || req?.headers?.host || 'localhost:3333';
     const forwardedProto = req?.get?.('x-forwarded-proto') || req?.headers?.['x-forwarded-proto'];
     const proto = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || req?.protocol || 'http';
-    return `${proto}://${host}${prefix}/webhooks/whatsapp/${tenantId}`;
+    
+    const instance = await this.prisma.whatsAppInstance.findUnique({ where: { tenantId } });
+    const secret = instance?.webhookSecret ? `?secret=${instance.webhookSecret}` : '';
+    
+    return `${proto}://${host}${prefix}/webhooks/whatsapp/${tenantId}${secret}`;
   }
 
   @Get()
@@ -44,11 +48,13 @@ export class WhatsAppInstanceController {
   @Permissions('settings.manage')
   async createOrUpdateInstance(@Request() req: AuthenticatedRequest, @Body() dto: CreateInstanceDto) {
     const tenantId = req.user.tenantId;
-    const safeDto: CreateInstanceDto = {
-      ...dto,
-      webhookUrl: dto?.webhookUrl?.trim() || this.buildWebhookUrl(req, tenantId),
-    };
-    return this.instanceService.createInstance(tenantId, safeDto);
+    
+    // Primeiro cria a instância (para gerar o secret se for nova)
+    const result = await this.instanceService.createInstance(tenantId, dto);
+    
+    // Depois reconecta com a URL de webhook correta incluindo o secret
+    const webhookUrl = dto?.webhookUrl?.trim() || await this.buildWebhookUrl(req, tenantId);
+    return this.instanceService.connectInstance(tenantId, webhookUrl);
   }
 
   @Get('status')
@@ -65,7 +71,7 @@ export class WhatsAppInstanceController {
   @Permissions('settings.manage')
   async connect(@Request() req: AuthenticatedRequest, @Body('webhookUrl') webhookUrl: string) {
     const tenantId = req.user.tenantId;
-    const effectiveWebhookUrl = webhookUrl?.trim() || this.buildWebhookUrl(req, tenantId);
+    const effectiveWebhookUrl = webhookUrl?.trim() || await this.buildWebhookUrl(req, tenantId);
     console.log(`[WhatsApp Connect] tenantId: ${tenantId}, webhookUrl: ${effectiveWebhookUrl}`);
     const result = await this.instanceService.connectInstance(tenantId, effectiveWebhookUrl);
     console.log(`[WhatsApp Connect] result:`, result);
