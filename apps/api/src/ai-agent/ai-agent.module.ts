@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { WhatsAppChannelModule } from '../whatsapp-channel/whatsapp-channel.module';
@@ -25,7 +25,7 @@ import { AiAgentController } from './controllers/ai-agent.controller';
   imports: [
     DatabaseModule,
     RbacModule,
-    WhatsAppChannelModule, // para enviar as mensagens de volta
+    forwardRef(() => WhatsAppChannelModule), // para enviar as mensagens de volta
     CatalogModule,         // para as tools lerem produtos
     OrdersModule,          // para as tools criarem pedidos
     StorefrontModule,      // para checkout e validação

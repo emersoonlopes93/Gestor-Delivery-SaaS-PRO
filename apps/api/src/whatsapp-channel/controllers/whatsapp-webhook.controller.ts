@@ -6,11 +6,14 @@ import {
   Logger,
   HttpCode,
   Param,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { WhatsAppProviderRegistryService } from '../services/whatsapp-provider-registry.service';
 import type { WhatsAppWebhookEvent } from '../interfaces/whatsapp-provider.interface';
 import { WhatsAppInstanceStatus } from '@prisma/client';
+import { AiOrchestratorService } from '../../ai-agent/services/ai-orchestrator.service';
 
 
 /**
@@ -30,6 +33,8 @@ export class WhatsAppWebhookController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly providerRegistry: WhatsAppProviderRegistryService,
+    @Inject(forwardRef(() => AiOrchestratorService))
+    private readonly aiOrchestrator: AiOrchestratorService,
   ) {}
 
   /**
@@ -118,7 +123,10 @@ export class WhatsAppWebhookController {
     });
 
     this.logger.log(`Message stored for session ${session.id} from ${phone}`);
-    // Emitir evento para o AI Orchestrator (se configurado)
+    
+    // Disparar o orquestrador de IA de forma assíncrona (não bloqueia o webhook)
+    this.aiOrchestrator.handleInboundMessage(tenantId, phone, content)
+      .catch(err => this.logger.error(`AI Orchestrator failed for ${phone}: ${err.message}`));
   }
 
   private async handleNormalizedConnection(event: WhatsAppWebhookEvent) {

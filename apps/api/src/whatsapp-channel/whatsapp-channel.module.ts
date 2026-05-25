@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { EvolutionGoProvider } from './providers/evolution-go.provider';
@@ -9,9 +9,14 @@ import { WhatsAppSenderService } from './services/whatsapp-sender.service';
 import { WhatsAppProviderRegistryService } from './services/whatsapp-provider-registry.service';
 import { WhatsAppInstanceController } from './controllers/whatsapp-instance.controller';
 import { WhatsAppWebhookController } from './controllers/whatsapp-webhook.controller';
+import { AiAgentModule } from '../ai-agent/ai-agent.module';
 
 @Module({
-  imports: [DatabaseModule, RbacModule],
+  imports: [
+    DatabaseModule, 
+    RbacModule,
+    forwardRef(() => AiAgentModule),
+  ],
   controllers: [WhatsAppInstanceController, WhatsAppWebhookController],
   providers: [
     EvolutionGoProvider,

@@ -1,9 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { AiAgentConfigService } from './ai-agent-config.service';
 import { ConversationService } from './conversation.service';
 import { AgentToolsService } from './agent-tools.service';
 import { WhatsAppSenderService } from '../../whatsapp-channel/services/whatsapp-sender.service';
-import { AiProviderRegistryService } from './ai-provider-registry.service';
+import { AiProviderRegistryService } from './services/ai-provider-registry.service';
 import type { AiMessage } from '../interfaces/ai-provider.interface';
 
 import { PrismaService } from '../../database/prisma.service';
@@ -19,6 +19,7 @@ export class AiOrchestratorService {
     private readonly configService: AiAgentConfigService,
     private readonly conversationService: ConversationService,
     private readonly toolsService: AgentToolsService,
+    @Inject(forwardRef(() => WhatsAppSenderService))
     private readonly whatsappSender: WhatsAppSenderService,
     private readonly aiRegistry: AiProviderRegistryService,
     private readonly prisma: PrismaService,
