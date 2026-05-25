@@ -13,6 +13,19 @@ import { PrismaService } from '../../database/prisma.service';
 import { StorefrontService } from '../../storefront/storefront.service';
 import { ZodError, z } from 'zod';
 import { PaymentMethod } from '@gestor/types';
+import type {
+  StorefrontComboPayload,
+  StorefrontPayload,
+  StorefrontProductPayload,
+} from '@gestor/types';
+import { AgentToolsFilterService } from './agent-tools-filter.service';
+import {
+  mapStorefrontComboToAgentDetail,
+  mapStorefrontProductToAgentDetail,
+  type AgentComboDetailResult,
+  type AgentProductDetailResult,
+} from '../utils/agent-product-detail.mapper';
+import { buildAgentPaymentMethodsResult } from '../utils/agent-payment-methods.util';
 
 export interface AgentSessionContext {
   customerId?: string;
@@ -73,6 +86,20 @@ const ConsultarSlotsSchema = z.object({
   data: z.string().optional(),
 });
 
+const ConsultarDetalheProdutoSchema = z
+  .object({
+    productId: z.string().optional(),
+    comboId: z.string().optional(),
+    nomeOuBusca: z.string().optional(),
+  })
+  .refine(
+    (data) =>
+      Boolean(data.productId?.trim()) ||
+      Boolean(data.comboId?.trim()) ||
+      Boolean(data.nomeOuBusca?.trim()),
+    { message: 'Informe productId, comboId ou nomeOuBusca.' },
+  );
+
 @Injectable()
 export class AgentToolsService {
   private readonly logger = new Logger('AgentToolsService');
@@ -93,6 +120,7 @@ export class AgentToolsService {
     private readonly couponsService: CouponsService,
     @Inject(forwardRef(() => SchedulingService))
     private readonly schedulingService: SchedulingService,
+    private readonly toolsFilterService: AgentToolsFilterService,
   ) {}
 
   /**
@@ -109,6 +137,31 @@ export class AgentToolsService {
             categoria: { type: 'string', description: 'Nome da categoria para filtrar (opcional)' },
             busca: { type: 'string', description: 'Termo de busca para encontrar produtos específicos (opcional)' },
           },
+        },
+      },
+      {
+        name: 'consultar_detalhe_produto',
+        description:
+          'Consulta detalhes reais de um produto ou combo: preço, disponibilidade, complementos, grupos de opções e blocos do combo. Use antes de responder sobre tamanhos, bordas, adicionais ou composição.',
+        parameters: {
+          type: 'object',
+          properties: {
+            productId: { type: 'string', description: 'ID do produto no cardápio' },
+            comboId: { type: 'string', description: 'ID do combo (produto tipo combo ou combo legado)' },
+            nomeOuBusca: {
+              type: 'string',
+              description: 'Nome ou termo para buscar no cardápio quando o ID não for conhecido',
+            },
+          },
+        },
+      },
+      {
+        name: 'consultar_formas_pagamento',
+        description:
+          'Lista as formas de pagamento aceitas pela loja (Pix, cartão, dinheiro, etc.) conforme configuração real. Use antes de responder sobre pagamento — não invente chave Pix.',
+        parameters: {
+          type: 'object',
+          properties: {},
         },
       },
       {
@@ -266,6 +319,14 @@ export class AgentToolsService {
   }
 
   /**
+   * Tools filtradas por módulo do tenant (mapeamento em agent-tool-modules.ts).
+   */
+  async getAvailableToolsForTenant(tenantId: string): Promise<AiToolDefinition[]> {
+    const all = this.getAvailableTools();
+    return this.toolsFilterService.filterForTenant(tenantId, all);
+  }
+
+  /**
    * Executa uma tool específica requisitada pelo LLM.
    */
   async executeTool(
@@ -286,6 +347,14 @@ export class AgentToolsService {
           const parsedArgs = ConsultarCardapioSchema.parse(args || {});
           return await this.executeConsultarCardapio(tenantId, parsedArgs);
         }
+
+        case 'consultar_detalhe_produto': {
+          const parsedArgs = ConsultarDetalheProdutoSchema.parse(args || {});
+          return await this.executeConsultarDetalheProduto(tenantId, parsedArgs);
+        }
+
+        case 'consultar_formas_pagamento':
+          return await this.executeConsultarFormasPagamento(tenantId);
 
         case 'consultar_taxa_entrega': {
           const parsedArgs = ConsultarTaxaEntregaSchema.parse(args || {});
@@ -727,6 +796,255 @@ export class AgentToolsService {
         }))
       })),
       mensagem: 'Aqui estão algumas sugestões para acompanhar seu pedido!'
+    };
+  }
+
+  private async executeConsultarFormasPagamento(
+    tenantId: string,
+  ): Promise<ReturnType<typeof buildAgentPaymentMethodsResult>> {
+    const settings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+      select: {
+        paymentMethods: true,
+        pixKey: true,
+        mercadoPagoAccessToken: true,
+      },
+    });
+
+    if (!settings) {
+      return {
+        methods: [],
+        notes: 'Configurações de pagamento não encontradas para esta loja.',
+        pixAutomaticAvailable: false,
+      };
+    }
+
+    return buildAgentPaymentMethodsResult({
+      paymentMethodsRaw: settings.paymentMethods,
+      pixKey: settings.pixKey,
+      mercadoPagoAccessToken: settings.mercadoPagoAccessToken,
+    });
+  }
+
+  private async executeConsultarDetalheProduto(
+    tenantId: string,
+    args: z.infer<typeof ConsultarDetalheProdutoSchema>,
+  ): Promise<
+    | AgentProductDetailResult
+    | AgentComboDetailResult
+    | { status: 'multiple'; matches: Array<{ id: string; name: string; type: string }> }
+    | { status: 'error'; code: string; message: string }
+  > {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+      return { status: 'error', code: 'TENANT_NOT_FOUND', message: 'Loja não encontrada.' };
+    }
+
+    const payload = await this.storefrontService.getStorefrontPayload(tenant.slug);
+    const targetId = args.productId?.trim() || args.comboId?.trim();
+
+    if (targetId) {
+      const byId = await this.resolveCatalogDetailById(tenantId, payload, targetId);
+      if (byId) {
+        return byId;
+      }
+      const legacyCombo = await this.resolveLegacyComboDetail(tenantId, targetId);
+      if (legacyCombo) {
+        return legacyCombo;
+      }
+      return {
+        status: 'error',
+        code: 'NOT_FOUND',
+        message: 'Produto ou combo não encontrado ou indisponível no cardápio.',
+      };
+    }
+
+    const term = args.nomeOuBusca?.trim().toLowerCase() ?? '';
+    const matches = this.searchCatalogMatches(payload, term);
+
+    if (matches.length === 0) {
+      return {
+        status: 'error',
+        code: 'NOT_FOUND',
+        message: 'Nenhum produto ou combo encontrado com esse nome. Peça mais detalhes ou use consultar_cardapio.',
+      };
+    }
+
+    if (matches.length > 1) {
+      return {
+        status: 'multiple',
+        matches: matches.slice(0, 8).map((m) => ({
+          id: m.id,
+          name: m.name,
+          type: m.kind,
+        })),
+      };
+    }
+
+    const single = matches[0];
+    const detail = await this.resolveCatalogDetailById(tenantId, payload, single.id);
+    if (detail) {
+      return detail;
+    }
+
+    if (single.kind === 'combo') {
+      const legacyCombo = await this.resolveLegacyComboDetail(tenantId, single.id);
+      if (legacyCombo) {
+        return legacyCombo;
+      }
+    }
+
+    return {
+      status: 'error',
+      code: 'NOT_AVAILABLE',
+      message: 'Item encontrado mas indisponível no momento.',
+    };
+  }
+
+  private searchCatalogMatches(
+    payload: StorefrontPayload,
+    term: string,
+  ): Array<{ id: string; name: string; kind: 'product' | 'combo' }> {
+    const results: Array<{ id: string; name: string; kind: 'product' | 'combo' }> = [];
+
+    for (const category of payload.categories) {
+      for (const product of category.products) {
+        const haystack = `${product.name} ${product.shortDescription ?? ''} ${product.longDescription ?? ''}`.toLowerCase();
+        if (haystack.includes(term)) {
+          results.push({
+            id: product.id,
+            name: product.name,
+            kind: product.type === 'combo' ? 'combo' : 'product',
+          });
+        }
+      }
+    }
+
+    for (const combo of payload.combos) {
+      const haystack = `${combo.name} ${combo.description ?? ''}`.toLowerCase();
+      if (haystack.includes(term)) {
+        results.push({ id: combo.id, name: combo.name, kind: 'combo' });
+      }
+    }
+
+    return results;
+  }
+
+  private async resolveCatalogDetailById(
+    tenantId: string,
+    payload: StorefrontPayload,
+    id: string,
+  ): Promise<AgentProductDetailResult | AgentComboDetailResult | null> {
+    for (const combo of payload.combos) {
+      if (combo.id === id) {
+        if (!combo.isAvailable) {
+          return null;
+        }
+        return mapStorefrontComboToAgentDetail(combo);
+      }
+    }
+
+    for (const category of payload.categories) {
+      for (const product of category.products) {
+        if (product.id !== id) {
+          continue;
+        }
+        if (!product.isAvailable) {
+          return null;
+        }
+        if (product.type === 'combo') {
+          const fromCombos = payload.combos.find((c) => c.id === id);
+          if (fromCombos?.isAvailable) {
+            return mapStorefrontComboToAgentDetail(fromCombos);
+          }
+          const comboShape: StorefrontComboPayload = {
+            id: product.id,
+            name: product.name,
+            slug: product.slug,
+            description: product.longDescription ?? product.shortDescription,
+            basePrice: product.basePrice,
+            image: product.image,
+            isAvailable: product.isAvailable,
+            blocks: this.extractComboBlocksFromProduct(product),
+            bundleItems: this.extractBundleItemsFromProduct(product),
+          };
+          return mapStorefrontComboToAgentDetail(comboShape);
+        }
+        return mapStorefrontProductToAgentDetail(product, category.name);
+      }
+    }
+
+    const inactive = await this.prisma.product.findFirst({
+      where: { id, tenantId, deletedAt: null, isActive: false },
+      select: { id: true, name: true },
+    });
+    if (inactive) {
+      return null;
+    }
+
+    return null;
+  }
+
+  private extractComboBlocksFromProduct(
+    product: StorefrontProductPayload,
+  ): StorefrontComboPayload['blocks'] {
+    const extended = product as StorefrontProductPayload & {
+      blocks?: StorefrontComboPayload['blocks'];
+    };
+    return extended.blocks;
+  }
+
+  private extractBundleItemsFromProduct(
+    product: StorefrontProductPayload,
+  ): StorefrontComboPayload['bundleItems'] {
+    const extended = product as StorefrontProductPayload & {
+      bundleItems?: StorefrontComboPayload['bundleItems'];
+    };
+    return extended.bundleItems;
+  }
+
+  private async resolveLegacyComboDetail(
+    tenantId: string,
+    comboId: string,
+  ): Promise<AgentComboDetailResult | null> {
+    const combo = await this.prisma.productCombo.findFirst({
+      where: { id: comboId, tenantId, deletedAt: null },
+      include: {
+        blocks: {
+          orderBy: { order: 'asc' },
+          include: {
+            items: {
+              orderBy: { order: 'asc' },
+              include: { product: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!combo || !combo.isActive) {
+      return null;
+    }
+
+    return {
+      type: 'combo',
+      id: combo.id,
+      name: combo.name,
+      description: combo.description,
+      basePrice: Number(combo.basePrice),
+      isAvailable: true,
+      blocks: combo.blocks.map((block) => ({
+        name: block.name,
+        minSelect: block.minSelect,
+        maxSelect: block.maxSelect,
+        items: block.items
+          .filter((item) => item.product.isActive && item.product.deletedAt === null)
+          .map((item) => ({
+            productId: item.productId,
+            name: item.product.name,
+            additionalPrice: Number(item.additionalPrice),
+          })),
+      })),
     };
   }
 }

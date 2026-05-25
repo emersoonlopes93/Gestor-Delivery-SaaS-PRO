@@ -14,6 +14,11 @@ import {
   buildToolsManifestForPrompt,
 } from '../constants/global-base-prompt';
 import type { AgentSessionContext } from './agent-tools.service';
+import { AvailabilityService } from '../../catalog/publication/availability.service';
+import {
+  buildStoreStatusPromptBlock,
+  resolveStoreOperationalStatus,
+} from '../utils/store-status-context.util';
 
 import { PrismaService } from '../../database/prisma.service';
 
@@ -50,6 +55,7 @@ export class AiOrchestratorService {
     private readonly aiRegistry: AiProviderRegistryService,
     private readonly prisma: PrismaService,
     private readonly adminModulesService: AdminModulesService,
+    private readonly availabilityService: AvailabilityService,
   ) {}
 
   /**
@@ -272,7 +278,28 @@ export class AiOrchestratorService {
       });
       const providerResolved = await this.aiRegistry.resolveProvider(tenantId);
 
-      const tools = this.toolsService.getAvailableTools();
+      const tools = await this.toolsService.getAvailableToolsForTenant(tenantId);
+
+      const tenantSettings = await this.prisma.tenantSettings.findUnique({
+        where: { tenantId },
+        select: { isStorePaused: true },
+      });
+      const storeStatusRaw = await this.availabilityService.getStoreStatus(tenantId);
+      const storeSnapshot = {
+        storeStatus: resolveStoreOperationalStatus({
+          isStorePaused: tenantSettings?.isStorePaused ?? false,
+          isOpen: storeStatusRaw.isOpen,
+          reason: storeStatusRaw.reason,
+        }),
+        message: storeStatusRaw.message,
+        nextOpenAt: storeStatusRaw.nextOpenAt ?? null,
+        reason: storeStatusRaw.reason,
+      };
+      const storeStatusBlock = buildStoreStatusPromptBlock(storeSnapshot);
+      AiFlowLogger.flow('store_status_injected', trace, {
+        storeStatus: storeSnapshot.storeStatus,
+      });
+
       const basePrompt =
         systemConfig?.baseAiPrompt?.trim() || DEFAULT_GLOBAL_BASE_AI_PROMPT;
       const tenantLayer = `
@@ -287,6 +314,7 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
 
       const systemContent = [
         basePrompt,
+        storeStatusBlock,
         tenantLayer,
         buildToolsManifestForPrompt(tools),
       ].join('\n\n');

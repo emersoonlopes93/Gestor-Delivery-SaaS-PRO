@@ -19,6 +19,7 @@ import { AiProviderRegistryService } from './services/ai-provider-registry.servi
 import { AiAgentConfigService } from './services/ai-agent-config.service';
 import { ConversationService } from './services/conversation.service';
 import { AgentToolsService } from './services/agent-tools.service';
+import { AgentToolsFilterService } from './services/agent-tools-filter.service';
 import { AiOrchestratorService } from './services/ai-orchestrator.service';
 
 import { AiAgentController } from './controllers/ai-agent.controller';
@@ -50,6 +51,7 @@ import { AiConfigDiagnosticsService } from './services/ai-config-diagnostics.ser
     },
     AiAgentConfigService,
     ConversationService,
+    AgentToolsFilterService,
     AgentToolsService,
     AiOrchestratorService,
   ],
