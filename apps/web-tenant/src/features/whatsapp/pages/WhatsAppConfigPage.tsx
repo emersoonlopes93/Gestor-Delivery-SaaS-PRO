@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Bot, Smartphone, Settings, RefreshCw, QrCode as QrIcon } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
+import { toast } from 'react-hot-toast';
 
 interface WhatsAppInstance {
   id: string;
@@ -98,9 +99,12 @@ export function WhatsAppConfigPage() {
       await api.patch('/ai-agent/config', cleanData);
     },
     onSuccess: () => {
+      toast.success('Configurações salvas!');
       queryClient.invalidateQueries({ queryKey: ['ai-agent-config'] });
-      alert('Configurações salvas!');
     },
+    onError: () => {
+      toast.error('Erro ao salvar configurações.');
+    }
   });
 
   const connectMutation = useMutation({
@@ -168,6 +172,17 @@ export function WhatsAppConfigPage() {
   useEffect(() => {
     if (aiConfig) setFormAi(aiConfig);
   }, [aiConfig]);
+
+  const toggleAiEnabled = async (enabled: boolean) => {
+    if (!formAi) return;
+    setFormAi(prev => prev ? { ...prev, isEnabled: enabled } : null);
+    try {
+      await updateAiMutation.mutateAsync({ isEnabled: enabled });
+    } catch (err) {
+      // Reverter estado local em caso de erro
+      setFormAi(prev => prev ? { ...prev, isEnabled: !enabled } : null);
+    }
+  };
 
   if (loadingInstance || loadingAi) {
     return <div className="p-8 text-center text-gray-400">Carregando configurações...</div>;
@@ -407,7 +422,7 @@ export function WhatsAppConfigPage() {
                 type="checkbox" 
                 className="sr-only peer" 
                 checked={formAi?.isEnabled || false} 
-                onChange={(e) => setFormAi(prev => prev ? {...prev, isEnabled: e.target.checked} : null)}
+                onChange={(e) => toggleAiEnabled(e.target.checked)}
               />
               <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
             </label>

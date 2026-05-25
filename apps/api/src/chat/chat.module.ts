@@ -3,6 +3,7 @@ import { DatabaseModule } from '../database/database.module';
 import { ChatController } from './controllers/chat.controller';
 import { AiAgentModule } from '../ai-agent/ai-agent.module';
 import { RbacModule } from '../rbac/rbac.module';
+import { QuickRepliesService } from './services/quick-replies.service';
 
 @Module({
   imports: [
@@ -11,7 +12,7 @@ import { RbacModule } from '../rbac/rbac.module';
     RbacModule, // para PermissionsGuard e RbacService
   ],
   controllers: [ChatController],
-  providers: [],
-  exports: [],
+  providers: [QuickRepliesService],
+  exports: [QuickRepliesService],
 })
 export class ChatModule {}

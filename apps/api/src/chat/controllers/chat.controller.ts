@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Delete,
   Body,
   Param,
   HttpCode,
@@ -15,6 +17,8 @@ import { PrismaService } from '../../database/prisma.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions as Permissions } from '../../common/decorators';
+import { QuickRepliesService } from '../services/quick-replies.service';
+import { CreateQuickReplyDto, UpdateQuickReplyDto } from '../dto/quick-reply.dto';
 
 type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
 
@@ -24,6 +28,7 @@ export class ChatController {
   constructor(
     private readonly conversationService: ConversationService,
     private readonly prisma: PrismaService,
+    private readonly quickRepliesService: QuickRepliesService,
   ) {}
 
   private asJsonObject(value: unknown): Record<string, unknown> {
@@ -211,5 +216,42 @@ export class ChatController {
       metadata: dto.metadata,
     });
     return message;
+  }
+
+  // --- Quick Replies ---
+
+  @Get('quick-replies')
+  @Permissions('orders.read')
+  async listQuickReplies(@Request() req: TenantRequest) {
+    return this.quickRepliesService.findAll(req.user.tenantId);
+  }
+
+  @Post('quick-replies')
+  @Permissions('orders.read')
+  async createQuickReply(@Request() req: TenantRequest, @Body() dto: CreateQuickReplyDto) {
+    return this.quickRepliesService.create(req.user.tenantId, dto);
+  }
+
+  @Put('quick-replies/:id')
+  @Permissions('orders.read')
+  async updateQuickReply(
+    @Request() req: TenantRequest,
+    @Param('id') id: string,
+    @Body() dto: UpdateQuickReplyDto
+  ) {
+    return this.quickRepliesService.update(req.user.tenantId, id, dto);
+  }
+
+  @Delete('quick-replies/:id')
+  @Permissions('orders.read')
+  async deleteQuickReply(@Request() req: TenantRequest, @Param('id') id: string) {
+    return this.quickRepliesService.delete(req.user.tenantId, id);
+  }
+
+  @Post('quick-replies/:id/usage')
+  @HttpCode(200)
+  @Permissions('orders.read')
+  async incrementUsage(@Param('id') id: string) {
+    return this.quickRepliesService.incrementUsage(id);
   }
 }

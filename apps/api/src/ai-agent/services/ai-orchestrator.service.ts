@@ -4,6 +4,7 @@ import { ConversationService } from './conversation.service';
 import { AgentToolsService } from './agent-tools.service';
 import { WhatsAppSenderService } from '../../whatsapp-channel/services/whatsapp-sender.service';
 import { AiProviderRegistryService } from './ai-provider-registry.service';
+import { AdminModulesService } from '../../admin/modules/admin-modules.service';
 import type { AiMessage } from '../interfaces/ai-provider.interface';
 
 import { PrismaService } from '../../database/prisma.service';
@@ -24,6 +25,7 @@ export class AiOrchestratorService {
     private readonly whatsappSender: WhatsAppSenderService,
     private readonly aiRegistry: AiProviderRegistryService,
     private readonly prisma: PrismaService,
+    private readonly adminModulesService: AdminModulesService,
   ) {}
 
   /**
@@ -31,6 +33,13 @@ export class AiOrchestratorService {
    * Deve ser chamado pelo event listener do webhook.
    */
   async handleInboundMessage(tenantId: string, customerPhone: string, content: string) {
+    // 1. Verificar se o tenant tem acesso ao módulo de IA
+    const hasModuleAccess = await this.adminModulesService.hasModuleAccess(tenantId, 'ai_agent');
+    if (!hasModuleAccess) {
+      this.logger.debug(`Tenant ${tenantId} does not have access to ai_agent module. Skipping.`);
+      return;
+    }
+
     const debounceKey = `${tenantId}:${customerPhone}`;
     
     // Limpa timer anterior se existir

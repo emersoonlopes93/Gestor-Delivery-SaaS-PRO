@@ -8,6 +8,7 @@ import { StorefrontModule } from '../storefront/storefront.module';
 import { DeliveryModule } from '../delivery/delivery.module';
 import { PromotionsModule } from '../promotions/promotions.module';
 import { SchedulingModule } from '../scheduling/scheduling.module';
+import { AdminModulesModule } from '../admin/modules/admin-modules.module';
 
 import { OpenAiProvider } from './providers/openai.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
@@ -32,6 +33,7 @@ import { AiAgentController } from './controllers/ai-agent.controller';
     forwardRef(() => DeliveryModule),        // para calcular taxas de entrega
     forwardRef(() => PromotionsModule),      // para cashback e cupons
     forwardRef(() => SchedulingModule),      // para agendamentos
+    AdminModulesModule,                      // para verificar permissões de módulo
   ],
   controllers: [AiAgentController],
   providers: [

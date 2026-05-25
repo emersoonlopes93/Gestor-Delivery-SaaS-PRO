@@ -95,6 +95,7 @@ model Tenant {
   whatsappInstance            WhatsAppInstance?
   chatSessions                ChatSession[]
   aiAgentConfig               AiAgentConfig?
+  quickReplies                QuickReply[]
   campaigns                   Campaign[]
   customerOptOuts             CustomerOptOut[]
   DeliveryRateDistanceTier    DeliveryRateDistanceTier[]
@@ -2041,6 +2042,21 @@ model ChatMessage {
   @@index([sessionId])
   @@index([externalId])
   @@map("chat_messages")
+}
+
+model QuickReply {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  text       String   @db.Text
+  category   String?  @db.VarChar(50)
+  isActive   Boolean  @default(true) @map("is_active")
+  usageCount Int      @default(0) @map("usage_count")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("quick_replies")
 }
 
 model SystemConfig {
