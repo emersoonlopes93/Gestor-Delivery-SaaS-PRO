@@ -85,7 +85,17 @@ export function WhatsAppConfigPage() {
   // Mutations
   const updateAiMutation = useMutation({
     mutationFn: async (data: Partial<AiAgentConfig>) => {
-      await api.patch('/ai-agent/config', data);
+      // Filtrar apenas os campos que o backend aceita no DTO
+      const cleanData = {
+        isEnabled: data.isEnabled,
+        agentName: data.agentName,
+        greetingMessage: data.greetingMessage,
+        tone: data.tone,
+        customInstructions: data.customInstructions,
+        simulateTyping: data.simulateTyping,
+        debounceMs: data.debounceMs,
+      };
+      await api.patch('/ai-agent/config', cleanData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ai-agent-config'] });

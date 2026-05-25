@@ -1,20 +1,72 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { 
+  IsBoolean, 
+  IsString, 
+  IsOptional, 
+  IsNumber, 
+  IsEnum, 
+  Min, 
+  Max 
+} from 'class-validator';
 
-export interface UpdateAiAgentConfigDto {
+export class UpdateAiAgentConfigDto {
+  @IsOptional()
+  @IsBoolean()
   isEnabled?: boolean;
-  agentName?: string | null;
-  greetingMessage?: string | null;
+
+  @IsOptional()
+  @IsString()
+  agentName?: string;
+
+  @IsOptional()
+  @IsString()
+  greetingMessage?: string;
+
+  @IsOptional()
+  @IsString()
   tone?: string;
-  customInstructions?: string | null;
+
+  @IsOptional()
+  @IsString()
+  customInstructions?: string;
+
+  @IsOptional()
+  @IsString()
   operatingMode?: string;
+
+  @IsOptional()
+  @IsString()
   handoffPolicy?: string;
-  fallbackMessage?: string | null;
+
+  @IsOptional()
+  @IsString()
+  fallbackMessage?: string;
+
+  @IsOptional()
+  @IsNumber()
   maxRetries?: number;
+
+  @IsOptional()
+  @IsNumber()
   sessionTimeoutMin?: number;
+
+  @IsOptional()
+  @IsNumber()
   dailyMessageLimit?: number;
+
+  @IsOptional()
+  @IsNumber()
   customerCooldownMin?: number;
+
+  @IsOptional()
+  @IsBoolean()
   simulateTyping?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(500)
+  @Max(10000)
   debounceMs?: number;
 }
 
@@ -93,9 +145,9 @@ export class AiAgentConfigService {
       debounceMs: dto.debounceMs,
     };
 
-    // Remove campos undefined/null
+    // Remove campos apenas se forem undefined (PATCH semântico)
     const cleanData = Object.fromEntries(
-      Object.entries(allowedFields).filter(([_, value]) => value !== undefined && value !== null)
+      Object.entries(allowedFields).filter(([_, value]) => value !== undefined)
     );
 
     const updated = await this.prisma.aiAgentConfig.update({
