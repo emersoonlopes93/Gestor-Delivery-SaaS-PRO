@@ -25,9 +25,10 @@ import { AdminDebugAiAgentController } from '../ai-agent/controllers/admin-debug
 
 @Module({
   imports: [
-    AuthModule, 
+    AuthModule,
     BillingModule,
     AdminModulesModule,
+    forwardRef(() => AiAgentModule),
   ],
   controllers: [
     AdminAuthController, 
