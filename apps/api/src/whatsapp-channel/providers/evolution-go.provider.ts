@@ -96,20 +96,6 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
     try {
       this.logger.debug(`Connecting instance ${instanceId} with webhook: ${input.webhookUrl}`);
-      
-      // Tentar obter QR primeiro (opcional mas útil para o fluxo)
-      let preQrCode: string | undefined;
-      try {
-        const qrResponse = await client.get('/instance/qr');
-        const data = qrResponse.data as Record<string, unknown>;
-        const qrData = (data?.data || data) as Record<string, unknown>;
-        const qrCode = (qrData?.qrCode || qrData?.qr || qrData?.base64 || qrData?.Qrcode) as string | undefined;
-        
-        preQrCode = qrCode;
-      } catch (qrError: unknown) {
-        const message = qrError instanceof Error ? qrError.message : 'Unknown error';
-        this.logger.warn(`Failed to get QR code first: ${message}`);
-      }
 
       // Payload específico Evolution-Go
       const requestBody = {
@@ -126,13 +112,25 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       this.logger.log(`Webhook configuration response from Evolution Go: ${JSON.stringify(dataRec)}`);
       
       const parsed = this.parseConnectionStatus((dataRec?.data || dataRec) as Record<string, unknown>);
-      if (!parsed.qrCode && preQrCode) {
-        return {
-          ...parsed,
-          connected: false,
-          state: 'qr_pending',
-          qrCode: preQrCode,
-        };
+      if (!parsed.qrCode && parsed.state !== 'connected') {
+        try {
+          const qrResponse = await client.get('/instance/qr', { timeout: 8_000 });
+          const qrDataRoot = qrResponse.data as Record<string, unknown>;
+          const qrData = (qrDataRoot?.data || qrDataRoot) as Record<string, unknown>;
+          const qrCode = (qrData?.qrCode || qrData?.qr || qrData?.base64 || qrData?.Qrcode) as string | undefined;
+
+          if (qrCode) {
+            return {
+              ...parsed,
+              connected: false,
+              state: 'qr_pending',
+              qrCode,
+            };
+          }
+        } catch (qrError: unknown) {
+          const message = qrError instanceof Error ? qrError.message : 'Unknown error';
+          this.logger.warn(`Failed to get QR code after connect: ${message}`);
+        }
       }
 
       return parsed;

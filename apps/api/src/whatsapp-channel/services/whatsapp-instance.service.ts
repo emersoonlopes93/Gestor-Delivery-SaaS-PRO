@@ -155,12 +155,43 @@ export class WhatsAppInstanceService {
 
     console.log(`[WhatsApp Service] Connecting to instance: ${instance.evolutionInstanceId || instance.instanceName}`);
 
-    const connectionStatus = await provider.connect(
-      instance.apiUrl,
-      instance.apiKey,
-      instance.evolutionInstanceId || instance.instanceName,
-      { webhookUrl },
-    );
+    const safeWebhookUrl = this.maskWebhookSecret(webhookUrl);
+    console.log(`[WhatsApp Service] Webhook URL: ${safeWebhookUrl}`);
+
+    let apiKeyForConnect = instance.apiKey;
+    if (instance.providerType === 'evolution_go') {
+      const systemConfig = await this.prisma.systemConfig.findUnique({ where: { id: 'global' } });
+      if (systemConfig?.evolutionGlobalToken) {
+        apiKeyForConnect = systemConfig.evolutionGlobalToken;
+      }
+    }
+
+    let connectionStatus: Awaited<ReturnType<typeof provider.connect>>;
+    try {
+      connectionStatus = await provider.connect(
+        instance.apiUrl,
+        apiKeyForConnect,
+        instance.evolutionInstanceId || instance.instanceName,
+        { webhookUrl },
+      );
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
+      const errorStack = err instanceof Error ? err.stack : '';
+
+      let errorResponseData: string | undefined;
+      if (err && typeof err === 'object' && 'response' in err) {
+        const resp = (err as { response: unknown }).response;
+        if (resp && typeof resp === 'object' && 'data' in resp) {
+          const data = (resp as { data: unknown }).data;
+          errorResponseData = typeof data === 'string' ? data : JSON.stringify(data);
+        }
+      }
+
+      this.logger.error(`Error connecting instance in external provider: ${errorMsg}`, errorStack);
+      throw new InternalServerErrorException(
+        `Falha ao conectar na Evolution-Go. webhookUrl=${safeWebhookUrl} detalhe=${errorResponseData || errorMsg}`,
+      );
+    }
 
     console.log(`[WhatsApp Service] Connection status received:`, connectionStatus);
 
@@ -193,6 +224,10 @@ export class WhatsAppInstanceService {
     console.log(`[WhatsApp Service] QR Code in result:`, result.qrCode ? 'YES' : 'NO');
 
     return result;
+  }
+
+  private maskWebhookSecret(url: string): string {
+    return url.replace(/secret=[^&]+/i, 'secret=***');
   }
 
   /**

@@ -6,6 +6,7 @@ import {
   UseGuards,
   Request,
   HttpCode,
+  BadRequestException,
 } from '@nestjs/common';
 import { WhatsAppInstanceService, CreateInstanceDto } from '../services/whatsapp-instance.service';
 import { ConfigService } from '@nestjs/config';
@@ -35,6 +36,12 @@ export class WhatsAppInstanceController {
       baseUrl = publicUrl.replace(/\/+$/, '');
     } else {
       const host = req?.get?.('host') || req?.headers?.host || 'localhost:3333';
+
+      if (host.includes('vercel.app') || host.includes('vercel.com')) {
+        throw new BadRequestException(
+          'PUBLIC_API_URL não configurado na API. Configure no Render como https://SUA_API_RENDER.onrender.com (sem /api/v1).',
+        );
+      }
       const forwardedProto = req?.get?.('x-forwarded-proto') || req?.headers?.['x-forwarded-proto'];
       const proto = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || req?.protocol || 'http';
       baseUrl = `${proto}://${host}`;
@@ -45,7 +52,6 @@ export class WhatsAppInstanceController {
     
     const fullUrl = `${baseUrl}${prefix}/whatsapp/evolution/webhook${secret}`;
     
-    // Log seguro da configuração do webhook
     const safeSecret = instance?.webhookSecret 
       ? `${instance.webhookSecret.substring(0, 3)}***${instance.webhookSecret.substring(instance.webhookSecret.length - 3)}`
       : 'none';
