@@ -84,10 +84,20 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     instanceId: string,
     input: WhatsAppConnectInput,
   ): Promise<WhatsAppConnectionStatus> {
-    const client = this.buildClient(apiUrl, apiKey);
+    const client = axios.create({
+      baseURL: apiUrl.replace(/\/+$/, ''),
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: apiKey,
+        instanceId: instanceId, // Header obrigatório segundo a documentação
+      },
+      timeout: 30_000,
+    });
+
     try {
       this.logger.debug(`Connecting instance ${instanceId} with webhook: ${input.webhookUrl}`);
       
+      // Tentar obter QR primeiro (opcional mas útil para o fluxo)
       try {
         const qrResponse = await client.get('/instance/qr');
         const data = qrResponse.data as Record<string, unknown>;
@@ -106,14 +116,14 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         this.logger.warn(`Failed to get QR code first: ${message}`);
       }
 
+      // Payload específico Evolution-Go
       const requestBody = {
         webhookUrl: input.webhookUrl,
-        subscribe: input.subscribe || [
-          'messages.upsert',
-          'connection.update',
-          'messages.update',
-        ],
+        subscribe: ["ALL"], // Documentação sugere ["ALL"] ou eventos específicos
+        immediate: true,    // Parâmetro específico Evolution-Go
       };
+
+      this.logger.log(`[EVOLUTION-GO WEBHOOK CONFIG] instanceId=${instanceId} url=${input.webhookUrl.replace(/secret=.*$/, 'secret=***')} subscribe=["ALL"] immediate=true`);
 
       const { data } = await client.post('/instance/connect', requestBody);
       const dataRec = data as Record<string, unknown>;
@@ -407,9 +417,41 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
   parseWebhook(payload: unknown, tenantId: string): WhatsAppWebhookEvent | null {
     if (!payload || typeof payload !== 'object') return null;
     const dataRec = payload as Record<string, unknown>;
-    const eventType = (dataRec.event || (dataRec.data as Record<string, unknown>)?.event || dataRec.type || 'unknown') as string;
     
-    if (eventType === 'messages.upsert') {
+    // Padrão Evolution-Go: "event" e "data"
+    const eventType = String(dataRec.event || '');
+    
+    if (eventType === 'Message') {
+      const data = (dataRec.data || {}) as Record<string, unknown>;
+      const info = (data?.Info || {}) as Record<string, unknown>;
+      const message = (data?.Message || {}) as Record<string, unknown>;
+      
+      const remoteJid = String(info?.Sender || info?.Chat || '');
+      
+      // Ignorar grupos ou mensagens sem remetente
+      if (!remoteJid || remoteJid.includes('@g.us')) return null;
+      
+      // Ignorar mensagens enviadas pelo próprio bot
+      if (info?.IsFromMe === true) return null;
+
+      const content = String(message?.conversation || (message?.extendedTextMessage as any)?.text || '');
+      if (!content) return null;
+
+      return {
+        type: 'message',
+        tenantId,
+        from: remoteJid.replace(/@.*$/, ''),
+        content,
+        messageType: 'text', // Evolution-Go simplificado
+        externalId: String(info?.ID || ''),
+        raw: payload
+      };
+    }
+
+    // Fallback para padrões legados ou mensagens upsert (compatibilidade)
+    const legacyEventType = (dataRec.event || (dataRec.data as Record<string, unknown>)?.event || dataRec.type || 'unknown') as string;
+    
+    if (legacyEventType === 'messages.upsert') {
       const data = (dataRec.data || dataRec) as Record<string, unknown>;
       const key = data?.key as Record<string, unknown> | undefined;
       const remoteJid = (key?.remoteJid || data?.remoteJid || data?.from) as string | undefined;

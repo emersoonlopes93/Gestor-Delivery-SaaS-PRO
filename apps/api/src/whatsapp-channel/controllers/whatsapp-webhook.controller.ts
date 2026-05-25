@@ -42,22 +42,28 @@ export class WhatsAppWebhookController {
     @Headers('x-webhook-secret') webhookSecretHeader?: string,
     @Query('secret') webhookSecretQuery?: string,
   ) {
-    // Evolution Go envia o nome da instância no campo "instance"
-    const instanceName = body?.instance;
+    // Evolution-Go envia o instanceId e instanceToken no root do payload
+    const instanceId = body?.instanceId;
+    const instanceToken = body?.instanceToken;
     
-    if (!instanceName) {
-      this.logger.warn('Webhook received without instance name in payload');
-      return { received: true, processed: false, error: 'Instance name missing' };
+    if (!instanceId) {
+      this.logger.warn('Webhook received without instanceId in payload');
+      // Tentar fallback por instance name se existir (compatibilidade)
+      const instanceName = body?.instance;
+      if (!instanceName) {
+        return { received: true, processed: false, error: 'Instance identifier missing' };
+      }
+      return this.processByInstanceName(instanceName, body, webhookSecretHeader, webhookSecretQuery);
     }
 
     try {
-      // 1. Resolver a instância pelo nome e validar secret
+      // 1. Resolver a instância pelo instanceId (UUID do Evolution-Go)
       const instance = await this.prisma.whatsAppInstance.findFirst({
-        where: { instanceName },
+        where: { evolutionInstanceId: instanceId },
       });
 
       if (!instance) {
-        this.logger.warn(`No instance found for instance name: ${instanceName}`);
+        this.logger.warn(`No instance found for evolutionInstanceId: ${instanceId}`);
         return { received: true, processed: false, error: 'Instance not found' };
       }
 
@@ -73,7 +79,7 @@ export class WhatsAppWebhookController {
       // 2. Resolver o provider
       const provider = this.providerRegistry.getProvider(instance.providerType);
       
-      // 3. Tentar o parsing do evento
+      // 3. Tentar o parsing do evento (ajustado para Evolution-Go)
       const event = provider.parseWebhook(body, tenantId);
       if (!event) {
         return { received: true, processed: false };
@@ -98,6 +104,33 @@ export class WhatsAppWebhookController {
       this.logger.error(`Webhook processing failed: ${message}`);
       return { received: true, processed: false, error: message };
     }
+  }
+
+  private async processByInstanceName(instanceName: string, body: any, headerSecret?: string, querySecret?: string) {
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: { instanceName },
+    });
+
+    if (!instance) {
+      this.logger.warn(`No instance found for instance name: ${instanceName}`);
+      return { received: true, processed: false, error: 'Instance not found' };
+    }
+
+    const providedSecret = headerSecret || querySecret;
+    if (instance.webhookSecret && instance.webhookSecret !== providedSecret) {
+      return { received: true, processed: false, error: 'Invalid secret' };
+    }
+
+    const provider = this.providerRegistry.getProvider(instance.providerType);
+    const event = provider.parseWebhook(body, instance.tenantId);
+    if (!event) return { received: true, processed: false };
+
+    switch (event.type) {
+      case 'message': await this.handleNormalizedMessage(event); break;
+      case 'connection': await this.handleNormalizedConnection(event); break;
+      case 'ack': await this.handleNormalizedAck(event); break;
+    }
+    return { received: true, processed: true };
   }
 
   private async handleNormalizedMessage(event: WhatsAppWebhookEvent) {
