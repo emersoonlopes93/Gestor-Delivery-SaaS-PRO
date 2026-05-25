@@ -27,15 +27,32 @@ export class WhatsAppInstanceController {
   ) {}
 
   private async buildWebhookUrl(req: AuthenticatedRequest, tenantId: string): Promise<string> {
+    const publicUrl = this.configService.get<string>('PUBLIC_API_URL');
     const prefix = this.configService.get<string>('API_PREFIX', '/api/v1');
-    const host = req?.get?.('host') || req?.headers?.host || 'localhost:3333';
-    const forwardedProto = req?.get?.('x-forwarded-proto') || req?.headers?.['x-forwarded-proto'];
-    const proto = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || req?.protocol || 'http';
+    
+    let baseUrl = '';
+    if (publicUrl) {
+      baseUrl = publicUrl.replace(/\/+$/, '');
+    } else {
+      const host = req?.get?.('host') || req?.headers?.host || 'localhost:3333';
+      const forwardedProto = req?.get?.('x-forwarded-proto') || req?.headers?.['x-forwarded-proto'];
+      const proto = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || req?.protocol || 'http';
+      baseUrl = `${proto}://${host}`;
+    }
     
     const instance = await this.prisma.whatsAppInstance.findUnique({ where: { tenantId } });
     const secret = instance?.webhookSecret ? `?secret=${instance.webhookSecret}` : '';
     
-    return `${proto}://${host}${prefix}/webhooks/whatsapp/${tenantId}${secret}`;
+    const fullUrl = `${baseUrl}${prefix}/whatsapp/evolution/webhook${secret}`;
+    
+    // Log seguro da configuração do webhook
+    const safeSecret = instance?.webhookSecret 
+      ? `${instance.webhookSecret.substring(0, 3)}***${instance.webhookSecret.substring(instance.webhookSecret.length - 3)}`
+      : 'none';
+    
+    console.log(`[WhatsApp Webhook Config] tenantId: ${tenantId}, instance: ${instance?.instanceName}, url: ${baseUrl}${prefix}/whatsapp/evolution/webhook?secret=${safeSecret}`);
+    
+    return fullUrl;
   }
 
   @Get()

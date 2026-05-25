@@ -20,14 +20,11 @@ import { AiOrchestratorService } from '../../ai-agent/services/ai-orchestrator.s
 /**
  * Controller que recebe webhooks do Evolution Go.
  *
- * Eventos tratados:
- * - messages.upsert → nova mensagem recebida
- * - connection.update → mudança de status da conexão
- * - messages.update → atualização de status de entrega (ACK)
- *
  * Rota pública (sem auth guard) para receber callbacks.
+ * A URL configurada na Evolution Go deve ser:
+ * {PUBLIC_API_URL}/api/v1/whatsapp/evolution/webhook?secret={SECRET}
  */
-@Controller('webhooks/whatsapp')
+@Controller('whatsapp/evolution')
 export class WhatsAppWebhookController {
   private readonly logger = new Logger('WhatsAppWebhookController');
 
@@ -38,32 +35,35 @@ export class WhatsAppWebhookController {
     private readonly aiOrchestrator: AiOrchestratorService,
   ) {}
 
-  /**
-   * Webhook genérico do Evolution Go
-   * O Evolution envia eventos com o campo "event" indicando o tipo
-   */
-  @Post(':tenantId')
+  @Post('webhook')
   @HttpCode(200)
   async handleWebhook(
-    @Param('tenantId') tenantId: string,
-    @Body() body: unknown,
+    @Body() body: any,
     @Headers('x-webhook-secret') webhookSecretHeader?: string,
     @Query('secret') webhookSecretQuery?: string,
   ) {
-    this.logger.log(`Webhook received for tenant ${tenantId}`);
+    // Evolution Go envia o nome da instância no campo "instance"
+    const instanceName = body?.instance;
+    
+    if (!instanceName) {
+      this.logger.warn('Webhook received without instance name in payload');
+      return { received: true, processed: false, error: 'Instance name missing' };
+    }
 
     try {
-      // 1. Resolver a instância e validar secret
-      const instance = await this.prisma.whatsAppInstance.findUnique({
-        where: { tenantId },
+      // 1. Resolver a instância pelo nome e validar secret
+      const instance = await this.prisma.whatsAppInstance.findFirst({
+        where: { instanceName },
       });
 
       if (!instance) {
-        this.logger.warn(`No instance found for tenant ${tenantId}`);
+        this.logger.warn(`No instance found for instance name: ${instanceName}`);
         return { received: true, processed: false, error: 'Instance not found' };
       }
 
-      // Validar secret se configurado
+      const tenantId = instance.tenantId;
+
+      // Validar secret
       const providedSecret = webhookSecretHeader || webhookSecretQuery;
       if (instance.webhookSecret && instance.webhookSecret !== providedSecret) {
         this.logger.warn(`Invalid webhook secret for tenant ${tenantId}`);
@@ -76,7 +76,6 @@ export class WhatsAppWebhookController {
       // 3. Tentar o parsing do evento
       const event = provider.parseWebhook(body, tenantId);
       if (!event) {
-        this.logger.debug(`Unhandled event or invalid payload from ${provider.providerType}`);
         return { received: true, processed: false };
       }
 

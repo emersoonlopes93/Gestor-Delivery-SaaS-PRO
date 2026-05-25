@@ -117,6 +117,9 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       const { data } = await client.post('/instance/connect', requestBody);
       const dataRec = data as Record<string, unknown>;
+      
+      this.logger.log(`Webhook configuration response from Evolution Go: ${JSON.stringify(dataRec)}`);
+      
       return this.parseConnectionStatus((dataRec?.data || dataRec) as Record<string, unknown>);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
