@@ -6,11 +6,26 @@ import { WhatsAppSenderService } from '../../whatsapp-channel/services/whatsapp-
 import { AiProviderRegistryService } from './ai-provider-registry.service';
 import { AdminModulesService } from '../../admin/modules/admin-modules.service';
 import type { AiMessage } from '../interfaces/ai-provider.interface';
+import { AiFlowLogger, createAiTrace, type AiFlowContext } from '../../common/logging/ai-flow-logger';
 
 import { PrismaService } from '../../database/prisma.service';
 
 import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
+
+interface ProcessMessageOptions {
+  trace: AiFlowContext;
+  dryRun?: boolean;
+}
+
+export interface AiDebugTestResult {
+  success: boolean;
+  dryRun: boolean;
+  traceId: string;
+  steps: string[];
+  error?: string;
+  responsePreview?: string;
+}
 
 @Injectable()
 export class AiOrchestratorService {
@@ -30,76 +45,224 @@ export class AiOrchestratorService {
 
   /**
    * Ponto de entrada principal para mensagens inbound do WhatsApp.
-   * Deve ser chamado pelo event listener do webhook.
    */
-  async handleInboundMessage(tenantId: string, customerPhone: string, content: string) {
-    this.logger.log(`Handling inbound message from ${customerPhone} for tenant ${tenantId}`);
-    
-    // 1. Verificar se o tenant tem acesso ao módulo de IA
-    const hasModuleAccess = await this.adminModulesService.hasModuleAccess(tenantId, 'ai_agent');
+  async handleInboundMessage(
+    tenantId: string,
+    customerPhone: string,
+    content: string,
+    trace?: AiFlowContext,
+  ): Promise<void> {
+    const flowTrace = trace ?? createAiTrace();
+    flowTrace.tenantId = tenantId;
+    flowTrace.phone = customerPhone;
+
+    AiFlowLogger.flow('orchestrator_inbound_start', flowTrace, {
+      textLength: content.length,
+    });
+
+    const hasModuleAccess = await this.adminModulesService.hasModuleAccess(
+      tenantId,
+      'ai_agent',
+    );
     if (!hasModuleAccess) {
-      this.logger.log(`AI Agent skipped: tenant ${tenantId} has no module access (ai_agent).`);
+      AiFlowLogger.ignored('ai_module_disabled', flowTrace);
       return;
     }
 
     const config = await this.configService.getConfig(tenantId);
+    const systemConfig = await this.prisma.systemConfig.findUnique({
+      where: { id: 'global' },
+      select: { defaultAiProvider: true, googleAiModel: true },
+    });
+    const providerType = systemConfig?.defaultAiProvider ?? 'openai';
+
+    AiFlowLogger.flow('ai_config_loaded', flowTrace, {
+      enabled: config.isEnabled,
+      provider: providerType,
+      model:
+        providerType === 'google_ai'
+          ? systemConfig?.googleAiModel ?? 'gemini-2.0-flash-lite'
+          : providerType === 'anthropic'
+            ? process.env.ANTHROPIC_MODEL ?? 'claude-3-5-sonnet-20240620'
+            : process.env.OPENAI_MODEL ?? 'gpt-4o',
+      debounceMs: config.debounceMs ?? 1000,
+      operatingMode: config.operatingMode,
+      handoffActive: false,
+    });
+
     if (!config.isEnabled) {
-      this.logger.log(`AI Agent skipped: tenant ${tenantId} is disabled (isEnabled=false).`);
+      AiFlowLogger.ignored('ai_disabled_for_tenant', flowTrace);
       return;
     }
 
     const debounceKey = `${tenantId}:${customerPhone}`;
-    
-    // Limpa timer anterior se existir
+
     if (this.debounceTimers.has(debounceKey)) {
+      AiFlowLogger.flow('debounce_reset', flowTrace, { debounceKey });
       clearTimeout(this.debounceTimers.get(debounceKey));
     }
 
     const debounceMs = config.debounceMs || 1000;
+    AiFlowLogger.flow('debounce_scheduled', flowTrace, { delayMs: debounceMs });
 
-    // Define novo timer
     const timer = setTimeout(() => {
       this.debounceTimers.delete(debounceKey);
-      this.processMessage(tenantId, customerPhone, content, config)
-        .catch(err => this.logger.error(`Error processing message for ${customerPhone}: ${err.message}`));
+      AiFlowLogger.flow('debounce_fired', flowTrace);
+      this.processMessage(tenantId, customerPhone, content, config, {
+        trace: flowTrace,
+      }).catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        AiFlowLogger.error('process_message', flowTrace, { error: msg });
+        this.logger.error(`Error processing message for ${customerPhone}: ${msg}`);
+      });
     }, debounceMs);
 
     this.debounceTimers.set(debounceKey, timer);
   }
 
-  private async processMessage(
-    tenantId: string, 
-    customerPhone: string, 
-    _content: string, 
-    config: Awaited<ReturnType<AiAgentConfigService['getConfig']>>
-  ) {
-    this.logger.log(`Processing message for ${customerPhone} (Tenant: ${tenantId})`);
+  /**
+   * Teste manual do orquestrador (admin), sem depender do webhook WhatsApp.
+   */
+  async debugTestInboundMessage(input: {
+    tenantSlug: string;
+    text: string;
+    phone: string;
+    dryRun?: boolean;
+  }): Promise<AiDebugTestResult> {
+    const trace = createAiTrace();
+    const steps: string[] = [];
+    const push = (s: string) => steps.push(s);
+
+    push('debug_test_start');
+
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { slug: input.tenantSlug },
+      select: { id: true, slug: true, name: true },
+    });
+
+    if (!tenant) {
+      AiFlowLogger.error('tenant_not_found', trace, { slug: input.tenantSlug });
+      return {
+        success: false,
+        dryRun: input.dryRun ?? true,
+        traceId: trace.traceId ?? '',
+        steps,
+        error: `Tenant não encontrado: ${input.tenantSlug}`,
+      };
+    }
+
+    trace.tenantId = tenant.id;
+    trace.phone = input.phone;
+    push(`tenant_resolved slug=${tenant.slug}`);
+
+    const hasModuleAccess = await this.adminModulesService.hasModuleAccess(
+      tenant.id,
+      'ai_agent',
+    );
+    if (!hasModuleAccess) {
+      AiFlowLogger.ignored('ai_module_disabled', trace);
+      return {
+        success: false,
+        dryRun: input.dryRun ?? true,
+        traceId: trace.traceId ?? '',
+        steps: [...steps, 'ignored:ai_module_disabled'],
+        error: 'Módulo ai_agent desabilitado para o tenant',
+      };
+    }
+
+    const config = await this.configService.getConfig(tenant.id);
+    push(`ai_config enabled=${config.isEnabled}`);
+
+    if (!config.isEnabled) {
+      return {
+        success: false,
+        dryRun: input.dryRun ?? true,
+        traceId: trace.traceId ?? '',
+        steps: [...steps, 'ignored:ai_disabled_for_tenant'],
+        error: 'Agente IA desativado (isEnabled=false). Ative em Configurações do tenant.',
+      };
+    }
+
     try {
-      // Re-verificar isEnabled dentro do processo de debounce
+      const result = await this.processMessage(
+        tenant.id,
+        input.phone,
+        input.text,
+        config,
+        { trace, dryRun: input.dryRun ?? true },
+      );
+      push('process_message_completed');
+      const preview =
+        result && typeof result === 'object' && 'contentPreview' in result
+          ? result.contentPreview
+          : undefined;
+      return {
+        success: true,
+        dryRun: input.dryRun ?? true,
+        traceId: trace.traceId ?? '',
+        steps,
+        responsePreview: preview,
+      };
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      AiFlowLogger.error('debug_test', trace, { error: msg });
+      return {
+        success: false,
+        dryRun: input.dryRun ?? true,
+        traceId: trace.traceId ?? '',
+        steps,
+        error: msg,
+      };
+    }
+  }
+
+  private async processMessage(
+    tenantId: string,
+    customerPhone: string,
+    _content: string,
+    config: Awaited<ReturnType<AiAgentConfigService['getConfig']>>,
+    options: ProcessMessageOptions,
+  ): Promise<{ contentPreview?: string } | void> {
+    const { trace, dryRun } = options;
+    trace.tenantId = tenantId;
+    trace.phone = customerPhone;
+
+    AiFlowLogger.flow('process_message_start', trace);
+
+    try {
       if (!config.isEnabled) {
-        this.logger.debug(`Agent is disabled for tenant ${tenantId}. Ignoring.`);
+        AiFlowLogger.ignored('ai_disabled_for_tenant', trace);
         return;
       }
 
-      const session = await this.conversationService.getOrCreateSession(tenantId, customerPhone);
+      const session = await this.conversationService.getOrCreateSession(
+        tenantId,
+        customerPhone,
+      );
 
-      // Se está em Handoff, não responde como bot
+      AiFlowLogger.flow('session_loaded', trace, {
+        sessionId: session.id,
+        handoffActive: session.handoffActive,
+        state: session.state,
+      });
+
       if (session.handoffActive) {
-        this.logger.debug(`Session ${session.id} is in handoff. Bot muted.`);
+        AiFlowLogger.ignored('human_handoff', trace, { sessionId: session.id });
         return;
       }
 
-      // Adiciona mensagem do usuário ao histórico local (se já não foi salva pelo webhook)
-      // O webhook já deve ter salvo.
+      const history = await this.conversationService.getRecentHistory(
+        session.id,
+        15,
+      );
 
-      // Busca histórico recente
-      const history = await this.conversationService.getRecentHistory(session.id, 15);
+      const systemConfig = await this.prisma.systemConfig.findUnique({
+        where: { id: 'global' },
+      });
+      const providerResolved = await this.aiRegistry.resolveProvider(tenantId);
 
-      // Busca Configuração Global (SystemConfig)
-      const systemConfig = await this.prisma.systemConfig.findUnique({ where: { id: 'global' } });
-
-      // Constrói array de mensagens pro LLM
-      const basePrompt = systemConfig?.baseAiPrompt || 'Você é um assistente virtual de delivery.';
+      const basePrompt =
+        systemConfig?.baseAiPrompt || 'Você é um assistente virtual de delivery.';
       const agentContext = `
 Você está atendendo para o restaurante: ${config.tenant.name}.
 Seu nome é: ${config.agentName || 'Assistente'}.
@@ -111,117 +274,220 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
       `.trim();
 
       const messages: AiMessage[] = [
-        { role: 'system', content: `${basePrompt}\n\n${agentContext}` }
+        { role: 'system', content: `${basePrompt}\n\n${agentContext}` },
       ];
 
       for (const msg of history) {
-        // Ignora mensagens que não sejam texto/tool do fluxo principal
-        if (msg.messageType !== 'text' && msg.messageType !== 'tool_result') continue;
-        
+        if (msg.messageType !== 'text' && msg.messageType !== 'tool_result') {
+          continue;
+        }
+
         const toolCalls = msg.toolCalls as Prisma.JsonArray | null;
-        
+
         messages.push({
           role: msg.direction === 'inbound' ? 'user' : 'assistant',
           content: msg.content,
-          ...(toolCalls && Array.isArray(toolCalls) ? { 
-            toolCalls: toolCalls.map(tc => {
-              const obj = tc as Record<string, unknown>;
-              return {
-                id: String(obj.id),
-                name: String(obj.name),
-                arguments: (obj.arguments || {}) as Record<string, unknown>
-              };
-            })
-          } : {}),
+          ...(toolCalls && Array.isArray(toolCalls)
+            ? {
+                toolCalls: toolCalls.map((tc) => {
+                  const obj = tc as Record<string, unknown>;
+                  return {
+                    id: String(obj.id),
+                    name: String(obj.name),
+                    arguments: (obj.arguments || {}) as Record<string, unknown>,
+                  };
+                }),
+              }
+            : {}),
         });
       }
 
-      // Pega tools disponíveis
       const tools = this.toolsService.getAvailableTools();
 
-      // Resolve o provider (dinâmico por tenant/global)
-      const aiProvider = await this.aiRegistry.resolveProvider(tenantId);
-      const providerAvailable = await aiProvider.isAvailable();
-      if (!providerAvailable) {
-        this.logger.error(`AI Provider unavailable for tenant ${tenantId} (missing credentials/env).`);
-        if (config.fallbackMessage) {
-          await this.sendFinalResponse(tenantId, session.id, customerPhone, config.fallbackMessage);
-        }
-        return;
-      }
-
-      // Simulação de digitando (se habilitado)
-      if (config.simulateTyping) {
-        await this.whatsappSender.sendPresence(tenantId, customerPhone, 'composing');
-      }
-
-      // Envia pro LLM
-      const completion = await aiProvider.complete({
-        messages,
-        tools,
-        temperature: 0.3, // Menos alucinação
+      const providerAvailable = await providerResolved.isAvailable();
+      AiFlowLogger.flow('llm_provider_check', trace, {
+        provider: providerResolved.providerType,
+        available: providerAvailable,
+        messagesCount: messages.length,
+        toolsCount: tools.length,
       });
 
-      if (completion.finishReason === 'error' || (!completion.content && (!completion.toolCalls || completion.toolCalls.length === 0))) {
-        this.logger.error(`AI completion produced no response (finishReason=${completion.finishReason}).`);
-        if (config.fallbackMessage) {
-          await this.sendFinalResponse(tenantId, session.id, customerPhone, config.fallbackMessage);
+      if (!providerAvailable) {
+        AiFlowLogger.error('llm_provider_unavailable', trace, {
+          provider: providerResolved.providerType,
+        });
+        if (config.fallbackMessage && !dryRun) {
+          await this.sendFinalResponse(
+            tenantId,
+            session.id,
+            customerPhone,
+            config.fallbackMessage,
+            trace,
+          );
         }
         return;
       }
 
-      // Se o LLM resolveu chamar Tools
-      if (completion.finishReason === 'tool_calls' && completion.toolCalls && completion.toolCalls.length > 0) {
-        await this.handleToolCalls(tenantId, session.id, customerPhone, messages, completion.toolCalls, tools, config);
+      if (config.simulateTyping && !dryRun) {
+        await this.whatsappSender.sendPresence(
+          tenantId,
+          customerPhone,
+          'composing',
+        );
+      }
+
+      const llmStartedAt = Date.now();
+      AiFlowLogger.flow('llm_request_start', trace, {
+        provider: providerResolved.providerType,
+        inputMessages: messages.length,
+      });
+
+      const completion = await providerResolved.complete({
+        messages,
+        tools,
+        temperature: 0.3,
+      });
+
+      const llmDurationMs = Date.now() - llmStartedAt;
+      const outputLength = completion.content?.length ?? 0;
+      const toolCallsCount = completion.toolCalls?.length ?? 0;
+
+      if (completion.finishReason === 'error') {
+        AiFlowLogger.error('llm_response_failed', trace, {
+          provider: providerResolved.providerType,
+          finishReason: completion.finishReason,
+          durationMs: llmDurationMs,
+        });
+        if (config.fallbackMessage && !dryRun) {
+          await this.sendFinalResponse(
+            tenantId,
+            session.id,
+            customerPhone,
+            config.fallbackMessage,
+            trace,
+          );
+        }
         return;
       }
 
-      // Se for apenas resposta de texto
-      if (completion.content) {
-        await this.sendFinalResponse(tenantId, session.id, customerPhone, completion.content);
+      AiFlowLogger.flow('llm_response_success', trace, {
+        provider: providerResolved.providerType,
+        finishReason: completion.finishReason,
+        length: outputLength,
+        toolCallsCount,
+        durationMs: llmDurationMs,
+        promptTokens: completion.usage?.promptTokens,
+        completionTokens: completion.usage?.completionTokens,
+      });
+
+      if (
+        !completion.content &&
+        (!completion.toolCalls || completion.toolCalls.length === 0)
+      ) {
+        AiFlowLogger.error('llm_empty_response', trace);
+        if (config.fallbackMessage && !dryRun) {
+          await this.sendFinalResponse(
+            tenantId,
+            session.id,
+            customerPhone,
+            config.fallbackMessage,
+            trace,
+          );
+        }
+        return;
       }
 
+      if (
+        completion.finishReason === 'tool_calls' &&
+        completion.toolCalls &&
+        completion.toolCalls.length > 0
+      ) {
+        if (dryRun) {
+          AiFlowLogger.flow('llm_tool_calls_dry_run', trace, {
+            toolCallsCount: completion.toolCalls.length,
+          });
+          return {
+            contentPreview: `[dryRun] tool_calls=${completion.toolCalls.map((t) => t.name).join(',')}`,
+          };
+        }
+        await this.handleToolCalls(
+          tenantId,
+          session.id,
+          customerPhone,
+          messages,
+          completion.toolCalls,
+          tools,
+          config,
+          trace,
+        );
+        return;
+      }
+
+      if (completion.content) {
+        if (dryRun) {
+          AiFlowLogger.flow('dry_run_skip_whatsapp_send', trace, {
+            previewLength: completion.content.length,
+          });
+          return { contentPreview: completion.content.slice(0, 200) };
+        }
+        await this.sendFinalResponse(
+          tenantId,
+          session.id,
+          customerPhone,
+          completion.content,
+          trace,
+        );
+        return { contentPreview: completion.content.slice(0, 200) };
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
+      AiFlowLogger.error('process_message', trace, { error: message });
       this.logger.error(`Error handling inbound message: ${message}`);
-      // Fallback
-      try {
-        if (config?.fallbackMessage) {
-          await this.sendFinalResponse(tenantId, 'error-fallback', customerPhone, config.fallbackMessage);
+      if (config?.fallbackMessage && !options.dryRun) {
+        try {
+          await this.sendFinalResponse(
+            tenantId,
+            'error-fallback',
+            customerPhone,
+            config.fallbackMessage,
+            trace,
+          );
+        } catch {
+          /* fallback send failed */
         }
-      } catch {}
+      }
+      throw error;
     }
   }
 
   private async handleToolCalls(
-    tenantId: string, 
-    sessionId: string, 
+    tenantId: string,
+    sessionId: string,
     customerPhone: string,
     historyMessages: AiMessage[],
     toolCalls: NonNullable<AiMessage['toolCalls']>,
     tools: ReturnType<AgentToolsService['getAvailableTools']>,
-    config: Awaited<ReturnType<AiAgentConfigService['getConfig']>>
-  ) {
-    this.logger.log(`Handling ${toolCalls.length} tool calls for session ${sessionId}`);
+    config: Awaited<ReturnType<AiAgentConfigService['getConfig']>>,
+    trace: AiFlowContext,
+  ): Promise<void> {
+    AiFlowLogger.flow('tool_calls_start', trace, { count: toolCalls.length });
 
-    // Adiciona a chamada da tool no histórico para o LLM não se perder
     const assistantToolMessage: AiMessage = {
       role: 'assistant',
       content: '',
       toolCalls: toolCalls,
     };
-    
-    // Salva a mensagem do assistant chamando a tool no banco
+
     await this.conversationService.addMessage({
       sessionId,
       direction: 'outbound',
-      content: '', // Sem texto visível
-      toolCalls: toolCalls.map(tc => ({ 
-        id: tc.id, 
-        name: tc.name, 
-        arguments: tc.arguments as Prisma.InputJsonObject 
+      content: '',
+      toolCalls: toolCalls.map((tc) => ({
+        id: tc.id,
+        name: tc.name,
+        arguments: tc.arguments as Prisma.InputJsonObject,
       })) as Prisma.InputJsonArray,
-      metadata: { type: 'tool_call' }
+      metadata: { type: 'tool_call' },
     });
 
     const newMessages = [...historyMessages, assistantToolMessage];
@@ -229,15 +495,21 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
     for (const toolCall of toolCalls) {
       const signatureHash = this.hashToolArgs(toolCall.arguments);
 
-      // Verifica se é handoff
       if (toolCall.name === 'transferir_atendimento_humano') {
         const args = toolCall.arguments as Record<string, unknown>;
-        const motivo = typeof args === 'object' && args !== null && 'motivo' in args 
-          ? String(args.motivo) 
-          : undefined;
+        const motivo =
+          typeof args === 'object' && args !== null && 'motivo' in args
+            ? String(args.motivo)
+            : undefined;
         await this.conversationService.activateHandoff(sessionId, motivo);
-        await this.sendFinalResponse(tenantId, sessionId, customerPhone, "Certo, estou transferindo você para um de nossos atendentes. Por favor, aguarde um momento.");
-        return; // Interrompe o fluxo da IA
+        await this.sendFinalResponse(
+          tenantId,
+          sessionId,
+          customerPhone,
+          'Certo, estou transferindo você para um de nossos atendentes. Por favor, aguarde um momento.',
+          trace,
+        );
+        return;
       }
 
       const shouldBlock = await this.conversationService.shouldBlockAiToolCall({
@@ -249,52 +521,36 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
       });
 
       if (shouldBlock) {
-        this.logger.warn(`AI tool call blocked to avoid loop (tenantId=${tenantId}, sessionId=${sessionId}, tool=${toolCall.name}, signature=${signatureHash})`);
-        const blockedResult = { status: 'error', code: 'TOOL_LOOP_BLOCKED', message: 'Tool call blocked to avoid loop.' };
-        await this.conversationService.addMessage({
-          sessionId,
-          direction: 'inbound',
-          content: JSON.stringify(blockedResult),
-          messageType: 'tool_result',
-          metadata: {
-            type: 'tool_result',
-            toolName: toolCall.name,
-            status: 'error',
-            code: 'TOOL_LOOP_BLOCKED',
-            signatureHash,
-          },
-        });
+        AiFlowLogger.ignored('tool_loop_blocked', trace, { tool: toolCall.name });
         await this.sendFinalResponse(
           tenantId,
           sessionId,
           customerPhone,
           'Tive um problema ao processar essa solicitação automaticamente. Pode reformular a mensagem com mais detalhes, por favor?',
+          trace,
         );
         return;
       }
 
-      // Executa a tool
       const result = await this.toolsService.executeTool(
-        tenantId, 
-        toolCall.name, 
-        toolCall.arguments, 
-        { sessionId } // Contexto injetado
+        tenantId,
+        toolCall.name,
+        toolCall.arguments,
+        { sessionId },
       );
 
       const toolStatus = this.getToolResultStatus(result);
       const toolCode = this.getToolResultCode(result);
 
-      // Adiciona o resultado
       newMessages.push({
         role: 'tool',
         toolCallId: toolCall.id,
         content: JSON.stringify(result),
       });
 
-      // Salva o resultado no banco
       await this.conversationService.addMessage({
         sessionId,
-        direction: 'inbound', // Tratamos o retorno da tool como input pro LLM ler
+        direction: 'inbound',
         content: JSON.stringify(result),
         messageType: 'tool_result',
         metadata: {
@@ -307,7 +563,10 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
       });
 
       if (toolStatus === 'success') {
-        await this.conversationService.clearAiToolFailures(sessionId, toolCall.name);
+        await this.conversationService.clearAiToolFailures(
+          sessionId,
+          toolCall.name,
+        );
       } else if (toolStatus === 'error') {
         await this.conversationService.recordAiToolFailure({
           sessionId,
@@ -317,25 +576,32 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
         });
 
         if (toolCode === 'INVALID_TOOL_ARGS') {
-          this.logger.warn(`Invalid tool args (tenantId=${tenantId}, sessionId=${sessionId}, tool=${toolCall.name}, signature=${signatureHash})`);
           await this.sendFinalResponse(
             tenantId,
             sessionId,
             customerPhone,
             'Não consegui entender alguns dados necessários para continuar. Pode enviar novamente com as informações completas (ex: itens, endereço e forma de pagamento), por favor?',
+            trace,
           );
           return;
         }
       }
     }
 
-    // Chama o LLM novamente com os resultados
     const aiProvider = await this.aiRegistry.resolveProvider(tenantId);
-    
-    // Simulação de digitando novamente antes da resposta final
+
     if (config.simulateTyping) {
-      await this.whatsappSender.sendPresence(tenantId, customerPhone, 'composing');
+      await this.whatsappSender.sendPresence(
+        tenantId,
+        customerPhone,
+        'composing',
+      );
     }
+
+    AiFlowLogger.flow('llm_request_start', trace, {
+      provider: aiProvider.providerType,
+      phase: 'after_tools',
+    });
 
     const finalCompletion = await aiProvider.complete({
       messages: newMessages,
@@ -343,8 +609,21 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
       temperature: 0.3,
     });
 
+    AiFlowLogger.flow('llm_response_success', trace, {
+      provider: aiProvider.providerType,
+      phase: 'after_tools',
+      length: finalCompletion.content?.length ?? 0,
+      finishReason: finalCompletion.finishReason,
+    });
+
     if (finalCompletion.content) {
-      await this.sendFinalResponse(tenantId, sessionId, customerPhone, finalCompletion.content);
+      await this.sendFinalResponse(
+        tenantId,
+        sessionId,
+        customerPhone,
+        finalCompletion.content,
+        trace,
+      );
     }
   }
 
@@ -394,17 +673,31 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
     return typeof code === 'string' ? code : null;
   }
 
-  private async sendFinalResponse(tenantId: string, sessionId: string, customerPhone: string, content: string) {
-    // 1. Envia via WhatsApp Channel
+  private async sendFinalResponse(
+    tenantId: string,
+    sessionId: string,
+    customerPhone: string,
+    content: string,
+    trace: AiFlowContext,
+  ): Promise<void> {
+    AiFlowLogger.flow('whatsapp_send_start', trace, {
+      textLength: content.length,
+    });
+
     const result = await this.whatsappSender.sendText(tenantId, {
       to: customerPhone,
       text: content,
     });
+
     if (!result.success) {
+      AiFlowLogger.error('whatsapp_send', trace, { error: result.error });
       throw new Error(result.error || 'WhatsApp send failed');
     }
 
-    // 2. Salva no banco
+    AiFlowLogger.flow('whatsapp_send_success', trace, {
+      messageId: result.messageId,
+    });
+
     if (sessionId !== 'error-fallback') {
       await this.conversationService.addMessage({
         sessionId,

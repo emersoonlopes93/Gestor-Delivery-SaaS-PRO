@@ -14,6 +14,7 @@ import { WhatsAppProviderRegistryService } from '../services/whatsapp-provider-r
 import type { WhatsAppWebhookEvent } from '../interfaces/whatsapp-provider.interface';
 import { WhatsAppInstanceStatus } from '@prisma/client';
 import { AiOrchestratorService } from '../../ai-agent/services/ai-orchestrator.service';
+import { AiFlowLogger, createAiTrace } from '../../common/logging/ai-flow-logger';
 
 
 /**
@@ -48,7 +49,6 @@ export class WhatsAppWebhookController {
 
     const payload = body as Record<string, unknown>;
 
-    // Log básico para diagnóstico
     const eventName =
       (typeof payload.event === 'string' && payload.event) ||
       (typeof payload.type === 'string' && payload.type) ||
@@ -57,59 +57,76 @@ export class WhatsAppWebhookController {
       (typeof payload.instance === 'string' && payload.instance) ||
       (typeof payload.instanceName === 'string' && payload.instanceName) ||
       '';
-    const instanceIdFromPayload = typeof payload.instanceId === 'string' ? payload.instanceId : '';
-    
-    this.logger.log(
-      `Webhook received. Event: ${eventName || 'unknown'}, Instance: ${instanceNameFromPayload || instanceIdFromPayload || 'unknown'}`,
-    );
+    const instanceIdFromPayload =
+      typeof payload.instanceId === 'string' ? payload.instanceId : '';
 
-    // Evolution-Go envia o instanceId e instanceToken no root do payload
+    const trace = createAiTrace();
+    AiFlowLogger.flow('received_webhook', {
+      traceId: trace.traceId,
+      instanceId: instanceIdFromPayload || undefined,
+    }, {
+      event: eventName || 'unknown',
+      instanceName: instanceNameFromPayload || undefined,
+    });
+
     const instanceId = instanceIdFromPayload;
-    
+
     if (!instanceId) {
-      // Tentar fallback por instance name se existir (compatibilidade)
       const instanceName = instanceNameFromPayload;
       if (!instanceName) {
+        AiFlowLogger.ignored('missing_instance_identifier', {
+          traceId: trace.traceId,
+        });
         this.logger.warn('Webhook received without instance identifier (instanceId or instance name)');
         return { received: true, processed: false, error: 'Instance identifier missing' };
       }
-      return this.processByInstanceName(instanceName, payload, webhookSecretHeader, webhookSecretQuery);
+      return this.processByInstanceName(
+        instanceName,
+        payload,
+        webhookSecretHeader,
+        webhookSecretQuery,
+        trace,
+      );
     }
 
     try {
-      // 1. Resolver a instância pelo instanceId (UUID do Evolution-Go)
       const instance = await this.prisma.whatsAppInstance.findFirst({
         where: { evolutionInstanceId: instanceId },
       });
 
       if (!instance) {
+        AiFlowLogger.ignored('instance_not_found', {
+          traceId: trace.traceId,
+          instanceId,
+        });
         this.logger.warn(`No instance found for evolutionInstanceId: ${instanceId}`);
         return { received: true, processed: false, error: 'Instance not found' };
       }
 
       const tenantId = instance.tenantId;
+      trace.tenantId = tenantId;
+      trace.instanceId = instanceId;
 
-      // Validar secret
+      AiFlowLogger.flow('tenant_resolved', trace);
+
       const providedSecret = webhookSecretHeader || webhookSecretQuery;
       if (instance.webhookSecret && instance.webhookSecret !== providedSecret) {
+        AiFlowLogger.ignored('invalid_webhook_secret', trace);
         this.logger.warn(`Invalid webhook secret for tenant ${tenantId}`);
         return { received: true, processed: false, error: 'Invalid secret' };
       }
 
-      // 2. Resolver o provider
       const provider = this.providerRegistry.getProvider(instance.providerType);
-      
-      // 3. Tentar o parsing do evento (ajustado para Evolution-Go)
+
       const event = provider.parseWebhook(payload, tenantId);
       if (!event) {
-        this.logger.debug(`Event ignored or not parsed: ${eventName}`);
+        AiFlowLogger.ignored('event_not_parsed', trace, { event: eventName });
         return { received: true, processed: false };
       }
 
-      // 4. Processar baseado no tipo normalizado
       switch (event.type) {
         case 'message':
-          await this.handleNormalizedMessage(event);
+          await this.handleNormalizedMessage(event, trace);
           break;
         case 'connection':
           await this.handleNormalizedConnection(event);
@@ -119,9 +136,11 @@ export class WhatsAppWebhookController {
           break;
       }
 
+      AiFlowLogger.flow('webhook_processed', trace, { eventType: event.type });
       return { received: true, processed: true };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
+      AiFlowLogger.error('webhook_handler', trace, { error: message });
       this.logger.error(`Webhook processing failed: ${message}`);
       return { received: true, processed: false, error: message };
     }
@@ -132,52 +151,84 @@ export class WhatsAppWebhookController {
     payload: Record<string, unknown>,
     headerSecret?: string,
     querySecret?: string,
+    trace?: ReturnType<typeof createAiTrace>,
   ) {
+    const flowTrace = trace ?? createAiTrace();
+
     const instance = await this.prisma.whatsAppInstance.findFirst({
-      where: { 
+      where: {
         OR: [
           { instanceName: instanceName },
-          { evolutionInstanceId: instanceName }
-        ]
+          { evolutionInstanceId: instanceName },
+        ],
       },
     });
 
     if (!instance) {
+      AiFlowLogger.ignored('instance_not_found', flowTrace, { instanceName });
       this.logger.warn(`No instance found for instance name: ${instanceName}`);
       return { received: true, processed: false, error: 'Instance not found' };
     }
 
+    flowTrace.tenantId = instance.tenantId;
+    flowTrace.instanceId = instance.evolutionInstanceId ?? undefined;
+    AiFlowLogger.flow('tenant_resolved', flowTrace, { via: 'instanceName' });
+
     const providedSecret = headerSecret || querySecret;
     if (instance.webhookSecret && instance.webhookSecret !== providedSecret) {
-      this.logger.warn(`Invalid webhook secret for instance name: ${instanceName}`);
+      AiFlowLogger.ignored('invalid_webhook_secret', flowTrace);
       return { received: true, processed: false, error: 'Invalid secret' };
     }
 
     const provider = this.providerRegistry.getProvider(instance.providerType);
     const event = provider.parseWebhook(payload, instance.tenantId);
-    if (!event) return { received: true, processed: false };
+    if (!event) {
+      AiFlowLogger.ignored('event_not_parsed', flowTrace);
+      return { received: true, processed: false };
+    }
 
     switch (event.type) {
-      case 'message': await this.handleNormalizedMessage(event); break;
-      case 'connection': await this.handleNormalizedConnection(event); break;
-      case 'ack': await this.handleNormalizedAck(event); break;
+      case 'message':
+        await this.handleNormalizedMessage(event, flowTrace);
+        break;
+      case 'connection':
+        await this.handleNormalizedConnection(event);
+        break;
+      case 'ack':
+        await this.handleNormalizedAck(event);
+        break;
     }
     return { received: true, processed: true };
   }
 
-  private async handleNormalizedMessage(event: WhatsAppWebhookEvent) {
+  private async handleNormalizedMessage(
+    event: WhatsAppWebhookEvent,
+    trace: ReturnType<typeof createAiTrace>,
+  ) {
     const { tenantId, from: phone, content, messageType, externalId } = event;
-    if (!phone || !content) return;
+    trace.tenantId = tenantId;
+    trace.phone = phone;
+    if (externalId) trace.messageId = externalId;
 
-    // Verificar se já processamos essa mensagem
+    if (!phone || !content) {
+      AiFlowLogger.ignored('missing_phone_or_content', trace);
+      return;
+    }
+
     if (externalId) {
       const existing = await this.prisma.chatMessage.findUnique({
         where: { externalId },
       });
-      if (existing) return;
+      if (existing) {
+        AiFlowLogger.ignored('duplicate_message_id', trace, {
+          sessionId: existing.sessionId,
+        });
+        return;
+      }
+    } else {
+      AiFlowLogger.flow('dedup_skipped_no_external_id', trace);
     }
 
-    // Encontrar ou criar sessão
     const session = await this.prisma.chatSession.upsert({
       where: {
         tenantId_customerPhone: { tenantId, customerPhone: phone },
@@ -194,23 +245,27 @@ export class WhatsAppWebhookController {
       },
     });
 
-    // Persistir mensagem
     await this.prisma.chatMessage.create({
       data: {
         sessionId: session.id,
         direction: 'inbound',
         content,
         messageType: messageType || 'text',
-        externalId,
+        externalId: externalId || undefined,
       },
     });
 
-    this.logger.log(`Message stored for session ${session.id} from ${phone}`);
-    
-    // Disparar o orquestrador de IA de forma assíncrona (não bloqueia o webhook)
-    this.aiOrchestrator.handleInboundMessage(tenantId, phone, content)
+    AiFlowLogger.flow('message_persisted', trace, {
+      sessionId: session.id,
+      messageType: messageType || 'text',
+      textLength: content.length,
+    });
+
+    this.aiOrchestrator
+      .handleInboundMessage(tenantId, phone, content, trace)
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : 'Unknown error';
+        AiFlowLogger.error('orchestrator_dispatch', trace, { error: msg });
         this.logger.error(`AI Orchestrator failed for ${phone}: ${msg}`);
       });
   }

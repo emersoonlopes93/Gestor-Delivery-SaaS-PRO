@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { AiFlowLogger } from '../../common/logging/ai-flow-logger';
 import { WhatsAppInstanceService } from './whatsapp-instance.service';
 import { WhatsAppProviderRegistryService } from './whatsapp-provider-registry.service';
 import type {
@@ -137,10 +138,16 @@ export class WhatsAppSenderService {
   private async resolveProvider(tenantId: string) {
     const instance = await this.instanceService.getInstance(tenantId);
     if (!instance) {
+      AiFlowLogger.error('whatsapp_instance_missing', { tenantId });
       throw new Error(`No WhatsApp instance found for tenant ${tenantId}`);
     }
 
     const provider = await this.providerRegistry.resolveProvider(tenantId);
+
+    AiFlowLogger.flow('whatsapp_provider_resolved', {
+      tenantId,
+      instanceId: instance.evolutionInstanceId ?? instance.instanceName,
+    }, { providerType: provider.providerType });
 
     return { provider, instance };
   }

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { AdminAuthController } from './auth/admin-auth.controller';
 import { AdminAuthService } from './auth/admin-auth.service';
 import { AdminRbacService } from './rbac/admin-rbac.service';
@@ -20,6 +20,8 @@ import { SystemConfigService } from './services/system-config.service';
 import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
 import { AdminModulesModule } from './modules/admin-modules.module';
+import { AiAgentModule } from '../ai-agent/ai-agent.module';
+import { AdminDebugAiAgentController } from '../ai-agent/controllers/admin-debug-ai-agent.controller';
 
 @Module({
   imports: [
@@ -36,7 +38,8 @@ import { AdminModulesModule } from './modules/admin-modules.module';
     AdminAuditLogsController,
     AdminBillingController,
     AdminFranchiseController,
-    AdminIntegrationsController
+    AdminIntegrationsController,
+    AdminDebugAiAgentController,
   ],
   providers: [
     AdminAuthService, 

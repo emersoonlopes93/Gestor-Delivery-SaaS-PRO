@@ -22,6 +22,7 @@ import { AgentToolsService } from './services/agent-tools.service';
 import { AiOrchestratorService } from './services/ai-orchestrator.service';
 
 import { AiAgentController } from './controllers/ai-agent.controller';
+import { AiConfigDiagnosticsService } from './services/ai-config-diagnostics.service';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { AiAgentController } from './controllers/ai-agent.controller';
   ],
   controllers: [AiAgentController],
   providers: [
+    AiConfigDiagnosticsService,
     OpenAiProvider,
     AnthropicProvider,
     GoogleAiProvider,

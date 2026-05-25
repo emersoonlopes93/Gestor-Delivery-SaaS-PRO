@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import axios, { AxiosInstance } from 'axios';
+import axios, { AxiosInstance, isAxiosError } from 'axios';
+import { AiFlowLogger } from '../../common/logging/ai-flow-logger';
+import { normalizeWhatsAppSendNumber } from '../../common/utils/whatsapp-number.util';
 import type {
   IWhatsAppProvider,
   WhatsAppConnectionStatus,
@@ -41,6 +43,23 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       headers: {
         'Content-Type': 'application/json',
         apikey: apiKey,
+      },
+      timeout: 30_000,
+    });
+  }
+
+  /** Cliente com header instanceId — obrigatório em vários endpoints Evolution-Go */
+  private buildInstanceClient(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+  ): AxiosInstance {
+    return axios.create({
+      baseURL: apiUrl.replace(/\/+$/, ''),
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: apiKey,
+        instanceId,
       },
       timeout: 30_000,
     });
@@ -259,13 +278,20 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
   async sendText(
     apiUrl: string,
     apiKey: string,
-    _instanceId: string,
+    instanceId: string,
     input: WhatsAppSendTextInput,
   ): Promise<WhatsAppSendResult> {
-    const client = this.buildClient(apiUrl, apiKey);
+    const client = this.buildInstanceClient(apiUrl, apiKey, instanceId);
+    const number = normalizeWhatsAppSendNumber(input.to);
+
+    AiFlowLogger.flow('evolution_send_start', {
+      instanceId,
+      phone: number,
+    }, { textLength: input.text.length });
+
     try {
       const body: Record<string, unknown> = {
-        number: input.to,
+        number,
         text: input.text,
       };
       if (input.delay) body.delay = input.delay;
@@ -273,17 +299,25 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         body.quoted = { messageId: input.quotedMessageId };
       }
 
-      const { data } = await client.post('/send/text', body);
+      const { data, status } = await client.post('/send/text', body);
       const responseData = (data && typeof data === 'object' && 'data' in data) 
         ? (data as { data: Record<string, unknown> }).data 
         : (data as Record<string, unknown>);
       
+      AiFlowLogger.flow('evolution_send_success', {
+        instanceId,
+        phone: number,
+      }, { status, messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id || '') });
+
       return {
         success: true,
         messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id),
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
+      const status = isAxiosError(error) ? error.response?.status : undefined;
+      const body = isAxiosError(error) ? JSON.stringify(error.response?.data) : undefined;
+      AiFlowLogger.error('evolution_send', { instanceId, phone: number }, { status, body, error: message });
       this.logger.error(`sendText failed: ${message}`);
       return { success: false, error: message };
     }
@@ -392,14 +426,14 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
   async sendPresence(
     apiUrl: string,
     apiKey: string,
-    _instanceId: string,
+    instanceId: string,
     to: string,
     presence: 'composing' | 'recording' | 'paused',
   ): Promise<void> {
-    const client = this.buildClient(apiUrl, apiKey);
+    const client = this.buildInstanceClient(apiUrl, apiKey, instanceId);
     try {
       await client.post('/chat/presence', {
-        number: to,
+        number: normalizeWhatsAppSendNumber(to),
         presence: presence,
       });
     } catch (error: unknown) {
@@ -430,6 +464,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
   parseWebhook(payload: unknown, tenantId: string): WhatsAppWebhookEvent | null {
     if (!payload || typeof payload !== 'object') return null;
     const dataRec = payload as Record<string, unknown>;
+    const baseCtx = this.extractFlowContext(dataRec, tenantId);
     
     // Padrão Evolution-Go: "event" e "data"
     // Tornar insensível a maiúsculas/minúsculas para maior compatibilidade
@@ -442,12 +477,24 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       const message = (data?.Message || data?.message || {}) as Record<string, unknown>;
       
       const remoteJid = String(info?.Sender || info?.Chat || info?.remoteJid || '');
+      const messageId = String(info?.ID || info?.id || '');
+      const ctx = { ...baseCtx, messageId: messageId || baseCtx.messageId, remoteJid, sender: String(info?.Sender || '') };
       
       // Ignorar grupos ou mensagens sem remetente
-      if (!remoteJid || remoteJid.includes('@g.us')) return null;
+      if (!remoteJid) {
+        AiFlowLogger.ignored('missing_remote_jid', ctx);
+        return null;
+      }
+      if (remoteJid.includes('@g.us')) {
+        AiFlowLogger.ignored('group_message', ctx);
+        return null;
+      }
       
       // Ignorar mensagens enviadas pelo próprio bot
-      if (info?.IsFromMe === true || info?.fromMe === true) return null;
+      if (info?.IsFromMe === true || info?.fromMe === true) {
+        AiFlowLogger.ignored('from_me', ctx);
+        return null;
+      }
 
       let content = '';
       if (typeof message.conversation === 'string') content = message.conversation;
@@ -468,7 +515,12 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         }
       }
       
-      if (!content) return null;
+      if (!content) {
+        AiFlowLogger.ignored('empty_text', ctx);
+        return null;
+      }
+
+      AiFlowLogger.flow('parsed_message', ctx, { textLength: content.length, event: eventTypeRaw });
 
       return {
         type: 'message',
@@ -476,7 +528,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         from: remoteJid.replace(/@.*$/, ''),
         content,
         messageType: 'text', // Evolution-Go simplificado
-        externalId: String(info?.ID || info?.id || ''),
+        externalId: messageId,
         raw: payload
       };
     }
@@ -533,9 +585,26 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       };
     }
 
+    AiFlowLogger.ignored('unsupported_event', baseCtx, { event: eventTypeRaw || 'unknown' });
     return null;
   }
 
+  private extractFlowContext(
+    payload: Record<string, unknown>,
+    tenantId: string,
+  ): { tenantId: string; instanceId?: string; messageId?: string; remoteJid?: string; sender?: string } {
+    const data = (payload.data || {}) as Record<string, unknown>;
+    const info = (data?.Info || data?.key || {}) as Record<string, unknown>;
+    const instanceId = typeof payload.instanceId === 'string' ? payload.instanceId : undefined;
+    const messageId = String(info?.ID || info?.id || '');
+    return {
+      tenantId,
+      instanceId,
+      messageId: messageId || undefined,
+      remoteJid: String(info?.Chat || info?.Sender || info?.remoteJid || '') || undefined,
+      sender: String(info?.Sender || '') || undefined,
+    };
+  }
 
   private extractMessageContent(data: Record<string, unknown>): string | null {
     const message = (data?.message || data) as Record<string, unknown>;
