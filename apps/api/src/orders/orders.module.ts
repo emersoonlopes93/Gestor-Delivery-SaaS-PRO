@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { OrdersController } from './orders.controller';
 import { PublicOrdersController } from './public-orders.controller';
@@ -24,11 +24,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
     PromotionsModule,
     CrmModule,
     InventoryModule,
-    DeliveryModule,
+    forwardRef(() => DeliveryModule),
     CatalogModule,
     PaymentGatewayModule,
     SchedulingModule,
-    NotificationsModule,
+    forwardRef(() => NotificationsModule),
   ],
   controllers: [OrdersController, PublicOrdersController],
   providers: [OrdersService, CheckoutValidatorService, OrdersGateway],

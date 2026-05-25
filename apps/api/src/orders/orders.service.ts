@@ -3,6 +3,8 @@ import {
   BadRequestException,
   NotFoundException,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { PaymentTxStatus, OrderStatus, Prisma, DineInTable, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
@@ -58,6 +60,7 @@ export class OrdersService {
     private readonly inventoryService: TheoreticalStockService,
     private readonly paymentGatewayService: PaymentGatewayService,
     private readonly schedulingService: SchedulingService,
+    @Inject(forwardRef(() => WhatsappService))
     private readonly whatsappService: WhatsappService,
     private readonly ordersGateway: OrdersGateway,
   ) {}

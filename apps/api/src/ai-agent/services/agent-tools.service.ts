@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import axios from 'axios';
 import { OrdersService } from '../../orders/orders.service';
 import { DeliveryRateService } from '../../delivery/delivery-rate.service';
@@ -78,13 +78,20 @@ export class AgentToolsService {
   private readonly logger = new Logger('AgentToolsService');
 
   constructor(
+    @Inject(forwardRef(() => OrdersService))
     private readonly ordersService: OrdersService,
+    @Inject(forwardRef(() => DeliveryRateService))
     private readonly deliveryRateService: DeliveryRateService,
     private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => StorefrontService))
     private readonly storefrontService: StorefrontService,
+    @Inject(forwardRef(() => AvailabilityService))
     private readonly availabilityService: AvailabilityService,
+    @Inject(forwardRef(() => CashbackService))
     private readonly cashbackService: CashbackService,
+    @Inject(forwardRef(() => CouponsService))
     private readonly couponsService: CouponsService,
+    @Inject(forwardRef(() => SchedulingService))
     private readonly schedulingService: SchedulingService,
   ) {}
 

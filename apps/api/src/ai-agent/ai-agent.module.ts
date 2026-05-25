@@ -26,12 +26,12 @@ import { AiAgentController } from './controllers/ai-agent.controller';
     DatabaseModule,
     RbacModule,
     forwardRef(() => WhatsAppChannelModule), // para enviar as mensagens de volta
-    CatalogModule,         // para as tools lerem produtos
-    OrdersModule,          // para as tools criarem pedidos
-    StorefrontModule,      // para checkout e validação
-    DeliveryModule,        // para calcular taxas de entrega
-    PromotionsModule,      // para cashback e cupons
-    SchedulingModule,      // para agendamentos
+    forwardRef(() => CatalogModule),         // para as tools lerem produtos
+    forwardRef(() => OrdersModule),          // para as tools criarem pedidos
+    forwardRef(() => StorefrontModule),      // para checkout e validação
+    forwardRef(() => DeliveryModule),        // para calcular taxas de entrega
+    forwardRef(() => PromotionsModule),      // para cashback e cupons
+    forwardRef(() => SchedulingModule),      // para agendamentos
   ],
   controllers: [AiAgentController],
   providers: [
