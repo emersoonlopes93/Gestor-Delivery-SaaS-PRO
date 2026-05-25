@@ -109,10 +109,7 @@ export function WhatsAppConfigPage() {
 
   const connectMutation = useMutation({
     mutationFn: async () => {
-      // No evolution-go, o webhookUrl pode vir da config global, mas enviamos o relativo ao tenant
-      const res = await api.post<WhatsAppStatusResponse>('/whatsapp/instance/connect', { 
-        webhookUrl: `${window.location.origin}/api/webhooks/whatsapp/` 
-      });
+      const res = await api.post<WhatsAppStatusResponse>('/whatsapp/instance/connect', {});
       return res.data;
     },
     onSuccess: (data) => {
@@ -148,9 +145,7 @@ export function WhatsAppConfigPage() {
 
   const generateInstanceMutation = useMutation({
     mutationFn: async () => {
-      await api.post('/whatsapp/instance', {
-        webhookUrl: `${window.location.origin}/api/webhooks/whatsapp/`
-      });
+      await api.post('/whatsapp/instance', {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp-instance'] });
