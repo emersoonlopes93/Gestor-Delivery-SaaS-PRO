@@ -15,14 +15,14 @@ import type { WhatsAppWebhookEvent } from '../interfaces/whatsapp-provider.inter
 import { WhatsAppInstanceStatus } from '@prisma/client';
 import { AiOrchestratorService } from '../../ai-agent/services/ai-orchestrator.service';
 import { AiFlowLogger, createAiTrace } from '../../common/logging/ai-flow-logger';
+import {
+  isInboundMessageWebhookEvent,
+  isNonActionableWebhookEvent,
+} from '../../common/utils/whatsapp-presence.util';
 
 
 /**
  * Controller que recebe webhooks do Evolution Go.
- *
- * Rota pública (sem auth guard) para receber callbacks.
- * A URL configurada na Evolution Go deve ser:
- * {PUBLIC_API_URL}/api/v1/whatsapp/evolution/webhook?secret={SECRET}
  */
 @Controller('whatsapp/evolution')
 export class WhatsAppWebhookController {
@@ -61,13 +61,26 @@ export class WhatsAppWebhookController {
       typeof payload.instanceId === 'string' ? payload.instanceId : '';
 
     const trace = createAiTrace();
-    AiFlowLogger.flow('received_webhook', {
-      traceId: trace.traceId,
-      instanceId: instanceIdFromPayload || undefined,
-    }, {
-      event: eventName || 'unknown',
-      instanceName: instanceNameFromPayload || undefined,
-    });
+
+    if (isNonActionableWebhookEvent(eventName)) {
+      AiFlowLogger.debug('webhook_non_actionable', {
+        traceId: trace.traceId,
+        instanceId: instanceIdFromPayload || undefined,
+      }, { event: eventName || 'unknown' });
+      return { received: true, processed: false };
+    }
+
+    if (isInboundMessageWebhookEvent(eventName)) {
+      AiFlowLogger.flow('received_webhook', {
+        traceId: trace.traceId,
+        instanceId: instanceIdFromPayload || undefined,
+      }, { event: eventName });
+    } else {
+      AiFlowLogger.debug('received_webhook', {
+        traceId: trace.traceId,
+        instanceId: instanceIdFromPayload || undefined,
+      }, { event: eventName || 'unknown' });
+    }
 
     const instanceId = instanceIdFromPayload;
 
@@ -77,7 +90,7 @@ export class WhatsAppWebhookController {
         AiFlowLogger.ignored('missing_instance_identifier', {
           traceId: trace.traceId,
         });
-        this.logger.warn('Webhook received without instance identifier (instanceId or instance name)');
+        this.logger.warn('Webhook received without instance identifier');
         return { received: true, processed: false, error: 'Instance identifier missing' };
       }
       return this.processByInstanceName(
@@ -99,7 +112,6 @@ export class WhatsAppWebhookController {
           traceId: trace.traceId,
           instanceId,
         });
-        this.logger.warn(`No instance found for evolutionInstanceId: ${instanceId}`);
         return { received: true, processed: false, error: 'Instance not found' };
       }
 
@@ -112,31 +124,40 @@ export class WhatsAppWebhookController {
       const providedSecret = webhookSecretHeader || webhookSecretQuery;
       if (instance.webhookSecret && instance.webhookSecret !== providedSecret) {
         AiFlowLogger.ignored('invalid_webhook_secret', trace);
-        this.logger.warn(`Invalid webhook secret for tenant ${tenantId}`);
         return { received: true, processed: false, error: 'Invalid secret' };
       }
 
       const provider = this.providerRegistry.getProvider(instance.providerType);
-
       const event = provider.parseWebhook(payload, tenantId);
+
       if (!event) {
-        AiFlowLogger.ignored('event_not_parsed', trace, { event: eventName });
+        if (isInboundMessageWebhookEvent(eventName)) {
+          AiFlowLogger.ignored('message_parse_failed', trace, { event: eventName });
+        } else {
+          AiFlowLogger.debug('event_not_parsed', trace, { event: eventName });
+        }
         return { received: true, processed: false };
       }
 
-      switch (event.type) {
-        case 'message':
-          await this.handleNormalizedMessage(event, trace);
-          break;
-        case 'connection':
-          await this.handleNormalizedConnection(event);
-          break;
-        case 'ack':
-          await this.handleNormalizedAck(event);
-          break;
+      if (event.type !== 'message') {
+        AiFlowLogger.debug('webhook_non_message_event', trace, {
+          event: eventName,
+          normalizedType: event.type,
+        });
+        switch (event.type) {
+          case 'connection':
+            await this.handleNormalizedConnection(event);
+            break;
+          case 'ack':
+            await this.handleNormalizedAck(event);
+            break;
+        }
+        return { received: true, processed: true };
       }
 
-      AiFlowLogger.flow('webhook_processed', trace, { eventType: event.type });
+      await this.handleNormalizedMessage(event, trace);
+
+      AiFlowLogger.flow('webhook_message_flow_complete', trace);
       return { received: true, processed: true };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -166,7 +187,6 @@ export class WhatsAppWebhookController {
 
     if (!instance) {
       AiFlowLogger.ignored('instance_not_found', flowTrace, { instanceName });
-      this.logger.warn(`No instance found for instance name: ${instanceName}`);
       return { received: true, processed: false, error: 'Instance not found' };
     }
 
@@ -182,22 +202,12 @@ export class WhatsAppWebhookController {
 
     const provider = this.providerRegistry.getProvider(instance.providerType);
     const event = provider.parseWebhook(payload, instance.tenantId);
-    if (!event) {
-      AiFlowLogger.ignored('event_not_parsed', flowTrace);
+    if (!event || event.type !== 'message') {
+      AiFlowLogger.debug('event_not_parsed_or_not_message', flowTrace);
       return { received: true, processed: false };
     }
 
-    switch (event.type) {
-      case 'message':
-        await this.handleNormalizedMessage(event, flowTrace);
-        break;
-      case 'connection':
-        await this.handleNormalizedConnection(event);
-        break;
-      case 'ack':
-        await this.handleNormalizedAck(event);
-        break;
-    }
+    await this.handleNormalizedMessage(event, flowTrace);
     return { received: true, processed: true };
   }
 
@@ -205,13 +215,22 @@ export class WhatsAppWebhookController {
     event: WhatsAppWebhookEvent,
     trace: ReturnType<typeof createAiTrace>,
   ) {
-    const { tenantId, from: phone, content, messageType, externalId } = event;
+    const { tenantId, from: phone, content, messageType, externalId, chatJid } = event;
     trace.tenantId = tenantId;
     trace.phone = phone;
+    trace.chatJid = chatJid;
     if (externalId) trace.messageId = externalId;
 
+    AiFlowLogger.flow('handle_message_start', trace, {
+      hasChatJid: Boolean(chatJid),
+      textLength: content?.length ?? 0,
+    });
+
     if (!phone || !content) {
-      AiFlowLogger.ignored('missing_phone_or_content', trace);
+      AiFlowLogger.ignored('missing_phone_or_content', trace, {
+        hasPhone: Boolean(phone),
+        hasContent: Boolean(content),
+      });
       return;
     }
 
@@ -229,45 +248,63 @@ export class WhatsAppWebhookController {
       AiFlowLogger.flow('dedup_skipped_no_external_id', trace);
     }
 
-    const session = await this.prisma.chatSession.upsert({
-      where: {
-        tenantId_customerPhone: { tenantId, customerPhone: phone },
-      },
-      create: {
-        tenantId,
-        customerPhone: phone,
-        state: 'greeting',
-        lastMessageAt: new Date(),
-      },
-      update: {
-        lastMessageAt: new Date(),
-        closedAt: null,
-      },
-    });
+    AiFlowLogger.flow('message_persist_start', trace);
 
-    await this.prisma.chatMessage.create({
-      data: {
-        sessionId: session.id,
-        direction: 'inbound',
-        content,
-        messageType: messageType || 'text',
-        externalId: externalId || undefined,
-      },
-    });
-
-    AiFlowLogger.flow('message_persisted', trace, {
-      sessionId: session.id,
-      messageType: messageType || 'text',
-      textLength: content.length,
-    });
-
-    this.aiOrchestrator
-      .handleInboundMessage(tenantId, phone, content, trace)
-      .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : 'Unknown error';
-        AiFlowLogger.error('orchestrator_dispatch', trace, { error: msg });
-        this.logger.error(`AI Orchestrator failed for ${phone}: ${msg}`);
+    try {
+      const session = await this.prisma.chatSession.upsert({
+        where: {
+          tenantId_customerPhone: { tenantId, customerPhone: phone },
+        },
+        create: {
+          tenantId,
+          customerPhone: phone,
+          state: 'greeting',
+          lastMessageAt: new Date(),
+        },
+        update: {
+          lastMessageAt: new Date(),
+          closedAt: null,
+        },
       });
+
+      if (session.handoffActive) {
+        AiFlowLogger.ignored('human_handoff', trace, { sessionId: session.id });
+        return;
+      }
+
+      await this.prisma.chatMessage.create({
+        data: {
+          sessionId: session.id,
+          direction: 'inbound',
+          content,
+          messageType: messageType || 'text',
+          externalId: externalId || undefined,
+        },
+      });
+
+      AiFlowLogger.flow('message_persist_success', trace, {
+        sessionId: session.id,
+        messageType: messageType || 'text',
+        textLength: content.length,
+      });
+
+      AiFlowLogger.flow('orchestrator_dispatch_start', trace);
+
+      void this.aiOrchestrator
+        .handleInboundMessage(tenantId, phone, content, trace, chatJid)
+        .then(() => {
+          AiFlowLogger.flow('orchestrator_dispatch_done', trace);
+        })
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          AiFlowLogger.error('orchestrator_dispatch', trace, { error: msg });
+          this.logger.error(`AI Orchestrator failed for ${phone}: ${msg}`);
+        });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      AiFlowLogger.error('message_persist', trace, { error: msg });
+      throw error;
+    }
   }
 
   private async handleNormalizedConnection(event: WhatsAppWebhookEvent) {
@@ -286,7 +323,7 @@ export class WhatsAppWebhookController {
           phoneNumber: phoneNumber || instance.phoneNumber,
         },
       });
-      this.logger.log(`Connection updated for ${tenantId}: ${state}`);
+      this.logger.debug(`Connection updated for ${tenantId}: ${state}`);
     }
   }
 

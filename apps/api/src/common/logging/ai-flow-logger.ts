@@ -9,6 +9,7 @@ export interface AiFlowContext {
   remoteJid?: string;
   sender?: string;
   phone?: string;
+  chatJid?: string;
 }
 
 type FlowFieldValue = string | number | boolean | undefined;
@@ -22,6 +23,11 @@ export class AiFlowLogger {
 
   static flow(step: string, ctx: AiFlowContext, extra?: Record<string, FlowFieldValue>): void {
     this.logger.log(this.format('[AI_FLOW]', step, ctx, extra));
+  }
+
+  /** Eventos não acionáveis (Receipt, ChatPresence) — não poluir produção */
+  static debug(step: string, ctx: AiFlowContext, extra?: Record<string, FlowFieldValue>): void {
+    this.logger.debug(this.format('[AI_FLOW]', step, ctx, extra));
   }
 
   static ignored(reason: string, ctx: AiFlowContext, extra?: Record<string, FlowFieldValue>): void {
@@ -81,6 +87,7 @@ export class AiFlowLogger {
     if (ctx.remoteJid) fields.push(`remoteJid=${ctx.remoteJid}`);
     if (ctx.sender) fields.push(`sender=${ctx.sender}`);
     if (ctx.phone) fields.push(`phone=${ctx.phone}`);
+    if (ctx.chatJid) fields.push(`chatJid=${ctx.chatJid}`);
 
     if (extra) {
       for (const [key, value] of Object.entries(extra)) {

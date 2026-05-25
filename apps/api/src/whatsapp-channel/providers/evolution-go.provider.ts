@@ -2,6 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosInstance, isAxiosError } from 'axios';
 import { AiFlowLogger } from '../../common/logging/ai-flow-logger';
 import { normalizeWhatsAppSendNumber } from '../../common/utils/whatsapp-number.util';
+import {
+  isNonActionableWebhookEvent,
+  resolveWhatsAppPresenceTarget,
+  summarizeHttpBody,
+} from '../../common/utils/whatsapp-presence.util';
 import type {
   IWhatsAppProvider,
   WhatsAppConnectionStatus,
@@ -430,34 +435,36 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     instanceId: string,
     to: string,
     presence: 'composing' | 'recording' | 'paused',
-  ): Promise<void> {
+  ): Promise<{ success: boolean; status?: number; bodySummary?: string }> {
     const client = this.buildInstanceClient(apiUrl, apiKey, instanceId);
-    const number = normalizeWhatsAppSendNumber(to);
+    const number = to.includes('@')
+      ? to
+      : normalizeWhatsAppSendNumber(to);
 
-    const state =
-      presence === 'paused'
-        ? 'paused'
-        : 'composing';
+    const state = presence === 'paused' ? 'paused' : 'composing';
     const isAudio = presence === 'recording';
 
     try {
-      await client.post('/message/presence', {
+      const response = await client.post('/message/presence', {
         number,
         state,
         isAudio,
       });
+      return {
+        success: true,
+        status: response.status,
+        bodySummary: summarizeHttpBody(response.data),
+      };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       const status = isAxiosError(error) ? error.response?.status : undefined;
-      const body = isAxiosError(error)
-        ? JSON.stringify(error.response?.data)
+      const bodySummary = isAxiosError(error)
+        ? summarizeHttpBody(error.response?.data)
         : undefined;
       this.logger.warn(
         `sendPresence failed (Evolution-Go /message/presence): ${message} status=${status ?? 'n/a'}`,
       );
-      if (body) {
-        this.logger.warn(`sendPresence response body: ${body}`);
-      }
+      return { success: false, status, bodySummary };
     }
   }
 
@@ -489,15 +496,27 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     // Tornar insensível a maiúsculas/minúsculas para maior compatibilidade
     const eventTypeRaw = String(dataRec.event || '');
     const eventType = eventTypeRaw.toLowerCase();
+
+    if (isNonActionableWebhookEvent(eventTypeRaw)) {
+      AiFlowLogger.debug('webhook_event_skip', baseCtx, { event: eventTypeRaw });
+      return null;
+    }
     
     if (eventType === 'message') {
       const data = (dataRec.data || {}) as Record<string, unknown>;
       const info = (data?.Info || data?.key || {}) as Record<string, unknown>;
       const message = (data?.Message || data?.message || {}) as Record<string, unknown>;
       
-      const remoteJid = String(info?.Sender || info?.Chat || info?.remoteJid || '');
+      const chatJid = String(info?.Chat || info?.Sender || info?.remoteJid || '');
+      const remoteJid = chatJid;
       const messageId = String(info?.ID || info?.id || '');
-      const ctx = { ...baseCtx, messageId: messageId || baseCtx.messageId, remoteJid, sender: String(info?.Sender || '') };
+      const ctx = {
+        ...baseCtx,
+        messageId: messageId || baseCtx.messageId,
+        remoteJid,
+        chatJid: chatJid.includes('@') ? chatJid : undefined,
+        sender: String(info?.Sender || ''),
+      };
       
       // Ignorar grupos ou mensagens sem remetente
       if (!remoteJid) {
@@ -545,10 +564,11 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         type: 'message',
         tenantId,
         from: remoteJid.replace(/@.*$/, ''),
+        chatJid: chatJid.includes('@') ? chatJid : undefined,
         content,
-        messageType: 'text', // Evolution-Go simplificado
+        messageType: 'text',
         externalId: messageId,
-        raw: payload
+        raw: payload,
       };
     }
 
@@ -604,7 +624,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       };
     }
 
-    AiFlowLogger.ignored('unsupported_event', baseCtx, { event: eventTypeRaw || 'unknown' });
+    AiFlowLogger.debug('unsupported_event', baseCtx, { event: eventTypeRaw || 'unknown' });
     return null;
   }
 

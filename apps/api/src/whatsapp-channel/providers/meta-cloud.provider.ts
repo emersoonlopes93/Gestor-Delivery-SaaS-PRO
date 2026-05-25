@@ -249,9 +249,10 @@ export class MetaCloudProvider implements IWhatsAppProvider {
     _instanceId: string,
     _to: string,
     _presence: 'composing' | 'recording' | 'paused',
-  ): Promise<void> {
+  ): Promise<{ success: boolean; status?: number; bodySummary?: string }> {
     // Meta Cloud API não suporta simulação de digitação via Graph API comum
     this.logger.debug('sendPresence not supported for Meta Cloud Provider');
+    return { success: false, bodySummary: 'not_supported' };
   }
 
   async markAsRead(

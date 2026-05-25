@@ -8,6 +8,7 @@ import { AdminModulesService } from '../../admin/modules/admin-modules.service';
 import type { AiMessage } from '../interfaces/ai-provider.interface';
 import { AiFlowLogger, createAiTrace, type AiFlowContext } from '../../common/logging/ai-flow-logger';
 import { shouldSimulateTyping } from '../utils/simulate-typing.util';
+import { getTypingDelayMs } from '../../common/utils/whatsapp-presence.util';
 
 import { PrismaService } from '../../database/prisma.service';
 
@@ -32,6 +33,8 @@ export interface AiDebugTestResult {
 export class AiOrchestratorService {
   private readonly logger = new Logger('AiOrchestratorService');
   private readonly debounceTimers = new Map<string, NodeJS.Timeout>();
+  /** Momento em que composing foi enviado (para delay mínimo visível no WhatsApp) */
+  private readonly typingStartedAt = new Map<string, number>();
 
   constructor(
     private readonly configService: AiAgentConfigService,
@@ -52,10 +55,12 @@ export class AiOrchestratorService {
     customerPhone: string,
     content: string,
     trace?: AiFlowContext,
+    chatJid?: string,
   ): Promise<void> {
     const flowTrace = trace ?? createAiTrace();
     flowTrace.tenantId = tenantId;
     flowTrace.phone = customerPhone;
+    if (chatJid) flowTrace.chatJid = chatJid;
 
     AiFlowLogger.flow('orchestrator_inbound_start', flowTrace, {
       textLength: content.length,
@@ -700,7 +705,44 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
       return;
     }
 
-    await this.whatsappSender.sendPresence(tenantId, customerPhone, state);
+    await this.whatsappSender.sendPresence(
+      tenantId,
+      customerPhone,
+      state,
+      trace,
+    );
+
+    if (state === 'composing') {
+      const key = `${tenantId}:${customerPhone}`;
+      this.typingStartedAt.set(key, Date.now());
+    }
+  }
+
+  /** Aguarda tempo mínimo de "digitando..." antes de enviar texto */
+  private async ensureTypingMinDelay(
+    tenantId: string,
+    customerPhone: string,
+    trace: AiFlowContext,
+    tenantSimulateTyping: boolean,
+  ): Promise<void> {
+    if (!shouldSimulateTyping(tenantSimulateTyping)) {
+      return;
+    }
+
+    const key = `${tenantId}:${customerPhone}`;
+    const started = this.typingStartedAt.get(key);
+    if (!started) return;
+
+    const minDelay = getTypingDelayMs();
+    const elapsed = Date.now() - started;
+    const waitMs = minDelay - elapsed;
+
+    if (waitMs > 0) {
+      AiFlowLogger.flow('typing_delay_wait', trace, { waitMs, minDelayMs: minDelay });
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+    }
+
+    this.typingStartedAt.delete(key);
   }
 
   private async sendFinalResponse(
@@ -711,6 +753,13 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
     trace: AiFlowContext,
     tenantSimulateTyping = false,
   ): Promise<void> {
+    await this.ensureTypingMinDelay(
+      tenantId,
+      customerPhone,
+      trace,
+      tenantSimulateTyping,
+    );
+
     AiFlowLogger.flow('whatsapp_send_start', trace, {
       textLength: content.length,
     });

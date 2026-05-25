@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { AiFlowLogger } from '../../common/logging/ai-flow-logger';
+import { AiFlowLogger, type AiFlowContext } from '../../common/logging/ai-flow-logger';
+import { resolveWhatsAppPresenceTarget } from '../../common/utils/whatsapp-presence.util';
 import { WhatsAppInstanceService } from './whatsapp-instance.service';
 import { WhatsAppProviderRegistryService } from './whatsapp-provider-registry.service';
 import type {
@@ -13,9 +14,6 @@ import type {
 /**
  * Facade de envio de mensagens WhatsApp.
  * Resolve automaticamente o provider correto baseado na instância do tenant.
- *
- * NOTA: Este serviço NÃO contém regra de negócio.
- * Ele é uma camada de conveniência sobre o provider.
  */
 @Injectable()
 export class WhatsAppSenderService {
@@ -26,9 +24,6 @@ export class WhatsAppSenderService {
     private readonly providerRegistry: WhatsAppProviderRegistryService,
   ) {}
 
-  /**
-   * Envia texto para um número via instância do tenant
-   */
   async sendText(
     tenantId: string,
     input: WhatsAppSendTextInput,
@@ -43,9 +38,6 @@ export class WhatsAppSenderService {
     );
   }
 
-  /**
-   * Envia mídia para um número via instância do tenant
-   */
   async sendMedia(
     tenantId: string,
     input: WhatsAppSendMediaInput,
@@ -60,9 +52,6 @@ export class WhatsAppSenderService {
     );
   }
 
-  /**
-   * Envia lista interativa para um número via instância do tenant
-   */
   async sendList(
     tenantId: string,
     input: WhatsAppSendListInput,
@@ -77,9 +66,6 @@ export class WhatsAppSenderService {
     );
   }
 
-  /**
-   * Envia botões de resposta rápida para um número via instância do tenant
-   */
   async sendButtons(
     tenantId: string,
     input: WhatsAppSendButtonInput,
@@ -101,13 +87,22 @@ export class WhatsAppSenderService {
     tenantId: string,
     to: string,
     presence: 'composing' | 'recording' | 'paused',
+    trace?: AiFlowContext,
   ): Promise<void> {
-    const ctx: { tenantId: string; phone: string; instanceId?: string } = {
+    const presenceTarget = resolveWhatsAppPresenceTarget(trace?.chatJid, to);
+    const ctx: AiFlowContext = {
       tenantId,
       phone: to,
+      chatJid: trace?.chatJid,
+      messageId: trace?.messageId,
+      traceId: trace?.traceId,
+      instanceId: trace?.instanceId,
     };
 
-    AiFlowLogger.flow('typing_presence_start', ctx, { state: presence });
+    AiFlowLogger.flow('typing_presence_start', ctx, {
+      state: presence,
+      destination: presenceTarget,
+    });
 
     try {
       const { provider, instance } = await this.resolveProvider(tenantId);
@@ -116,27 +111,40 @@ export class WhatsAppSenderService {
 
       ctx.instanceId = instanceId;
 
-      await provider.sendPresence(
+      const result = await provider.sendPresence(
         instance.apiUrl,
         instance.apiKey,
         instanceId,
-        to,
+        presenceTarget,
         presence,
       );
 
-      AiFlowLogger.flow('typing_presence_success', ctx, { state: presence });
+      if (result.success) {
+        AiFlowLogger.flow('typing_presence_success', ctx, {
+          state: presence,
+          status: result.status,
+          body: result.bodySummary,
+          destination: presenceTarget,
+        });
+      } else {
+        AiFlowLogger.warn('typing_presence_failed', ctx, {
+          state: presence,
+          status: result.status,
+          body: result.bodySummary,
+          destination: presenceTarget,
+          note: 'best_effort_whatsapp_may_still_hide_typing',
+        });
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       AiFlowLogger.warn('typing_presence_failed', ctx, {
         state: presence,
         error: message,
+        destination: presenceTarget,
       });
     }
   }
 
-  /**
-   * Marca mensagens como lidas
-   */
   async markAsRead(
     tenantId: string,
     chatId: string,
@@ -153,9 +161,6 @@ export class WhatsAppSenderService {
     );
   }
 
-  /**
-   * Resolve o provider e instância para um tenant
-   */
   private async resolveProvider(tenantId: string) {
     const instance = await this.instanceService.getInstance(tenantId);
     if (!instance) {

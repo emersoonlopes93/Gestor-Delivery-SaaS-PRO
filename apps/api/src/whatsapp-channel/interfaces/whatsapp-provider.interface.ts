@@ -86,6 +86,8 @@ export interface WhatsAppWebhookEvent {
   type: 'message' | 'connection' | 'ack' | 'other';
   tenantId: string;
   from?: string;
+  /** JID completo do chat (ex: 5513...@s.whatsapp.net) — preferir para presença */
+  chatJid?: string;
   content?: string;
   messageType?: string;
   externalId?: string;
@@ -208,7 +210,7 @@ export interface IWhatsAppProvider {
     instanceId: string,
     to: string,
     presence: 'composing' | 'recording' | 'paused',
-  ): Promise<void>;
+  ): Promise<{ success: boolean; status?: number; bodySummary?: string }>;
 
   /**
    * Marca mensagens como lidas
