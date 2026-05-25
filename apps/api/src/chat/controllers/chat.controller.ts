@@ -141,6 +141,15 @@ export class ChatController {
     });
   }
 
+  @Get('sessions/:id')
+  @Permissions('orders.read')
+  async getSession(@Request() req: TenantRequest, @Param('id') sessionId: string) {
+    const session = await this.prisma.chatSession.findFirst({
+      where: { id: sessionId, tenantId: req.user.tenantId },
+    });
+    return session;
+  }
+
   @Get('sessions/:id/messages')
   @Permissions('orders.read')
   async getMessages(@Param('id') sessionId: string) {

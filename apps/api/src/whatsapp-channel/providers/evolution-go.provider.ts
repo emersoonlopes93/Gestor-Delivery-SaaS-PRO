@@ -144,11 +144,21 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
   async disconnect(
     apiUrl: string,
     apiKey: string,
-    _instanceId: string,
+    instanceId: string,
   ): Promise<void> {
-    const client = this.buildClient(apiUrl, apiKey);
+    const client = axios.create({
+      baseURL: apiUrl.replace(/\/+$/, ''),
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: apiKey,
+        instanceId,
+      },
+      timeout: 30_000,
+    });
     try {
-      await client.post('/instance/disconnect');
+      const { data } = await client.post('/instance/disconnect');
+      const dataRec = data as Record<string, unknown>;
+      this.logger.log(`Disconnect response from Evolution Go: ${JSON.stringify(dataRec)}`);
       this.logger.log('Instance disconnected');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';

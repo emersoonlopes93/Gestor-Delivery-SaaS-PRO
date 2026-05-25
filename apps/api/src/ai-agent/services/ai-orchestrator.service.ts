@@ -38,13 +38,13 @@ export class AiOrchestratorService {
     // 1. Verificar se o tenant tem acesso ao módulo de IA
     const hasModuleAccess = await this.adminModulesService.hasModuleAccess(tenantId, 'ai_agent');
     if (!hasModuleAccess) {
-      this.logger.debug(`Tenant ${tenantId} does not have access to ai_agent module. Skipping.`);
+      this.logger.log(`AI Agent skipped: tenant ${tenantId} has no module access (ai_agent).`);
       return;
     }
 
     const config = await this.configService.getConfig(tenantId);
     if (!config.isEnabled) {
-      this.logger.debug(`Agent is disabled for tenant ${tenantId}. Ignoring.`);
+      this.logger.log(`AI Agent skipped: tenant ${tenantId} is disabled (isEnabled=false).`);
       return;
     }
 
@@ -380,10 +380,13 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
 
   private async sendFinalResponse(tenantId: string, sessionId: string, customerPhone: string, content: string) {
     // 1. Envia via WhatsApp Channel
-    await this.whatsappSender.sendText(tenantId, {
+    const result = await this.whatsappSender.sendText(tenantId, {
       to: customerPhone,
       text: content,
     });
+    if (!result.success) {
+      throw new Error(result.error || 'WhatsApp send failed');
+    }
 
     // 2. Salva no banco
     if (sessionId !== 'error-fallback') {
