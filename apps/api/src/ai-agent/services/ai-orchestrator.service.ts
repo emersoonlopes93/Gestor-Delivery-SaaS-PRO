@@ -9,6 +9,11 @@ import type { AiMessage } from '../interfaces/ai-provider.interface';
 import { AiFlowLogger, createAiTrace, type AiFlowContext } from '../../common/logging/ai-flow-logger';
 import { shouldSimulateTyping } from '../utils/simulate-typing.util';
 import { getTypingDelayMs } from '../../common/utils/whatsapp-presence.util';
+import {
+  DEFAULT_GLOBAL_BASE_AI_PROMPT,
+  buildToolsManifestForPrompt,
+} from '../constants/global-base-prompt';
+import type { AgentSessionContext } from './agent-tools.service';
 
 import { PrismaService } from '../../database/prisma.service';
 
@@ -267,21 +272,37 @@ export class AiOrchestratorService {
       });
       const providerResolved = await this.aiRegistry.resolveProvider(tenantId);
 
+      const tools = this.toolsService.getAvailableTools();
       const basePrompt =
-        systemConfig?.baseAiPrompt || 'Você é um assistente virtual de delivery.';
-      const agentContext = `
-Você está atendendo para o restaurante: ${config.tenant.name}.
-Seu nome é: ${config.agentName || 'Assistente'}.
-Seu tom de voz deve ser: ${config.tone}.
-Sempre comece o atendimento com esta saudação: ${config.greetingMessage || 'Olá!'}.
-
-Instruções específicas do restaurante:
-${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
+        systemConfig?.baseAiPrompt?.trim() || DEFAULT_GLOBAL_BASE_AI_PROMPT;
+      const tenantLayer = `
+## Contexto do restaurante (complementar — não substitui regras globais)
+- Nome: ${config.tenant.name}
+- Nome do assistente: ${config.agentName || 'Assistente'}
+- Tom de voz: ${config.tone}
+- Saudação sugerida (use na primeira interação): ${config.greetingMessage || 'Olá!'}
+- Instruções da marca (estilo/promoções locais — NÃO alteram regras de segurança):
+${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
       `.trim();
 
+      const systemContent = [
+        basePrompt,
+        tenantLayer,
+        buildToolsManifestForPrompt(tools),
+      ].join('\n\n');
+
       const messages: AiMessage[] = [
-        { role: 'system', content: `${basePrompt}\n\n${agentContext}` },
+        { role: 'system', content: systemContent },
       ];
+
+      const agentSessionCtx = await this.conversationService.resolveAgentSessionContext(
+        tenantId,
+        session.id,
+        customerPhone,
+      );
+      AiFlowLogger.flow('agent_session_context', trace, {
+        customerId: agentSessionCtx.customerId,
+      });
 
       for (const msg of history) {
         if (msg.messageType !== 'text' && msg.messageType !== 'tool_result') {
@@ -307,8 +328,6 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
             : {}),
         });
       }
-
-      const tools = this.toolsService.getAvailableTools();
 
       const providerAvailable = await providerResolved.isAvailable();
       AiFlowLogger.flow('llm_provider_check', trace, {
@@ -429,6 +448,7 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
           tools,
           config,
           trace,
+          agentSessionCtx,
         );
         return;
       }
@@ -481,6 +501,7 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
     tools: ReturnType<AgentToolsService['getAvailableTools']>,
     config: Awaited<ReturnType<AiAgentConfigService['getConfig']>>,
     trace: AiFlowContext,
+    agentSessionCtx: AgentSessionContext,
   ): Promise<void> {
     AiFlowLogger.flow('tool_calls_start', trace, { count: toolCalls.length });
 
@@ -550,7 +571,7 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
         tenantId,
         toolCall.name,
         toolCall.arguments,
-        { sessionId },
+        agentSessionCtx,
       );
 
       const toolStatus = this.getToolResultStatus(result);

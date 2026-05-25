@@ -472,8 +472,28 @@ export class AgentToolsService {
   }
 
   private async executeCriarPedido(tenantId: string, args: z.infer<typeof CriarPedidoSchema>, sessionContext?: AgentSessionContext) {
-    if (!sessionContext?.customerId) {
-      return { status: 'error', message: 'Cliente não identificado no sistema. Necessário cadastro prévio.' };
+    let ctx = sessionContext;
+    if (!ctx?.customerId && ctx?.customerPhone) {
+      const cleanPhone = ctx.customerPhone.replace(/\D/g, '');
+      const customer = await this.prisma.customer.upsert({
+        where: { tenantId_phone: { tenantId, phone: cleanPhone } },
+        create: { tenantId, phone: cleanPhone, name: ctx.customerName || 'Cliente WhatsApp' },
+        update: { name: ctx.customerName || undefined },
+        select: { id: true, name: true, phone: true },
+      });
+      ctx = {
+        ...ctx,
+        customerId: customer.id,
+        customerName: customer.name,
+        customerPhone: customer.phone,
+      };
+    }
+    if (!ctx?.customerId) {
+      return {
+        status: 'error',
+        code: 'CUSTOMER_NOT_IDENTIFIED',
+        message: 'Cliente não identificado. Confirme o telefone ou transfira para atendente.',
+      };
     }
 
     try {
@@ -488,8 +508,8 @@ export class AgentToolsService {
           quantity: i.quantity,
           notes: i.notes,
         })),
-        customerName: sessionContext?.customerName || 'Cliente WhatsApp',
-        customerPhone: sessionContext?.customerPhone || '00000000000',
+        customerName: ctx.customerName || 'Cliente WhatsApp',
+        customerPhone: ctx.customerPhone || '00000000000',
         fulfillmentType: 'delivery',
         deliveryAddress: {
           street: args.endereco.street,

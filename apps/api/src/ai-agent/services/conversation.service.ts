@@ -3,6 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { ChatState, MessageDirection } from '@prisma/client';
 
 import { Prisma } from '@prisma/client';
+import type { AgentSessionContext } from './agent-tools.service';
 
 export interface CreateMessageDto {
   sessionId: string;
@@ -28,6 +29,36 @@ export class ConversationService {
   private readonly logger = new Logger('ConversationService');
 
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Vincula telefone WhatsApp ao Customer do tenant (necessário para pedidos, status, fidelidade).
+   */
+  async resolveAgentSessionContext(
+    tenantId: string,
+    sessionId: string,
+    customerPhone: string,
+  ): Promise<AgentSessionContext> {
+    const cleanPhone = customerPhone.replace(/\D/g, '');
+    const customer = await this.prisma.customer.upsert({
+      where: {
+        tenantId_phone: { tenantId, phone: cleanPhone },
+      },
+      create: {
+        tenantId,
+        phone: cleanPhone,
+        name: 'Cliente WhatsApp',
+      },
+      update: {},
+      select: { id: true, name: true, phone: true },
+    });
+
+    return {
+      sessionId,
+      customerId: customer.id,
+      customerPhone: customer.phone,
+      customerName: customer.name,
+    };
+  }
 
   /**
    * Encontra a sessão ativa ou cria uma nova.
