@@ -98,19 +98,14 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       this.logger.debug(`Connecting instance ${instanceId} with webhook: ${input.webhookUrl}`);
       
       // Tentar obter QR primeiro (opcional mas útil para o fluxo)
+      let preQrCode: string | undefined;
       try {
         const qrResponse = await client.get('/instance/qr');
         const data = qrResponse.data as Record<string, unknown>;
         const qrData = (data?.data || data) as Record<string, unknown>;
         const qrCode = (qrData?.qrCode || qrData?.qr || qrData?.base64 || qrData?.Qrcode) as string | undefined;
         
-        if (qrCode) {
-          return {
-            connected: false,
-            state: 'qr_pending',
-            qrCode: qrCode,
-          };
-        }
+        preQrCode = qrCode;
       } catch (qrError: unknown) {
         const message = qrError instanceof Error ? qrError.message : 'Unknown error';
         this.logger.warn(`Failed to get QR code first: ${message}`);
@@ -130,7 +125,17 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       
       this.logger.log(`Webhook configuration response from Evolution Go: ${JSON.stringify(dataRec)}`);
       
-      return this.parseConnectionStatus((dataRec?.data || dataRec) as Record<string, unknown>);
+      const parsed = this.parseConnectionStatus((dataRec?.data || dataRec) as Record<string, unknown>);
+      if (!parsed.qrCode && preQrCode) {
+        return {
+          ...parsed,
+          connected: false,
+          state: 'qr_pending',
+          qrCode: preQrCode,
+        };
+      }
+
+      return parsed;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`connect failed: ${message}`);
@@ -419,22 +424,42 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     const dataRec = payload as Record<string, unknown>;
     
     // Padrão Evolution-Go: "event" e "data"
-    const eventType = String(dataRec.event || '');
+    // Tornar insensível a maiúsculas/minúsculas para maior compatibilidade
+    const eventTypeRaw = String(dataRec.event || '');
+    const eventType = eventTypeRaw.toLowerCase();
     
-    if (eventType === 'Message') {
+    if (eventType === 'message') {
       const data = (dataRec.data || {}) as Record<string, unknown>;
-      const info = (data?.Info || {}) as Record<string, unknown>;
-      const message = (data?.Message || {}) as Record<string, unknown>;
+      const info = (data?.Info || data?.key || {}) as Record<string, unknown>;
+      const message = (data?.Message || data?.message || {}) as Record<string, unknown>;
       
-      const remoteJid = String(info?.Sender || info?.Chat || '');
+      const remoteJid = String(info?.Sender || info?.Chat || info?.remoteJid || '');
       
       // Ignorar grupos ou mensagens sem remetente
       if (!remoteJid || remoteJid.includes('@g.us')) return null;
       
       // Ignorar mensagens enviadas pelo próprio bot
-      if (info?.IsFromMe === true) return null;
+      if (info?.IsFromMe === true || info?.fromMe === true) return null;
 
-      const content = String(message?.conversation || (message?.extendedTextMessage as any)?.text || '');
+      let content = '';
+      if (typeof message.conversation === 'string') content = message.conversation;
+
+      if (!content) {
+        const ext = message.extendedTextMessage;
+        if (ext && typeof ext === 'object' && !Array.isArray(ext)) {
+          const text = (ext as Record<string, unknown>).text;
+          if (typeof text === 'string') content = text;
+        }
+      }
+
+      if (!content) {
+        const img = message.imageMessage;
+        if (img && typeof img === 'object' && !Array.isArray(img)) {
+          const caption = (img as Record<string, unknown>).caption;
+          if (typeof caption === 'string') content = caption;
+        }
+      }
+      
       if (!content) return null;
 
       return {
@@ -443,15 +468,16 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         from: remoteJid.replace(/@.*$/, ''),
         content,
         messageType: 'text', // Evolution-Go simplificado
-        externalId: String(info?.ID || ''),
+        externalId: String(info?.ID || info?.id || ''),
         raw: payload
       };
     }
 
     // Fallback para padrões legados ou mensagens upsert (compatibilidade)
     const legacyEventType = (dataRec.event || (dataRec.data as Record<string, unknown>)?.event || dataRec.type || 'unknown') as string;
+    const legacyEventTypeLower = legacyEventType.toLowerCase();
     
-    if (legacyEventType === 'messages.upsert') {
+    if (legacyEventTypeLower === 'messages.upsert' || legacyEventTypeLower === 'message') {
       const data = (dataRec.data || dataRec) as Record<string, unknown>;
       const key = data?.key as Record<string, unknown> | undefined;
       const remoteJid = (key?.remoteJid || data?.remoteJid || data?.from) as string | undefined;

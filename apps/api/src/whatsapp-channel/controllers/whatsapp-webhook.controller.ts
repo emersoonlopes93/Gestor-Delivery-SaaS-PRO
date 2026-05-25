@@ -5,7 +5,6 @@ import {
   Headers,
   Logger,
   HttpCode,
-  Param,
   Inject,
   forwardRef,
   Query,
@@ -38,22 +37,43 @@ export class WhatsAppWebhookController {
   @Post('webhook')
   @HttpCode(200)
   async handleWebhook(
-    @Body() body: any,
+    @Body() body: unknown,
     @Headers('x-webhook-secret') webhookSecretHeader?: string,
     @Query('secret') webhookSecretQuery?: string,
   ) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      this.logger.warn('Webhook received with invalid body');
+      return { received: true, processed: false, error: 'Invalid body' };
+    }
+
+    const payload = body as Record<string, unknown>;
+
+    // Log básico para diagnóstico
+    const eventName =
+      (typeof payload.event === 'string' && payload.event) ||
+      (typeof payload.type === 'string' && payload.type) ||
+      '';
+    const instanceNameFromPayload =
+      (typeof payload.instance === 'string' && payload.instance) ||
+      (typeof payload.instanceName === 'string' && payload.instanceName) ||
+      '';
+    const instanceIdFromPayload = typeof payload.instanceId === 'string' ? payload.instanceId : '';
+    
+    this.logger.log(
+      `Webhook received. Event: ${eventName || 'unknown'}, Instance: ${instanceNameFromPayload || instanceIdFromPayload || 'unknown'}`,
+    );
+
     // Evolution-Go envia o instanceId e instanceToken no root do payload
-    const instanceId = body?.instanceId;
-    const instanceToken = body?.instanceToken;
+    const instanceId = instanceIdFromPayload;
     
     if (!instanceId) {
-      this.logger.warn('Webhook received without instanceId in payload');
       // Tentar fallback por instance name se existir (compatibilidade)
-      const instanceName = body?.instance;
+      const instanceName = instanceNameFromPayload;
       if (!instanceName) {
+        this.logger.warn('Webhook received without instance identifier (instanceId or instance name)');
         return { received: true, processed: false, error: 'Instance identifier missing' };
       }
-      return this.processByInstanceName(instanceName, body, webhookSecretHeader, webhookSecretQuery);
+      return this.processByInstanceName(instanceName, payload, webhookSecretHeader, webhookSecretQuery);
     }
 
     try {
@@ -80,8 +100,9 @@ export class WhatsAppWebhookController {
       const provider = this.providerRegistry.getProvider(instance.providerType);
       
       // 3. Tentar o parsing do evento (ajustado para Evolution-Go)
-      const event = provider.parseWebhook(body, tenantId);
+      const event = provider.parseWebhook(payload, tenantId);
       if (!event) {
+        this.logger.debug(`Event ignored or not parsed: ${eventName}`);
         return { received: true, processed: false };
       }
 
@@ -106,9 +127,19 @@ export class WhatsAppWebhookController {
     }
   }
 
-  private async processByInstanceName(instanceName: string, body: any, headerSecret?: string, querySecret?: string) {
+  private async processByInstanceName(
+    instanceName: string,
+    payload: Record<string, unknown>,
+    headerSecret?: string,
+    querySecret?: string,
+  ) {
     const instance = await this.prisma.whatsAppInstance.findFirst({
-      where: { instanceName },
+      where: { 
+        OR: [
+          { instanceName: instanceName },
+          { evolutionInstanceId: instanceName }
+        ]
+      },
     });
 
     if (!instance) {
@@ -118,11 +149,12 @@ export class WhatsAppWebhookController {
 
     const providedSecret = headerSecret || querySecret;
     if (instance.webhookSecret && instance.webhookSecret !== providedSecret) {
+      this.logger.warn(`Invalid webhook secret for instance name: ${instanceName}`);
       return { received: true, processed: false, error: 'Invalid secret' };
     }
 
     const provider = this.providerRegistry.getProvider(instance.providerType);
-    const event = provider.parseWebhook(body, instance.tenantId);
+    const event = provider.parseWebhook(payload, instance.tenantId);
     if (!event) return { received: true, processed: false };
 
     switch (event.type) {
@@ -177,7 +209,10 @@ export class WhatsAppWebhookController {
     
     // Disparar o orquestrador de IA de forma assíncrona (não bloqueia o webhook)
     this.aiOrchestrator.handleInboundMessage(tenantId, phone, content)
-      .catch(err => this.logger.error(`AI Orchestrator failed for ${phone}: ${err.message}`));
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        this.logger.error(`AI Orchestrator failed for ${phone}: ${msg}`);
+      });
   }
 
   private async handleNormalizedConnection(event: WhatsAppWebhookEvent) {
