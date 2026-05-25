@@ -209,12 +209,33 @@ export class CreateOrderDTO {
   @IsNumber() @IsOptional() estimatedDuration?: number;
 }
 
+export class EditOrderOperationDTO {
+  @IsString() @IsNotEmpty() type!: 'add_item' | 'remove_item' | 'update_quantity' | 'update_item_notes' | 'update_order_notes';
+  
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CreateOrderItemDTO)
+  payload?: CreateOrderItemDTO; // Para add_item
+
+  @IsString() @IsOptional() orderItemId?: string; // Para remove_item, update_quantity, update_item_notes
+  @IsNumber() @IsOptional() quantity?: number; // Para update_quantity
+  @IsString() @IsOptional() notes?: string; // Para update_item_notes, update_order_notes
+}
+
 export class EditOrderDTO {
   @IsArray()
-  @IsNotEmpty()
+  @IsOptional()
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemDTO)
-  items!: CreateOrderItemDTO[];
+  items?: CreateOrderItemDTO[]; // Mantido para retrocompatibilidade ou fallback
+
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => EditOrderOperationDTO)
+  operations?: EditOrderOperationDTO[];
+
+  @IsString() @IsOptional() reason?: string;
 }
 
 export class UpdateOrderNotesDTO {

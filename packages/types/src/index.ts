@@ -78,6 +78,7 @@ export {
   CreateOrderItemDTO, 
   CreateOrderDTO,
   EditOrderDTO,
+  EditOrderOperationDTO,
   UpdateOrderNotesDTO,
   UpdateOrderStatusDTO,
   PaymentInput,

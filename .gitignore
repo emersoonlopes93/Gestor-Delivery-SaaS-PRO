@@ -20,7 +20,7 @@ out/
 Thumbs.db
 
 # Prisma
-apps/api/prisma/migrations/
+#apps/api/prisma/migrations/
 
 # Turbo
 .turbo/

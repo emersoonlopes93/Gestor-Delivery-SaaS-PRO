@@ -26,6 +26,7 @@ import type {
   ValidatedLine,
   EditOrderDTO,
   UpdateOrderNotesDTO,
+  CreateOrderItemDTO,
 } from '@gestor/types';
 import { ORDER_STATUS_TRANSITIONS, UpdateOrderStatusDTO } from '@gestor/types';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
@@ -864,8 +865,16 @@ export class OrdersService {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },
       include: {
-        items: true,
+        items: {
+          include: {
+            complements: true,
+            comboSelections: true,
+          },
+        },
         deliveryAddress: true,
+        paymentTransactions: {
+          where: { status: 'confirmed' }
+        }
       },
     });
 
@@ -877,6 +886,79 @@ export class OrdersService {
       throw new BadRequestException(`Não é possível editar pedido com status ${order.status}`);
     }
 
+    // Regra Financeira: Bloquear edição se pagamento online já estiver confirmado/pago
+    // Exceto se for pagamento offline (dinheiro, pix manual, etc)
+    const offlineMethods = ['cash', 'pix', 'card_on_delivery', 'other'];
+    if (!offlineMethods.includes(order.paymentMethod || '') && order.paymentTransactions.length > 0) {
+      throw new BadRequestException('Não é possível editar pedido com pagamento online já aprovado.');
+    }
+
+    let finalItems: CreateOrderItemDTO[] = [];
+    const timelineNotes: string[] = [];
+
+    if (dto.operations && dto.operations.length > 0) {
+      // 1. Converter itens atuais para DTOs
+      finalItems = order.items.map((item) => this.mapOrderItemToCreateDTO(item));
+
+      // 2. Aplicar operações
+      for (const op of dto.operations) {
+        switch (op.type) {
+          case 'add_item':
+            if (op.payload) {
+              finalItems.push(op.payload);
+              timelineNotes.push(`Item adicionado: ${op.payload.notes || 'Novo item'}`);
+            }
+            break;
+
+          case 'remove_item':
+            if (op.orderItemId) {
+              const idx = order.items.findIndex((i) => i.id === op.orderItemId);
+              if (idx !== -1) {
+                const removedItem = order.items[idx];
+                timelineNotes.push(`Item removido: ${removedItem.snapshotName}`);
+                // Na lista de DTOs, precisamos identificar qual item remover. 
+                // Como os DTOs não têm ID original, vamos usar o índice.
+                finalItems.splice(idx, 1);
+              }
+            }
+            break;
+
+          case 'update_quantity':
+            if (op.orderItemId && op.quantity !== undefined) {
+              const idx = order.items.findIndex((i) => i.id === op.orderItemId);
+              if (idx !== -1) {
+                const oldQty = order.items[idx].quantity;
+                timelineNotes.push(`Quantidade alterada (${order.items[idx].snapshotName}): ${oldQty} -> ${op.quantity}`);
+                finalItems[idx].quantity = op.quantity;
+              }
+            }
+            break;
+
+          case 'update_item_notes':
+            if (op.orderItemId) {
+              const idx = order.items.findIndex((i) => i.id === op.orderItemId);
+              if (idx !== -1) {
+                timelineNotes.push(`Observação alterada em "${order.items[idx].snapshotName}"`);
+                finalItems[idx].notes = op.notes;
+              }
+            }
+            break;
+
+          case 'update_order_notes':
+            timelineNotes.push(`Observação geral do pedido alterada`);
+            break;
+        }
+      }
+    } else if (dto.items) {
+      // Fallback para substituição total
+      finalItems = dto.items;
+      timelineNotes.push(`Itens do pedido alterados (substituição total).`);
+    }
+
+    if (finalItems.length === 0) {
+      throw new BadRequestException('O pedido deve ter pelo menos 1 item.');
+    }
+
     const customerId = order.customerId;
     const paymentInfo = {
       method: this.mapPaymentMethod(order.paymentMethod),
@@ -884,10 +966,10 @@ export class OrdersService {
     };
 
     // 1. Revalidate with CheckoutValidatorService using the new items array
-    const validation = await this.checkoutValidator.validate(tenant.slug, dto.items, {
+    const validation = await this.checkoutValidator.validate(tenant.slug, finalItems, {
       customerId: customerId,
-      couponCode: undefined, // Ignorar cupom na edição simplificada por enquanto ou reaplicar se existia
-      useCashbackAmount: undefined, // Cashback reavaliar pode ser complexo
+      couponCode: undefined, // Cupom re-validar pode ser complexo, por ora mantemos o que estava ou ignoramos se mudar muito
+      useCashbackAmount: undefined,
       deliveryAddress: order.deliveryAddress ? {
         street: order.deliveryAddress.street,
         number: order.deliveryAddress.number,
@@ -903,18 +985,23 @@ export class OrdersService {
 
     const { lines, itemsSubtotal, discountTotal, deliveryFee, total } = validation;
 
-    const finalTotal = total;
-
     // 2. Transaction to replace items
     await this.prisma.$transaction(async (tx) => {
-      // Revert previous stock depletion first?
-      // Since it's complex, we could reverse stock, edit, and re-apply stock
-      // But we will do stock sync async afterwards
-      
-      // Delete old items
-      await tx.orderItem.deleteMany({
-        where: { orderId: order.id },
-      });
+      // Process order notes update if requested
+      if (dto.operations) {
+        const orderNotesOp = dto.operations.find(op => op.type === 'update_order_notes');
+        if (orderNotesOp) {
+          await tx.order.update({
+            where: { id: order.id },
+            data: { notes: orderNotesOp.notes || null },
+          });
+        }
+      }
+
+      // Delete old items and their relations
+      await tx.orderItemComplement.deleteMany({ where: { orderItem: { orderId: order.id } } });
+      await tx.orderItemComboSelection.deleteMany({ where: { orderItem: { orderId: order.id } } });
+      await tx.orderItem.deleteMany({ where: { orderId: order.id } });
 
       // Update order totals
       await tx.order.update({
@@ -923,24 +1010,22 @@ export class OrdersService {
           itemsSubtotal,
           discountTotal: discountTotal || 0,
           deliveryFee,
-          total: finalTotal,
+          total: total,
         },
       });
 
       // Create new items
       for (const line of lines) {
-        const snapshotCatalogV2Json = (line as ValidatedLine & { snapshotCatalogV2Json?: unknown })
-          .snapshotCatalogV2Json as Prisma.InputJsonValue | undefined;
-
-        const sourceUpsellId = (line as ValidatedLine & { sourceUpsellId?: string }).sourceUpsellId || null;
+        const snapshotCatalogV2Json = (line as any).snapshotCatalogV2Json;
+        const sourceUpsellId = (line as any).sourceUpsellId || null;
 
         const orderItem = await tx.orderItem.create({
           data: {
             orderId: order.id,
             tenantId,
             lineType: line.lineType,
-            productId: line.lineType === 'product' ? (line as ValidatedLine & { productId: string }).productId : null,
-            comboId: line.lineType === 'combo' ? (line as ValidatedLine & { comboId: string }).comboId : null,
+            productId: line.lineType === 'product' ? (line as any).productId : null,
+            comboId: line.lineType === 'combo' ? (line as any).comboId : null,
             quantity: line.quantity,
             unitPrice: line.unitPrice,
             lineTotal: line.lineTotal,
@@ -959,12 +1044,11 @@ export class OrdersService {
         if (!snapshotCatalogV2Json) {
           if (line.lineType === 'product' && line.complements) {
             for (const c of line.complements) {
-              const complementItemId = (c as { itemId?: string; complementItemId?: string }).itemId || (c as { itemId?: string; complementItemId?: string }).complementItemId || '';
               await tx.orderItemComplement.create({
                 data: {
                   orderItemId: orderItem.id,
                   tenantId,
-                  complementItemId,
+                  complementItemId: (c as any).itemId || (c as any).complementItemId || '',
                   snapshotName: c.snapshotName,
                   snapshotPrice: c.snapshotPrice,
                 },
@@ -972,12 +1056,11 @@ export class OrdersService {
             }
           } else if (line.lineType === 'combo' && line.comboSelections) {
             for (const s of line.comboSelections) {
-              const comboBlockItemId = (s as { blockItemId?: string; comboBlockItemId?: string }).blockItemId || (s as { blockItemId?: string; comboBlockItemId?: string }).comboBlockItemId || '';
               await tx.orderItemComboSelection.create({
                 data: {
                   orderItemId: orderItem.id,
                   tenantId,
-                  comboBlockItemId,
+                  comboBlockItemId: (s as any).blockItemId || (s as any).comboBlockItemId || '',
                   snapshotBlockName: s.snapshotBlockName,
                   snapshotProductName: s.snapshotProductName,
                   snapshotAdditionalPrice: s.snapshotAdditionalPrice,
@@ -989,30 +1072,58 @@ export class OrdersService {
       }
 
       // Add to timeline
+      const finalNote = timelineNotes.join('; ') + (dto.reason ? ` | Motivo: ${dto.reason}` : '');
       await tx.orderTimeline.create({
         data: {
           orderId,
           tenantId,
           status: order.status,
-          note: `Pedido editado manualmente.`,
+          note: `Pedido editado: ${finalNote}`,
           actorId,
         },
       });
     }, { timeout: 20000 });
 
-    // Sync inventory async (if you had a syncOrderStock method, we would call it here)
-    // await this.inventoryService.syncOrderDepletion(tenantId, orderId).catch(console.error);
-
     // Notify sockets
-    const orderDetail = await this.getOrderDetail(order.id, tenantId);
-    
-    // We emit new order again or a specific update event so board is re-fetched
     this.ordersGateway.server.to(`tenant:${tenantId}`).emit('orderUpdated', { 
       orderId: order.id, 
       orderNumber: order.orderNumber 
     });
 
-    return orderDetail;
+    return this.getOrderDetail(order.id, tenantId);
+  }
+
+  private mapOrderItemToCreateDTO(item: any): CreateOrderItemDTO {
+    // Se tiver snapshotCatalogV2Json, usamos ele como base
+    if (item.snapshotCatalogV2Json) {
+      const v2 = item.snapshotCatalogV2Json;
+      return {
+        lineType: item.lineType,
+        productId: item.productId,
+        quantity: item.quantity,
+        notes: item.notes,
+        selections: v2.selections,
+        slots: v2.slots,
+        pizzaComposition: v2.pizzaComposition,
+      };
+    }
+
+    // Fallback para legacy
+    return {
+      lineType: item.lineType,
+      productId: item.productId || undefined,
+      comboId: item.comboId || undefined,
+      quantity: item.quantity,
+      notes: item.notes || undefined,
+      complements: item.complements?.map((c: any) => ({
+        groupId: c.groupId || '', // Infelizmente não temos o groupId original fácil aqui se não estiver no snapshot
+        itemId: c.complementItemId,
+      })),
+      comboSelections: item.comboSelections?.map((s: any) => ({
+        blockId: s.blockId || '',
+        blockItemId: s.comboBlockItemId,
+      })),
+    };
   }
 
   private mapOrderToDispatchItem(
