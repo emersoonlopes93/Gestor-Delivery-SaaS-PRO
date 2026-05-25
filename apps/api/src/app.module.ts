@@ -70,24 +70,27 @@ import { ChatModule } from './chat/chat.module';
       },
     ]),
 
-    // BullMQ (Redis)
-    BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: Number(process.env.REDIS_PORT || 6379),
-        password: process.env.REDIS_PASSWORD || undefined,
-        tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
-      },
-      defaultJobOptions: {
-        removeOnComplete: 1000,
-        removeOnFail: 5000,
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 5000,
-        },
-      },
-    }),
+    ...(process.env.BULLMQ_ENABLED === 'true' || process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true'
+      ? [
+          BullModule.forRoot({
+            connection: {
+              host: process.env.REDIS_HOST || 'localhost',
+              port: Number(process.env.REDIS_PORT || 6379),
+              password: process.env.REDIS_PASSWORD || undefined,
+              tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
+            },
+            defaultJobOptions: {
+              removeOnComplete: 1000,
+              removeOnFail: 5000,
+              attempts: 3,
+              backoff: {
+                type: 'exponential',
+                delay: 5000,
+              },
+            },
+          }),
+        ]
+      : []),
 
     // Cache (Redis)
     CacheModule.registerAsync({

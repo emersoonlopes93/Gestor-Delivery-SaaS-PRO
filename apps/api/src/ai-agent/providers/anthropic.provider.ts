@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
+import { PrismaService } from '../../database/prisma.service';
 import type {
   IAiProvider,
   AiCompletionInput,
@@ -20,8 +21,27 @@ export class AnthropicProvider implements IAiProvider {
   private readonly logger = new Logger('AnthropicProvider');
   readonly providerType = 'anthropic' as const;
 
-  private get apiKey(): string {
-    return process.env.ANTHROPIC_API_KEY || '';
+  private cachedApiKey: { value: string; fetchedAt: number } | null = null;
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  private async getApiKey(): Promise<string> {
+    const envKey = process.env.ANTHROPIC_API_KEY;
+    if (envKey && envKey.trim() !== '') return envKey.trim();
+
+    const now = Date.now();
+    if (this.cachedApiKey && now - this.cachedApiKey.fetchedAt < 60_000) {
+      return this.cachedApiKey.value;
+    }
+
+    const systemConfig = await this.prisma.systemConfig.findUnique({
+      where: { id: 'global' },
+      select: { anthropicApiKey: true },
+    });
+
+    const dbKey = systemConfig?.anthropicApiKey?.trim() || '';
+    this.cachedApiKey = { value: dbKey, fetchedAt: now };
+    return dbKey;
   }
 
   private get model(): string {
@@ -33,11 +53,20 @@ export class AnthropicProvider implements IAiProvider {
   }
 
   async isAvailable(): Promise<boolean> {
-    return !!this.apiKey;
+    const apiKey = await this.getApiKey();
+    return apiKey.trim() !== '';
   }
 
   async complete(input: AiCompletionInput): Promise<AiCompletionResult> {
     const model = input.model || this.model;
+    const apiKey = await this.getApiKey();
+    if (!apiKey) {
+      return {
+        content: null,
+        toolCalls: [],
+        finishReason: 'error',
+      };
+    }
 
     // Anthropic separa System Prompt de Mensagens
     const systemMessage = input.messages.find(m => m.role === 'system');
@@ -98,7 +127,7 @@ export class AnthropicProvider implements IAiProvider {
         {
           headers: {
             'Content-Type': 'application/json',
-            'x-api-key': this.apiKey,
+            'x-api-key': apiKey,
             'anthropic-version': this.anthropicVersion,
           },
           timeout: 60_000,

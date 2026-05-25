@@ -8,33 +8,38 @@ import { CampaignsController } from './controllers/campaigns.controller';
 import { BullModule } from '@nestjs/bullmq';
 import { RbacModule } from '../rbac/rbac.module';
 
+const enableCampaignDispatch = process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true';
+
 @Module({
   imports: [
     DatabaseModule,
     WhatsAppChannelModule, // para enviar as mensagens das campanhas
     RbacModule, // para PermissionsGuard e RbacService
-    BullModule.registerQueue({
-      name: 'campaign-dispatch',
-      defaultJobOptions: {
-        removeOnComplete: 100,
-        removeOnFail: 1000,
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 10000, // 10s
-        },
-      },
-    }),
+    ...(enableCampaignDispatch
+      ? [
+          BullModule.registerQueue({
+            name: 'campaign-dispatch',
+            defaultJobOptions: {
+              removeOnComplete: 100,
+              removeOnFail: 1000,
+              attempts: 3,
+              backoff: {
+                type: 'exponential',
+                delay: 10000, // 10s
+              },
+            },
+          }),
+        ]
+      : []),
   ],
   controllers: [CampaignsController],
   providers: [
     CampaignsService,
-    CampaignDispatcherService,
-    CampaignProcessor,
+    ...(enableCampaignDispatch ? [CampaignDispatcherService, CampaignProcessor] : []),
   ],
   exports: [
     CampaignsService,
-    CampaignDispatcherService,
+    ...(enableCampaignDispatch ? [CampaignDispatcherService] : []),
   ],
 })
 export class CampaignsModule {}

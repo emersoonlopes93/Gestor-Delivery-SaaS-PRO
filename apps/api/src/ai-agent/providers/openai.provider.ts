@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
+import { PrismaService } from '../../database/prisma.service';
 import type {
   IAiProvider,
   AiCompletionInput,
@@ -20,8 +21,27 @@ export class OpenAiProvider implements IAiProvider {
   private readonly logger = new Logger('OpenAiProvider');
   readonly providerType = 'openai' as const;
 
-  private get apiKey(): string {
-    return process.env.OPENAI_API_KEY || '';
+  private cachedApiKey: { value: string; fetchedAt: number } | null = null;
+
+  constructor(private readonly prisma: PrismaService) {}
+
+  private async getApiKey(): Promise<string> {
+    const envKey = process.env.OPENAI_API_KEY;
+    if (envKey && envKey.trim() !== '') return envKey.trim();
+
+    const now = Date.now();
+    if (this.cachedApiKey && now - this.cachedApiKey.fetchedAt < 60_000) {
+      return this.cachedApiKey.value;
+    }
+
+    const systemConfig = await this.prisma.systemConfig.findUnique({
+      where: { id: 'global' },
+      select: { openaiApiKey: true },
+    });
+
+    const dbKey = systemConfig?.openaiApiKey?.trim() || '';
+    this.cachedApiKey = { value: dbKey, fetchedAt: now };
+    return dbKey;
   }
 
   private get model(): string {
@@ -33,11 +53,20 @@ export class OpenAiProvider implements IAiProvider {
   }
 
   async isAvailable(): Promise<boolean> {
-    return !!this.apiKey;
+    const apiKey = await this.getApiKey();
+    return apiKey.trim() !== '';
   }
 
   async complete(input: AiCompletionInput): Promise<AiCompletionResult> {
     const model = input.model || this.model;
+    const apiKey = await this.getApiKey();
+    if (!apiKey) {
+      return {
+        content: null,
+        toolCalls: [],
+        finishReason: 'error',
+      };
+    }
 
     const messages = input.messages.map((m) => {
       if (m.role === 'tool') {
@@ -93,7 +122,7 @@ export class OpenAiProvider implements IAiProvider {
         {
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${this.apiKey}`,
+            Authorization: `Bearer ${apiKey}`,
           },
           timeout: 60_000,
         },
