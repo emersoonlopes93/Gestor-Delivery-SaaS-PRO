@@ -200,6 +200,17 @@ export interface IWhatsAppProvider {
   ): Promise<WhatsAppSendResult>;
 
   /**
+   * Simula presença (composing/typing ou recording)
+   */
+  sendPresence(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+    to: string,
+    presence: 'composing' | 'recording' | 'paused',
+  ): Promise<void>;
+
+  /**
    * Marca mensagens como lidas
    */
   markAsRead(

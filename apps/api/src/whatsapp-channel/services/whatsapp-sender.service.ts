@@ -94,6 +94,25 @@ export class WhatsAppSenderService {
   }
 
   /**
+   * Simula presença (digitando...)
+   */
+  async sendPresence(
+    tenantId: string,
+    to: string,
+    presence: 'composing' | 'recording' | 'paused',
+  ): Promise<void> {
+    const { provider, instance } = await this.resolveProvider(tenantId);
+
+    await provider.sendPresence(
+      instance.apiUrl,
+      instance.apiKey,
+      instance.evolutionInstanceId || instance.instanceName,
+      to,
+      presence,
+    );
+  }
+
+  /**
    * Marca mensagens como lidas
    */
   async markAsRead(

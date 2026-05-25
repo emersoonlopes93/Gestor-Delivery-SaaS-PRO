@@ -14,6 +14,8 @@ export interface UpdateAiAgentConfigDto {
   sessionTimeoutMin?: number;
   dailyMessageLimit?: number;
   customerCooldownMin?: number;
+  simulateTyping?: boolean;
+  debounceMs?: number;
 }
 
 @Injectable()
@@ -48,6 +50,8 @@ export class AiAgentConfigService {
           sessionTimeoutMin: 120,
           dailyMessageLimit: 1000,
           customerCooldownMin: 5,
+          simulateTyping: true,
+          debounceMs: 1000,
           greetingMessage: 'Olá! Sou o assistente virtual da loja. Como posso ajudar?',
           fallbackMessage: 'Desculpe, não consegui entender. Quer falar com um atendente?',
           customInstructions: 'Seja sempre conciso. Responda em português (BR).',
@@ -85,6 +89,8 @@ export class AiAgentConfigService {
       sessionTimeoutMin: dto.sessionTimeoutMin,
       dailyMessageLimit: dto.dailyMessageLimit,
       customerCooldownMin: dto.customerCooldownMin,
+      simulateTyping: dto.simulateTyping,
+      debounceMs: dto.debounceMs,
     };
 
     // Remove campos undefined/null

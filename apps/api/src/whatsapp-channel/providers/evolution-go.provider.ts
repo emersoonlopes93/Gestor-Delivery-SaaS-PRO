@@ -336,23 +336,22 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
   ): Promise<WhatsAppSendResult> {
     const client = this.buildClient(apiUrl, apiKey);
     try {
-      const body = {
+      const body: Record<string, unknown> = {
         number: input.to,
         title: input.title,
         description: input.description,
         footer: input.footer,
         buttons: input.buttons.map((b) => ({
-          type: b.type,
-          id: b.id,
-          displayText: b.displayText,
+          type: 'reply',
+          reply: { id: b.id, title: b.displayText },
         })),
-        delay: input.delay,
       };
+      if (input.delay) body.delay = input.delay;
 
-      const { data } = await client.post('/send/button', body);
+      const { data } = await client.post('/send/buttons', body);
       const dataRec = data as Record<string, unknown>;
       const responseData = (dataRec?.data || dataRec) as Record<string, unknown>;
-
+      
       return {
         success: true,
         messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id),
@@ -361,6 +360,25 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`sendButtons failed: ${message}`);
       return { success: false, error: message };
+    }
+  }
+
+  async sendPresence(
+    apiUrl: string,
+    apiKey: string,
+    _instanceId: string,
+    to: string,
+    presence: 'composing' | 'recording' | 'paused',
+  ): Promise<void> {
+    const client = this.buildClient(apiUrl, apiKey);
+    try {
+      await client.post('/chat/presence', {
+        number: to,
+        presence: presence,
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`sendPresence failed: ${message}`);
     }
   }
 

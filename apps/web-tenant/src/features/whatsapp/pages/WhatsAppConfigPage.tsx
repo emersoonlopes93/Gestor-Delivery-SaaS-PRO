@@ -18,6 +18,8 @@ interface AiAgentConfig {
   greetingMessage: string;
   tone: string;
   customInstructions: string;
+  simulateTyping: boolean;
+  debounceMs: number;
 }
 
 interface WhatsAppStatusResponse {
@@ -447,6 +449,41 @@ export function WhatsAppConfigPage() {
                  onChange={(e) => setFormAi(prev => prev ? {...prev, customInstructions: e.target.value} : null)}
                />
                <p className="text-[10px] text-gray-500 italic">Forneça detalhes que a IA deve saber sobre seu negócio.</p>
+             </div>
+
+             <div className="pt-4 border-t border-gray-100 dark:border-gray-800 space-y-4">
+               <div className="flex items-center justify-between">
+                 <div className="space-y-0.5">
+                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Simular Digitação</label>
+                   <p className="text-xs text-gray-500">Mostra "digitando..." antes de responder</p>
+                 </div>
+                 <label className="relative inline-flex items-center cursor-pointer">
+                   <input 
+                     type="checkbox" 
+                     className="sr-only peer" 
+                     checked={formAi?.simulateTyping || false} 
+                     onChange={(e) => setFormAi(prev => prev ? {...prev, simulateTyping: e.target.checked} : null)}
+                   />
+                   <div className="w-9 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                 </label>
+               </div>
+
+               <div className="space-y-2">
+                 <div className="flex justify-between items-center">
+                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Atraso de Resposta (Debounce)</label>
+                   <span className="text-xs font-mono text-blue-600 dark:text-blue-400">{formAi?.debounceMs || 1000}ms</span>
+                 </div>
+                 <input 
+                   type="range"
+                   min="500"
+                   max="5000"
+                   step="500"
+                   className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                   value={formAi?.debounceMs || 1000}
+                   onChange={(e) => setFormAi(prev => prev ? {...prev, debounceMs: parseInt(e.target.value)} : null)}
+                 />
+                 <p className="text-[10px] text-gray-500 italic">Tempo de espera após a última mensagem do cliente antes da IA começar a processar.</p>
+               </div>
              </div>
 
              <button 

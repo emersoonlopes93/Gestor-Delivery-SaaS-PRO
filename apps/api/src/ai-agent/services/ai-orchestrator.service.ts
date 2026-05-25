@@ -3,7 +3,7 @@ import { AiAgentConfigService } from './ai-agent-config.service';
 import { ConversationService } from './conversation.service';
 import { AgentToolsService } from './agent-tools.service';
 import { WhatsAppSenderService } from '../../whatsapp-channel/services/whatsapp-sender.service';
-import { AiProviderRegistryService } from './services/ai-provider-registry.service';
+import { AiProviderRegistryService } from './ai-provider-registry.service';
 import type { AiMessage } from '../interfaces/ai-provider.interface';
 
 import { PrismaService } from '../../database/prisma.service';
@@ -14,6 +14,7 @@ import { createHash } from 'crypto';
 @Injectable()
 export class AiOrchestratorService {
   private readonly logger = new Logger('AiOrchestratorService');
+  private readonly debounceTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(
     private readonly configService: AiAgentConfigService,
@@ -29,9 +30,34 @@ export class AiOrchestratorService {
    * Ponto de entrada principal para mensagens inbound do WhatsApp.
    * Deve ser chamado pelo event listener do webhook.
    */
-  async handleInboundMessage(tenantId: string, customerPhone: string, _content: string) {
+  async handleInboundMessage(tenantId: string, customerPhone: string, content: string) {
+    const debounceKey = `${tenantId}:${customerPhone}`;
+    
+    // Limpa timer anterior se existir
+    if (this.debounceTimers.has(debounceKey)) {
+      clearTimeout(this.debounceTimers.get(debounceKey));
+    }
+
+    const config = await this.configService.getConfig(tenantId);
+    const debounceMs = config.debounceMs || 1000;
+
+    // Define novo timer
+    const timer = setTimeout(() => {
+      this.debounceTimers.delete(debounceKey);
+      this.processMessage(tenantId, customerPhone, content, config)
+        .catch(err => this.logger.error(`Error processing message for ${customerPhone}: ${err.message}`));
+    }, debounceMs);
+
+    this.debounceTimers.set(debounceKey, timer);
+  }
+
+  private async processMessage(
+    tenantId: string, 
+    customerPhone: string, 
+    _content: string, 
+    config: Awaited<ReturnType<AiAgentConfigService['getConfig']>>
+  ) {
     try {
-      const config = await this.configService.getConfig(tenantId);
       if (!config.isEnabled) {
         this.logger.debug(`Agent is disabled for tenant ${tenantId}. Ignoring.`);
         return;
@@ -74,16 +100,18 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
         // Ignora mensagens que não sejam texto/tool do fluxo principal
         if (msg.messageType !== 'text' && msg.messageType !== 'tool_result') continue;
         
+        const toolCalls = msg.toolCalls as Prisma.JsonArray | null;
+        
         messages.push({
           role: msg.direction === 'inbound' ? 'user' : 'assistant',
           content: msg.content,
-          ...(msg.toolCalls && Array.isArray(msg.toolCalls) ? { 
-            toolCalls: msg.toolCalls.map(tc => {
+          ...(toolCalls && Array.isArray(toolCalls) ? { 
+            toolCalls: toolCalls.map(tc => {
               const obj = tc as Record<string, unknown>;
               return {
                 id: String(obj.id),
                 name: String(obj.name),
-                arguments: obj.arguments as Record<string, unknown>
+                arguments: (obj.arguments || {}) as Record<string, unknown>
               };
             })
           } : {}),
@@ -96,6 +124,11 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
       // Resolve o provider (dinâmico por tenant/global)
       const aiProvider = await this.aiRegistry.resolveProvider(tenantId);
 
+      // Simulação de digitando (se habilitado)
+      if (config.simulateTyping) {
+        await this.whatsappSender.sendPresence(tenantId, customerPhone, 'composing');
+      }
+
       // Envia pro LLM
       const completion = await aiProvider.complete({
         messages,
@@ -105,7 +138,7 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
 
       // Se o LLM resolveu chamar Tools
       if (completion.finishReason === 'tool_calls' && completion.toolCalls && completion.toolCalls.length > 0) {
-        await this.handleToolCalls(tenantId, session.id, customerPhone, messages, completion.toolCalls, tools);
+        await this.handleToolCalls(tenantId, session.id, customerPhone, messages, completion.toolCalls, tools, config);
         return;
       }
 
@@ -119,7 +152,6 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
       this.logger.error(`Error handling inbound message: ${message}`);
       // Fallback
       try {
-        const config = await this.configService.getConfig(tenantId);
         if (config?.fallbackMessage) {
           await this.sendFinalResponse(tenantId, 'error-fallback', customerPhone, config.fallbackMessage);
         }
@@ -133,7 +165,8 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
     customerPhone: string,
     historyMessages: AiMessage[],
     toolCalls: NonNullable<AiMessage['toolCalls']>,
-    tools: ReturnType<AgentToolsService['getAvailableTools']>
+    tools: ReturnType<AgentToolsService['getAvailableTools']>,
+    config: Awaited<ReturnType<AiAgentConfigService['getConfig']>>
   ) {
     this.logger.log(`Handling ${toolCalls.length} tool calls for session ${sessionId}`);
 
@@ -164,8 +197,9 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
 
       // Verifica se é handoff
       if (toolCall.name === 'transferir_atendimento_humano') {
-        const motivo = typeof toolCall.arguments === 'object' && toolCall.arguments !== null && 'motivo' in toolCall.arguments 
-          ? String(toolCall.arguments.motivo) 
+        const args = toolCall.arguments as Record<string, unknown>;
+        const motivo = typeof args === 'object' && args !== null && 'motivo' in args 
+          ? String(args.motivo) 
           : undefined;
         await this.conversationService.activateHandoff(sessionId, motivo);
         await this.sendFinalResponse(tenantId, sessionId, customerPhone, "Certo, estou transferindo você para um de nossos atendentes. Por favor, aguarde um momento.");
@@ -264,6 +298,11 @@ ${config.customInstructions || 'Atenda o cliente da melhor forma possível.'}
     // Chama o LLM novamente com os resultados
     const aiProvider = await this.aiRegistry.resolveProvider(tenantId);
     
+    // Simulação de digitando novamente antes da resposta final
+    if (config.simulateTyping) {
+      await this.whatsappSender.sendPresence(tenantId, customerPhone, 'composing');
+    }
+
     const finalCompletion = await aiProvider.complete({
       messages: newMessages,
       tools,

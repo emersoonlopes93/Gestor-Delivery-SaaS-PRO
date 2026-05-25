@@ -243,6 +243,17 @@ export class MetaCloudProvider implements IWhatsAppProvider {
     }
   }
 
+  async sendPresence(
+    _apiUrl: string,
+    _apiKey: string,
+    _instanceId: string,
+    _to: string,
+    _presence: 'composing' | 'recording' | 'paused',
+  ): Promise<void> {
+    // Meta Cloud API não suporta simulação de digitação via Graph API comum
+    this.logger.debug('sendPresence not supported for Meta Cloud Provider');
+  }
+
   async markAsRead(
     apiUrl: string,
     apiKey: string,

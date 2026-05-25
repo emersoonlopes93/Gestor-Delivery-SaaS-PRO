@@ -2080,6 +2080,10 @@ model AiAgentConfig {
   sessionTimeoutMin   Int      @default(120) @map("session_timeout_min")
   dailyMessageLimit   Int      @default(1000) @map("daily_message_limit")
   customerCooldownMin Int      @default(5) @map("customer_cooldown_min")
+
+  simulateTyping Boolean @default(true) @map("simulate_typing")
+  debounceMs     Int     @default(1000) @map("debounce_ms")
+
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
   tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
