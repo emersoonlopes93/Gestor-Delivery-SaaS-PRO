@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { CreditCard, Wallet, Banknote, Ticket, Sparkles } from 'lucide-react';
+import { CreditCard, Wallet, Banknote, Ticket, Sparkles, type LucideIcon } from 'lucide-react';
 
 interface OrderPaymentSectionProps {
   itemsSubtotal: number;
@@ -13,7 +13,7 @@ interface OrderPaymentSectionProps {
   cashbackUsed?: number | null;
 }
 
-const PAYMENT_METHOD_LABELS: Record<string, { label: string; icon: any; color: string }> = {
+const PAYMENT_METHOD_LABELS: Record<string, { label: string; icon: LucideIcon; color: string }> = {
   credit_card: { label: 'Cartão de Crédito', icon: CreditCard, color: 'text-blue-600 bg-blue-100 dark:bg-blue-900/40 dark:text-blue-400' },
   debit_card: { label: 'Cartão de Débito', icon: CreditCard, color: 'text-indigo-600 bg-indigo-100 dark:bg-indigo-900/40 dark:text-indigo-400' },
   pix: { label: 'PIX', icon: Sparkles, color: 'text-teal-600 bg-teal-100 dark:bg-teal-900/40 dark:text-teal-400' },

@@ -7,7 +7,8 @@ import {
   ChefHat, 
   Truck, 
   PackageCheck,
-  RefreshCw
+  RefreshCw,
+  type LucideIcon
 } from 'lucide-react';
 import type { OrderStatus } from '@gestor/types';
 
@@ -22,7 +23,7 @@ interface OrderActionsBarProps {
   isValidating: boolean;
 }
 
-const NEXT_ACTION_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
+const NEXT_ACTION_CONFIG: Record<string, { label: string; icon: LucideIcon; color: string }> = {
   pending: { label: 'Confirmar Pedido', icon: CheckCircle2, color: 'bg-primary-600 hover:bg-primary-700 shadow-primary-900/10' },
   confirmed: { label: 'Enviar p/ Cozinha', icon: ChefHat, color: 'bg-orange-600 hover:bg-orange-700 shadow-orange-900/10' },
   preparing: { label: 'Marcar como Pronto', icon: PackageCheck, color: 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-900/10' },

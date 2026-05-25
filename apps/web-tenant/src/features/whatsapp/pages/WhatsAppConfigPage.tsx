@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Bot, Smartphone, Settings, RefreshCw, QrCode as QrIcon } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../../lib/api-client';
+import { api } from '@/lib/api-client';
 
 interface WhatsAppInstance {
   id: string;

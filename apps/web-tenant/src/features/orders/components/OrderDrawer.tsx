@@ -1,7 +1,7 @@
 import { memo, useEffect, useState, useCallback } from 'react';
 import { X, RefreshCw } from 'lucide-react';
 import type { OrderResponseDTO, OrderStatus, UpdateOrderStatusDTO, DriverDTO } from '@gestor/types';
-import { api, ApiError } from '../../../lib/api-client';
+import { api, ApiError } from '@/lib/api-client';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderCustomerSection } from './OrderCustomerSection';
 import { OrderFulfillmentSection } from './OrderFulfillmentSection';
@@ -12,7 +12,7 @@ import { OrderTimelineSection } from './OrderTimelineSection';
 import { OrderActionsBar } from './OrderActionsBar';
 import { OrderPrintTemplate } from './OrderPrintTemplate';
 import { EditOrderModal } from './EditOrderModal';
-import { DriverSelectionModal } from './DriverSelectionModal'; // I'll create this or use the one from OperationBoard
+import { DriverSelectionModal } from './DriverSelectionModal';
 import toast from 'react-hot-toast';
 
 export interface OrderDrawerProps {
@@ -296,7 +296,7 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
 
       {/* Template de Impressão (invisível na tela, visível no print) */}
       {isPrinting && order && (
-        <div className="hidden">
+        <div className="hidden print:block">
           <OrderPrintTemplate order={order} />
         </div>
       )}
