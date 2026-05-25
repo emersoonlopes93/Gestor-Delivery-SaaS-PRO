@@ -3,6 +3,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { AiProviderType } from '@prisma/client';
 import { OpenAiProvider } from '../providers/openai.provider';
 import { AnthropicProvider } from '../providers/anthropic.provider';
+import { GoogleAiProvider } from '../providers/google-ai.provider';
 import { IAiProvider } from '../interfaces/ai-provider.interface';
 
 @Injectable()
@@ -13,6 +14,7 @@ export class AiProviderRegistryService {
     private readonly prisma: PrismaService,
     private readonly openai: OpenAiProvider,
     private readonly anthropic: AnthropicProvider,
+    private readonly googleAi: GoogleAiProvider,
   ) {}
 
   /**
@@ -24,6 +26,8 @@ export class AiProviderRegistryService {
         return this.openai;
       case 'anthropic':
         return this.anthropic;
+      case 'google_ai':
+        return this.googleAi;
       default:
         return this.openai;
     }

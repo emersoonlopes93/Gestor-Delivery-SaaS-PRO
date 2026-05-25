@@ -1,6 +1,6 @@
 /**
  * Interface de abstração para providers de IA (LLM).
- * Implementações: OpenAiProvider, (futuro: AnthropicProvider)
+ * Implementações: OpenAiProvider, AnthropicProvider, GoogleAiProvider
  *
  * O provider de IA é responsável apenas pela comunicação com o LLM.
  * As tools e o contexto de negócio são injetados externamente.
@@ -50,7 +50,7 @@ export interface IAiProvider {
   /**
    * Identifica o tipo do provider
    */
-  readonly providerType: 'openai' | 'anthropic';
+  readonly providerType: 'openai' | 'anthropic' | 'google_ai';
 
   /**
    * Envia mensagens para o LLM e recebe resposta

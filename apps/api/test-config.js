@@ -10,6 +10,8 @@ async function test() {
     evolutionGlobalToken: "",
     openaiApiKey: "",
     anthropicApiKey: "",
+    googleAiApiKey: "",
+    googleAiModel: "gemini-2.0-flash-lite",
     baseAiPrompt: "",
     updatedAt: new Date().toISOString()
   };

@@ -1945,6 +1945,7 @@ enum WhatsAppProviderType {
 enum AiProviderType {
   openai
   anthropic
+  google_ai
 }
 
 enum ChatState {
@@ -2071,6 +2072,8 @@ model SystemConfig {
   // AI Infrastructure
   openaiApiKey    String? @map("openai_api_key")
   anthropicApiKey String? @map("anthropic_api_key")
+  googleAiApiKey  String? @map("google_ai_api_key")
+  googleAiModel   String? @default("gemini-2.0-flash-lite") @map("google_ai_model") @db.VarChar(100)
   baseAiPrompt    String? @map("base_ai_prompt") @db.Text
 
   updatedAt DateTime @updatedAt @map("updated_at")

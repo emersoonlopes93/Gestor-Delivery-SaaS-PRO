@@ -10,13 +10,22 @@ import {
   Zap
 } from 'lucide-react';
 
+const GOOGLE_AI_FREE_MODELS = [
+  { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash-Lite (gratuito)' },
+  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (gratuito)' },
+  { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (gratuito)' },
+  { id: 'gemini-1.5-flash-8b', label: 'Gemini 1.5 Flash 8B (gratuito)' },
+] as const;
+
 interface SystemConfig {
   defaultWhatsAppProvider: 'evolution_go' | 'meta_cloud';
-  defaultAiProvider: 'openai' | 'anthropic';
+  defaultAiProvider: 'openai' | 'anthropic' | 'google_ai';
   evolutionUrl: string;
   evolutionGlobalToken: string;
   openaiApiKey: string;
   anthropicApiKey: string;
+  googleAiApiKey: string;
+  googleAiModel: string;
   baseAiPrompt: string;
 }
 
@@ -65,6 +74,8 @@ export default function IntegrationsPage() {
         evolutionGlobalToken: config.evolutionGlobalToken,
         openaiApiKey: config.openaiApiKey,
         anthropicApiKey: config.anthropicApiKey,
+        googleAiApiKey: config.googleAiApiKey,
+        googleAiModel: config.googleAiModel,
         baseAiPrompt: config.baseAiPrompt,
       };
 
@@ -188,10 +199,11 @@ export default function IntegrationsPage() {
                 >
                   <option value="openai">OpenAI (GPT-4/o)</option>
                   <option value="anthropic">Anthropic (Claude 3.5)</option>
+                  <option value="google_ai">Google AI Studio (Gemini)</option>
                 </select>
               </div>
 
-              {config?.defaultAiProvider === 'openai' ? (
+              {config?.defaultAiProvider === 'openai' && (
                 <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
                   <label className="text-sm font-medium text-gray-700">OpenAI API Key</label>
                   <input 
@@ -202,7 +214,9 @@ export default function IntegrationsPage() {
                     onChange={(e) => setConfig(prev => prev ? {...prev, openaiApiKey: e.target.value} : null)}
                   />
                 </div>
-              ) : (
+              )}
+
+              {config?.defaultAiProvider === 'anthropic' && (
                 <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
                   <label className="text-sm font-medium text-gray-700">Anthropic API Key</label>
                   <input 
@@ -212,6 +226,46 @@ export default function IntegrationsPage() {
                     value={config?.anthropicApiKey || ''}
                     onChange={(e) => setConfig(prev => prev ? {...prev, anthropicApiKey: e.target.value} : null)}
                   />
+                </div>
+              )}
+
+              {config?.defaultAiProvider === 'google_ai' && (
+                <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Google AI Studio API Key</label>
+                    <input 
+                      type="password"
+                      placeholder="AIza..."
+                      className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none font-mono text-sm"
+                      value={config?.googleAiApiKey || ''}
+                      onChange={(e) => setConfig(prev => prev ? {...prev, googleAiApiKey: e.target.value} : null)}
+                    />
+                    <p className="text-xs text-gray-400">
+                      Obtenha em{' '}
+                      <a
+                        href="https://aistudio.google.com/apikey"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary-600 hover:underline"
+                      >
+                        aistudio.google.com/apikey
+                      </a>
+                      . Modelos abaixo usam o tier gratuito.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Modelo Gemini (gratuito)</label>
+                    <select
+                      className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                      value={config?.googleAiModel || GOOGLE_AI_FREE_MODELS[0].id}
+                      onChange={(e) => setConfig(prev => prev ? {...prev, googleAiModel: e.target.value} : null)}
+                    >
+                      {GOOGLE_AI_FREE_MODELS.map((m) => (
+                        <option key={m.id} value={m.id}>{m.label}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               )}
 

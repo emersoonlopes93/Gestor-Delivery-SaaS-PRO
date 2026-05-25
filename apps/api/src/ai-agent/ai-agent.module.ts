@@ -12,6 +12,7 @@ import { AdminModulesModule } from '../admin/modules/admin-modules.module';
 
 import { OpenAiProvider } from './providers/openai.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
+import { GoogleAiProvider } from './providers/google-ai.provider';
 import { AI_PROVIDER } from './interfaces/ai-provider.interface';
 import { AiProviderRegistryService } from './services/ai-provider-registry.service';
 
@@ -39,6 +40,7 @@ import { AiAgentController } from './controllers/ai-agent.controller';
   providers: [
     OpenAiProvider,
     AnthropicProvider,
+    GoogleAiProvider,
     AiProviderRegistryService,
     {
       provide: AI_PROVIDER,

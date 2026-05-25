@@ -47,6 +47,16 @@ export class UpdateIntegrationsConfigDto {
   @IsOptional()
   @ValidateIf((_, v) => v !== null)
   @IsString()
+  googleAiApiKey?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  googleAiModel?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
   baseAiPrompt?: string | null;
 
   // Campos que podem vir do frontend mas devem ser ignorados com segurança
