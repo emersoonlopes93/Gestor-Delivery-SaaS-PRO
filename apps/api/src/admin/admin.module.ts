@@ -19,9 +19,14 @@ import { AdminIntegrationsController } from './integrations/admin-integrations.c
 import { SystemConfigService } from './services/system-config.service';
 import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
+import { AdminModulesModule } from './modules/admin-modules.module';
 
 @Module({
-  imports: [AuthModule, BillingModule],
+  imports: [
+    AuthModule, 
+    BillingModule,
+    AdminModulesModule,
+  ],
   controllers: [
     AdminAuthController, 
     AdminTenantsController, 
@@ -37,13 +42,12 @@ import { BillingModule } from '../billing/billing.module';
     AdminAuthService, 
     AdminRbacService, 
     AdminTenantsService, 
-    AdminModulesService, 
     AdminGroupsService, 
     AdminHealthService, 
     AdminAuditLogsService,
     AdminFranchiseService,
     SystemConfigService
   ],
-  exports: [AdminAuthService, AdminRbacService],
+  exports: [AdminAuthService, AdminRbacService, AdminModulesModule],
 })
 export class AdminModule {}
