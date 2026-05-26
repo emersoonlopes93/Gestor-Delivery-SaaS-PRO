@@ -37,16 +37,7 @@ export class WhatsAppInstanceService {
     providerType: WhatsAppProviderType;
     instanceApiKey: string;
   }): Promise<string> {
-    if (input.providerType !== 'evolution_go') {
-      return input.instanceApiKey;
-    }
-
-    const systemConfig = await this.prisma.systemConfig.findUnique({
-      where: { id: 'global' },
-      select: { evolutionGlobalToken: true },
-    });
-
-    return systemConfig?.evolutionGlobalToken || input.instanceApiKey;
+    return input.instanceApiKey;
   }
 
   /**
