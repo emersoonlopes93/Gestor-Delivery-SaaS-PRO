@@ -2,7 +2,7 @@ import { normalizeWhatsAppSendNumber } from './whatsapp-number.util';
 
 /** Eventos Evolution-Go que não disparam resposta da IA */
 /** Eventos que não devem acionar IA nem poluir logs em nível info */
-const NON_ACTIONABLE_EVENTS = new Set(['receipt', 'chatpresence']);
+const NON_ACTIONABLE_EVENTS = new Set(['receipt', 'chatpresence', 'sendmessage']);
 
 export function isNonActionableWebhookEvent(eventName: string): boolean {
   return NON_ACTIONABLE_EVENTS.has(eventName.trim().toLowerCase());

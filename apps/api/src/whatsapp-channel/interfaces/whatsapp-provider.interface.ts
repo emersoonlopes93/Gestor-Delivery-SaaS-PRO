@@ -80,6 +80,7 @@ export interface WhatsAppCreateInstanceResult {
 export interface WhatsAppConnectInput {
   webhookUrl: string;
   subscribe?: string[];
+  tenantId?: string;
 }
 
 export interface WhatsAppWebhookEvent {

@@ -145,11 +145,11 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       // Payload específico Evolution-Go
       const requestBody = {
         webhookUrl: input.webhookUrl,
-        subscribe: ["ALL"], // Documentação sugere ["ALL"] ou eventos específicos
+        subscribe: ["Message"],
         immediate: true,    // Parâmetro específico Evolution-Go
       };
 
-      this.logger.log(`[EVOLUTION-GO WEBHOOK CONFIG] instanceId=${instanceId} url=${input.webhookUrl.replace(/secret=.*$/, 'secret=***')} subscribe=["ALL"] immediate=true`);
+      this.logger.log(`[WHATSAPP_CONNECT] tenantId=${input.tenantId || 'n/a'} instanceId=${instanceId} webhookUrl=${input.webhookUrl.replace(/secret=.*$/, 'secret=***')} subscribe=["Message"]`);
 
       const { data } = await client.post('/instance/connect', requestBody);
       const dataRec = data as Record<string, unknown>;
@@ -170,10 +170,12 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         }
       }
 
+      this.logger.log(`[WHATSAPP_QR] tenantId=${input.tenantId || 'n/a'} instanceId=${instanceId} qrPresent=${!!parsed.qrCode}`);
+
       return parsed;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`connect failed: ${message}`);
+      this.logger.error(`[WHATSAPP_ERROR] step=connect tenantId=${input.tenantId || 'n/a'} instanceId=${instanceId} status=${isAxiosError(error) ? error.response?.status : 'unknown'} body=${isAxiosError(error) ? JSON.stringify(error.response?.data) : 'unknown'}`);
       throw error;
     }
   }
@@ -196,10 +198,12 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       const { data } = await client.post('/instance/disconnect');
       const dataRec = data as Record<string, unknown>;
       this.logger.log(`Disconnect response from Evolution Go: ${JSON.stringify(dataRec)}`);
-      this.logger.log('Instance disconnected');
+      
+      const parsedStatus = this.parseConnectionStatus((dataRec?.data || dataRec) as Record<string, unknown>);
+      this.logger.log(`[WHATSAPP_DISCONNECT] instanceId=${instanceId} providerStatus=${parsedStatus.state} localStatus=disconnected`);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`disconnect failed: ${message}`);
+      this.logger.error(`[WHATSAPP_ERROR] step=disconnect instanceId=${instanceId} status=${isAxiosError(error) ? error.response?.status : 'unknown'} body=${isAxiosError(error) ? JSON.stringify(error.response?.data) : 'unknown'}`);
       throw error;
     }
   }
@@ -221,7 +225,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       const requestBody = {
         phone: cleanPhone,
-        subscribe: ["ALL"],
+        subscribe: ["Message"],
       };
 
       const { data } = await client.post('/instance/pair', requestBody);
@@ -237,7 +241,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       return { pairingCode: String(pairingCode) };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`generatePairingCode failed: ${message}`);
+      this.logger.error(`[WHATSAPP_ERROR] step=pair instanceId=${instanceId} status=${isAxiosError(error) ? error.response?.status : 'unknown'} body=${isAxiosError(error) ? JSON.stringify(error.response?.data) : 'unknown'}`);
       throw error;
     }
   }
@@ -510,6 +514,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     const eventType = eventTypeRaw.toLowerCase();
 
     if (isNonActionableWebhookEvent(eventTypeRaw)) {
+      this.logger.log(`[AI_FLOW_DEBUG] ignored_event event=${eventTypeRaw}`);
       AiFlowLogger.debug('webhook_event_skip', baseCtx, { event: eventTypeRaw });
       return null;
     }
@@ -530,6 +535,12 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         sender: String(info?.Sender || ''),
       };
       
+      // Ignorar status@broadcast ou qualquer broadcast cedo
+      if (remoteJid.includes('status@broadcast') || remoteJid.includes('broadcast')) {
+        this.logger.log(`[AI_FLOW_DEBUG] ignored_broadcast remoteJid=${remoteJid}`);
+        return null;
+      }
+
       // Ignorar grupos ou mensagens sem remetente
       if (!remoteJid) {
         AiFlowLogger.ignored('missing_remote_jid', ctx);
@@ -570,6 +581,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         return null;
       }
 
+      this.logger.log(`[AI_FLOW] received_webhook event=Message instanceId=${baseCtx.instanceId || 'unknown'} messageId=${messageId}`);
       AiFlowLogger.flow('parsed_message', ctx, { textLength: content.length, event: eventTypeRaw });
 
       return {
@@ -593,11 +605,18 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       const key = data?.key as Record<string, unknown> | undefined;
       const remoteJid = (key?.remoteJid || data?.remoteJid || data?.from) as string | undefined;
       
+      if (remoteJid && (remoteJid.includes('status@broadcast') || remoteJid.includes('broadcast'))) {
+        this.logger.log(`[AI_FLOW_DEBUG] ignored_broadcast remoteJid=${remoteJid}`);
+        return null;
+      }
+
       if (!remoteJid || remoteJid.includes('@g.us')) return null;
       if (key?.fromMe) return null;
 
       const content = this.extractMessageContent(data);
       if (!content) return null;
+
+      this.logger.log(`[AI_FLOW] received_webhook event=Message legacy=true`);
 
       return {
         type: 'message',

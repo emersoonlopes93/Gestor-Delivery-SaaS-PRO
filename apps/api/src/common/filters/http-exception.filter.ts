@@ -40,6 +40,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
           code = 'VALIDATION_ERROR';
         }
       }
+    } else if (exception && typeof exception === 'object' && ('status' in exception || 'statusCode' in exception)) {
+      const excObj = exception as { status?: number; statusCode?: number; message?: string; type?: string };
+      status = excObj.status || excObj.statusCode || HttpStatus.INTERNAL_SERVER_ERROR;
+      message = excObj.message || 'Error occurred';
+      if (excObj.type === 'entity.too.large' || status === 413) {
+        code = 'PAYLOAD_TOO_LARGE';
+      } else {
+        code = 'HTTP_ERROR';
+      }
     } else if (exception instanceof Error) {
       message = exception.message;
 

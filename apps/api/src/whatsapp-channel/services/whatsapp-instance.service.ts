@@ -61,6 +61,22 @@ export class WhatsAppInstanceService {
       const apiUrl = systemConfig?.evolutionUrl;
       const apiKey = systemConfig?.evolutionGlobalToken;
 
+      // Check if we already have an instance for this tenant
+      const existing = await this.prisma.whatsAppInstance.findUnique({
+        where: { tenantId },
+      });
+
+      if (existing) {
+        this.logger.log(`Reusing existing instance for tenant ${tenantId}: ${existing.instanceName}`);
+        return {
+          id: existing.id,
+          instanceName: existing.instanceName,
+          providerType: existing.providerType,
+          status: existing.status,
+          phoneNumber: existing.phoneNumber,
+        };
+      }
+
       if (providerType === 'evolution_go' && (!apiUrl || !apiKey)) {
         throw new BadRequestException('Infraestrutura WhatsApp não configurada no SaaS Admin.');
       }
@@ -176,7 +192,7 @@ export class WhatsAppInstanceService {
         instance.apiUrl,
         apiKeyForConnect,
         instance.evolutionInstanceId || instance.instanceName,
-        { webhookUrl },
+        { webhookUrl, tenantId },
       );
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
@@ -246,11 +262,16 @@ export class WhatsAppInstanceService {
       instanceApiKey: instance.apiKey,
     });
 
-    await provider.disconnect(
-      instance.apiUrl,
-      apiKeyForDisconnect,
-      instance.evolutionInstanceId || instance.instanceName,
-    );
+    try {
+      await provider.disconnect(
+        instance.apiUrl,
+        apiKeyForDisconnect,
+        instance.evolutionInstanceId || instance.instanceName,
+      );
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to disconnect from external provider for tenant ${tenantId} but proceeding with local disconnection: ${msg}`);
+    }
 
     await this.prisma.whatsAppInstance.update({
       where: { id: instance.id },

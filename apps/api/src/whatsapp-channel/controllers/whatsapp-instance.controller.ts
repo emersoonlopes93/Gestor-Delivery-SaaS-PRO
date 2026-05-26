@@ -7,6 +7,7 @@ import {
   Request,
   HttpCode,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { WhatsAppInstanceService, CreateInstanceDto } from '../services/whatsapp-instance.service';
 import { ConfigService } from '@nestjs/config';
@@ -21,6 +22,8 @@ import { AuthenticatedRequest } from '../../common/interfaces/request.interface'
 @Controller('whatsapp/instance')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class WhatsAppInstanceController {
+  private readonly logger = new Logger('WhatsAppInstanceController');
+
   constructor(
     private readonly instanceService: WhatsAppInstanceService,
     private readonly configService: ConfigService,
@@ -94,6 +97,14 @@ export class WhatsAppInstanceController {
   @Permissions('settings.manage')
   async connect(@Request() req: AuthenticatedRequest, @Body('webhookUrl') webhookUrl: string) {
     const tenantId = req.user.tenantId;
+    
+    // Auto-create instance if it doesn't exist
+    let instance = await this.instanceService.getInstance(tenantId);
+    if (!instance) {
+      this.logger.log(`Auto-creating new WhatsAppInstance for tenant ${tenantId} on connect request`);
+      await this.instanceService.createInstance(tenantId, {});
+    }
+
     const effectiveWebhookUrl = webhookUrl?.trim() || await this.buildWebhookUrl(req, tenantId);
     console.log(`[WhatsApp Connect] tenantId: ${tenantId}, webhookUrl: ${effectiveWebhookUrl}`);
     const result = await this.instanceService.connectInstance(tenantId, effectiveWebhookUrl);
