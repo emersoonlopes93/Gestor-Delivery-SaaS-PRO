@@ -144,9 +144,11 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       const requestBody = {
         webhookUrl: input.webhookUrl,
-        subscribe: ["MESSAGE"],
+        subscribe: ["MESSAGE", "CONNECTION", "QRCODE"],
         immediate: true,
       };
+
+      this.logger.log(`[WHATSAPP_CONNECT] subscribe=["MESSAGE","CONNECTION","QRCODE"]`);
 
       const { data } = await client.post('/instance/connect', requestBody);
       const dataRec = data as Record<string, unknown>;
@@ -235,7 +237,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       const requestBody = {
         phone: cleanPhone,
-        subscribe: ["MESSAGE"],
+        subscribe: ["MESSAGE", "CONNECTION", "QRCODE"],
       };
 
       const { data } = await client.post('/instance/pair', requestBody);
