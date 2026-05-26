@@ -58,6 +58,7 @@ export type {
   OrderTimelineEntryDTO,
   FulfillmentType,
   OrderStatus,
+  OrderLineType,
   OrderKdsItemDTO,
   OrderBoardItemDTO,
   OrderListItemDTO,

@@ -27,6 +27,10 @@ import type {
   EditOrderDTO,
   UpdateOrderNotesDTO,
   CreateOrderItemDTO,
+  OrderLineType,
+  CreateOrderItemSelectionGroupDTO,
+  CreateOrderItemComboSlotSelectionDTO,
+  PizzaCompositionDTO,
 } from '@gestor/types';
 import { ORDER_STATUS_TRANSITIONS, UpdateOrderStatusDTO } from '@gestor/types';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
@@ -1016,16 +1020,16 @@ export class OrdersService {
 
       // Create new items
       for (const line of lines) {
-        const snapshotCatalogV2Json = (line as any).snapshotCatalogV2Json;
-        const sourceUpsellId = (line as any).sourceUpsellId || null;
+        const snapshotCatalogV2Json = line.snapshotCatalogV2Json;
+        const sourceUpsellId = line.lineType === 'product' ? line.sourceUpsellId || null : null;
 
         const orderItem = await tx.orderItem.create({
           data: {
             orderId: order.id,
             tenantId,
             lineType: line.lineType,
-            productId: line.lineType === 'product' ? (line as any).productId : null,
-            comboId: line.lineType === 'combo' ? (line as any).comboId : null,
+            productId: line.lineType === 'product' ? line.productId : null,
+            comboId: line.lineType === 'combo' ? line.comboId : null,
             quantity: line.quantity,
             unitPrice: line.unitPrice,
             lineTotal: line.lineTotal,
@@ -1035,7 +1039,7 @@ export class OrdersService {
             snapshotBasePrice: line.basePrice,
             snapshotExtrasTotal: line.extrasTotal,
             snapshotComposition: line.composition || null,
-            snapshotCatalogV2Json,
+            snapshotCatalogV2Json: snapshotCatalogV2Json as Prisma.InputJsonValue,
             sourceUpsellId,
           },
         });
@@ -1048,7 +1052,7 @@ export class OrdersService {
                 data: {
                   orderItemId: orderItem.id,
                   tenantId,
-                  complementItemId: (c as any).itemId || (c as any).complementItemId || '',
+                  complementItemId: c.complementItemId,
                   snapshotName: c.snapshotName,
                   snapshotPrice: c.snapshotPrice,
                 },
@@ -1060,7 +1064,7 @@ export class OrdersService {
                 data: {
                   orderItemId: orderItem.id,
                   tenantId,
-                  comboBlockItemId: (s as any).blockItemId || (s as any).comboBlockItemId || '',
+                  comboBlockItemId: s.comboBlockItemId,
                   snapshotBlockName: s.snapshotBlockName,
                   snapshotProductName: s.snapshotProductName,
                   snapshotAdditionalPrice: s.snapshotAdditionalPrice,
@@ -1093,36 +1097,44 @@ export class OrdersService {
     return this.getOrderDetail(order.id, tenantId);
   }
 
-  private mapOrderItemToCreateDTO(item: any): CreateOrderItemDTO {
+  private mapOrderItemToCreateDTO(
+    item: Prisma.OrderItemGetPayload<{ include: { complements: true; comboSelections: true } }>,
+  ): CreateOrderItemDTO {
     // Se tiver snapshotCatalogV2Json, usamos ele como base
     if (item.snapshotCatalogV2Json) {
-      const v2 = item.snapshotCatalogV2Json;
+      const v2 = item.snapshotCatalogV2Json as Prisma.JsonObject;
       return {
-        lineType: item.lineType,
-        productId: item.productId,
+        lineType: item.lineType as OrderLineType,
+        productId: item.productId || undefined,
         quantity: item.quantity,
-        notes: item.notes,
-        selections: v2.selections,
-        slots: v2.slots,
-        pizzaComposition: v2.pizzaComposition,
+        notes: item.notes || undefined,
+        selections: (v2.selections as unknown) as CreateOrderItemSelectionGroupDTO[] | undefined,
+        slots: (v2.slots as unknown) as CreateOrderItemComboSlotSelectionDTO[] | undefined,
+        pizzaComposition: (v2.pizzaComposition as unknown) as PizzaCompositionDTO | undefined,
       };
     }
 
     // Fallback para legacy
     return {
-      lineType: item.lineType,
+      lineType: item.lineType as OrderLineType,
       productId: item.productId || undefined,
       comboId: item.comboId || undefined,
       quantity: item.quantity,
       notes: item.notes || undefined,
-      complements: item.complements?.map((c: any) => ({
-        groupId: c.groupId || '', // Infelizmente não temos o groupId original fácil aqui se não estiver no snapshot
-        itemId: c.complementItemId,
-      })),
-      comboSelections: item.comboSelections?.map((s: any) => ({
-        blockId: s.blockId || '',
-        blockItemId: s.comboBlockItemId,
-      })),
+      complements: item.complements?.map((c) => {
+        const legacy = c as Record<string, unknown>;
+        return {
+          groupId: (legacy.groupId as string | undefined) || '',
+          itemId: c.complementItemId,
+        };
+      }),
+      comboSelections: item.comboSelections?.map((s) => {
+        const legacy = s as Record<string, unknown>;
+        return {
+          blockId: (legacy.blockId as string | undefined) || '',
+          blockItemId: s.comboBlockItemId,
+        };
+      }),
     };
   }
 

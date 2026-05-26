@@ -70,8 +70,8 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
     queryKey: ['catalog-search', searchTerm],
     queryFn: async () => {
       if (searchTerm.length < 2) return [];
-      const res = await api.get<any[]>(`/catalog/products?search=${encodeURIComponent(searchTerm)}&limit=10`);
-      return (res.data || []).map((p: any) => ({
+      const res = await api.get<CatalogProduct[]>(`/catalog/products?search=${encodeURIComponent(searchTerm)}&limit=10`);
+      return (res.data || []).map((p) => ({
         id: p.id,
         name: p.name,
         basePrice: Number(p.basePrice || 0),
@@ -134,7 +134,20 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
     }
   };
 
-  const handleConfigConfirm = (result: any) => {
+  interface ConfiguratorResult {
+    lineType: 'product' | 'combo';
+    productId: string;
+    quantity: number;
+    computedUnitPrice: number;
+    name: string;
+    notes?: string;
+    complements?: CreateOrderItemDTO['complements'];
+    selections?: CreateOrderItemDTO['selections'];
+    pizzaComposition?: CreateOrderItemDTO['pizzaComposition'];
+    slots?: CreateOrderItemDTO['slots'];
+  }
+
+  const handleConfigConfirm = (result: ConfiguratorResult) => {
     const newItem: EditableItem = {
       id: `new-${Date.now()}`,
       lineType: result.lineType,
