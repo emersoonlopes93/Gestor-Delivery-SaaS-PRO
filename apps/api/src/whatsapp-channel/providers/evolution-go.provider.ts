@@ -43,6 +43,26 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
   private readonly logger = new Logger('EvolutionGoProvider');
   readonly providerType = 'evolution_go' as const;
 
+  private normalizeQrCode(value?: string | null): string | undefined {
+    if (!value) return undefined;
+    const trimmed = String(value).trim();
+    if (!trimmed) return undefined;
+    if (trimmed.startsWith('data:image/')) return trimmed;
+
+    // Se vier base64 "puro", normalizar para data URL (o <img src> do browser exige isso).
+    // Heurística: sem espaços, comprimento razoável, e apenas chars de base64.
+    const base64Like =
+      trimmed.length > 80 &&
+      !/\s/.test(trimmed) &&
+      /^[A-Za-z0-9+/=]+$/.test(trimmed);
+
+    if (base64Like) {
+      return `data:image/png;base64,${trimmed}`;
+    }
+
+    return trimmed;
+  }
+
   private buildClient(apiUrl: string, apiKey: string): AxiosInstance {
     return axios.create({
       baseURL: apiUrl.replace(/\/+$/, ''),
@@ -139,7 +159,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       const parsed = this.parseConnectionStatus((dataRec?.data || dataRec) as Record<string, unknown>);
       if (!parsed.qrCode && parsed.state !== 'connected') {
         try {
-          const qrResponse = await client.get('/instance/qr', { timeout: 8_000 });
+          const qrResponse = await client.get('/instance/qr', { timeout: 15_000 });
           const qrDataRoot = qrResponse.data as Record<string, unknown>;
           const qrData = (qrDataRoot?.data || qrDataRoot) as Record<string, unknown>;
           const qrCode = (qrData?.qrCode || qrData?.qr || qrData?.base64 || qrData?.Qrcode) as string | undefined;
@@ -149,7 +169,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
               ...parsed,
               connected: false,
               state: 'qr_pending',
-              qrCode,
+              qrCode: this.normalizeQrCode(qrCode),
             };
           }
         } catch (qrError: unknown) {
@@ -198,7 +218,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     instanceId: string,
     phone?: string,
   ): Promise<{ pairingCode: string }> {
-    const client = this.buildClient(apiUrl, apiKey);
+    const client = this.buildInstanceClient(apiUrl, apiKey, instanceId);
     try {
       this.logger.log(`Generating pairing code for instance: ${instanceId}, phone: ${phone}`);
       
@@ -208,8 +228,8 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       }
 
       const requestBody = {
-        instanceName: instanceId,
-        phone: cleanPhone
+        phone: cleanPhone,
+        subscribe: ["ALL"],
       };
 
       const { data } = await client.post('/instance/pair', requestBody);
@@ -235,7 +255,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     apiKey: string,
     instanceId: string,
   ): Promise<WhatsAppConnectionStatus> {
-    const client = this.buildClient(apiUrl, apiKey);
+    const client = this.buildInstanceClient(apiUrl, apiKey, instanceId);
     try {
       console.log(`[Evolution Go] Getting status for instance ${instanceId}`);
       const { data } = await client.get('/instance/status');
@@ -262,7 +282,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     apiKey: string,
     instanceId: string,
   ): Promise<string | null> {
-    const client = this.buildClient(apiUrl, apiKey);
+    const client = this.buildInstanceClient(apiUrl, apiKey, instanceId);
     try {
       console.log(`[Evolution Go] Getting QR code for instance ${instanceId}`);
       const { data } = await client.get('/instance/qr');
@@ -272,7 +292,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         : (data as Record<string, unknown>);
       const qrCode = (responseData?.qrCode || responseData?.qr || responseData?.base64 || responseData?.Qrcode || null) as string | null;
       console.log(`[Evolution Go] Extracted QR code:`, qrCode ? '***FOUND***' : 'NOT FOUND');
-      return qrCode;
+      return this.normalizeQrCode(qrCode) ?? null;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`getQrCode failed: ${message}`);
@@ -702,7 +722,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       connected: state === 'connected',
       state,
       phoneNumber: (data?.phoneNumber || data?.phone || data?.jid || data?.number) as string | undefined,
-      qrCode: (data?.qrCode || data?.qr || data?.base64 || data?.Qrcode) as string | undefined,
+      qrCode: this.normalizeQrCode((data?.qrCode || data?.qr || data?.base64 || data?.Qrcode) as string | undefined),
     };
 
     console.log(`[Evolution Go] Parsed result:`, result);

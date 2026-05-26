@@ -66,7 +66,9 @@ export function WhatsAppConfigPage() {
       
       return res.data;
     } catch (e) {
-      return null;
+      // Importante: não retornar `null`, senão o polling pode parar (status vira undefined).
+      // Deixar falhar preserva o último `data` conhecido do React Query.
+      throw e;
     }
   };
 
@@ -79,9 +81,26 @@ export function WhatsAppConfigPage() {
       // Continuar polling enquanto não estiver conectado (ainda mais rápido)
       if (currentStatus === 'qr_pending') return 1500; // QR code muda rápido
       if (currentStatus === 'connecting' || currentStatus === 'disconnected') return 2000;
-      return false; // Parar quando conectado
+      // Mesmo conectado, manter um polling mais lento para refletir quedas sem exigir F5.
+      return 8000;
     },
   });
+
+  const refreshQrCode = async () => {
+    try {
+      const res = await api.get<{ qrCode: string | null }>('/whatsapp/instance/qr-code');
+      if (res.data?.qrCode) {
+        setQrCode(res.data.qrCode);
+      } else {
+        toast.error('QR Code ainda não está disponível. Tente novamente em alguns segundos.');
+      }
+    } catch {
+      toast.error('Erro ao atualizar QR Code.');
+    } finally {
+      // Garantir que o status também seja revalidado
+      refetchStatus();
+    }
+  };
 
   // Mutations
   const updateAiMutation = useMutation({
@@ -301,7 +320,7 @@ export function WhatsAppConfigPage() {
                             <p className="text-xs text-gray-500 mb-4 font-bold uppercase tracking-widest">Escaneie o QR Code</p>
                             <img src={qrCode} alt="WhatsApp QR Code" className="w-48 h-48" />
                             <button 
-                              onClick={() => refetchStatus()}
+                              onClick={refreshQrCode}
                               className="mt-4 flex items-center gap-2 text-xs text-primary-600 hover:text-primary-700 font-bold"
                             >
                               <RefreshCw className="w-3 h-3" /> Atualizar QR

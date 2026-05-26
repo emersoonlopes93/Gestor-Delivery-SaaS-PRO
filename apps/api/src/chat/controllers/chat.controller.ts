@@ -19,6 +19,7 @@ import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions as Permissions } from '../../common/decorators';
 import { QuickRepliesService } from '../services/quick-replies.service';
 import { CreateQuickReplyDto, UpdateQuickReplyDto } from '../dto/quick-reply.dto';
+import { WhatsAppSenderService } from '../../whatsapp-channel/services/whatsapp-sender.service';
 
 type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
 
@@ -29,6 +30,7 @@ export class ChatController {
     private readonly conversationService: ConversationService,
     private readonly prisma: PrismaService,
     private readonly quickRepliesService: QuickRepliesService,
+    private readonly whatsappSender: WhatsAppSenderService,
   ) {}
 
   private asJsonObject(value: unknown): Record<string, unknown> {
@@ -220,17 +222,46 @@ export class ChatController {
   @HttpCode(200)
   @Permissions('orders.read')
   async sendMessage(
+    @Request() req: TenantRequest,
     @Param('id') sessionId: string,
     @Body() dto: CreateMessageDto,
   ) {
+    const session = await this.prisma.chatSession.findFirst({
+      where: { id: sessionId, tenantId: req.user.tenantId },
+      select: { id: true, tenantId: true, customerPhone: true, handoffActive: true },
+    });
+    if (!session) {
+      return { error: 'Sessão não encontrada' };
+    }
+
+    // Envio real para WhatsApp
+    const sendResult = await this.whatsappSender.sendText(session.tenantId, {
+      to: session.customerPhone,
+      text: dto.content,
+    });
+
+    const externalId = sendResult.success ? sendResult.messageId : undefined;
+
     const message = await this.conversationService.addMessage({
       sessionId,
       direction: 'outbound',
       content: dto.content,
       messageType: dto.messageType || 'text',
-      externalId: dto.externalId,
-      metadata: dto.metadata,
+      externalId,
+      metadata: {
+        ...(dto.metadata && typeof dto.metadata === 'object' ? dto.metadata : {}),
+        whatsapp: {
+          sent: sendResult.success,
+          error: sendResult.success ? null : sendResult.error,
+        },
+      },
     });
+
+    await this.prisma.chatSession.update({
+      where: { id: sessionId },
+      data: { lastMessageAt: new Date() },
+    });
+
     return message;
   }
 

@@ -267,26 +267,36 @@ export class WhatsAppWebhookController {
         },
       });
 
-      if (session.handoffActive) {
-        AiFlowLogger.ignored('human_handoff', trace, { sessionId: session.id });
-        return;
+      try {
+        await this.prisma.chatMessage.create({
+          data: {
+            sessionId: session.id,
+            direction: 'inbound',
+            content,
+            messageType: messageType || 'text',
+            externalId: externalId || undefined,
+          },
+        });
+      } catch (err: unknown) {
+        // Se duas requisições simultâneas tentarem criar o mesmo externalId, apenas ignorar a duplicata.
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        if (msg.toLowerCase().includes('unique') && externalId) {
+          AiFlowLogger.ignored('duplicate_message_id_race', trace, { sessionId: session.id });
+          return;
+        }
+        throw err;
       }
-
-      await this.prisma.chatMessage.create({
-        data: {
-          sessionId: session.id,
-          direction: 'inbound',
-          content,
-          messageType: messageType || 'text',
-          externalId: externalId || undefined,
-        },
-      });
 
       AiFlowLogger.flow('message_persist_success', trace, {
         sessionId: session.id,
         messageType: messageType || 'text',
         textLength: content.length,
       });
+
+      if (session.handoffActive) {
+        AiFlowLogger.ignored('human_handoff', trace, { sessionId: session.id });
+        return;
+      }
 
       AiFlowLogger.flow('orchestrator_dispatch_start', trace);
 

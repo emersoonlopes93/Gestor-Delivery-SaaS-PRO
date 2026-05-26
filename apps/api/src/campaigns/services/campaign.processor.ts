@@ -93,6 +93,38 @@ export class CampaignProcessor extends WorkerHost {
           where: { id: campaignId },
           data: { totalSent: { increment: 1 } },
         });
+
+        // Registrar na inbox (chat) como outbound, para ficar sincronizado com a caixa de entrada
+        const session = await this.prisma.chatSession.upsert({
+          where: {
+            tenantId_customerPhone: { tenantId, customerPhone: phone },
+          },
+          create: {
+            tenantId,
+            customerPhone: phone,
+            state: 'greeting',
+            lastMessageAt: new Date(),
+          },
+          update: {
+            lastMessageAt: new Date(),
+          },
+        });
+
+        await this.prisma.chatMessage.create({
+          data: {
+            sessionId: session.id,
+            direction: 'outbound',
+            content: mediaUrl ? `${personalizedMessage}` : personalizedMessage,
+            messageType: 'text',
+            externalId: result.messageId || undefined,
+            metadata: {
+              source: 'campaign',
+              campaignId,
+              dispatchId,
+              hasMedia: Boolean(mediaUrl),
+            },
+          },
+        });
       }
 
       return { success: result.success, messageId: result.messageId };

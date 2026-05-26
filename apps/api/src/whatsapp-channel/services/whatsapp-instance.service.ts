@@ -33,6 +33,22 @@ export class WhatsAppInstanceService {
     private readonly providerRegistry: WhatsAppProviderRegistryService,
   ) {}
 
+  private async resolveApiKeyForProvider(input: {
+    providerType: WhatsAppProviderType;
+    instanceApiKey: string;
+  }): Promise<string> {
+    if (input.providerType !== 'evolution_go') {
+      return input.instanceApiKey;
+    }
+
+    const systemConfig = await this.prisma.systemConfig.findUnique({
+      where: { id: 'global' },
+      select: { evolutionGlobalToken: true },
+    });
+
+    return systemConfig?.evolutionGlobalToken || input.instanceApiKey;
+  }
+
   /**
    * Retorna o provider correto baseado no tipo
    */
@@ -158,13 +174,10 @@ export class WhatsAppInstanceService {
     const safeWebhookUrl = this.maskWebhookSecret(webhookUrl);
     console.log(`[WhatsApp Service] Webhook URL: ${safeWebhookUrl}`);
 
-    let apiKeyForConnect = instance.apiKey;
-    if (instance.providerType === 'evolution_go') {
-      const systemConfig = await this.prisma.systemConfig.findUnique({ where: { id: 'global' } });
-      if (systemConfig?.evolutionGlobalToken) {
-        apiKeyForConnect = systemConfig.evolutionGlobalToken;
-      }
-    }
+    const apiKeyForConnect = await this.resolveApiKeyForProvider({
+      providerType: instance.providerType,
+      instanceApiKey: instance.apiKey,
+    });
 
     let connectionStatus: Awaited<ReturnType<typeof provider.connect>>;
     try {
@@ -237,9 +250,14 @@ export class WhatsAppInstanceService {
     const instance = await this.getInstanceOrFail(tenantId);
     const provider = this.getProvider(instance.providerType);
 
+    const apiKeyForDisconnect = await this.resolveApiKeyForProvider({
+      providerType: instance.providerType,
+      instanceApiKey: instance.apiKey,
+    });
+
     await provider.disconnect(
       instance.apiUrl,
-      instance.apiKey,
+      apiKeyForDisconnect,
       instance.evolutionInstanceId || instance.instanceName,
     );
 
@@ -256,10 +274,15 @@ export class WhatsAppInstanceService {
     const instance = await this.getInstanceOrFail(tenantId);
     const provider = this.getProvider(instance.providerType);
 
+    const apiKeyForPair = await this.resolveApiKeyForProvider({
+      providerType: instance.providerType,
+      instanceApiKey: instance.apiKey,
+    });
+
     return await provider.generatePairingCode(
       instance.apiUrl,
-      instance.apiKey,
-      instance.instanceName, // Usar o nome legível (slug) em vez do UUID para compatibilidade
+      apiKeyForPair,
+      instance.evolutionInstanceId || instance.instanceName,
       phone,
     );
   }
@@ -271,9 +294,14 @@ export class WhatsAppInstanceService {
     const instance = await this.getInstanceOrFail(tenantId);
     const provider = this.getProvider(instance.providerType);
 
+    const apiKeyForStatus = await this.resolveApiKeyForProvider({
+      providerType: instance.providerType,
+      instanceApiKey: instance.apiKey,
+    });
+
     const connectionStatus = await provider.getConnectionStatus(
       instance.apiUrl,
-      instance.apiKey,
+      apiKeyForStatus,
       instance.evolutionInstanceId || instance.instanceName,
     );
 
@@ -312,9 +340,14 @@ export class WhatsAppInstanceService {
     const instance = await this.getInstanceOrFail(tenantId);
     const provider = this.getProvider(instance.providerType);
 
+    const apiKeyForQr = await this.resolveApiKeyForProvider({
+      providerType: instance.providerType,
+      instanceApiKey: instance.apiKey,
+    });
+
     return provider.getQrCode(
       instance.apiUrl,
-      instance.apiKey,
+      apiKeyForQr,
       instance.evolutionInstanceId || instance.instanceName,
     );
   }
