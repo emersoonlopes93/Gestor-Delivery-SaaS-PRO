@@ -710,7 +710,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     return 'text';
   }
 
-  private extractQrFromObject(obj: any): string | undefined {
+  private extractQrFromObject(obj: Record<string, unknown> | null | undefined): string | undefined {
     if (!obj || typeof obj !== 'object') return undefined;
     
     const keys = [
@@ -719,25 +719,32 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     
     // Check root keys
     for (const key of keys) {
-      if (typeof obj[key] === 'string' && obj[key].trim()) {
-        return obj[key].trim();
+      const val = obj[key];
+      if (typeof val === 'string' && val.trim()) {
+        return val.trim();
       }
     }
 
     // Check data key
-    if (obj.data && typeof obj.data === 'object') {
+    const dataVal = obj.data;
+    if (dataVal && typeof dataVal === 'object' && !Array.isArray(dataVal)) {
+      const dataObj = dataVal as Record<string, unknown>;
       for (const key of keys) {
-        if (typeof obj.data[key] === 'string' && obj.data[key].trim()) {
-          return obj.data[key].trim();
+        const val = dataObj[key];
+        if (typeof val === 'string' && val.trim()) {
+          return val.trim();
         }
       }
     }
 
     // Check nested under instance
-    if (obj.instance && typeof obj.instance === 'object') {
+    const instanceVal = obj.instance;
+    if (instanceVal && typeof instanceVal === 'object' && !Array.isArray(instanceVal)) {
+      const instanceObj = instanceVal as Record<string, unknown>;
       for (const key of keys) {
-        if (typeof obj.instance[key] === 'string' && obj.instance[key].trim()) {
-          return obj.instance[key].trim();
+        const val = instanceObj[key];
+        if (typeof val === 'string' && val.trim()) {
+          return val.trim();
         }
       }
     }

@@ -118,7 +118,16 @@ export class WhatsAppInstanceController {
   @HttpCode(200)
   @Permissions('settings.manage')
   async disconnect(@Request() req: AuthenticatedRequest) {
-    return this.instanceService.disconnectInstance(req.user.tenantId);
+    await this.instanceService.disconnectInstance(req.user.tenantId);
+    return { status: 'disconnected', qrCode: null };
+  }
+
+  @Post('dev-reset')
+  @HttpCode(200)
+  @Permissions('settings.manage')
+  async devReset(@Request() req: AuthenticatedRequest) {
+    await this.instanceService.devResetInstance(req.user.tenantId);
+    return { success: true };
   }
 
   @Post('pair')

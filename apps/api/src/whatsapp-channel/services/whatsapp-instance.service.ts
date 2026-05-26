@@ -4,6 +4,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { WhatsAppInstanceStatus, WhatsAppProviderType } from '@prisma/client';
 import { WhatsAppProviderRegistryService } from './whatsapp-provider-registry.service';
 import type { IWhatsAppProvider } from '../interfaces/whatsapp-provider.interface';
+import axios from 'axios';
 
 export class CreateInstanceDto {
   @IsString()
@@ -223,13 +224,22 @@ export class WhatsAppInstanceService {
       qr_pending: 'qr_pending',
     };
 
-    const updateData: any = {
-      status: statusMap[connectionStatus.state] || 'disconnected',
+    const targetStatus = statusMap[connectionStatus.state] || 'disconnected';
+    const updateData: {
+      status: WhatsAppInstanceStatus;
+      phoneNumber: string | null;
+      qrCode?: string | null;
+    } = {
+      status: targetStatus,
       phoneNumber: connectionStatus.phoneNumber || instance.phoneNumber,
     };
+
     if (connectionStatus.qrCode) {
       updateData.qrCode = connectionStatus.qrCode;
+    } else if (targetStatus !== 'qr_pending') {
+      updateData.qrCode = null;
     }
+
     const updated = await this.prisma.whatsAppInstance.update({
       where: { id: instance.id },
       data: updateData,
@@ -241,7 +251,7 @@ export class WhatsAppInstanceService {
       providerType: updated.providerType,
       status: updated.status,
       phoneNumber: connectionStatus.phoneNumber || updated.phoneNumber,
-      qrCode: connectionStatus.qrCode,
+      qrCode: connectionStatus.qrCode || (updated.status === 'qr_pending' ? updated.qrCode : null),
     };
 
     console.log(`[WhatsApp Service] Final result:`, result);
@@ -279,7 +289,47 @@ export class WhatsAppInstanceService {
 
     await this.prisma.whatsAppInstance.update({
       where: { id: instance.id },
-      data: { status: 'disconnected' },
+      data: {
+        status: 'disconnected',
+        qrCode: null,
+      },
+    });
+  }
+
+  /**
+   * Reseta completamente a instância (remove do Evolution-Go e do banco local)
+   */
+  async devResetInstance(tenantId: string): Promise<void> {
+    const instance = await this.prisma.whatsAppInstance.findUnique({
+      where: { tenantId },
+    });
+    if (!instance) return;
+
+    const provider = this.getProvider(instance.providerType);
+    const apiKeyForDelete = await this.resolveApiKeyForProvider({
+      providerType: instance.providerType,
+      instanceApiKey: instance.apiKey,
+    });
+
+    try {
+      const client = axios.create({
+        baseURL: instance.apiUrl.replace(/\/+$/, ''),
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: apiKeyForDelete,
+        },
+        timeout: 10_000,
+      });
+      const instanceName = instance.evolutionInstanceId || instance.instanceName;
+      await client.delete(`/instance/delete/${instanceName}`);
+      this.logger.log(`Instance ${instanceName} deleted from Evolution-Go`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to delete instance from Evolution-Go during devResetInstance: ${msg}`);
+    }
+
+    await this.prisma.whatsAppInstance.delete({
+      where: { id: instance.id },
     });
   }
 
@@ -329,13 +379,43 @@ export class WhatsAppInstanceService {
       qr_pending: 'qr_pending',
     };
 
-    if (statusMap[connectionStatus.state] !== instance.status) {
+    const targetStatus = statusMap[connectionStatus.state] || 'disconnected';
+
+    // Anti-resurrection check
+    let finalStatus = targetStatus;
+    if (instance.status === 'disconnected' && (targetStatus === 'qr_pending' || targetStatus === 'connecting')) {
+      finalStatus = 'disconnected';
+    }
+
+    // Determine what to update
+    const updateData: {
+      status?: WhatsAppInstanceStatus;
+      phoneNumber?: string | null;
+      qrCode?: string | null;
+    } = {};
+
+    if (finalStatus !== instance.status) {
+      updateData.status = finalStatus;
+    }
+
+    if (connectionStatus.phoneNumber && connectionStatus.phoneNumber !== instance.phoneNumber) {
+      updateData.phoneNumber = connectionStatus.phoneNumber;
+    }
+
+    if (finalStatus === 'qr_pending') {
+      if (connectionStatus.qrCode) {
+        updateData.qrCode = connectionStatus.qrCode;
+      }
+    } else {
+      if (instance.qrCode !== null) {
+        updateData.qrCode = null;
+      }
+    }
+
+    if (Object.keys(updateData).length > 0) {
       await this.prisma.whatsAppInstance.update({
         where: { id: instance.id },
-        data: {
-          status: statusMap[connectionStatus.state] || 'disconnected',
-          phoneNumber: connectionStatus.phoneNumber || instance.phoneNumber,
-        },
+        data: updateData,
       });
     }
 
@@ -343,9 +423,9 @@ export class WhatsAppInstanceService {
       id: instance.id,
       instanceName: instance.instanceName,
       providerType: instance.providerType,
-      status: statusMap[connectionStatus.state] || instance.status,
+      status: finalStatus,
       phoneNumber: connectionStatus.phoneNumber || instance.phoneNumber,
-      qrCode: connectionStatus.qrCode,
+      qrCode: connectionStatus.qrCode || (finalStatus === 'qr_pending' ? instance.qrCode : null),
     };
   }
 
@@ -361,11 +441,23 @@ export class WhatsAppInstanceService {
       instanceApiKey: instance.apiKey,
     });
 
-    return provider.getQrCode(
+    const qrCode = await provider.getQrCode(
       instance.apiUrl,
       apiKeyForQr,
       instance.evolutionInstanceId || instance.instanceName,
     );
+
+    if (qrCode) {
+      await this.prisma.whatsAppInstance.update({
+        where: { id: instance.id },
+        data: {
+          qrCode,
+          status: 'qr_pending',
+        },
+      });
+    }
+
+    return qrCode;
   }
 
   /**

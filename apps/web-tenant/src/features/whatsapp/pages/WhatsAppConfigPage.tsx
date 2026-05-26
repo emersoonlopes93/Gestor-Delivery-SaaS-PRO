@@ -57,8 +57,8 @@ export function WhatsAppConfigPage() {
       const res = await api.get<WhatsAppStatusResponse>('/whatsapp/instance/status');
       console.log('[Frontend] Status response:', res.data);
       
-      // Se conectou, limpar QR code
-      if (res.data.status === 'connected') {
+      // Se conectou ou desconectou, limpar QR code
+      if (res.data.status === 'connected' || res.data.status === 'disconnected') {
         setQrCode(null);
       } else if (res.data.qrCode) {
         setQrCode(res.data.qrCode);
@@ -176,9 +176,25 @@ export function WhatsAppConfigPage() {
       await api.post('/whatsapp/instance/disconnect');
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-instance'] });
       queryClient.invalidateQueries({ queryKey: ['whatsapp-status'] });
       setQrCode(null);
     },
+  });
+
+  const devResetMutation = useMutation({
+    mutationFn: async () => {
+      await api.post('/whatsapp/instance/dev-reset');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-instance'] });
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-status'] });
+      setQrCode(null);
+      toast.success('Instância resetada com sucesso.');
+    },
+    onError: () => {
+      toast.error('Erro ao resetar instância.');
+    }
   });
 
   const [formAi, setFormAi] = useState<AiAgentConfig | null>(null);
@@ -276,12 +292,22 @@ export function WhatsAppConfigPage() {
                         Desconectar
                       </button>
                     ) : (
-                      <button 
-                        onClick={() => connectMutation.mutate()}
-                        className="px-4 py-2 bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/20 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        Conectar
-                      </button>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => connectMutation.mutate()}
+                          disabled={connectMutation.isPending}
+                          className="px-4 py-2 bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/20 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          {connectMutation.isPending ? 'Conectando...' : 'Conectar'}
+                        </button>
+                        <button 
+                          onClick={() => devResetMutation.mutate()}
+                          disabled={devResetMutation.isPending}
+                          className="px-4 py-2 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/20 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          {devResetMutation.isPending ? 'Resetando...' : 'Dev Reset'}
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
