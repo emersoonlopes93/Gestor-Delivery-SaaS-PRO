@@ -106,8 +106,8 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         token: token,
       });
 
-      const responseData = (data && typeof data === 'object' && 'data' in data) 
-        ? (data as { data: Record<string, unknown> }).data 
+      const responseData = (data && typeof data === 'object' && 'data' in data)
+        ? (data as { data: Record<string, unknown> }).data
         : (data as Record<string, unknown>);
 
       this.logger.log(`Instance created: ${input.instanceName}`);
@@ -144,7 +144,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       const requestBody = {
         webhookUrl: input.webhookUrl,
-        subscribe: ["Message"],
+        subscribe: ["MESSAGE"],
         immediate: true,
       };
 
@@ -157,7 +157,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       // Try to extract QR from the full response first (not just .data sub-object)
       const rawQrFromRoot = this.extractQrFromObject(dataRec);
-      
+
       // Parse the connection status from response (tries both root and .data)
       const statusSource = (dataRec?.data && typeof dataRec.data === 'object')
         ? (dataRec.data as Record<string, unknown>)
@@ -208,7 +208,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       const { data } = await client.post('/instance/disconnect');
       const dataRec = data as Record<string, unknown>;
       this.logger.log(`Disconnect response from Evolution Go: ${JSON.stringify(dataRec)}`);
-      
+
       const parsedStatus = this.parseConnectionStatus((dataRec?.data || dataRec) as Record<string, unknown>);
       this.logger.log(`[WHATSAPP_DISCONNECT] instanceId=${instanceId} providerStatus=${parsedStatus.state} localStatus=disconnected`);
     } catch (error: unknown) {
@@ -227,7 +227,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     const client = this.buildInstanceClient(apiUrl, apiKey, instanceId);
     try {
       this.logger.log(`Generating pairing code for instance: ${instanceId}, phone: ${phone}`);
-      
+
       const cleanPhone = phone?.replace(/\D/g, '');
       if (!cleanPhone) {
         throw new Error('Número de telefone é obrigatório para gerar o código de pareamento.');
@@ -235,17 +235,17 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       const requestBody = {
         phone: cleanPhone,
-        subscribe: ["Message"],
+        subscribe: ["MESSAGE"],
       };
 
       const { data } = await client.post('/instance/pair', requestBody);
       const dataRec = data as Record<string, unknown>;
       const responseData = (dataRec?.data || dataRec) as Record<string, unknown>;
-      
-      const pairingCode = 
-        responseData?.PairingCode || 
-        responseData?.pairingCode || 
-        responseData?.code || 
+
+      const pairingCode =
+        responseData?.PairingCode ||
+        responseData?.pairingCode ||
+        responseData?.code ||
         responseData?.pairing_code;
 
       return { pairingCode: String(pairingCode) };
@@ -293,8 +293,8 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       console.log(`[Evolution Go] Getting QR code for instance ${instanceId}`);
       const { data } = await client.get('/instance/qr');
       console.log(`[Evolution Go] QR response:`, data);
-      const responseData = (data && typeof data === 'object' && 'data' in data) 
-        ? (data as { data: Record<string, unknown> }).data 
+      const responseData = (data && typeof data === 'object' && 'data' in data)
+        ? (data as { data: Record<string, unknown> }).data
         : (data as Record<string, unknown>);
       const qrCode = (responseData?.qrCode || responseData?.qr || responseData?.base64 || responseData?.Qrcode || null) as string | null;
       console.log(`[Evolution Go] Extracted QR code:`, qrCode ? '***FOUND***' : 'NOT FOUND');
@@ -306,7 +306,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     }
   }
 
-  
+
   async sendText(
     apiUrl: string,
     apiKey: string,
@@ -332,10 +332,10 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       }
 
       const { data, status } = await client.post('/send/text', body);
-      const responseData = (data && typeof data === 'object' && 'data' in data) 
-        ? (data as { data: Record<string, unknown> }).data 
+      const responseData = (data && typeof data === 'object' && 'data' in data)
+        ? (data as { data: Record<string, unknown> }).data
         : (data as Record<string, unknown>);
-      
+
       AiFlowLogger.flow('evolution_send_success', {
         instanceId,
         phone: number,
@@ -375,7 +375,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       const { data } = await client.post('/send/media', body);
       const dataRec = data as Record<string, unknown>;
       const responseData = (dataRec?.data || dataRec) as Record<string, unknown>;
-      
+
       return {
         success: true,
         messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id),
@@ -443,7 +443,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       const { data } = await client.post('/send/buttons', body);
       const dataRec = data as Record<string, unknown>;
       const responseData = (dataRec?.data || dataRec) as Record<string, unknown>;
-      
+
       return {
         success: true,
         messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id),
@@ -517,7 +517,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     if (!payload || typeof payload !== 'object') return null;
     const dataRec = payload as Record<string, unknown>;
     const baseCtx = this.extractFlowContext(dataRec, tenantId);
-    
+
     // Padrão Evolution-Go: "event" e "data"
     // Tornar insensível a maiúsculas/minúsculas para maior compatibilidade
     const eventTypeRaw = String(dataRec.event || '');
@@ -528,12 +528,12 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       AiFlowLogger.debug('webhook_event_skip', baseCtx, { event: eventTypeRaw });
       return null;
     }
-    
+
     if (eventType === 'message') {
       const data = (dataRec.data || {}) as Record<string, unknown>;
       const info = (data?.Info || data?.key || {}) as Record<string, unknown>;
       const message = (data?.Message || data?.message || {}) as Record<string, unknown>;
-      
+
       const chatJid = String(info?.Chat || info?.Sender || info?.remoteJid || '');
       const remoteJid = chatJid;
       const messageId = String(info?.ID || info?.id || '');
@@ -544,7 +544,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         chatJid: chatJid.includes('@') ? chatJid : undefined,
         sender: String(info?.Sender || ''),
       };
-      
+
       // Ignorar status@broadcast ou qualquer broadcast cedo
       if (remoteJid.includes('status@broadcast') || remoteJid.includes('broadcast')) {
         this.logger.log(`[AI_FLOW_DEBUG] ignored_broadcast remoteJid=${remoteJid}`);
@@ -560,7 +560,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         AiFlowLogger.ignored('group_message', ctx);
         return null;
       }
-      
+
       // Ignorar mensagens enviadas pelo próprio bot
       if (info?.IsFromMe === true || info?.fromMe === true) {
         AiFlowLogger.ignored('from_me', ctx);
@@ -585,7 +585,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
           if (typeof caption === 'string') content = caption;
         }
       }
-      
+
       if (!content) {
         AiFlowLogger.ignored('empty_text', ctx);
         return null;
@@ -609,12 +609,12 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     // Fallback para padrões legados ou mensagens upsert (compatibilidade)
     const legacyEventType = (dataRec.event || (dataRec.data as Record<string, unknown>)?.event || dataRec.type || 'unknown') as string;
     const legacyEventTypeLower = legacyEventType.toLowerCase();
-    
+
     if (legacyEventTypeLower === 'messages.upsert' || legacyEventTypeLower === 'message') {
       const data = (dataRec.data || dataRec) as Record<string, unknown>;
       const key = data?.key as Record<string, unknown> | undefined;
       const remoteJid = (key?.remoteJid || data?.remoteJid || data?.from) as string | undefined;
-      
+
       if (remoteJid && (remoteJid.includes('status@broadcast') || remoteJid.includes('broadcast'))) {
         this.logger.log(`[AI_FLOW_DEBUG] ignored_broadcast remoteJid=${remoteJid}`);
         return null;
@@ -712,11 +712,11 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
   private extractQrFromObject(obj: Record<string, unknown> | null | undefined): string | undefined {
     if (!obj || typeof obj !== 'object') return undefined;
-    
+
     const keys = [
       'qr', 'qrcode', 'qrCode', 'Qrcode', 'base64', 'code', 'pairingCode', 'pairing_code'
     ];
-    
+
     // Check root keys
     for (const key of keys) {
       const val = obj[key];
@@ -762,7 +762,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     ).toLowerCase();
 
     let state: WhatsAppConnectionStatus['state'] = 'disconnected';
-    
+
     const connectedRaw = data?.Connected === true || data?.connected === true;
     const loggedInRaw = data?.LoggedIn === true || data?.loggedIn === true;
 
