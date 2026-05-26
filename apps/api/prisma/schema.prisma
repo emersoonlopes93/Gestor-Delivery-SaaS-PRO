@@ -1993,6 +1993,7 @@ model WhatsAppInstance {
   apiKey              String                 @map("api_key") @db.VarChar(500)
   phoneNumber         String?                @map("phone_number") @db.VarChar(30)
   status              WhatsAppInstanceStatus @default(disconnected)
+  qrCode              String?                @map("qr_code") @db.Text
   webhookSecret       String?                @map("webhook_secret") @db.VarChar(255)
   evolutionInstanceId String?                @map("evolution_instance_id") @db.VarChar(100)
   createdAt           DateTime               @default(now()) @map("created_at")

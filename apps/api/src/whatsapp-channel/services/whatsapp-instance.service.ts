@@ -223,12 +223,16 @@ export class WhatsAppInstanceService {
       qr_pending: 'qr_pending',
     };
 
+    const updateData: any = {
+      status: statusMap[connectionStatus.state] || 'disconnected',
+      phoneNumber: connectionStatus.phoneNumber || instance.phoneNumber,
+    };
+    if (connectionStatus.qrCode) {
+      updateData.qrCode = connectionStatus.qrCode;
+    }
     const updated = await this.prisma.whatsAppInstance.update({
       where: { id: instance.id },
-      data: {
-        status: statusMap[connectionStatus.state] || 'disconnected',
-        phoneNumber: connectionStatus.phoneNumber || instance.phoneNumber,
-      },
+      data: updateData,
     });
 
     const result = {

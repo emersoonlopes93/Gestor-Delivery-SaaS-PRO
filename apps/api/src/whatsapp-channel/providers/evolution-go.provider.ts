@@ -134,48 +134,58 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       headers: {
         'Content-Type': 'application/json',
         apikey: apiKey,
-        instanceId: instanceId, // Header obrigatório segundo a documentação
+        instanceId: instanceId,
       },
       timeout: 30_000,
     });
 
     try {
-      this.logger.debug(`Connecting instance ${instanceId} with webhook: ${input.webhookUrl}`);
+      this.logger.log(`[WHATSAPP_CONNECT_START] tenantId=${input.tenantId || 'n/a'} instanceId=${instanceId} webhookUrl=${input.webhookUrl.replace(/secret=.*$/, 'secret=***')}`);
 
-      // Payload específico Evolution-Go
       const requestBody = {
         webhookUrl: input.webhookUrl,
         subscribe: ["Message"],
-        immediate: true,    // Parâmetro específico Evolution-Go
+        immediate: true,
       };
-
-      this.logger.log(`[WHATSAPP_CONNECT] tenantId=${input.tenantId || 'n/a'} instanceId=${instanceId} webhookUrl=${input.webhookUrl.replace(/secret=.*$/, 'secret=***')} subscribe=["Message"]`);
 
       const { data } = await client.post('/instance/connect', requestBody);
       const dataRec = data as Record<string, unknown>;
-      
-      this.logger.log(`Webhook configuration response from Evolution Go: ${JSON.stringify(dataRec)}`);
-      
-      // Parse the connection status from response
-      const parsed = this.parseConnectionStatus((dataRec?.data || dataRec) as Record<string, unknown>);
 
-      // If QR code not present and pending, attempt to fetch it explicitly
-      if (!parsed.qrCode && (parsed.state === 'qr_pending' || parsed.state === 'connecting')) {
+      // Log all root keys for debugging
+      const rootKeys = Object.keys(dataRec);
+      this.logger.log(`[WHATSAPP_QR_RESPONSE] qrPresent=${!!this.extractQrFromObject(dataRec)} keys=[${rootKeys.join(', ')}]`);
+
+      // Try to extract QR from the full response first (not just .data sub-object)
+      const rawQrFromRoot = this.extractQrFromObject(dataRec);
+      
+      // Parse the connection status from response (tries both root and .data)
+      const statusSource = (dataRec?.data && typeof dataRec.data === 'object')
+        ? (dataRec.data as Record<string, unknown>)
+        : dataRec;
+      const parsed = this.parseConnectionStatus(statusSource);
+
+      // Override qrCode if found directly at root
+      if (!parsed.qrCode && rawQrFromRoot) {
+        parsed.qrCode = this.normalizeQrCode(rawQrFromRoot) ?? undefined;
+        parsed.state = 'qr_pending';
+      }
+
+      // If QR code not present and state suggests pairing needed, attempt explicit fetch
+      if (!parsed.qrCode && (parsed.state === 'qr_pending' || parsed.state === 'connecting' || parsed.state === 'disconnected')) {
         this.logger.debug('QR code missing after connect, attempting explicit fetch via getQrCode');
         const fetchedQr = await this.getQrCode(apiUrl, apiKey, instanceId);
         if (fetchedQr) {
           parsed.qrCode = fetchedQr;
-          // Ensure state reflects pending QR
           parsed.state = 'qr_pending';
         }
       }
 
-      this.logger.log(`[WHATSAPP_QR] tenantId=${input.tenantId || 'n/a'} instanceId=${instanceId} qrPresent=${!!parsed.qrCode}`);
+      this.logger.log(`[WHATSAPP_CONNECT_RESULT] tenantId=${input.tenantId || 'n/a'} instanceId=${instanceId} state=${parsed.state} qrPresent=${!!parsed.qrCode}`);
 
       return parsed;
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`[WHATSAPP_ERROR] step=connect tenantId=${input.tenantId || 'n/a'} instanceId=${instanceId} status=${isAxiosError(error) ? error.response?.status : 'unknown'} body=${isAxiosError(error) ? JSON.stringify(error.response?.data) : 'unknown'}`);
+      const msg = isAxiosError(error) ? `status=${error.response?.status} body=${JSON.stringify(error.response?.data)}` : (error instanceof Error ? error.message : 'unknown');
+      this.logger.error(`[WHATSAPP_ERROR] step=connect tenantId=${input.tenantId || 'n/a'} instanceId=${instanceId} ${msg}`);
       throw error;
     }
   }
@@ -700,12 +710,45 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     return 'text';
   }
 
+  private extractQrFromObject(obj: any): string | undefined {
+    if (!obj || typeof obj !== 'object') return undefined;
+    
+    const keys = [
+      'qr', 'qrcode', 'qrCode', 'Qrcode', 'base64', 'code', 'pairingCode', 'pairing_code'
+    ];
+    
+    // Check root keys
+    for (const key of keys) {
+      if (typeof obj[key] === 'string' && obj[key].trim()) {
+        return obj[key].trim();
+      }
+    }
+
+    // Check data key
+    if (obj.data && typeof obj.data === 'object') {
+      for (const key of keys) {
+        if (typeof obj.data[key] === 'string' && obj.data[key].trim()) {
+          return obj.data[key].trim();
+        }
+      }
+    }
+
+    // Check nested under instance
+    if (obj.instance && typeof obj.instance === 'object') {
+      for (const key of keys) {
+        if (typeof obj.instance[key] === 'string' && obj.instance[key].trim()) {
+          return obj.instance[key].trim();
+        }
+      }
+    }
+
+    return undefined;
+  }
+
   private parseConnectionStatus(data: Record<string, unknown>): WhatsAppConnectionStatus {
     if (!data) {
       return { connected: false, state: 'disconnected' };
     }
-
-    console.log(`[Evolution Go] Parsing status from:`, data);
 
     const rawState = (
       String(data?.state || data?.status || data?.connectionStatus || '')
@@ -713,30 +756,35 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
     let state: WhatsAppConnectionStatus['state'] = 'disconnected';
     
-    // Verificar Connected: true e LoggedIn: true = conectado
-    if (data?.Connected === true && data?.LoggedIn === true) {
+    const connectedRaw = data?.Connected === true || data?.connected === true;
+    const loggedInRaw = data?.LoggedIn === true || data?.loggedIn === true;
+
+    if (connectedRaw && loggedInRaw) {
       state = 'connected';
+    } else if (connectedRaw && !loggedInRaw) {
+      state = 'qr_pending';
     } else if (rawState === 'open' || rawState === 'connected') {
       state = 'connected';
     } else if (rawState === 'connecting' || rawState === 'opening') {
       state = 'connecting';
-    } else if (rawState === 'qr' || rawState === 'qr_pending') {
+    } else if (rawState === 'qr' || rawState === 'qr_pending' || rawState === 'pairing_required') {
       state = 'qr_pending';
     }
 
-    // Se Connected: true mas LoggedIn: false, significa que QR está pendente
-    if (data?.Connected === true && data?.LoggedIn === false) {
-      state = 'qr_pending';
-    }
+    const rawQr = this.extractQrFromObject(data);
+    const normalizedQr = this.normalizeQrCode(rawQr);
 
     const result = {
       connected: state === 'connected',
       state,
       phoneNumber: (data?.phoneNumber || data?.phone || data?.jid || data?.number) as string | undefined,
-      qrCode: this.normalizeQrCode((data?.qrCode || data?.qr || data?.base64 || data?.Qrcode) as string | undefined),
+      qrCode: normalizedQr,
     };
 
-    console.log(`[Evolution Go] Parsed result:`, result);
+    const keys = Object.keys(data).filter(k => data[k] !== undefined && data[k] !== null);
+    this.logger.log(`[WHATSAPP_STATUS_PARSE] connectedRaw=${connectedRaw} loggedInRaw=${loggedInRaw} mapped=${state} qrPresent=${!!normalizedQr}`);
+    this.logger.log(`[WHATSAPP_QR] qrPresent=${!!normalizedQr} keys=[${keys.join(', ')}]`);
+
     return result;
   }
 }
