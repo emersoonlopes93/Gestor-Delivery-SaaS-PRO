@@ -156,25 +156,17 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       
       this.logger.log(`Webhook configuration response from Evolution Go: ${JSON.stringify(dataRec)}`);
       
+      // Parse the connection status from response
       const parsed = this.parseConnectionStatus((dataRec?.data || dataRec) as Record<string, unknown>);
-      if (!parsed.qrCode && parsed.state !== 'connected') {
-        try {
-          const qrResponse = await client.get('/instance/qr', { timeout: 15_000 });
-          const qrDataRoot = qrResponse.data as Record<string, unknown>;
-          const qrData = (qrDataRoot?.data || qrDataRoot) as Record<string, unknown>;
-          const qrCode = (qrData?.qrCode || qrData?.qr || qrData?.base64 || qrData?.Qrcode) as string | undefined;
 
-          if (qrCode) {
-            return {
-              ...parsed,
-              connected: false,
-              state: 'qr_pending',
-              qrCode: this.normalizeQrCode(qrCode),
-            };
-          }
-        } catch (qrError: unknown) {
-          const message = qrError instanceof Error ? qrError.message : 'Unknown error';
-          this.logger.warn(`Failed to get QR code after connect: ${message}`);
+      // If QR code not present and pending, attempt to fetch it explicitly
+      if (!parsed.qrCode && (parsed.state === 'qr_pending' || parsed.state === 'connecting')) {
+        this.logger.debug('QR code missing after connect, attempting explicit fetch via getQrCode');
+        const fetchedQr = await this.getQrCode(apiUrl, apiKey, instanceId);
+        if (fetchedQr) {
+          parsed.qrCode = fetchedQr;
+          // Ensure state reflects pending QR
+          parsed.state = 'qr_pending';
         }
       }
 
