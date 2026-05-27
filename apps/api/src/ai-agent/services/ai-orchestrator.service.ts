@@ -645,6 +645,8 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
 
     const newMessages = [...historyMessages, assistantToolMessage];
 
+    let createdOrderResult: { orderId: string; orderNumber?: string; totalAmount?: number } | null = null;
+
     for (const toolCall of toolCalls) {
       const signatureHash = this.hashToolArgs(toolCall.arguments);
 
@@ -706,6 +708,19 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
         toolCall.arguments,
         agentSessionCtx,
       );
+
+      // capture created order details to generate a system confirmation
+      if (toolCall.name === 'criar_pedido') {
+        const toolStatusLocal = this.getToolResultStatus(result);
+        if (toolStatusLocal === 'success') {
+          const orderId = this.getOrderIdFromToolResult(result);
+          const orderNumber = result && typeof result === 'object' && 'orderNumber' in result ? String((result as Record<string, unknown>).orderNumber) : undefined;
+          const totalAmount = result && typeof result === 'object' && 'totalAmount' in result ? Number((result as Record<string, unknown>).totalAmount) : undefined;
+          if (orderId) {
+            createdOrderResult = { orderId, orderNumber, totalAmount };
+          }
+        }
+      }
 
       const toolStatus = this.getToolResultStatus(result);
       const toolCode = this.getToolResultCode(result);
@@ -829,6 +844,34 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
       false,
       'composing',
     );
+
+    // If we created an order via a tool, send a safe, system-generated confirmation
+    if (createdOrderResult) {
+      AiFlowLogger.flow('order_confirmation_by_system', trace, {
+        orderId: createdOrderResult.orderId,
+        orderNumber: createdOrderResult.orderNumber,
+      });
+
+      const formattedTotal = typeof createdOrderResult.totalAmount === 'number'
+        ? ` R$ ${createdOrderResult.totalAmount.toFixed(2)}`
+        : '';
+
+      const confirmationMessage = createdOrderResult.orderNumber
+        ? `Seu pedido ${createdOrderResult.orderNumber} foi criado com sucesso!${formattedTotal ? ` O total é${formattedTotal}.` : ''} Em breve enviaremos atualizações pelo WhatsApp.`
+        : `Seu pedido foi criado com sucesso!${formattedTotal ? ` O total é${formattedTotal}.` : ''} Em breve enviaremos atualizações pelo WhatsApp.`;
+
+      await this.sendFinalResponse(
+        tenantId,
+        sessionId,
+        customerPhone,
+        confirmationMessage,
+        trace,
+        config.simulateTyping,
+      );
+
+      // stop here to avoid sending any LLM-generated confirmation that might contradict actual order state
+      return;
+    }
 
     AiFlowLogger.flow('llm_request_start', trace, {
       provider: aiProvider.providerType,
