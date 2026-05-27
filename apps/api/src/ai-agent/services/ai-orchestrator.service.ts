@@ -93,15 +93,35 @@ export class AiOrchestratorService {
     });
     const providerType = systemConfig?.defaultAiProvider ?? 'openai';
 
+    const resolvedModel =
+      providerType === 'google_ai'
+        ? systemConfig?.googleAiModel ?? 'gemini-2.0-flash-lite'
+        : providerType === 'anthropic'
+          ? process.env.ANTHROPIC_MODEL ?? 'claude-3-5-sonnet-20240620'
+          : process.env.OPENAI_MODEL ?? 'gpt-4o';
+
+    const modelSource =
+      providerType === 'google_ai'
+        ? systemConfig?.googleAiModel
+          ? 'system_config'
+          : 'default'
+        : providerType === 'anthropic'
+          ? process.env.ANTHROPIC_MODEL
+            ? 'env'
+            : 'default'
+          : process.env.OPENAI_MODEL
+            ? 'env'
+            : 'default';
+
     AiFlowLogger.flow('ai_config_loaded', flowTrace, {
-      enabled: config.isEnabled,
+      tenantId,
+      agentConfigId: config.id,
+      agentName: config.agentName,
+      isEnabled: config.isEnabled,
       provider: providerType,
-      model:
-        providerType === 'google_ai'
-          ? systemConfig?.googleAiModel ?? 'gemini-2.0-flash-lite'
-          : providerType === 'anthropic'
-            ? process.env.ANTHROPIC_MODEL ?? 'claude-3-5-sonnet-20240620'
-            : process.env.OPENAI_MODEL ?? 'gpt-4o',
+      providerSource: 'system_config',
+      model: resolvedModel,
+      modelSource,
       debounceMs: config.debounceMs ?? 1000,
       operatingMode: config.operatingMode,
       handoffActive: false,
@@ -277,6 +297,10 @@ export class AiOrchestratorService {
         where: { id: 'global' },
       });
       const providerResolved = await this.aiRegistry.resolveProvider(tenantId);
+      AiFlowLogger.flow('provider_resolved', trace, {
+        provider: providerResolved.providerType,
+        providerSource: 'ai_provider_registry',
+      });
 
       const tools = await this.toolsService.getAvailableToolsForTenant(tenantId);
 
