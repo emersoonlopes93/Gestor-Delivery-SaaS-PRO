@@ -347,8 +347,8 @@ model TenantSettings {
   whatsappNotificationsEnabled Boolean  @default(false) @map("whatsapp_notifications_enabled")
   notificationTemplates        Json?    @map("notification_templates")
   audioNotificationEnabled     Boolean  @default(true) @map("audio_notification_enabled")
-  newOrderSound                String   @default("default") @map("new_order_sound")
-  cancellationSound            String   @default("default") @map("cancellation_sound")
+  newOrderSound                String   @default("notification.mp3") @map("new_order_sound")
+  cancellationSound            String   @default("notification.mp3") @map("cancellation_sound")
   notificationVolume           Float    @default(1.0) @map("notification_volume")
   tenant                       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 

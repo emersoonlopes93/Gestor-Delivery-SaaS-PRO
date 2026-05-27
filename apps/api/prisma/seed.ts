@@ -169,6 +169,15 @@ async function seedDemoTenant() {
     console.log('   ✅ Demo modules (ai_agent, whatsapp) + AI agent isEnabled=true');
 
     // Create tenant settings with full operational configs
+    const notificationTemplates = {
+      confirmed: '✅ Pedido #{{orderNumber}} confirmado! {{restaurantName}} já está preparando seu pedido.',
+      preparing: '👨‍🍳 Pedido #{{orderNumber}} está sendo preparado por {{restaurantName}}. Já já sai!',
+      ready: '📦 Pedido #{{orderNumber}} está pronto! Aguardando retirada/entregador.',
+      out_for_delivery: '🛵 Pedido #{{orderNumber}} saiu para entrega! Fique atento.',
+      completed: '🎉 Pedido #{{orderNumber}} foi entregue! Bom apetite! Obrigado por pedir no {{restaurantName}}.',
+      cancelled: '❌ Pedido #{{orderNumber}} foi cancelado. Entre em contato com {{restaurantName}} para mais informações.',
+    };
+
     await prisma.tenantSettings.upsert({
       where: { tenantId: tenant.id },
       update: {
@@ -180,6 +189,12 @@ async function seedDemoTenant() {
         zipCode: '01310-100',
         pixKey: 'contato@pizzariademo.com',
         paymentMethods: ['pix', 'credit_card', 'cash'],
+        audioNotificationEnabled: true,
+        newOrderSound: 'notification.mp3',
+        cancellationSound: 'notification.mp3',
+        notificationVolume: 1.0,
+        whatsappNotificationsEnabled: false,
+        notificationTemplates: notificationTemplates,
       },
       create: {
         tenantId: tenant.id,
@@ -196,6 +211,12 @@ async function seedDemoTenant() {
         zipCode: '01310-100',
         pixKey: 'contato@pizzariademo.com',
         paymentMethods: ['pix', 'credit_card', 'cash'],
+        audioNotificationEnabled: true,
+        newOrderSound: 'notification.mp3',
+        cancellationSound: 'notification.mp3',
+        notificationVolume: 1.0,
+        whatsappNotificationsEnabled: false,
+        notificationTemplates: notificationTemplates,
       },
     });
 

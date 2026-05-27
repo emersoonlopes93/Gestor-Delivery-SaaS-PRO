@@ -6,6 +6,61 @@ import { Prisma } from '@prisma/client';
 import type { AgentSessionContext } from './agent-tools.service';
 import { ChatGateway } from '../../chat/chat.gateway';
 
+export interface AiOrderDraft {
+  items: Array<{
+    productId: string;
+    quantity: number;
+    notes?: string | null;
+    productName?: string | null;
+  }>;
+  fulfillmentType: 'delivery' | 'pickup' | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  deliveryAddress: {
+    street: string | null;
+    number: string | null;
+    neighborhood: string | null;
+    city: string | null;
+    state: string | null;
+    zipCode: string | null;
+    complement: string | null;
+    reference: string | null;
+    lat: number | null;
+    lng: number | null;
+  };
+  payment: {
+    method: string | null;
+    changeFor: number | null;
+  };
+  deliveryFee: number | null;
+  subtotal: number | null;
+  total: number | null;
+  missingFields: string[];
+  readyToConfirm: boolean;
+  confirmationAskedAt: string | null;
+}
+
+export interface AiSessionMemory {
+  lastAiProcessedAt: string | null;
+  lastProcessedMessageId: string | null;
+  pendingCustomerMessageIds: string[];
+  currentIntent: 'order' | 'menu' | 'delivery_fee' | 'payment' | 'support' | null;
+  orderDraft: AiOrderDraft;
+  lastKnownCustomerName: string | null;
+  lastKnownAddress: {
+    street: string | null;
+    number: string | null;
+    neighborhood: string | null;
+    city: string | null;
+    state: string | null;
+    zipCode: string | null;
+    complement: string | null;
+    reference: string | null;
+  };
+  lastOrderId: string | null;
+  lastOrderSummary: string | null;
+}
+
 export interface CreateMessageDto {
   sessionId: string;
   direction: MessageDirection;
@@ -66,6 +121,121 @@ export class ConversationService {
       customerPhone: customer.phone,
       customerName: customer.name,
     };
+  }
+
+  async getSessionById(sessionId: string) {
+    return this.prisma.chatSession.findUnique({ where: { id: sessionId } });
+  }
+
+  async getSessionAiMemory(sessionId: string): Promise<AiSessionMemory> {
+    const session = await this.prisma.chatSession.findUnique({
+      where: { id: sessionId },
+      select: { metadata: true },
+    });
+
+    const metadata = this.asJsonObject(session?.metadata);
+    const ai = this.asJsonObject(metadata.ai);
+
+    const draft = this.asJsonObject(ai.orderDraft);
+
+    return {
+      lastAiProcessedAt: typeof ai.lastAiProcessedAt === 'string' ? ai.lastAiProcessedAt : null,
+      lastProcessedMessageId: typeof ai.lastProcessedMessageId === 'string' ? ai.lastProcessedMessageId : null,
+      pendingCustomerMessageIds: Array.isArray(ai.pendingCustomerMessageIds)
+        ? (ai.pendingCustomerMessageIds as string[])
+        : [],
+      currentIntent:
+        ai.currentIntent === 'order' ||
+        ai.currentIntent === 'menu' ||
+        ai.currentIntent === 'delivery_fee' ||
+        ai.currentIntent === 'payment' ||
+        ai.currentIntent === 'support'
+          ? ai.currentIntent
+          : null,
+      orderDraft: {
+        items: Array.isArray(draft.items)
+          ? (draft.items as Array<{
+              productId: string;
+              quantity: number;
+              notes?: string;
+              productName?: string;
+            }>)
+          : [],
+        fulfillmentType:
+          draft.fulfillmentType === 'delivery' || draft.fulfillmentType === 'pickup'
+            ? draft.fulfillmentType
+            : null,
+        customerName: typeof draft.customerName === 'string' ? draft.customerName : null,
+        customerPhone: typeof draft.customerPhone === 'string' ? draft.customerPhone : null,
+        deliveryAddress: {
+          street: typeof draft.deliveryAddress?.street === 'string' ? draft.deliveryAddress.street : null,
+          number: typeof draft.deliveryAddress?.number === 'string' ? draft.deliveryAddress.number : null,
+          neighborhood: typeof draft.deliveryAddress?.neighborhood === 'string' ? draft.deliveryAddress.neighborhood : null,
+          city: typeof draft.deliveryAddress?.city === 'string' ? draft.deliveryAddress.city : null,
+          state: typeof draft.deliveryAddress?.state === 'string' ? draft.deliveryAddress.state : null,
+          zipCode: typeof draft.deliveryAddress?.zipCode === 'string' ? draft.deliveryAddress.zipCode : null,
+          complement: typeof draft.deliveryAddress?.complement === 'string' ? draft.deliveryAddress.complement : null,
+          reference: typeof draft.deliveryAddress?.reference === 'string' ? draft.deliveryAddress.reference : null,
+          lat: typeof draft.deliveryAddress?.lat === 'number' ? draft.deliveryAddress.lat : null,
+          lng: typeof draft.deliveryAddress?.lng === 'number' ? draft.deliveryAddress.lng : null,
+        },
+        payment: {
+          method: typeof draft.payment?.method === 'string' ? draft.payment.method : null,
+          changeFor: typeof draft.payment?.changeFor === 'number' ? draft.payment.changeFor : null,
+        },
+        deliveryFee: typeof draft.deliveryFee === 'number' ? draft.deliveryFee : null,
+        subtotal: typeof draft.subtotal === 'number' ? draft.subtotal : null,
+        total: typeof draft.total === 'number' ? draft.total : null,
+        missingFields: Array.isArray(draft.missingFields)
+          ? (draft.missingFields as string[])
+          : [],
+        readyToConfirm: draft.readyToConfirm === true,
+        confirmationAskedAt:
+          typeof draft.confirmationAskedAt === 'string' ? draft.confirmationAskedAt : null,
+      },
+      lastKnownCustomerName:
+        typeof ai.lastKnownCustomerName === 'string' ? ai.lastKnownCustomerName : null,
+      lastKnownAddress: {
+        street: typeof ai.lastKnownAddress?.street === 'string' ? ai.lastKnownAddress.street : null,
+        number: typeof ai.lastKnownAddress?.number === 'string' ? ai.lastKnownAddress.number : null,
+        neighborhood:
+          typeof ai.lastKnownAddress?.neighborhood === 'string'
+            ? ai.lastKnownAddress.neighborhood
+            : null,
+        city: typeof ai.lastKnownAddress?.city === 'string' ? ai.lastKnownAddress.city : null,
+        state: typeof ai.lastKnownAddress?.state === 'string' ? ai.lastKnownAddress.state : null,
+        zipCode: typeof ai.lastKnownAddress?.zipCode === 'string' ? ai.lastKnownAddress.zipCode : null,
+        complement:
+          typeof ai.lastKnownAddress?.complement === 'string'
+            ? ai.lastKnownAddress.complement
+            : null,
+        reference:
+          typeof ai.lastKnownAddress?.reference === 'string'
+            ? ai.lastKnownAddress.reference
+            : null,
+      },
+      lastOrderId: typeof ai.lastOrderId === 'string' ? ai.lastOrderId : null,
+      lastOrderSummary: typeof ai.lastOrderSummary === 'string' ? ai.lastOrderSummary : null,
+    };
+  }
+
+  async updateSessionAiMemory(sessionId: string, update: Partial<AiSessionMemory>) {
+    const session = await this.prisma.chatSession.findUnique({
+      where: { id: sessionId },
+      select: { metadata: true },
+    });
+
+    const metadata = this.asJsonObject(session?.metadata);
+    const ai = this.asJsonObject(metadata.ai);
+    const nextAi = { ...ai, ...update } as Record<string, unknown>;
+    metadata.ai = nextAi;
+
+    await this.prisma.chatSession.update({
+      where: { id: sessionId },
+      data: { metadata: metadata as Prisma.InputJsonObject },
+    });
+
+    return nextAi as AiSessionMemory;
   }
 
   /**

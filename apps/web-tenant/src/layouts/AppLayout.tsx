@@ -317,7 +317,7 @@ export function AppLayout() {
   const [storefrontBaseUrl, setStorefrontBaseUrl] = useState('');
 
   const { data: tenantData } = useQuery({
-    queryKey: ['tenant-settings-applayout'],
+    queryKey: ['tenant-settings'],
     queryFn: async () => {
       const res = await api.get<Tenant & { settings: TenantSettings, operatingHours: TenantOperatingHours[] }>('/tenant/me');
       return res.data;

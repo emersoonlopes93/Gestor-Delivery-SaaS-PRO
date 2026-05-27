@@ -47,9 +47,7 @@ export class AiOrchestratorService {
   private readonly typingStartedAt = new Map<string, number>();
   /** Sessions currently being processed to avoid parallel runs */
   private readonly processingSessions = new Set<string>();
-  /** If a message arrived while processing, store latest content to trigger a rerun */
-  private readonly pendingRerunContent = new Map<string, string>();
-  /** Keys that need a rerun after current processing finishes */
+  /** Keys que precisam de nova rodada após o processamento atual terminar */
   private readonly pendingReruns = new Set<string>();
 
   constructor(
@@ -138,36 +136,44 @@ export class AiOrchestratorService {
       return;
     }
 
-    const debounceKey = `${tenantId}:${customerPhone}`;
+    const debounceKey = `${tenantId}:${sessionId}`;
 
     if (this.debounceTimers.has(debounceKey)) {
-      AiFlowLogger.flow('debounce_reset', flowTrace, { debounceKey });
+      AiFlowLogger.flow('AI_DEBOUNCE timer_cancelled', flowTrace, { sessionId, tenantId });
+      this.logger.log(`[AI_DEBOUNCE] timer_cancelled sessionId=${sessionId}`);
       clearTimeout(this.debounceTimers.get(debounceKey));
     }
 
-    const debounceMs = config.debounceMs || 1000;
-    AiFlowLogger.flow('debounce_scheduled', flowTrace, { delayMs: debounceMs });
+    const debounceMs = config.debounceMs ?? 10000;
+    AiFlowLogger.flow('AI_DEBOUNCE timer_scheduled', flowTrace, { sessionId, tenantId, delayMs: debounceMs });
+    this.logger.log(`[AI_DEBOUNCE] timer_scheduled sessionId=${sessionId} delayMs=${debounceMs}`);
 
     const timer = setTimeout(() => {
       this.debounceTimers.delete(debounceKey);
-      AiFlowLogger.flow('debounce_fired', flowTrace);
+      AiFlowLogger.flow('AI_DEBOUNCE timer_fired', flowTrace, { sessionId, tenantId });
+      this.logger.log(`[AI_DEBOUNCE] timer_fired sessionId=${sessionId}`);
 
-      // If already processing this session, schedule a rerun with latest content
       if (this.processingSessions.has(debounceKey)) {
-        AiFlowLogger.flow('process_skipped_already_running', flowTrace, { debounceKey });
+        AiFlowLogger.flow('AI_DEBOUNCE skipped_already_processing', flowTrace, { sessionId, tenantId });
+        this.logger.log(`[AI_DEBOUNCE] skipped_already_processing sessionId=${sessionId}`);
         this.pendingReruns.add(debounceKey);
-        this.pendingRerunContent.set(debounceKey, content);
-        AiFlowLogger.flow('process_rerun_scheduled', flowTrace, { debounceKey });
+        AiFlowLogger.flow('AI_DEBOUNCE rerun_scheduled', flowTrace, { sessionId, tenantId });
+        this.logger.log(`[AI_DEBOUNCE] rerun_scheduled sessionId=${sessionId}`);
         return;
       }
 
-      // Mark processing and run
       this.processingSessions.add(debounceKey);
       (async () => {
         try {
-          await this.processMessage(tenantId, customerPhone, content, config, {
-            trace: flowTrace,
-          });
+          await this.processPendingSessionMessages(
+            tenantId,
+            sessionId,
+            customerPhone,
+            config,
+            {
+              trace: flowTrace,
+            },
+          );
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : 'Unknown error';
           AiFlowLogger.error('process_message', flowTrace, { error: msg });
@@ -175,26 +181,33 @@ export class AiOrchestratorService {
         } finally {
           this.processingSessions.delete(debounceKey);
 
-          // If a rerun was requested while processing, schedule it now
           if (this.pendingReruns.has(debounceKey)) {
             this.pendingReruns.delete(debounceKey);
-            const nextContent = this.pendingRerunContent.get(debounceKey) ?? '';
-            this.pendingRerunContent.delete(debounceKey);
-            AiFlowLogger.flow('debounce_scheduled', flowTrace, { delayMs: 50, debounceKey });
+            AiFlowLogger.flow('AI_DEBOUNCE rerun_triggered', flowTrace, { sessionId, tenantId });
+            this.logger.log(`[AI_DEBOUNCE] rerun_triggered sessionId=${sessionId}`);
             const rerunTimer = setTimeout(() => {
               this.debounceTimers.delete(debounceKey);
-              AiFlowLogger.flow('debounce_fired', flowTrace);
-              // If still processing, re-schedule; otherwise run immediately
+              AiFlowLogger.flow('AI_DEBOUNCE timer_fired', flowTrace, { sessionId, tenantId });
+              this.logger.log(`[AI_DEBOUNCE] timer_fired sessionId=${sessionId}`);
+
               if (this.processingSessions.has(debounceKey)) {
                 this.pendingReruns.add(debounceKey);
-                this.pendingRerunContent.set(debounceKey, nextContent);
-                AiFlowLogger.flow('process_rerun_scheduled', flowTrace, { debounceKey });
+                AiFlowLogger.flow('AI_DEBOUNCE rerun_scheduled', flowTrace, { sessionId, tenantId });
+                this.logger.log(`[AI_DEBOUNCE] rerun_scheduled sessionId=${sessionId}`);
                 return;
               }
+
               this.processingSessions.add(debounceKey);
               (async () => {
                 try {
-                  await this.processMessage(tenantId, customerPhone, nextContent, config, { trace: flowTrace });
+                  this.logger.log(`[AI_DEBOUNCE] rerun_processing sessionId=${sessionId}`);
+                  await this.processPendingSessionMessages(
+                    tenantId,
+                    sessionId,
+                    customerPhone,
+                    config,
+                    { trace: flowTrace },
+                  );
                 } catch (err: unknown) {
                   const msg = err instanceof Error ? err.message : 'Unknown error';
                   AiFlowLogger.error('process_message', flowTrace, { error: msg });
@@ -212,6 +225,126 @@ export class AiOrchestratorService {
     }, debounceMs);
 
     this.debounceTimers.set(debounceKey, timer);
+  }
+
+  private async processPendingSessionMessages(
+    tenantId: string,
+    sessionId: string,
+    customerPhone: string,
+    config: Awaited<ReturnType<AiAgentConfigService['getConfig']>>,
+    options: ProcessMessageOptions,
+  ) {
+    const { trace } = options;
+    const session = await this.conversationService.getSessionById(sessionId);
+    if (!session) {
+      AiFlowLogger.error('AI_DEBOUNCE session_not_found', trace, {
+        sessionId,
+        tenantId,
+      });
+      this.logger.error(`[AI_DEBOUNCE] session_not_found sessionId=${sessionId}`);
+      return;
+    }
+
+    const aiMemory = await this.conversationService.getSessionAiMemory(sessionId);
+    const lastProcessedAt = aiMemory.lastAiProcessedAt
+      ? new Date(aiMemory.lastAiProcessedAt)
+      : undefined;
+
+    const pendingMessages = await this.prisma.chatMessage.findMany({
+      where: {
+        sessionId,
+        direction: 'inbound',
+        messageType: 'text',
+        ...(lastProcessedAt
+          ? {
+              createdAt: {
+                gt: lastProcessedAt,
+              },
+            }
+          : {}),
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    if (pendingMessages.length === 0) {
+      AiFlowLogger.flow('AI_DEBOUNCE no_new_messages', trace, {
+        sessionId,
+        tenantId,
+      });
+      this.logger.log(`[AI_DEBOUNCE] no_new_messages sessionId=${sessionId}`);
+      return;
+    }
+
+    const messageIds = pendingMessages.map((message) => message.id);
+    await this.conversationService.updateSessionAiMemory(sessionId, {
+      pendingCustomerMessageIds: messageIds,
+    });
+
+    AiFlowLogger.flow('AI_DEBOUNCE batch_started', trace, {
+      sessionId,
+      tenantId,
+      messageCount: pendingMessages.length,
+    });
+    this.logger.log(`[AI_DEBOUNCE] batch_started sessionId=${sessionId} messageCount=${pendingMessages.length}`);
+
+    await this.processMessage(
+      tenantId,
+      sessionId,
+      customerPhone,
+      pendingMessages.map((m) => m.content).join('\n'),
+      config,
+      options,
+    );
+
+    await this.conversationService.updateSessionAiMemory(sessionId, {
+      lastAiProcessedAt: new Date().toISOString(),
+      lastProcessedMessageId: messageIds[messageIds.length - 1],
+      pendingCustomerMessageIds: [],
+    });
+
+    AiFlowLogger.flow('AI_DEBOUNCE batch_completed', trace, {
+      sessionId,
+      tenantId,
+      messageCount: pendingMessages.length,
+    });
+    this.logger.log(`[AI_DEBOUNCE] batch_completed sessionId=${sessionId} messageCount=${pendingMessages.length}`);
+  }
+
+  private buildSessionMemoryPrompt(
+    aiMemory: Awaited<ReturnType<ConversationService['getSessionAiMemory']>>,
+    config: Awaited<ReturnType<AiAgentConfigService['getConfig']>>,
+  ): string | null {
+    const memoryLines: string[] = [
+      '## Memória do cliente e sessão (apenas contexto interno)',
+    ];
+
+    if (config.rememberCustomerName && aiMemory.lastKnownCustomerName) {
+      memoryLines.push(`- Nome do cliente: ${aiMemory.lastKnownCustomerName}`);
+    }
+
+    if (config.rememberAddresses && aiMemory.lastKnownAddress.street) {
+      const address = aiMemory.lastKnownAddress;
+      const formatted = `${address.street}${address.number ? `, ${address.number}` : ''}${address.neighborhood ? ` - ${address.neighborhood}` : ''}${address.city ? `, ${address.city}` : ''}${address.state ? `/${address.state}` : ''}`;
+      memoryLines.push(`- Último endereço conhecido: ${formatted}`);
+    }
+
+    if (config.rememberLastOrder && aiMemory.lastOrderSummary) {
+      memoryLines.push(`- Último pedido salvo: ${aiMemory.lastOrderSummary}`);
+    }
+
+    if (config.rememberPreferences && aiMemory.orderDraft.items.length > 0) {
+      const favorites = aiMemory.orderDraft.items.map((item) => `${item.quantity}x ${item.productName || item.productId}`).join(', ');
+      memoryLines.push(`- Preferências da conversa atual: ${favorites}`);
+    }
+
+    if (memoryLines.length <= 1) {
+      return null;
+    }
+
+    memoryLines.push(
+      '- Use apenas informações do tenant atual. Não compartilhe dados de outros clientes ou tenants. Se tiver dúvida, confirme com o cliente.',
+    );
+    return memoryLines.join('\n');
   }
 
   /**
@@ -278,8 +411,13 @@ export class AiOrchestratorService {
     }
 
     try {
+      const session = await this.conversationService.getOrCreateSession(
+        tenant.id,
+        input.phone,
+      );
       const result = await this.processMessage(
         tenant.id,
+        session.id,
         input.phone,
         input.text,
         config,
@@ -312,6 +450,7 @@ export class AiOrchestratorService {
 
   private async processMessage(
     tenantId: string,
+    sessionId: string,
     customerPhone: string,
     _content: string,
     config: Awaited<ReturnType<AiAgentConfigService['getConfig']>>,
@@ -320,6 +459,7 @@ export class AiOrchestratorService {
     const { trace, dryRun } = options;
     trace.tenantId = tenantId;
     trace.phone = customerPhone;
+    trace.sessionId = sessionId;
 
     AiFlowLogger.flow('process_message_start', trace);
 
@@ -329,10 +469,9 @@ export class AiOrchestratorService {
         return;
       }
 
-      const session = await this.conversationService.getOrCreateSession(
-        tenantId,
-        customerPhone,
-      );
+      const session =
+        (await this.conversationService.getSessionById(sessionId)) ??
+        (await this.conversationService.getOrCreateSession(tenantId, customerPhone));
 
       AiFlowLogger.flow('session_loaded', trace, {
         sessionId: session.id,
@@ -344,6 +483,11 @@ export class AiOrchestratorService {
         AiFlowLogger.ignored('human_handoff', trace, { sessionId: session.id });
         return;
       }
+
+      const aiMemory = await this.conversationService.getSessionAiMemory(session.id);
+      AiFlowLogger.flow('AI_MEMORY session_memory_loaded', trace, {
+        sessionId: session.id,
+      });
 
       const history = await this.conversationService.getRecentHistory(
         session.id,
@@ -403,6 +547,13 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
       const messages: AiMessage[] = [
         { role: 'system', content: systemContent },
       ];
+
+      if (config.memoryEnabled) {
+        const memoryPrompt = this.buildSessionMemoryPrompt(aiMemory, config);
+        if (memoryPrompt) {
+          messages.push({ role: 'system', content: memoryPrompt });
+        }
+      }
 
       const agentSessionCtx = await this.conversationService.resolveAgentSessionContext(
         tenantId,

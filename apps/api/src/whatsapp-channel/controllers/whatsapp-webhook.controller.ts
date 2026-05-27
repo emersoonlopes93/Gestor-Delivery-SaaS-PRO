@@ -366,7 +366,7 @@ export class WhatsAppWebhookController {
       AiFlowLogger.flow('orchestrator_dispatch_start', trace);
 
       void this.aiOrchestrator
-        .handleInboundMessage(tenantId, phone, content, trace, chatJid)
+        .handleInboundMessage(tenantId, session.id, phone, content, trace, chatJid)
         .then(() => {
           AiFlowLogger.flow('orchestrator_dispatch_done', trace);
         })

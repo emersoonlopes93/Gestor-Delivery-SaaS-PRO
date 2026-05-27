@@ -9,6 +9,7 @@ import {
   VolumeX,
   Play
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { api } from '../../lib/api-client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNotificationAudio, AVAILABLE_SOUNDS } from '../../hooks/useNotificationAudio';
@@ -33,7 +34,7 @@ export function NotificationSettings() {
   const [templates, setTemplates] = useState<Record<string, string>>(DEFAULT_TEMPLATES);
 
   const { data: settings, isLoading } = useQuery({
-    queryKey: ['tenant-settings-notifications'],
+    queryKey: ['tenant-settings'],
     queryFn: async () => {
       const res = await api.get<Tenant & { settings: TenantSettings }>('/tenant/me');
       return res.data.settings;
@@ -58,8 +59,18 @@ export function NotificationSettings() {
       return api.patch('/tenant/settings', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenant-settings-notifications'] });
-      alert('Configurações salvas com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['tenant-settings'] });
+      toast.success('Configurações salvas com sucesso!', {
+        duration: 3000,
+        style: { fontWeight: 'bold' },
+      });
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : 'Erro ao salvar configurações';
+      toast.error(message, {
+        duration: 4000,
+        style: { fontWeight: 'bold' },
+      });
     }
   });
 
@@ -83,15 +94,23 @@ export function NotificationSettings() {
   });
 
   const handleTestNewOrder = () => {
-    playTestNewOrder().catch(() =>
-      alert('Clique na página primeiro para permitir o áudio do navegador!')
-    );
+    console.log('[Test] Playing new order sound:', { volume, newOrderSound });
+    playTestNewOrder().catch(() => {
+      toast.error('Clique na página primeiro para permitir o áudio do navegador!', {
+        duration: 4000,
+        style: { fontWeight: 'bold' },
+      });
+    });
   };
 
   const handleTestCancellation = () => {
-    playTestCancellation().catch(() =>
-      alert('Clique na página primeiro para permitir o áudio do navegador!')
-    );
+    console.log('[Test] Playing cancellation sound:', { volume, cancellationSound });
+    playTestCancellation().catch(() => {
+      toast.error('Clique na página primeiro para permitir o áudio do navegador!', {
+        duration: 4000,
+        style: { fontWeight: 'bold' },
+      });
+    });
   };
 
   if (isLoading) return (
@@ -116,10 +135,10 @@ export function NotificationSettings() {
         </div>
         <button
           onClick={handleSave}
-          disabled={mutation.isPending}
-          className="btn-primary px-8 py-3 rounded-2xl flex items-center gap-2 shadow-xl"
+          disabled={mutation.isPending} disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          {mutation.isPending ? 'Salvando...' : 'Salvar Alterações'}ng ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Salvar Alterações
         </button>
       </header>

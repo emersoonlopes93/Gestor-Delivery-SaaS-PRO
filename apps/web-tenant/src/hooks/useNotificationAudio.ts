@@ -16,15 +16,39 @@ const DEFAULT_CANCELLATION_SOUND: SoundFile = 'notification.mp3';
 function buildSoundUrl(filename: string | undefined, fallback: SoundFile): string {
   const name = filename?.trim();
   if (!name || !AVAILABLE_SOUNDS.some((s) => s.value === name)) {
+    console.warn(`[Audio] Invalid sound: "${name}", using fallback: "${fallback}"`);
     return `/sounds/${fallback}`;
   }
   return `/sounds/${name}`;
 }
 
 function playAudio(url: string, volume: number): Promise<void> {
-  const audio = new Audio(url);
-  audio.volume = Math.max(0, Math.min(1, volume));
-  return audio.play();
+  return new Promise((resolve, reject) => {
+    try {
+      const audio = new Audio(url);
+      const validVolume = Math.max(0, Math.min(1, volume || 1.0));
+      audio.volume = validVolume;
+      
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log(`[Audio] Playing: ${url} (volume: ${Math.round(validVolume * 100)}%)`);
+            resolve();
+          })
+          .catch((err) => {
+            console.warn(`[Audio] Play error for ${url}:`, err);
+            reject(err);
+          });
+      } else {
+        console.log(`[Audio] Playing: ${url} (volume: ${Math.round(validVolume * 100)}%)`);
+        resolve();
+      }
+    } catch (err) {
+      console.error(`[Audio] Error creating audio element:`, err);
+      reject(err);
+    }
+  });
 }
 
 interface AudioSettings {
@@ -51,6 +75,7 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
   useEffect(() => {
     if (!tenantId || !settings.enabled) {
       if (socketRef.current) {
+        console.log('[Websocket] Disconnecting orders namespace');
         socketRef.current.disconnect();
         socketRef.current = null;
       }
@@ -59,14 +84,26 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
 
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3333';
     const socketUrl = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
+    console.log(`[Websocket] Connecting to orders namespace at: ${socketUrl}/orders`);
+    
     const socket = io(`${socketUrl}/orders`, {
       reconnection: true,
       reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
 
     socket.on('connect', () => {
       console.log('[Websocket] Connected to orders namespace');
       socket.emit('joinTenant', { tenantId });
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('[Websocket] Connection error:', error);
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.warn('[Websocket] Disconnected:', reason);
     });
 
     socket.on('newOrder', (data: { order: { orderNumber: string; customerName: string; total: number } }) => {
@@ -108,7 +145,10 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
     socketRef.current = socket;
 
     return () => {
-      socket.disconnect();
+      if (socketRef.current) {
+        console.log('[Websocket] Cleaning up socket connection');
+        socketRef.current.disconnect();
+      }
     };
   // Re-subscribe apenas quando tenantId ou enabled muda — volume/som são lidos por ref
   // eslint-disable-next-line react-hooks/exhaustive-deps
