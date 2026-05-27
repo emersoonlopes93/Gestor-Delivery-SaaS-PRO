@@ -136,6 +136,7 @@ export class ChatController {
         lastMessageAt: s.lastMessageAt,
         lastMessage: s.messages[0]?.content || null,
         handoffActive: s.handoffActive,
+        unreadCount: s.unreadCount,
         aiAttentionRequired: aiSummary.attentionRequired,
         aiBlockedTools: aiSummary.blockedTools,
         aiLastFailureAt: aiSummary.lastFailureAt,

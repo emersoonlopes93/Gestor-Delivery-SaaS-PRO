@@ -97,9 +97,16 @@ export function InboxPage() {
                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r-full" />
               )}
               <div className="flex items-start justify-between mb-1">
-                <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                  {s.displayName || s.name || `Cliente ${s.customerPhone}`}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                    {s.displayName || s.name || `Cliente ${s.customerPhone}`}
+                  </h3>
+                  {s.unreadCount && s.unreadCount > 0 && (
+                    <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                      {s.unreadCount}
+                    </span>
+                  )}
+                </div>
                 <span className="text-xs text-gray-400 dark:text-gray-500">
                   {s.time || new Date(s.lastMessageAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                 </span>

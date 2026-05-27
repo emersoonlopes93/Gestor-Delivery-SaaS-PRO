@@ -203,9 +203,17 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
             <h3 className="font-semibold text-gray-900 dark:text-white">
               {session.displayName || `Cliente ${session.customerPhone}`}
             </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {session.handoffActive ? 'Atendimento Humano' : 'Bot Ativo'}
-            </p>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                session.state === 'closed' 
+                  ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                  : session.handoffActive
+                  ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
+                  : 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
+              }`}>
+                {session.state === 'closed' ? 'Encerrado' : session.handoffActive ? 'Atendimento Humano' : 'Bot Ativo'}
+              </span>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -317,18 +325,23 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="Digite uma mensagem..."
+              disabled={session?.state === 'closed' || sendMessageMutation.isPending}
+              placeholder={session?.state === 'closed' ? 'Conversa encerrada' : 'Digite uma mensagem...'}
               rows={1}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ minHeight: '40px', maxHeight: '120px' }}
             />
           </div>
           <button
             onClick={handleSend}
-            disabled={!message.trim() || sendMessageMutation.isPending}
+            disabled={!message.trim() || session?.state === 'closed' || sendMessageMutation.isPending}
             className="p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            <Send className="w-5 h-5" />
+            {sendMessageMutation.isPending ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Send className="w-5 h-5" />
+            )}
           </button>
         </div>
       </div>

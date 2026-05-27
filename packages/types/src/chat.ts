@@ -75,6 +75,7 @@ export interface ChatSessionListItem {
   lastMessageAt: string;
   lastMessage: string | null;
   handoffActive: boolean;
+  unreadCount?: number;
   aiAttentionRequired?: boolean;
   aiBlockedTools?: string[];
   aiLastFailureAt?: string | null;
