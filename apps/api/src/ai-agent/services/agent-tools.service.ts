@@ -7,7 +7,7 @@ import { AvailabilityService } from '../../catalog/publication/availability.serv
 import { CashbackService } from '../../promotions/cashback.service';
 import { CouponsService } from '../../promotions/coupons.service';
 import { SchedulingService } from '../../scheduling/scheduling.service';
-import { CreateOrderDTO } from '@gestor/types';
+import { CreateOrderDTO, DeliveryAddressDTO } from '@gestor/types';
 
 import { PrismaService } from '../../database/prisma.service';
 import { StorefrontService } from '../../storefront/storefront.service';
@@ -58,8 +58,12 @@ const CriarPedidoSchema = z.object({
     city: z.string(),
     state: z.string().optional(),
     zipCode: z.string().optional(),
+    complement: z.string().optional(),
+    lat: z.number().optional(),
+    lng: z.number().optional(),
   }),
-  formaPagamento: z.enum(['pix', 'credit_card', 'cash']),
+  formaPagamento: z.string(),
+  troco: z.number().optional(),
   scheduledFor: z.string().optional(),
   timeSlotId: z.string().optional(),
 });
@@ -540,6 +544,79 @@ export class AgentToolsService {
     }
   }
 
+  private normalizePaymentMethod(value: string): PaymentMethod | null {
+    const normalized = value.trim().toLowerCase();
+    const map: Record<string, PaymentMethod> = {
+      pix: PaymentMethod.pix,
+      credit_card: PaymentMethod.credit_card,
+      'credit card': PaymentMethod.credit_card,
+      cartao: PaymentMethod.credit_card,
+      cartão: PaymentMethod.credit_card,
+      debit_card: PaymentMethod.debit_card,
+      'debit card': PaymentMethod.debit_card,
+      dinheiro: PaymentMethod.cash,
+      cash: PaymentMethod.cash,
+      money: PaymentMethod.cash,
+    };
+    return map[normalized] || null;
+  }
+
+  private async geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+    const apiKey = process.env.GOOGLE_MAPS_KEY || process.env.VITE_GOOGLE_MAPS_KEY;
+    if (!apiKey) {
+      return null;
+    }
+
+    try {
+      const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+        params: {
+          address,
+          key: apiKey,
+          components: 'country:BR',
+        },
+      });
+
+      if (response.data.status === 'OK' && response.data.results.length > 0) {
+        const location = response.data.results[0].geometry.location;
+        return { lat: location.lat, lng: location.lng };
+      }
+    } catch (error) {
+      this.logger.warn(`Geocoding failed for address ${address}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+
+    return null;
+  }
+
+  private async resolveDeliveryAddress(
+    tenantId: string,
+    endereco: z.infer<typeof CriarPedidoSchema>['endereco'],
+  ): Promise<DeliveryAddressDTO> {
+    const address: DeliveryAddressDTO = {
+      street: endereco.street,
+      number: endereco.number,
+      neighborhood: endereco.neighborhood,
+      city: endereco.city,
+      state: endereco.state || '',
+      zipCode: endereco.zipCode || '',
+      complement: endereco.complement || undefined,
+      reference: undefined,
+      lat: endereco.lat ?? null,
+      lng: endereco.lng ?? null,
+    };
+
+    if (!address.lat || !address.lng) {
+      const fullAddress = `${address.street}, ${address.number}, ${address.neighborhood}, ${address.city}${address.state ? `, ${address.state}` : ''}${address.zipCode ? `, ${address.zipCode}` : ''}`;
+      const coords = await this.geocodeAddress(fullAddress);
+      if (!coords) {
+        throw new Error('Não foi possível localizar o endereço. Por favor, confirme o CEP ou forneça o endereço completo novamente.');
+      }
+      address.lat = coords.lat;
+      address.lng = coords.lng;
+    }
+
+    return address;
+  }
+
   private async executeCriarPedido(tenantId: string, args: z.infer<typeof CriarPedidoSchema>, sessionContext?: AgentSessionContext) {
     let ctx = sessionContext;
     if (!ctx?.customerId && ctx?.customerPhone) {
@@ -569,6 +646,17 @@ export class AgentToolsService {
       const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
       if (!tenant) throw new Error('Loja não encontrada');
 
+      const paymentMethod = this.normalizePaymentMethod(args.formaPagamento);
+      if (!paymentMethod) {
+        return {
+          status: 'error',
+          code: 'INVALID_PAYMENT_METHOD',
+          message: 'Forma de pagamento inválida. Use pix, credit_card ou cash.',
+        };
+      }
+
+      const deliveryAddress = await this.resolveDeliveryAddress(tenantId, args.endereco);
+
       const orderDto: CreateOrderDTO = {
         idempotencyKey: Math.random().toString(36).substring(7),
         items: args.itens.map((i) => ({
@@ -580,16 +668,10 @@ export class AgentToolsService {
         customerName: ctx.customerName || 'Cliente WhatsApp',
         customerPhone: ctx.customerPhone || '00000000000',
         fulfillmentType: 'delivery',
-        deliveryAddress: {
-          street: args.endereco.street,
-          number: args.endereco.number,
-          neighborhood: args.endereco.neighborhood,
-          city: args.endereco.city,
-          state: args.endereco.state || '',
-          zipCode: args.endereco.zipCode || '',
-        },
+        deliveryAddress,
         payment: {
-          method: args.formaPagamento.toUpperCase() as PaymentMethod,
+          method: paymentMethod,
+          changeFor: paymentMethod === PaymentMethod.cash ? args.troco : undefined,
         },
         scheduledFor: args.scheduledFor,
         timeSlotId: args.timeSlotId,
@@ -603,6 +685,7 @@ export class AgentToolsService {
 
       return {
         status: 'success',
+        success: true,
         orderId: order.id,
         orderNumber: order.orderNumber,
         totalAmount: Number(order.total),

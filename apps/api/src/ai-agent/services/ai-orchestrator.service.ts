@@ -687,6 +687,19 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
         return;
       }
 
+      AiFlowLogger.flow('tool_call_start', trace, {
+        name: toolCall.name,
+        toolId: toolCall.id,
+        signatureHash,
+      });
+
+      if (toolCall.name === 'criar_pedido') {
+        AiFlowLogger.flow('order_creation_start', trace, {
+          toolId: toolCall.id,
+          toolName: toolCall.name,
+        });
+      }
+
       const result = await this.toolsService.executeTool(
         tenantId,
         toolCall.name,
@@ -696,6 +709,12 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
 
       const toolStatus = this.getToolResultStatus(result);
       const toolCode = this.getToolResultCode(result);
+
+      AiFlowLogger.flow('tool_call_success', trace, {
+        name: toolCall.name,
+        toolId: toolCall.id,
+        status: toolStatus,
+      });
 
       newMessages.push({
         role: 'tool',
@@ -720,6 +739,58 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
           signatureHash,
         },
       });
+
+      AiFlowLogger.flow('tool_result_hidden_from_customer', trace, {
+        name: toolCall.name,
+        toolId: toolCall.id,
+        status: toolStatus,
+      });
+
+      if (toolCall.name === 'criar_pedido') {
+        const toolResultOrderId = this.getOrderIdFromToolResult(result);
+
+        if (toolStatus !== 'success' || !toolResultOrderId) {
+          AiFlowLogger.error('order_creation_inconsistent', trace, {
+            toolId: toolCall.id,
+            orderId: toolResultOrderId || 'unknown',
+          });
+          await this.sendFinalResponse(
+            tenantId,
+            sessionId,
+            customerPhone,
+            'Desculpe, não consegui criar seu pedido corretamente. Vou pedir a um atendente para verificar o seu caso.',
+            trace,
+            config.simulateTyping,
+          );
+          return;
+        }
+
+        const existingOrder = await this.prisma.order.findUnique({
+          where: { id: toolResultOrderId },
+        });
+
+        if (!existingOrder) {
+          AiFlowLogger.error('order_creation_inconsistent', trace, {
+            orderId: toolResultOrderId,
+          });
+          await this.sendFinalResponse(
+            tenantId,
+            sessionId,
+            customerPhone,
+            'Desculpe, houve um problema ao registrar seu pedido. Um atendente irá verificar em instantes.',
+            trace,
+            config.simulateTyping,
+          );
+          return;
+        }
+
+        AiFlowLogger.flow('order_creation_success', trace, {
+          orderId: toolResultOrderId,
+        });
+        AiFlowLogger.flow('order_visible_in_orders_endpoint', trace, {
+          orderId: toolResultOrderId,
+        });
+      }
 
       if (toolStatus === 'success') {
         await this.conversationService.clearAiToolFailures(
@@ -843,6 +914,106 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
     return typeof code === 'string' ? code : null;
   }
 
+  private getOrderIdFromToolResult(result: unknown): string | null {
+    if (!result || typeof result !== 'object') return null;
+    const orderId = (result as Record<string, unknown>).orderId;
+    if (typeof orderId === 'string' && orderId.trim() !== '') return orderId;
+    if (typeof orderId === 'number') return String(orderId);
+    return null;
+  }
+
+  private sanitizeFinalResponse(content: string): { sanitized: string; removedToolOutput: boolean } {
+    const trimQuotes = (value: string) => value.trim();
+
+    const findJsonBlockEndIndex = (text: string): number => {
+      const firstChar = text[0];
+      if (firstChar !== '{' && firstChar !== '[') return -1;
+
+      const stack: string[] = [firstChar];
+      let inString = false;
+      let escaped = false;
+
+      for (let i = 1; i < text.length; i += 1) {
+        const char = text[i];
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (char === '\\') {
+          escaped = true;
+          continue;
+        }
+        if (char === '"') {
+          inString = !inString;
+          continue;
+        }
+        if (inString) continue;
+        if (char === '{' || char === '[') {
+          stack.push(char);
+          continue;
+        }
+        if ((char === '}' && stack[stack.length - 1] === '{') || (char === ']' && stack[stack.length - 1] === '[')) {
+          stack.pop();
+          if (stack.length === 0) {
+            return i;
+          }
+        }
+      }
+      return -1;
+    };
+
+    const stripLeadingJsonBlock = (text: string): string => {
+      const trimmed = text.trimStart();
+      if (!trimmed) return text;
+      const endIndex = findJsonBlockEndIndex(trimmed);
+      if (endIndex < 0) return text;
+      return trimmed.slice(endIndex + 1).trimStart();
+    };
+
+    let sanitized = content;
+    let removedToolOutput = false;
+
+    const removeToolOutputPrefix = (text: string): string => {
+      const trimmed = text.trimStart();
+      const prefixRegex = /^(tool_outputs|tool_output|tool_result|tool_call)\b/i;
+      if (!prefixRegex.test(trimmed)) return text;
+      removedToolOutput = true;
+      const withoutPrefix = trimmed.replace(prefixRegex, '').trimStart();
+      return stripLeadingJsonBlock(withoutPrefix).trimStart();
+    };
+
+    const removeJsonPrefix = (text: string): string => {
+      const stripped = stripLeadingJsonBlock(text);
+      if (stripped !== text) {
+        removedToolOutput = true;
+      }
+      return stripped;
+    };
+
+    while (true) {
+      const trimmed = sanitized.trimStart();
+      const prefixRegex = /^(tool_outputs|tool_output|tool_result|tool_call)\b/i;
+      if (prefixRegex.test(trimmed)) {
+        sanitized = removeToolOutputPrefix(trimmed);
+        continue;
+      }
+      const next = removeJsonPrefix(trimmed);
+      if (next !== trimmed) {
+        sanitized = next;
+        continue;
+      }
+      break;
+    }
+
+    sanitized = sanitized.trim();
+    if (!sanitized) {
+      removedToolOutput = true;
+      sanitized = 'Desculpe, não consegui gerar uma resposta clara no momento. Vou pedir para um atendente verificar.';
+    }
+
+    return { sanitized: trimQuotes(sanitized), removedToolOutput };
+  }
+
   /**
    * Presença/digitação — best-effort; falha não interrompe o fluxo da IA.
    */
@@ -906,6 +1077,13 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
     trace: AiFlowContext,
     tenantSimulateTyping = false,
   ): Promise<void> {
+    const { sanitized, removedToolOutput } = this.sanitizeFinalResponse(content);
+    if (removedToolOutput) {
+      AiFlowLogger.flow('final_response_sanitized', trace, {
+        removedToolOutput: true,
+      });
+    }
+
     await this.ensureTypingMinDelay(
       tenantId,
       customerPhone,
@@ -914,7 +1092,7 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
     );
 
     AiFlowLogger.flow('whatsapp_send_start', trace, {
-      textLength: content.length,
+      textLength: sanitized.length,
     });
 
     try {
@@ -928,7 +1106,7 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
               const lastTs = m.timestamp ? new Date(m.timestamp).getTime() : 0;
               const now = Date.now();
               const ageMs = now - lastTs;
-              if (m.content === content && ageMs <= 10_000) {
+              if (m.content === sanitized && ageMs <= 10_000) {
                 AiFlowLogger.flow('duplicate_ai_response_suppressed', trace, { sessionId, ageMs });
                 return;
               }
@@ -943,7 +1121,7 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
 
       const result = await this.whatsappSender.sendText(tenantId, {
         to: customerPhone,
-        text: content,
+        text: sanitized,
       });
 
       if (!result.success) {
@@ -960,7 +1138,7 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
           sessionId,
           direction: 'outbound',
           senderType: 'ai',
-          content,
+          content: sanitized,
           externalStatus: 'sent',
           timestamp: new Date(),
         });
