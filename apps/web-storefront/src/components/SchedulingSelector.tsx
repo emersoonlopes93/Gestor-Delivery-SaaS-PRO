@@ -62,7 +62,7 @@ export function SchedulingSelector({ tenantSlug, onSlotSelect, selectedSlotId, s
   };
 
   return (
-    <div className="space-y-4 p-4 border rounded-lg bg-gray-50/50">
+    <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
       <div className="flex flex-col gap-2">
         <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
           <Calendar className="h-4 w-4" />
@@ -73,7 +73,7 @@ export function SchedulingSelector({ tenantSlug, onSlotSelect, selectedSlotId, s
           min={today}
           value={date}
           onChange={handleDateChange}
-          className="w-full p-2 border rounded-md focus:ring-2 focus:ring-primary-500 outline-none"
+          className="input-premium"
         />
       </div>
 

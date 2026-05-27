@@ -72,7 +72,7 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
         type="text"
         disabled={loading}
         placeholder={loading ? 'Carregando mapas...' : error || placeholder}
-        className="input-premium pl-12 pr-4 py-3 sm:py-4 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm shadow-sm text-sm sm:text-base"
+        className="input-premium pl-12 pr-4 py-3 sm:py-4 shadow-sm text-sm sm:text-base"
       />
       {!loading && !error && (
         <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-medium text-gray-300 uppercase tracking-widest pointer-events-none">

@@ -87,7 +87,7 @@ export function CashbackSelector({
               max={maxCashbackToUse}
               step="0.01"
               onChange={(e) => onUseCashback(Number(e.target.value))}
-              className="flex-1 px-3 py-2 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+              className="flex-1 input-premium"
               placeholder="0,00"
             />
             <button

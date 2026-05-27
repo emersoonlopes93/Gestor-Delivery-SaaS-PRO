@@ -226,7 +226,7 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
                             "w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left",
                             isSelected 
                               ? "bg-white border-orange-200 ring-2 ring-orange-200/50" 
-                              : "bg-white/50 border-gray-100 hover:border-orange-100"
+                              : "bg-white border-gray-100 hover:border-orange-100"
                           )}
                         >
                           <div className="flex-1">
