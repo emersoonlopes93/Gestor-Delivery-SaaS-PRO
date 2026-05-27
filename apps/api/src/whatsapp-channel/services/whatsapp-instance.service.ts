@@ -187,6 +187,31 @@ export class WhatsAppInstanceService {
       instanceApiKey: instance.apiKey,
     });
 
+    // Check if instance is in a bad state (disconnected but Evolution Go might still have it active)
+    // If so, try to logout first to clean up the session
+    if (instance.status === 'disconnected') {
+      try {
+        const client = axios.create({
+          baseURL: instance.apiUrl.replace(/\/+$/, ''),
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: apiKeyForConnect,
+          },
+          timeout: 30_000,
+        });
+        const instanceName = instance.evolutionInstanceId || instance.instanceName;
+        
+        await client.post('/instance/logout', {}, {
+          headers: {
+            instanceId: instanceName,
+          },
+        });
+        this.logger.log(`Pre-connect logout successful for instance ${instanceName}`);
+      } catch (logoutError) {
+        this.logger.warn(`Pre-connect logout failed, proceeding with connect attempt: ${logoutError instanceof Error ? logoutError.message : 'Unknown error'}`);
+      }
+    }
+
     let connectionStatus: Awaited<ReturnType<typeof provider.connect>>;
     try {
       connectionStatus = await provider.connect(
@@ -277,10 +302,34 @@ export class WhatsAppInstanceService {
     });
 
     try {
+      // First try to logout from Evolution Go to properly clean up the session
+      const client = axios.create({
+        baseURL: instance.apiUrl.replace(/\/+$/, ''),
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: apiKeyForDisconnect,
+        },
+        timeout: 30_000,
+      });
+      const instanceName = instance.evolutionInstanceId || instance.instanceName;
+      
+      // Try logout first to properly clean up the session
+      try {
+        await client.post('/instance/logout', {}, {
+          headers: {
+            instanceId: instanceName,
+          },
+        });
+        this.logger.log(`Instance ${instanceName} logged out from Evolution-Go`);
+      } catch (logoutError) {
+        this.logger.warn(`Logout failed for instance ${instanceName}, trying disconnect: ${logoutError instanceof Error ? logoutError.message : 'Unknown error'}`);
+      }
+
+      // Then try disconnect as fallback
       await provider.disconnect(
         instance.apiUrl,
         apiKeyForDisconnect,
-        instance.evolutionInstanceId || instance.instanceName,
+        instanceName,
       );
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
