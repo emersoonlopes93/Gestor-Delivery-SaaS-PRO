@@ -990,6 +990,42 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
       return stripped;
     };
 
+    // Remove any inline occurrences like "tool_result { ... }" or "tool_output: [ ... ]"
+    const removeInlineToolJsonBlocks = (text: string): string => {
+      const keywords = ['tool_outputs', 'tool_output', 'tool_result', 'tool_call'];
+      let out = text;
+      for (const key of keywords) {
+        let idx = out.toLowerCase().indexOf(key);
+        while (idx >= 0) {
+          // find first brace after the keyword
+          const after = out.slice(idx + key.length);
+          const braceIndex = after.search(/[\[{]/);
+          if (braceIndex >= 0) {
+            const jsonStart = idx + key.length + braceIndex + 1 - 1; // position of brace
+            const sub = out.slice(jsonStart);
+            const endOffset = findJsonBlockEndIndex(sub);
+            if (endOffset >= 0) {
+              // remove keyword up to end of JSON block
+              const removeStart = idx;
+              const removeEnd = jsonStart + endOffset + 1;
+              out = (out.slice(0, removeStart) + out.slice(removeEnd)).trim();
+              removedToolOutput = true;
+            } else {
+              // no balanced JSON found; remove the keyword only
+              out = (out.slice(0, idx) + out.slice(idx + key.length)).trim();
+              removedToolOutput = true;
+            }
+          } else {
+            // no brace after keyword; just remove the keyword
+            out = (out.slice(0, idx) + out.slice(idx + key.length)).trim();
+            removedToolOutput = true;
+          }
+          idx = out.toLowerCase().indexOf(key);
+        }
+      }
+      return out;
+    };
+
     while (true) {
       const trimmed = sanitized.trimStart();
       const prefixRegex = /^(tool_outputs|tool_output|tool_result|tool_call)\b/i;
@@ -1004,6 +1040,51 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
       }
       break;
     }
+
+    // also remove any inline tool JSON blocks that may appear later in the text
+    sanitized = removeInlineToolJsonBlocks(sanitized);
+
+    // Remove any standalone JSON blocks anywhere in the text (avoid removing tiny braces)
+    const removeAllJsonBlocksAnywhere = (text: string): string => {
+      let out = text;
+      let idx = Math.min(
+        ...['{', '[']
+          .map((c) => {
+            const i = out.indexOf(c);
+            return i >= 0 ? i : Infinity;
+          })
+      );
+
+      while (idx !== Infinity && idx >= 0) {
+        const sub = out.slice(idx);
+        const end = findJsonBlockEndIndex(sub);
+        if (end >= 0 && end > 10) {
+          out = (out.slice(0, idx) + out.slice(idx + end + 1)).trim();
+          removedToolOutput = true;
+        } else {
+          // if not a valid JSON block, skip this brace
+          const nextIdx = Math.min(
+            ...['{', '[']
+              .map((c) => {
+                const i = out.indexOf(c, idx + 1);
+                return i >= 0 ? i : Infinity;
+              })
+          );
+          if (nextIdx === Infinity) break;
+          idx = nextIdx;
+        }
+        idx = Math.min(
+          ...['{', '[']
+            .map((c) => {
+              const i = out.indexOf(c);
+              return i >= 0 ? i : Infinity;
+            })
+        );
+      }
+      return out;
+    };
+
+    sanitized = removeAllJsonBlocksAnywhere(sanitized);
 
     sanitized = sanitized.trim();
     if (!sanitized) {
