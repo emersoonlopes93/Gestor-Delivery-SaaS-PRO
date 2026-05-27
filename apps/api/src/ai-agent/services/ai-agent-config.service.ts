@@ -65,9 +65,39 @@ export class UpdateAiAgentConfigDto {
 
   @IsOptional()
   @IsNumber()
-  @Min(500)
-  @Max(10000)
+  @Min(10000)
+  @Max(30000)
   debounceMs?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  memoryEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  rememberCustomerName?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  rememberAddresses?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  rememberLastOrder?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  rememberPreferences?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  allowRepeatLastOrder?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(7)
+  @Max(365)
+  memoryRetentionDays?: number;
 }
 
 @Injectable()
@@ -103,10 +133,17 @@ export class AiAgentConfigService {
           dailyMessageLimit: 1000,
           customerCooldownMin: 5,
           simulateTyping: true,
-          debounceMs: 1000,
+          debounceMs: 10000,
           greetingMessage: 'Olá! Sou o assistente virtual da loja. Como posso ajudar?',
           fallbackMessage: 'Desculpe, não consegui entender. Quer falar com um atendente?',
           customInstructions: 'Seja sempre conciso. Responda em português (BR).',
+          memoryEnabled: false,
+          rememberCustomerName: false,
+          rememberAddresses: false,
+          rememberLastOrder: false,
+          rememberPreferences: false,
+          allowRepeatLastOrder: false,
+          memoryRetentionDays: 180,
         },
         include: {
           tenant: {
@@ -143,6 +180,13 @@ export class AiAgentConfigService {
       customerCooldownMin: dto.customerCooldownMin,
       simulateTyping: dto.simulateTyping,
       debounceMs: dto.debounceMs,
+      memoryEnabled: dto.memoryEnabled,
+      rememberCustomerName: dto.rememberCustomerName,
+      rememberAddresses: dto.rememberAddresses,
+      rememberLastOrder: dto.rememberLastOrder,
+      rememberPreferences: dto.rememberPreferences,
+      allowRepeatLastOrder: dto.allowRepeatLastOrder,
+      memoryRetentionDays: dto.memoryRetentionDays,
     };
 
     // Remove campos apenas se forem undefined (PATCH semântico)

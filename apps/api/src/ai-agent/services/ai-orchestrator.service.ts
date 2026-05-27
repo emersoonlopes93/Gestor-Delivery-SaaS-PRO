@@ -67,6 +67,7 @@ export class AiOrchestratorService {
    */
   async handleInboundMessage(
     tenantId: string,
+    sessionId: string,
     customerPhone: string,
     content: string,
     trace?: AiFlowContext,
@@ -74,6 +75,7 @@ export class AiOrchestratorService {
   ): Promise<void> {
     const flowTrace = trace ?? createAiTrace();
     flowTrace.tenantId = tenantId;
+    flowTrace.sessionId = sessionId;
     flowTrace.phone = customerPhone;
     if (chatJid) flowTrace.chatJid = chatJid;
 
@@ -1060,6 +1062,38 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
         config.simulateTyping,
       );
     }
+  }
+
+  private buildSessionMemoryPrompt(
+    aiMemory: any,
+    config: any,
+  ): string | null {
+    const parts: string[] = [];
+
+    if (config.rememberCustomerName && aiMemory.lastKnownCustomerName) {
+      parts.push(`- Nome do cliente: ${aiMemory.lastKnownCustomerName}`);
+    }
+
+    if (config.rememberAddresses && aiMemory.lastKnownAddress?.street) {
+      const addr = aiMemory.lastKnownAddress;
+      const addrStr = `${addr.street}, ${addr.number}${addr.complement ? ` (${addr.complement})` : ''}, ${addr.neighborhood}, ${addr.city}${addr.state ? ` - ${addr.state}` : ''}`;
+      parts.push(`- Último endereço usado: ${addrStr}`);
+    }
+
+    if (config.rememberLastOrder && aiMemory.lastOrderSummary) {
+      parts.push(`- Último pedido: ${aiMemory.lastOrderSummary}`);
+      if (config.allowRepeatLastOrder) {
+        parts.push(
+          `  (Cliente pode repetir usando a tool repetir_ultimo_pedido)`,
+        );
+      }
+    }
+
+    if (parts.length === 0) {
+      return null;
+    }
+
+    return `## Memória de sessão (contexto do cliente)\n${parts.join('\n')}\n\nUse essas informações para personalizar o atendimento. Sempre confirme dados com o cliente antes de usar.`;
   }
 
   private stableStringify(value: unknown): string {

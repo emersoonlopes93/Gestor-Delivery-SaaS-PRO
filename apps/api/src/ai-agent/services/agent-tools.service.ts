@@ -642,6 +642,26 @@ export class AgentToolsService {
       };
     }
 
+    // Validate required fields for order creation
+    const missingFields: string[] = [];
+    if (!args.itens || args.itens.length === 0) missingFields.push('itens');
+    if (!args.endereco?.street) missingFields.push('rua do endereço');
+    if (!args.endereco?.number) missingFields.push('número do endereço');
+    if (!args.endereco?.neighborhood) missingFields.push('bairro do endereço');
+    if (!args.endereco?.city) missingFields.push('cidade do endereço');
+    if (!args.formaPagamento) missingFields.push('forma de pagamento');
+    if (!ctx.customerName) missingFields.push('nome do cliente');
+    if (!ctx.customerPhone) missingFields.push('telefone do cliente');
+
+    if (missingFields.length > 0) {
+      return {
+        status: 'error',
+        code: 'MISSING_REQUIRED_FIELDS',
+        message: `Dados obrigatórios faltando: ${missingFields.join(', ')}.`,
+        missingFields,
+      };
+    }
+
     try {
       const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
       if (!tenant) throw new Error('Loja não encontrada');
@@ -683,6 +703,8 @@ export class AgentToolsService {
         orderDto,
       );
 
+      this.logger.log(`[AI_ORDER] create_order_success orderId=${order.id} orderNumber=${order.orderNumber}`);
+
       return {
         status: 'success',
         success: true,
@@ -693,6 +715,7 @@ export class AgentToolsService {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`[AI_ORDER] create_order_error message=${message}`);
       return { status: 'error', message: `Erro ao criar pedido: ${message}` };
     }
   }
@@ -758,19 +781,40 @@ export class AgentToolsService {
   }
 
   private async executeRepetirUltimoPedido(tenantId: string, sessionContext?: AgentSessionContext) {
-    if (!sessionContext?.customerId) return { status: 'error', message: 'Cliente não identificado.' };
-    
+    if (!sessionContext?.customerId) {
+      return { status: 'error', message: 'Cliente não identificado.' };
+    }
+
     const order = await this.ordersService.getLatestCustomerOrder(tenantId, sessionContext.customerId);
-    if (!order) return { message: 'Não encontramos pedidos anteriores para repetir.' };
+    if (!order) {
+      return { message: 'Não encontramos pedidos anteriores para repetir.' };
+    }
+
+    // Build summary of last order for memory
+    const itemsSummary = order.items
+      .map((i) => `${i.quantity}x ${i.snapshotName}`)
+      .join(', ');
+
+    const lastOrderSummary = `#${order.orderNumber}: ${itemsSummary} (${new Date(order.createdAt).toLocaleDateString('pt-BR')})`;
+
+    this.logger.log(
+      `[AI_MEMORY] last_order_loaded customerId=${sessionContext.customerId} orderId=${order.id}`,
+    );
 
     return {
-      itens: order.items.map(i => ({
+      hasLastOrder: true,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      items: order.items.map((i) => ({
         productId: i.productId,
         nome: i.snapshotName,
         quantidade: i.quantity,
-        notas: i.notes
+        notas: i.notes,
       })),
-      mensagem: `Seu último pedido foi o #${order.orderNumber}. Deseja que eu adicione os mesmos itens ao carrinho?`
+      total: Number(order.total),
+      createdAt: order.createdAt.toISOString(),
+      summary: lastOrderSummary,
+      mensagem: `Seu último pedido foi o ${order.orderNumber} com ${itemsSummary}. Deseja repetir esses itens? Vou recalcular preços e confirmar a entrega.`,
     };
   }
 

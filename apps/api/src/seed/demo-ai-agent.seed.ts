@@ -47,13 +47,20 @@ export async function seedDemoAiAgentAccess(
       dailyMessageLimit: 1000,
       customerCooldownMin: 5,
       simulateTyping: true,
-      debounceMs: 1000,
+      debounceMs: 10000,
       greetingMessage:
         'Olá! Sou o assistente virtual da Pizzaria Demo. Como posso ajudar?',
       fallbackMessage:
         'Desculpe, não consegui processar agora. Quer falar com um atendente?',
       customInstructions:
         'Atenda em português (BR). Seja conciso e ajude com cardápio, pedidos e entrega.',
+      memoryEnabled: true,
+      rememberCustomerName: true,
+      rememberAddresses: true,
+      rememberLastOrder: true,
+      rememberPreferences: false,
+      allowRepeatLastOrder: true,
+      memoryRetentionDays: 180,
     },
   });
 }

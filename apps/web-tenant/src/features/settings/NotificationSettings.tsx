@@ -135,11 +135,11 @@ export function NotificationSettings() {
         </div>
         <button
           onClick={handleSave}
-          disabled={mutation.isPending} disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={mutation.isPending}
+          className="btn-primary px-8 py-3 rounded-2xl flex items-center gap-2 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          {mutation.isPending ? 'Salvando...' : 'Salvar Alterações'}ng ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          Salvar Alterações
+          {mutation.isPending ? 'Salvando...' : 'Salvar Alterações'}
         </button>
       </header>
 

@@ -101,14 +101,14 @@ export function useOrderNotifications(orders: OrderBoardItemDTO[]) {
   }, [orders, playNotification]);
 
   const handleEnableAudio = useCallback(() => {
+    const nextValue = !isAudioEnabled;
     if (!isInteractionAllowed) {
       setIsInteractionAllowed(true);
     }
-    setIsAudioEnabled(prev => !prev);
+    setIsAudioEnabled(nextValue);
     
-    // If user enables audio on this page, save it to settings
-    if (!isAudioEnabled && settingsRef.current) {
-      api.patch('/tenant/settings', { audioNotificationEnabled: true }).catch(err => {
+    if (settingsRef.current) {
+      api.patch('/tenant/settings', { audioNotificationEnabled: nextValue }).catch(err => {
         console.warn('[useOrderNotifications] Failed to save audio setting:', err);
       });
     }
