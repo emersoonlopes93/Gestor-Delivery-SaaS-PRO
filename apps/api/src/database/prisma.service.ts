@@ -43,6 +43,7 @@ export class PrismaService
         'TenantUserRole',
         'Plan',
         'TenantSubscription',
+        'ChatMessage',
         'SystemConfig',
       ];
 

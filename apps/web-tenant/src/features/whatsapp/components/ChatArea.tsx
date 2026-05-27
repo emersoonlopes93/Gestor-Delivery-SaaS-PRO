@@ -14,7 +14,9 @@ interface ChatAreaProps {
 export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isAtBottom, setIsAtBottom] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: sessionMessages = [], refetch: refetchMessages } = useQuery({
@@ -119,6 +121,28 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       console.log('Arquivo selecionado:', file);
     }
   };
+
+  const handleScroll = () => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+
+    const distanceToBottom = el.scrollHeight - el.clientHeight - el.scrollTop;
+    setIsAtBottom(distanceToBottom <= 80);
+  };
+
+  useEffect(() => {
+    setMessages(sessionMessages);
+  }, [sessionMessages]);
+
+  useEffect(() => {
+    if (isAtBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isAtBottom]);
+
+  useEffect(() => {
+    setIsAtBottom(true);
+  }, [session?.id]);
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -265,7 +289,11 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 space-y-4"
+      >
         {messages.map((msg) => (
           <div
             key={msg.id}
