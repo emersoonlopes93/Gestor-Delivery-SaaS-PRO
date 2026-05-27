@@ -207,16 +207,15 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       timeout: 30_000,
     });
     try {
+      // Try POST /instance/disconnect first (may not work in all Evolution Go versions)
       const { data } = await client.post('/instance/disconnect');
       const dataRec = data as Record<string, unknown>;
       this.logger.log(`Disconnect response from Evolution Go: ${JSON.stringify(dataRec)}`);
-
-      const parsedStatus = this.parseConnectionStatus((dataRec?.data || dataRec) as Record<string, unknown>);
-      this.logger.log(`[WHATSAPP_DISCONNECT] instanceId=${instanceId} providerStatus=${parsedStatus.state} localStatus=disconnected`);
+      this.logger.log(`[WHATSAPP_DISCONNECT] instanceId=${instanceId} action=disconnected localStatus=disconnected`);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`[WHATSAPP_ERROR] step=disconnect instanceId=${instanceId} status=${isAxiosError(error) ? error.response?.status : 'unknown'} body=${isAxiosError(error) ? JSON.stringify(error.response?.data) : 'unknown'}`);
-      throw error;
+      this.logger.warn(`[WHATSAPP_WARN] step=disconnect instanceId=${instanceId} POST /instance/disconnect failed: ${message}. This is expected if endpoint doesn't exist. Proceeding with local disconnection only.`);
+      // Don't throw error - we still want to mark as disconnected locally
     }
   }
 

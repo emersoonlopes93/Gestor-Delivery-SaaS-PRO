@@ -381,9 +381,11 @@ export class WhatsAppInstanceService {
 
     const targetStatus = statusMap[connectionStatus.state] || 'disconnected';
 
-    // Anti-resurrection check
+    // Anti-resurrection check - prevent auto-reconnection when explicitly disconnected
     let finalStatus = targetStatus;
-    if (instance.status === 'disconnected' && (targetStatus === 'qr_pending' || targetStatus === 'connecting')) {
+    if (instance.status === 'disconnected') {
+      // If locally disconnected, keep it disconnected regardless of provider status
+      // User must explicitly reconnect
       finalStatus = 'disconnected';
     }
 
