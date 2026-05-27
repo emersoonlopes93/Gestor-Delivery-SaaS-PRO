@@ -45,6 +45,15 @@ export class ChatController {
     return {};
   }
 
+  private isInboxMessage(message: { metadata?: unknown }): boolean {
+    const metadata = this.asJsonObject(message.metadata);
+    if (metadata.hiddenFromInbox === true) {
+      return false;
+    }
+    const type = typeof metadata.type === 'string' ? metadata.type : undefined;
+    return type !== 'tool_call' && type !== 'tool_result';
+  }
+
   private buildAiSummary(metadata: unknown): {
     attentionRequired: boolean;
     blockedTools: string[];
@@ -126,12 +135,15 @@ export class ChatController {
       include: {
         messages: {
           orderBy: { createdAt: 'desc' },
-          take: 1,
+          take: 5,
         },
       },
     });
 
     return sessions.map((s) => {
+      const visibleMessages = Array.isArray(s.messages)
+        ? s.messages.filter((msg) => this.isInboxMessage(msg))
+        : [];
       const aiSummary = this.buildAiSummary(s.metadata);
       return {
         id: s.id,
@@ -139,7 +151,7 @@ export class ChatController {
         displayName: s.displayName,
         state: s.state,
         lastMessageAt: s.lastMessageAt,
-        lastMessage: s.messages[0]?.content || null,
+        lastMessage: visibleMessages[0]?.content || null,
         handoffActive: s.handoffActive,
         unreadCount: s.unreadCount,
         aiAttentionRequired: aiSummary.attentionRequired,
@@ -170,7 +182,7 @@ export class ChatController {
       orderBy: { createdAt: 'asc' },
       take: 50,
     });
-    return messages;
+    return messages.filter((msg) => this.isInboxMessage(msg));
   }
 
   @Get('sessions/:id/ai/summary')

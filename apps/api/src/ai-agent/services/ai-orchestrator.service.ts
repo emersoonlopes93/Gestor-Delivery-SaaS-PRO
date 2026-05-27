@@ -566,13 +566,20 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
     await this.conversationService.addMessage({
       sessionId,
       direction: 'outbound',
+      senderType: 'system',
       content: '',
+      messageType: 'tool_call',
+      externalStatus: 'sent',
+      timestamp: new Date(),
       toolCalls: toolCalls.map((tc) => ({
         id: tc.id,
         name: tc.name,
         arguments: tc.arguments as Prisma.InputJsonObject,
       })) as Prisma.InputJsonArray,
-      metadata: { type: 'tool_call' },
+      metadata: {
+        type: 'tool_call',
+        hiddenFromInbox: true,
+      },
     });
 
     const newMessages = [...historyMessages, assistantToolMessage];
@@ -637,11 +644,15 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
 
       await this.conversationService.addMessage({
         sessionId,
-        direction: 'inbound',
+        direction: 'outbound',
+        senderType: 'system',
         content: JSON.stringify(result),
         messageType: 'tool_result',
+        externalStatus: 'sent',
+        timestamp: new Date(),
         metadata: {
           type: 'tool_result',
+          hiddenFromInbox: true,
           toolName: toolCall.name,
           status: toolStatus,
           code: toolCode,

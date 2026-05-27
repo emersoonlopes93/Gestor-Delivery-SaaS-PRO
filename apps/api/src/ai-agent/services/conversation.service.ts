@@ -106,16 +106,22 @@ export class ConversationService {
    * Registra uma nova mensagem no banco de dados.
    */
   async addMessage(dto: CreateMessageDto) {
+    const senderType =
+      dto.senderType ?? (dto.direction === 'inbound' ? 'customer' : 'system');
+    const externalStatus =
+      dto.externalStatus ?? (dto.direction === 'inbound' ? 'delivered' : 'sent');
+    const timestamp = dto.timestamp ?? new Date();
+
     const message = await this.prisma.chatMessage.create({
       data: {
         sessionId: dto.sessionId,
         direction: dto.direction,
-        senderType: dto.senderType || 'customer',
+        senderType,
         content: dto.content,
         messageType: dto.messageType || 'text',
         externalId: dto.externalId,
-        externalStatus: dto.externalStatus,
-        timestamp: dto.timestamp,
+        externalStatus,
+        timestamp,
         toolCalls: dto.toolCalls,
         metadata: dto.metadata,
       },

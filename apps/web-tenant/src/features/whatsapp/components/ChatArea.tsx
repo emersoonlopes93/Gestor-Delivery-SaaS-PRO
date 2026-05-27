@@ -245,6 +245,13 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
     );
   }
 
+  const visibleMessages = messages.filter((msg) => {
+    const meta = msg.metadata as Record<string, unknown> | undefined;
+    if (meta?.hiddenFromInbox === true) return false;
+    if (meta?.type === 'tool_call' || meta?.type === 'tool_result') return false;
+    return true;
+  });
+
   return (
     <div className="flex-1 flex flex-col bg-white dark:bg-gray-900">
       {/* Header */}
@@ -361,7 +368,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto p-4 space-y-4"
       >
-        {messages.map((msg) => (
+        {visibleMessages.map((msg) => (
           <div
             key={msg.id}
             className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
