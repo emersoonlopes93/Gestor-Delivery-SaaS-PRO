@@ -17,7 +17,7 @@ export const GOOGLE_AI_FREE_MODELS = [
   { id: 'gemini-1.5-flash-8b', label: 'Gemini 1.5 Flash 8B (gratuito)' },
 ] as const;
 
-const DEFAULT_GOOGLE_AI_MODEL = 'gemini-1.5-flash';
+const DEFAULT_GOOGLE_AI_MODEL = 'gemini-2.0-flash';
 
 /**
  * Provider de IA via Google AI Studio (Gemini API).
