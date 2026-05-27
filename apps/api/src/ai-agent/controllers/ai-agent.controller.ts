@@ -10,21 +10,20 @@ import { AiAgentConfigService, UpdateAiAgentConfigDto } from '../services/ai-age
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions as Permissions } from '../../common/decorators';
+import type { TenantJwtPayload } from '@gestor/types';
 
 @Controller('ai-agent/config')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard)
 export class AiAgentController {
   constructor(private readonly configService: AiAgentConfigService) {}
 
   @Get()
-  @Permissions('settings.manage')
-  async getConfig(@Request() req: { user: { tenantId: string } }) {
+  async getConfig(@Request() req: { user: TenantJwtPayload }) {
     return this.configService.getConfig(req.user.tenantId);
   }
 
   @Patch()
-  @Permissions('settings.manage')
-  async updateConfig(@Request() req: { user: { tenantId: string } }, @Body() dto: UpdateAiAgentConfigDto) {
+  async updateConfig(@Request() req: { user: TenantJwtPayload }, @Body() dto: UpdateAiAgentConfigDto) {
     return this.configService.updateConfig(req.user.tenantId, dto);
   }
 }
