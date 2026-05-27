@@ -71,6 +71,22 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
     },
   });
 
+  const deactivateHandoffMutation = useMutation({
+    mutationFn: async () => {
+      if (!session) return;
+      const res = await api.post(`/chat/sessions/${session.id}/handoff/deactivate`);
+      return res.data;
+    },
+    onSuccess: () => {
+      if (!session) return;
+      onSessionUpdate({
+        ...session,
+        handoffActive: false,
+        handoffOperator: undefined,
+      });
+    },
+  });
+
   useEffect(() => {
     if (sessionMessages.length > 0) {
       setMessages(sessionMessages);
@@ -181,6 +197,36 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
           </button>
         </div>
       </div>
+
+      {session.handoffActive && (
+        <div className="bg-red-50 dark:bg-red-950/20 border-b border-red-100 dark:border-red-900/30 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 animate-in slide-in-from-top">
+          <div className="flex items-center gap-2">
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+            </span>
+            <p className="text-xs font-medium text-red-800 dark:text-red-300">
+              Atendimento humano ativo. O Agente IA está silenciado para esta conversa.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => deactivateHandoffMutation.mutate()}
+              disabled={deactivateHandoffMutation.isPending}
+              className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
+            >
+              {deactivateHandoffMutation.isPending ? 'Reativando...' : 'Reativar IA'}
+            </button>
+            <button
+              onClick={() => closeSessionMutation.mutate()}
+              disabled={closeSessionMutation.isPending}
+              className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-lg transition-colors"
+            >
+              Encerrar atendimento humano
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">

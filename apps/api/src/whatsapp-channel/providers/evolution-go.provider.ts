@@ -721,6 +721,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
     // Check root keys
     for (const key of keys) {
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
       const val = obj[key];
       if (typeof val === 'string' && val.trim()) {
         return val.trim();
@@ -732,6 +733,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     if (dataVal && typeof dataVal === 'object' && !Array.isArray(dataVal)) {
       const dataObj = dataVal as Record<string, unknown>;
       for (const key of keys) {
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
         const val = dataObj[key];
         if (typeof val === 'string' && val.trim()) {
           return val.trim();
@@ -744,6 +746,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     if (instanceVal && typeof instanceVal === 'object' && !Array.isArray(instanceVal)) {
       const instanceObj = instanceVal as Record<string, unknown>;
       for (const key of keys) {
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
         const val = instanceObj[key];
         if (typeof val === 'string' && val.trim()) {
           return val.trim();
@@ -790,9 +793,12 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       qrCode: normalizedQr,
     };
 
-    const keys = Object.keys(data).filter(k => data[k] !== undefined && data[k] !== null);
+    const keysFiltered = Object.keys(data).filter(k => {
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') return false;
+      return data[k] !== undefined && data[k] !== null;
+    });
     this.logger.log(`[WHATSAPP_STATUS_PARSE] connectedRaw=${connectedRaw} loggedInRaw=${loggedInRaw} mapped=${state} qrPresent=${!!normalizedQr}`);
-    this.logger.log(`[WHATSAPP_QR] qrPresent=${!!normalizedQr} keys=[${keys.join(', ')}]`);
+    this.logger.log(`[WHATSAPP_QR] qrPresent=${!!normalizedQr} keys=[${keysFiltered.join(', ')}]`);
 
     return result;
   }

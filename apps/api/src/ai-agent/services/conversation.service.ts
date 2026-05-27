@@ -152,6 +152,7 @@ export class ConversationService {
         handoffOperator: null,
       },
     });
+    this.logger.log(`[AI_FLOW] handoff_deactivated sessionId=${sessionId}`);
     this.logger.log(`Handoff deactivated for session ${sessionId}. Bot is back.`);
     return session;
   }

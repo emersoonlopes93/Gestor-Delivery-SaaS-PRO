@@ -13,6 +13,11 @@ interface WhatsAppInstance {
   apiKey?: string;
 }
 
+interface HandoffSessionListItem {
+  id: string;
+  handoffActive: boolean;
+}
+
 interface AiAgentConfig {
   isEnabled: boolean;
   agentName: string;
@@ -50,6 +55,21 @@ export function WhatsAppConfigPage() {
       return res.data;
     },
   });
+
+  // Fetch Chat Sessions to check for active handoffs
+  const { data: chatSessions = [] } = useQuery<HandoffSessionListItem[]>({
+    queryKey: ['chat-sessions'],
+    queryFn: async () => {
+      try {
+        const res = await api.get<HandoffSessionListItem[]>('/chat/sessions');
+        return res.success ? res.data : [];
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  const hasHandoffActive = Array.isArray(chatSessions) && chatSessions.some((s) => s.handoffActive);
 
   // Fetch Status/QR
   const fetchStatus = async () => {
@@ -241,6 +261,24 @@ export function WhatsAppConfigPage() {
           </div>
         )}
       </div>
+
+      {hasHandoffActive && (
+        <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded-xl p-4 flex items-start gap-3 animate-in fade-in duration-300">
+          <div className="flex-shrink-0 text-yellow-600 dark:text-yellow-400">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div>
+            <h4 className="text-sm font-semibold text-yellow-800 dark:text-yellow-300 mb-1">
+              Atendimento Humano em Andamento
+            </h4>
+            <p className="text-xs text-yellow-700 dark:text-yellow-400">
+              Existem conversas em atendimento humano. A IA não responderá essas conversas até serem reativadas na Caixa de Entrada.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Card Instância WhatsApp */}

@@ -301,4 +301,16 @@ export class ChatController {
   async incrementUsage(@Param('id') id: string) {
     return this.quickRepliesService.incrementUsage(id);
   }
+
+  @Post('dev/clear-handoffs')
+  @HttpCode(200)
+  @Permissions('orders.read')
+  async devClearHandoffs(@Request() req: TenantRequest) {
+    const tenantId = req.user.tenantId;
+    await this.prisma.chatSession.updateMany({
+      where: { tenantId, handoffActive: true },
+      data: { handoffActive: false, handoffOperator: null },
+    });
+    return { success: true, message: 'All handoffs cleared' };
+  }
 }
