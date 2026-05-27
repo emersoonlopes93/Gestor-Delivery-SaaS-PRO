@@ -21,11 +21,15 @@ export function useChatSocket(tenantId: string | undefined) {
   useEffect(() => {
     if (!tenantId) return;
 
+    const token = localStorage.getItem('accessToken');
+    if (!token) return;
+
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3333';
     const socketUrl = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
     const socket = io(`${socketUrl}/chat`, {
       reconnection: true,
       reconnectionAttempts: 10,
+      auth: { token },
     });
 
     socket.on('connect', () => {

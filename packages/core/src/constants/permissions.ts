@@ -99,6 +99,13 @@ export const TENANT_PERMISSIONS = {
   // Billing module
   'billing.read': 'View billing and plans',
   'billing.write': 'Manage billing and subscriptions',
+
+  // Chat module
+  'chat.read': 'View chat sessions and messages',
+  'chat.send': 'Send chat messages',
+  'chat.manage_handoff': 'Manage chat handoff to human',
+  'chat.close': 'Close chat sessions',
+  'chat.manage_quick_replies': 'Manage quick replies',
 } as const;
 
 export type TenantPermission = keyof typeof TENANT_PERMISSIONS;
@@ -153,6 +160,7 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
     'users.read',
     'dashboard.view',
     'billing.read',
+    'chat.read', 'chat.send', 'chat.manage_handoff', 'chat.close', 'chat.manage_quick_replies',
   ],
   attendant: [
     'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.view_timeline', 'orders.use_kanban',

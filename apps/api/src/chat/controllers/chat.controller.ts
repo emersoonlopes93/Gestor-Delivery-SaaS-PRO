@@ -112,7 +112,7 @@ export class ChatController {
   }
 
   @Get('sessions')
-  @Permissions('orders.read')
+  @Permissions('chat.read')
   async listSessions(@Request() req: TenantRequest) {
     const sessions = await this.prisma.chatSession.findMany({
       where: { tenantId: req.user.tenantId },
@@ -144,7 +144,7 @@ export class ChatController {
   }
 
   @Get('sessions/:id')
-  @Permissions('orders.read')
+  @Permissions('chat.read')
   async getSession(@Request() req: TenantRequest, @Param('id') sessionId: string) {
     const session = await this.prisma.chatSession.findFirst({
       where: { id: sessionId, tenantId: req.user.tenantId },
@@ -153,7 +153,7 @@ export class ChatController {
   }
 
   @Get('sessions/:id/messages')
-  @Permissions('orders.read')
+  @Permissions('chat.read')
   async getMessages(@Request() req: TenantRequest, @Param('id') sessionId: string) {
     const messages = await this.prisma.chatMessage.findMany({
       where: {
@@ -167,7 +167,7 @@ export class ChatController {
   }
 
   @Get('sessions/:id/ai/summary')
-  @Permissions('orders.read')
+  @Permissions('chat.read')
   async getAiSummary(@Param('id') sessionId: string) {
     const session = await this.prisma.chatSession.findUnique({
       where: { id: sessionId },
@@ -178,7 +178,7 @@ export class ChatController {
 
   @Post('sessions/:id/ai/failures/reset')
   @HttpCode(200)
-  @Permissions('orders.read')
+  @Permissions('chat.read')
   async resetAiFailures(
     @Param('id') sessionId: string,
     @Body('toolName') toolName?: string,
@@ -193,7 +193,7 @@ export class ChatController {
 
   @Post('sessions/:id/handoff')
   @HttpCode(200)
-  @Permissions('orders.read')
+  @Permissions('chat.manage_handoff')
   async activateHandoff(
     @Param('id') sessionId: string,
     @Body('reason') reason?: string,
@@ -204,7 +204,7 @@ export class ChatController {
 
   @Post('sessions/:id/handoff/deactivate')
   @HttpCode(200)
-  @Permissions('orders.read')
+  @Permissions('chat.manage_handoff')
   async deactivateHandoff(@Param('id') sessionId: string) {
     await this.conversationService.deactivateHandoff(sessionId);
     return { message: 'Handoff desativado' };
@@ -212,7 +212,7 @@ export class ChatController {
 
   @Post('sessions/:id/close')
   @HttpCode(200)
-  @Permissions('orders.read')
+  @Permissions('chat.close')
   async closeSession(@Param('id') sessionId: string) {
     await this.conversationService.closeSession(sessionId);
     return { message: 'Sessão encerrada' };
@@ -220,7 +220,7 @@ export class ChatController {
 
   @Post('sessions/:id/messages')
   @HttpCode(200)
-  @Permissions('orders.read')
+  @Permissions('chat.send')
   async sendMessage(
     @Request() req: TenantRequest,
     @Param('id') sessionId: string,
@@ -271,19 +271,19 @@ export class ChatController {
   // --- Quick Replies ---
 
   @Get('quick-replies')
-  @Permissions('orders.read')
+  @Permissions('chat.read')
   async listQuickReplies(@Request() req: TenantRequest) {
     return this.quickRepliesService.findAll(req.user.tenantId);
   }
 
   @Post('quick-replies')
-  @Permissions('orders.read')
+  @Permissions('chat.manage_quick_replies')
   async createQuickReply(@Request() req: TenantRequest, @Body() dto: CreateQuickReplyDto) {
     return this.quickRepliesService.create(req.user.tenantId, dto);
   }
 
   @Put('quick-replies/:id')
-  @Permissions('orders.read')
+  @Permissions('chat.manage_quick_replies')
   async updateQuickReply(
     @Request() req: TenantRequest,
     @Param('id') id: string,
@@ -293,21 +293,21 @@ export class ChatController {
   }
 
   @Delete('quick-replies/:id')
-  @Permissions('orders.read')
+  @Permissions('chat.manage_quick_replies')
   async deleteQuickReply(@Request() req: TenantRequest, @Param('id') id: string) {
     return this.quickRepliesService.delete(req.user.tenantId, id);
   }
 
   @Post('quick-replies/:id/usage')
   @HttpCode(200)
-  @Permissions('orders.read')
+  @Permissions('chat.read')
   async incrementUsage(@Param('id') id: string) {
     return this.quickRepliesService.incrementUsage(id);
   }
 
   @Post('dev/clear-handoffs')
   @HttpCode(200)
-  @Permissions('orders.read')
+  @Permissions('chat.manage_handoff')
   async devClearHandoffs(@Request() req: TenantRequest) {
     const tenantId = req.user.tenantId;
     await this.prisma.chatSession.updateMany({

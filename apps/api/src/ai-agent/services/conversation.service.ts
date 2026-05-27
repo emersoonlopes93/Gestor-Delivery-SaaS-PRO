@@ -131,6 +131,8 @@ export class ConversationService {
       this.chatGateway.emitMessageCreated(session.tenantId, dto.sessionId, message);
     }
 
+    this.logger.log(`[CHAT_INBOX] message_saved sessionId=${dto.sessionId} senderType=${message.senderType} direction=${message.direction}`);
+
     return message;
   }
 
@@ -165,7 +167,7 @@ export class ConversationService {
         state: 'handoff_human',
       },
     });
-    this.logger.log(`Session ${sessionId} transferred to human operator.`);
+    this.logger.log(`[CHAT_INBOX] handoff_activated sessionId=${sessionId} reason=${reason || 'default'}`);
 
     // Emit WebSocket event for session update
     this.chatGateway.emitSessionUpdated(session.tenantId, session);
@@ -195,8 +197,7 @@ export class ConversationService {
         handoffOperator: null,
       },
     });
-    this.logger.log(`[AI_FLOW] handoff_deactivated sessionId=${sessionId}`);
-    this.logger.log(`Handoff deactivated for session ${sessionId}. Bot is back.`);
+    this.logger.log(`[CHAT_INBOX] handoff_deactivated sessionId=${sessionId}`);
 
     // Emit WebSocket event for session update
     this.chatGateway.emitSessionUpdated(session.tenantId, session);
@@ -227,7 +228,7 @@ export class ConversationService {
         handoffActive: false,
       },
     });
-    this.logger.log(`Session ${sessionId} closed.`);
+    this.logger.log(`[CHAT_INBOX] session_closed sessionId=${sessionId}`);
 
     // Emit WebSocket event for session update
     this.chatGateway.emitSessionUpdated(session.tenantId, session);
