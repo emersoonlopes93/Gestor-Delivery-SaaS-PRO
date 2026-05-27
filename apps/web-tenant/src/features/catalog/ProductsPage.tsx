@@ -606,7 +606,7 @@ export function ProductsPage() {
               <select
                 value={selectedCategoryId ?? ''}
                 onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : null)}
-                className="h-8 pl-2 pr-6 bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 focus:ring-0 cursor-pointer"
+                className="h-8 pl-2 pr-6 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
               >
                 <option value="">Categorias</option>
                 {categories.map((c) => (
@@ -618,7 +618,7 @@ export function ProductsPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as ProductStatusFilter)}
-                className="h-8 pl-2 pr-6 bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 focus:ring-0 cursor-pointer"
+                className="h-8 pl-2 pr-6 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
               >
                 <option value="all">Status</option>
                 <option value="active">Ativos</option>
@@ -628,7 +628,7 @@ export function ProductsPage() {
               <select
                 value={publicationFilter}
                 onChange={(e) => setPublicationFilter(e.target.value as PublicationFilter)}
-                className="h-8 pl-2 pr-6 bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 focus:ring-0 cursor-pointer"
+                className="h-8 pl-2 pr-6 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
               >
                 <option value="all">Publicação</option>
                 <option value="draft">Rascunho</option>

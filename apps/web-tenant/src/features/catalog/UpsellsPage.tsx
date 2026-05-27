@@ -168,7 +168,7 @@ export function UpsellsPage() {
           <input
             type="text"
             placeholder="Buscar ofertas..."
-            className="flex-1 outline-none text-sm bg-transparent text-gray-900 dark:text-gray-100"
+            className="flex-1 input-premium bg-transparent"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />

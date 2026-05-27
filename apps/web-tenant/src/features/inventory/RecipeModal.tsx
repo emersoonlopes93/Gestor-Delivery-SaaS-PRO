@@ -144,7 +144,7 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
                           <select
                             value={item.ingredientId}
                             onChange={(e) => handleUpdateItem(index, { ingredientId: e.target.value })}
-                            className="w-full bg-transparent border-none focus:ring-0 text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer"
+                            className="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg px-2 py-1 text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all"
                           >
                             {ingredients.map(ing => (
                               <option key={ing.id} value={ing.id}>{ing.name} ({ing.unit})</option>
