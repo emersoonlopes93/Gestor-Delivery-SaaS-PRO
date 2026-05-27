@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { WhatsAppChannelModule } from '../whatsapp-channel/whatsapp-channel.module';
+import { ChatModule } from '../chat/chat.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { OrdersModule } from '../orders/orders.module';
 import { StorefrontModule } from '../storefront/storefront.module';
@@ -29,6 +30,7 @@ import { AiConfigDiagnosticsService } from './services/ai-config-diagnostics.ser
   imports: [
     DatabaseModule,
     RbacModule,
+    ChatModule,                               // para WebSocket events
     forwardRef(() => WhatsAppChannelModule), // para enviar as mensagens de volta
     forwardRef(() => CatalogModule),         // para as tools lerem produtos
     forwardRef(() => OrdersModule),          // para as tools criarem pedidos
