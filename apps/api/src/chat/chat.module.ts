@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { ChatController } from './controllers/chat.controller';
 import { AiAgentModule } from '../ai-agent/ai-agent.module';
@@ -10,7 +10,7 @@ import { ChatGateway } from './chat.gateway';
 @Module({
   imports: [
     DatabaseModule,
-    AiAgentModule, // para ConversationService
+    forwardRef(() => AiAgentModule), // para ConversationService
     RbacModule, // para PermissionsGuard e RbacService
     WhatsAppChannelModule, // para WhatsAppSenderService
   ],

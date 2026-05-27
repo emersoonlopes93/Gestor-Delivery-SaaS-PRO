@@ -30,7 +30,7 @@ import { AiConfigDiagnosticsService } from './services/ai-config-diagnostics.ser
   imports: [
     DatabaseModule,
     RbacModule,
-    ChatModule,                               // para WebSocket events
+    forwardRef(() => ChatModule),            // para WebSocket events
     forwardRef(() => WhatsAppChannelModule), // para enviar as mensagens de volta
     forwardRef(() => CatalogModule),         // para as tools lerem produtos
     forwardRef(() => OrdersModule),          // para as tools criarem pedidos
