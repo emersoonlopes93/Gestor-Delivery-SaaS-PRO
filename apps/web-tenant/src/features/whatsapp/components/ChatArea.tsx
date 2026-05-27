@@ -88,9 +88,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
   });
 
   useEffect(() => {
-    if (sessionMessages.length > 0) {
-      setMessages(sessionMessages);
-    }
+    setMessages(sessionMessages);
   }, [sessionMessages]);
 
   useEffect(() => {

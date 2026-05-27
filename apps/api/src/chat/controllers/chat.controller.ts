@@ -131,6 +131,7 @@ export class ChatController {
       return {
         id: s.id,
         customerPhone: s.customerPhone,
+        displayName: s.displayName,
         state: s.state,
         lastMessageAt: s.lastMessageAt,
         lastMessage: s.messages[0]?.content || null,

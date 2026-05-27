@@ -9,6 +9,7 @@ import { useTenantAuth } from '../../../hooks/use-tenant-auth';
 export function InboxPage() {
   const queryClient = useQueryClient();
   const [selectedSession, setSelectedSession] = useState<ChatSession | null>(null);
+  const [filter, setFilter] = useState<'all' | 'waiting'>('all');
   const { user } = useTenantAuth();
 
   // Enable WebSocket for real-time updates
@@ -21,6 +22,15 @@ export function InboxPage() {
       return res.success ? res.data : [];
     },
   });
+
+  const filteredSessions = sessions.filter(s => {
+    if (filter === 'waiting') {
+      return s.handoffActive;
+    }
+    return true;
+  });
+
+  const waitingCount = sessions.filter(s => s.handoffActive).length;
 
   const handleSessionSelect = async (session: ChatSessionListItem) => {
     try {
@@ -53,17 +63,31 @@ export function InboxPage() {
         <div className="p-4 border-b border-gray-200 dark:border-gray-800">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Caixa de Entrada</h2>
           <div className="flex gap-2">
-            <button className="flex-1 py-1.5 px-3 bg-primary-500/10 text-primary-600 dark:text-primary-400 text-sm font-medium rounded-lg border border-primary-500/20">
-              Aguardando (1)
+            <button
+              onClick={() => setFilter('waiting')}
+              className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-lg transition-colors ${
+                filter === 'waiting'
+                  ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400 border border-primary-500/20'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              Aguardando ({waitingCount})
             </button>
-            <button className="flex-1 py-1.5 px-3 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-sm font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+            <button
+              onClick={() => setFilter('all')}
+              className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-lg transition-colors ${
+                filter === 'all'
+                  ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400 border border-primary-500/20'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
               Todos
             </button>
           </div>
         </div>
         
         <div className="flex-1 overflow-y-auto">
-          {sessions.map(s => (
+          {filteredSessions.map(s => (
             <div 
               key={s.id} 
               onClick={() => handleSessionSelect(s)}
