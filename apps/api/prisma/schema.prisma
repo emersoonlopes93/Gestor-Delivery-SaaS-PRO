@@ -28,40 +28,47 @@ model Tenant {
   updatedAt                   DateTime                     @updatedAt @map("updated_at")
   orderSequence               Int                          @default(0) @map("order_sequence")
   paymentTransactions         PaymentTransaction[]
-  printJobs                   PrintJob[]
-  scheduledOrders             ScheduledOrder[]
   subscription                TenantSubscription?
+  aiAgentConfig               AiAgentConfig?
+  auditLogs                   AuditLog[]
+  campaigns                   Campaign[]
   cashMovements               CashMovement[]
   cashSessions                CashSession[]
   cashbackTransactions        CashbackTransaction[]
   catalogAvailabilityRules    CatalogAvailabilityRule[]
   catalogPublications         CatalogPublication[]
+  chatSessions                ChatSession[]
   comboBundleItems            ComboBundleItem[]
   comboRecipeIngredients      ComboRecipeIngredient[]
   comboSlotAllowedItems       ComboSlotAllowedItem[]
   comboSlots                  ComboSlot[]
   complementRecipeIngredients ComplementRecipeIngredient[]
   coupons                     Coupon[]
+  customerOptOuts             CustomerOptOut[]
   customerOtps                CustomerOTP[]
   customers                   Customer[]
   deliveryCoverageConfig      DeliveryCoverageConfig?
   deliveryDriverLocations     DeliveryDriverLocation[]
   deliveryDrivers             DeliveryDriver[]
+  DeliveryRateDistanceTier    DeliveryRateDistanceTier[]
   deliveryRateRules           DeliveryRateRule[]
   dineInTables                DineInTable[]
+  financialAccounts           FinancialAccount[]
+  financialTransactions       FinancialTransaction[]
   goals                       Goal[]
   ingredients                 Ingredient[]
+  inventoryCountItems         InventoryCountItem[]
+  inventoryCounts             InventoryCount[]
   optionGroups                OptionGroup[]
   optionItems                 OptionItem[]
   orderDeliveryAddresses      OrderDeliveryAddress[]
   orderItemComboSelections    OrderItemComboSelection[]
   orderItemComplements        OrderItemComplement[]
   orderItems                  OrderItem[]
+  orderSplits                 OrderSplit[]
   orderTimelines              OrderTimeline[]
   orders                      Order[]
-  orderSplits                 OrderSplit[]
-  splitPayments               SplitPayment[]
-  timeSlots                   TimeSlot[]
+  printJobs                   PrintJob[]
   categories                  ProductCategory[]
   productComboBlockItems      ProductComboBlockItem[]
   productComboBlocks          ProductComboBlock[]
@@ -74,31 +81,24 @@ model Tenant {
   productRecipeIngredients    ProductRecipeIngredient[]
   productUpsells              ProductUpsell[]
   products                    Product[]
+  purchaseItems               PurchaseItem[]
+  purchases                   Purchase[]
+  quickReplies                QuickReply[]
+  scheduledOrders             ScheduledOrder[]
+  splitPayments               SplitPayment[]
   stockMovements              StockMovement[]
+  suppliers                   Supplier[]
   moduleAccess                TenantModuleAccess[]
+  onboarding                  TenantOnboarding?
   operatingHours              TenantOperatingHours[]
   roles                       TenantRole[]
   settings                    TenantSettings?
   users                       TenantUser[]
+  businessGroup               BusinessGroup?               @relation(fields: [businessGroupId], references: [id])
+  timeSlots                   TimeSlot[]
   upsellItems                 UpsellItem[]
   upsells                     Upsell[]
-  suppliers                   Supplier[]
-  purchases                   Purchase[]
-  inventoryCounts             InventoryCount[]
-  financialAccounts           FinancialAccount[]
-  financialTransactions       FinancialTransaction[]
-  purchaseItems               PurchaseItem[]
-  inventoryCountItems         InventoryCountItem[]
-  businessGroup               BusinessGroup?               @relation(fields: [businessGroupId], references: [id])
-  onboarding                  TenantOnboarding?
-  auditLogs                   AuditLog[]
   whatsappInstance            WhatsAppInstance?
-  chatSessions                ChatSession[]
-  aiAgentConfig               AiAgentConfig?
-  quickReplies                QuickReply[]
-  campaigns                   Campaign[]
-  customerOptOuts             CustomerOptOut[]
-  DeliveryRateDistanceTier    DeliveryRateDistanceTier[]
 
   @@map("tenants")
 }
@@ -107,7 +107,7 @@ model AuditLog {
   id        String   @id @default(uuid())
   tenantId  String   @map("tenant_id")
   userId    String?  @map("user_id")
-  userType  String   @map("user_type") // 'admin' or 'tenant_user'
+  userType  String   @map("user_type")
   action    String   @db.VarChar(100)
   resource  String?  @db.VarChar(100)
   details   Json?
@@ -338,7 +338,7 @@ model TenantSettings {
   state                        String?  @db.VarChar(2)
   street                       String?  @db.VarChar(255)
   zipCode                      String?  @map("zip_code") @db.VarChar(10)
-  taxRegime                    String?  @map("tax_regime") @db.VarChar(20) // ex: Simples Nacional, Lucro Real
+  taxRegime                    String?  @map("tax_regime") @db.VarChar(20)
   mercadoPagoAccessToken       String?  @map("mercado_pago_access_token") @db.VarChar(500)
   mercadoPagoPublicKey         String?  @map("mercado_pago_public_key") @db.VarChar(255)
   mercadoPagoWebhookSecret     String?  @map("mercado_pago_webhook_secret") @db.VarChar(255)
@@ -554,6 +554,7 @@ model Product {
   usedInComboBundles  ComboBundleItem[]            @relation("ComboBundleLinkedProduct")
   allowedInComboSlots ComboSlotAllowedItem[]
   comboSlots          ComboSlot[]
+  orderItems          OrderItem[]
   comboBlockItems     ProductComboBlockItem[]
   complementGroups    ProductComplementGroupLink[]
   optionGroupLinks    ProductOptionGroupLink[]
@@ -563,7 +564,6 @@ model Product {
   category            ProductCategory?             @relation(fields: [categoryId], references: [id])
   tenant              Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   upsellItemEntries   UpsellItem[]
-  orderItems          OrderItem[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
@@ -791,21 +791,21 @@ model Order {
   waiterId            String?               @map("waiter_id")
   orderCoupons        OrderCoupon[]
   paymentTransactions PaymentTransaction[]
-  printJobs           PrintJob[]
-  scheduledOrders     ScheduledOrder[]
   cashMovements       CashMovement[]
   cashbackHistory     CashbackTransaction[]
   activeTable         DineInTable?          @relation("ActiveTableOrder")
   deliveryAddress     OrderDeliveryAddress?
   items               OrderItem[]
-  timeline            OrderTimeline[]
   orderSplits         OrderSplit[]
+  timeline            OrderTimeline[]
   cashSession         CashSession?          @relation(fields: [cashSessionId], references: [id])
   coupon              Coupon?               @relation(fields: [couponId], references: [id])
   customer            Customer?             @relation(fields: [customerId], references: [id])
   deliveryDriver      DeliveryDriver?       @relation(fields: [deliveryDriverId], references: [id])
   tenant              Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   waiter              TenantUser?           @relation("WaiterOrders", fields: [waiterId], references: [id])
+  printJobs           PrintJob[]
+  scheduledOrders     ScheduledOrder[]
   stockMovements      StockMovement[]
 
   @@unique([tenantId, idempotencyKey])
@@ -918,7 +918,7 @@ model DeliveryDriver {
   tenantId       String                   @map("tenant_id")
   name           String                   @db.VarChar(150)
   phone          String                   @db.VarChar(30)
-  pin            String?                  @db.VarChar(60) // hash or raw PIN
+  pin            String?                  @db.VarChar(60)
   isActive       Boolean                  @default(true) @map("is_active")
   status         DriverStatus             @default(offline)
   vehicleType    DriverVehicleType        @default(motorcycle) @map("vehicle_type")
@@ -1096,13 +1096,13 @@ model Customer {
   cashbackBalance    Decimal               @default(0) @map("cashback_balance") @db.Decimal(10, 2)
   createdAt          DateTime              @default(now()) @map("created_at")
   updatedAt          DateTime              @updatedAt @map("updated_at")
+  campaignDispatches CampaignDispatch[]
   cashbackHistory    CashbackTransaction[]
+  chatSessions       ChatSession[]
+  optOuts            CustomerOptOut[]
   tenant             Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orders             Order[]
   scheduledOrders    ScheduledOrder[]
-  chatSessions       ChatSession[]
-  campaignDispatches CampaignDispatch[]
-  optOuts            CustomerOptOut[]
 
   @@unique([tenantId, phone])
   @@index([tenantId])
@@ -1146,10 +1146,10 @@ model Ingredient {
   comboRecipes        ComboRecipeIngredient[]
   complementRecipes   ComplementRecipeIngredient[]
   tenant              Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  productRecipes      ProductRecipeIngredient[]
-  movements           StockMovement[]
-  purchaseItems       PurchaseItem[]
   inventoryCountItems InventoryCountItem[]
+  productRecipes      ProductRecipeIngredient[]
+  purchaseItems       PurchaseItem[]
+  movements           StockMovement[]
 
   @@unique([tenantId, sku])
   @@index([tenantId])
@@ -1265,8 +1265,8 @@ model DeliveryRateRule {
   pricePerKm         Decimal?                   @map("price_per_km") @db.Decimal(10, 2)
   pricingMode        DeliveryPricingMode?       @map("pricing_mode")
   zoneKind           DeliveryZoneKind?          @map("zone_kind")
-  tenant             Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   distanceTiers      DeliveryRateDistanceTier[]
+  tenant             Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([tenantId, type])
@@ -1276,19 +1276,18 @@ model DeliveryRateRule {
 }
 
 model DeliveryRateDistanceTier {
-  id                 String   @id @default(uuid())
-  tenantId           String   @map("tenant_id")
-  deliveryRateRuleId String   @map("delivery_rate_rule_id")
-  minDistanceKm      Decimal  @map("min_distance_km") @db.Decimal(5, 2)
-  maxDistanceKm      Decimal  @map("max_distance_km") @db.Decimal(5, 2)
-  fee                Decimal  @map("fee") @db.Decimal(10, 2)
-  sortOrder          Int      @default(0) @map("sort_order")
-  isActive           Boolean  @default(true) @map("is_active")
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
-
-  deliveryRateRule DeliveryRateRule @relation(fields: [deliveryRateRuleId], references: [id], onDelete: Cascade)
-  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id                 String           @id @default(uuid())
+  tenantId           String           @map("tenant_id")
+  deliveryRateRuleId String           @map("delivery_rate_rule_id")
+  minDistanceKm      Decimal          @map("min_distance_km") @db.Decimal(5, 2)
+  maxDistanceKm      Decimal          @map("max_distance_km") @db.Decimal(5, 2)
+  fee                Decimal          @map("fee") @db.Decimal(10, 2)
+  sortOrder          Int              @default(0) @map("sort_order")
+  isActive           Boolean          @default(true) @map("is_active")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+  deliveryRateRule   DeliveryRateRule @relation(fields: [deliveryRateRuleId], references: [id], onDelete: Cascade)
+  tenant             Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([deliveryRateRuleId])
@@ -1384,22 +1383,21 @@ model PrintJob {
 }
 
 model TimeSlot {
-  id               String         @id @default(uuid())
-  tenantId         String         @map("tenant_id")
-  startTime        DateTime       @map("start_time")
-  endTime          DateTime       @map("end_time")
-  capacity         Int            @default(4)
-  currentOccupancy Int            @default(0) @map("current_occupancy")
-  status           TimeSlotStatus @default(available)
-  minOrderValue    Decimal?       @map("min_order_value") @db.Decimal(10, 2)
-  maxOrderValue    Decimal?       @map("max_order_value") @db.Decimal(10, 2)
-  maxItems         Int?           @map("max_items")
-  isActive         Boolean        @default(true) @map("is_active")
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime       @updatedAt @map("updated_at")
-
-  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  scheduledOrders ScheduledOrder[]
+  id               String           @id @default(uuid())
+  tenantId         String           @map("tenant_id")
+  startTime        DateTime         @map("start_time")
+  endTime          DateTime         @map("end_time")
+  capacity         Int              @default(4)
+  currentOccupancy Int              @default(0) @map("current_occupancy")
+  status           TimeSlotStatus   @default(available)
+  minOrderValue    Decimal?         @map("min_order_value") @db.Decimal(10, 2)
+  maxOrderValue    Decimal?         @map("max_order_value") @db.Decimal(10, 2)
+  maxItems         Int?             @map("max_items")
+  isActive         Boolean          @default(true) @map("is_active")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  scheduledOrders  ScheduledOrder[]
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, startTime])
   @@map("time_slots")
@@ -1421,37 +1419,29 @@ model ScheduledOrder {
   confirmedAt       DateTime?            @map("confirmed_at")
   createdAt         DateTime             @default(now()) @map("created_at")
   updatedAt         DateTime             @updatedAt @map("updated_at")
-
-  customer Customer? @relation(fields: [customerId], references: [id])
-  order    Order?    @relation(fields: [orderId], references: [id])
-  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  timeSlot TimeSlot? @relation(fields: [timeSlotId], references: [id])
+  customer          Customer?            @relation(fields: [customerId], references: [id])
+  order             Order?               @relation(fields: [orderId], references: [id])
+  tenant            Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  timeSlot          TimeSlot?            @relation(fields: [timeSlotId], references: [id])
 
   @@index([tenantId, scheduledFor])
   @@map("scheduled_orders")
 }
 
-enum TimeSlotStatus {
-  available
-  occupied
-  blocked
-}
-
 model Supplier {
-  id          String   @id @default(uuid())
-  tenantId    String   @map("tenant_id")
-  name        String   @db.VarChar(150)
-  cnpj        String?  @db.VarChar(18)
-  email       String?  @db.VarChar(255)
-  phone       String?  @db.VarChar(30)
-  contactName String?  @map("contact_name") @db.VarChar(100)
-  category    String?  @db.VarChar(50)
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  purchases Purchase[]
+  id          String     @id @default(uuid())
+  tenantId    String     @map("tenant_id")
+  name        String     @db.VarChar(150)
+  cnpj        String?    @db.VarChar(18)
+  email       String?    @db.VarChar(255)
+  phone       String?    @db.VarChar(30)
+  contactName String?    @map("contact_name") @db.VarChar(100)
+  category    String?    @db.VarChar(50)
+  isActive    Boolean    @default(true) @map("is_active")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  purchases   Purchase[]
+  tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, cnpj])
   @@index([tenantId])
@@ -1469,10 +1459,9 @@ model Purchase {
   purchaseDate  DateTime       @default(now()) @map("purchase_date")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
-
-  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  supplier Supplier       @relation(fields: [supplierId], references: [id], onDelete: Restrict)
-  items    PurchaseItem[]
+  items         PurchaseItem[]
+  supplier      Supplier       @relation(fields: [supplierId], references: [id])
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([supplierId])
@@ -1480,18 +1469,17 @@ model Purchase {
 }
 
 model PurchaseItem {
-  id           String    @id @default(uuid())
-  tenantId     String    @map("tenant_id")
-  purchaseId   String    @map("purchase_id")
-  ingredientId String    @map("ingredient_id")
-  quantity     Decimal   @db.Decimal(10, 4)
-  unitCost     Decimal   @map("unit_cost") @db.Decimal(10, 4)
-  totalCost    Decimal   @map("total_cost") @db.Decimal(10, 4)
-  expiryDate   DateTime? @map("expiry_date")
-
-  purchase   Purchase   @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
-  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id           String     @id @default(uuid())
+  tenantId     String     @map("tenant_id")
+  purchaseId   String     @map("purchase_id")
+  ingredientId String     @map("ingredient_id")
+  quantity     Decimal    @db.Decimal(10, 4)
+  unitCost     Decimal    @map("unit_cost") @db.Decimal(10, 4)
+  totalCost    Decimal    @map("total_cost") @db.Decimal(10, 4)
+  expiryDate   DateTime?  @map("expiry_date")
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  purchase     Purchase   @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  tenant       Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([purchaseId])
   @@index([ingredientId])
@@ -1507,26 +1495,24 @@ model InventoryCount {
   closedAt  DateTime?            @map("closed_at")
   createdAt DateTime             @default(now()) @map("created_at")
   updatedAt DateTime             @updatedAt @map("updated_at")
-
-  tenant Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  items  InventoryCountItem[]
+  items     InventoryCountItem[]
+  tenant    Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@map("inventory_counts")
 }
 
 model InventoryCountItem {
-  id               String  @id @default(uuid())
-  tenantId         String  @map("tenant_id")
-  inventoryCountId String  @map("inventory_count_id")
-  ingredientId     String  @map("ingredient_id")
-  theoreticalStock Decimal @map("theoretical_stock") @db.Decimal(10, 4)
-  physicalStock    Decimal @map("physical_stock") @db.Decimal(10, 4)
-  adjustedQuantity Decimal @map("adjusted_quantity") @db.Decimal(10, 4)
-
-  inventoryCount InventoryCount @relation(fields: [inventoryCountId], references: [id], onDelete: Cascade)
-  ingredient     Ingredient     @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
-  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id               String         @id @default(uuid())
+  tenantId         String         @map("tenant_id")
+  inventoryCountId String         @map("inventory_count_id")
+  ingredientId     String         @map("ingredient_id")
+  theoreticalStock Decimal        @map("theoretical_stock") @db.Decimal(10, 4)
+  physicalStock    Decimal        @map("physical_stock") @db.Decimal(10, 4)
+  adjustedQuantity Decimal        @map("adjusted_quantity") @db.Decimal(10, 4)
+  ingredient       Ingredient     @relation(fields: [ingredientId], references: [id])
+  inventoryCount   InventoryCount @relation(fields: [inventoryCountId], references: [id], onDelete: Cascade)
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([inventoryCountId])
   @@index([ingredientId])
@@ -1534,15 +1520,14 @@ model InventoryCountItem {
 }
 
 model FinancialAccount {
-  id        String               @id @default(uuid())
-  tenantId  String               @map("tenant_id")
-  name      String               @db.VarChar(100)
-  type      FinancialAccountType @default(cash)
-  balance   Decimal              @default(0) @db.Decimal(10, 2)
-  active    Boolean              @default(true)
-  createdAt DateTime             @default(now()) @map("created_at")
-  updatedAt DateTime             @updatedAt @map("updated_at")
-
+  id           String                 @id @default(uuid())
+  tenantId     String                 @map("tenant_id")
+  name         String                 @db.VarChar(100)
+  type         FinancialAccountType   @default(cash)
+  balance      Decimal                @default(0) @db.Decimal(10, 2)
+  active       Boolean                @default(true)
+  createdAt    DateTime               @default(now()) @map("created_at")
+  updatedAt    DateTime               @updatedAt @map("updated_at")
   tenant       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   transactions FinancialTransaction[]
 
@@ -1565,9 +1550,8 @@ model FinancialTransaction {
   referenceType String?                  @map("reference_type")
   createdAt     DateTime                 @default(now()) @map("created_at")
   updatedAt     DateTime                 @updatedAt @map("updated_at")
-
-  account FinancialAccount? @relation(fields: [accountId], references: [id])
-  tenant  Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account       FinancialAccount?        @relation(fields: [accountId], references: [id])
+  tenant        Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@index([accountId])
@@ -1579,7 +1563,7 @@ model OrderSplit {
   id                String           @id @default(uuid())
   tenantId          String           @map("tenant_id")
   orderId           String           @map("order_id")
-  splitType         String           @map("split_type") // 'items', 'people', 'custom'
+  splitType         String           @map("split_type")
   description       String?
   subtotalAmount    Decimal          @map("subtotal_amount") @db.Decimal(10, 2)
   discountAmount    Decimal          @default(0) @map("discount_amount") @db.Decimal(10, 2)
@@ -1594,10 +1578,9 @@ model OrderSplit {
   cancelledAt       DateTime?        @map("cancelled_at")
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @updatedAt @map("updated_at")
-
-  order    Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  payments SplitPayment[]
+  order             Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  tenant            Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payments          SplitPayment[]
 
   @@index([tenantId])
   @@index([orderId])
@@ -1624,6 +1607,203 @@ model SplitPayment {
   @@index([tenantId])
   @@index([orderSplitId])
   @@map("split_payments")
+}
+
+model WhatsAppInstance {
+  id                  String                 @id @default(uuid())
+  tenantId            String                 @unique @map("tenant_id")
+  providerType        WhatsAppProviderType   @default(evolution_go) @map("provider_type")
+  instanceName        String                 @unique @map("instance_name") @db.VarChar(100)
+  apiUrl              String                 @map("api_url") @db.VarChar(500)
+  apiKey              String                 @map("api_key") @db.VarChar(500)
+  phoneNumber         String?                @map("phone_number") @db.VarChar(30)
+  status              WhatsAppInstanceStatus @default(disconnected)
+  qrCode              String?                @map("qr_code")
+  webhookSecret       String?                @map("webhook_secret") @db.VarChar(255)
+  evolutionInstanceId String?                @map("evolution_instance_id") @db.VarChar(100)
+  createdAt           DateTime               @default(now()) @map("created_at")
+  updatedAt           DateTime               @updatedAt @map("updated_at")
+  tenant              Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("whatsapp_instances")
+}
+
+model ChatSession {
+  id              String        @id @default(uuid())
+  tenantId        String        @map("tenant_id")
+  customerPhone   String        @map("customer_phone") @db.VarChar(30)
+  customerId      String?       @map("customer_id")
+  displayName     String?       @map("display_name") @db.VarChar(150)
+  channel         String        @default("whatsapp") @db.VarChar(30)
+  remoteJid       String?       @map("remote_jid") @db.VarChar(100)
+  state           ChatState     @default(greeting)
+  cartData        Json?         @map("cart_data")
+  handoffActive   Boolean       @default(false) @map("handoff_active")
+  handoffOperator String?       @map("handoff_operator")
+  handoffReason   String?       @map("handoff_reason")
+  handoffAt       DateTime?     @map("handoff_at")
+  lastMessageAt   DateTime      @default(now()) @map("last_message_at")
+  unreadCount     Int           @default(0) @map("unread_count")
+  closedAt        DateTime?     @map("closed_at")
+  metadata        Json?
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  messages        ChatMessage[]
+  customer        Customer?     @relation(fields: [customerId], references: [id])
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, customerPhone])
+  @@index([tenantId])
+  @@index([tenantId, state])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id             String                @id @default(uuid())
+  sessionId      String                @map("session_id")
+  direction      MessageDirection
+  senderType     MessageSenderType     @default(customer)
+  content        String
+  messageType    String                @default("text") @map("message_type") @db.VarChar(30)
+  externalId     String?               @unique @map("external_id") @db.VarChar(100)
+  externalStatus MessageExternalStatus @map("external_status")
+  timestamp      DateTime?             @map("timestamp")
+  toolCalls      Json?                 @map("tool_calls")
+  metadata       Json?
+  createdAt      DateTime              @default(now()) @map("created_at")
+  session        ChatSession           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([externalId])
+  @@map("chat_messages")
+}
+
+model QuickReply {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  text       String
+  category   String?  @db.VarChar(50)
+  isActive   Boolean  @default(true) @map("is_active")
+  usageCount Int      @default(0) @map("usage_count")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("quick_replies")
+}
+
+model SystemConfig {
+  id                      String               @id @default("global")
+  defaultWhatsAppProvider WhatsAppProviderType @default(evolution_go) @map("default_whatsapp_provider")
+  defaultAiProvider       AiProviderType       @default(openai) @map("default_ai_provider")
+  evolutionUrl            String?              @map("evolution_url") @db.VarChar(500)
+  evolutionGlobalToken    String?              @map("evolution_global_token") @db.VarChar(500)
+  openaiApiKey            String?              @map("openai_api_key")
+  anthropicApiKey         String?              @map("anthropic_api_key")
+  googleAiApiKey          String?              @map("google_ai_api_key")
+  googleAiModel           String?              @default("gemini-2.0-flash-lite") @map("google_ai_model") @db.VarChar(100)
+  baseAiPrompt            String?              @map("base_ai_prompt")
+  updatedAt               DateTime             @updatedAt @map("updated_at")
+
+  @@map("system_configs")
+}
+
+model AiAgentConfig {
+  id                  String   @id @default(uuid())
+  tenantId            String   @unique @map("tenant_id")
+  isEnabled           Boolean  @default(false) @map("is_enabled")
+  agentName           String?  @map("agent_name") @db.VarChar(100)
+  greetingMessage     String?  @map("greeting_message")
+  tone                String   @default("friendly") @db.VarChar(30)
+  customInstructions  String?  @map("custom_instructions")
+  operatingMode       String   @default("always") @map("operating_mode") @db.VarChar(30)
+  handoffPolicy       String   @default("on_request") @map("handoff_policy") @db.VarChar(30)
+  fallbackMessage     String?  @map("fallback_message")
+  maxRetries          Int      @default(3) @map("max_retries")
+  sessionTimeoutMin   Int      @default(120) @map("session_timeout_min")
+  dailyMessageLimit   Int      @default(1000) @map("daily_message_limit")
+  customerCooldownMin Int      @default(5) @map("customer_cooldown_min")
+  simulateTyping      Boolean  @default(true) @map("simulate_typing")
+  debounceMs          Int      @default(1000) @map("debounce_ms")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("ai_agent_configs")
+}
+
+model Campaign {
+  id              String             @id @default(uuid())
+  tenantId        String             @map("tenant_id")
+  name            String             @db.VarChar(200)
+  objective       String?            @db.VarChar(100)
+  status          CampaignStatus     @default(draft)
+  messageTemplate String             @map("message_template")
+  mediaUrl        String?            @map("media_url") @db.VarChar(500)
+  segmentRules    Json               @map("segment_rules")
+  scheduledAt     DateTime?          @map("scheduled_at")
+  startedAt       DateTime?          @map("started_at")
+  completedAt     DateTime?          @map("completed_at")
+  cancelledAt     DateTime?          @map("cancelled_at")
+  totalAudience   Int                @default(0) @map("total_audience")
+  totalSent       Int                @default(0) @map("total_sent")
+  totalDelivered  Int                @default(0) @map("total_delivered")
+  totalRead       Int                @default(0) @map("total_read")
+  totalReplied    Int                @default(0) @map("total_replied")
+  totalConverted  Int                @default(0) @map("total_converted")
+  totalOptOut     Int                @default(0) @map("total_opt_out")
+  maxDispatches   Int                @default(500) @map("max_dispatches")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  dispatches      CampaignDispatch[]
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("campaigns")
+}
+
+model CampaignDispatch {
+  id          String                 @id @default(uuid())
+  campaignId  String                 @map("campaign_id")
+  customerId  String                 @map("customer_id")
+  phone       String                 @db.VarChar(30)
+  status      CampaignDispatchStatus @default(queued)
+  sentAt      DateTime?              @map("sent_at")
+  deliveredAt DateTime?              @map("delivered_at")
+  readAt      DateTime?              @map("read_at")
+  repliedAt   DateTime?              @map("replied_at")
+  failReason  String?                @map("fail_reason")
+  externalId  String?                @map("external_id") @db.VarChar(100)
+  createdAt   DateTime               @default(now()) @map("created_at")
+  campaign    Campaign               @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customer    Customer               @relation(fields: [customerId], references: [id])
+
+  @@index([campaignId])
+  @@index([customerId])
+  @@index([campaignId, status])
+  @@map("campaign_dispatches")
+}
+
+model CustomerOptOut {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  customerId String   @map("customer_id")
+  phone      String   @db.VarChar(30)
+  reason     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  customer   Customer @relation(fields: [customerId], references: [id])
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, phone])
+  @@map("customer_opt_outs")
+}
+
+enum TimeSlotStatus {
+  available
+  occupied
+  blocked
 }
 
 enum OrderSplitStatus {
@@ -1928,8 +2108,6 @@ enum FinancialStatus {
   overdue
 }
 
-// ===== WhatsApp Channel + AI Agent + Campaigns =====
-
 enum WhatsAppInstanceStatus {
   connected
   disconnected
@@ -1996,205 +2174,4 @@ enum CampaignDispatchStatus {
   replied
   failed
   opt_out
-}
-
-model WhatsAppInstance {
-  id                  String                 @id @default(uuid())
-  tenantId            String                 @unique @map("tenant_id")
-  providerType        WhatsAppProviderType   @default(evolution_go) @map("provider_type")
-  instanceName        String                 @unique @map("instance_name") @db.VarChar(100)
-  apiUrl              String                 @map("api_url") @db.VarChar(500)
-  apiKey              String                 @map("api_key") @db.VarChar(500)
-  phoneNumber         String?                @map("phone_number") @db.VarChar(30)
-  status              WhatsAppInstanceStatus @default(disconnected)
-  qrCode              String?                @map("qr_code") @db.Text
-  webhookSecret       String?                @map("webhook_secret") @db.VarChar(255)
-  evolutionInstanceId String?                @map("evolution_instance_id") @db.VarChar(100)
-  createdAt           DateTime               @default(now()) @map("created_at")
-  updatedAt           DateTime               @updatedAt @map("updated_at")
-  tenant              Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("whatsapp_instances")
-}
-
-model ChatSession {
-  id              String        @id @default(uuid())
-  tenantId        String        @map("tenant_id")
-  customerPhone   String        @map("customer_phone") @db.VarChar(30)
-  customerId      String?       @map("customer_id")
-  displayName     String?       @map("display_name") @db.VarChar(150)
-  channel         String        @default("whatsapp") @db.VarChar(30)
-  remoteJid       String?       @map("remote_jid") @db.VarChar(100)
-  state           ChatState     @default(greeting)
-  cartData        Json?         @map("cart_data")
-  handoffActive   Boolean       @default(false) @map("handoff_active")
-  handoffOperator String?       @map("handoff_operator")
-  handoffReason   String?       @map("handoff_reason")
-  handoffAt       DateTime?     @map("handoff_at")
-  lastMessageAt   DateTime      @default(now()) @map("last_message_at")
-  unreadCount     Int           @default(0) @map("unread_count")
-  closedAt        DateTime?     @map("closed_at")
-  metadata        Json?
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
-  messages        ChatMessage[]
-  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer        Customer?     @relation(fields: [customerId], references: [id])
-
-  @@unique([tenantId, customerPhone])
-  @@index([tenantId])
-  @@index([tenantId, state])
-  @@map("chat_sessions")
-}
-
-model ChatMessage {
-  id            String                @id @default(uuid())
-  sessionId     String                @map("session_id")
-  direction     MessageDirection
-  senderType    MessageSenderType     @default(customer)
-  content       String
-  messageType   String                @default("text") @map("message_type") @db.VarChar(30)
-  externalId    String?               @unique @map("external_id") @db.VarChar(100)
-  externalStatus MessageExternalStatus @map("external_status")
-  timestamp     DateTime?             @map("timestamp")
-  toolCalls     Json?                 @map("tool_calls")
-  metadata      Json?
-  createdAt     DateTime              @default(now()) @map("created_at")
-  session       ChatSession           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@index([sessionId])
-  @@index([externalId])
-  @@map("chat_messages")
-}
-
-model QuickReply {
-  id         String   @id @default(uuid())
-  tenantId   String   @map("tenant_id")
-  text       String   @db.Text
-  category   String?  @db.VarChar(50)
-  isActive   Boolean  @default(true) @map("is_active")
-  usageCount Int      @default(0) @map("usage_count")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId])
-  @@map("quick_replies")
-}
-
-model SystemConfig {
-  id                      String               @id @default("global")
-  defaultWhatsAppProvider WhatsAppProviderType @default(evolution_go) @map("default_whatsapp_provider")
-  defaultAiProvider       AiProviderType       @default(openai) @map("default_ai_provider")
-
-  // WhatsApp Infrastructure
-  evolutionUrl         String? @map("evolution_url") @db.VarChar(500)
-  evolutionGlobalToken String? @map("evolution_global_token") @db.VarChar(500)
-
-  // AI Infrastructure
-  openaiApiKey    String? @map("openai_api_key")
-  anthropicApiKey String? @map("anthropic_api_key")
-  googleAiApiKey  String? @map("google_ai_api_key")
-  googleAiModel   String? @default("gemini-2.0-flash-lite") @map("google_ai_model") @db.VarChar(100)
-  baseAiPrompt    String? @map("base_ai_prompt") @db.Text
-
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("system_configs")
-}
-
-model AiAgentConfig {
-  id              String  @id @default(uuid())
-  tenantId        String  @unique @map("tenant_id")
-  isEnabled       Boolean @default(false) @map("is_enabled")
-  agentName       String? @map("agent_name") @db.VarChar(100)
-  greetingMessage String? @map("greeting_message") @db.Text
-  tone            String  @default("friendly") @db.VarChar(30)
-
-  // Personalização adicional (instruções específicas do restaurante)
-  customInstructions String? @map("custom_instructions") @db.Text
-
-  operatingMode       String   @default("always") @map("operating_mode") @db.VarChar(30)
-  handoffPolicy       String   @default("on_request") @map("handoff_policy") @db.VarChar(30)
-  fallbackMessage     String?  @map("fallback_message")
-  maxRetries          Int      @default(3) @map("max_retries")
-  sessionTimeoutMin   Int      @default(120) @map("session_timeout_min")
-  dailyMessageLimit   Int      @default(1000) @map("daily_message_limit")
-  customerCooldownMin Int      @default(5) @map("customer_cooldown_min")
-
-  simulateTyping Boolean @default(true) @map("simulate_typing")
-  debounceMs     Int     @default(1000) @map("debounce_ms")
-
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
-  tenant              Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@map("ai_agent_configs")
-}
-
-model Campaign {
-  id              String             @id @default(uuid())
-  tenantId        String             @map("tenant_id")
-  name            String             @db.VarChar(200)
-  objective       String?            @db.VarChar(100)
-  status          CampaignStatus     @default(draft)
-  messageTemplate String             @map("message_template")
-  mediaUrl        String?            @map("media_url") @db.VarChar(500)
-  segmentRules    Json               @map("segment_rules")
-  scheduledAt     DateTime?          @map("scheduled_at")
-  startedAt       DateTime?          @map("started_at")
-  completedAt     DateTime?          @map("completed_at")
-  cancelledAt     DateTime?          @map("cancelled_at")
-  totalAudience   Int                @default(0) @map("total_audience")
-  totalSent       Int                @default(0) @map("total_sent")
-  totalDelivered  Int                @default(0) @map("total_delivered")
-  totalRead       Int                @default(0) @map("total_read")
-  totalReplied    Int                @default(0) @map("total_replied")
-  totalConverted  Int                @default(0) @map("total_converted")
-  totalOptOut     Int                @default(0) @map("total_opt_out")
-  maxDispatches   Int                @default(500) @map("max_dispatches")
-  createdAt       DateTime           @default(now()) @map("created_at")
-  updatedAt       DateTime           @updatedAt @map("updated_at")
-  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  dispatches      CampaignDispatch[]
-
-  @@index([tenantId])
-  @@index([tenantId, status])
-  @@map("campaigns")
-}
-
-model CampaignDispatch {
-  id          String                 @id @default(uuid())
-  campaignId  String                 @map("campaign_id")
-  customerId  String                 @map("customer_id")
-  phone       String                 @db.VarChar(30)
-  status      CampaignDispatchStatus @default(queued)
-  sentAt      DateTime?              @map("sent_at")
-  deliveredAt DateTime?              @map("delivered_at")
-  readAt      DateTime?              @map("read_at")
-  repliedAt   DateTime?              @map("replied_at")
-  failReason  String?                @map("fail_reason")
-  externalId  String?                @map("external_id") @db.VarChar(100)
-  createdAt   DateTime               @default(now()) @map("created_at")
-  campaign    Campaign               @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  customer    Customer               @relation(fields: [customerId], references: [id])
-
-  @@index([campaignId])
-  @@index([customerId])
-  @@index([campaignId, status])
-  @@map("campaign_dispatches")
-}
-
-model CustomerOptOut {
-  id         String   @id @default(uuid())
-  tenantId   String   @map("tenant_id")
-  customerId String   @map("customer_id")
-  phone      String   @db.VarChar(30)
-  reason     String?
-  createdAt  DateTime @default(now()) @map("created_at")
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  customer   Customer @relation(fields: [customerId], references: [id])
-
-  @@unique([tenantId, phone])
-  @@map("customer_opt_outs")
 }
