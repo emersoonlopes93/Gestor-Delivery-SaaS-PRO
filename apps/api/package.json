@@ -19,7 +19,7 @@
     "test:delivery-rate-engine": "ts-node scripts/unit-test-delivery-rate-engine.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:migrate:deploy": "prisma db push",
+    "prisma:migrate:deploy": "prisma db push --skip-generate",
     "prisma:seed": "ts-node -r tsconfig-paths/register prisma/seed.ts",
     "enable:ai-agent-demo": "ts-node -r tsconfig-paths/register scripts/enable-ai-agent-demo.ts",
     "prisma:studio": "prisma studio",
