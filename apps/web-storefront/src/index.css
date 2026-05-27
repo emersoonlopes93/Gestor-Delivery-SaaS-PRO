@@ -52,7 +52,7 @@
     &:-webkit-autofill:hover,
     &:-webkit-autofill:focus,
     &:-webkit-autofill:active {
-      -webkit-box-shadow: 0 0 0 30px white dark:white inset !important;
+      -webkit-box-shadow: 0 0 0 30px white inset !important;
       -webkit-text-fill-color: #1f2937 !important;
     }
     @media (prefers-color-scheme: dark) {

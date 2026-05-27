@@ -5,6 +5,7 @@ export interface AiFlowContext {
   traceId?: string;
   messageId?: string;
   tenantId?: string;
+  sessionId?: string;
   instanceId?: string;
   remoteJid?: string;
   sender?: string;

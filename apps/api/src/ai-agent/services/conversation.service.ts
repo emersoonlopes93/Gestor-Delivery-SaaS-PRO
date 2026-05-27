@@ -40,6 +40,75 @@ export interface AiOrderDraft {
   confirmationAskedAt: string | null;
 }
 
+// Tipos auxiliares para dados do metadata (JSON)
+interface MetadataAi {
+  lastAiProcessedAt?: string;
+  lastProcessedMessageId?: string;
+  pendingCustomerMessageIds?: unknown;
+  currentIntent?: unknown;
+  orderDraft?: unknown;
+  lastKnownCustomerName?: string;
+  lastKnownAddress?: unknown;
+  lastOrderId?: string;
+  lastOrderSummary?: string;
+  toolFailures?: unknown;
+}
+
+interface MetadataOrderDraft {
+  items?: unknown;
+  fulfillmentType?: unknown;
+  customerName?: unknown;
+  customerPhone?: unknown;
+  deliveryAddress?: unknown;
+  payment?: unknown;
+  deliveryFee?: unknown;
+  subtotal?: unknown;
+  total?: unknown;
+  missingFields?: unknown;
+  readyToConfirm?: unknown;
+  confirmationAskedAt?: unknown;
+}
+
+interface MetadataDeliveryAddress {
+  street?: unknown;
+  number?: unknown;
+  neighborhood?: unknown;
+  city?: unknown;
+  state?: unknown;
+  zipCode?: unknown;
+  complement?: unknown;
+  reference?: unknown;
+  lat?: unknown;
+  lng?: unknown;
+}
+
+interface MetadataPayment {
+  method?: unknown;
+  changeFor?: unknown;
+}
+
+interface MetadataLastKnownAddress {
+  street?: unknown;
+  number?: unknown;
+  neighborhood?: unknown;
+  city?: unknown;
+  state?: unknown;
+  zipCode?: unknown;
+  complement?: unknown;
+  reference?: unknown;
+}
+
+interface MetadataToolFailures {
+  [key: string]: unknown;
+}
+
+interface MetadataToolFailureEntry {
+  count?: unknown;
+  lastAt?: unknown;
+  lastSignatureHash?: unknown;
+  lastErrorCode?: unknown;
+}
+
 export interface AiSessionMemory {
   lastAiProcessedAt: string | null;
   lastProcessedMessageId: string | null;
@@ -133,10 +202,13 @@ export class ConversationService {
       select: { metadata: true },
     });
 
-    const metadata = this.asJsonObject(session?.metadata);
-    const ai = this.asJsonObject(metadata.ai);
+    const metadata = this.asJsonObject<Record<string, unknown>>(session?.metadata);
+    const ai = this.asJsonObject<MetadataAi>(metadata.ai);
 
-    const draft = this.asJsonObject(ai.orderDraft);
+    const draft = this.asJsonObject<MetadataOrderDraft>(ai.orderDraft);
+    const deliveryAddress = this.asJsonObject<MetadataDeliveryAddress>(draft.deliveryAddress);
+    const payment = this.asJsonObject<MetadataPayment>(draft.payment);
+    const lastKnownAddress = this.asJsonObject<MetadataLastKnownAddress>(ai.lastKnownAddress);
 
     return {
       lastAiProcessedAt: typeof ai.lastAiProcessedAt === 'string' ? ai.lastAiProcessedAt : null,
@@ -168,20 +240,20 @@ export class ConversationService {
         customerName: typeof draft.customerName === 'string' ? draft.customerName : null,
         customerPhone: typeof draft.customerPhone === 'string' ? draft.customerPhone : null,
         deliveryAddress: {
-          street: typeof draft.deliveryAddress?.street === 'string' ? draft.deliveryAddress.street : null,
-          number: typeof draft.deliveryAddress?.number === 'string' ? draft.deliveryAddress.number : null,
-          neighborhood: typeof draft.deliveryAddress?.neighborhood === 'string' ? draft.deliveryAddress.neighborhood : null,
-          city: typeof draft.deliveryAddress?.city === 'string' ? draft.deliveryAddress.city : null,
-          state: typeof draft.deliveryAddress?.state === 'string' ? draft.deliveryAddress.state : null,
-          zipCode: typeof draft.deliveryAddress?.zipCode === 'string' ? draft.deliveryAddress.zipCode : null,
-          complement: typeof draft.deliveryAddress?.complement === 'string' ? draft.deliveryAddress.complement : null,
-          reference: typeof draft.deliveryAddress?.reference === 'string' ? draft.deliveryAddress.reference : null,
-          lat: typeof draft.deliveryAddress?.lat === 'number' ? draft.deliveryAddress.lat : null,
-          lng: typeof draft.deliveryAddress?.lng === 'number' ? draft.deliveryAddress.lng : null,
+          street: typeof deliveryAddress.street === 'string' ? deliveryAddress.street : null,
+          number: typeof deliveryAddress.number === 'string' ? deliveryAddress.number : null,
+          neighborhood: typeof deliveryAddress.neighborhood === 'string' ? deliveryAddress.neighborhood : null,
+          city: typeof deliveryAddress.city === 'string' ? deliveryAddress.city : null,
+          state: typeof deliveryAddress.state === 'string' ? deliveryAddress.state : null,
+          zipCode: typeof deliveryAddress.zipCode === 'string' ? deliveryAddress.zipCode : null,
+          complement: typeof deliveryAddress.complement === 'string' ? deliveryAddress.complement : null,
+          reference: typeof deliveryAddress.reference === 'string' ? deliveryAddress.reference : null,
+          lat: typeof deliveryAddress.lat === 'number' ? deliveryAddress.lat : null,
+          lng: typeof deliveryAddress.lng === 'number' ? deliveryAddress.lng : null,
         },
         payment: {
-          method: typeof draft.payment?.method === 'string' ? draft.payment.method : null,
-          changeFor: typeof draft.payment?.changeFor === 'number' ? draft.payment.changeFor : null,
+          method: typeof payment.method === 'string' ? payment.method : null,
+          changeFor: typeof payment.changeFor === 'number' ? payment.changeFor : null,
         },
         deliveryFee: typeof draft.deliveryFee === 'number' ? draft.deliveryFee : null,
         subtotal: typeof draft.subtotal === 'number' ? draft.subtotal : null,
@@ -196,22 +268,22 @@ export class ConversationService {
       lastKnownCustomerName:
         typeof ai.lastKnownCustomerName === 'string' ? ai.lastKnownCustomerName : null,
       lastKnownAddress: {
-        street: typeof ai.lastKnownAddress?.street === 'string' ? ai.lastKnownAddress.street : null,
-        number: typeof ai.lastKnownAddress?.number === 'string' ? ai.lastKnownAddress.number : null,
+        street: typeof lastKnownAddress.street === 'string' ? lastKnownAddress.street : null,
+        number: typeof lastKnownAddress.number === 'string' ? lastKnownAddress.number : null,
         neighborhood:
-          typeof ai.lastKnownAddress?.neighborhood === 'string'
-            ? ai.lastKnownAddress.neighborhood
+          typeof lastKnownAddress.neighborhood === 'string'
+            ? lastKnownAddress.neighborhood
             : null,
-        city: typeof ai.lastKnownAddress?.city === 'string' ? ai.lastKnownAddress.city : null,
-        state: typeof ai.lastKnownAddress?.state === 'string' ? ai.lastKnownAddress.state : null,
-        zipCode: typeof ai.lastKnownAddress?.zipCode === 'string' ? ai.lastKnownAddress.zipCode : null,
+        city: typeof lastKnownAddress.city === 'string' ? lastKnownAddress.city : null,
+        state: typeof lastKnownAddress.state === 'string' ? lastKnownAddress.state : null,
+        zipCode: typeof lastKnownAddress.zipCode === 'string' ? lastKnownAddress.zipCode : null,
         complement:
-          typeof ai.lastKnownAddress?.complement === 'string'
-            ? ai.lastKnownAddress.complement
+          typeof lastKnownAddress.complement === 'string'
+            ? lastKnownAddress.complement
             : null,
         reference:
-          typeof ai.lastKnownAddress?.reference === 'string'
-            ? ai.lastKnownAddress.reference
+          typeof lastKnownAddress.reference === 'string'
+            ? lastKnownAddress.reference
             : null,
       },
       lastOrderId: typeof ai.lastOrderId === 'string' ? ai.lastOrderId : null,
@@ -219,7 +291,7 @@ export class ConversationService {
     };
   }
 
-  async updateSessionAiMemory(sessionId: string, update: Partial<AiSessionMemory>) {
+  async updateSessionAiMemory(sessionId: string, update: Partial<AiSessionMemory>): Promise<void> {
     const session = await this.prisma.chatSession.findUnique({
       where: { id: sessionId },
       select: { metadata: true },
@@ -234,8 +306,6 @@ export class ConversationService {
       where: { id: sessionId },
       data: { metadata: metadata as Prisma.InputJsonObject },
     });
-
-    return nextAi as AiSessionMemory;
   }
 
   /**
@@ -423,11 +493,11 @@ export class ConversationService {
     return session;
   }
 
-  private asJsonObject(value: unknown): Record<string, unknown> {
+  private asJsonObject<T = Record<string, unknown>>(value: unknown): T {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
-      return value as Record<string, unknown>;
+      return value as T;
     }
-    return {};
+    return {} as T;
   }
 
   async recordAiToolFailure(input: {
@@ -441,10 +511,10 @@ export class ConversationService {
       select: { metadata: true },
     });
 
-    const metadata = this.asJsonObject(session?.metadata);
-    const ai = this.asJsonObject(metadata.ai);
-    const toolFailures = this.asJsonObject(ai.toolFailures);
-    const existing = this.asJsonObject(toolFailures[input.toolName]);
+    const metadata = this.asJsonObject<Record<string, unknown>>(session?.metadata);
+    const ai = this.asJsonObject<MetadataAi>(metadata.ai);
+    const toolFailures = this.asJsonObject<MetadataToolFailures>(ai.toolFailures);
+    const existing = this.asJsonObject<MetadataToolFailureEntry>(toolFailures[input.toolName]);
 
     const count = typeof existing.count === 'number' ? existing.count : 0;
     const updated: AiToolFailureEntry = {
@@ -472,9 +542,9 @@ export class ConversationService {
       select: { metadata: true },
     });
 
-    const metadata = this.asJsonObject(session?.metadata);
-    const ai = this.asJsonObject(metadata.ai);
-    const toolFailures = this.asJsonObject(ai.toolFailures);
+    const metadata = this.asJsonObject<Record<string, unknown>>(session?.metadata);
+    const ai = this.asJsonObject<MetadataAi>(metadata.ai);
+    const toolFailures = this.asJsonObject<MetadataToolFailures>(ai.toolFailures);
 
     if (toolFailures[toolName]) {
       delete toolFailures[toolName];
@@ -494,8 +564,8 @@ export class ConversationService {
       select: { metadata: true },
     });
 
-    const metadata = this.asJsonObject(session?.metadata);
-    const ai = this.asJsonObject(metadata.ai);
+    const metadata = this.asJsonObject<Record<string, unknown>>(session?.metadata);
+    const ai = this.asJsonObject<MetadataAi>(metadata.ai);
 
     if (ai.toolFailures) {
       delete ai.toolFailures;
@@ -513,13 +583,13 @@ export class ConversationService {
       select: { metadata: true },
     });
 
-    const metadata = this.asJsonObject(session?.metadata);
-    const ai = this.asJsonObject(metadata.ai);
-    const toolFailures = this.asJsonObject(ai.toolFailures);
+    const metadata = this.asJsonObject<Record<string, unknown>>(session?.metadata);
+    const ai = this.asJsonObject<MetadataAi>(metadata.ai);
+    const toolFailures = this.asJsonObject<MetadataToolFailures>(ai.toolFailures);
 
     const out: AiToolFailuresMap = {};
     for (const key of Object.keys(toolFailures)) {
-      const entry = this.asJsonObject(toolFailures[key]);
+      const entry = this.asJsonObject<MetadataToolFailureEntry>(toolFailures[key]);
       const count = typeof entry.count === 'number' ? entry.count : null;
       const lastAt = typeof entry.lastAt === 'string' ? entry.lastAt : null;
       if (count === null || lastAt === null) continue;
@@ -547,10 +617,10 @@ export class ConversationService {
       select: { metadata: true },
     });
 
-    const metadata = this.asJsonObject(session?.metadata);
-    const ai = this.asJsonObject(metadata.ai);
-    const toolFailures = this.asJsonObject(ai.toolFailures);
-    const entry = this.asJsonObject(toolFailures[input.toolName]);
+    const metadata = this.asJsonObject<Record<string, unknown>>(session?.metadata);
+    const ai = this.asJsonObject<MetadataAi>(metadata.ai);
+    const toolFailures = this.asJsonObject<MetadataToolFailures>(ai.toolFailures);
+    const entry = this.asJsonObject<MetadataToolFailureEntry>(toolFailures[input.toolName]);
 
     const count = typeof entry.count === 'number' ? entry.count : 0;
     const lastAt = typeof entry.lastAt === 'string' ? entry.lastAt : null;
