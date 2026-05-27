@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { PrismaService } from '../../database/prisma.service';
+import { normalizeToolResponse } from '../utils/normalize-tool-response';
 import type {
   IAiProvider,
   AiCompletionInput,
@@ -261,12 +262,14 @@ export class GoogleAiProvider implements IAiProvider {
       if (m.role === 'tool') {
         const toolName =
           (m.toolCallId && toolNameById.get(m.toolCallId)) || 'unknown_tool';
-        let responsePayload: Record<string, unknown>;
+        let parsed: unknown;
         try {
-          responsePayload = JSON.parse(m.content) as Record<string, unknown>;
+          parsed = JSON.parse(m.content);
         } catch {
-          responsePayload = { result: m.content };
+          parsed = m.content;
         }
+
+        const responsePayload = normalizeToolResponse(parsed);
 
         contents.push({
           role: 'user',

@@ -45,6 +45,12 @@ export class AiOrchestratorService {
   private readonly debounceTimers = new Map<string, NodeJS.Timeout>();
   /** Momento em que composing foi enviado (para delay mínimo visível no WhatsApp) */
   private readonly typingStartedAt = new Map<string, number>();
+  /** Sessions currently being processed to avoid parallel runs */
+  private readonly processingSessions = new Set<string>();
+  /** If a message arrived while processing, store latest content to trigger a rerun */
+  private readonly pendingRerunContent = new Map<string, string>();
+  /** Keys that need a rerun after current processing finishes */
+  private readonly pendingReruns = new Set<string>();
 
   constructor(
     private readonly configService: AiAgentConfigService,
@@ -145,13 +151,64 @@ export class AiOrchestratorService {
     const timer = setTimeout(() => {
       this.debounceTimers.delete(debounceKey);
       AiFlowLogger.flow('debounce_fired', flowTrace);
-      this.processMessage(tenantId, customerPhone, content, config, {
-        trace: flowTrace,
-      }).catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : 'Unknown error';
-        AiFlowLogger.error('process_message', flowTrace, { error: msg });
-        this.logger.error(`Error processing message for ${customerPhone}: ${msg}`);
-      });
+
+      // If already processing this session, schedule a rerun with latest content
+      if (this.processingSessions.has(debounceKey)) {
+        AiFlowLogger.flow('process_skipped_already_running', flowTrace, { debounceKey });
+        this.pendingReruns.add(debounceKey);
+        this.pendingRerunContent.set(debounceKey, content);
+        AiFlowLogger.flow('process_rerun_scheduled', flowTrace, { debounceKey });
+        return;
+      }
+
+      // Mark processing and run
+      this.processingSessions.add(debounceKey);
+      (async () => {
+        try {
+          await this.processMessage(tenantId, customerPhone, content, config, {
+            trace: flowTrace,
+          });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          AiFlowLogger.error('process_message', flowTrace, { error: msg });
+          this.logger.error(`Error processing message for ${customerPhone}: ${msg}`);
+        } finally {
+          this.processingSessions.delete(debounceKey);
+
+          // If a rerun was requested while processing, schedule it now
+          if (this.pendingReruns.has(debounceKey)) {
+            this.pendingReruns.delete(debounceKey);
+            const nextContent = this.pendingRerunContent.get(debounceKey) ?? '';
+            this.pendingRerunContent.delete(debounceKey);
+            AiFlowLogger.flow('debounce_scheduled', flowTrace, { delayMs: 50, debounceKey });
+            const rerunTimer = setTimeout(() => {
+              this.debounceTimers.delete(debounceKey);
+              AiFlowLogger.flow('debounce_fired', flowTrace);
+              // If still processing, re-schedule; otherwise run immediately
+              if (this.processingSessions.has(debounceKey)) {
+                this.pendingReruns.add(debounceKey);
+                this.pendingRerunContent.set(debounceKey, nextContent);
+                AiFlowLogger.flow('process_rerun_scheduled', flowTrace, { debounceKey });
+                return;
+              }
+              this.processingSessions.add(debounceKey);
+              (async () => {
+                try {
+                  await this.processMessage(tenantId, customerPhone, nextContent, config, { trace: flowTrace });
+                } catch (err: unknown) {
+                  const msg = err instanceof Error ? err.message : 'Unknown error';
+                  AiFlowLogger.error('process_message', flowTrace, { error: msg });
+                  this.logger.error(`Error processing message for ${customerPhone}: ${msg}`);
+                } finally {
+                  this.processingSessions.delete(debounceKey);
+                }
+              })();
+            }, 50);
+
+            this.debounceTimers.set(debounceKey, rerunTimer);
+          }
+        }
+      })();
     }, debounceMs);
 
     this.debounceTimers.set(debounceKey, timer);
@@ -363,8 +420,12 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
 
         const toolCalls = msg.toolCalls as Prisma.JsonArray | null;
 
+        // If this message is a tool result saved in the DB, represent it as a `tool` role
+        // so providers build proper `functionResponse` parts. Otherwise keep user/model roles.
+        const role = msg.messageType === 'tool_result' ? 'tool' : (msg.direction === 'inbound' ? 'user' : 'assistant');
+
         messages.push({
-          role: msg.direction === 'inbound' ? 'user' : 'assistant',
+          role,
           content: msg.content,
           ...(toolCalls && Array.isArray(toolCalls)
             ? {
@@ -709,12 +770,20 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
       temperature: 0.3,
     });
 
-    AiFlowLogger.flow('llm_response_success', trace, {
-      provider: aiProvider.providerType,
-      phase: 'after_tools',
-      length: finalCompletion.content?.length ?? 0,
-      finishReason: finalCompletion.finishReason,
-    });
+    if (finalCompletion.finishReason === 'error') {
+      AiFlowLogger.error('llm_response_failed', trace, {
+        provider: aiProvider.providerType,
+        phase: 'after_tools',
+        finishReason: finalCompletion.finishReason,
+      });
+    } else {
+      AiFlowLogger.flow('llm_response_success', trace, {
+        provider: aiProvider.providerType,
+        phase: 'after_tools',
+        length: finalCompletion.content?.length ?? 0,
+        finishReason: finalCompletion.finishReason,
+      });
+    }
 
     if (finalCompletion.content) {
       await this.sendFinalResponse(
@@ -849,6 +918,29 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
     });
 
     try {
+      // Duplicate suppression: check last outbound AI message
+      try {
+        if (sessionId !== 'error-fallback') {
+          const recent = await this.conversationService.getRecentHistory(sessionId, 5);
+          for (let i = recent.length - 1; i >= 0; i--) {
+            const m = recent[i] as { direction?: string; senderType?: string; content?: string; timestamp?: Date };
+            if (m.direction === 'outbound' && m.senderType === 'ai' && typeof m.content === 'string') {
+              const lastTs = m.timestamp ? new Date(m.timestamp).getTime() : 0;
+              const now = Date.now();
+              const ageMs = now - lastTs;
+              if (m.content === content && ageMs <= 10_000) {
+                AiFlowLogger.flow('duplicate_ai_response_suppressed', trace, { sessionId, ageMs });
+                return;
+              }
+              break;
+            }
+          }
+        }
+      } catch (err: unknown) {
+        // Non-fatal; continue to send if history check fails
+        AiFlowLogger.flow('duplicate_check_failed', trace, { error: err instanceof Error ? err.message : String(err) });
+      }
+
       const result = await this.whatsappSender.sendText(tenantId, {
         to: customerPhone,
         text: content,
