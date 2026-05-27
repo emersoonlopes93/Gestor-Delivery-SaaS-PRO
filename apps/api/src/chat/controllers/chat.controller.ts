@@ -22,6 +22,7 @@ import { RequirePermissions as Permissions } from '../../common/decorators';
 import { QuickRepliesService } from '../services/quick-replies.service';
 import { CreateQuickReplyDto, UpdateQuickReplyDto } from '../dto/quick-reply.dto';
 import { WhatsAppSenderService } from '../../whatsapp-channel/services/whatsapp-sender.service';
+import { ChatGateway } from '../chat.gateway';
 
 type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
 
@@ -34,7 +35,7 @@ export class ChatController {
     private readonly prisma: PrismaService,
     private readonly quickRepliesService: QuickRepliesService,
     private readonly whatsappSender: WhatsAppSenderService,
-    private readonly chatGateway: import('../chat.gateway').ChatGateway,
+    private readonly chatGateway: ChatGateway,
   ) {}
 
   private asJsonObject(value: unknown): Record<string, unknown> {

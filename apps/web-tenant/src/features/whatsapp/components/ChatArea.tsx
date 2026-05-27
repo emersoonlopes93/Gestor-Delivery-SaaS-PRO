@@ -76,8 +76,17 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
         handoffReason: reason,
         handoffAt: new Date().toISOString(),
       });
+      setHandoffReason('');
     },
   });
+
+  const [handoffReason, setHandoffReason] = useState('');
+
+  const handleActivateHandoff = () => {
+    if (!session || session.handoffActive) return;
+    const reason = handoffReason.trim() || undefined;
+    handoffMutation.mutate(reason);
+  };
 
   const closeSessionMutation = useMutation({
     mutationFn: async () => {
@@ -268,12 +277,20 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => handoffMutation.mutate(undefined)}
+            onClick={handleActivateHandoff}
             disabled={handoffMutation.isPending || session.handoffActive}
             className="px-3 py-1.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 text-sm font-medium rounded-lg hover:bg-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {session.handoffActive ? 'Já em atendimento' : 'Transferir'}
           </button>
+          {!session.handoffActive && (
+            <input
+              value={handoffReason}
+              onChange={(e) => setHandoffReason(e.target.value)}
+              placeholder="Motivo da transferência (opcional)"
+              className="ml-3 flex-1 min-w-0 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition-colors focus:border-orange-400 focus:ring-2 focus:ring-orange-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-orange-400 dark:focus:ring-orange-500/20"
+            />
+          )}
           <button
             onClick={() => closeSessionMutation.mutate()}
             disabled={closeSessionMutation.isPending}
@@ -311,6 +328,30 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
               Encerrar atendimento humano
             </button>
           </div>
+        </div>
+      )}
+
+      {session.handoffActive && (session.handoffReason || session.handoffOperator || session.handoffAt) && (
+        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 text-sm text-gray-700 dark:text-gray-300 space-y-1">
+          {session.handoffReason && (
+            <p>
+              <span className="font-semibold">Motivo:</span> {session.handoffReason}
+            </p>
+          )}
+          {session.handoffOperator && (
+            <p>
+              <span className="font-semibold">Operador:</span> {session.handoffOperator}
+            </p>
+          )}
+          {session.handoffAt && (
+            <p>
+              <span className="font-semibold">Iniciado em:</span>{' '}
+              {new Date(session.handoffAt).toLocaleString('pt-BR', {
+                dateStyle: 'short',
+                timeStyle: 'short',
+              })}
+            </p>
+          )}
         </div>
       )}
 
