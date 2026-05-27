@@ -538,12 +538,14 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       const chatJid = String(info?.Chat || info?.Sender || info?.remoteJid || '');
       const remoteJid = chatJid;
       const messageId = String(info?.ID || info?.id || '');
+      const pushName = String(info?.PushName || info?.pushName || data?.pushName || '');
       const ctx = {
         ...baseCtx,
         messageId: messageId || baseCtx.messageId,
         remoteJid,
         chatJid: chatJid.includes('@') ? chatJid : undefined,
         sender: String(info?.Sender || ''),
+        pushName,
       };
 
       // Ignorar status@broadcast ou qualquer broadcast cedo
@@ -593,7 +595,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       }
 
       this.logger.log(`[AI_FLOW] received_webhook event=Message instanceId=${baseCtx.instanceId || 'unknown'} messageId=${messageId}`);
-      AiFlowLogger.flow('parsed_message', ctx, { textLength: content.length, event: eventTypeRaw });
+      AiFlowLogger.flow('parsed_message', ctx, { textLength: content.length, event: eventTypeRaw, pushName: pushName || 'none' });
 
       return {
         type: 'message',
@@ -603,6 +605,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         content,
         messageType: 'text',
         externalId: messageId,
+        pushName: pushName || undefined,
         raw: payload,
       };
     }

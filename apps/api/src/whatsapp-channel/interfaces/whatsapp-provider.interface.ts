@@ -92,6 +92,7 @@ export interface WhatsAppWebhookEvent {
   content?: string;
   messageType?: string;
   externalId?: string;
+  pushName?: string;
   state?: 'connected' | 'disconnected' | 'connecting' | 'qr_pending';
   phoneNumber?: string;
   status?: string;

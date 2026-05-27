@@ -140,6 +140,36 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
     }
   };
 
+  const getSenderLabel = (senderType: string) => {
+    switch (senderType) {
+      case 'customer':
+        return 'Cliente';
+      case 'ai':
+        return 'IA';
+      case 'human':
+        return 'Humano';
+      case 'system':
+        return 'Sistema';
+      default:
+        return '';
+    }
+  };
+
+  const getSenderColor = (senderType: string) => {
+    switch (senderType) {
+      case 'customer':
+        return 'text-gray-600 dark:text-gray-400';
+      case 'ai':
+        return 'text-purple-600 dark:text-purple-400';
+      case 'human':
+        return 'text-blue-600 dark:text-blue-400';
+      case 'system':
+        return 'text-orange-600 dark:text-orange-400';
+      default:
+        return 'text-gray-600 dark:text-gray-400';
+    }
+  };
+
   const handleQuickReply = (reply: string) => {
     setMessage(reply);
   };
@@ -173,7 +203,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
           </button>
           <div>
             <h3 className="font-semibold text-gray-900 dark:text-white">
-              {`Cliente ${session.customerPhone}`}
+              {session.displayName || `Cliente ${session.customerPhone}`}
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {session.handoffActive ? 'Atendimento Humano' : 'Bot Ativo'}
@@ -242,12 +272,17 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
                   : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
               }`}
             >
+              {msg.senderType && msg.senderType !== 'customer' && (
+                <p className={`text-[10px] uppercase font-semibold mb-1 ${getSenderColor(msg.senderType)}`}>
+                  {getSenderLabel(msg.senderType)}
+                </p>
+              )}
               <p className="text-sm">{msg.content}</p>
               <div className={`flex items-center gap-2 mt-1 text-xs ${
                 msg.direction === 'outbound' ? 'text-primary-200' : 'text-gray-500'
               }`}>
-                {getStatusIcon(msg.messageType)}
-                <span>{formatTime(msg.createdAt)}</span>
+                {getStatusIcon(msg.externalStatus || 'sent')}
+                <span>{formatTime(msg.timestamp || msg.createdAt)}</span>
               </div>
             </div>
           </div>

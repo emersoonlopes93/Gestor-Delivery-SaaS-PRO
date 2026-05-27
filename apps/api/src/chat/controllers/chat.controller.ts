@@ -245,9 +245,12 @@ export class ChatController {
     const message = await this.conversationService.addMessage({
       sessionId,
       direction: 'outbound',
+      senderType: 'human',
       content: dto.content,
       messageType: dto.messageType || 'text',
       externalId,
+      externalStatus: sendResult.success ? 'sent' : 'failed',
+      timestamp: new Date(),
       metadata: {
         ...(dto.metadata && typeof dto.metadata === 'object' ? dto.metadata : {}),
         whatsapp: {

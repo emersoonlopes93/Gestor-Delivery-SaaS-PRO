@@ -3,10 +3,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../../lib/api-client';
 import type { ChatSessionListItem, ChatSession } from '@gestor/types';
 import { ChatArea } from '../components/ChatArea';
+import { useChatSocket } from '../hooks/useChatSocket';
+import { useTenantAuth } from '../../../hooks/use-tenant-auth';
 
 export function InboxPage() {
   const queryClient = useQueryClient();
   const [selectedSession, setSelectedSession] = useState<ChatSession | null>(null);
+  const { user } = useTenantAuth();
+
+  // Enable WebSocket for real-time updates
+  useChatSocket(user?.tenantId);
 
   const { data: sessions = [] } = useQuery({
     queryKey: ['chat-sessions'],
@@ -68,7 +74,7 @@ export function InboxPage() {
               )}
               <div className="flex items-start justify-between mb-1">
                 <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                  {s.name || `Cliente ${s.customerPhone}`}
+                  {s.displayName || s.name || `Cliente ${s.customerPhone}`}
                 </h3>
                 <span className="text-xs text-gray-400 dark:text-gray-500">
                   {s.time || new Date(s.lastMessageAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}

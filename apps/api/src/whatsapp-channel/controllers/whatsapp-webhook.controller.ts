@@ -215,7 +215,7 @@ export class WhatsAppWebhookController {
     event: WhatsAppWebhookEvent,
     trace: ReturnType<typeof createAiTrace>,
   ) {
-    const { tenantId, from: phone, content, messageType, externalId, chatJid } = event;
+    const { tenantId, from: phone, content, messageType, externalId, chatJid, pushName } = event;
     trace.tenantId = tenantId;
     trace.phone = phone;
     trace.chatJid = chatJid;
@@ -224,6 +224,7 @@ export class WhatsAppWebhookController {
     AiFlowLogger.flow('handle_message_start', trace, {
       hasChatJid: Boolean(chatJid),
       textLength: content?.length ?? 0,
+      pushName: pushName || 'none',
     });
 
     if (!phone || !content) {
@@ -251,6 +252,58 @@ export class WhatsAppWebhookController {
     AiFlowLogger.flow('message_persist_start', trace);
 
     try {
+      // Resolve or update Customer with pushName if available
+      let customerId: string | undefined;
+      if (pushName && pushName.trim()) {
+        const customer = await this.prisma.customer.upsert({
+          where: {
+            tenantId_phone: { tenantId, phone },
+          },
+          create: {
+            tenantId,
+            phone,
+            name: pushName.trim(),
+          },
+          update: {
+            name: pushName.trim(),
+          },
+          select: { id: true },
+        });
+        customerId = customer.id;
+        AiFlowLogger.flow('contact_resolved', trace, {
+          source: 'pushName',
+          customerId,
+        });
+      } else {
+        // Try to find existing customer
+        const existingCustomer = await this.prisma.customer.findUnique({
+          where: {
+            tenantId_phone: { tenantId, phone },
+          },
+          select: { id: true, name: true },
+        });
+        if (existingCustomer) {
+          customerId = existingCustomer.id;
+          AiFlowLogger.flow('contact_resolved', trace, {
+            source: 'existing_customer',
+            customerId,
+          });
+        }
+      }
+
+      // Resolve displayName for session: Customer.name > pushName > phone
+      let displayName: string | undefined;
+      if (customerId) {
+        const customer = await this.prisma.customer.findUnique({
+          where: { id: customerId },
+          select: { name: true },
+        });
+        displayName = customer?.name;
+      }
+      if (!displayName && pushName) {
+        displayName = pushName.trim();
+      }
+
       const session = await this.prisma.chatSession.upsert({
         where: {
           tenantId_customerPhone: { tenantId, customerPhone: phone },
@@ -258,12 +311,20 @@ export class WhatsAppWebhookController {
         create: {
           tenantId,
           customerPhone: phone,
+          customerId,
+          displayName,
+          channel: 'whatsapp',
+          remoteJid: chatJid,
           state: 'greeting',
           lastMessageAt: new Date(),
         },
         update: {
+          customerId: customerId || undefined,
+          displayName: displayName || undefined,
+          remoteJid: chatJid,
           lastMessageAt: new Date(),
           closedAt: null,
+          unreadCount: { increment: 1 },
         },
       });
 
@@ -272,9 +333,12 @@ export class WhatsAppWebhookController {
           data: {
             sessionId: session.id,
             direction: 'inbound',
+            senderType: 'customer',
             content,
             messageType: messageType || 'text',
             externalId: externalId || undefined,
+            externalStatus: 'delivered',
+            timestamp: new Date(),
           },
         });
       } catch (err: unknown) {
@@ -291,6 +355,7 @@ export class WhatsAppWebhookController {
         sessionId: session.id,
         messageType: messageType || 'text',
         textLength: content.length,
+        senderType: 'customer',
       });
 
       if (session.handoffActive) {

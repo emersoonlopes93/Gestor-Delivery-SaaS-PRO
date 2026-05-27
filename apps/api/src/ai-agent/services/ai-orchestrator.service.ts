@@ -832,7 +832,10 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
         await this.conversationService.addMessage({
           sessionId,
           direction: 'outbound',
+          senderType: 'ai',
           content,
+          externalStatus: 'sent',
+          timestamp: new Date(),
         });
       }
     } finally {

@@ -5,6 +5,7 @@ import { AiAgentModule } from '../ai-agent/ai-agent.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { QuickRepliesService } from './services/quick-replies.service';
 import { WhatsAppChannelModule } from '../whatsapp-channel/whatsapp-channel.module';
+import { ChatGateway } from './chat.gateway';
 
 @Module({
   imports: [
@@ -14,7 +15,7 @@ import { WhatsAppChannelModule } from '../whatsapp-channel/whatsapp-channel.modu
     WhatsAppChannelModule, // para WhatsAppSenderService
   ],
   controllers: [ChatController],
-  providers: [QuickRepliesService],
-  exports: [QuickRepliesService],
+  providers: [QuickRepliesService, ChatGateway],
+  exports: [QuickRepliesService, ChatGateway],
 })
 export class ChatModule {}

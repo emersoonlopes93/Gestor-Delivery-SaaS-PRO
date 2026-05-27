@@ -1,16 +1,20 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { ChatState, MessageDirection } from '@prisma/client';
 
 import { Prisma } from '@prisma/client';
 import type { AgentSessionContext } from './agent-tools.service';
+import { ChatGateway } from '../../chat/chat.gateway';
 
 export interface CreateMessageDto {
   sessionId: string;
   direction: MessageDirection;
+  senderType?: 'customer' | 'ai' | 'human' | 'system';
   content: string;
   messageType?: string;
   externalId?: string;
+  externalStatus?: 'sent' | 'delivered' | 'read' | 'failed';
+  timestamp?: Date;
   toolCalls?: Prisma.InputJsonValue;
   metadata?: Prisma.InputJsonValue;
 }
@@ -28,7 +32,11 @@ type AiToolFailuresMap = Record<string, AiToolFailureEntry>;
 export class ConversationService {
   private readonly logger = new Logger('ConversationService');
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => ChatGateway))
+    private readonly chatGateway: ChatGateway,
+  ) {}
 
   /**
    * Vincula telefone WhatsApp ao Customer do tenant (necessário para pedidos, status, fidelidade).
@@ -98,30 +106,50 @@ export class ConversationService {
    * Registra uma nova mensagem no banco de dados.
    */
   async addMessage(dto: CreateMessageDto) {
-    return this.prisma.chatMessage.create({
+    const message = await this.prisma.chatMessage.create({
       data: {
         sessionId: dto.sessionId,
         direction: dto.direction,
+        senderType: dto.senderType || 'customer',
         content: dto.content,
         messageType: dto.messageType || 'text',
         externalId: dto.externalId,
+        externalStatus: dto.externalStatus,
+        timestamp: dto.timestamp,
         toolCalls: dto.toolCalls,
         metadata: dto.metadata,
       },
     });
+
+    // Emit WebSocket event for new message
+    const session = await this.prisma.chatSession.findUnique({
+      where: { id: dto.sessionId },
+      select: { tenantId: true },
+    });
+
+    if (session) {
+      this.chatGateway.emitMessageCreated(session.tenantId, dto.sessionId, message);
+    }
+
+    return message;
   }
 
   /**
    * Atualiza o estado da conversa (ex: de browsing_menu para checkout).
    */
   async updateSessionState(sessionId: string, state: ChatState, cartData?: Prisma.InputJsonValue) {
-    return this.prisma.chatSession.update({
+    const session = await this.prisma.chatSession.update({
       where: { id: sessionId },
       data: {
         state,
         ...(cartData !== undefined ? { cartData } : {}),
       },
     });
+
+    // Emit WebSocket event for session update
+    this.chatGateway.emitSessionUpdated(session.tenantId, session);
+
+    return session;
   }
 
   /**
@@ -138,6 +166,21 @@ export class ConversationService {
       },
     });
     this.logger.log(`Session ${sessionId} transferred to human operator.`);
+
+    // Emit WebSocket event for session update
+    this.chatGateway.emitSessionUpdated(session.tenantId, session);
+
+    // Log system message
+    await this.addMessage({
+      sessionId,
+      direction: 'outbound',
+      senderType: 'system',
+      content: reason ? `Atendimento transferido para humano: ${reason}` : 'Atendimento transferido para humano',
+      messageType: 'system',
+      externalStatus: 'sent',
+      timestamp: new Date(),
+    });
+
     return session;
   }
 
@@ -154,6 +197,21 @@ export class ConversationService {
     });
     this.logger.log(`[AI_FLOW] handoff_deactivated sessionId=${sessionId}`);
     this.logger.log(`Handoff deactivated for session ${sessionId}. Bot is back.`);
+
+    // Emit WebSocket event for session update
+    this.chatGateway.emitSessionUpdated(session.tenantId, session);
+
+    // Log system message
+    await this.addMessage({
+      sessionId,
+      direction: 'outbound',
+      senderType: 'system',
+      content: 'Atendimento retomado pelo assistente virtual',
+      messageType: 'system',
+      externalStatus: 'sent',
+      timestamp: new Date(),
+    });
+
     return session;
   }
 
@@ -170,6 +228,21 @@ export class ConversationService {
       },
     });
     this.logger.log(`Session ${sessionId} closed.`);
+
+    // Emit WebSocket event for session update
+    this.chatGateway.emitSessionUpdated(session.tenantId, session);
+
+    // Log system message
+    await this.addMessage({
+      sessionId,
+      direction: 'outbound',
+      senderType: 'system',
+      content: 'Conversa encerrada',
+      messageType: 'system',
+      externalStatus: 'sent',
+      timestamp: new Date(),
+    });
+
     return session;
   }
 

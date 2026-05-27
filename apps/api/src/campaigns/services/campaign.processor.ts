@@ -114,9 +114,12 @@ export class CampaignProcessor extends WorkerHost {
           data: {
             sessionId: session.id,
             direction: 'outbound',
+            senderType: 'human',
             content: mediaUrl ? `${personalizedMessage}` : personalizedMessage,
             messageType: 'text',
             externalId: result.messageId || undefined,
+            externalStatus: result.success ? 'sent' : 'failed',
+            timestamp: new Date(),
             metadata: {
               source: 'campaign',
               campaignId,
