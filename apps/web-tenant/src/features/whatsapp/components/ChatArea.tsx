@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+
 import { MessageSquare, Send, Paperclip, Smile, Clock, CheckCircle, Check } from 'lucide-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api-client';
@@ -19,6 +20,21 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [socketConnected, setSocketConnected] = useState<boolean>(
+    typeof window !== 'undefined' ? !!window.__CHAT_SOCKET_CONNECTED : false,
+  );
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      try {
+        setSocketConnected(!!window.__CHAT_SOCKET_CONNECTED);
+      } catch (e) {
+        setSocketConnected(false);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const { data: sessionMessages = [], refetch: refetchMessages } = useQuery({
     queryKey: ['chat-messages', session?.id],
     queryFn: async () => {
@@ -27,6 +43,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       return res.success ? res.data : [];
     },
     enabled: !!session,
+    refetchInterval: socketConnected ? false : 3000,
   });
 
   const sendMessageMutation = useMutation({
@@ -92,6 +109,15 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
   useEffect(() => {
     setMessages(sessionMessages);
   }, [sessionMessages]);
+
+  useEffect(() => {
+    if (session?.id) {
+      try {
+        window.__CHAT_SOCKET?.emit('joinSession', { sessionId: session.id });
+      } catch (e) {}
+      setIsAtBottom(true);
+    }
+  }, [session?.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

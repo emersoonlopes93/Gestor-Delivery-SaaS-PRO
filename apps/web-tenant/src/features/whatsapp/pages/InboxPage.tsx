@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../../lib/api-client';
 import type { ChatSessionListItem, ChatSession } from '@gestor/types';
 import { ChatArea } from '../components/ChatArea';
 import { useChatSocket } from '../hooks/useChatSocket';
 import { useTenantAuth } from '../../../hooks/use-tenant-auth';
+import { useHandoffNotification } from '../hooks/useHandoffNotification';
 
 export function InboxPage() {
   const queryClient = useQueryClient();
@@ -15,12 +16,27 @@ export function InboxPage() {
   // Enable WebSocket for real-time updates
   useChatSocket(user?.tenantId);
 
+  // Handoff notifications (sound + toast)
+  useHandoffNotification(true);
+
+  const [socketConnected, setSocketConnected] = useState<boolean>(
+    typeof window !== 'undefined' ? !!window.__CHAT_SOCKET_CONNECTED : false,
+  );
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      try { setSocketConnected(!!window.__CHAT_SOCKET_CONNECTED); } catch (e) { setSocketConnected(false); }
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const { data: sessions = [] } = useQuery({
     queryKey: ['chat-sessions'],
     queryFn: async () => {
       const res = await api.get<ChatSessionListItem[]>('/chat/sessions');
       return res.success ? res.data : [];
     },
+    refetchInterval: socketConnected ? false : 10000,
   });
 
   const filteredSessions = sessions.filter(s => {
@@ -37,6 +53,17 @@ export function InboxPage() {
       const res = await api.get<ChatSession>(`/chat/sessions/${session.id}`);
       if (res.success) {
         setSelectedSession(res.data);
+        // Mark as read immediately
+        try {
+          await api.post(`/chat/sessions/${session.id}/read`);
+        } catch (err) {
+          console.warn('Failed to mark session as read', err);
+        }
+        // Update local cache so badge disappears
+        queryClient.setQueryData(['chat-sessions'], (old: ChatSessionListItem[] | undefined) => {
+          if (!old) return old;
+          return old.map(s => s.id === session.id ? { ...s, unreadCount: 0 } : s);
+        });
       }
     } catch (err) {
       console.error('Erro ao buscar detalhes da sessão:', err);

@@ -17,7 +17,7 @@ export const GOOGLE_AI_FREE_MODELS = [
   { id: 'gemini-1.5-flash-8b', label: 'Gemini 1.5 Flash 8B (gratuito)' },
 ] as const;
 
-const DEFAULT_GOOGLE_AI_MODEL = GOOGLE_AI_FREE_MODELS[0].id;
+const DEFAULT_GOOGLE_AI_MODEL = 'gemini-1.5-flash';
 
 /**
  * Provider de IA via Google AI Studio (Gemini API).
@@ -194,9 +194,13 @@ export class GoogleAiProvider implements IAiProvider {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Google AI completion failed: ${message}`);
       if (axios.isAxiosError(error) && error.response?.data) {
-        this.logger.error(
-          `Google AI error details: ${JSON.stringify(error.response.data)}`,
-        );
+        this.logger.error(`Google AI error details: ${JSON.stringify(error.response.data)}`);
+        const responseStr = JSON.stringify(error.response.data);
+        if (responseStr.includes('no longer available')) {
+          this.logger.error(`[AI_FLOW_ERROR] step=llm_model_unavailable model=${model}`);
+        }
+      } else if (typeof message === 'string' && message.includes('no longer available')) {
+        this.logger.error(`[AI_FLOW_ERROR] step=llm_model_unavailable model=${model}`);
       }
       return {
         content: null,

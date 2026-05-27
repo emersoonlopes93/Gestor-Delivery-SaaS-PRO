@@ -57,24 +57,29 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async handleConnection(client: Socket) {
     try {
-      const token = client.handshake.auth.token || client.handshake.headers.authorization?.replace('Bearer ', '');
-      
+      // Normalize token coming from either auth or headers. Support both raw and "Bearer <token>" formats.
+      let rawToken = client.handshake.auth?.token;
+      if (!rawToken) rawToken = client.handshake.headers.authorization;
+      if (typeof rawToken === 'string' && rawToken.startsWith('Bearer ')) rawToken = rawToken.replace('Bearer ', '').trim();
+
+      const token = typeof rawToken === 'string' ? rawToken : undefined;
+
       if (!token) {
-        this.logger.warn(`Client ${client.id} connected without token`);
+        this.logger.warn(`[CHAT_WS] Client ${client.id} connected without token`);
         client.disconnect();
         return;
       }
 
       const payload = await this.validateToken(token);
       if (!payload || !payload.tenantId) {
-        this.logger.warn(`Client ${client.id} connected with invalid token`);
+        this.logger.warn(`[CHAT_WS] Client ${client.id} connected with invalid token`);
         client.disconnect();
         return;
       }
 
       client.data.tenantId = payload.tenantId;
       client.data.userId = payload.sub;
-      this.logger.log(`[CHAT_WS] Client ${client.id} connected for tenant: ${payload.tenantId}`);
+      this.logger.log(`[CHAT_WS] client_authenticated tenantId=${payload.tenantId} clientId=${client.id}`);
     } catch (error) {
       this.logger.error(`Error handling connection for client ${client.id}:`, error);
       client.disconnect();
@@ -82,7 +87,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   handleDisconnect(client: Socket) {
-    this.logger.log(`[CHAT_WS] Client ${client.id} disconnected from chat namespace`);
+    this.logger.log(`[CHAT_WS] client_disconnected clientId=${client.id}`);
   }
 
   @SubscribeMessage('joinTenant')
@@ -93,17 +98,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const clientTenantId = client.data.tenantId;
     
     if (!data.tenantId) {
-      this.logger.warn(`[CHAT_WS] Client ${client.id} tried to join without tenantId`);
+      this.logger.warn(`[CHAT_WS] client_join_tenant_missing tenantClient=${client.id}`);
       return { event: 'error', data: 'TenantId missing' };
     }
 
     if (data.tenantId !== clientTenantId) {
-      this.logger.warn(`[CHAT_WS] Client ${client.id} tried to join tenant ${data.tenantId} but belongs to ${clientTenantId}`);
+      this.logger.warn(`[CHAT_WS] client_join_unauthorized clientId=${client.id} tried=${data.tenantId} actual=${clientTenantId}`);
       return { event: 'error', data: 'Unauthorized tenant' };
     }
 
     client.join(`tenant:${data.tenantId}`);
-    this.logger.log(`[CHAT_WS] Client ${client.id} joined chat updates for tenant: ${data.tenantId}`);
+    this.logger.log(`[CHAT_WS] joined_tenant_room tenantId=${data.tenantId} clientId=${client.id}`);
     return { event: 'joinedTenant', data: { tenantId: data.tenantId } };
   }
 
@@ -115,18 +120,18 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const clientTenantId = client.data.tenantId;
     
     if (!data.sessionId) {
-      this.logger.warn(`[CHAT_WS] Client ${client.id} tried to join without sessionId`);
+      this.logger.warn(`[CHAT_WS] client_join_session_missing clientId=${client.id}`);
       return { event: 'error', data: 'SessionId missing' };
     }
 
     const ownsSession = await this.validateSessionOwnership(data.sessionId, clientTenantId);
     if (!ownsSession) {
-      this.logger.warn(`[CHAT_WS] Client ${client.id} tried to join session ${data.sessionId} but does not own it`);
+      this.logger.warn(`[CHAT_WS] client_join_session_unauthorized clientId=${client.id} sessionId=${data.sessionId}`);
       return { event: 'error', data: 'Unauthorized session' };
     }
 
     client.join(`session:${data.sessionId}`);
-    this.logger.log(`[CHAT_WS] Client ${client.id} joined chat session: ${data.sessionId}`);
+    this.logger.log(`[CHAT_WS] joined_session_room sessionId=${data.sessionId} clientId=${client.id}`);
     return { event: 'joinedSession', data: { sessionId: data.sessionId } };
   }
 

@@ -9,8 +9,10 @@ import {
   HttpCode,
   UseGuards,
   Request,
+  Logger,
 } from '@nestjs/common';
 import type { Request as ExpressRequest } from 'express';
+import type { ChatSession } from '@prisma/client';
 import type { TenantJwtPayload } from '@gestor/types';
 import { ConversationService, CreateMessageDto } from '../../ai-agent/services/conversation.service';
 import { PrismaService } from '../../database/prisma.service';
@@ -26,11 +28,13 @@ type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
 @Controller('chat')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class ChatController {
+  private readonly logger = new Logger('ChatController');
   constructor(
     private readonly conversationService: ConversationService,
     private readonly prisma: PrismaService,
     private readonly quickRepliesService: QuickRepliesService,
     private readonly whatsappSender: WhatsAppSenderService,
+    private readonly chatGateway: import('../chat.gateway').ChatGateway,
   ) {}
 
   private asJsonObject(value: unknown): Record<string, unknown> {
@@ -268,6 +272,28 @@ export class ChatController {
     });
 
     return message;
+  }
+
+  @Post('sessions/:id/read')
+  @HttpCode(200)
+  @Permissions('chat.read')
+  async markAsRead(@Request() req: TenantRequest, @Param('id') sessionId: string) {
+    const tenantId = req.user.tenantId;
+    const session = await this.prisma.chatSession.findFirst({ where: { id: sessionId, tenantId } });
+    if (!session) {
+      this.logger.log(`[CHAT_INBOX] session_mark_read_not_found sessionId=${sessionId} tenantId=${tenantId}`);
+      return { error: 'Sessão não encontrada' };
+    }
+
+    await this.prisma.chatSession.update({ where: { id: sessionId }, data: { unreadCount: 0 } });
+
+    const updated = await this.prisma.chatSession.findUnique({ where: { id: sessionId } });
+    if (updated) {
+      try { this.chatGateway.emitSessionUpdated(tenantId, updated as ChatSession); } catch (e) { this.logger.error('Failed to emit sessionUpdated', e); }
+    }
+
+    this.logger.log(`[CHAT_INBOX] session_marked_read sessionId=${sessionId} tenantId=${tenantId}`);
+    return { success: true };
   }
 
   // --- Quick Replies ---
