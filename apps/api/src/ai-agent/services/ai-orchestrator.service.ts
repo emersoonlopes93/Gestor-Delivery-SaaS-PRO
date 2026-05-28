@@ -93,6 +93,7 @@ export class AiOrchestratorService {
     }
 
     const config = await this.configService.getConfig(tenantId);
+    this.logger.log(`[AI_MEMORY] config_loaded tenantId=${tenantId} memoryEnabled=${config.memoryEnabled}`);
     const systemConfig = await this.prisma.systemConfig.findUnique({
       where: { id: 'global' },
       select: { defaultAiProvider: true, googleAiModel: true },
@@ -320,22 +321,36 @@ export class AiOrchestratorService {
       '## Memória do cliente e sessão (apenas contexto interno)',
     ];
 
-    if (config.rememberCustomerName && aiMemory.lastKnownCustomerName) {
+    const isRecentName = this.isMemoryEntryFresh(
+      aiMemory.lastKnownCustomerNameAt,
+      config.memoryRetentionDays,
+    );
+    if (config.rememberCustomerName && aiMemory.lastKnownCustomerName && isRecentName) {
       memoryLines.push(`- Nome do cliente: ${aiMemory.lastKnownCustomerName}`);
     }
 
-    if (config.rememberAddresses && aiMemory.lastKnownAddress.street) {
+    const isRecentAddress = this.isMemoryEntryFresh(
+      aiMemory.lastKnownAddressAt,
+      config.memoryRetentionDays,
+    );
+    if (config.rememberAddresses && aiMemory.lastKnownAddress.street && isRecentAddress) {
       const address = aiMemory.lastKnownAddress;
       const formatted = `${address.street}${address.number ? `, ${address.number}` : ''}${address.neighborhood ? ` - ${address.neighborhood}` : ''}${address.city ? `, ${address.city}` : ''}${address.state ? `/${address.state}` : ''}`;
       memoryLines.push(`- Último endereço conhecido: ${formatted}`);
     }
 
-    if (config.rememberLastOrder && aiMemory.lastOrderSummary) {
+    if (
+      config.rememberLastOrder &&
+      aiMemory.lastOrderSummary &&
+      this.isMemoryEntryFresh(aiMemory.lastOrderCreatedAt, config.memoryRetentionDays)
+    ) {
       memoryLines.push(`- Último pedido salvo: ${aiMemory.lastOrderSummary}`);
     }
 
     if (config.rememberPreferences && aiMemory.orderDraft.items.length > 0) {
-      const favorites = aiMemory.orderDraft.items.map((item) => `${item.quantity}x ${item.productName || item.productId}`).join(', ');
+      const favorites = aiMemory.orderDraft.items
+        .map((item) => `${item.quantity}x ${item.productName || item.productId}`)
+        .join(', ');
       memoryLines.push(`- Preferências da conversa atual: ${favorites}`);
     }
 
@@ -347,6 +362,26 @@ export class AiOrchestratorService {
       '- Use apenas informações do tenant atual. Não compartilhe dados de outros clientes ou tenants. Se tiver dúvida, confirme com o cliente.',
     );
     return memoryLines.join('\n');
+  }
+
+  private isMemoryEntryFresh(entryAt: string | null, retentionDays?: number): boolean {
+    if (!entryAt) return false;
+    if (!retentionDays || retentionDays <= 0) return true;
+    const entryDate = new Date(entryAt);
+    if (Number.isNaN(entryDate.getTime())) return false;
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+    return entryDate >= cutoff;
+  }
+
+  private extractCustomerNameFromText(text: string): string | null {
+    const match = text.match(/\b(?:meu nome é|me chamo|sou)\s+([A-ZÀ-Ÿ][A-Za-zÀ-ÿ]+(?:\s+[A-ZÀ-Ÿ][A-Za-zÀ-ÿ]+){0,3})/i);
+    return match ? match[1].trim() : null;
+  }
+
+  private extractSimpleAddressFromText(text: string): { street: string | null } | null {
+    const match = text.match(/\b(?:meu endereço é|endereço é|endereco é|endereço:|endereco:)\s*([^\n\.\,]+)/i);
+    if (!match) return null;
+    return { street: match[1].trim() };
   }
 
   /**
@@ -481,6 +516,14 @@ export class AiOrchestratorService {
         state: session.state,
       });
 
+      if (!config.memoryEnabled) {
+        AiFlowLogger.flow('AI_MEMORY memory_disabled', trace, {
+          sessionId: session.id,
+          tenantId,
+        });
+        this.logger.log(`[AI_MEMORY] memory_disabled tenantId=${tenantId} sessionId=${session.id}`);
+      }
+
       if (session.handoffActive) {
         AiFlowLogger.ignored('human_handoff', trace, { sessionId: session.id });
         return;
@@ -490,6 +533,43 @@ export class AiOrchestratorService {
       AiFlowLogger.flow('AI_MEMORY session_memory_loaded', trace, {
         sessionId: session.id,
       });
+      this.logger.log(`[AI_MEMORY] customer_memory_loaded phone=${customerPhone}`);
+      const hasAddress = Boolean(
+        aiMemory.lastKnownAddress.street ||
+          aiMemory.lastKnownAddress.number ||
+          aiMemory.lastKnownAddress.city,
+      );
+      this.logger.log(`[AI_MEMORY] address_memory_loaded hasAddress=${hasAddress}`);
+      this.logger.log(`[AI_MEMORY] last_order_loaded hasLastOrder=${Boolean(aiMemory.lastOrderId)}`);
+
+      if (config.memoryEnabled) {
+        const extractedName = this.extractCustomerNameFromText(_content);
+        if (config.rememberCustomerName && extractedName) {
+          await this.conversationService.saveCustomerName(
+            tenantId,
+            customerPhone,
+            extractedName,
+          );
+          await this.conversationService.updateSessionAiMemory(session.id, {
+            lastKnownCustomerName: extractedName,
+            lastKnownCustomerNameAt: new Date().toISOString(),
+          });
+        }
+
+        const extractedAddress = this.extractSimpleAddressFromText(_content);
+        if (config.rememberAddresses && extractedAddress?.street) {
+          await this.conversationService.saveLastKnownAddress(session.id, {
+            street: extractedAddress.street,
+            number: null,
+            neighborhood: null,
+            city: null,
+            state: null,
+            zipCode: null,
+            complement: null,
+            reference: null,
+          });
+        }
+      }
 
       const history = await this.conversationService.getRecentHistory(
         session.id,
@@ -505,7 +585,10 @@ export class AiOrchestratorService {
         providerSource: 'ai_provider_registry',
       });
 
-      const tools = await this.toolsService.getAvailableToolsForTenant(tenantId);
+      let tools = await this.toolsService.getAvailableToolsForTenant(tenantId);
+      if (!config.memoryEnabled || !config.allowRepeatLastOrder) {
+        tools = tools.filter((tool) => tool.name !== 'repetir_ultimo_pedido');
+      }
 
       const tenantSettings = await this.prisma.tenantSettings.findUnique({
         where: { tenantId },
@@ -562,6 +645,8 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
         session.id,
         customerPhone,
       );
+      agentSessionCtx.allowRepeatLastOrder = config.allowRepeatLastOrder;
+      agentSessionCtx.memoryRetentionDays = config.memoryRetentionDays;
       AiFlowLogger.flow('agent_session_context', trace, {
         customerId: agentSessionCtx.customerId,
       });
@@ -848,6 +933,14 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
         signatureHash,
       });
 
+      if (toolCall.name === 'repetir_ultimo_pedido') {
+        AiFlowLogger.flow('repeat_last_order_requested', trace, {
+          toolId: toolCall.id,
+          sessionId,
+        });
+        this.logger.log(`[AI_MEMORY] repeat_last_order_requested tenantId=${tenantId} sessionId=${sessionId}`);
+      }
+
       if (toolCall.name === 'criar_pedido') {
         AiFlowLogger.flow('order_creation_start', trace, {
           toolId: toolCall.id,
@@ -908,6 +1001,61 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
         },
       });
 
+      if (
+        toolCall.name === 'repetir_ultimo_pedido' &&
+        toolStatus === 'success' &&
+        result &&
+        typeof result === 'object'
+      ) {
+        const orderId = this.getOrderIdFromToolResult(result);
+        const orderItems = Array.isArray((result as Record<string, unknown>).items)
+          ? ((result as Record<string, unknown>).items as Array<Record<string, unknown>>)
+          : [];
+        await this.conversationService.updateSessionAiMemory(sessionId, {
+          orderDraft: {
+            items: orderItems.map((item) => ({
+              productId: item.productId ? String(item.productId) : null,
+              productName: item.productName ? String(item.productName) : null,
+              quantity: item.quantity ? Number(item.quantity) : 1,
+              notes: null,
+            })),
+            fulfillmentType: null,
+            customerName: null,
+            customerPhone: null,
+            deliveryAddress: {
+              street: null,
+              number: null,
+              neighborhood: null,
+              city: null,
+              state: null,
+              zipCode: null,
+              complement: null,
+              reference: null,
+              lat: null,
+              lng: null,
+            },
+            payment: {
+              method: null,
+              changeFor: null,
+            },
+            deliveryFee: null,
+            subtotal: null,
+            total: typeof (result as Record<string, unknown>).total === 'number'
+              ? (result as Record<string, unknown>).total as number
+              : null,
+            missingFields: [],
+            readyToConfirm: false,
+            confirmationAskedAt: null,
+          },
+          lastOrderSummary: orderId ? `Pedido repetido ${orderId}` : 'Pedido repetido',
+        });
+        AiFlowLogger.flow('repeat_last_order_draft_created', trace, {
+          sessionId,
+          orderId,
+        });
+        this.logger.log(`[AI_MEMORY] repeat_last_order_draft_created tenantId=${tenantId} sessionId=${sessionId} orderId=${orderId ?? 'unknown'}`);
+      }
+
       AiFlowLogger.flow('tool_result_hidden_from_customer', trace, {
         name: toolCall.name,
         toolId: toolCall.id,
@@ -935,6 +1083,16 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
 
         const existingOrder = await this.prisma.order.findUnique({
           where: { id: toolResultOrderId },
+          select: {
+            id: true,
+            orderNumber: true,
+            items: {
+              select: {
+                quantity: true,
+                snapshotName: true,
+              },
+            },
+          },
         });
 
         if (!existingOrder) {
@@ -958,6 +1116,17 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
         AiFlowLogger.flow('order_visible_in_orders_endpoint', trace, {
           orderId: toolResultOrderId,
         });
+
+        if (config.memoryEnabled && config.rememberLastOrder) {
+          const summaryItems = existingOrder.items
+            .map((item) => `${item.quantity}x ${item.snapshotName}`)
+            .join(', ');
+          await this.conversationService.updateSessionAiMemory(sessionId, {
+            lastOrderId: existingOrder.id,
+            lastOrderSummary: `#${existingOrder.orderNumber}: ${summaryItems}`,
+            lastOrderCreatedAt: new Date().toISOString(),
+          });
+        }
       }
 
       if (toolStatus === 'success') {

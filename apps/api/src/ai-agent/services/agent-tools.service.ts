@@ -785,6 +785,14 @@ export class AgentToolsService {
       return { status: 'error', message: 'Cliente não identificado.' };
     }
 
+    if (sessionContext.allowRepeatLastOrder === false) {
+      return {
+        status: 'error',
+        code: 'REPEAT_ORDER_DISABLED',
+        message: 'Repetir último pedido não está habilitado para este tenant.',
+      };
+    }
+
     const order = await this.ordersService.getLatestCustomerOrder(tenantId, sessionContext.customerId);
     if (!order) {
       return { message: 'Não encontramos pedidos anteriores para repetir.' };

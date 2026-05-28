@@ -48,9 +48,12 @@ interface MetadataAi {
   currentIntent?: unknown;
   orderDraft?: unknown;
   lastKnownCustomerName?: string;
+  lastKnownCustomerNameAt?: string;
   lastKnownAddress?: unknown;
+  lastKnownAddressAt?: string;
   lastOrderId?: string;
   lastOrderSummary?: string;
+  lastOrderCreatedAt?: string;
   toolFailures?: unknown;
 }
 
@@ -116,6 +119,7 @@ export interface AiSessionMemory {
   currentIntent: 'order' | 'menu' | 'delivery_fee' | 'payment' | 'support' | null;
   orderDraft: AiOrderDraft;
   lastKnownCustomerName: string | null;
+  lastKnownCustomerNameAt: string | null;
   lastKnownAddress: {
     street: string | null;
     number: string | null;
@@ -126,8 +130,10 @@ export interface AiSessionMemory {
     complement: string | null;
     reference: string | null;
   };
+  lastKnownAddressAt: string | null;
   lastOrderId: string | null;
   lastOrderSummary: string | null;
+  lastOrderCreatedAt: string | null;
 }
 
 export interface CreateMessageDto {
@@ -194,6 +200,22 @@ export class ConversationService {
 
   async getSessionById(sessionId: string) {
     return this.prisma.chatSession.findUnique({ where: { id: sessionId } });
+  }
+
+  async saveCustomerName(tenantId: string, customerPhone: string, name: string): Promise<void> {
+    const cleanPhone = customerPhone.replace(/\D/g, '');
+    await this.prisma.customer.upsert({
+      where: { tenantId_phone: { tenantId, phone: cleanPhone } },
+      create: { tenantId, phone: cleanPhone, name },
+      update: { name },
+    });
+  }
+
+  async saveLastKnownAddress(sessionId: string, address: AiSessionMemory['lastKnownAddress']): Promise<void> {
+    await this.updateSessionAiMemory(sessionId, {
+      lastKnownAddress: address,
+      lastKnownAddressAt: new Date().toISOString(),
+    });
   }
 
   async getSessionAiMemory(sessionId: string): Promise<AiSessionMemory> {
@@ -267,6 +289,8 @@ export class ConversationService {
       },
       lastKnownCustomerName:
         typeof ai.lastKnownCustomerName === 'string' ? ai.lastKnownCustomerName : null,
+      lastKnownCustomerNameAt:
+        typeof ai.lastKnownCustomerNameAt === 'string' ? ai.lastKnownCustomerNameAt : null,
       lastKnownAddress: {
         street: typeof lastKnownAddress.street === 'string' ? lastKnownAddress.street : null,
         number: typeof lastKnownAddress.number === 'string' ? lastKnownAddress.number : null,
@@ -286,8 +310,12 @@ export class ConversationService {
             ? lastKnownAddress.reference
             : null,
       },
+      lastKnownAddressAt:
+        typeof ai.lastKnownAddressAt === 'string' ? ai.lastKnownAddressAt : null,
       lastOrderId: typeof ai.lastOrderId === 'string' ? ai.lastOrderId : null,
       lastOrderSummary: typeof ai.lastOrderSummary === 'string' ? ai.lastOrderSummary : null,
+      lastOrderCreatedAt:
+        typeof ai.lastOrderCreatedAt === 'string' ? ai.lastOrderCreatedAt : null,
     };
   }
 
