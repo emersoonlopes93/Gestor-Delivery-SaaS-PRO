@@ -94,8 +94,8 @@ export function InboxPage() {
               onClick={() => setFilter('waiting')}
               className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-lg transition-colors ${
                 filter === 'waiting'
-                  ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400 border border-primary-500/20'
-                  : 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground hover:bg-muted/80 dark:hover:bg-muted/80'
+                  ? 'bg-primary/10 text-primary border border-primary/20'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
             >
               Aguardando ({waitingCount})
@@ -104,8 +104,8 @@ export function InboxPage() {
               onClick={() => setFilter('all')}
               className={`flex-1 py-1.5 px-3 text-sm font-medium rounded-lg transition-colors ${
                 filter === 'all'
-                  ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400 border border-primary-500/20'
-                  : 'bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground hover:bg-muted/80 dark:hover:bg-muted/80'
+                  ? 'bg-primary/10 text-primary border border-primary/20'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
             >
               Todos
@@ -121,7 +121,7 @@ export function InboxPage() {
               className="p-4 border-b border-muted/50 hover:bg-muted/30 dark:hover:bg-muted/30 cursor-pointer transition-colors relative"
             >
               {s.handoffActive && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r-full" />
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-destructive rounded-r-full" />
               )}
               <div className="flex items-start justify-between mb-1">
                 <div className="flex items-center gap-2">
@@ -129,7 +129,7 @@ export function InboxPage() {
                     {s.displayName || s.name || `Cliente ${s.customerPhone}`}
                   </h3>
                   {s.unreadCount && s.unreadCount > 0 && (
-                    <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                    <span className="bg-destructive text-destructive-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                       {s.unreadCount}
                     </span>
                   )}
@@ -141,7 +141,7 @@ export function InboxPage() {
               <p className="text-xs text-muted-foreground truncate mb-2">{s.lastMessage || 'Sem mensagens'}</p>
               <div className="flex items-center gap-2">
                 <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
-                  s.handoffActive ? 'bg-red-500/10 text-red-600 dark:text-red-400' : 'bg-primary-500/10 text-primary-600 dark:text-primary-400'
+                  s.handoffActive ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'
                 }`}>
                   {s.handoffActive ? 'Atendimento Humano' : 'Bot Ativo'}
                 </span>

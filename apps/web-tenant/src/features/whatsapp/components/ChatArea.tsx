@@ -187,13 +187,13 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'sent':
-        return <Check className="w-4 h-4 text-gray-400" />;
+        return <Check className="w-4 h-4 text-muted-foreground" />;
       case 'delivered':
         return <CheckCircle className="w-4 h-4 text-blue-500" />;
       case 'read':
         return <CheckCircle className="w-4 h-4 text-green-500" />;
       default:
-        return <Clock className="w-4 h-4 text-gray-400" />;
+        return <Clock className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
@@ -255,18 +255,18 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
   return (
     <div className="flex-1 flex flex-col bg-card dark:bg-card">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
+      <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
             className="p-2 hover:bg-muted/40 dark:hover:bg-muted/40 rounded-lg transition-colors"
           >
-            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white">
+            <h3 className="font-semibold text-foreground">
               {session.displayName || `Cliente ${session.customerPhone}`}
             </h3>
             <div className="flex items-center gap-2">
@@ -339,7 +339,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       )}
 
       {session.handoffActive && (session.handoffReason || session.handoffOperator || session.handoffAt) && (
-        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 text-sm text-gray-700 dark:text-gray-300 space-y-1">
+        <div className="px-4 py-3 border-b border-border bg-muted text-sm text-foreground space-y-1">
           {session.handoffReason && (
             <p>
               <span className="font-semibold">Motivo:</span> {session.handoffReason}
@@ -376,8 +376,8 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
             <div
               className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
                 msg.direction === 'outbound'
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-50'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-foreground border border-border'
               }`}
             >
               {msg.senderType && msg.senderType !== 'customer' && (
@@ -387,7 +387,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
               )}
               <p className="text-sm">{msg.content}</p>
               <div className={`flex items-center gap-2 mt-1 text-xs ${
-                msg.direction === 'outbound' ? 'text-primary-200' : 'text-slate-600 dark:text-slate-400'
+                msg.direction === 'outbound' ? 'text-primary-foreground/80' : 'text-muted-foreground'
               }`}>
                 {getStatusIcon(msg.externalStatus || 'sent')}
                 <span>{formatTime(msg.timestamp || msg.createdAt)}</span>
@@ -402,11 +402,11 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       <QuickReplies onReplySelect={handleQuickReply} />
 
       {/* Input */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-800">
+      <div className="p-4 border-t border-border">
         <div className="flex items-end gap-2">
           <button
             onClick={handleFileUpload}
-            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="p-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             <Paperclip className="w-5 h-5" />
           </button>
@@ -418,7 +418,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
             className="hidden"
           />
           <button
-            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="p-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             <Smile className="w-5 h-5" />
           </button>
@@ -430,14 +430,14 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
               disabled={session?.state === 'closed' || sendMessageMutation.isPending}
               placeholder={session?.state === 'closed' ? 'Conversa encerrada' : 'Digite uma mensagem...'}
               rows={1}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2 border border-input rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-card text-foreground placeholder:text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
               style={{ minHeight: '40px', maxHeight: '120px' }}
             />
           </div>
           <button
             onClick={handleSend}
             disabled={!message.trim() || session?.state === 'closed' || sendMessageMutation.isPending}
-            className="p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {sendMessageMutation.isPending ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />

@@ -223,7 +223,7 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
           type="button"
           onClick={() => onToggle(group.id)}
           className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-300 group ${isAnyItemActive
-              ? 'bg-primary-50/50 dark:bg-primary-500/5 text-primary-700 dark:text-primary-400'
+              ? 'bg-sidebar-active text-sidebar-active-foreground'
               : 'text-muted-foreground hover:text-foreground'
             }`}
         >
@@ -273,14 +273,14 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
                 title={collapsed ? item.label : undefined}
                 className={({ isActive }) => {
                   return `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isActive
-                      ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20 dark:bg-primary-600/20 dark:text-primary-400'
-                      : 'text-muted-foreground hover:bg-primary-50/50 dark:hover:bg-primary-500/5 hover:text-foreground'
+                      ? 'bg-primary text-primary-foreground shadow-lg dark:bg-sidebar-active dark:text-sidebar-active-foreground'
+                      : 'text-muted-foreground hover:bg-sidebar-hover dark:hover:bg-sidebar-hover hover:text-foreground'
                     } ${collapsed ? 'justify-center' : ''}`;
                 }}
               >
                 {({ isActive }) => (
                   <>
-                    <span className={`flex items-center justify-center transition-colors duration-300 ${isActive ? 'text-white dark:text-primary-400' : 'text-muted-foreground group-hover:text-foreground'}`} aria-hidden>
+                    <span className={`flex items-center justify-center transition-colors duration-300 ${isActive ? 'text-primary-foreground dark:text-sidebar-active-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} aria-hidden>
                       <item.icon className="h-[18px] w-[18px] stroke-[2.5px]" aria-hidden />
                     </span>
                     {!collapsed ? <span className="truncate">{item.label}</span> : null}
@@ -290,7 +290,7 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
                       </span>
                     ) : null}
                     {isActive && !collapsed && (
-                      <span className="absolute right-3 w-1.5 h-1.5 rounded-full bg-white dark:bg-primary-400 animate-pulse" />
+                      <span className="absolute right-3 w-1.5 h-1.5 rounded-full bg-primary-foreground dark:bg-sidebar-active-foreground animate-pulse" />
                     )}
                   </>
                 )}
