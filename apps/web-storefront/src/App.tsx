@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { StorefrontPage } from './pages/StorefrontPage';
 import { CheckoutPage } from './pages/CheckoutPage';
@@ -8,8 +9,14 @@ import { OrdersHistoryPage } from './pages/OrdersHistoryPage';
 import { StorefrontLayout } from './layouts/StorefrontLayout';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
+import { useStorefrontThemeStore } from './stores/theme.store';
 
 export function App() {
+  const initTheme = useStorefrontThemeStore((s) => s.initializeTheme);
+  useEffect(() => {
+    initTheme();
+  }, [initTheme]);
+
   return (
     <ToastProvider>
       <ErrorBoundary>
@@ -44,4 +51,3 @@ export function App() {
     </ToastProvider>
   );
 }
-

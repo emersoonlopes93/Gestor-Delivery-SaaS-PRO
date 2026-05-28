@@ -4,71 +4,101 @@
 
 /* ============================================================
    DESIGN SYSTEM — Gestor Delivery SaaS PRO
-   Tokens centralizados: superfícies, bordas, sombras, hierarquia
+   Tokens semânticos centralizados (shadcn/ui compatible)
    ============================================================ */
 
 @layer base {
   :root {
     font-family: 'Inter', 'Outfit', system-ui, sans-serif;
 
-    /* === SUPERFÍCIES LIGHT — camadas distintas, não lavadas === */
-    --surface-page:       #f1f5f9;   /* fundo geral levemente acinzentado slate-100 */
-    --surface-base:       #ffffff;   /* cards, painéis, tabelas — branco sólido */
-    --surface-raised:     #ffffff;   /* dropdowns, popovers */
-    --surface-inset:      #f8fafc;   /* áreas internas, thead, badge bg */
-    --surface-subtle:     #f1f5f9;   /* hover rows, estado secundário */
-
-    /* === BORDAS LIGHT — perceptíveis, não pesadas === */
-    --border-strong:      #cbd5e1;   /* bordas primárias — slate-300 */
-    --border-default:     #e2e8f0;   /* bordas normais — slate-200 */
-    --border-subtle:      #f1f5f9;   /* divisórias internas — slate-100 */
-
-    /* === SOMBRAS LIGHT — profundidade elegante === */
+    /* === TOKENS SEMÂNTICOS LIGHT === */
+    --background: #f1f5f9;           /* fundo geral - slate-100 */
+    --foreground: #0f172a;            /* texto principal - slate-900 */
+    
+    --card: #ffffff;                  /* fundo de cards - branco */
+    --card-foreground: #0f172a;       /* texto de cards - slate-900 */
+    
+    --popover: #ffffff;               /* fundo de popovers - branco */
+    --popover-foreground: #0f172a;    /* texto de popovers - slate-900 */
+    
+    --primary: #0c93e9;               /* cor primária - primary-500 */
+    --primary-foreground: #ffffff;    /* texto sobre primária - branco */
+    
+    --secondary: #f1f5f9;             /* fundo secundário - slate-100 */
+    --secondary-foreground: #0f172a;   /* texto sobre secundário - slate-900 */
+    
+    --muted: #f1f5f9;                /* fundo muted - slate-100 */
+    --muted-foreground: #64748b;      /* texto muted - slate-500 */
+    
+    --accent: #f1f5f9;               /* fundo de destaque - slate-100 */
+    --accent-foreground: #0f172a;     /* texto sobre destaque - slate-900 */
+    
+    --destructive: #ef4444;          /* cor de destruição - red-500 */
+    --destructive-foreground: #ffffff; /* texto sobre destruição - branco */
+    
+    --border: #e2e8f0;               /* borda padrão - slate-200 */
+    --input: #e2e8f0;                /* borda de inputs - slate-200 */
+    --ring: #0c93e9;                 /* ring de foco - primary-500 */
+    
+    --radius: 0.75rem;                /* border-radius padrão - 12px */
+    
+    /* === SOMBRAS === */
     --shadow-card:        0 1px 3px 0 rgb(15 23 42 / 0.07), 0 1px 2px -1px rgb(15 23 42 / 0.05);
     --shadow-card-hover:  0 4px 12px 0 rgb(15 23 42 / 0.10), 0 2px 4px -1px rgb(15 23 42 / 0.06);
     --shadow-panel:       0 2px 8px 0 rgb(15 23 42 / 0.08), 0 1px 3px -1px rgb(15 23 42 / 0.05);
     --shadow-dropdown:    0 8px 24px 0 rgb(15 23 42 / 0.12), 0 2px 6px -2px rgb(15 23 42 / 0.08);
-    --shadow-none:        none;
-
-    /* === TEXTO LIGHT — hierarquia clara === */
-    --text-primary:   #0f172a;   /* slate-900 */
-    --text-secondary: #475569;   /* slate-600 */
-    --text-muted:     #94a3b8;   /* slate-400 */
-    --text-placeholder: #cbd5e1; /* slate-300 */
   }
 
   /* === DARK MODE TOKENS === */
   .dark {
-    --surface-page:   #0a0f1a;   /* fundo principal dark profundo */
-    --surface-base:   #111827;   /* cards — gray-900 */
-    --surface-raised: #1f2937;   /* modais, dropdowns — gray-800 */
-    --surface-inset:  #0f172a;   /* insets internos — slate-900 */
-    --surface-subtle: #1e293b;   /* hover states — slate-800 */
-
-    --border-strong:  #334155;   /* slate-700 */
-    --border-default: #1e293b;   /* slate-800 */
-    --border-subtle:  #111827;   /* gray-900 */
-
+    --background: #0a0f1a;          /* fundo geral dark */
+    --foreground: #f8fafc;          /* texto principal dark */
+    
+    --card: #111827;                 /* fundo de cards dark - gray-900 */
+    --card-foreground: #f8fafc;      /* texto de cards dark */
+    
+    --popover: #1f2937;              /* fundo de popovers dark - gray-800 */
+    --popover-foreground: #f8fafc;    /* texto de popovers dark */
+    
+    --primary: #0c93e9;              /* cor primária dark (mantida) */
+    --primary-foreground: #ffffff;   /* texto sobre primária dark */
+    
+    --secondary: #1e293b;            /* fundo secundário dark - slate-800 */
+    --secondary-foreground: #f8fafc; /* texto sobre secundário dark */
+    
+    --muted: #1e293b;               /* fundo muted dark - slate-800 */
+    --muted-foreground: #94a3b8;     /* texto muted dark - slate-400 */
+    
+    --accent: #1e293b;              /* fundo de destaque dark - slate-800 */
+    --accent-foreground: #f8fafc;    /* texto sobre destaque dark */
+    
+    --destructive: #ef4444;         /* cor de destruição dark (mantida) */
+    --destructive-foreground: #ffffff; /* texto sobre destruição dark */
+    
+    --border: #1e293b;               /* borda padrão dark - slate-800 */
+    --input: #1e293b;                /* borda de inputs dark - slate-800 */
+    --ring: #0c93e9;                 /* ring de foco dark (mantido) */
+    
+    /* === SOMBRAS DARK === */
     --shadow-card:        0 1px 3px 0 rgb(0 0 0 / 0.40), 0 1px 2px -1px rgb(0 0 0 / 0.30);
     --shadow-card-hover:  0 4px 16px 0 rgb(0 0 0 / 0.50), 0 2px 6px -1px rgb(0 0 0 / 0.35);
     --shadow-panel:       0 2px 8px 0 rgb(0 0 0 / 0.40), 0 1px 3px -1px rgb(0 0 0 / 0.25);
     --shadow-dropdown:    0 8px 32px 0 rgb(0 0 0 / 0.60), 0 2px 8px -2px rgb(0 0 0 / 0.40);
-
-    --text-primary:   #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-muted:     #64748b;
-    --text-placeholder: #334155;
   }
 
   body {
-    @apply antialiased selection:bg-primary-500/30 transition-colors duration-300;
-    background-color: var(--surface-page);
-    color: var(--text-primary);
+    @apply antialiased transition-colors duration-300;
+    background-color: var(--background);
+    color: var(--foreground);
     min-height: 100vh;
   }
 
   html {
     scroll-behavior: smooth;
+  }
+
+  ::selection {
+    background-color: rgb(12 147 233 / 0.3);
   }
 }
 
@@ -87,355 +117,115 @@
   }
 
   .custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
-  .custom-scrollbar::-webkit-scrollbar-track { @apply bg-transparent; }
+  .custom-scrollbar::-webkit-scrollbar-track { background-color: transparent; }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-slate-300 dark:bg-slate-700 rounded-full;
+    background-color: var(--muted-foreground);
+    border-radius: 9999px;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-400 dark:bg-slate-600;
+    background-color: var(--foreground);
   }
-
-  .no-scrollbar::-webkit-scrollbar { display: none; }
-  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
   /* Glassmorphism refinado */
   .glass {
-    @apply bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border border-white/60 dark:border-gray-800/60 shadow-xl transition-all;
+    background-color: var(--card);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-card);
+    transition: all 0.3s;
   }
 
   /* Gradiente de texto premium */
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-indigo-600;
+    background: linear-gradient(to right, #0074c7, #4f46e5);
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
   }
 
   /* Shimmer para loading skeleton */
   .shimmer {
-    @apply relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_2s_infinite] before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent;
+    position: relative;
+    overflow: hidden;
+  }
+  .shimmer::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    animation: shimmer 2s infinite;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.2), transparent);
   }
 
-  /* Sombras via CSS var (usadas em JS className) */
+  /* Sombras via CSS var */
   .shadow-card { box-shadow: var(--shadow-card); }
   .shadow-card-hover { box-shadow: var(--shadow-card-hover); }
   .shadow-panel { box-shadow: var(--shadow-panel); }
 }
 
 /* ============================================================
-   COMPONENTS — Design System Centralizado
+   COMPONENTS CSS SIMPLES (sem @apply complexo)
    ============================================================ */
 
 @layer components {
-
-  /* ── Botões ─────────────────────────────────────────────── */
-
-  .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl
-           font-bold text-[11px] uppercase tracking-widest text-white
-           bg-primary-600 hover:bg-primary-700 active:scale-[0.97]
-           shadow-md shadow-primary-500/25 hover:shadow-lg hover:shadow-primary-500/30
-           transition-all duration-200
-           focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:ring-offset-2
-           disabled:opacity-50 disabled:cursor-not-allowed
-           dark:bg-primary-600 dark:hover:bg-primary-500 dark:shadow-primary-900/40;
-  }
-
-  .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl
-           font-bold text-[11px] uppercase tracking-widest
-           text-slate-700 dark:text-slate-200
-           bg-white dark:bg-gray-900
-           border border-slate-300 dark:border-gray-700
-           hover:bg-slate-50 dark:hover:bg-gray-800
-           hover:border-slate-400 dark:hover:border-gray-600
-           active:scale-[0.97] shadow-sm hover:shadow-md
-           transition-all duration-200
-           focus:outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-gray-600
-           disabled:opacity-50 disabled:cursor-not-allowed;
-  }
-
-  .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg
-           font-semibold text-slate-600 dark:text-slate-400
-           hover:text-slate-900 dark:hover:text-white
-           hover:bg-slate-100 dark:hover:bg-gray-800
-           transition-all duration-200
-           focus:outline-none disabled:opacity-50;
-  }
-
-  .btn-icon {
-    @apply inline-flex items-center justify-center w-9 h-9 rounded-lg
-           text-slate-500 dark:text-slate-400
-           hover:text-slate-900 dark:hover:text-white
-           hover:bg-slate-100 dark:hover:bg-gray-800
-           border border-transparent hover:border-slate-200 dark:hover:border-gray-700
-           transition-all duration-200;
-  }
-
-  /* ── Cards ──────────────────────────────────────────────── */
-
-  .card-premium {
-    background-color: var(--surface-base);
-    box-shadow: var(--shadow-card);
-    @apply rounded-2xl border border-slate-200 dark:border-gray-800 overflow-hidden transition-all duration-200;
-  }
-
-  .card-premium-hover {
-    @apply card-premium hover:border-slate-300 dark:hover:border-gray-700 cursor-pointer;
-  }
-  .card-premium-hover:hover {
-    box-shadow: var(--shadow-card-hover);
-  }
-
-  /* ── Inputs ─────────────────────────────────────────────── */
-
+  /* Input premium simplificado */
   .input-premium {
-    @apply w-full px-4 py-2.5 rounded-xl text-sm font-medium
-           text-slate-900 dark:text-slate-100
-           placeholder:text-slate-500 dark:placeholder:text-slate-400
-           bg-white dark:bg-gray-900
-           border border-slate-300 dark:border-gray-700
-           focus:bg-white dark:focus:bg-gray-900
-           focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500
-           hover:border-slate-400 dark:hover:border-gray-600
-           transition-all duration-200
-           disabled:opacity-50 disabled:cursor-not-allowed;
-    -webkit-autofill-outline: 0;
-    &:-webkit-autofill,
-    &:-webkit-autofill:hover,
-    &:-webkit-autofill:focus,
-    &:-webkit-autofill:active {
-      -webkit-box-shadow: 0 0 0 30px white inset !important;
-      -webkit-text-fill-color: #0f172a !important;
-    }
-    @media (prefers-color-scheme: dark) {
-      &:-webkit-autofill,
-      &:-webkit-autofill:hover,
-      &:-webkit-autofill:focus,
-      &:-webkit-autofill:active {
-        -webkit-box-shadow: 0 0 0 30px #111827 inset !important;
-        -webkit-text-fill-color: #f8fafc !important;
-      }
-    }
+    width: 100%;
+    padding: 0.625rem 1rem;
+    border-radius: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    background-color: var(--card);
+    color: var(--foreground);
+    border: 1px solid var(--input);
+    transition: all 0.2s;
+  }
+  .input-premium::placeholder {
+    color: var(--muted-foreground);
+  }
+  .input-premium:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--ring);
+    border-color: #0c93e9;
+  }
+  .input-premium:hover {
+    border-color: var(--border);
+  }
+  .input-premium:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .input-premium:-webkit-autofill,
+  .input-premium:-webkit-autofill:hover,
+  .input-premium:-webkit-autofill:focus,
+  .input-premium:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px var(--card) inset !important;
+    -webkit-text-fill-color: var(--foreground) !important;
   }
 
-  /* ── Badges ─────────────────────────────────────────────── */
-
-  .badge-premium {
-    @apply px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border transition-colors;
-  }
-
-  /* Status badges — light com fundo sólido suficiente, dark com tint sutil */
-  .status-badge-pending {
-    @apply bg-amber-50 text-amber-700 border-amber-200
-           dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/25;
-  }
-  .status-badge-confirmed {
-    @apply bg-blue-50 text-blue-700 border-blue-200
-           dark:bg-blue-500/15 dark:text-blue-400 dark:border-blue-500/25;
-  }
-  .status-badge-preparing {
-    @apply bg-orange-50 text-orange-700 border-orange-200
-           dark:bg-orange-500/15 dark:text-orange-400 dark:border-orange-500/25;
-  }
-  .status-badge-success {
-    @apply bg-emerald-50 text-emerald-700 border-emerald-200
-           dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/25;
-  }
-  .status-badge-danger {
-    @apply bg-red-50 text-red-700 border-red-200
-           dark:bg-red-500/15 dark:text-red-400 dark:border-red-500/25;
-  }
-  .status-badge-neutral {
-    @apply bg-slate-100 text-slate-600 border-slate-200
-           dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700;
-  }
-  .status-badge-warning {
-    @apply bg-amber-50 text-amber-700 border-amber-200
-           dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/25;
-  }
-  .status-badge-indigo {
-    @apply bg-indigo-50 text-indigo-700 border-indigo-200
-           dark:bg-indigo-500/15 dark:text-indigo-400 dark:border-indigo-500/25;
-  }
-
-  /* ── Alert cards ────────────────────────────────────────── */
-  .alert-info    { @apply bg-primary-50 dark:bg-primary-500/10 border border-primary-200 dark:border-primary-500/30 text-primary-700 dark:text-primary-400; }
-  .alert-warning { @apply bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-400; }
-  .alert-danger  { @apply bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-800 dark:text-red-400; }
-  .alert-indigo  { @apply bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30 text-indigo-800 dark:text-indigo-400; }
-
-  /* ── Toolbar/Filter Bar ─────────────────────────────────── */
-
-  .toolbar-bar {
-    background-color: var(--surface-base);
+  /* Card premium */
+  .card-premium {
+    background-color: var(--card);
     box-shadow: var(--shadow-card);
-    @apply rounded-2xl border border-slate-200 dark:border-gray-800 p-4 transition-all;
-  }
-
-  /* ── Tabelas ────────────────────────────────────────────── */
-
-  .table-premium {
-    @apply w-full text-left border-collapse;
-  }
-
-  .table-premium thead tr {
-    background-color: var(--surface-inset);
-    @apply border-b border-slate-200 dark:border-gray-800;
-  }
-
-  .table-premium thead th {
-    @apply px-6 py-3.5 text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest;
-  }
-
-  .table-premium tbody tr {
-    background-color: var(--surface-base);
-    @apply border-b border-slate-100 dark:border-gray-800/70 transition-colors duration-150;
-  }
-
-  .table-premium tbody tr:hover {
-    background-color: var(--surface-subtle);
-  }
-
-  .table-premium tbody td {
-    @apply px-6 py-3.5 text-sm;
-  }
-
-  /* ── Page header padrão ─────────────────────────────────── */
-
-  .page-header {
-    @apply flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6;
-  }
-
-  .page-title {
-    @apply text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight;
-  }
-
-  .page-subtitle {
-    @apply text-sm text-slate-500 dark:text-slate-400 mt-0.5;
-  }
-
-  /* ── Kanban ─────────────────────────────────────────────── */
-
-  /* Coluna base */
-  .kanban-col {
-    @apply rounded-2xl flex flex-col border;
-    min-height: 160px;
-  }
-
-  /* Colunas por identidade */
-  .kanban-col-entry {
-    @apply bg-slate-50 border-slate-200 dark:bg-slate-900/40 dark:border-slate-800;
-  }
-
-  .kanban-col-production {
-    @apply bg-orange-50/70 border-orange-200/80 dark:bg-orange-950/20 dark:border-orange-900/40;
-  }
-
-  .kanban-col-delivery {
-    @apply bg-emerald-50/60 border-emerald-200/70 dark:bg-emerald-950/15 dark:border-emerald-900/30;
-  }
-
-  /* Header das colunas */
-  .kanban-col-header {
-    @apply flex items-start justify-between p-4 pb-3 border-b shrink-0;
-  }
-
-  .kanban-col-header-entry {
-    @apply border-slate-200 dark:border-slate-800;
-  }
-
-  .kanban-col-header-production {
-    @apply border-orange-200/80 dark:border-orange-900/40;
-  }
-
-  .kanban-col-header-delivery {
-    @apply border-emerald-200/70 dark:border-emerald-900/30;
-  }
-
-  /* Acento superior da coluna (barra colorida no topo) */
-  .kanban-accent-entry      { @apply border-t-2 border-t-slate-400 dark:border-t-slate-600; }
-  .kanban-accent-production { @apply border-t-2 border-t-orange-400 dark:border-t-orange-500; }
-  .kanban-accent-delivery   { @apply border-t-2 border-t-emerald-500 dark:border-t-emerald-500; }
-
-  /* Contador de coluna */
-  .kanban-count-entry      { @apply bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 ring-1 ring-slate-300 dark:ring-slate-700; }
-  .kanban-count-production { @apply bg-white dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 ring-1 ring-orange-300 dark:ring-orange-800/60; }
-  .kanban-count-delivery   { @apply bg-white dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-300 dark:ring-emerald-800/50; }
-
-  /* Card do Kanban */
-  .kanban-card {
-    @apply rounded-xl border transition-all duration-200 text-left;
-    background-color: var(--surface-base);
-    box-shadow: var(--shadow-card);
-    @apply border-slate-200 dark:border-gray-800/80;
-  }
-  .kanban-card:hover {
-    box-shadow: var(--shadow-card-hover);
-    @apply border-slate-300 dark:border-gray-700;
-  }
-
-  /* Botão Avançar — ação principal do card */
-  .btn-advance {
-    @apply w-full mt-1 flex items-center justify-center gap-1.5
-           py-2 rounded-lg text-[10px] font-black uppercase tracking-wider
-           transition-all duration-200 active:scale-[0.97];
-  }
-
-  .btn-advance-primary {
-    @apply btn-advance
-           bg-primary-600 hover:bg-primary-700 text-white
-           shadow-sm shadow-primary-500/25;
-  }
-
-  .btn-advance-compact {
-    @apply btn-advance
-           bg-slate-900 dark:bg-slate-100 hover:bg-slate-800 dark:hover:bg-white
-           text-white dark:text-slate-900;
+    border-radius: 1rem;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    transition: all 0.2s;
   }
 }
 
 /* ============================================================
-   ANIMAÇÕES
+   ANIMATIONS
    ============================================================ */
-
-@keyframes pulse-soft {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.8; transform: scale(0.99); }
-}
-
-@keyframes shimmer {
-  100% { transform: translateX(100%); }
-}
 
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
-  25%       { transform: translateX(-4px); }
-  75%       { transform: translateX(4px); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
 }
 
-@keyframes slide-in-up {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.animate-pulse-soft   { animation: pulse-soft 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-.animate-shake        { animation: shake 0.4s ease-in-out; }
-.animate-slide-in-up  { animation: slide-in-up 0.25s ease-out both; }
-
-/* Page transitions */
-.page-transition-enter        { opacity: 0; transform: translateY(8px); }
-.page-transition-enter-active { opacity: 1; transform: translateY(0); transition: opacity 300ms, transform 300ms; }
-
-/* ============================================================
-   LEAFLET DARK MODE
-   ============================================================ */
-
-.dark .leaflet-container {
-  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
-}
-.dark .leaflet-container .leaflet-tile-container img {
-  filter: brightness(0.8) contrast(1.2);
-}
-.dark .leaflet-container .leaflet-marker-icon,
-.dark .leaflet-container .leaflet-marker-shadow {
-  filter: invert(100%) hue-rotate(-180deg);
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }

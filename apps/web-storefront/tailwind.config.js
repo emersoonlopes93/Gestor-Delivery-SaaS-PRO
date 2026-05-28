@@ -17,6 +17,15 @@ export default {
           900: '#0b426e',
           950: '#072a49',
         },
+        // Tokens semânticos do storefront
+        background: 'var(--storefront-background)',
+        foreground: 'var(--storefront-foreground)',
+        card: 'var(--storefront-card)',
+        'card-foreground': 'var(--storefront-card-foreground)',
+        muted: 'var(--storefront-muted)',
+        'muted-foreground': 'var(--storefront-muted-foreground)',
+        border: 'var(--storefront-border)',
+        input: 'var(--storefront-input)',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

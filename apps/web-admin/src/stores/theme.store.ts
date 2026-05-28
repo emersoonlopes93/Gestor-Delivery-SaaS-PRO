@@ -8,15 +8,17 @@ interface ThemeState {
   initializeTheme: () => void;
 }
 
+const THEME_STORAGE_KEY = 'gestor-delivery:saas-admin-theme';
+
 export const useThemeStore = create<ThemeState>((set) => ({
   theme: 'system',
   setTheme: (theme) => {
     set({ theme });
-    localStorage.setItem('admin_theme_preference', theme);
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
     applyTheme(theme);
   },
   initializeTheme: () => {
-    const savedTheme = (localStorage.getItem('admin_theme_preference') as Theme) || 'system';
+    const savedTheme = (localStorage.getItem(THEME_STORAGE_KEY) as Theme) || 'system';
     set({ theme: savedTheme });
     applyTheme(savedTheme);
   },

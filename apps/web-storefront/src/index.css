@@ -2,18 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   STOREFRONT DESIGN SYSTEM
+   Isolado do tema do painel/admin
+   Sistema próprio de branding do tenant
+   ============================================================ */
+
 @layer base {
   :root {
     font-family: 'Inter', system-ui, sans-serif;
+
+    /* === STOREFRONT TOKENS LIGHT === */
+    --storefront-background: #f9fafb;       /* fundo geral - gray-50 */
+    --storefront-foreground: #111827;       /* texto principal - gray-900 */
+    
+    --storefront-card: #ffffff;             /* fundo de cards - branco */
+    --storefront-card-foreground: #111827;  /* texto de cards - gray-900 */
+    
+    --storefront-primary: #0c93e9;          /* cor primária - primary-500 */
+    --storefront-primary-foreground: #ffffff; /* texto sobre primária - branco */
+    
+    --storefront-muted: #f3f4f6;           /* fundo muted - gray-100 */
+    --storefront-muted-foreground: #6b7280; /* texto muted - gray-500 */
+    
+    --storefront-border: #e5e7eb;           /* borda padrão - gray-200 */
+    --storefront-input: #e5e7eb;          /* borda de inputs - gray-200 */
+  }
+
+  /* Escopo específico para storefront - não usa .dark global */
+  [data-storefront-theme="dark"] {
+    --storefront-background: #111827;       /* fundo geral dark */
+    --storefront-foreground: #f9fafb;      /* texto principal dark */
+    
+    --storefront-card: #1f2937;             /* fundo de cards dark */
+    --storefront-card-foreground: #f9fafb;  /* texto de cards dark */
+    
+    --storefront-primary: #0c93e9;          /* cor primária dark (mantida) */
+    --storefront-primary-foreground: #ffffff; /* texto sobre primária dark */
+    
+    --storefront-muted: #1f2937;           /* fundo muted dark */
+    --storefront-muted-foreground: #9ca3af; /* texto muted dark */
+    
+    --storefront-border: #374151;           /* borda padrão dark */
+    --storefront-input: #374151;          /* borda de inputs dark */
   }
 
   body {
-    @apply bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 antialiased selection:bg-primary-500/30 transition-colors duration-500;
+    @apply antialiased transition-colors duration-500;
+    background-color: var(--storefront-background);
+    color: var(--storefront-foreground);
     min-height: 100vh;
   }
 
   #root {
     width: 100%;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  ::selection {
+    background-color: rgb(12 147 233 / 0.3);
   }
 }
 
@@ -24,11 +74,16 @@
   }
 
   .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-transparent;
+    background-color: transparent;
   }
 
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 dark:bg-gray-800 rounded-full hover:bg-gray-400 dark:hover:bg-gray-700 transition-colors;
+    background-color: var(--storefront-muted-foreground);
+    border-radius: 9999px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: var(--storefront-foreground);
   }
 
   .no-scrollbar::-webkit-scrollbar {
@@ -43,26 +98,33 @@
 
 @layer components {
   .input-premium {
-    @apply w-full px-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl text-sm font-medium text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:bg-white dark:focus:bg-gray-800 focus:outline-none focus:ring-4 focus:ring-primary-500/20 focus:border-primary-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed;
-    /* Mobile: aumentar padding e fonte para melhor legibilidade */
-    @apply sm:px-4 sm:py-3;
-    /* Garantir que autofill não causa problemas */
-    -webkit-autofill-outline: 0;
-    &:-webkit-autofill,
-    &:-webkit-autofill:hover,
-    &:-webkit-autofill:focus,
-    &:-webkit-autofill:active {
-      -webkit-box-shadow: 0 0 0 30px white inset !important;
-      -webkit-text-fill-color: #1f2937 !important;
-    }
-    @media (prefers-color-scheme: dark) {
-      &:-webkit-autofill,
-      &:-webkit-autofill:hover,
-      &:-webkit-autofill:focus,
-      &:-webkit-autofill:active {
-        -webkit-box-shadow: 0 0 0 30px #111827 inset !important;
-        -webkit-text-fill-color: #f3f4f6 !important;
-      }
-    }
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border-radius: 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    background-color: var(--storefront-card);
+    color: var(--storefront-foreground);
+    border: 1px solid var(--storefront-input);
+    transition: all 0.3s;
+  }
+  .input-premium::placeholder {
+    color: var(--storefront-muted-foreground);
+  }
+  .input-premium:focus {
+    outline: none;
+    box-shadow: 0 0 0 4px rgb(12 147 233 / 0.2);
+    border-color: #0c93e9;
+  }
+  .input-premium:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .input-premium:-webkit-autofill,
+  .input-premium:-webkit-autofill:hover,
+  .input-premium:-webkit-autofill:focus,
+  .input-premium:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px var(--storefront-card) inset !important;
+    -webkit-text-fill-color: var(--storefront-foreground) !important;
   }
 }
