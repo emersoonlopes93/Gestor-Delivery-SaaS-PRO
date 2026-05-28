@@ -1,22 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-
-interface DashboardStats {
-  activeTenants: number;
-  trialTenants: number;
-  totalTenants: number;
-  mrr: number;
-  supportTickets: number;
-}
-
-interface ActivityItem {
-  id: string;
-  tenantId: string;
-  tenantName: string;
-  action: string;
-  resource: string | null;
-  createdAt: string;
-}
+import { DashboardStats, ActivityItem } from './admin-dashboard.types';
 
 @Injectable()
 export class AdminDashboardService {
