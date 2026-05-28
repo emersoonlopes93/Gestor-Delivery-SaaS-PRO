@@ -62,8 +62,8 @@ export class AdminModulesService {
 
     for (const { module, enabled } of modules) {
       const rows = await this.prisma.$queryRaw<ModuleAccessRow[]>`
-        INSERT INTO tenant_module_access (tenant_id, module, enabled, created_at, updated_at)
-        VALUES (${tenantId}, ${module}, ${enabled}, NOW(), NOW())
+        INSERT INTO tenant_module_access (id, tenant_id, module, enabled, created_at, updated_at)
+        VALUES (gen_random_uuid(), ${tenantId}, ${module}, ${enabled}, NOW(), NOW())
         ON CONFLICT (tenant_id, module)
         DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = NOW()
         RETURNING id, module, enabled
