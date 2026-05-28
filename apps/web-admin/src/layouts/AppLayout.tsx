@@ -109,7 +109,7 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
         <button
           type="button"
           onClick={() => onToggle(group.id)}
-          className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all group ${hasActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'}`}
+          className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all group ${hasActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-muted-foreground hover:text-foreground'}`}
         >
           <span className="text-[10px] font-black uppercase tracking-widest">
             {group.label}
@@ -219,7 +219,7 @@ export function AppLayout() {
               </div>
               <div className="min-w-0">
                 <h1 className="text-sm font-black text-foreground tracking-tight">SaaS<span className="text-indigo-600">Admin</span></h1>
-                <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">{user?.name || 'Carregando...'}</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{user?.name || 'Carregando...'}</p>
               </div>
             </div>
           ) : (

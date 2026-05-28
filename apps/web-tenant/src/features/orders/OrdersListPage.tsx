@@ -138,7 +138,7 @@ export function OrdersListPage() {
             className={`whitespace-nowrap px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all disabled:opacity-50 ${
               statusFilter === ''
                 ? 'bg-primary-600 text-white border-primary-600 shadow-sm shadow-primary-500/20'
-                : 'bg-transparent text-slate-500 dark:text-slate-400 border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 hover:bg-slate-50 dark:hover:bg-gray-800'
+                : 'bg-card text-muted-foreground border-border hover:bg-muted'
             }`}
           >
             Todos
@@ -151,7 +151,7 @@ export function OrdersListPage() {
               className={`whitespace-nowrap px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all disabled:opacity-50 ${
                 statusFilter === status
                   ? 'bg-primary-600 text-white border-primary-600 shadow-sm shadow-primary-500/20'
-                  : 'bg-transparent text-slate-500 dark:text-slate-400 border-slate-200 dark:border-gray-700 hover:border-slate-300 dark:hover:border-gray-600 hover:bg-slate-50 dark:hover:bg-gray-800'
+                  : 'bg-card text-muted-foreground border-border hover:bg-muted'
               }`}
             >
               {STATUS_LABELS[status]}

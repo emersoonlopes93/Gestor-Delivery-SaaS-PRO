@@ -7,13 +7,13 @@ import type { OrderDispatchItemDTO } from '@gestor/types';
 function StatusBadge({ status }: { status: OrderDispatchItemDTO['status'] }) {
   if (status === 'ready_for_delivery') {
     return (
-      <span className="text-xs font-semibold text-yellow-700 bg-yellow-100 px-2 py-0.5 rounded-full">
+      <span className="text-xs font-semibold text-status-warning-foreground bg-status-warning px-2 py-0.5 rounded-full">
         Aguardando Saída
       </span>
     );
   }
   return (
-    <span className="text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+    <span className="text-xs font-semibold text-status-success-foreground bg-status-success px-2 py-0.5 rounded-full">
       Em Rota
     </span>
   );
@@ -85,8 +85,8 @@ export function DispatchPage() {
   return (
     <div className="p-6 max-w-7xl mx-auto h-full flex flex-col">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Despacho em Tempo Real</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <h1 className="text-2xl font-bold text-foreground">Despacho em Tempo Real</h1>
+        <p className="text-sm text-muted-foreground">
           Supervisione os pedidos prontos, atribua entregadores e controle rotas.
         </p>
       </div>
@@ -94,31 +94,31 @@ export function DispatchPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 items-start">
 
         {/* Coluna 1: Aguardando Despacho (ready_for_delivery) */}
-        <div className="bg-yellow-50/60 rounded-xl p-4 min-h-[500px] border border-yellow-200">
-          <h2 className="font-bold text-yellow-800 dark:text-yellow-700 mb-4 flex items-center justify-between">
+        <div className="bg-card rounded-xl p-4 min-h-[500px] border border-border">
+          <h2 className="font-bold text-foreground mb-4 flex items-center justify-between">
             <span className="flex items-center gap-2">
               <Package className="w-4 h-4" />
               Aguardando Despacho
             </span>
-            <span className="bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full text-sm">
+            <span className="bg-status-warning text-status-warning-foreground px-2 py-0.5 rounded-full text-sm">
               {waitingOrders.length}
             </span>
           </h2>
           <div className="space-y-4">
             {waitingOrders.map((o) => (
-              <div key={o.id} className="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm border border-yellow-200">
+              <div key={o.id} className="bg-card p-4 rounded-lg shadow-sm border border-border">
                 <div className="flex justify-between items-start mb-2">
-                  <span className="font-bold text-yellow-600">{o.orderNumber}</span>
+                  <span className="font-bold text-foreground">{o.orderNumber}</span>
                   <StatusBadge status={o.status} />
                 </div>
-                <div className="font-medium text-gray-900 dark:text-gray-100">{o.customerName}</div>
+                <div className="font-medium text-foreground">{o.customerName}</div>
                 {o.customerPhone && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                     <Phone className="w-3 h-3" />
                     {o.customerPhone}
                   </div>
                 )}
-                <div className="text-sm text-gray-500 dark:text-gray-400 mt-2 truncate flex items-start gap-1">
+                <div className="text-sm text-muted-foreground mt-2 truncate flex items-start gap-1">
                   <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
                   <span>
                     {o.deliveryAddress?.street}, {o.deliveryAddress?.number}
@@ -128,25 +128,25 @@ export function DispatchPage() {
 
                 {/* Entregador já atribuído */}
                 {o.deliveryDriverName ? (
-                  <div className="mt-3 px-3 py-2 bg-blue-50 rounded-lg border border-blue-100">
-                    <p className="text-xs font-semibold text-blue-700">
+                  <div className="mt-3 px-3 py-2 bg-primary/10 rounded-lg border border-primary/20">
+                    <p className="text-xs font-semibold text-primary">
                       🏍 Entregador: {o.deliveryDriverName}
                     </p>
                     {o.deliveryDriverStatus === 'busy' && (
-                      <p className="text-xs text-blue-500">Status: Em rota</p>
+                      <p className="text-xs text-primary/70">Status: Em rota</p>
                     )}
                   </div>
                 ) : (
                   <div className="mt-3 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-orange-400 shrink-0" />
-                    <p className="text-xs text-orange-500 font-medium">Nenhum entregador atribuído</p>
+                    <AlertCircle className="w-4 h-4 text-status-warning shrink-0" />
+                    <p className="text-xs text-status-warning-foreground font-medium">Nenhum entregador atribuído</p>
                   </div>
                 )}
 
-                <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 space-y-2">
+                <div className="mt-4 pt-3 border-t border-border space-y-2">
                   <div className="flex items-center gap-2">
                     <select
-                      className="text-sm border-gray-300 dark:border-gray-700 rounded focus:ring-primary-500 focus:border-primary-500 bg-gray-50 dark:bg-gray-900/50 flex-1"
+                      className="text-sm border-input rounded focus:ring-ring focus:border-primary bg-card text-foreground flex-1"
                       value={selectedDriverForOrder[o.id] || o.deliveryDriverId || ''}
                       onChange={(e) =>
                         setSelectedDriverForOrder({ ...selectedDriverForOrder, [o.id]: e.target.value })
@@ -161,7 +161,7 @@ export function DispatchPage() {
                     </select>
                     <button
                       onClick={() => handleAssignDriver(o.id)}
-                      className="text-xs font-semibold text-primary-600 hover:text-primary-800 whitespace-nowrap border border-primary-200 px-2 py-1.5 rounded"
+                      className="text-xs font-semibold text-primary hover:text-primary/80 whitespace-nowrap border border-primary/30 px-2 py-1.5 rounded"
                     >
                       Atribuir
                     </button>
@@ -170,65 +170,65 @@ export function DispatchPage() {
                   <button
                     onClick={() => handleDispatch(o)}
                     disabled={!o.deliveryDriverId && !selectedDriverForOrder[o.id]}
-                    className={`w-full py-2 rounded text-sm font-bold text-white transition-colors ${
+                    className={`w-full py-2 rounded text-sm font-bold text-primary-foreground transition-colors ${
                       o.deliveryDriverId || selectedDriverForOrder[o.id]
-                        ? 'bg-primary-600 hover:bg-primary-700 shadow-sm'
-                        : 'bg-gray-300 cursor-not-allowed'
+                        ? 'bg-primary hover:bg-primary/90 shadow-sm'
+                        : 'bg-secondary text-muted-foreground cursor-not-allowed'
                     }`}
                   >
                     Despachar Pedido
                   </button>
                   {!o.deliveryDriverId && !selectedDriverForOrder[o.id] && (
-                    <p className="text-xs text-center text-gray-400">Atribua um entregador primeiro</p>
+                    <p className="text-xs text-center text-muted-foreground">Atribua um entregador primeiro</p>
                   )}
                 </div>
               </div>
             ))}
             {waitingOrders.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-4">Nenhum pedido aguardando despacho.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhum pedido aguardando despacho.</p>
             )}
           </div>
         </div>
 
         {/* Coluna 2: Em Rota (out_for_delivery) */}
-        <div className="bg-primary-50/50 rounded-xl p-4 min-h-[500px] border border-primary-100">
-          <h2 className="font-bold text-primary-800 mb-4 flex items-center justify-between">
+        <div className="bg-card rounded-xl p-4 min-h-[500px] border border-border">
+          <h2 className="font-bold text-foreground mb-4 flex items-center justify-between">
             <span className="flex items-center gap-2">
               <Truck className="w-4 h-4" />
               Em Rota
             </span>
-            <span className="bg-primary-200 text-primary-800 px-2 py-0.5 rounded-full text-sm">
+            <span className="bg-primary text-primary-foreground px-2 py-0.5 rounded-full text-sm">
               {outOrders.length}
             </span>
           </h2>
           <div className="space-y-4">
             {outOrders.map((o) => (
-              <div key={o.id} className="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm border border-primary-200">
+              <div key={o.id} className="bg-card p-4 rounded-lg shadow-sm border border-border">
                 <div className="flex justify-between items-start mb-2">
-                  <span className="font-bold text-primary-600">{o.orderNumber}</span>
+                  <span className="font-bold text-foreground">{o.orderNumber}</span>
                   <StatusBadge status={o.status} />
                 </div>
-                <div className="font-medium text-gray-900 dark:text-gray-100">{o.customerName}</div>
+                <div className="font-medium text-foreground">{o.customerName}</div>
                 {o.customerPhone && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-1">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                     <Phone className="w-3 h-3" />
                     {o.customerPhone}
                   </div>
                 )}
-                <div className="text-sm text-gray-500 dark:text-gray-400 truncate mb-3 flex items-start gap-1 mt-2">
+                <div className="text-sm text-muted-foreground truncate mb-3 flex items-start gap-1 mt-2">
                   <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
                   <span>
                     {o.deliveryAddress?.street}, {o.deliveryAddress?.number}
                   </span>
                 </div>
-                <div className="text-sm font-semibold text-primary-700 bg-primary-50 p-2 rounded truncate">
+                <div className="text-sm font-semibold text-foreground bg-primary/10 p-2 rounded truncate">
                   🏍 Entregador: {o.deliveryDriverName || 'Desconhecido'}
                 </div>
 
                 <div className="mt-4">
                   <button
                     onClick={() => handleComplete(o.id)}
-                    className="w-full py-2 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 rounded text-sm font-bold transition-colors"
+                    className="w-full py-2 bg-status-success text-status-success-foreground border border-status-success/30 hover:bg-status-success/90 rounded text-sm font-bold transition-colors"
                   >
                     Marcar como Entregue
                   </button>
@@ -236,7 +236,7 @@ export function DispatchPage() {
               </div>
             ))}
             {outOrders.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-4">Nenhum pedido em rota neste momento.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhum pedido em rota neste momento.</p>
             )}
           </div>
         </div>

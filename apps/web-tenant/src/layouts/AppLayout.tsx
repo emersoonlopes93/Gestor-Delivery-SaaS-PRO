@@ -591,7 +591,7 @@ export function AppLayout() {
                   <h1 className="text-sm font-black text-foreground tracking-tight truncate leading-tight flex items-center gap-1.5">
                     Gestor<span className="text-primary-600">PRO</span>
                   </h1>
-                  <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 mt-1 truncate leading-none uppercase tracking-wider">{user?.tenant?.name || 'Carregando...'}</p>
+                  <p className="text-[10px] font-black text-muted-foreground mt-1 truncate leading-none uppercase tracking-wider">{user?.tenant?.name || 'Carregando...'}</p>
                 </div>
               </div>
             ) : (

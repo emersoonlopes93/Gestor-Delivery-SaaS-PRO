@@ -333,7 +333,7 @@ export function OperationBoardPage() {
   };
 
   return (
-    <div className="p-3 md:p-6 h-screen md:h-[calc(100vh-64px)] flex flex-col overflow-hidden bg-slate-50/50 dark:bg-transparent">
+    <div className="p-3 md:p-6 h-screen md:h-[calc(100vh-64px)] flex flex-col overflow-hidden bg-background">
       {/* ── Toolbar / Header ── */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 md:mb-5 shrink-0 gap-4">
         <div className="flex items-center justify-between sm:block">
