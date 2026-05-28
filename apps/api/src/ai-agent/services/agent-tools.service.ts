@@ -618,6 +618,7 @@ export class AgentToolsService {
   }
 
   private async executeCriarPedido(tenantId: string, args: z.infer<typeof CriarPedidoSchema>, sessionContext?: AgentSessionContext) {
+    this.logger.log(`[AI_ORDER] executeCriarPedido called with args: ${JSON.stringify(args)}, sessionContext: ${JSON.stringify(sessionContext)}`);
     let ctx = sessionContext;
     if (!ctx?.customerId && ctx?.customerPhone) {
       const cleanPhone = ctx.customerPhone.replace(/\D/g, '');
