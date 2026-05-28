@@ -273,24 +273,24 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
                 title={collapsed ? item.label : undefined}
                 className={({ isActive }) => {
                   return `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isActive
-                      ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
-                      : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
+                      ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20 dark:bg-primary-600/20 dark:text-primary-400'
+                      : 'text-muted-foreground hover:bg-primary-50/50 dark:hover:bg-primary-500/5 hover:text-foreground'
                     } ${collapsed ? 'justify-center' : ''}`;
                 }}
               >
                 {({ isActive }) => (
                   <>
-                    <span className={`flex items-center justify-center transition-colors duration-300 ${isActive ? 'text-white' : 'text-muted-foreground group-hover:text-foreground'}`} aria-hidden>
+                    <span className={`flex items-center justify-center transition-colors duration-300 ${isActive ? 'text-white dark:text-primary-400' : 'text-muted-foreground group-hover:text-foreground'}`} aria-hidden>
                       <item.icon className="h-[18px] w-[18px] stroke-[2.5px]" aria-hidden />
                     </span>
                     {!collapsed ? <span className="truncate">{item.label}</span> : null}
                     {collapsed ? (
-                      <span className="pointer-events-none absolute left-full ml-4 whitespace-nowrap rounded-xl bg-gray-900 dark:bg-gray-950 border border-border px-3.5 py-2 text-xs font-black text-white opacity-0 shadow-2xl transition-all duration-300 translate-x-[-8px] group-hover:translate-x-0 group-hover:opacity-100 z-50">
+                      <span className="pointer-events-none absolute left-full ml-4 whitespace-nowrap rounded-xl bg-card border border-border px-3.5 py-2 text-xs font-black text-foreground opacity-0 shadow-2xl transition-all duration-300 translate-x-[-8px] group-hover:translate-x-0 group-hover:opacity-100 z-50 dark:bg-popover dark:text-popover-foreground">
                         {item.label}
                       </span>
                     ) : null}
                     {isActive && !collapsed && (
-                      <span className="absolute right-3 w-1.5 h-1.5 rounded-full bg-white/40 animate-pulse" />
+                      <span className="absolute right-3 w-1.5 h-1.5 rounded-full bg-white dark:bg-primary-400 animate-pulse" />
                     )}
                   </>
                 )}

@@ -1,86 +1,172 @@
 {
+
   "name": "@gestor/api",
+
   "version": "0.1.0",
+
   "private": true,
+
   "scripts": {
+
     "dev": "ts-node-dev -r tsconfig-paths/register --respawn --transpile-only src/main.ts",
+
     "dev:watch": "nest start --watch",
+
     "build": "nest build -p tsconfig.build.json",
+
     "start": "nest start",
+
     "start:prod": "node dist/main",
+
     "lint": "eslint \"{src,test}/**/*.ts\"",
+
     "smoke:auth": "ts-node scripts/smoke-test-auth.ts",
+
     "smoke:combos": "ts-node scripts/smoke-test-combos.ts",
+
     "smoke:delivery-rate": "ts-node scripts/smoke-test-delivery-rate.ts",
+
     "smoke:inventory": "ts-node scripts/smoke-test-inventory.ts",
+
     "smoke:orders": "ts-node scripts/smoke-test-orders.ts",
+
     "smoke:logistics": "ts-node -r tsconfig-paths/register scripts/smoke-test-logistics-flow.ts",
+
     "smoke:all": "pnpm smoke:auth && pnpm smoke:combos && pnpm smoke:delivery-rate && pnpm smoke:inventory && pnpm smoke:orders",
+
     "test:delivery-rate-engine": "ts-node scripts/unit-test-delivery-rate-engine.ts",
+
     "prisma:generate": "prisma generate",
+
     "prisma:migrate": "prisma migrate dev",
-    "prisma:migrate:deploy": "prisma migrate deploy",
+
+    "prisma:migrate:deploy": "prisma db push --accept-data-loss",
+
     "prisma:seed": "ts-node -r tsconfig-paths/register prisma/seed.ts",
+
     "enable:ai-agent-demo": "ts-node -r tsconfig-paths/register scripts/enable-ai-agent-demo.ts",
+
     "prisma:studio": "prisma studio",
+
     "clean": "pnpm exec rimraf dist"
+
   },
+
   "dependencies": {
+
     "@aws-sdk/client-s3": "^3.1048.0",
+
     "@gestor/auth": "workspace:*",
+
     "@gestor/config": "workspace:*",
+
     "@gestor/core": "workspace:*",
+
     "@gestor/types": "workspace:*",
+
     "@gestor/utils": "workspace:*",
+
     "@nestjs/bullmq": "^11.0.4",
+
     "@nestjs/cache-manager": "^3.1.2",
+
     "@nestjs/common": "^10.4.0",
+
     "@nestjs/config": "^3.2.0",
+
     "@nestjs/core": "^10.4.0",
+
     "@nestjs/jwt": "^10.2.0",
+
     "@nestjs/mapped-types": "^2.0.5",
+
     "@nestjs/passport": "^10.0.3",
+
     "@nestjs/platform-express": "^10.4.0",
+
     "@nestjs/platform-socket.io": "^10.4.0",
+
     "@nestjs/swagger": "^7.4.2",
+
     "@nestjs/throttler": "^5.2.0",
+
     "@nestjs/websockets": "^10.4.0",
+
     "@prisma/client": "^5.20.0",
+
     "axios": "^1.7.7",
+
     "bcryptjs": "^2.4.3",
+
     "bullmq": "^5.76.5",
+
     "cache-manager": "^7.2.8",
+
     "cache-manager-redis-yet": "^5.1.5",
+
     "class-transformer": "^0.5.1",
+
     "class-validator": "^0.14.1",
+
     "date-fns": "^4.1.0",
+
     "express": "^4.21.2",
+
     "helmet": "^7.1.0",
+
     "multer": "^1.4.5-lts.1",
+
     "passport": "^0.7.0",
+
     "passport-jwt": "^4.0.1",
+
     "reflect-metadata": "^0.2.2",
+
     "rxjs": "^7.8.1",
+
     "sharp": "^0.34.5",
+
     "socket.io": "^4.8.3",
+
     "swagger-ui-express": "^5.0.1",
+
     "zod": "^3.23.0"
+
   },
+
   "devDependencies": {
+
     "@nestjs/cli": "^10.4.0",
+
     "@nestjs/schematics": "^10.1.0",
+
     "@types/bcryptjs": "^2.4.6",
+
     "@types/express": "^4.17.21",
+
     "@types/multer": "^1.4.12",
+
     "@types/node": "^22.0.0",
+
     "@types/passport-jwt": "^4.0.1",
+
     "@types/sharp": "^0.32.0",
+
     "@typescript-eslint/eslint-plugin": "^8.59.1",
+
     "@typescript-eslint/parser": "^8.59.1",
+
     "eslint": "^8.57.1",
+
     "prisma": "^5.20.0",
+
     "ts-node": "^10.9.2",
+
     "ts-node-dev": "^2.0.0",
+
     "typescript": "^5.5.0"
+
   }
+
 }
+

@@ -57,6 +57,46 @@
     --topbar-border: #e2e8f0;         /* borda da topbar */
     --surface-1: #ffffff;             /* superfície nivel 1 */
     --surface-2: #f8fafc;            /* superfície nivel 2 */
+    --surface-subtle: #f8fafc;        /* fundo sutil de superfícies */
+    --surface-inset: #ffffff;         /* fundo de superfícies embutidas */
+    --border-subtle: #e2e8f0;         /* borda sutil */
+    
+    /* === CHAT BUBBLE TOKENS (LIGHT MODE) === */
+    --chat-bubble-user: #0c93e9;     /* cor do usuário - primary-500 */
+    --chat-bubble-user-foreground: #ffffff; /* texto do usuário - branco */
+    --chat-bubble-agent: #ffffff;    /* fundo do agente - branco */
+    --chat-bubble-agent-foreground: #0f172a; /* texto do agente - slate-900 */
+    --chat-bubble-agent-border: #e2e8f0; /* borda do agente - slate-200 */
+    --chat-bubble-system: #fef3c7;   /* fundo do sistema - amber-100 */
+    --chat-bubble-system-foreground: #78350f; /* texto do sistema - amber-900 */
+    
+    /* === BADGE TOKENS (LIGHT MODE) === */
+    --badge-success: #10b981;        /* verde - emerald-500 */
+    --badge-success-foreground: #ffffff; /* branco */
+    --badge-danger: #ef4444;         /* vermelho - red-500 */
+    --badge-danger-foreground: #ffffff; /* branco */
+    --badge-warning: #f59e0b;        /* âmbar - amber-500 */
+    --badge-warning-foreground: #ffffff; /* branco */
+    --badge-neutral: #6b7280;        /* cinza - gray-500 */
+    --badge-neutral-foreground: #ffffff; /* branco */
+    
+    /* === TAB & CONTROL TOKENS (LIGHT MODE) === */
+    --tab-active: #0c93e9;           /* cor ativa da aba - primary-500 */
+    --tab-active-foreground: #ffffff; /* texto ativo - branco */
+    --tab-inactive: #e2e8f0;         /* fundo inativo - slate-200 */
+    --tab-inactive-foreground: #64748b; /* texto inativo - slate-500 */
+    
+    /* === PANEL TOKENS (LIGHT MODE) === */
+    --panel-subtle: #f8fafc;         /* fundo sutil - slate-50 */
+    --panel-subtle-foreground: #64748b; /* texto sutil - slate-500 */
+    --panel-strong: #e2e8f0;         /* fundo forte - slate-200 */
+    --panel-strong-foreground: #0f172a; /* texto forte - slate-900 */
+    
+    /* === STATUS/SEMANTIC COLORS (LIGHT MODE) === */
+    --status-open: #10b981;          /* aberto/ativo - verde */
+    --status-closed: #ef4444;        /* fechado/inativo - vermelho */
+    --status-pending: #f59e0b;       /* pendente/aguardando - amarelo */
+    --status-disabled: #9ca3af;      /* desabilitado - cinza */
     
     /* === SOMBRAS === */
     --shadow-card:        0 1px 3px 0 rgb(15 23 42 / 0.07), 0 1px 2px -1px rgb(15 23 42 / 0.05);
@@ -110,6 +150,46 @@
     --topbar-border: #1e293b;        /* borda da topbar dark */
     --surface-1: #111827;            /* superfície nivel 1 dark */
     --surface-2: #0f172a;           /* superfície nivel 2 dark */
+    --surface-subtle: #111827;      /* fundo sutil de superfícies dark */
+    --surface-inset: #1f2937;       /* fundo de superfícies embutidas dark */
+    --border-subtle: #334155;       /* borda sutil dark */
+    
+    /* === CHAT BUBBLE TOKENS (DARK MODE) === */
+    --chat-bubble-user: #0c93e9;     /* cor do usuário - primary-500 (mantida) */
+    --chat-bubble-user-foreground: #ffffff; /* texto do usuário - branco */
+    --chat-bubble-agent: #1e293b;    /* fundo do agente - slate-800 */
+    --chat-bubble-agent-foreground: #f8fafc; /* texto do agente - slate-50 */
+    --chat-bubble-agent-border: #334155; /* borda do agente - slate-700 */
+    --chat-bubble-system: #7c2d12;   /* fundo do sistema - amber-900 */
+    --chat-bubble-system-foreground: #fef3c7; /* texto do sistema - amber-100 */
+    
+    /* === BADGE TOKENS (DARK MODE) === */
+    --badge-success: #10b981;        /* verde - emerald-500 (mantida) */
+    --badge-success-foreground: #ffffff; /* branco */
+    --badge-danger: #ef4444;         /* vermelho - red-500 (mantida) */
+    --badge-danger-foreground: #ffffff; /* branco */
+    --badge-warning: #f59e0b;        /* âmbar - amber-500 (mantida) */
+    --badge-warning-foreground: #ffffff; /* branco */
+    --badge-neutral: #9ca3af;        /* cinza - gray-400 */
+    --badge-neutral-foreground: #111827; /* texto escuro */
+    
+    /* === TAB & CONTROL TOKENS (DARK MODE) === */
+    --tab-active: #0c93e9;           /* cor ativa da aba - primary-500 (mantida) */
+    --tab-active-foreground: #ffffff; /* texto ativo - branco */
+    --tab-inactive: #334155;         /* fundo inativo - slate-700 */
+    --tab-inactive-foreground: #94a3b8; /* texto inativo - slate-400 */
+    
+    /* === PANEL TOKENS (DARK MODE) === */
+    --panel-subtle: #111827;         /* fundo sutil - gray-900 */
+    --panel-subtle-foreground: #94a3b8; /* texto sutil - slate-400 */
+    --panel-strong: #1e293b;         /* fundo forte - slate-800 */
+    --panel-strong-foreground: #f8fafc; /* texto forte - slate-50 */
+    
+    /* === STATUS/SEMANTIC COLORS (DARK MODE) === */
+    --status-open: #10b981;          /* aberto/ativo - verde (mantida) */
+    --status-closed: #ef4444;        /* fechado/inativo - vermelho (mantida) */
+    --status-pending: #f59e0b;       /* pendente/aguardando - amarelo (mantida) */
+    --status-disabled: #6b7280;      /* desabilitado - cinza-600 */
     
     /* === SOMBRAS DARK === */
     --shadow-card:        0 1px 3px 0 rgb(0 0 0 / 0.40), 0 1px 2px -1px rgb(0 0 0 / 0.30);
@@ -273,6 +353,124 @@
     border: 1px solid var(--border);
     overflow: hidden;
     transition: all 0.2s;
+  }
+
+  /* === STATUS BADGE CLASSES === */
+  .status-badge-success {
+    background-color: var(--badge-success);
+    color: var(--badge-success-foreground);
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+
+  .status-badge-danger {
+    background-color: var(--badge-danger);
+    color: var(--badge-danger-foreground);
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+
+  .status-badge-warning {
+    background-color: var(--badge-warning);
+    color: var(--badge-warning-foreground);
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+
+  .status-badge-neutral {
+    background-color: var(--badge-neutral);
+    color: var(--badge-neutral-foreground);
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+
+  .status-badge-confirmed {
+    background-color: var(--badge-success);
+    color: var(--badge-success-foreground);
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+
+  /* === MUTED COLOR UTILITIES === */
+  .muted50 {
+    background-color: var(--muted);
+    opacity: 0.5;
+  }
+
+  .muted100 {
+    background-color: var(--muted);
+    opacity: 0.1;
+  }
+
+  .muted800 {
+    background-color: var(--muted);
+    opacity: 0.8;
+  }
+
+  .muted900 {
+    background-color: var(--muted);
+    opacity: 0.9;
+  }
+
+  .muted-foreground100 {
+    color: var(--muted-foreground);
+    opacity: 0.1;
+  }
+
+  .muted-foreground400 {
+    color: var(--muted-foreground);
+    opacity: 0.4;
+  }
+
+  .muted-foreground500 {
+    color: var(--muted-foreground);
+    opacity: 0.5;
+  }
+
+  .muted-foreground900 {
+    color: var(--muted-foreground);
+    opacity: 0.9;
+  }
+
+  /* === BORDER COLOR UTILITIES === */
+  .border100 {
+    border-color: var(--border);
+    opacity: 0.1;
+  }
+
+  .border200 {
+    border-color: var(--border);
+    opacity: 0.2;
+  }
+
+  .border700 {
+    border-color: var(--border);
+    opacity: 0.7;
+  }
+
+  .border800 {
+    border-color: var(--border);
+    opacity: 0.8;
   }
 }
 

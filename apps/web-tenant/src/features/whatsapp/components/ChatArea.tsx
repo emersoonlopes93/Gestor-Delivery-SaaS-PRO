@@ -215,15 +215,15 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
   const getSenderColor = (senderType: string) => {
     switch (senderType) {
       case 'customer':
-        return 'text-gray-600 dark:text-gray-400';
+        return 'text-muted-foreground';
       case 'ai':
         return 'text-purple-600 dark:text-purple-400';
       case 'human':
         return 'text-blue-600 dark:text-blue-400';
       case 'system':
-        return 'text-orange-600 dark:text-orange-400';
+        return 'text-amber-600 dark:text-amber-500';
       default:
-        return 'text-gray-600 dark:text-gray-400';
+        return 'text-muted-foreground';
     }
   };
 
@@ -233,12 +233,12 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
 
   if (!session) {
     return (
-      <div className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-950 items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 bg-gray-200 dark:bg-gray-800/50 rounded-2xl flex items-center justify-center mb-4 text-gray-400 dark:text-gray-500">
+      <div className="flex-1 flex flex-col bg-background dark:bg-background items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 bg-muted dark:bg-muted/50 rounded-2xl flex items-center justify-center mb-4 text-muted-foreground dark:text-muted-foreground">
           <MessageSquare className="w-8 h-8" />
         </div>
-        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Selecione uma conversa</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm">
+        <h3 className="text-xl font-semibold text-foreground mb-2">Selecione uma conversa</h3>
+        <p className="text-sm text-muted-foreground max-w-sm">
           Acompanhe o atendimento do bot em tempo real ou assuma o controle quando o cliente solicitar ajuda humana.
         </p>
       </div>
@@ -253,13 +253,13 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
   });
 
   return (
-    <div className="flex-1 flex flex-col bg-white dark:bg-gray-900">
+    <div className="flex-1 flex flex-col bg-card dark:bg-card">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            className="p-2 hover:bg-muted/40 dark:hover:bg-muted/40 rounded-lg transition-colors"
           >
             <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -272,7 +272,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
             <div className="flex items-center gap-2">
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                 session.state === 'closed' 
-                  ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                  ? 'bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground'
                   : session.handoffActive
                   ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
                   : 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
@@ -295,13 +295,13 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
               value={handoffReason}
               onChange={(e) => setHandoffReason(e.target.value)}
               placeholder="Motivo da transferência (opcional)"
-              className="ml-3 flex-1 min-w-0 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm outline-none transition-colors focus:border-orange-400 focus:ring-2 focus:ring-orange-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:focus:border-orange-400 dark:focus:ring-orange-500/20"
+              className="ml-3 flex-1 min-w-0 rounded-lg input-premium focus:border-primary-500 focus:ring-2 focus:ring-primary-200/50 dark:focus:border-primary-500 dark:focus:ring-primary-500/20"
             />
           )}
           <button
             onClick={() => closeSessionMutation.mutate()}
             disabled={closeSessionMutation.isPending}
-            className="px-3 py-1.5 bg-red-500/10 text-red-600 dark:text-red-400 text-sm font-medium rounded-lg hover:bg-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-1.5 bg-destructive/10 text-destructive dark:text-destructive text-sm font-medium rounded-lg hover:bg-destructive/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Encerrar
           </button>
@@ -309,13 +309,13 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       </div>
 
       {session.handoffActive && (
-        <div className="bg-red-50 dark:bg-red-950/20 border-b border-red-100 dark:border-red-900/30 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 animate-in slide-in-from-top">
+        <div className="bg-destructive/10 dark:bg-destructive/5 border-b border-destructive/20 dark:border-destructive/30 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 animate-in slide-in-from-top">
           <div className="flex items-center gap-2">
             <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive"></span>
             </span>
-            <p className="text-xs font-medium text-red-800 dark:text-red-300">
+            <p className="text-xs font-medium text-destructive dark:text-destructive">
               Atendimento humano ativo. O Agente IA está silenciado para esta conversa.
             </p>
           </div>
@@ -323,14 +323,14 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
             <button
               onClick={() => deactivateHandoffMutation.mutate()}
               disabled={deactivateHandoffMutation.isPending}
-              className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
+              className="px-2.5 py-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
             >
               {deactivateHandoffMutation.isPending ? 'Reativando...' : 'Reativar IA'}
             </button>
             <button
               onClick={() => closeSessionMutation.mutate()}
               disabled={closeSessionMutation.isPending}
-              className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-lg transition-colors"
+              className="px-2.5 py-1 bg-muted hover:bg-muted/80 dark:bg-muted dark:hover:bg-muted/80 text-muted-foreground dark:text-muted-foreground text-xs font-semibold rounded-lg transition-colors"
             >
               Encerrar atendimento humano
             </button>
@@ -377,7 +377,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
               className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
                 msg.direction === 'outbound'
                   ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+                  : 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-50'
               }`}
             >
               {msg.senderType && msg.senderType !== 'customer' && (
@@ -387,7 +387,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
               )}
               <p className="text-sm">{msg.content}</p>
               <div className={`flex items-center gap-2 mt-1 text-xs ${
-                msg.direction === 'outbound' ? 'text-primary-200' : 'text-gray-500'
+                msg.direction === 'outbound' ? 'text-primary-200' : 'text-slate-600 dark:text-slate-400'
               }`}>
                 {getStatusIcon(msg.externalStatus || 'sent')}
                 <span>{formatTime(msg.timestamp || msg.createdAt)}</span>

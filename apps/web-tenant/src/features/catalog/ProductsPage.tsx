@@ -249,11 +249,11 @@ export function ProductsPage() {
         >
           <td className="px-6 py-2">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-12 h-12 rounded-lg bg-muted50 dark:bg-muted900/50 border border-border100 dark:border-border800 overflow-hidden shrink-0">
+              <div className="w-12 h-12 rounded-lg bg-muted/50 dark:bg-muted/80 border border-border overflow-hidden shrink-0">
                 {product.image ? (
                   <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-300 text-[10px] font-black uppercase tracking-widest">
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground text-[10px] font-black uppercase tracking-widest">
                     IMG
                   </div>
                 )}
@@ -261,13 +261,13 @@ export function ProductsPage() {
 
               <div className="min-w-0">
                 <div className="font-bold text-foreground truncate">{product.name}</div>
-                <div className="text-xs text-muted-foreground dark:text-gray-400 truncate hidden sm:block">{product.shortDescription || 'Sem descrição'}</div>
+                <div className="text-xs text-muted-foreground truncate hidden sm:block">{product.shortDescription || 'Sem descrição'}</div>
                 <div className="mt-1 flex items-center gap-2">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-muted100 dark:bg-muted800 text-gray-700 dark:text-gray-300 border-border200 dark:border-border700'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-muted/20 dark:bg-muted/80 text-foreground dark:text-muted-foreground border-border dark:border-border/70'}`}>
                     {typeLabel}
                   </span>
                   {pubLabel ? (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30' : 'bg-muted100 dark:bg-muted800 text-gray-600 dark:text-gray-400 border border-border200 dark:border-border700'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30' : 'bg-muted/20 dark:bg-muted/80 text-muted-foreground dark:text-muted-foreground border border-border dark:border-border/70'}`}>
                       {pubLabel}
                     </span>
                   ) : null}
@@ -281,7 +281,7 @@ export function ProductsPage() {
             </div>
           </td>
 
-          <td className="px-6 py-2 text-sm text-gray-600 dark:text-gray-400 font-medium hidden lg:table-cell">
+          <td className="px-6 py-2 text-sm text-muted-foreground font-medium hidden lg:table-cell">
             {categoryName}
           </td>
 
@@ -299,7 +299,7 @@ export function ProductsPage() {
             <div className="flex justify-end gap-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
               <button
                 onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
-                className="p-2 text-gray-400 hover:text-foreground hover:bg-muted100 dark:hover:bg-muted800 rounded-lg transition-all"
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded-lg transition-all"
                 title="Ficha técnica"
                 type="button"
               >
@@ -307,7 +307,7 @@ export function ProductsPage() {
               </button>
               <button
                 onClick={() => navigate(`/catalog/products/${product.id}/v2`)}
-                className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-500/10 rounded-lg transition-all"
+                className="p-2 text-muted-foreground hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-500/10 rounded-lg transition-all"
                 title="Editar"
                 type="button"
               >
@@ -316,7 +316,7 @@ export function ProductsPage() {
               <button
                 onClick={() => handleDuplicate(product.id)}
                 disabled={savingMap[`duplicate-${product.id}`]}
-                className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-all disabled:opacity-50"
+                className="p-2 text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-all disabled:opacity-50"
                 title={savingMap[`duplicate-${product.id}`] ? 'Duplicando...' : 'Duplicar'}
                 type="button"
               >
@@ -325,7 +325,7 @@ export function ProductsPage() {
               <PermissionGate permission="catalog.publish" fallback={null}>
                 <button
                   onClick={() => handleTogglePublication(product)}
-                  className={`p-2 rounded-lg transition-all ${product.publication?.publicationStatus === 'published' ? 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-500/10' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10'}`}
+                  className={`p-2 rounded-lg transition-all ${product.publication?.publicationStatus === 'published' ? 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-500/10' : 'text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10'}`}
                   title={product.publication?.publicationStatus === 'published' ? 'Despublicar' : 'Publicar'}
                   type="button"
                 >
@@ -335,7 +335,7 @@ export function ProductsPage() {
               <PermissionGate permission="catalog.publish" fallback={null}>
                 <button
                   onClick={() => handleToggleOperational(product)}
-                  className={`p-2 rounded-lg transition-all ${product.publication?.operationalStatus === 'active' ? 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-500/10' : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10'}`}
+                  className={`p-2 rounded-lg transition-all ${product.publication?.operationalStatus === 'active' ? 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-500/10' : 'text-muted-foreground hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10'}`}
                   title={product.publication?.operationalStatus === 'active' ? 'Ocultar' : 'Exibir'}
                   type="button"
                 >
@@ -344,7 +344,7 @@ export function ProductsPage() {
               </PermissionGate>
               <button
                 onClick={() => handleToggleActive(product)}
-                className={`p-2 rounded-lg transition-all ${product.isActive ? 'text-gray-400 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-500/10' : 'text-gray-400 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-500/10'}`}
+                className={`p-2 rounded-lg transition-all ${product.isActive ? 'text-muted-foreground hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-500/10' : 'text-muted-foreground hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-500/10'}`}
                 title={product.isActive ? 'Desativar' : 'Ativar'}
                 type="button"
               >
@@ -352,7 +352,7 @@ export function ProductsPage() {
               </button>
               <button
                 onClick={() => handleDelete(product.id)}
-                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
+                className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
                 title="Excluir"
                 type="button"
               >
@@ -375,11 +375,11 @@ export function ProductsPage() {
         <div key={product.id} className="card-premium p-3 md:p-4 hover:shadow-md transition-all">
           <div className="flex items-start justify-between gap-3">
             <div className="flex gap-3 min-w-0 flex-1">
-               <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-muted50 dark:bg-muted800 border border-border100 dark:border-border800 overflow-hidden shrink-0 shadow-sm">
+               <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-muted/50 dark:bg-muted/80 border border-border overflow-hidden shrink-0 shadow-sm">
                 {product.image ? (
                   <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-300 text-[10px] font-black uppercase tracking-widest">
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground text-[10px] font-black uppercase tracking-widest">
                     IMG
                   </div>
                 )}
@@ -387,13 +387,13 @@ export function ProductsPage() {
 
               <div className="min-w-0 flex-1">
                 <div className="font-black text-foreground truncate text-sm md:text-base leading-tight">{product.name}</div>
-                <div className="text-[10px] md:text-xs text-muted-foreground dark:text-gray-400 font-bold mt-0.5 truncate">{categoryName}</div>
+                <div className="text-[10px] md:text-xs text-muted-foreground font-bold mt-0.5 truncate">{categoryName}</div>
                 <div className="mt-2 flex flex-wrap items-center gap-1">
-                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-muted100 dark:bg-muted800 text-gray-700 dark:text-gray-300 border-border200 dark:border-border800'}`}>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-muted/20 dark:bg-muted/80 text-foreground dark:text-muted-foreground border-border dark:border-border/70'}`}>
                     {product.type === 'simple' ? 'Individual' : product.type === 'configurable' ? 'Personalizado' : 'Combo'}
                   </span>
                   {pubLabel && (
-                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-muted100 text-gray-600 dark:text-gray-400 border border-border200 dark:border-border800'}`}>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-muted/20 text-muted-foreground dark:text-muted-foreground border border-border dark:border-border/70'}`}>
                       {pubLabel}
                     </span>
                   )}
@@ -406,7 +406,7 @@ export function ProductsPage() {
               </div>
             </div>
             <div className="text-right shrink-0">
-              <div className="text-[9px] md:text-[10px] text-gray-400 font-black uppercase tracking-widest mb-0.5">Preço</div>
+              <div className="text-[9px] md:text-[10px] text-muted-foreground font-black uppercase tracking-widest mb-0.5">Preço</div>
               <div className="text-sm md:text-base font-black text-foreground">{formatMoney(product.basePrice)}</div>
             </div>
           </div>
@@ -417,7 +417,7 @@ export function ProductsPage() {
           >
              <div className="flex items-center gap-2">
                <span className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${product.isActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-               <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-400">
+               <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 {product.isActive ? 'Ativo' : 'Inativo'}
               </span>
              </div>
@@ -439,7 +439,7 @@ export function ProductsPage() {
               </button>
               <button
                 onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
-                className="p-1.5 md:p-2 text-muted-foreground bg-muted50 dark:bg-muted800 rounded-xl hover:bg-muted100 transition-colors"
+                className="p-1.5 md:p-2 text-muted-foreground bg-muted/50 dark:bg-muted/80 rounded-xl hover:bg-muted/70 transition-colors"
                 title="Ficha técnica"
               >
                 <FileText size={14} />
@@ -506,7 +506,7 @@ export function ProductsPage() {
       <div className="page-header mb-5 md:mb-6">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight uppercase">Produtos</h1>
-          <p className="text-[11px] md:text-sm text-muted-foreground dark:text-gray-400 font-medium mt-0.5">Gerencie seu cardápio de forma simples.</p>
+          <p className="text-[11px] md:text-sm text-muted-foreground font-medium mt-0.5">Gerencie seu cardápio de forma simples.</p>
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto">
@@ -555,7 +555,7 @@ export function ProductsPage() {
                 className={`flex-1 md:flex-none md:px-6 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
                   viewMode === 'all'
                     ? 'bg-card dark:bg-muted900 text-primary-600 shadow-sm'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                    : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground'
                 }`}
                 type="button"
               >
@@ -566,7 +566,7 @@ export function ProductsPage() {
                 className={`flex-1 md:flex-none md:px-6 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
                   viewMode === 'grouped'
                     ? 'bg-card dark:bg-muted900 text-primary-600 shadow-sm'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                    : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground'
                 }`}
                 type="button"
               >
@@ -589,7 +589,7 @@ export function ProductsPage() {
                   className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border ${
                     typeFilter === t.id
                       ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800 text-primary-600'
-                      : 'bg-transparent border-slate-200 dark:border-border700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                      : 'bg-transparent border border-border dark:border-border/70 text-muted-foreground hover:text-foreground dark:hover:text-foreground'
                   }`}
                 >
                   {t.label}
@@ -606,7 +606,7 @@ export function ProductsPage() {
               <select
                 value={selectedCategoryId ?? ''}
                 onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : null)}
-                className="h-8 pl-2 pr-6 bg-card dark:bg-muted900 border border-slate-200 dark:border-border700 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
+                className="h-8 pl-2 pr-6 bg-card dark:bg-muted900 border border-border dark:border-border/70 text-[10px] font-black uppercase tracking-widest text-muted-foreground dark:text-muted-foreground focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
               >
                 <option value="">Categorias</option>
                 {categories.map((c) => (
@@ -618,7 +618,7 @@ export function ProductsPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as ProductStatusFilter)}
-                className="h-8 pl-2 pr-6 bg-card dark:bg-muted900 border border-slate-200 dark:border-border700 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
+                className="h-8 pl-2 pr-6 bg-card dark:bg-muted900 border border-border dark:border-border/70 text-[10px] font-black uppercase tracking-widest text-muted-foreground dark:text-muted-foreground focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
               >
                 <option value="all">Status</option>
                 <option value="active">Ativos</option>
@@ -628,7 +628,7 @@ export function ProductsPage() {
               <select
                 value={publicationFilter}
                 onChange={(e) => setPublicationFilter(e.target.value as PublicationFilter)}
-                className="h-8 pl-2 pr-6 bg-card dark:bg-muted900 border border-slate-200 dark:border-border700 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
+                className="h-8 pl-2 pr-6 bg-card dark:bg-muted900 border border-border dark:border-border/70 text-[10px] font-black uppercase tracking-widest text-muted-foreground dark:text-muted-foreground focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
               >
                 <option value="all">Publicação</option>
                 <option value="draft">Rascunho</option>
@@ -650,7 +650,7 @@ export function ProductsPage() {
               <div className="space-y-3 md:hidden">
                 {renderCards(filteredProducts)}
                 {filteredProducts.length === 0 ? (
-                  <div className="bg-card dark:bg-muted900 rounded-2xl shadow-sm border border-border100 dark:border-border800 p-6 text-center text-gray-400 font-medium italic">
+                  <div className="bg-card dark:bg-muted900 rounded-2xl shadow-sm border border-border dark:border-border/80 p-6 text-center text-muted-foreground font-medium italic">
                     {searchTerm.trim().length > 0 || statusFilter !== 'all' || typeFilter !== 'all' || publicationFilter !== 'all' || operationalFilter !== 'all' || Boolean(selectedCategoryId)
                       ? 'Nenhum resultado para os filtros atuais.'
                       : 'Nenhum produto cadastrado ainda no cardápio.'}
@@ -687,7 +687,7 @@ export function ProductsPage() {
                       )}
                       {filteredProducts.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="px-6 py-12 text-center text-gray-400 font-medium italic">
+                          <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground font-medium italic">
                             {searchTerm.trim().length > 0 || statusFilter !== 'all' || typeFilter !== 'all' || publicationFilter !== 'all' || operationalFilter !== 'all' || Boolean(selectedCategoryId)
                               ? 'Nenhum resultado para os filtros atuais.'
                               : 'Nenhum produto cadastrado ainda no cardápio.'}
@@ -709,14 +709,14 @@ export function ProductsPage() {
                     <button
                       type="button"
                       onClick={() => toggleGroupExpanded(group.key)}
-                      className="w-full px-4 py-4 bg-muted50/50 dark:bg-muted800/20 flex items-center justify-between hover:bg-muted100 dark:hover:bg-muted800/40 transition-all"
+                      className="w-full px-4 py-4 bg-muted/20 dark:bg-muted/80 flex items-center justify-between hover:bg-muted/70 dark:hover:bg-muted/90 transition-all"
                     >
                       <div className="text-left min-w-0 flex-1">
                         <div className="text-sm font-black text-foreground uppercase tracking-tight truncate">{title}</div>
-                        <div className="text-[10px] text-muted-foreground dark:text-gray-400 font-bold uppercase tracking-widest mt-0.5">{group.products.length} {group.products.length === 1 ? 'produto' : 'produtos'}</div>
+                        <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-0.5">{group.products.length} {group.products.length === 1 ? 'produto' : 'produtos'}</div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0 ml-4">
-                        <div className={`w-8 h-8 flex items-center justify-center rounded-full bg-card dark:bg-muted900 border border-border100 dark:border-border800 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                        <div className={`w-8 h-8 flex items-center justify-center rounded-full bg-card dark:bg-muted900 border border-border dark:border-border/80 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
                           <ChevronDown size={16} className="text-muted-foreground" />
                         </div>
                       </div>
@@ -732,13 +732,13 @@ export function ProductsPage() {
                         {/* Desktop View: Table */}
                         <div className="hidden md:block max-h-[60vh] overflow-auto custom-scrollbar">
                           <table className="w-full text-left border-collapse">
-                            <thead className="bg-card dark:bg-muted900 border-b border-border100 dark:border-border800 sticky top-0 z-10">
+                            <thead className="bg-card dark:bg-muted900 border-b border-border dark:border-border/80 sticky top-0 z-10">
                               <tr>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Produto</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hidden lg:table-cell">Categoria</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Preço</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Produto</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest hidden lg:table-cell">Categoria</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">Preço</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Status</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Ações</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -754,10 +754,10 @@ export function ProductsPage() {
 
               {productsGroupedByCategory.length === 0 && (
                 <div className="card-premium py-20 text-center flex flex-col items-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-muted50 dark:bg-muted800 flex items-center justify-center text-gray-300">
+                  <div className="w-16 h-16 rounded-full bg-muted/50 dark:bg-muted/80 flex items-center justify-center text-muted-foreground">
                     <Search size={32} />
                   </div>
-                  <div className="text-gray-400 font-black uppercase tracking-widest text-xs">
+                  <div className="text-muted-foreground font-black uppercase tracking-widest text-xs">
                     Nenhum produto encontrado nesta visualização.
                   </div>
                 </div>
@@ -802,35 +802,35 @@ export function ProductsPage() {
         <div className="space-y-6">
           <div>
             <h3 className="text-sm font-black text-foreground mb-2">Publicação (publicationStatus)</h3>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Controla a visibilidade externa do produto (storefront, PDV, etc.).</p>
-            <ul className="text-xs text-muted-foreground dark:text-gray-400 space-y-1">
-              <li><span className="font-bold text-gray-700 dark:text-gray-300">Draft:</span> rascunho, não visível publicamente.</li>
-              <li><span className="font-bold text-gray-700 dark:text-gray-300">Publicado:</span> visível em catálogos públicos.</li>
+            <p className="text-xs text-muted-foreground mb-2">Controla a visibilidade externa do produto (storefront, PDV, etc.).</p>
+            <ul className="text-xs text-muted-foreground dark:text-muted-foreground space-y-1">
+              <li><span className="font-bold text-foreground dark:text-muted-foreground">Draft:</span> rascunho, não visível publicamente.</li>
+              <li><span className="font-bold text-foreground dark:text-muted-foreground">Publicado:</span> visível em catálogos públicos.</li>
             </ul>
           </div>
 
           <div>
             <h3 className="text-sm font-black text-foreground mb-2">Operação (operationalStatus)</h3>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Define se o produto pode ser vendido no momento, mesmo estando publicado.</p>
-            <ul className="text-xs text-muted-foreground dark:text-gray-400 space-y-1">
-              <li><span className="font-bold text-gray-700 dark:text-gray-300">Active:</span> disponível para venda.</li>
-              <li><span className="font-bold text-gray-700 dark:text-gray-300">Hidden:</span> visível mas não vendável (indisponível).</li>
-              <li><span className="font-bold text-gray-700 dark:text-gray-300">Sold out:</span> esgotado manualmente.</li>
-              <li><span className="font-bold text-gray-700 dark:text-gray-300">Inactive:</span> oculto e não vendável.</li>
+            <p className="text-xs text-muted-foreground mb-2">Define se o produto pode ser vendido no momento, mesmo estando publicado.</p>
+            <ul className="text-xs text-muted-foreground dark:text-muted-foreground space-y-1">
+              <li><span className="font-bold text-foreground dark:text-muted-foreground">Active:</span> disponível para venda.</li>
+              <li><span className="font-bold text-foreground dark:text-muted-foreground">Hidden:</span> visível mas não vendável (indisponível).</li>
+              <li><span className="font-bold text-foreground dark:text-muted-foreground">Sold out:</span> esgotado manualmente.</li>
+              <li><span className="font-bold text-foreground dark:text-muted-foreground">Inactive:</span> oculto e não vendável.</li>
             </ul>
           </div>
 
           <div>
             <h3 className="text-sm font-black text-foreground mb-2">Status Geral (isActive)</h3>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Controle de baixo nível (soft-delete). Geralmente não alterado no dia a dia.</p>
-            <ul className="text-xs text-muted-foreground dark:text-gray-400 space-y-1">
-              <li><span className="font-bold text-gray-700 dark:text-gray-300">Ativo:</span> produto existe no sistema.</li>
-              <li><span className="font-bold text-gray-700 dark:text-gray-300">Inativo:</span> produto desativado (soft delete).</li>
+            <p className="text-xs text-muted-foreground mb-2">Controle de baixo nível (soft-delete). Geralmente não alterado no dia a dia.</p>
+            <ul className="text-xs text-muted-foreground dark:text-muted-foreground space-y-1">
+              <li><span className="font-bold text-foreground dark:text-muted-foreground">Ativo:</span> produto existe no sistema.</li>
+              <li><span className="font-bold text-foreground dark:text-muted-foreground">Inativo:</span> produto desativado (soft delete).</li>
             </ul>
           </div>
 
-          <div className="bg-muted50 dark:bg-muted900/50 border border-border200 dark:border-border800 rounded-xl p-3">
-            <p className="text-xs text-gray-600 dark:text-gray-400">
+          <div className="bg-muted/50 dark:bg-muted/80 border border-border dark:border-border/80 rounded-xl p-3">
+            <p className="text-xs text-muted-foreground dark:text-muted-foreground">
               <span className="font-black">Dica:</span> Use <span className="font-bold">Publicado + Active</span> para vender normalmente.
               Use <span className="font-bold">Hidden</span> para manter visível mas indisponível.
               Use <span className="font-bold">Draft</span> para produtos em criação/aprovação.
