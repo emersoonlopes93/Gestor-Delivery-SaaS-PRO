@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 interface GlobalAiConfig {
   id: string;
+  baseAiPrompt?: string;
   aiDefaultAgentName: string;
   aiDefaultTone: string;
   aiMemoryEnabled: boolean;
@@ -51,7 +52,26 @@ export function GlobalAiAgentConfigPage() {
     setMsg(null);
     setError(null);
     try {
-      const res = await api.patch('/admin/ai-agent/global-config', config);
+      // Enviar apenas os campos permitidos pelo DTO do backend
+      const updateData = {
+        baseAiPrompt: config.baseAiPrompt,
+        aiDefaultAgentName: config.aiDefaultAgentName,
+        aiDefaultTone: config.aiDefaultTone,
+        aiMemoryEnabled: config.aiMemoryEnabled,
+        aiRememberCustomerName: config.aiRememberCustomerName,
+        aiRememberAddresses: config.aiRememberAddresses,
+        aiRememberLastOrder: config.aiRememberLastOrder,
+        aiRememberPreferences: config.aiRememberPreferences,
+        aiAllowRepeatLastOrder: config.aiAllowRepeatLastOrder,
+        aiMemoryRetentionDays: config.aiMemoryRetentionDays,
+        aiDebounceMs: config.aiDebounceMs,
+        aiSimulateTyping: config.aiSimulateTyping,
+        aiRequireCustomerName: config.aiRequireCustomerName,
+        aiRequireConfirmation: config.aiRequireConfirmation,
+        aiEnableUpsell: config.aiEnableUpsell,
+        aiEnableHumanHandoff: config.aiEnableHumanHandoff,
+      };
+      const res = await api.patch('/admin/ai-agent/global-config', updateData);
       if (res.success) setMsg('Configuração salva com sucesso');
       else setError('Falha ao salvar configuração');
     } catch (e) {
