@@ -85,7 +85,7 @@ export class AiAgentPlanPresetService {
     if (!subscription?.plan) return null;
 
     const preset = await this.prisma.aiAgentPlanPreset.findUnique({
-      where: { plan: subscription.plan },
+      where: { plan: subscription.plan.slug },
     });
 
     return preset ?? null;

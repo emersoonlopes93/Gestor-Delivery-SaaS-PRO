@@ -315,7 +315,7 @@ export class AiOrchestratorService {
 
   private buildSessionMemoryPrompt(
     aiMemory: Awaited<ReturnType<ConversationService['getSessionAiMemory']>>,
-    config: Awaited<ReturnType<AiAgentConfigService['getConfig']>>,
+    config: EffectiveAiAgentConfig,
   ): string | null {
     const memoryLines: string[] = [
       '## Memória do cliente e sessão (apenas contexto interno)',
@@ -850,7 +850,7 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
     historyMessages: AiMessage[],
     toolCalls: NonNullable<AiMessage['toolCalls']>,
     tools: ReturnType<AgentToolsService['getAvailableTools']>,
-    config: Awaited<ReturnType<AiAgentConfigService['getConfig']>>,
+    config: EffectiveAiAgentConfig,
     trace: AiFlowContext,
     agentSessionCtx: AgentSessionContext,
   ): Promise<void> {
