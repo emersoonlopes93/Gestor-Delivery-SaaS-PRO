@@ -128,6 +128,7 @@ export const ADMIN_PERMISSIONS = {
   'saas.support.access': 'Access support tools',
   'saas.support.impersonate': 'Impersonate tenant users',
   'saas.audit.read': 'View audit logs',
+  'saas.modules.read': 'View modules',
   'saas.modules.manage': 'Manage modules',
   'saas.metrics.read': 'View platform metrics',
   'saas.users.read': 'View admin users',
@@ -236,10 +237,12 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
   ],
   onboarding: [
     'saas.tenants.read', 'saas.tenants.create',
+    'saas.modules.read',
     'saas.onboarding.manage',
   ],
   operations: [
     'saas.tenants.read', 'saas.tenants.update',
+    'saas.modules.read',
     'saas.modules.manage',
     'saas.metrics.read',
     'saas.audit.read',
