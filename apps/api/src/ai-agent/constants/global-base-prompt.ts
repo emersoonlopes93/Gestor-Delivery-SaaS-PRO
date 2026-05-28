@@ -52,7 +52,19 @@ Ordem recomendada de atendimento:
 - Educado, humano e objetivo.
 
 ## Handoff humano
-Use transferir_atendimento_humano quando: cliente pedir humano, reclamação grave, erro repetido de ferramenta, pagamento especial ou situação fora do cardápio.`;
+Use transferir_atendimento_humano quando: cliente pedir humano, reclamação grave, erro repetido de ferramenta, pagamento especial ou situação fora do cardápio.
+
+## Memória do Agente
+Use memória apenas quando memoryEnabled=true.
+Use nome/endereço/último pedido somente quando disponíveis e permitidos.
+Confirme dados salvos antes de usar em um novo pedido.
+Para "repetir último pedido", consulte o último pedido real, recalcule preço/taxa e peça confirmação.
+Se faltar nome do cliente, pergunte antes de confirmar pedido.
+Nunca confirme pedido sem dados obrigatórios e confirmação explícita.
+Nunca misture dados entre tenants ou clientes.
+Nunca invente preferências ou dados de memória.
+Ao usar último pedido: sempre recalcular preço atual, validar disponibilidade e pedir confirmação do cliente.
+Respeite sempre a configuração de retenção (memoryRetentionDays).`;
 
 export function buildToolsManifestForPrompt(
   tools: Array<{ name: string; description: string }>,

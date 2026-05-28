@@ -119,6 +119,8 @@ export const ADMIN_PERMISSIONS = {
   'saas.tenants.create': 'Create tenants',
   'saas.tenants.update': 'Update tenants',
   'saas.tenants.suspend': 'Suspend tenants',
+  'saas.tenants.ai.read': 'View tenant AI agent configuration',
+  'saas.tenants.ai.manage': 'Manage tenant AI agent configuration',
   'saas.plans.read': 'View plans',
   'saas.plans.manage': 'Manage plans',
   'saas.billing.read': 'View billing',

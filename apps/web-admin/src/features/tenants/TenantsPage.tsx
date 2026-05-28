@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Tenant, PaginatedResponse } from '@gestor/types';
 import { api } from '../../lib/api-client';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Bot } from 'lucide-react';
 
 interface TenantListItem extends Tenant {
   _count?: { users: number; roles: number };
@@ -122,6 +122,14 @@ export function TenantsPage() {
                       >
                         Módulos
                       </button>
+                      <button
+                        onClick={() => window.location.href = `/tenants/${tenant.id}/ai-agent`}
+                        className="text-purple-600 hover:text-purple-900 text-sm font-medium flex items-center gap-1"
+                        title="Configurar Agente IA"
+                      >
+                        <Bot size={14} />
+                        Agente IA
+                      </button>
                       <select
                         value={tenant.status}
                         onChange={(e) => handleStatusChange(tenant.id, e.target.value)}
@@ -188,6 +196,13 @@ export function TenantsPage() {
                   className="flex-1 py-2.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold"
                 >
                   Módulos
+                </button>
+                <button
+                  onClick={() => window.location.href = `/tenants/${tenant.id}/ai-agent`}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-bold"
+                >
+                  <Bot size={14} />
+                  Agente IA
                 </button>
               </div>
               
