@@ -706,7 +706,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                 min="0"
                 value={formData.priority ?? 1000}
                 onChange={(e) => setFormData({ ...formData, priority: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-input bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
             <div className="flex items-end">
@@ -732,7 +732,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                   type="text"
                   value={formData.neighborhood}
                   onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-input bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                   placeholder="Ex: Centro"
                   required
                 />
@@ -747,7 +747,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                   min="0"
                   value={formData.rate}
                   onChange={(e) => setFormData({ ...formData, rate: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-input bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                   placeholder="0.00"
                   required
                 />
@@ -768,7 +768,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                     min="0"
                     value={formData.minKm}
                     onChange={(e) => setFormData({ ...formData, minKm: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="w-full px-3 py-2 border border-input bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                     required
                   />
                 </div>
@@ -782,7 +782,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                     min="0"
                     value={formData.maxKm}
                     onChange={(e) => setFormData({ ...formData, maxKm: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="w-full px-3 py-2 border border-input bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                     required
                   />
                 </div>
@@ -797,7 +797,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                   min="0"
                   value={formData.ratePerKm}
                   onChange={(e) => setFormData({ ...formData, ratePerKm: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full px-3 py-2 border border-input bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                   placeholder="0.00"
                   required
                 />
@@ -816,7 +816,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                 min="0"
                 value={formData.fixedRate}
                 onChange={(e) => setFormData({ ...formData, fixedRate: parseFloat(e.target.value) || 0 })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full px-3 py-2 border border-input bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 placeholder="0.00"
                 required
               />
@@ -832,7 +832,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                     type="text"
                     value={zoneName}
                     onChange={(e) => setZoneName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="w-full px-3 py-2 border border-input bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                     placeholder="Ex: Zona Centro"
                   />
                 </div>

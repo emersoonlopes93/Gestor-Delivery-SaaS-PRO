@@ -727,7 +727,7 @@ export function AppLayout() {
             <div className="hidden sm:flex items-center gap-2">
               <button
                 type="button"
-                className="btn-ghost"
+                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-foreground hover:bg-muted transition-all"
                 title="Atalhos"
               >
                 <CornerDownRight className="h-4 w-4" aria-hidden />
@@ -738,7 +738,7 @@ export function AppLayout() {
             <button
               type="button"
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="btn-ghost w-10 h-10 p-0 rounded-full bg-muted border-none"
+              className="inline-flex items-center justify-center w-10 h-10 p-0 rounded-full bg-muted text-foreground hover:bg-muted/80 transition-all border-none"
               title="Tema"
               aria-label="Alternar Tema"
             >
@@ -747,7 +747,7 @@ export function AppLayout() {
 
             <button
               type="button"
-              className="btn-ghost w-10 h-10 p-0 rounded-full bg-muted/50"
+              className="inline-flex items-center justify-center w-10 h-10 p-0 rounded-full bg-muted/50 text-foreground hover:bg-muted transition-all"
               title="Notificações"
               aria-label="Notificações"
             >
