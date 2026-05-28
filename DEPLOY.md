@@ -48,7 +48,8 @@ Adicione as variáveis abaixo na seção **Environment** do Render:
 | :--- | :--- | :--- |
 | `NODE_ENV` | `production` | Modo de execução do NestJS |
 | `PORT` | `3333` | Porta exposta pelo container |
-| `DATABASE_URL` | `postgresql://user:pass@host/db?sslmode=require` | String de conexão do PostgreSQL (Supabase/Neon) |
+| `DATABASE_URL` | `postgresql://user:pass@host/db?sslmode=require&connect_timeout=30&pool_timeout=30` | String de conexão do PostgreSQL (Supabase/Neon) com pooler |
+| `DIRECT_URL` | `postgresql://user:pass@host/db?sslmode=require&connect_timeout=30&pool_timeout=30` | **Obrigatório para Neon/Supabase**. Conexão direta sem pooler para migrations (remova `-pooler` do hostname) |
 | `JWT_SECRET` | `sua-chave-secreta-e-longa` | Chave de assinatura para tokens JWT dos usuários |
 | `JWT_REFRESH_SECRET` | `outra-chave-secreta-e-longa-diferente` | **Obrigatória**. Chave para assinatura do refresh token |
 | `REDIS_HOST` | `sua-instancia.upstash.io` | Host do Redis (Ex: Upstash ou Redis Cloud) |
@@ -204,7 +205,8 @@ Utilize esta lista consolidada para preencher os painéis do Render, Vercel ou P
 | :--- | :--- | :--- | :--- |
 | **Geral** | `NODE_ENV` | `production` | API |
 | **Geral** | `PORT` | `3333` | API |
-| **Banco de Dados** | `DATABASE_URL` | `postgresql://postgres:senha@neon-host.db.neon.tech/main?sslmode=require` | API |
+| **Banco de Dados** | `DATABASE_URL` | `postgresql://postgres:senha@neon-host.db.neon.tech/main?sslmode=require&connect_timeout=30&pool_timeout=30` | API |
+| **Banco de Dados** | `DIRECT_URL` | `postgresql://postgres:senha@neon-host.db.neon.tech/main?sslmode=require&connect_timeout=30&pool_timeout=30` | API (remova `-pooler` do hostname) |
 | **Segurança** | `JWT_SECRET` | `8f5b8210d7a6e191b...` *(gere um hash de 32+ caracteres)* | API |
 | **Segurança** | `JWT_REFRESH_SECRET` | `9b8c7d6e5a4f3e2d1...` *(gere outro hash diferente)* | API |
 | **Mensageria & Fila** | `REDIS_HOST` | `redis-10023.c302.us-east-1-4.ec2.cloud.redislabs.com` | API |
