@@ -560,17 +560,17 @@ export function AppLayout() {
         toastOptions={{
           className: 'font-bold text-sm',
           success: {
-            style: { background: '#10b981', color: '#fff', borderRadius: '12px' },
-            iconTheme: { primary: '#fff', secondary: '#10b981' },
+            style: { background: 'var(--status-open)', color: 'var(--status-success-foreground)', borderRadius: '12px' },
+            iconTheme: { primary: 'var(--status-success-foreground)', secondary: 'var(--status-open)' },
           },
           error: {
-            style: { background: '#ef4444', color: '#fff', borderRadius: '12px' },
-            iconTheme: { primary: '#fff', secondary: '#ef4444' },
+            style: { background: 'var(--destructive)', color: 'var(--destructive-foreground)', borderRadius: '12px' },
+            iconTheme: { primary: 'var(--destructive-foreground)', secondary: 'var(--destructive)' },
           },
         }}
       />
       {isMobileOpen ? (
-        <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={closeMobile} />
+        <div className="fixed inset-0 z-40 bg-black/40 md:hidden" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={closeMobile} />
       ) : null}
 
       <aside
@@ -584,18 +584,18 @@ export function AppLayout() {
           <div className="flex items-center justify-between gap-3">
             {!collapsed ? (
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-primary-600 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-primary-600/20 shrink-0 border-2 border-white dark:border-gray-800">
+                <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20 shrink-0 border-2 border-border">
                   G
                 </div>
                 <div className="min-w-0 flex-1">
                   <h1 className="text-sm font-black text-foreground tracking-tight truncate leading-tight flex items-center gap-1.5">
-                    Gestor<span className="text-primary-600">PRO</span>
+                    Gestor<span className="text-primary">PRO</span>
                   </h1>
                   <p className="text-[10px] font-black text-muted-foreground mt-1 truncate leading-none uppercase tracking-wider">{user?.tenant?.name || 'Carregando...'}</p>
                 </div>
               </div>
             ) : (
-              <div className="w-10 h-10 rounded-2xl bg-primary-600 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-primary-600/20 border-2 border-white dark:border-gray-800">
+              <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20 border-2 border-border">
                 G
               </div>
             )}
@@ -609,23 +609,23 @@ export function AppLayout() {
                 disabled={toggleStoreMutation.isPending}
                 className={`w-full flex items-center justify-between p-2.5 rounded-2xl border transition-all duration-300 group hover:shadow-md active:scale-[0.98] ${
                   storeStatus === 'open' 
-                    ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-600' 
+                    ? 'bg-status-open/10 border-status-open/20 text-status-open' 
                     : storeStatus === 'paused'
-                    ? 'bg-red-500/5 border-red-500/10 text-red-600'
-                    : 'bg-amber-500/5 border-amber-500/10 text-amber-600'
-                } ${toggleStoreMutation.isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    ? 'bg-status-closed/10 border-status-closed/20 text-status-closed'
+                    : 'bg-status-pending/10 border-status-pending/20 text-status-pending'
+                } ${toggleStoreMutation.isPending ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
                 <div className="flex items-center gap-2.5">
                   <div className="relative flex h-2 w-2">
                     {storeStatus === 'open' && (
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-open opacity-75"></span>
                     )}
                     <span className={`relative inline-flex rounded-full h-2 w-2 ${
                       storeStatus === 'open' 
-                        ? 'bg-emerald-500' 
+                        ? 'bg-status-open' 
                         : storeStatus === 'paused'
-                        ? 'bg-red-500'
-                        : 'bg-amber-500'
+                        ? 'bg-status-closed'
+                        : 'bg-status-pending'
                     }`}></span>
                   </div>
                   <span className="text-[10px] font-black tracking-widest uppercase">
@@ -638,12 +638,12 @@ export function AppLayout() {
                 </div>
                 <div className={`w-8 h-4 rounded-full relative transition-colors duration-300 ${
                   storeStatus === 'open' 
-                    ? 'bg-emerald-500' 
+                    ? 'bg-status-open' 
                     : storeStatus === 'paused'
-                    ? 'bg-red-500/40'
-                    : 'bg-amber-500/40'
+                    ? 'bg-status-closed/40'
+                    : 'bg-status-pending/40'
                 }`}>
-                   <div className={`absolute top-1 w-2 h-2 rounded-full bg-white transition-all duration-300 ${storeStatus === 'open' ? 'right-1' : 'left-1'}`} />
+                   <div className={`absolute top-1 w-2 h-2 rounded-full bg-foreground transition-all duration-300 ${storeStatus === 'open' ? 'right-1' : 'left-1'}`} />
                 </div>
               </button>
 
@@ -691,7 +691,7 @@ export function AppLayout() {
         <div className="p-4" style={{ borderTop: '1px solid var(--border-default)' }}>
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50/10 dark:hover:bg-red-500/10 transition-all active:scale-95 ${collapsed ? 'justify-center' : ''
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest text-destructive hover:bg-destructive/10 transition-all active:scale-95 ${collapsed ? 'justify-center' : ''
               }`}
             title={collapsed ? 'Sair' : undefined}
           >
@@ -715,7 +715,7 @@ export function AppLayout() {
             </button>
 
             <div className="relative flex-1 max-w-[320px] lg:max-w-[520px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" aria-hidden />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden />
               <input
                 value={desktopSearch}
                 onChange={(e) => setDesktopSearch(e.target.value)}

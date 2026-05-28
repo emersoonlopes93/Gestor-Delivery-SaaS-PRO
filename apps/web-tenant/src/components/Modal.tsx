@@ -13,7 +13,7 @@ export function Modal({ isOpen, onClose, title, children, footer, maxWidth = 'ma
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
       <div className={`card-premium w-full ${maxWidth} overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] shadow-2xl border border-border`}>
         <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-card/80 backdrop-blur-xl">
           <h3 className="text-xl font-black text-foreground tracking-tight">{title}</h3>

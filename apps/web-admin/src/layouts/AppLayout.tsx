@@ -109,7 +109,7 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
         <button
           type="button"
           onClick={() => onToggle(group.id)}
-          className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all group ${hasActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-muted-foreground hover:text-foreground'}`}
+          className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all group ${hasActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
         >
           <span className="text-[10px] font-black uppercase tracking-widest">
             {group.label}
@@ -128,8 +128,8 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
               className={({ isActive }) =>
                 `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
                   isActive
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-                    : 'text-muted-foreground hover:bg-muted/40 hover:text-gray-900 dark:hover:text-gray-100'
+                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 } ${collapsed ? 'justify-center' : ''}`
               }
             >
@@ -138,7 +138,7 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
               </span>
               {!collapsed ? <span className="truncate">{item.label}</span> : null}
               {collapsed ? (
-                <span className="pointer-events-none absolute left-full ml-4 whitespace-nowrap rounded-xl bg-gray-900 dark:bg-gray-800 px-3.5 py-2 text-xs font-black text-white opacity-0 shadow-2xl transition-all group-hover:opacity-100 z-50">
+                <span className="pointer-events-none absolute left-full ml-4 whitespace-nowrap rounded-xl bg-popover px-3.5 py-2 text-xs font-black text-popover-foreground opacity-0 shadow-2xl transition-all group-hover:opacity-100 z-50">
                   {item.label}
                 </span>
               ) : null}
@@ -214,16 +214,16 @@ export function AppLayout() {
         <div className={`p-6 border-b border-input100 dark:border-input800/60 ${collapsed ? 'flex justify-center' : ''}`}>
           {!collapsed ? (
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-indigo-600/20">
+              <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20">
                 S
               </div>
               <div className="min-w-0">
-                <h1 className="text-sm font-black text-foreground tracking-tight">SaaS<span className="text-indigo-600">Admin</span></h1>
+                <h1 className="text-sm font-black text-foreground tracking-tight">SaaS<span className="text-primary">Admin</span></h1>
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{user?.name || 'Carregando...'}</p>
               </div>
             </div>
           ) : (
-            <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-indigo-600/20">
+            <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20">
               S
             </div>
           )}
@@ -245,7 +245,7 @@ export function AppLayout() {
         <div className="p-4 border-t border-input100 dark:border-input800/60">
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all ${collapsed ? 'justify-center' : ''}`}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest text-destructive hover:bg-destructive/10 transition-all ${collapsed ? 'justify-center' : ''}`}
           >
             <LogOut size={18} />
             {!collapsed && <span>Encerrar Sessão</span>}
@@ -254,38 +254,38 @@ export function AppLayout() {
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        <header className="hidden md:flex sticky top-0 z-30 h-16 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl border-b border-border/60 px-6 items-center gap-4">
-          <button onClick={toggleCollapsed} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-muted rounded-xl transition-all">
+        <header className="hidden md:flex sticky top-0 z-30 h-16 bg-background/80 backdrop-blur-xl border-b border-border px-6 items-center gap-4">
+          <button onClick={toggleCollapsed} className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-all">
             <Menu size={20} />
           </button>
 
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               value={desktopSearch}
               onChange={(e) => setDesktopSearch(e.target.value)}
               placeholder="Pesquisar no sistema..."
-              className="w-full h-10 pl-10 pr-4 bg-gray-50 dark:bg-gray-900 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+              className="w-full h-10 pl-10 pr-4 bg-card border border-input rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-ring transition-all"
             />
           </div>
 
           <div className="ml-auto flex items-center gap-3">
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-900 text-muted-foreground hover:bg-muted transition-all"
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-card text-muted-foreground hover:bg-muted transition-all"
             >
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
 
-            <button className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-900 text-muted-foreground hover:bg-muted transition-all relative">
+            <button className="w-10 h-10 flex items-center justify-center rounded-xl bg-card text-muted-foreground hover:bg-muted transition-all relative">
               <Bell size={18} />
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-indigo-500 rounded-full border-2 border-white dark:border-input900" />
+              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full border-2 border-background" />
             </button>
 
-            <div className="h-8 w-px bg-gray-200 dark:bg-gray-800 mx-1" />
+            <div className="h-8 w-px bg-border mx-1" />
 
-            <button className="flex items-center gap-3 pl-1 pr-3 py-1 rounded-2xl bg-card border border-input100 dark:border-input800 shadow-sm hover:shadow-md transition-all">
-              <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center">
+            <button className="flex items-center gap-3 pl-1 pr-3 py-1 rounded-2xl bg-card border border-border shadow-sm hover:shadow-md transition-all">
+              <div className="w-8 h-8 rounded-xl bg-muted text-primary flex items-center justify-center">
                 <UserCircle size={20} />
               </div>
               <span className="text-xs font-bold text-foreground hidden lg:block">{user?.name}</span>
@@ -293,17 +293,17 @@ export function AppLayout() {
           </div>
         </header>
 
-        <header className="md:hidden sticky top-0 z-30 h-14 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl border-b border-border px-4 flex items-center justify-between transition-colors">
-          <button onClick={openMobile} className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-900 text-foreground">
+        <header className="md:hidden sticky top-0 z-30 h-14 bg-background backdrop-blur-xl border-b border-border px-4 flex items-center justify-between transition-colors">
+          <button onClick={openMobile} className="w-10 h-10 flex items-center justify-center rounded-xl bg-card text-foreground">
             <Menu size={20} />
           </button>
           <div className="text-center">
-            <div className="text-sm font-black text-foreground uppercase tracking-tight">SaaS<span className="text-indigo-600">Admin</span></div>
+            <div className="text-sm font-black text-foreground uppercase tracking-tight">SaaS<span className="text-primary">Admin</span></div>
             <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none mt-0.5">Gestão Global</div>
           </div>
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-900 text-muted-foreground"
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-card text-muted-foreground"
           >
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
