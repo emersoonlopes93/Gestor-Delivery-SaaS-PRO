@@ -16,7 +16,7 @@
 
     "start": "nest start",
 
-    "start:prod": "node dist/main",
+    "start:prod": "node --max-old-space-size=512 dist/main",
 
     "lint": "eslint \"{src,test}/**/*.ts\"",
 
@@ -40,7 +40,7 @@
 
     "prisma:migrate": "prisma migrate dev",
 
-    "prisma:migrate:deploy": "prisma db push --accept-data-loss",
+    "prisma:migrate:deploy": "prisma db push --accept-data-loss --skip-generate",
 
     "prisma:seed": "ts-node -r tsconfig-paths/register prisma/seed.ts",
 
