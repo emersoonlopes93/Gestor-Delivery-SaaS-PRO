@@ -238,7 +238,7 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
           </span>
         </button>
       ) : (
-        <div className="mx-auto w-8 h-px bg-gray-100 dark:bg-gray-800/60 my-4" />
+        <div className="mx-auto w-8 h-px bg-muted/60 my-4" />
       )}
 
       <div
@@ -254,7 +254,7 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
                   href={item.to}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:text-gray-100"
+                  className="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                 >
                   <span className="w-6 flex items-center justify-center text-gray-400 group-hover:text-gray-600 dark:text-gray-400 transition-colors" aria-hidden>
                     <item.icon className="h-4 w-4" aria-hidden />
@@ -274,7 +274,7 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
                 className={({ isActive }) => {
                   return `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isActive
                       ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
-                      : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/40 hover:text-gray-900 dark:hover:text-gray-100'
+                      : 'text-muted-foreground hover:bg-muted/40 hover:text-gray-900 dark:hover:text-gray-100'
                     } ${collapsed ? 'justify-center' : ''}`;
                 }}
               >
@@ -588,7 +588,7 @@ export function AppLayout() {
                   G
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h1 className="text-sm font-black text-gray-900 dark:text-gray-100 tracking-tight truncate leading-tight flex items-center gap-1.5">
+                  <h1 className="text-sm font-black text-foreground tracking-tight truncate leading-tight flex items-center gap-1.5">
                     Gestor<span className="text-primary-600">PRO</span>
                   </h1>
                   <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 mt-1 truncate leading-none uppercase tracking-wider">{user?.tenant?.name || 'Carregando...'}</p>
@@ -653,18 +653,18 @@ export function AppLayout() {
                   href={publicMenuUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800/40 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-primary-500/30 transition-all group shadow-sm"
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-border bg-white dark:bg-gray-800/40 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-primary-500/30 transition-all group shadow-sm"
                 >
                   <Globe className="w-4 h-4 text-primary-500 group-hover:scale-110 transition-transform" />
-                  <span className="text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">Cardápio</span>
+                  <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">Cardápio</span>
                 </a>
                 <button
                   type="button"
                   onClick={() => navigate('/settings/qr-codes')}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-800/40 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-primary-500/30 transition-all group shadow-sm"
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-border bg-white dark:bg-gray-800/40 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-primary-500/30 transition-all group shadow-sm"
                 >
                   <QrCode className="w-4 h-4 text-primary-500 group-hover:scale-110 transition-transform" />
-                  <span className="text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">QR Code</span>
+                  <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">QR Code</span>
                 </button>
               </div>
             </div>
@@ -707,7 +707,7 @@ export function AppLayout() {
             <button
               type="button"
               onClick={toggleCollapsed}
-              className="inline-flex items-center justify-center rounded-xl p-2 text-gray-400 hover:text-gray-900 dark:text-gray-100 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 dark:hover:bg-gray-800 transition-all"
+              className="inline-flex items-center justify-center rounded-xl p-2 text-gray-400 hover:text-foreground dark:hover:text-gray-100 hover:bg-muted dark:hover:bg-gray-800 transition-all"
               aria-label="Alternar sidebar"
               title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
             >
@@ -738,7 +738,7 @@ export function AppLayout() {
             <button
               type="button"
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="btn-ghost w-10 h-10 p-0 rounded-full bg-gray-50 dark:bg-gray-900 border-none"
+              className="btn-ghost w-10 h-10 p-0 rounded-full bg-muted border-none"
               title="Tema"
               aria-label="Alternar Tema"
             >
@@ -747,7 +747,7 @@ export function AppLayout() {
 
             <button
               type="button"
-              className="btn-ghost w-10 h-10 p-0 rounded-full bg-gray-50 dark:bg-gray-900/50 dark:bg-gray-800"
+              className="btn-ghost w-10 h-10 p-0 rounded-full bg-muted/50 dark:bg-gray-800"
               title="Notificações"
               aria-label="Notificações"
             >
@@ -756,7 +756,7 @@ export function AppLayout() {
 
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-2 py-1 sm:pr-3 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all shadow-sm"
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1 sm:pr-3 text-sm font-bold text-foreground hover:bg-gray-50 dark:hover:bg-gray-800 transition-all shadow-sm"
               title="Perfil"
             >
               <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center">
@@ -772,21 +772,21 @@ export function AppLayout() {
             <button
               type="button"
               onClick={openMobile}
-              className="inline-flex items-center justify-center rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 w-10 h-10 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all active:scale-95"
+              className="inline-flex items-center justify-center rounded-xl border border-border bg-card w-10 h-10 text-foreground hover:bg-gray-50 dark:hover:bg-gray-800 transition-all active:scale-95"
               aria-label="Abrir menu"
             >
               <Menu className="h-5 w-5" aria-hidden />
             </button>
             <div className="min-w-0 text-center">
-              <div className="text-sm font-black text-gray-900 dark:text-gray-100 truncate flex items-center justify-center gap-1.5">
+              <div className="text-sm font-black text-foreground truncate flex items-center justify-center gap-1.5">
                 Gestor<span className="text-primary-600">PRO</span>
               </div>
-              <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 truncate uppercase tracking-widest leading-none mt-0.5">{user?.tenant?.name || 'Carregando...'}</div>
+              <div className="text-[10px] font-bold text-muted-foreground truncate uppercase tracking-widest leading-none mt-0.5">{user?.tenant?.name || 'Carregando...'}</div>
             </div>
             <button
               type="button"
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 transition-all active:scale-95"
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800 text-muted-foreground transition-all active:scale-95"
             >
                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>

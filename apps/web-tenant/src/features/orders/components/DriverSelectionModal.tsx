@@ -24,25 +24,25 @@ export const DriverSelectionModal = memo(function DriverSelectionModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800">
-        <header className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
+      <div className="bg-card dark:bg-muted900 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200 border border-border200 dark:border-border800">
+        <header className="px-6 py-5 border-b border-border100 dark:border-border800 flex items-center justify-between bg-muted50/50 dark:bg-muted800/50">
           <div>
-            <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Atribuir Entregador</h2>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">Selecione quem fará a entrega</p>
+            <h2 className="text-lg font-black text-muted-foreground900 dark:text-white tracking-tight">Atribuir Entregador</h2>
+            <p className="text-xs text-muted-foreground500 font-medium mt-0.5">Selecione quem fará a entrega</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors">
-            <X className="w-5 h-5 text-slate-500" />
+          <button onClick={onClose} className="p-2 hover:bg-muted200 dark:hover:bg-muted700 rounded-xl transition-colors">
+            <X className="w-5 h-5 text-muted-foreground500" />
           </button>
         </header>
 
         <div className="p-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
           {availableDrivers.length === 0 ? (
             <div className="py-10 text-center">
-              <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <User className="w-6 h-6 text-slate-400" />
+              <div className="w-12 h-12 bg-muted100 dark:bg-muted800 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <User className="w-6 h-6 text-muted-foreground400" />
               </div>
-              <p className="text-sm font-bold text-slate-900 dark:text-white">Nenhum entregador disponível</p>
-              <p className="text-xs text-slate-500 mt-1 px-6">Todos os entregadores estão offline ou ocupados no momento.</p>
+              <p className="text-sm font-bold text-muted-foreground900 dark:text-white">Nenhum entregador disponível</p>
+              <p className="text-xs text-muted-foreground500 mt-1 px-6">Todos os entregadores estão offline ou ocupados no momento.</p>
             </div>
           ) : (
             <div className="grid gap-2">
@@ -57,8 +57,8 @@ export const DriverSelectionModal = memo(function DriverSelectionModal({
                     {d.name.substring(0, 1).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-black text-slate-900 dark:text-white truncate">{d.name}</p>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">{d.vehicleType}</p>
+                    <p className="text-sm font-black text-muted-foreground900 dark:text-white truncate">{d.name}</p>
+                    <p className="text-[10px] text-muted-foreground500 font-bold uppercase tracking-widest mt-0.5">{d.vehicleType}</p>
                   </div>
                   <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50" />
                 </button>
@@ -67,10 +67,10 @@ export const DriverSelectionModal = memo(function DriverSelectionModal({
           )}
         </div>
 
-        <footer className="p-4 bg-slate-50 dark:bg-slate-800/30 border-t border-slate-100 dark:border-slate-800">
+        <footer className="p-4 bg-muted50 dark:bg-muted800/30 border-t border-border100 dark:border-border800">
           <button
             onClick={onClose}
-            className="w-full py-3 text-sm font-black text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors uppercase tracking-widest"
+            className="w-full py-3 text-sm font-black text-muted-foreground500 hover:text-muted-foreground800 dark:hover:text-muted-foreground200 transition-colors uppercase tracking-widest"
           >
             Cancelar
           </button>

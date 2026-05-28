@@ -303,14 +303,14 @@ export function SettingsPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto text-left space-y-8">
       <div>
-        <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">Configurações da Loja</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1 font-medium">Gerencie o funcionamento e informações do seu estabelecimento.</p>
+        <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Configurações da Loja</h1>
+        <p className="text-muted-foreground mt-1 font-medium">Gerencie o funcionamento e informações do seu estabelecimento.</p>
       </div>
 
       {settings.businessGroupId && (
         <div className="bg-indigo-600 rounded-2xl shadow-lg p-5 text-white flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="bg-white dark:bg-gray-900/20 p-2.5 rounded-xl">
+            <div className="bg-card/20 p-2.5 rounded-xl">
               <Building2 className="w-6 h-6" />
             </div>
             <div>
@@ -318,22 +318,22 @@ export function SettingsPage() {
               <p className="font-bold">Esta unidade faz parte de um <span className="text-indigo-100 italic">Grupo de Negócios</span>.</p>
             </div>
           </div>
-          <div className="hidden md:block bg-white dark:bg-gray-900/10 px-4 py-2 rounded-lg border border-white/20 text-xs font-bold">
+          <div className="hidden md:block bg-card/10 px-4 py-2 rounded-lg border border-white/20 text-xs font-bold">
             Multi-unidade Ativado
           </div>
         </div>
       )}
 
       {/* Pausa Manual */}
-      <div className={`bg-white dark:bg-gray-900 rounded-2xl shadow-sm border p-6 transition-all ${settings.isStorePaused ? 'border-amber-200 bg-amber-50/30' : 'border-gray-100 dark:border-gray-800'}`}>
+      <div className={`bg-card rounded-2xl shadow-sm border p-6 transition-all ${settings.isStorePaused ? 'border-amber-200 bg-amber-50/30' : 'border-border'}`}>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
             <div className={`p-3 rounded-xl ${settings.isStorePaused ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'}`}>
               <Pause className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Pausa Temporária</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">Use isso para fechar a loja imediatamente, independente dos horários.</p>
+              <h2 className="text-lg font-bold text-foreground">Pausa Temporária</h2>
+              <p className="text-sm text-muted-foreground font-medium">Use isso para fechar a loja imediatamente, independente dos horários.</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -364,16 +364,16 @@ export function SettingsPage() {
         {/* Coluna da Esquerda: Dados Básicos */}
         <div className="lg:col-span-2 space-y-6">
           <form onSubmit={handleSaveSettings} className="space-y-6">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2">
+            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+              <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-primary-50 text-primary-600 rounded-lg text-sm">🏪</span>
                 Identidade e Contato
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                   <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Logotipo da Loja</label>
-                  <div className="flex items-center gap-6 p-4 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl bg-gray-50 dark:bg-gray-900/20">
-                    <div className="relative w-24 h-24 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                  <div className="flex items-center gap-6 p-4 border-2 border-dashed border-input rounded-2xl bg-gray-50 dark:bg-gray-900/20">
+                    <div className="relative w-24 h-24 bg-card border border-border rounded-xl flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                       {settings.logoUrl ? (
                         <img src={settings.logoUrl} alt="Logo preview" className="w-full h-full object-contain" />
                       ) : (
@@ -382,7 +382,7 @@ export function SettingsPage() {
                     </div>
                     <div className="flex flex-col gap-2 text-left">
                       <div className="flex items-center gap-2">
-                        <label className="cursor-pointer bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 text-gray-700 dark:text-gray-300 font-bold py-2 px-4 border border-gray-200 dark:border-gray-800 rounded-lg text-sm shadow-sm transition-all active:scale-95">
+                        <label className="cursor-pointer bg-card hover:bg-muted dark:bg-gray-900/50 text-foreground font-bold py-2 px-4 border border-input rounded-lg text-sm shadow-sm transition-all active:scale-95">
                           <span>{uploading ? 'Enviando...' : 'Selecionar Imagem'}</span>
                           <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} disabled={uploading} />
                         </label>
@@ -424,8 +424,8 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2">
+            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+              <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm"><MapPin className="w-4 h-4" /></span>
                 Endereço da Loja
               </h2>
@@ -509,8 +509,8 @@ export function SettingsPage() {
                               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2">
+            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+              <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-purple-50 text-purple-600 rounded-lg text-sm"><Building2 className="w-4 h-4" /></span>
                 Dados Fiscais & Integração
               </h2>
@@ -588,8 +588,8 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2">
+            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+              <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-green-50 text-green-600 rounded-lg text-sm">💰</span>
                 Configuração de Pagamento
               </h2>
@@ -601,7 +601,7 @@ export function SettingsPage() {
                     { id: 'cash', label: 'Dinheiro (Na entrega)' },
                     { id: 'card_on_delivery', label: 'Cartão (Na entrega)' },
                   ].map((m) => (
-                    <label key={m.id} className="flex items-center gap-3 p-3 border border-gray-100 dark:border-gray-800 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 cursor-pointer transition-all">
+                    <label key={m.id} className="flex items-center gap-3 p-3 border border-border rounded-xl hover:bg-muted dark:bg-gray-900/50 cursor-pointer transition-all">
                       <input
                         type="checkbox"
                         checked={settings.paymentMethods?.includes(m.id) ?? false}
@@ -614,14 +614,14 @@ export function SettingsPage() {
                         }}
                         className="w-4 h-4 text-primary-600 rounded border-gray-300 dark:border-gray-700 focus:ring-primary-500"
                       />
-                      <span className="text-sm font-bold text-gray-700 dark:text-gray-300">{m.label}</span>
+                      <span className="text-sm font-bold text-foreground">{m.label}</span>
                     </label>
                   ))}
                 </div>
               </div>
 
-              <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800 space-y-6">
-                <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <div className="mt-8 pt-6 border-t border-border space-y-6">
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
                   Dados para Repasse / PIX
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -667,8 +667,8 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2">
+            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+              <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-amber-50 text-amber-600 rounded-lg text-sm">🌍</span>
                 Configurações Regionais
               </h2>
@@ -678,7 +678,7 @@ export function SettingsPage() {
                   <select
                     value={settings.timezone || 'America/Sao_Paulo'}
                     onChange={e => setSettings({...settings, timezone: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl outline-none font-medium"
+                    className="w-full px-4 py-2.5 bg-card border border-input rounded-xl outline-none font-medium"
                   >
                     <option value="America/Sao_Paulo">Brasília (GMT-3)</option>
                     <option value="America/Manaus">Manaus (GMT-4)</option>
@@ -689,7 +689,7 @@ export function SettingsPage() {
                   <select
                     value={settings.currency || 'BRL'}
                     onChange={e => setSettings({...settings, currency: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl outline-none font-medium"
+                    className="w-full px-4 py-2.5 bg-card border border-input rounded-xl outline-none font-medium"
                   >
                     <option value="BRL">Real (BRL)</option>
                     <option value="USD">Dólar (USD)</option>
@@ -712,9 +712,9 @@ export function SettingsPage() {
 
         {/* Coluna da Direita: Horários */}
         <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
                 <Clock className="w-5 h-5 text-primary-500" />
                 Horário Semanal
               </h2>
@@ -740,9 +740,9 @@ export function SettingsPage() {
               {DAY_NAMES.map((name, i) => {
                 const day = hours.find(h => h.dayOfWeek === i) || { dayOfWeek: i, isOpen: false, openTime: '08:00', closeTime: '22:00' };
                 return (
-                  <div key={i} className="flex flex-col gap-2 p-3 rounded-xl border border-gray-50 hover:border-gray-100 dark:border-gray-800 transition-colors">
+                  <div key={i} className="flex flex-col gap-2 p-3 rounded-xl border border-gray-50 hover:border-border transition-colors">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-gray-700 dark:text-gray-300">{name}</span>
+                      <span className="text-sm font-bold text-foreground">{name}</span>
                       <label className="relative inline-flex items-center cursor-pointer">
                         <input 
                           type="checkbox" 
@@ -750,7 +750,7 @@ export function SettingsPage() {
                           checked={day.isOpen}
                           onChange={(e) => updateDay(i, 'isOpen', e.target.checked)}
                         />
-                        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white dark:bg-gray-900 after:border-gray-300 dark:border-gray-700 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
+                        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-card after:border-gray-300 dark:border-gray-700 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
                       </label>
                     </div>
                     {day.isOpen && (
@@ -759,14 +759,14 @@ export function SettingsPage() {
                           type="time" 
                           value={day.openTime || '08:00'}
                           onChange={(e) => updateDay(i, 'openTime', e.target.value)}
-                          className="flex-1 px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-lg text-sm outline-none focus:border-primary-300"
+                          className="flex-1 px-2 py-1.5 bg-muted border border-border rounded-lg text-sm outline-none focus:border-primary-300"
                         />
                         <span className="text-gray-300 text-xs">até</span>
                         <input 
                           type="time" 
                           value={day.closeTime || '22:00'}
                           onChange={(e) => updateDay(i, 'closeTime', e.target.value)}
-                          className="flex-1 px-2 py-1.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 rounded-lg text-sm outline-none focus:border-primary-300"
+                          className="flex-1 px-2 py-1.5 bg-muted border border-border rounded-lg text-sm outline-none focus:border-primary-300"
                         />
                       </div>
                     )}

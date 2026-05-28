@@ -127,7 +127,7 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
                 `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${
                   isActive
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800/40 hover:text-gray-900 dark:hover:text-gray-100'
+                    : 'text-muted-foreground hover:bg-muted/40 hover:text-gray-900 dark:hover:text-gray-100'
                 } ${collapsed ? 'justify-center' : ''}`
               }
             >
@@ -199,24 +199,24 @@ export function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-50 dark:bg-gray-950 transition-colors duration-300">
+    <div className="min-h-screen flex bg-background transition-colors duration-300">
       {isMobileOpen ? (
         <div className="fixed inset-0 z-40 bg-black/40 md:hidden backdrop-blur-sm" onClick={closeMobile} />
       ) : null}
 
       <aside
-        className={`fixed z-50 inset-y-0 left-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-[width,transform] duration-300 ease-out md:static md:translate-x-0 ${
+        className={`fixed z-50 inset-y-0 left-0 bg-card border-r border-border flex flex-col transition-[width,transform] duration-300 ease-out md:static md:translate-x-0 ${
           collapsed ? 'w-[72px]' : 'w-64'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
       >
-        <div className={`p-6 border-b border-gray-100 dark:border-gray-800/60 ${collapsed ? 'flex justify-center' : ''}`}>
+        <div className={`p-6 border-b border-input100 dark:border-input800/60 ${collapsed ? 'flex justify-center' : ''}`}>
           {!collapsed ? (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-indigo-600/20">
                 S
               </div>
               <div className="min-w-0">
-                <h1 className="text-sm font-black text-gray-900 dark:text-gray-100 tracking-tight">SaaS<span className="text-indigo-600">Admin</span></h1>
+                <h1 className="text-sm font-black text-foreground tracking-tight">SaaS<span className="text-indigo-600">Admin</span></h1>
                 <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">{user?.name || 'Carregando...'}</p>
               </div>
             </div>
@@ -240,7 +240,7 @@ export function AppLayout() {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-gray-100 dark:border-gray-800/60">
+        <div className="p-4 border-t border-input100 dark:border-input800/60">
           <button
             onClick={handleLogout}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all ${collapsed ? 'justify-center' : ''}`}
@@ -252,8 +252,8 @@ export function AppLayout() {
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        <header className="hidden md:flex sticky top-0 z-30 h-16 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800/60 px-6 items-center gap-4">
-          <button onClick={toggleCollapsed} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all">
+        <header className="hidden md:flex sticky top-0 z-30 h-16 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl border-b border-border/60 px-6 items-center gap-4">
+          <button onClick={toggleCollapsed} className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-muted rounded-xl transition-all">
             <Menu size={20} />
           </button>
 
@@ -263,51 +263,51 @@ export function AppLayout() {
               value={desktopSearch}
               onChange={(e) => setDesktopSearch(e.target.value)}
               placeholder="Pesquisar no sistema..."
-              className="w-full h-10 pl-10 pr-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+              className="w-full h-10 pl-10 pr-4 bg-gray-50 dark:bg-gray-900 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
             />
           </div>
 
           <div className="ml-auto flex items-center gap-3">
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-900 text-muted-foreground hover:bg-muted transition-all"
             >
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
 
-            <button className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all relative">
+            <button className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-900 text-muted-foreground hover:bg-muted transition-all relative">
               <Bell size={18} />
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-indigo-500 rounded-full border-2 border-white dark:border-gray-900" />
+              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-indigo-500 rounded-full border-2 border-white dark:border-input900" />
             </button>
 
             <div className="h-8 w-px bg-gray-200 dark:bg-gray-800 mx-1" />
 
-            <button className="flex items-center gap-3 pl-1 pr-3 py-1 rounded-2xl bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
+            <button className="flex items-center gap-3 pl-1 pr-3 py-1 rounded-2xl bg-card border border-input100 dark:border-input800 shadow-sm hover:shadow-md transition-all">
               <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 flex items-center justify-center">
                 <UserCircle size={20} />
               </div>
-              <span className="text-xs font-bold text-gray-700 dark:text-gray-300 hidden lg:block">{user?.name}</span>
+              <span className="text-xs font-bold text-foreground hidden lg:block">{user?.name}</span>
             </button>
           </div>
         </header>
 
-        <header className="md:hidden sticky top-0 z-30 h-14 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 px-4 flex items-center justify-between transition-colors">
-          <button onClick={openMobile} className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300">
+        <header className="md:hidden sticky top-0 z-30 h-14 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl border-b border-border px-4 flex items-center justify-between transition-colors">
+          <button onClick={openMobile} className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-900 text-foreground">
             <Menu size={20} />
           </button>
           <div className="text-center">
-            <div className="text-sm font-black text-gray-900 dark:text-gray-100 uppercase tracking-tight">SaaS<span className="text-indigo-600">Admin</span></div>
-            <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest leading-none mt-0.5">Gestão Global</div>
+            <div className="text-sm font-black text-foreground uppercase tracking-tight">SaaS<span className="text-indigo-600">Admin</span></div>
+            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none mt-0.5">Gestão Global</div>
           </div>
           <button
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400"
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-900 text-muted-foreground"
           >
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-950/50">
+        <main className="flex-1 overflow-y-auto bg-background/50">
           <div className="animate-in fade-in duration-500 p-4 md:p-8">
             <Outlet />
           </div>

@@ -249,7 +249,7 @@ export function ProductsPage() {
         >
           <td className="px-6 py-2">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-12 h-12 rounded-lg bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 overflow-hidden shrink-0">
+              <div className="w-12 h-12 rounded-lg bg-muted50 dark:bg-muted900/50 border border-border100 dark:border-border800 overflow-hidden shrink-0">
                 {product.image ? (
                   <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
                 ) : (
@@ -260,14 +260,14 @@ export function ProductsPage() {
               </div>
 
               <div className="min-w-0">
-                <div className="font-bold text-gray-900 dark:text-gray-100 truncate">{product.name}</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 truncate hidden sm:block">{product.shortDescription || 'Sem descrição'}</div>
+                <div className="font-bold text-foreground truncate">{product.name}</div>
+                <div className="text-xs text-muted-foreground dark:text-gray-400 truncate hidden sm:block">{product.shortDescription || 'Sem descrição'}</div>
                 <div className="mt-1 flex items-center gap-2">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-muted100 dark:bg-muted800 text-gray-700 dark:text-gray-300 border-border200 dark:border-border700'}`}>
                     {typeLabel}
                   </span>
                   {pubLabel ? (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30' : 'bg-muted100 dark:bg-muted800 text-gray-600 dark:text-gray-400 border border-border200 dark:border-border700'}`}>
                       {pubLabel}
                     </span>
                   ) : null}
@@ -285,7 +285,7 @@ export function ProductsPage() {
             {categoryName}
           </td>
 
-          <td className="px-6 py-2 text-sm font-black text-gray-900 dark:text-gray-100 whitespace-nowrap">
+          <td className="px-6 py-2 text-sm font-black text-foreground whitespace-nowrap">
             {formatMoney(product.basePrice)}
           </td>
 
@@ -299,7 +299,7 @@ export function ProductsPage() {
             <div className="flex justify-end gap-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
               <button
                 onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
-                className="p-2 text-gray-400 hover:text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all"
+                className="p-2 text-gray-400 hover:text-foreground hover:bg-muted100 dark:hover:bg-muted800 rounded-lg transition-all"
                 title="Ficha técnica"
                 type="button"
               >
@@ -375,7 +375,7 @@ export function ProductsPage() {
         <div key={product.id} className="card-premium p-3 md:p-4 hover:shadow-md transition-all">
           <div className="flex items-start justify-between gap-3">
             <div className="flex gap-3 min-w-0 flex-1">
-               <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 overflow-hidden shrink-0 shadow-sm">
+               <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-muted50 dark:bg-muted800 border border-border100 dark:border-border800 overflow-hidden shrink-0 shadow-sm">
                 {product.image ? (
                   <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
                 ) : (
@@ -386,14 +386,14 @@ export function ProductsPage() {
               </div>
 
               <div className="min-w-0 flex-1">
-                <div className="font-black text-gray-900 dark:text-gray-100 truncate text-sm md:text-base leading-tight">{product.name}</div>
-                <div className="text-[10px] md:text-xs text-gray-500 dark:text-gray-400 font-bold mt-0.5 truncate">{categoryName}</div>
+                <div className="font-black text-foreground truncate text-sm md:text-base leading-tight">{product.name}</div>
+                <div className="text-[10px] md:text-xs text-muted-foreground dark:text-gray-400 font-bold mt-0.5 truncate">{categoryName}</div>
                 <div className="mt-2 flex flex-wrap items-center gap-1">
-                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-800'}`}>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-muted100 dark:bg-muted800 text-gray-700 dark:text-gray-300 border-border200 dark:border-border800'}`}>
                     {product.type === 'simple' ? 'Individual' : product.type === 'configurable' ? 'Personalizado' : 'Combo'}
                   </span>
                   {pubLabel && (
-                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-gray-100 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-800'}`}>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-muted100 text-gray-600 dark:text-gray-400 border border-border200 dark:border-border800'}`}>
                       {pubLabel}
                     </span>
                   )}
@@ -407,7 +407,7 @@ export function ProductsPage() {
             </div>
             <div className="text-right shrink-0">
               <div className="text-[9px] md:text-[10px] text-gray-400 font-black uppercase tracking-widest mb-0.5">Preço</div>
-              <div className="text-sm md:text-base font-black text-gray-900 dark:text-gray-100">{formatMoney(product.basePrice)}</div>
+              <div className="text-sm md:text-base font-black text-foreground">{formatMoney(product.basePrice)}</div>
             </div>
           </div>
 
@@ -439,7 +439,7 @@ export function ProductsPage() {
               </button>
               <button
                 onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
-                className="p-1.5 md:p-2 text-gray-500 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 transition-colors"
+                className="p-1.5 md:p-2 text-muted-foreground bg-muted50 dark:bg-muted800 rounded-xl hover:bg-muted100 transition-colors"
                 title="Ficha técnica"
               >
                 <FileText size={14} />
@@ -505,8 +505,8 @@ export function ProductsPage() {
       {/* Header */}
       <div className="page-header mb-5 md:mb-6">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-gray-100 tracking-tight uppercase">Produtos</h1>
-          <p className="text-[11px] md:text-sm text-gray-500 dark:text-gray-400 font-medium mt-0.5">Gerencie seu cardápio de forma simples.</p>
+          <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight uppercase">Produtos</h1>
+          <p className="text-[11px] md:text-sm text-muted-foreground dark:text-gray-400 font-medium mt-0.5">Gerencie seu cardápio de forma simples.</p>
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto">
@@ -554,7 +554,7 @@ export function ProductsPage() {
                 onClick={() => setViewMode('all')}
                 className={`flex-1 md:flex-none md:px-6 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
                   viewMode === 'all'
-                    ? 'bg-white dark:bg-gray-900 text-primary-600 shadow-sm'
+                    ? 'bg-card dark:bg-muted900 text-primary-600 shadow-sm'
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                 }`}
                 type="button"
@@ -565,7 +565,7 @@ export function ProductsPage() {
                 onClick={() => setViewMode('grouped')}
                 className={`flex-1 md:flex-none md:px-6 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
                   viewMode === 'grouped'
-                    ? 'bg-white dark:bg-gray-900 text-primary-600 shadow-sm'
+                    ? 'bg-card dark:bg-muted900 text-primary-600 shadow-sm'
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                 }`}
                 type="button"
@@ -589,7 +589,7 @@ export function ProductsPage() {
                   className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border ${
                     typeFilter === t.id
                       ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800 text-primary-600'
-                      : 'bg-transparent border-slate-200 dark:border-gray-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                      : 'bg-transparent border-slate-200 dark:border-border700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
                   }`}
                 >
                   {t.label}
@@ -606,7 +606,7 @@ export function ProductsPage() {
               <select
                 value={selectedCategoryId ?? ''}
                 onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : null)}
-                className="h-8 pl-2 pr-6 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
+                className="h-8 pl-2 pr-6 bg-card dark:bg-muted900 border border-slate-200 dark:border-border700 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
               >
                 <option value="">Categorias</option>
                 {categories.map((c) => (
@@ -618,7 +618,7 @@ export function ProductsPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as ProductStatusFilter)}
-                className="h-8 pl-2 pr-6 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
+                className="h-8 pl-2 pr-6 bg-card dark:bg-muted900 border border-slate-200 dark:border-border700 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
               >
                 <option value="all">Status</option>
                 <option value="active">Ativos</option>
@@ -628,7 +628,7 @@ export function ProductsPage() {
               <select
                 value={publicationFilter}
                 onChange={(e) => setPublicationFilter(e.target.value as PublicationFilter)}
-                className="h-8 pl-2 pr-6 bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
+                className="h-8 pl-2 pr-6 bg-card dark:bg-muted900 border border-slate-200 dark:border-border700 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
               >
                 <option value="all">Publicação</option>
                 <option value="draft">Rascunho</option>
@@ -650,7 +650,7 @@ export function ProductsPage() {
               <div className="space-y-3 md:hidden">
                 {renderCards(filteredProducts)}
                 {filteredProducts.length === 0 ? (
-                  <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6 text-center text-gray-400 font-medium italic">
+                  <div className="bg-card dark:bg-muted900 rounded-2xl shadow-sm border border-border100 dark:border-border800 p-6 text-center text-gray-400 font-medium italic">
                     {searchTerm.trim().length > 0 || statusFilter !== 'all' || typeFilter !== 'all' || publicationFilter !== 'all' || operationalFilter !== 'all' || Boolean(selectedCategoryId)
                       ? 'Nenhum resultado para os filtros atuais.'
                       : 'Nenhum produto cadastrado ainda no cardápio.'}
@@ -709,15 +709,15 @@ export function ProductsPage() {
                     <button
                       type="button"
                       onClick={() => toggleGroupExpanded(group.key)}
-                      className="w-full px-4 py-4 bg-gray-50/50 dark:bg-gray-800/20 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-800/40 transition-all"
+                      className="w-full px-4 py-4 bg-muted50/50 dark:bg-muted800/20 flex items-center justify-between hover:bg-muted100 dark:hover:bg-muted800/40 transition-all"
                     >
                       <div className="text-left min-w-0 flex-1">
-                        <div className="text-sm font-black text-gray-900 dark:text-gray-100 uppercase tracking-tight truncate">{title}</div>
-                        <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest mt-0.5">{group.products.length} {group.products.length === 1 ? 'produto' : 'produtos'}</div>
+                        <div className="text-sm font-black text-foreground uppercase tracking-tight truncate">{title}</div>
+                        <div className="text-[10px] text-muted-foreground dark:text-gray-400 font-bold uppercase tracking-widest mt-0.5">{group.products.length} {group.products.length === 1 ? 'produto' : 'produtos'}</div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0 ml-4">
-                        <div className={`w-8 h-8 flex items-center justify-center rounded-full bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
-                          <ChevronDown size={16} className="text-gray-500" />
+                        <div className={`w-8 h-8 flex items-center justify-center rounded-full bg-card dark:bg-muted900 border border-border100 dark:border-border800 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                          <ChevronDown size={16} className="text-muted-foreground" />
                         </div>
                       </div>
                     </button>
@@ -732,7 +732,7 @@ export function ProductsPage() {
                         {/* Desktop View: Table */}
                         <div className="hidden md:block max-h-[60vh] overflow-auto custom-scrollbar">
                           <table className="w-full text-left border-collapse">
-                            <thead className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
+                            <thead className="bg-card dark:bg-muted900 border-b border-border100 dark:border-border800 sticky top-0 z-10">
                               <tr>
                                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Produto</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest hidden lg:table-cell">Categoria</th>
@@ -754,7 +754,7 @@ export function ProductsPage() {
 
               {productsGroupedByCategory.length === 0 && (
                 <div className="card-premium py-20 text-center flex flex-col items-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-gray-300">
+                  <div className="w-16 h-16 rounded-full bg-muted50 dark:bg-muted800 flex items-center justify-center text-gray-300">
                     <Search size={32} />
                   </div>
                   <div className="text-gray-400 font-black uppercase tracking-widest text-xs">
@@ -801,18 +801,18 @@ export function ProductsPage() {
       >
         <div className="space-y-6">
           <div>
-            <h3 className="text-sm font-black text-gray-900 dark:text-gray-100 mb-2">Publicação (publicationStatus)</h3>
+            <h3 className="text-sm font-black text-foreground mb-2">Publicação (publicationStatus)</h3>
             <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Controla a visibilidade externa do produto (storefront, PDV, etc.).</p>
-            <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+            <ul className="text-xs text-muted-foreground dark:text-gray-400 space-y-1">
               <li><span className="font-bold text-gray-700 dark:text-gray-300">Draft:</span> rascunho, não visível publicamente.</li>
               <li><span className="font-bold text-gray-700 dark:text-gray-300">Publicado:</span> visível em catálogos públicos.</li>
             </ul>
           </div>
 
           <div>
-            <h3 className="text-sm font-black text-gray-900 dark:text-gray-100 mb-2">Operação (operationalStatus)</h3>
+            <h3 className="text-sm font-black text-foreground mb-2">Operação (operationalStatus)</h3>
             <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Define se o produto pode ser vendido no momento, mesmo estando publicado.</p>
-            <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+            <ul className="text-xs text-muted-foreground dark:text-gray-400 space-y-1">
               <li><span className="font-bold text-gray-700 dark:text-gray-300">Active:</span> disponível para venda.</li>
               <li><span className="font-bold text-gray-700 dark:text-gray-300">Hidden:</span> visível mas não vendável (indisponível).</li>
               <li><span className="font-bold text-gray-700 dark:text-gray-300">Sold out:</span> esgotado manualmente.</li>
@@ -821,15 +821,15 @@ export function ProductsPage() {
           </div>
 
           <div>
-            <h3 className="text-sm font-black text-gray-900 dark:text-gray-100 mb-2">Status Geral (isActive)</h3>
+            <h3 className="text-sm font-black text-foreground mb-2">Status Geral (isActive)</h3>
             <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Controle de baixo nível (soft-delete). Geralmente não alterado no dia a dia.</p>
-            <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+            <ul className="text-xs text-muted-foreground dark:text-gray-400 space-y-1">
               <li><span className="font-bold text-gray-700 dark:text-gray-300">Ativo:</span> produto existe no sistema.</li>
               <li><span className="font-bold text-gray-700 dark:text-gray-300">Inativo:</span> produto desativado (soft delete).</li>
             </ul>
           </div>
 
-          <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl p-3">
+          <div className="bg-muted50 dark:bg-muted900/50 border border-border200 dark:border-border800 rounded-xl p-3">
             <p className="text-xs text-gray-600 dark:text-gray-400">
               <span className="font-black">Dica:</span> Use <span className="font-bold">Publicado + Active</span> para vender normalmente.
               Use <span className="font-bold">Hidden</span> para manter visível mas indisponível.

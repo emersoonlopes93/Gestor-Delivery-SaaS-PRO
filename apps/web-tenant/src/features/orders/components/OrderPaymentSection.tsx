@@ -35,32 +35,32 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
 }: OrderPaymentSectionProps) {
   
   const fmt = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
-  const payment = PAYMENT_METHOD_LABELS[paymentMethod] || { label: paymentMethod, icon: Wallet, color: 'text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-400' };
+  const payment = PAYMENT_METHOD_LABELS[paymentMethod] || { label: paymentMethod, icon: Wallet, color: 'text-muted-foreground600 bg-slate-100 dark:bg-slate-800 dark:text-muted-foreground400' };
   const Icon = payment.icon;
 
   return (
     <section>
-      <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-3">Pagamento e Totais</h3>
-      <div className="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-2xl border border-slate-100 dark:border-slate-800">
+      <h3 className="text-[11px] font-black uppercase tracking-wider text-muted-foreground400 mb-3">Pagamento e Totais</h3>
+      <div className="bg-slate-50 dark:bg-slate-800/50 p-5 rounded-2xl border border-border100 dark:border-border800">
         
         {/* Detalhamento de Valores */}
         <div className="space-y-2.5 mb-5">
           <div className="flex justify-between text-sm">
-            <span className="text-slate-500 font-medium">Subtotal</span>
-            <span className="text-slate-700 dark:text-slate-300 font-bold">{fmt(itemsSubtotal)}</span>
+            <span className="text-muted-foreground500 font-medium">Subtotal</span>
+            <span className="text-muted-foreground700 dark:text-muted-foreground300 font-bold">{fmt(itemsSubtotal)}</span>
           </div>
           
           {deliveryFee > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-slate-500 font-medium">Taxa de Entrega</span>
-              <span className="text-slate-700 dark:text-slate-300 font-bold">{fmt(deliveryFee)}</span>
+              <span className="text-muted-foreground500 font-medium">Taxa de Entrega</span>
+              <span className="text-muted-foreground700 dark:text-muted-foreground300 font-bold">{fmt(deliveryFee)}</span>
             </div>
           )}
 
           {serviceFee > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-slate-500 font-medium">Taxa de Serviço</span>
-              <span className="text-slate-700 dark:text-slate-300 font-bold">{fmt(serviceFee)}</span>
+              <span className="text-muted-foreground500 font-medium">Taxa de Serviço</span>
+              <span className="text-muted-foreground700 dark:text-muted-foreground300 font-bold">{fmt(serviceFee)}</span>
             </div>
           )}
 
@@ -84,29 +84,29 @@ export const OrderPaymentSection = memo(function OrderPaymentSection({
             </div>
           )}
 
-          <div className="pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
-            <span className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Total a Pagar</span>
-            <span className="text-xl font-black text-slate-900 dark:text-white">{fmt(total)}</span>
+          <div className="pt-4 border-t border-border200 dark:border-border700 flex justify-between items-center">
+            <span className="text-sm font-black text-muted-foreground900 dark:text-white uppercase tracking-tight">Total a Pagar</span>
+            <span className="text-xl font-black text-muted-foreground900 dark:text-white">{fmt(total)}</span>
           </div>
         </div>
 
         {/* Método de Pagamento */}
-        <div className="bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="bg-card dark:bg-slate-900 p-3.5 rounded-xl border border-border100 dark:border-border800 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${payment.color}`}>
               <Icon className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Método</p>
-              <p className="text-sm font-black text-slate-900 dark:text-white leading-none">{payment.label}</p>
+              <p className="text-[10px] font-black text-muted-foreground400 uppercase tracking-widest leading-none mb-1">Método</p>
+              <p className="text-sm font-black text-muted-foreground900 dark:text-white leading-none">{payment.label}</p>
             </div>
           </div>
           
           {paymentMethod === 'cash' && changeFor && changeFor > total && (
             <div className="text-right">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Troco para</p>
+              <p className="text-[10px] font-black text-muted-foreground400 uppercase tracking-widest leading-none mb-1">Troco para</p>
               <p className="text-sm font-black text-emerald-600 dark:text-emerald-400 leading-none">{fmt(changeFor)}</p>
-              <p className="text-[9px] font-bold text-slate-400 mt-1">Troco: {fmt(changeFor - total)}</p>
+              <p className="text-[9px] font-bold text-muted-foreground400 mt-1">Troco: {fmt(changeFor - total)}</p>
             </div>
           )}
         </div>

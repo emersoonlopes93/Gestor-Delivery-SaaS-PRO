@@ -48,7 +48,7 @@ export const OrderActionsBar = memo(function OrderActionsBar({
   const isFinalStatus = ['completed', 'cancelled'].includes(status);
 
   return (
-    <footer className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col gap-3 shrink-0">
+    <footer className="p-4 border-t border-border200 dark:border-border800 bg-card dark:bg-slate-900 flex flex-col gap-3 shrink-0">
       
       {/* Ação Principal (Avançar Status) */}
       {!isFinalStatus && nextAction && (
@@ -70,7 +70,7 @@ export const OrderActionsBar = memo(function OrderActionsBar({
       <div className="grid grid-cols-3 gap-2">
         <button 
           onClick={onPrint}
-          className="py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-[10px] uppercase tracking-wider flex flex-col items-center justify-center gap-1.5 transition-colors border border-slate-200 dark:border-slate-700"
+          className="py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-muted-foreground700 dark:text-muted-foreground300 rounded-xl font-bold text-[10px] uppercase tracking-wider flex flex-col items-center justify-center gap-1.5 transition-colors border border-border200 dark:border-border700"
         >
           <Printer className="w-4 h-4" /> 
           Imprimir
@@ -79,7 +79,7 @@ export const OrderActionsBar = memo(function OrderActionsBar({
         {canEdit ? (
           <button 
             onClick={onEdit}
-            className="py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-[10px] uppercase tracking-wider flex flex-col items-center justify-center gap-1.5 transition-colors border border-slate-200 dark:border-slate-700"
+            className="py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-muted-foreground700 dark:text-muted-foreground300 rounded-xl font-bold text-[10px] uppercase tracking-wider flex flex-col items-center justify-center gap-1.5 transition-colors border border-border200 dark:border-border700"
           >
             <Edit2 className="w-4 h-4" /> 
             Editar
@@ -88,7 +88,7 @@ export const OrderActionsBar = memo(function OrderActionsBar({
           <button 
             onClick={onRefresh}
             disabled={isValidating}
-            className="py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-[10px] uppercase tracking-wider flex flex-col items-center justify-center gap-1.5 transition-colors border border-slate-200 dark:border-slate-700"
+            className="py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-muted-foreground700 dark:text-muted-foreground300 rounded-xl font-bold text-[10px] uppercase tracking-wider flex flex-col items-center justify-center gap-1.5 transition-colors border border-border200 dark:border-border700"
           >
             <RefreshCw className={`w-4 h-4 ${isValidating ? 'animate-spin' : ''}`} /> 
             Atualizar

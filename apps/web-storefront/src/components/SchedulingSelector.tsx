@@ -62,9 +62,9 @@ export function SchedulingSelector({ tenantSlug, onSlotSelect, selectedSlotId, s
   };
 
   return (
-    <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
+    <div className="space-y-4 p-4 border rounded-lg bg-storefront-muted50">
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+        <label className="text-sm font-medium text-storefront-muted-foreground700 flex items-center gap-2">
           <Calendar className="h-4 w-4" />
           Data da Entrega/Retirada
         </label>
@@ -78,13 +78,13 @@ export function SchedulingSelector({ tenantSlug, onSlotSelect, selectedSlotId, s
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+        <label className="text-sm font-medium text-storefront-muted-foreground700 flex items-center gap-2">
           <Clock className="h-4 w-4" />
           Horários Disponíveis
         </label>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-4 text-gray-500 gap-2">
+          <div className="flex items-center justify-center py-4 text-storefront-muted-foreground500 gap-2">
             <Loader2 className="h-4 w-4 animate-spin" />
             Carregando horários...
           </div>
@@ -109,9 +109,9 @@ export function SchedulingSelector({ tenantSlug, onSlotSelect, selectedSlotId, s
                     p-2 text-sm border rounded-md transition-all
                     ${isSelected 
                       ? 'bg-primary-600 border-primary-600 text-white' 
-                      : 'bg-white border-gray-200 text-gray-700 hover:border-primary-500'
+                      : 'bg-storefront-card border-storefront-border200 text-storefront-muted-foreground700 hover:border-primary-500'
                     }
-                    ${isFull ? 'opacity-50 cursor-not-allowed bg-gray-100' : ''}
+                    ${isFull ? 'opacity-50 cursor-not-allowed bg-storefront-muted100' : ''}
                   `}
                 >
                   {formatTime(slot.startTime)} - {formatTime(slot.endTime)}

@@ -32,20 +32,20 @@ export const OrderCustomerSection = memo(function OrderCustomerSection({
 
   return (
     <section>
-      <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-3">Cliente</h3>
-      <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+      <h3 className="text-[11px] font-black uppercase tracking-wider text-400 mb-3">Cliente</h3>
+      <div className="bg-50 dark:bg-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
         <div className="flex justify-between items-start">
           <div>
-            <p className="font-bold text-slate-900 dark:text-white">{customerName}</p>
+            <p className="font-bold text-900 dark:text-white">{customerName}</p>
             {customerEmail && (
-              <p className="text-xs text-slate-500 mt-0.5">{customerEmail}</p>
+              <p className="text-xs text-500 mt-0.5">{customerEmail}</p>
             )}
           </div>
           {customerPhone && (
             <div className="flex gap-1">
               <button 
                 onClick={handleCopyPhone}
-                className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-slate-500 transition-colors"
+                className="p-1.5 hover:bg-200 dark:hover:bg-700 rounded-lg text-500 transition-colors"
                 title="Copiar Telefone"
               >
                 <Copy className="w-3.5 h-3.5" />
@@ -63,8 +63,8 @@ export const OrderCustomerSection = memo(function OrderCustomerSection({
 
         {customerPhone && (
           <div className="flex items-center gap-2 mt-2">
-            <Phone className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{customerPhone}</span>
+            <Phone className="w-3.5 h-3.5 text-400" />
+            <span className="text-sm font-medium text-600 dark:text-300">{customerPhone}</span>
           </div>
         )}
 

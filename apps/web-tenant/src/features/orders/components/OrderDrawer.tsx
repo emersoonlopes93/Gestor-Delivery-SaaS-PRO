@@ -152,23 +152,23 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
           onClick={onClose}
         />
         <div 
-          className={`relative z-50 h-[92%] sm:h-full w-full sm:w-[500px] bg-white dark:bg-slate-900 shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out ${orderId ? 'translate-y-0 sm:translate-x-0' : 'translate-y-full sm:translate-x-full sm:translate-y-0'} rounded-t-[32px] sm:rounded-t-none border-l border-slate-200 dark:border-slate-800`}
+          className={`relative z-50 h-[92%] sm:h-full w-full sm:w-[500px] bg-card shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out ${orderId ? 'translate-y-0 sm:translate-x-0' : 'translate-y-full sm:translate-x-full sm:translate-y-0'} rounded-t-[32px] sm:rounded-t-none border-l border-border`}
         >
           {/* Mobile Handle */}
           <div className="sm:hidden flex justify-center py-3 shrink-0">
-            <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full" />
+            <div className="w-12 h-1.5 bg-muted rounded-full" />
           </div>
 
-          <header className="flex items-center justify-between px-6 py-4 sm:py-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+          <header className="flex items-center justify-between px-6 py-4 sm:py-5 border-b border-border bg-muted/50 dark:bg-muted/50 shrink-0">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3">
-              <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+              <h2 className="text-xl font-black text-foreground tracking-tight">
                 Pedido #{order?.orderNumber || '...'}
               </h2>
               {order && <OrderStatusBadge status={order.status} />}
             </div>
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
                 {order ? `Canal: ${order.sourceChannel}` : 'Carregando...'}
               </span>
               {isValidating && (
@@ -182,15 +182,15 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
             onClick={onClose} 
             className="p-2.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl transition-all active:scale-90"
           >
-            <X className="w-6 h-6 text-slate-500" />
+            <X className="w-6 h-6 text-muted-foreground" />
           </button>
         </header>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8 bg-white dark:bg-slate-900">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8 bg-card">
           {loading ? (
             <div className="flex flex-col items-center justify-center h-64 gap-4">
               <div className="w-12 h-12 rounded-full border-2 border-primary-600/20 border-t-primary-600 animate-spin" />
-              <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Buscando detalhes...</p>
+              <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Buscando detalhes...</p>
             </div>
           ) : error ? (
             <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-3xl border border-red-100 dark:border-red-900/30 text-center">
