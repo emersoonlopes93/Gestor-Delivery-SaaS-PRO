@@ -371,18 +371,18 @@ export function SettingsPage() {
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Logotipo da Loja</label>
-                  <div className="flex items-center gap-6 p-4 border-2 border-dashed border-input rounded-2xl bg-gray-50 dark:bg-gray-900/20">
+                  <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Logotipo da Loja</label>
+                  <div className="flex items-center gap-6 p-4 border-2 border-dashed border-input rounded-2xl bg-muted">
                     <div className="relative w-24 h-24 bg-card border border-border rounded-xl flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
                       {settings.logoUrl ? (
                         <img src={settings.logoUrl} alt="Logo preview" className="w-full h-full object-contain" />
                       ) : (
-                        <span className="text-gray-300 text-2xl">🖼️</span>
+                        <span className="text-muted-foreground/50 text-2xl">🖼️</span>
                       )}
                     </div>
                     <div className="flex flex-col gap-2 text-left">
                       <div className="flex items-center gap-2">
-                        <label className="cursor-pointer bg-card hover:bg-muted dark:bg-gray-900/50 text-foreground font-bold py-2 px-4 border border-input rounded-lg text-sm shadow-sm transition-all active:scale-95">
+                        <label className="cursor-pointer bg-card hover:bg-muted text-foreground font-bold py-2 px-4 border border-input rounded-lg text-sm shadow-sm transition-all active:scale-95">
                           <span>{uploading ? 'Enviando...' : 'Selecionar Imagem'}</span>
                           <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} disabled={uploading} />
                         </label>
@@ -396,7 +396,7 @@ export function SettingsPage() {
                           </button>
                         )}
                       </div>
-                      <p className="text-[10px] text-gray-400 font-medium leading-tight">
+                      <p className="text-[10px] text-muted-foreground font-medium leading-tight">
                         Formatos aceitos: JPG, PNG ou WEBP. <br />
                         Tamanho recomendado: 512x512 pixels.
                       </p>
@@ -404,7 +404,7 @@ export function SettingsPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Telefone Comercial</label>
+                  <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Telefone Comercial</label>
                   <input
                     type="text"
                     value={settings.businessPhone || ''}
@@ -413,7 +413,7 @@ export function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">E-mail Comercial</label>
+                  <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">E-mail Comercial</label>
                   <input
                     type="email"
                     value={settings.businessEmail || ''}
@@ -432,7 +432,7 @@ export function SettingsPage() {
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className="md:col-span-1">
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">CEP</label>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">CEP</label>
                     <input
                       type="text"
                       value={settings.zipCode || ''}
@@ -443,7 +443,7 @@ export function SettingsPage() {
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Rua / Logradouro</label>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Rua / Logradouro</label>
                     <input
                       type="text"
                       value={settings.street || ''}
@@ -452,7 +452,7 @@ export function SettingsPage() {
                     />
                   </div>
                   <div className="md:col-span-1">
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Número</label>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Número</label>
                     <input
                       type="text"
                       value={settings.number || ''}
@@ -464,7 +464,7 @@ export function SettingsPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Bairro</label>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Bairro</label>
                     <input
                       type="text"
                       value={settings.neighborhood || ''}
@@ -473,7 +473,7 @@ export function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Cidade</label>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Cidade</label>
                     <input
                       type="text"
                       value={settings.city || ''}
@@ -482,7 +482,7 @@ export function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Estado (UF)</label>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Estado (UF)</label>
                     <input
                       type="text"
                       value={settings.state || ''}
@@ -495,7 +495,7 @@ export function SettingsPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                    <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Complemento</label>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Complemento</label>
                     <input
                       type="text"
                       value={settings.complement || ''}
@@ -516,7 +516,7 @@ export function SettingsPage() {
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">CNPJ</label>
+                  <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">CNPJ</label>
                   <input
                     type="text"
                     value={settings.cnpj || ''}
@@ -530,7 +530,7 @@ export function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Razão Social</label>
+                  <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Razão Social</label>
                   <input
                     type="text"
                     value={settings.razaoSocial || ''}
@@ -540,7 +540,7 @@ export function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Inscrição Estadual</label>
+                  <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Inscrição Estadual</label>
                   <input
                     type="text"
                     value={settings.inscricaoEstadual || ''}
@@ -550,7 +550,7 @@ export function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Regime Tributário</label>
+                  <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Regime Tributário</label>
                   <select
                     value={settings.taxRegime || ''}
                     onChange={e => setSettings({...settings, taxRegime: e.target.value})}
@@ -565,7 +565,7 @@ export function SettingsPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">CFOP Padrão</label>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">CFOP Padrão</label>
                     <input
                       type="text"
                       value={settings.standardCfop || ''}
@@ -575,7 +575,7 @@ export function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">NCM Padrão</label>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">NCM Padrão</label>
                     <input
                       type="text"
                       value={settings.standardNcm || ''}
@@ -594,14 +594,14 @@ export function SettingsPage() {
                 Configuração de Pagamento
               </h2>
               <div className="space-y-4">
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest">Métodos aceitos no Checkout</label>
+                <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest">Métodos aceitos no Checkout</label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {[
                     { id: 'pix', label: 'PIX (Online/Entrega)' },
                     { id: 'cash', label: 'Dinheiro (Na entrega)' },
                     { id: 'card_on_delivery', label: 'Cartão (Na entrega)' },
                   ].map((m) => (
-                    <label key={m.id} className="flex items-center gap-3 p-3 border border-border rounded-xl hover:bg-muted dark:bg-gray-900/50 cursor-pointer transition-all">
+                    <label key={m.id} className="flex items-center gap-3 p-3 border border-border rounded-xl hover:bg-muted cursor-pointer transition-all">
                       <input
                         type="checkbox"
                         checked={settings.paymentMethods?.includes(m.id) ?? false}
@@ -612,7 +612,7 @@ export function SettingsPage() {
                             : current.filter((x) => x !== m.id);
                           setSettings({ ...settings, paymentMethods: next });
                         }}
-                        className="w-4 h-4 text-primary-600 rounded border-gray-300 dark:border-gray-700 focus:ring-primary-500"
+                        className="w-4 h-4 text-primary rounded border-input focus:ring-primary"
                       />
                       <span className="text-sm font-bold text-foreground">{m.label}</span>
                     </label>
@@ -626,7 +626,7 @@ export function SettingsPage() {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Chave PIX da Loja</label>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Chave PIX da Loja</label>
                     <input
                       type="text"
                       value={settings.pixKey || ''}
@@ -636,7 +636,7 @@ export function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Nome do Banco</label>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Nome do Banco</label>
                     <input
                       type="text"
                       value={settings.bankName || ''}
@@ -646,7 +646,7 @@ export function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Agência</label>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Agência</label>
                     <input
                       type="text"
                       value={settings.bankAgency || ''}
@@ -655,7 +655,7 @@ export function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Conta com Dígito</label>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Conta com Dígito</label>
                     <input
                       type="text"
                       value={settings.bankAccount || ''}
@@ -674,7 +674,7 @@ export function SettingsPage() {
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <div>
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Fuso Horário</label>
+                  <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Fuso Horário</label>
                   <select
                     value={settings.timezone || 'America/Sao_Paulo'}
                     onChange={e => setSettings({...settings, timezone: e.target.value})}
@@ -685,7 +685,7 @@ export function SettingsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Moeda</label>
+                  <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Moeda</label>
                   <select
                     value={settings.currency || 'BRL'}
                     onChange={e => setSettings({...settings, currency: e.target.value})}
@@ -722,14 +722,14 @@ export function SettingsPage() {
                 <button 
                   onClick={copyFirstDayToAll}
                   title="Copiar Domingo para todos"
-                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-primary-600 transition-colors"
+                  className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-primary transition-colors"
                 >
                   <Copy className="w-4 h-4" />
                 </button>
                 <button 
                   onClick={applyMonToFri}
                   title="Aplicar Seg a Sex"
-                  className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-primary-600 transition-colors"
+                  className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-primary transition-colors"
                 >
                   <Calendar className="w-4 h-4" />
                 </button>
@@ -740,7 +740,7 @@ export function SettingsPage() {
               {DAY_NAMES.map((name, i) => {
                 const day = hours.find(h => h.dayOfWeek === i) || { dayOfWeek: i, isOpen: false, openTime: '08:00', closeTime: '22:00' };
                 return (
-                  <div key={i} className="flex flex-col gap-2 p-3 rounded-xl border border-gray-50 hover:border-border transition-colors">
+                  <div key={i} className="flex flex-col gap-2 p-3 rounded-xl border border-border hover:border-border/70 transition-colors">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-bold text-foreground">{name}</span>
                       <label className="relative inline-flex items-center cursor-pointer">
@@ -750,7 +750,7 @@ export function SettingsPage() {
                           checked={day.isOpen}
                           onChange={(e) => updateDay(i, 'isOpen', e.target.checked)}
                         />
-                        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-card after:border-gray-300 dark:border-gray-700 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
+                        <div className="w-9 h-5 bg-input peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-card after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                       </label>
                     </div>
                     {day.isOpen && (
@@ -778,7 +778,7 @@ export function SettingsPage() {
             <button
               onClick={handleSaveHours}
               disabled={saving}
-              className="w-full mt-6 bg-gray-900 border border-gray-900 text-white font-bold py-3 px-4 rounded-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
+              className="w-full mt-6 bg-primary border border-primary text-primary-foreground font-bold py-3 px-4 rounded-xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
             >
               <Save className="w-4 h-4 group-hover:scale-110 transition-transform" />
               {saving ? 'Salvando...' : 'Salvar Horários'}

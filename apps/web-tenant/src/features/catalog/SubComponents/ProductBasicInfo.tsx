@@ -52,13 +52,13 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
 }) => {
   return (
     <section className="space-y-6">
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm text-left">
-        <h2 className="text-lg font-black text-gray-900 dark:text-gray-100 mb-6">Informações Básicas</h2>
+      <div className="bg-card border border-border rounded-2xl p-6 shadow-sm text-left">
+        <h2 className="text-lg font-black text-foreground mb-6">Informações Básicas</h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Nome do Produto *</label>
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Nome do Produto *</label>
               <input
                 value={productForm.name}
                 onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
@@ -70,7 +70,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
             <div className="grid grid-cols-2 gap-4">
               {!isComboMode ? (
                 <div>
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Preço Base *</label>
+                  <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Preço Base *</label>
                   <input
                     type="number"
                     step="0.01"
@@ -81,7 +81,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                 </div>
               ) : (
                 <div>
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Preço Final do Combo</label>
+                  <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Preço Final do Combo</label>
                   <input
                     type="number"
                     step="0.01"
@@ -89,13 +89,13 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                     disabled
                     className="input-premium opacity-70 cursor-not-allowed"
                   />
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 font-bold">Preço derivado automaticamente pelos itens + estratégia de preço.</p>
+                  <p className="text-[10px] text-muted-foreground mt-1 font-bold">Preço derivado automaticamente pelos itens + estratégia de preço.</p>
                 </div>
               )}
               
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-black text-gray-400 uppercase tracking-wider">Preço de Custo (CMV)</label>
+                  <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider">Preço de Custo (CMV)</label>
                   {!isNew && (
                     <button
                       type="button"
@@ -118,7 +118,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Código do Produto</label>
+                <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Código do Produto</label>
                 <input
                   value={productForm.sku}
                   onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
@@ -129,7 +129,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Categoria</label>
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Categoria</label>
               <select
                 value={productForm.categoryId}
                 onChange={(e) => setProductForm({ ...productForm, categoryId: e.target.value })}
@@ -144,7 +144,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
 
             {!isComboMode ? (
               <div>
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Tipo de Produto</label>
+                <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Tipo de Produto</label>
                 <select
                   value={productForm.type}
                   onChange={(e) => setProductForm({ ...productForm, type: e.target.value as CatalogProductType })}
@@ -164,13 +164,13 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
 
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Imagem do Produto</label>
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Imagem do Produto</label>
               <div className="flex items-center gap-4">
-                <div className="w-24 h-24 rounded-2xl bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 overflow-hidden flex items-center justify-center relative group">
+                <div className="w-24 h-24 rounded-2xl bg-muted border border-border overflow-hidden flex items-center justify-center relative group">
                   {(imagePreviewUrl || productForm.image) ? (
                     <img src={imagePreviewUrl || productForm.image} alt="Preview" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-gray-300 font-black">IMG</span>
+                    <span className="text-muted-foreground font-black">IMG</span>
                   )}
                   <input
                     type="file"
@@ -180,7 +180,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                   />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mb-2">Clique na imagem para enviar um novo arquivo.</p>
+                  <p className="text-xs text-muted-foreground font-medium mb-2">Clique na imagem para enviar um novo arquivo.</p>
                   <button
                     type="button"
                     onClick={() => { setImageFile(null); setImagePreviewUrl(null); setProductForm({ ...productForm, image: '' }); }}
@@ -193,7 +193,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Resumo / Descrição Curta</label>
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Resumo / Descrição Curta</label>
               <input
                 value={productForm.shortDescription}
                 onChange={(e) => setProductForm({ ...productForm, shortDescription: e.target.value })}
@@ -203,7 +203,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Descrição Longa (Opcional)</label>
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Descrição Longa (Opcional)</label>
               <textarea
                 rows={3}
                 value={productForm.longDescription}
@@ -215,17 +215,17 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
           </div>
         </div>
 
-        <div className="mt-8 flex flex-wrap gap-6 border-t border-gray-100 dark:border-gray-800 pt-6">
+        <div className="mt-8 flex flex-wrap gap-6 border-t border-border pt-6">
           <label className="flex items-center gap-3 cursor-pointer group">
             <input
               type="checkbox"
               checked={productForm.isActive}
               onChange={(e) => setProductForm({ ...productForm, isActive: e.target.checked })}
-              className="w-5 h-5 rounded border-gray-300 dark:border-gray-700 text-primary-600 focus:ring-primary-500"
+              className="w-5 h-5 rounded border-input text-primary focus:ring-primary"
             />
             <div>
-              <div className="text-sm font-bold text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:text-gray-100 transition-colors">Ativo no Sistema</div>
-              <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Controle mestre</div>
+              <div className="text-sm font-bold text-foreground group-hover:text-foreground transition-colors">Ativo no Sistema</div>
+              <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Controle mestre</div>
             </div>
           </label>
 
@@ -234,11 +234,11 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
               type="checkbox"
               checked={productForm.isAvailable}
               onChange={(e) => setProductForm({ ...productForm, isAvailable: e.target.checked })}
-              className="w-5 h-5 rounded border-gray-300 dark:border-gray-700 text-primary-600 focus:ring-primary-500"
+              className="w-5 h-5 rounded border-input text-primary focus:ring-primary"
             />
             <div>
-              <div className="text-sm font-bold text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:text-gray-100 transition-colors">Disponível para venda</div>
-              <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Estoque / Pausa</div>
+              <div className="text-sm font-bold text-foreground group-hover:text-foreground transition-colors">Disponível para venda</div>
+              <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Estoque / Pausa</div>
             </div>
           </label>
 
@@ -247,11 +247,11 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
               type="checkbox"
               checked={productForm.sellableOnline}
               onChange={(e) => setProductForm({ ...productForm, sellableOnline: e.target.checked })}
-              className="w-5 h-5 rounded border-gray-300 dark:border-gray-700 text-primary-600 focus:ring-primary-500"
+              className="w-5 h-5 rounded border-input text-primary focus:ring-primary"
             />
             <div>
-              <div className="text-sm font-bold text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:text-gray-100 transition-colors">Vender Online</div>
-              <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">App / Web</div>
+              <div className="text-sm font-bold text-foreground group-hover:text-foreground transition-colors">Vender Online</div>
+              <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">App / Web</div>
             </div>
           </label>
         </div>
@@ -267,12 +267,12 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
 
           if (isPizzaTemplate && pizzaSizes.length > 0) {
             return (
-              <div className="mt-8 pt-8 border-t border-gray-100 dark:border-gray-800 animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <div className="mt-8 pt-8 border-t border-border animate-in fade-in slide-in-from-bottom-2 duration-500">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-10 h-10 bg-primary-100 dark:bg-primary-500/20 rounded-xl flex items-center justify-center text-xl">🍕</div>
                   <div>
-                    <h3 className="text-sm font-black text-gray-900 dark:text-gray-100 uppercase tracking-widest">Configuração de Sabor</h3>
-                    <p className="text-[10px] text-primary-600 font-bold uppercase tracking-wider mt-0.5">Preço por tamanho</p>
+                    <h3 className="text-sm font-black text-foreground uppercase tracking-widest">Configuração de Sabor</h3>
+                    <p className="text-[10px] text-primary font-bold uppercase tracking-wider mt-0.5">Preço por tamanho</p>
                   </div>
                 </div>
 
@@ -283,18 +283,18 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {pizzaSizes.map(size => (
-                      <div key={size.id} className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-primary-100/50 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group">
-                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 group-hover:text-primary-500 transition-colors">
+                      <div key={size.id} className="bg-card p-6 rounded-2xl border border-border shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group">
+                        <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 group-hover:text-primary transition-colors">
                           {size.name}
                         </label>
                         <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-base">R$</span>
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-base">R$</span>
                           <input
                             type="number"
                             step="0.01"
                             value={pizzaPrices[size.id] || ''}
                             onChange={(e) => setPizzaPrices({...pizzaPrices, [size.id]: Number(e.target.value)})}
-                            className="w-full pl-12 pr-4 py-3.5 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl outline-none text-base font-black focus:ring-2 focus:ring-primary-500 transition-all placeholder:text-gray-300 dark:text-gray-100"
+                            className="w-full pl-12 pr-4 py-3.5 bg-card border border-input rounded-xl outline-none text-base font-black focus:ring-2 focus:ring-primary transition-all placeholder:text-muted-foreground"
                             placeholder={productForm.basePrice.toString()}
                           />
                         </div>
@@ -313,7 +313,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
             <button
               type="button"
               onClick={goNextWizardStep}
-              className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-xl shadow-lg shadow-primary-200 transition-all"
+              className="px-8 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-black rounded-xl shadow-lg shadow-primary/20 transition-all"
             >
               Próximo
             </button>
@@ -322,7 +322,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
               type="button"
               onClick={handleSaveProduct}
               disabled={savingStates.saveProduct}
-              className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-xl shadow-lg shadow-primary-200 transition-all disabled:opacity-50 flex items-center gap-3"
+              className="px-8 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-black rounded-xl shadow-lg shadow-primary/20 transition-all disabled:opacity-50 flex items-center gap-3"
             >
               {savingStates.saveProduct && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
               {isNew ? 'CRIAR PRODUTO' : 'SALVAR ALTERAÇÕES'}

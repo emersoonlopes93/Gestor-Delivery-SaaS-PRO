@@ -224,8 +224,8 @@ function SectionHeader(props: { title: string; subtitle?: string; right?: React.
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <div className="text-sm font-black text-gray-900 dark:text-gray-100">{props.title}</div>
-        {props.subtitle ? <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{props.subtitle}</div> : null}
+        <div className="text-sm font-black text-foreground">{props.title}</div>
+        {props.subtitle ? <div className="text-xs text-muted-foreground mt-0.5">{props.subtitle}</div> : null}
       </div>
       {props.right ? <div className="shrink-0">{props.right}</div> : null}
     </div>
@@ -902,13 +902,13 @@ export function DeliveryZonesPageRefactored() {
   );
 
   const renderEditorForm = () => (
-    <div className="flex flex-col h-full bg-white dark:bg-gray-900">
-      <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-start justify-between gap-3 shrink-0">
+    <div className="flex flex-col h-full bg-card">
+      <div className="p-4 border-b border-border flex items-start justify-between gap-3 shrink-0">
         <div className="min-w-0">
-          <div className="text-lg font-black text-gray-900 dark:text-gray-100">
+          <div className="text-lg font-black text-foreground">
             {zoneForm.id ? 'Editar zona' : 'Nova zona'}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+          <div className="text-sm text-muted-foreground mt-0.5">
             {drawMode === 'drawing'
               ? 'Desenhe no mapa e depois ajuste os detalhes.'
               : 'Ajuste os detalhes e salve.'}
@@ -917,7 +917,7 @@ export function DeliveryZonesPageRefactored() {
         <button
           type="button"
           onClick={closeEditor}
-          className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           title="Fechar"
         >
           <X className="h-5 w-5" />
@@ -926,31 +926,31 @@ export function DeliveryZonesPageRefactored() {
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         <div>
-          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+          <label className="block text-sm font-semibold text-foreground mb-1.5">
             Nome da zona
           </label>
           <input
             value={zoneForm.name}
             onChange={(e) => setZoneForm((z) => ({ ...z, name: e.target.value }))}
-            className="w-full h-11 px-3 rounded-xl border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-all shadow-sm"
+            className="w-full h-11 px-3 rounded-xl border border-input focus:outline-none focus:ring-2 focus:ring-primary-500 bg-card text-foreground transition-all shadow-sm"
             placeholder="Ex: Centro, Condomínios..."
           />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+            <label className="block text-sm font-semibold text-foreground mb-1.5">
               Cor no mapa
             </label>
             <input
               type="color"
               value={zoneForm.color}
               onChange={(e) => setZoneForm((z) => ({ ...z, color: e.target.value }))}
-              className="w-full h-11 px-1 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 cursor-pointer shadow-sm"
+              className="w-full h-11 px-1 rounded-xl border border-input bg-card cursor-pointer shadow-sm"
             />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+            <label className="block text-sm font-semibold text-foreground mb-1.5">
               Prioridade
             </label>
             <input
@@ -958,14 +958,14 @@ export function DeliveryZonesPageRefactored() {
               min={0}
               value={zoneForm.priority}
               onChange={(e) => setZoneForm((z) => ({ ...z, priority: Number(e.target.value) }))}
-              className="w-full h-11 px-3 rounded-xl border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-all shadow-sm"
+              className="w-full h-11 px-3 rounded-xl border border-input focus:outline-none focus:ring-2 focus:ring-primary-500 bg-card text-foreground transition-all shadow-sm"
             />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+            <label className="block text-sm font-semibold text-foreground mb-1.5">
               Finalidade
             </label>
             <select
@@ -976,7 +976,7 @@ export function DeliveryZonesPageRefactored() {
                   setZoneForm((z) => ({ ...z, zoneKind: v }));
                 }
               }}
-              className="w-full h-11 px-3 rounded-xl border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-all shadow-sm"
+              className="w-full h-11 px-3 rounded-xl border border-input focus:outline-none focus:ring-2 focus:ring-primary-500 bg-card text-foreground transition-all shadow-sm"
             >
               <option value="custom_zone">Zona de entrega</option>
               <option value="blocked_zone">Área bloqueada</option>
@@ -984,7 +984,7 @@ export function DeliveryZonesPageRefactored() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+            <label className="block text-sm font-semibold text-foreground mb-1.5">
               Status
             </label>
             <button
@@ -994,7 +994,7 @@ export function DeliveryZonesPageRefactored() {
                 'w-full h-11 px-3 rounded-xl border text-sm font-bold inline-flex items-center justify-center gap-2 transition-all shadow-sm ' +
                 (zoneForm.isActive
                   ? 'border-green-500 bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400'
-                  : 'border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 text-gray-600 dark:text-gray-400')
+                  : 'border-input bg-muted text-muted-foreground')
               }
             >
               {zoneForm.isActive ? 'Ativada' : 'Desativada'}
@@ -1004,7 +1004,7 @@ export function DeliveryZonesPageRefactored() {
 
         {zoneForm.zoneKind !== 'blocked_zone' ? (
           <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+            <label className="block text-sm font-semibold text-foreground mb-1.5">
               Regra de cobrança
             </label>
             <div className="grid grid-cols-4 gap-2">
@@ -1022,7 +1022,7 @@ export function DeliveryZonesPageRefactored() {
                     'h-10 rounded-xl border text-sm font-bold transition-all ' +
                     (zoneForm.pricingMode === o.mode
                       ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-400 shadow-sm'
-                      : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800')
+                      : 'border-input bg-card text-muted-foreground hover:bg-muted')
                   }
                 >
                   {o.label}
@@ -1042,7 +1042,7 @@ export function DeliveryZonesPageRefactored() {
 
         {zoneForm.zoneKind !== 'blocked_zone' && zoneForm.pricingMode === 'fixed' ? (
           <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+            <label className="block text-sm font-semibold text-foreground mb-1.5">
               Valor da taxa (R$)
             </label>
             <input
@@ -1056,7 +1056,7 @@ export function DeliveryZonesPageRefactored() {
                   fixedFee: e.target.value.trim() === '' ? null : Number(e.target.value),
                 }))
               }
-              className="w-full h-11 px-3 rounded-xl border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-all shadow-sm"
+              className="w-full h-11 px-3 rounded-xl border border-input focus:outline-none focus:ring-2 focus:ring-primary-500 bg-card text-foreground transition-all shadow-sm"
               placeholder="0,00"
             />
           </div>
@@ -1064,7 +1064,7 @@ export function DeliveryZonesPageRefactored() {
 
         {zoneForm.zoneKind !== 'blocked_zone' && zoneForm.pricingMode === 'distance' ? (
           <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+            <label className="block text-sm font-semibold text-foreground mb-1.5">
               Valor por km percorrido (R$)
             </label>
             <input
@@ -1078,7 +1078,7 @@ export function DeliveryZonesPageRefactored() {
                   pricePerKm: e.target.value.trim() === '' ? null : Number(e.target.value),
                 }))
               }
-              className="w-full h-11 px-3 rounded-xl border border-gray-200 dark:border-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-all shadow-sm"
+              className="w-full h-11 px-3 rounded-xl border border-input focus:outline-none focus:ring-2 focus:ring-primary-500 bg-card text-foreground transition-all shadow-sm"
               placeholder="0,00"
             />
           </div>
@@ -1095,9 +1095,9 @@ export function DeliveryZonesPageRefactored() {
         ) : null}
 
         {zoneForm.zoneKind !== 'blocked_zone' && zoneForm.pricingMode === 'tiers' ? (
-          <div className="space-y-4 border-t border-gray-100 dark:border-gray-800 pt-4 mt-2">
+          <div className="space-y-4 border-t border-border pt-4 mt-2">
             <div className="flex items-center justify-between">
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+              <label className="block text-sm font-semibold text-foreground">
                 Faixas de Distância
               </label>
               <button
@@ -1118,16 +1118,16 @@ export function DeliveryZonesPageRefactored() {
             </div>
 
             {zoneForm.distanceTiers.length === 0 && (
-              <div className="text-sm text-gray-500 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-100 dark:border-gray-800">
+              <div className="text-sm text-muted-foreground italic bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-border">
                 Nenhuma faixa configurada. Adicione faixas para cobrar.
               </div>
             )}
 
             <div className="space-y-2">
               {zoneForm.distanceTiers.map((tier, idx) => (
-                <div key={idx} className="flex flex-wrap sm:flex-nowrap items-center gap-2 bg-gray-50 dark:bg-gray-800/30 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800 relative">
+                <div key={idx} className="flex flex-wrap sm:flex-nowrap items-center gap-2 bg-muted p-2.5 rounded-xl border border-border relative">
                   <div className="flex-1 min-w-[80px]">
-                    <label className="block text-[10px] uppercase font-bold text-gray-500 mb-1">De (km)</label>
+                    <label className="block text-[10px] uppercase font-bold text-muted-foreground mb-1">De (km)</label>
                     <input
                       type="number"
                       min={0}
@@ -1138,11 +1138,11 @@ export function DeliveryZonesPageRefactored() {
                         newTiers[idx].minDistanceKm = Number(e.target.value);
                         setZoneForm((z) => ({ ...z, distanceTiers: newTiers }));
                       }}
-                      className="w-full h-9 px-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                      className="w-full h-9 px-2 rounded-lg border border-input bg-card text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
                     />
                   </div>
                   <div className="flex-1 min-w-[80px]">
-                    <label className="block text-[10px] uppercase font-bold text-gray-500 mb-1">Até (km)</label>
+                    <label className="block text-[10px] uppercase font-bold text-muted-foreground mb-1">Até (km)</label>
                     <input
                       type="number"
                       min={0}
@@ -1153,11 +1153,11 @@ export function DeliveryZonesPageRefactored() {
                         newTiers[idx].maxDistanceKm = Number(e.target.value);
                         setZoneForm((z) => ({ ...z, distanceTiers: newTiers }));
                       }}
-                      className="w-full h-9 px-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                      className="w-full h-9 px-2 rounded-lg border border-input bg-card text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
                     />
                   </div>
                   <div className="flex-1 min-w-[90px]">
-                    <label className="block text-[10px] uppercase font-bold text-gray-500 mb-1">Valor (R$)</label>
+                    <label className="block text-[10px] uppercase font-bold text-muted-foreground mb-1">Valor (R$)</label>
                     <input
                       type="number"
                       min={0}
@@ -1168,7 +1168,7 @@ export function DeliveryZonesPageRefactored() {
                         newTiers[idx].fee = Number(e.target.value);
                         setZoneForm((z) => ({ ...z, distanceTiers: newTiers }));
                       }}
-                      className="w-full h-9 px-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
+                      className="w-full h-9 px-2 rounded-lg border border-input bg-card text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
                     />
                   </div>
                   <div className="flex items-end pb-[2px]">
@@ -1191,7 +1191,7 @@ export function DeliveryZonesPageRefactored() {
 
       </div>
 
-      <div className="shrink-0 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 p-4 space-y-3 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
+      <div className="shrink-0 bg-card border-t border-border p-4 space-y-3 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -1219,7 +1219,7 @@ export function DeliveryZonesPageRefactored() {
         <button
           type="button"
           onClick={closeEditor}
-          className="h-12 w-full rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-black text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
+          className="h-12 w-full rounded-xl bg-card border border-input text-sm font-black text-foreground hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
         >
           Cancelar
         </button>
@@ -1232,7 +1232,7 @@ export function DeliveryZonesPageRefactored() {
       <div className="p-6">
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
-          <span className="ml-3 text-gray-500 dark:text-gray-400">Carregando Zonas de Entrega...</span>
+          <span className="ml-3 text-muted-foreground">Carregando Zonas de Entrega...</span>
         </div>
       </div>
     );
@@ -1240,10 +1240,10 @@ export function DeliveryZonesPageRefactored() {
 
   const renderDesktopContent = () => (
     <div className="h-full flex overflow-hidden bg-gray-50 dark:bg-gray-900/50">
-      <div className="w-[420px] shrink-0 h-full border-r border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 flex flex-col z-10 shadow-sm relative">
-        <div className="p-6 pb-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
-          <h1 className="text-2xl font-black text-gray-900 dark:text-gray-100">Zonas de Entrega</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+      <div className="w-[420px] shrink-0 h-full border-r border-border bg-card flex flex-col z-10 shadow-sm relative">
+        <div className="p-6 pb-4 border-b border-border shrink-0">
+          <h1 className="text-2xl font-black text-foreground">Zonas de Entrega</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Configure seu mapa de entregas.
           </p>
         </div>
@@ -1275,7 +1275,7 @@ export function DeliveryZonesPageRefactored() {
               <button
                 type="button"
                 onClick={() => setFitToStoreSeq((v) => v + 1)}
-                className="h-10 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 inline-flex items-center justify-center gap-2 transition-all shadow-sm"
+                className="h-10 rounded-xl bg-card border border-input text-sm font-bold text-foreground hover:bg-gray-50 dark:hover:bg-gray-800 inline-flex items-center justify-center gap-2 transition-all shadow-sm"
               >
                 <Crosshair className="h-4 w-4" />
                 Localizar loja
@@ -1294,7 +1294,7 @@ export function DeliveryZonesPageRefactored() {
                   'h-10 rounded-xl border text-sm font-bold transition-all inline-flex items-center justify-center gap-2 shadow-sm ' +
                   (simulationOn
                     ? 'bg-gray-900 text-white border-gray-900 hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100'
-                    : 'bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800')
+                    : 'bg-card text-gray-800 dark:text-gray-200 border-input hover:bg-gray-50 dark:hover:bg-gray-800')
                 }
               >
                 <Target className="h-4 w-4" />
@@ -1328,7 +1328,7 @@ export function DeliveryZonesPageRefactored() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
                   Raio Max (km)
                 </label>
                 <input
@@ -1337,11 +1337,11 @@ export function DeliveryZonesPageRefactored() {
                   step={0.1}
                   value={coverageDraft.maxRadiusKm}
                   onChange={(e) => setCoverageDraft((d) => ({ ...d, maxRadiusKm: Number(e.target.value) }))}
-                  className="w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                  className="w-full h-10 px-3 rounded-lg border border-input bg-card focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
                   Preço/km (R$)
                 </label>
                 <input
@@ -1352,7 +1352,7 @@ export function DeliveryZonesPageRefactored() {
                   onChange={(e) =>
                     setCoverageDraft((d) => ({ ...d, defaultPricePerKm: Number(e.target.value) }))
                   }
-                  className="w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                  className="w-full h-10 px-3 rounded-lg border border-input bg-card focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
                 />
               </div>
             </div>
@@ -1360,14 +1360,14 @@ export function DeliveryZonesPageRefactored() {
               type="button"
               onClick={handleSaveCoverage}
               disabled={savingCoverage}
-              className="w-full h-10 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all inline-flex items-center justify-center gap-2"
+              className="w-full h-10 rounded-lg bg-gray-100 dark:bg-gray-800 text-foreground text-sm font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all inline-flex items-center justify-center gap-2"
             >
               {savingCoverage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Salvar cobertura base
             </button>
           </div>
 
-          <div className="border-t border-gray-100 dark:border-gray-800 pt-6">
+          <div className="border-t border-border pt-6">
             <SectionHeader
               title="Zonas Mapeadas"
               subtitle="Áreas desenhadas com regras exclusivas."
@@ -1375,7 +1375,7 @@ export function DeliveryZonesPageRefactored() {
             
             <div className="mt-4">
               {visibleZones.length === 0 ? (
-                <div className="text-center py-8 rounded-xl border border-dashed border-gray-200 dark:border-gray-800">
+                <div className="text-center py-8 rounded-xl border border-dashed border-input">
                   <MapPin className="h-8 w-8 text-gray-300 mx-auto mb-2" />
                   <div className="text-sm font-semibold text-gray-500">Sem zonas criadas</div>
                 </div>
@@ -1392,7 +1392,7 @@ export function DeliveryZonesPageRefactored() {
                             ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-500/10 shadow-sm ring-1 ring-primary-500'
                             : isHovered
                               ? 'border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800'
-                              : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'
+                              : 'border-input bg-card'
                         }`}
                         onClick={() => setSelectedZoneId(z.id)}
                         onMouseEnter={() => setHoveredZoneId(z.id)}
@@ -1405,11 +1405,11 @@ export function DeliveryZonesPageRefactored() {
                                 className="w-3 h-3 rounded-full shrink-0"
                                 style={{ backgroundColor: z.color ?? defaultZoneColor() }}
                               />
-                              <span className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">
+                              <span className="text-sm font-bold text-foreground truncate">
                                 {z.name || `Zona ${visibleZones.indexOf(z) + 1}`}
                               </span>
                             </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                            <div className="text-xs text-muted-foreground">
                               {z.zoneKind === 'blocked_zone' ? 'Bloqueada' : z.pricingMode === 'free' ? 'Entrega grátis' : 'Com taxa'}
                             </div>
                           </div>
@@ -1495,7 +1495,7 @@ export function DeliveryZonesPageRefactored() {
                   new L.DivIcon({
                     className: 'delivery-sim-marker',
                     html:
-                      '<div class="w-9 h-9 rounded-full bg-white dark:bg-gray-900 shadow-md border border-gray-200 dark:border-gray-800 flex items-center justify-center">' +
+                      '<div class="w-9 h-9 rounded-full bg-card shadow-md border border-input flex items-center justify-center">' +
                       '<div class="w-3 h-3 rounded-full bg-gray-900 dark:bg-white"></div>' +
                       '</div>',
                     iconSize: [36, 36],
@@ -1517,7 +1517,7 @@ export function DeliveryZonesPageRefactored() {
                         ? simulationDecision.canDeliver
                           ? 'bg-green-50/90 dark:bg-green-900/80 border-green-300 dark:border-green-700'
                           : 'bg-red-50/90 dark:bg-red-900/80 border-red-300 dark:border-red-700'
-                        : 'bg-white dark:bg-gray-900/85 border-gray-200 dark:border-gray-800')
+                        : 'bg-card/85 border-input')
                     }
                   >
                     {simulationLoading ? (
@@ -1548,30 +1548,30 @@ export function DeliveryZonesPageRefactored() {
                           )}
                           {simulationDecision.canDeliver ? 'Entrega disponível' : 'Entrega indisponível'}
                         </div>
-                        <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        <div className="text-sm font-semibold text-foreground">
                           Taxa de entrega: {fmtMoney(simulationDecision.fee)}
                         </div>
                         {(() => {
                           const zoneName = zoneNameById(zones, simulationDecision.matchedZoneId);
                           return zoneName ? (
-                            <div className="text-xs text-gray-700 dark:text-gray-300">
+                            <div className="text-xs text-foreground">
                               <span className="font-semibold">Zona aplicada:</span> {zoneName}
                             </div>
                           ) : null;
                         })()}
-                        <div className="text-xs text-gray-700 dark:text-gray-300">
+                        <div className="text-xs text-foreground">
                           <span className="font-semibold">Regra aplicada:</span> {strategyLabel(simulationDecision.matchedStrategy)}
                         </div>
                         {typeof simulationDecision.distanceKm === 'number' ? (
-                          <div className="text-xs text-gray-700 dark:text-gray-300">
+                          <div className="text-xs text-foreground">
                             <span className="font-semibold">Distância:</span> {simulationDecision.distanceKm.toFixed(2)} km
                           </div>
                         ) : null}
-                        <div className="text-[11px] text-gray-500 dark:text-gray-400 pt-1">{simulationDecision.reason}</div>
+                        <div className="text-[11px] text-muted-foreground pt-1">{simulationDecision.reason}</div>
                       </div>
                     ) : (
                       <div>
-                        <div className="text-sm font-black text-gray-900 dark:text-gray-100">Clique no mapa</div>
+                        <div className="text-sm font-black text-foreground">Clique no mapa</div>
                         <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                           Selecione um ponto para simular a entrega.
                         </div>
@@ -1626,15 +1626,15 @@ export function DeliveryZonesPageRefactored() {
 
         {editorOpen && (
           <div
-            className="absolute top-0 right-0 h-full w-[400px] bg-white dark:bg-gray-900 shadow-2xl z-[2000] border-l border-gray-200 dark:border-gray-800 flex flex-col transition-transform"
+            className="absolute top-0 right-0 h-full w-[400px] bg-card shadow-2xl z-[2000] border-l border-input flex flex-col transition-transform"
           >
             {renderEditorForm()}
           </div>
         )}
 
         <div className="hidden lg:block absolute bottom-6 right-6 z-[1000] pointer-events-none">
-          <div className="bg-white dark:bg-gray-900/90 backdrop-blur-md border border-gray-200 dark:border-gray-800 rounded-xl shadow-lg p-4 space-y-3">
-            <div className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wider">Legenda</div>
+          <div className="bg-card/90 backdrop-blur-md border border-input rounded-xl shadow-lg p-4 space-y-3">
+            <div className="text-xs font-bold text-foreground mb-1 uppercase tracking-wider">Legenda</div>
             <div className="flex items-center gap-3 text-xs font-semibold text-gray-600 dark:text-gray-400">
               <div className="w-3.5 h-3.5 rounded-full bg-blue-500 border border-blue-600" />
               <span>Cobertura padrão</span>
@@ -1769,7 +1769,7 @@ export function DeliveryZonesPageRefactored() {
             )}
 
             <div className="mb-4">
-              <h2 className="text-xl font-black text-gray-900 dark:text-gray-100">Zonas de Entrega</h2>
+              <h2 className="text-xl font-black text-foreground">Zonas de Entrega</h2>
             </div>
 
             {visibleZones.length === 0 ? (
@@ -1777,10 +1777,10 @@ export function DeliveryZonesPageRefactored() {
                 <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
                   <MapPin className="h-6 w-6 text-gray-400" />
                 </div>
-                <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                <div className="text-sm font-semibold text-foreground mb-2">
                   Nenhuma zona personalizada ainda
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mb-6">
+                <div className="text-xs text-muted-foreground mb-6">
                   Sua cobertura padrão (raio base) já está funcionando.
                 </div>
                 <button
@@ -1798,7 +1798,7 @@ export function DeliveryZonesPageRefactored() {
                   return (
                     <div
                       key={z.id}
-                      className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm"
+                      className="p-4 rounded-xl border border-input bg-card shadow-sm"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
@@ -1807,11 +1807,11 @@ export function DeliveryZonesPageRefactored() {
                               className="w-3.5 h-3.5 rounded-full border border-white shadow-sm"
                               style={{ backgroundColor: z.color ?? defaultZoneColor() }}
                             />
-                            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                            <span className="text-sm font-semibold text-foreground truncate">
                               {z.name || `Zona ${visibleZones.indexOf(z) + 1}`}
                             </span>
                           </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                          <div className="text-xs text-muted-foreground">
                             {z.zoneKind === 'blocked_zone' ? 'Bloqueada' : z.pricingMode === 'free' ? 'Grátis' : 'Taxa aplicada'}
                           </div>
                         </div>
@@ -1824,7 +1824,7 @@ export function DeliveryZonesPageRefactored() {
                             }}
                             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                           >
-                            <Crosshair className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                            <Crosshair className="h-4 w-4 text-muted-foreground" />
                           </button>
                           <button
                             type="button"
@@ -1834,7 +1834,7 @@ export function DeliveryZonesPageRefactored() {
                             }}
                             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                           >
-                            <Edit2 className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                            <Edit2 className="h-4 w-4 text-muted-foreground" />
                           </button>
                           <button
                             type="button"

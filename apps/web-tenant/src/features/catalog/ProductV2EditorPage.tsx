@@ -998,8 +998,8 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   if (!productId && !isNew) {
     return (
       <div className="p-6 max-w-4xl mx-auto">
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
-          <div className="font-black text-gray-900 dark:text-gray-100">Produto inválido.</div>
+        <div className="bg-card border border-border rounded-2xl p-6">
+          <div className="font-black text-foreground">Produto inválido.</div>
         </div>
       </div>
     );
@@ -1009,10 +1009,10 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     <div className="p-3 sm:p-6 max-w-7xl mx-auto text-left">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
         <div className="min-w-0">
-          <h1 className="text-2xl font-black text-gray-900 dark:text-gray-100 truncate">
+          <h1 className="text-2xl font-black text-foreground truncate">
             {isNew ? (isComboMode ? 'Novo Combo' : 'Novo Produto') : (isComboMode ? 'Editor de Combo' : 'Editor de Produto')}
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1 truncate">
+          <p className="text-muted-foreground mt-1 truncate">
             {isNew
               ? (isComboMode ? 'Crie a base do combo para iniciar a montagem' : 'Preencha as informações básicas para começar')
               : (product?.name ?? 'Carregando...')}
@@ -1022,18 +1022,18 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           <button
             type="button"
             onClick={() => navigate(isComboMode ? '/catalog/combos' : '/catalog/products')}
-            className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900"
+            className="px-4 py-2 text-sm font-bold text-foreground hover:bg-muted rounded-xl border border-border bg-card"
           >
             Voltar
           </button>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-2 shadow-sm mb-4 sm:mb-6 flex gap-2 overflow-x-auto">
+      <div className="bg-card border border-border rounded-2xl p-2 shadow-sm mb-4 sm:mb-6 flex gap-2 overflow-x-auto">
         <button
           type="button"
           onClick={() => setTab('geral')}
-          className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'geral' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50'}`}
+          className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'geral' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-muted'}`}
         >
           {(isComboWizard || isProductWizard) ? '1. Informações Gerais' : 'Informações Gerais'}
           <InfoTooltip text="Nome, categoria, preço base e descrição do item." />
@@ -1043,7 +1043,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             type="button"
             onClick={() => setTab('personalizacao')}
             disabled={isProductWizard && productWizardIndex < 1}
-            className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'personalizacao' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 disabled:opacity-50'}`}
+            className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'personalizacao' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-muted disabled:opacity-50'}`}
           >
             {isProductWizard ? '2. Complementos' : 'Complementos'}
             <InfoTooltip text="Adicione grupos de opções como adicionais, tamanhos ou ingredientes." />
@@ -1054,7 +1054,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             type="button"
             onClick={() => setTab('combo')}
             disabled={isComboWizard && comboWizardIndex < 1}
-            className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'combo' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 disabled:opacity-50'}`}
+            className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'combo' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-muted disabled:opacity-50'}`}
           >
             {isComboWizard ? '2. Itens do Combo' : 'Itens do Combo'}
             <InfoTooltip text="Defina os produtos que podem ser escolhidos neste combo." />
@@ -1064,7 +1064,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           type="button"
           onClick={() => setTab('vendas')}
           disabled={isNew}
-          className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'vendas' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 disabled:opacity-50'}`}
+          className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'vendas' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-muted disabled:opacity-50'}`}
         >
           {isComboWizard ? '3. Upsells' : 'Upsells / Ofertas'}
           <InfoTooltip text="Configurar sugestões de venda (compre também) para este produto." />
@@ -1073,7 +1073,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           type="button"
           onClick={() => setTab('publicacao')}
           disabled={(isComboWizard && comboWizardIndex < 2) || (isProductWizard && productWizardIndex < 2)}
-          className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'publicacao' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 disabled:opacity-50'}`}
+          className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'publicacao' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-muted disabled:opacity-50'}`}
         >
           {isComboWizard ? '4. Disponibilidade' : (isProductWizard ? '3. Disponibilidade' : 'Disponibilidade')}
           <InfoTooltip text="Controle em quais horários e canais (Delivery, Balcão) este item está ativo." />
@@ -1154,20 +1154,20 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
 
           {tab === 'vendas' && (
             <div className="space-y-6">
-              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6">
+              <div className="bg-card border border-border rounded-2xl p-6">
                 <div className="flex items-center gap-2 mb-2">
-                  <Sparkles className="h-5 w-5 text-primary-600" />
-                  <h3 className="text-lg font-black text-gray-900 dark:text-gray-100">Vincular Upsells</h3>
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  <h3 className="text-lg font-black text-foreground">Vincular Upsells</h3>
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 font-medium">
+                <p className="text-sm text-muted-foreground mb-6 font-medium">
                   Selecione quais ofertas de Upsell devem aparecer quando este produto for selecionado ou estiver no carrinho. 
-                  Configure as ofertas na página de <span className="text-primary-600 font-bold underline cursor-pointer" onClick={() => navigate('/catalog/upsells')}>Upsells</span>.
+                  Configure as ofertas na página de <span className="text-primary font-bold underline cursor-pointer" onClick={() => navigate('/catalog/upsells')}>Upsells</span>.
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {allUpsells.length === 0 ? (
-                    <div className="col-span-full py-12 text-center text-gray-400 border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-2xl flex flex-col items-center gap-2">
-                      <Sparkles className="h-8 w-8 text-gray-200" />
+                    <div className="col-span-full py-12 text-center text-muted-foreground border-2 border-dashed border-border rounded-2xl flex flex-col items-center gap-2">
+                      <Sparkles className="h-8 w-8 text-muted-foreground/50" />
                       <span className="font-bold">Nenhuma oferta cadastrada.</span>
                     </div>
                   ) : (
@@ -1179,27 +1179,27 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                           onClick={() => toggleProductUpsell(u.id)}
                           className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
                             isSelected 
-                              ? 'border-primary-500 bg-primary-50 shadow-sm' 
-                              : 'border-gray-100 dark:border-gray-800 hover:border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900'
+                              ? 'border-primary bg-primary/10 shadow-sm' 
+                              : 'border-border hover:border-border/70 bg-card'
                           }`}
                         >
                           <div className="flex items-center justify-between mb-2">
                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
                                u.pricingType === 'fixed_price' ? 'bg-orange-100 text-orange-700' :
                                u.pricingType.startsWith('discount') ? 'bg-green-100 text-green-700' :
-                               'bg-gray-100 text-gray-700 dark:text-gray-300'
+                               'bg-muted text-muted-foreground'
                              }`}>
                                {u.pricingType === 'normal' ? 'Preço Normal' : 
                                 u.pricingType === 'fixed_price' ? 'Fixo' :
                                 u.pricingType === 'discount_percent' ? `${u.pricingValue}% Desc.` :
                                 `R$${u.pricingValue} Desc.`}
                              </span>
-                             {isSelected && <div className="h-4 w-4 bg-primary-600 rounded-full flex items-center justify-center">
-                               <Plus className="h-3 w-3 text-white rotate-45" />
+                             {isSelected && <div className="h-4 w-4 bg-primary rounded-full flex items-center justify-center">
+                               <Plus className="h-3 w-3 text-primary-foreground rotate-45" />
                              </div>}
                           </div>
-                          <div className="font-bold text-gray-900 dark:text-gray-100">{u.name}</div>
-                          <div className="text-xs text-gray-400 mt-1 line-clamp-1">{u.description}</div>
+                          <div className="font-bold text-foreground">{u.name}</div>
+                          <div className="text-xs text-muted-foreground mt-1 line-clamp-1">{u.description}</div>
                         </div>
                       );
                     })
@@ -1238,7 +1238,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <button
               type="button"
               onClick={() => setIsAddGroupModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted rounded-lg"
             >
               Cancelar
             </button>
@@ -1246,9 +1246,9 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               type="button"
               onClick={addGroupLink}
               disabled={savingStates.addGroupLink || availableGroupsToAdd.length === 0}
-              className="px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {savingStates.addGroupLink && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+              {savingStates.addGroupLink && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
               Vincular
             </button>
           </>
@@ -1257,11 +1257,11 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
         <div className="space-y-3">
           {availableGroupsToAdd.length > 0 ? (
             <>
-              <div className="text-sm text-gray-600 dark:text-gray-400 font-bold">Selecione um complemento</div>
+              <div className="text-sm text-muted-foreground font-bold">Selecione um complemento</div>
               <select
                 value={selectedGroupIdToAdd}
                 onChange={(e) => setSelectedGroupIdToAdd(e.target.value)}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-muted border border-input rounded-xl outline-none"
               >
                 {availableGroupsToAdd.map((g) => (
                   <option key={g.id} value={g.id}>
@@ -1271,7 +1271,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               </select>
             </>
           ) : (
-            <div className="text-sm text-gray-400 font-bold italic p-4 text-center">
+            <div className="text-sm text-muted-foreground font-bold italic p-4 text-center">
               Nenhum complemento disponível para vínculo. Todos já estão vinculados.
             </div>
           )}
@@ -1287,7 +1287,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <button
               type="button"
               onClick={() => setIsCreateComplementModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted rounded-lg"
             >
               Cancelar
             </button>
@@ -1295,9 +1295,9 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               type="button"
               onClick={createComplementAndLink}
               disabled={savingStates.createComplementAndLink || !newComplementForm.name.trim()}
-              className="px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {savingStates.createComplementAndLink && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+              {savingStates.createComplementAndLink && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
               Criar e vincular
             </button>
           </>
@@ -1305,20 +1305,20 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Nome</label>
+            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Nome</label>
             <input
               value={newComplementForm.name}
               onChange={(e) => setNewComplementForm((p) => ({ ...p, name: e.target.value }))}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+              className="w-full px-4 py-2.5 bg-muted border border-input rounded-xl outline-none"
               placeholder="Ex: Molhos e adicionais"
             />
           </div>
           <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Tipo de seleção</label>
+            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Tipo de seleção</label>
             <select
               value={newComplementForm.selectionType}
               onChange={(e) => setNewComplementForm((p) => ({ ...p, selectionType: e.target.value as 'single' | 'multiple' | 'quantity' }))}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+              className="w-full px-4 py-2.5 bg-muted border border-input rounded-xl outline-none"
             >
               <option value="single">Escolha única</option>
               <option value="multiple">Múltipla escolha</option>
@@ -1327,21 +1327,21 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Mínimo</label>
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Mínimo</label>
               <input
                 type="number"
                 value={newComplementForm.minSelect}
                 onChange={(e) => setNewComplementForm((p) => ({ ...p, minSelect: Number(e.target.value || 0) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-muted border border-input rounded-xl outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Máximo</label>
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Máximo</label>
               <input
                 type="number"
                 value={newComplementForm.maxSelect}
                 onChange={(e) => setNewComplementForm((p) => ({ ...p, maxSelect: Number(e.target.value || 1) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-muted border border-input rounded-xl outline-none"
               />
             </div>
           </div>
@@ -1352,7 +1352,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               onChange={(e) => setNewComplementForm((p) => ({ ...p, isRequired: e.target.checked }))}
               className="w-4 h-4 text-primary-600"
             />
-            <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Obrigatório</span>
+            <span className="text-sm font-bold text-foreground">Obrigatório</span>
           </label>
         </div>
       </Modal>
@@ -1366,7 +1366,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <button
               type="button"
               onClick={() => setIsBundleItemModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted rounded-lg"
             >
               Cancelar
             </button>
@@ -1374,9 +1374,9 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               type="button"
               onClick={saveBundleItem}
               disabled={savingStates.saveBundleItem || !bundleItemForm.productId || selectableBundleProducts.length === 0 || comboModeState !== 'bundle'}
-              className="px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {savingStates.saveBundleItem && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+              {savingStates.saveBundleItem && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
               Salvar item
             </button>
           </>
@@ -1384,11 +1384,11 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Produto do cardápio</label>
+            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Produto do cardápio</label>
             <select
               value={bundleItemForm.productId}
               onChange={(e) => setBundleItemForm((p) => ({ ...p, productId: e.target.value }))}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+              className="w-full px-4 py-2.5 bg-muted border border-input rounded-xl outline-none"
             >
               {selectableBundleProducts.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -1402,23 +1402,23 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Quantidade</label>
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Quantidade</label>
               <input
                 type="number"
                 min={1}
                 value={Number(bundleItemForm.qty ?? 1)}
                 onChange={(e) => setBundleItemForm((p) => ({ ...p, qty: Math.max(1, Number(e.target.value || 1)) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-muted border border-input rounded-xl outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Ordem</label>
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Ordem</label>
               <input
                 type="number"
                 min={0}
                 value={Number(bundleItemForm.sortOrder ?? 0)}
                 onChange={(e) => setBundleItemForm((p) => ({ ...p, sortOrder: Math.max(0, Number(e.target.value || 0)) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-muted border border-input rounded-xl outline-none"
               />
             </div>
           </div>
@@ -1434,7 +1434,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <button
               type="button"
               onClick={() => setIsEditLinkModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted rounded-lg"
             >
               Cancelar
             </button>
@@ -1442,9 +1442,9 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               type="button"
               onClick={saveLinkOverrides}
               disabled={savingStates.saveLinkOverrides}
-              className="px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {savingStates.saveLinkOverrides && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+              {savingStates.saveLinkOverrides && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
               Salvar
             </button>
           </>
@@ -1452,11 +1452,11 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Pricing Axis</label>
+            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Pricing Axis</label>
             <select
               value={(linkForm.pricingAxis as string) ?? 'secondary'}
               onChange={(e) => setLinkForm((p) => ({ ...p, pricingAxis: e.target.value as 'primary' | 'secondary' }))}
-              className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+              className="w-full px-4 py-2.5 bg-muted border border-input rounded-xl outline-none"
             >
               <option value="secondary">secondary</option>
               <option value="primary">primary</option>
@@ -1470,11 +1470,11 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               onChange={(e) => setLinkForm((p) => ({ ...p, overrideIsRequired: e.target.checked }))}
               className="w-4 h-4 text-primary-600"
             />
-            <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Override required</span>
+            <span className="text-sm font-bold text-foreground">Override required</span>
             <button
               type="button"
               onClick={() => setLinkForm((p) => ({ ...p, overrideIsRequired: undefined }))}
-              className="ml-auto text-xs font-black text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:text-gray-200"
+              className="ml-auto text-xs font-black text-muted-foreground hover:text-gray-800 dark:text-gray-200"
             >
               limpar
             </button>
@@ -1482,21 +1482,21 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Override min</label>
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Override min</label>
               <input
                 type="number"
                 value={linkForm.overrideMinSelect ?? ''}
                 onChange={(e) => setLinkForm((p) => ({ ...p, overrideMinSelect: e.target.value === '' ? undefined : Number(e.target.value) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-muted border border-input rounded-xl outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Override max</label>
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Override max</label>
               <input
                 type="number"
                 value={linkForm.overrideMaxSelect ?? ''}
                 onChange={(e) => setLinkForm((p) => ({ ...p, overrideMaxSelect: e.target.value === '' ? undefined : Number(e.target.value) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                className="w-full px-4 py-2.5 bg-muted border border-input rounded-xl outline-none"
               />
             </div>
           </div>
@@ -1513,7 +1513,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <button
               type="button"
               onClick={() => setIsSlotModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted rounded-lg"
             >
               Cancelar
             </button>
@@ -1521,9 +1521,9 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               type="button"
               onClick={saveSlot}
               disabled={savingStates.saveSlot}
-              className="px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {savingStates.saveSlot && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+              {savingStates.saveSlot && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
               Salvar
             </button>
           </>
@@ -1531,7 +1531,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Nome</label>
+            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Nome</label>
             <input
               value={slotForm.name}
               onChange={(e) => setSlotForm((p) => ({ ...p, name: e.target.value }))}
@@ -1539,7 +1539,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             />
           </div>
           <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Descrição</label>
+            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Descrição</label>
             <input
               value={slotForm.description ?? ''}
               onChange={(e) => setSlotForm((p) => ({ ...p, description: e.target.value }))}
@@ -1553,11 +1553,11 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               onChange={(e) => setSlotForm((p) => ({ ...p, isRequired: e.target.checked }))}
               className="w-4 h-4 text-primary-600"
             />
-            <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Obrigatório</span>
+            <span className="text-sm font-bold text-foreground">Obrigatório</span>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Min</label>
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Min</label>
               <input
                 type="number"
                 value={Number(slotForm.minSelect ?? 1)}
@@ -1566,7 +1566,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               />
             </div>
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Max</label>
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Max</label>
               <input
                 type="number"
                 value={Number(slotForm.maxSelect ?? 1)}
@@ -1587,7 +1587,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <button
               type="button"
               onClick={() => setIsAllowedModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted rounded-lg"
             >
               Cancelar
             </button>
@@ -1595,9 +1595,9 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               type="button"
               onClick={saveAllowed}
               disabled={savingStates.saveAllowed}
-              className="px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {savingStates.saveAllowed && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+              {savingStates.saveAllowed && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
               {editingAllowed ? 'Salvar' : 'Adicionar'}
             </button>
           </>
@@ -1605,7 +1605,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Produto</label>
+            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Produto</label>
             <select
               value={allowedForm.productId}
               onChange={(e) => setAllowedForm((p) => ({ ...p, productId: e.target.value }))}
@@ -1619,7 +1619,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             </select>
           </div>
           <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Preço adicional</label>
+            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Preço adicional</label>
             <input
               type="number"
               step="0.01"
@@ -1641,7 +1641,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <button
               type="button"
               onClick={() => setIsRuleModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted rounded-lg"
             >
               Cancelar
             </button>
@@ -1649,9 +1649,9 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               type="button"
               onClick={saveRule}
               disabled={savingStates.saveRule}
-              className="px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {savingStates.saveRule && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+              {savingStates.saveRule && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
               Salvar
             </button>
           </>
@@ -1659,7 +1659,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Canal</label>
+            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Canal</label>
             {editingRule ? (
               <select
                 value={ruleForm.channel}
@@ -1687,7 +1687,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                         }}
                         className="w-4 h-4 text-primary-600"
                       />
-                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300">{label}</span>
+                      <span className="text-xs font-bold text-foreground">{label}</span>
                     </label>
                   );
                 })}
@@ -1696,7 +1696,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           </div>
 
           <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-2">Dias da semana</label>
+            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-2">Dias da semana</label>
             <div className="grid grid-cols-2 gap-2">
               {DAY_OPTIONS.map((day) => {
                 const isChecked = (ruleForm.daysOfWeek ?? []).includes(day.value);
@@ -1716,7 +1716,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                       }}
                       className="w-4 h-4 text-primary-600"
                     />
-                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300">{day.label}</span>
+                    <span className="text-xs font-bold text-foreground">{day.label}</span>
                   </label>
                 );
               })}
@@ -1725,7 +1725,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Início</label>
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Início</label>
               <input
                 value={ruleForm.startTime}
                 onChange={(e) => setRuleForm((p) => ({ ...p, startTime: e.target.value }))}
@@ -1734,7 +1734,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               />
             </div>
             <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Fim</label>
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Fim</label>
               <input
                 value={ruleForm.endTime}
                 onChange={(e) => setRuleForm((p) => ({ ...p, endTime: e.target.value }))}
@@ -1751,7 +1751,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               onChange={(e) => setRuleForm((p) => ({ ...p, isActive: e.target.checked }))}
               className="w-4 h-4 text-primary-600"
             />
-            <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Ativa</span>
+            <span className="text-sm font-bold text-foreground">Ativa</span>
           </div>
         </div>
       </Modal>
@@ -1765,7 +1765,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <>
               <button
                 onClick={() => setConfirmModal(null)}
-                className="px-4 py-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300 font-bold"
+                className="px-4 py-2 text-muted-foreground hover:text-foreground font-bold"
               >
                 Cancelar
               </button>
@@ -1778,7 +1778,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             </>
           }
         >
-          <p className="text-gray-600 dark:text-gray-400">{confirmModal.message}</p>
+          <p className="text-muted-foreground">{confirmModal.message}</p>
         </Modal>
       )}
 
@@ -1790,13 +1790,13 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           footer={
             <button
               onClick={() => setAlertModal(null)}
-              className="px-6 py-2 bg-primary-600 text-white rounded-xl font-bold"
+              className="px-6 py-2 bg-primary text-primary-foreground rounded-xl font-bold"
             >
               OK
             </button>
           }
         >
-          <p className="text-gray-600 dark:text-gray-400">{alertModal.message}</p>
+          <p className="text-muted-foreground">{alertModal.message}</p>
         </Modal>
       )}
       {product && (

@@ -267,7 +267,7 @@ export function ProductsPage() {
                     {typeLabel}
                   </span>
                   {pubLabel ? (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30' : 'bg-muted/20 dark:bg-muted/80 text-muted-foreground dark:text-muted-foreground border border-border dark:border-border/70'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30' : 'bg-muted/20 dark:bg-muted/80 text-muted-foreground border border-border'}`}>
                       {pubLabel}
                     </span>
                   ) : null}
@@ -307,7 +307,7 @@ export function ProductsPage() {
               </button>
               <button
                 onClick={() => navigate(`/catalog/products/${product.id}/v2`)}
-                className="p-2 text-muted-foreground hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-500/10 rounded-lg transition-all"
+                className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
                 title="Editar"
                 type="button"
               >
@@ -393,7 +393,7 @@ export function ProductsPage() {
                     {product.type === 'simple' ? 'Individual' : product.type === 'configurable' ? 'Personalizado' : 'Combo'}
                   </span>
                   {pubLabel && (
-                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-muted/20 text-muted-foreground dark:text-muted-foreground border border-border dark:border-border/70'}`}>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-muted/20 text-muted-foreground border border-border'}`}>
                       {pubLabel}
                     </span>
                   )}
@@ -416,7 +416,7 @@ export function ProductsPage() {
             style={{ borderTop: '1px solid var(--border-subtle)' }}
           >
              <div className="flex items-center gap-2">
-               <span className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${product.isActive ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+               <span className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${product.isActive ? 'bg-green-500 animate-pulse' : 'bg-destructive'}`} />
                <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 {product.isActive ? 'Ativo' : 'Inativo'}
               </span>
@@ -424,7 +424,7 @@ export function ProductsPage() {
             <div className="flex items-center gap-1">
               <button
                 onClick={() => navigate(`/catalog/products/${product.id}/v2`)}
-                className="p-1.5 md:p-2 text-primary-600 bg-primary-50 dark:bg-primary-500/10 rounded-xl hover:bg-primary-100 transition-colors"
+                className="p-1.5 md:p-2 text-primary bg-primary/10 rounded-xl hover:bg-primary/20 transition-colors"
                 title="Editar"
               >
                 <Pencil size={14} />
@@ -432,7 +432,7 @@ export function ProductsPage() {
               <button
                 onClick={() => handleDuplicate(product.id)}
                 disabled={savingMap[`duplicate-${product.id}`]}
-                className="p-1.5 md:p-2 text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl hover:bg-indigo-100 transition-colors disabled:opacity-50"
+                className="p-1.5 md:p-2 text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors disabled:opacity-50"
                 title="Duplicar"
               >
                 <Copy size={14} />
@@ -446,7 +446,7 @@ export function ProductsPage() {
               </button>
               <button
                 onClick={() => handleDelete(product.id)}
-                className="p-1.5 md:p-2 text-red-600 bg-red-50 dark:bg-red-900/10 rounded-xl hover:bg-red-100 transition-colors"
+                className="p-1.5 md:p-2 text-destructive bg-destructive/10 rounded-xl hover:bg-destructive/20 transition-colors"
                 title="Excluir"
               >
                 <Trash2 size={14} />
@@ -536,7 +536,7 @@ export function ProductsPage() {
           {/* Linha 1: Busca e ViewMode */}
           <div className="flex flex-col md:flex-row gap-3">
             <div className="relative flex-1">
-              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -554,8 +554,8 @@ export function ProductsPage() {
                 onClick={() => setViewMode('all')}
                 className={`flex-1 md:flex-none md:px-6 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
                   viewMode === 'all'
-                    ? 'bg-card dark:bg-muted900 text-primary-600 shadow-sm'
-                    : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground'
+                    ? 'bg-card text-primary shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
                 type="button"
               >
@@ -565,8 +565,8 @@ export function ProductsPage() {
                 onClick={() => setViewMode('grouped')}
                 className={`flex-1 md:flex-none md:px-6 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
                   viewMode === 'grouped'
-                    ? 'bg-card dark:bg-muted900 text-primary-600 shadow-sm'
-                    : 'text-muted-foreground dark:text-muted-foreground hover:text-foreground dark:hover:text-foreground'
+                    ? 'bg-card text-primary shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
                 type="button"
               >
@@ -588,8 +588,8 @@ export function ProductsPage() {
                   onClick={() => setTypeFilter(t.id as ProductTypeFilter)}
                   className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border ${
                     typeFilter === t.id
-                      ? 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800 text-primary-600'
-                      : 'bg-transparent border border-border dark:border-border/70 text-muted-foreground hover:text-foreground dark:hover:text-foreground'
+                      ? 'bg-primary/10 border-primary/20 text-primary'
+                      : 'bg-transparent border border-border text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {t.label}
@@ -606,7 +606,7 @@ export function ProductsPage() {
               <select
                 value={selectedCategoryId ?? ''}
                 onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : null)}
-                className="h-8 pl-2 pr-6 bg-card dark:bg-muted900 border border-border dark:border-border/70 text-[10px] font-black uppercase tracking-widest text-muted-foreground dark:text-muted-foreground focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
+                className="h-8 pl-2 pr-6 bg-card border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
               >
                 <option value="">Categorias</option>
                 {categories.map((c) => (
@@ -618,7 +618,7 @@ export function ProductsPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as ProductStatusFilter)}
-                className="h-8 pl-2 pr-6 bg-card dark:bg-muted900 border border-border dark:border-border/70 text-[10px] font-black uppercase tracking-widest text-muted-foreground dark:text-muted-foreground focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
+                className="h-8 pl-2 pr-6 bg-card border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
               >
                 <option value="all">Status</option>
                 <option value="active">Ativos</option>
@@ -628,7 +628,7 @@ export function ProductsPage() {
               <select
                 value={publicationFilter}
                 onChange={(e) => setPublicationFilter(e.target.value as PublicationFilter)}
-                className="h-8 pl-2 pr-6 bg-card dark:bg-muted900 border border-border dark:border-border/70 text-[10px] font-black uppercase tracking-widest text-muted-foreground dark:text-muted-foreground focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
+                className="h-8 pl-2 pr-6 bg-card border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
               >
                 <option value="all">Publicação</option>
                 <option value="draft">Rascunho</option>
@@ -793,7 +793,7 @@ export function ProductsPage() {
           <button
             type="button"
             onClick={() => setShowStatusHelp(false)}
-            className="px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg"
+            className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg"
           >
             Entendido
           </button>
