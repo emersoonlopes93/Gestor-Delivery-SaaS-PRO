@@ -153,7 +153,7 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
               </p>
               <button
                 onClick={onClose}
-                className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-bold shadow-lg active:scale-[0.98] transition-all"
+                className="w-full py-3 bg-slate-900 dark:bg-white text-white text-foreground rounded-xl font-bold shadow-lg active:scale-[0.98] transition-all"
               >
                 Concluir e Fechar
               </button>

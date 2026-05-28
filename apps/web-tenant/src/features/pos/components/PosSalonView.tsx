@@ -142,7 +142,7 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
                     </div>
                   </div>
                 ) : (
-                  <p className="text-[9px] mt-2 font-bold opacity-30 uppercase tracking-tighter">Mesa Livre</p>
+                  <p className="text-[9px] mt-2 font-bold opacity-50 uppercase tracking-tighter">Mesa Livre</p>
                 )}
 
                 {/* Hover Action */}

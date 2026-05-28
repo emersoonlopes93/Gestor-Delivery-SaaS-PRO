@@ -155,7 +155,7 @@ export function SuppliersPage() {
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center justify-center text-gray-400">
-                        <Truck className="h-12 w-12 mb-3 opacity-20" />
+                        <Truck className="h-12 w-12 mb-3 opacity-50" />
                         <p>Nenhum fornecedor encontrado.</p>
                       </div>
                     </td>

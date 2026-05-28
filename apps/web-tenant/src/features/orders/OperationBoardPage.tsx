@@ -82,7 +82,7 @@ const SegmentedControl = memo(function SegmentedControl(props: {
             onClick={() => onChange(item.id)}
             className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 focus:outline-none ${
               active
-                ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm'
+                ? 'bg-slate-900 dark:bg-slate-100 text-white text-foreground shadow-sm'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >

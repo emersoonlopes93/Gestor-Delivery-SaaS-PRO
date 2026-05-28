@@ -260,7 +260,7 @@ export function OrdersListPage() {
           <button
             disabled={page === 1}
             onClick={() => setPage((p) => p - 1)}
-            className="btn-secondary px-4 py-2 text-xs disabled:opacity-30"
+            className="btn-secondary px-4 py-2 text-xs disabled:opacity-50"
           >
             Anterior
           </button>
@@ -268,7 +268,7 @@ export function OrdersListPage() {
           <button
             disabled={page * 20 >= total}
             onClick={() => setPage((p) => p + 1)}
-            className="btn-secondary px-4 py-2 text-xs disabled:opacity-30"
+            className="btn-secondary px-4 py-2 text-xs disabled:opacity-50"
           >
             Próxima
           </button>

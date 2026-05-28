@@ -23,7 +23,8 @@
     "start:web-tenant": "pnpm --filter @gestor/web-tenant preview",
     "start:web-admin": "pnpm --filter @gestor/web-admin preview",
     "start:web-storefront": "pnpm --filter @gestor/web-storefront preview",
-    "check:no-any": "node scripts/check-no-any.js"
+    "check:no-any": "node scripts/check-no-any.js",
+    "check:theme": "node scripts/check-theme-hardcoded-classes.js"
   },
   "engines": {
     "node": ">=20.0.0",

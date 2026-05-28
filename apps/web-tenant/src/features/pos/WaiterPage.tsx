@@ -313,7 +313,7 @@ export default function WaiterPage() {
                         <button 
                           onClick={handleRequestBill}
                           disabled={!currentOrderId}
-                          className="flex-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 rounded-xl py-3 text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all disabled:opacity-20"
+                          className="flex-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 rounded-xl py-3 text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                         >
                            <Receipt size={14} />
                            Conta

@@ -164,7 +164,7 @@ export function PurchasesPage() {
                   <tr>
                     <td colSpan={6} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center justify-center text-gray-400">
-                        <ShoppingCart className="h-12 w-12 mb-3 opacity-20" />
+                        <ShoppingCart className="h-12 w-12 mb-3 opacity-50" />
                         <p>Nenhuma compra registrada.</p>
                       </div>
                     </td>

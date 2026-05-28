@@ -52,7 +52,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="card-premium p-8 shadow-2xl border-none bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl">
+    <div className="card-premium p-8 shadow-2xl border-none bg-card/80 backdrop-blur-xl">
       <form onSubmit={handleSubmit} className="space-y-6">
         {isExpired && !error && (
           <div className="alert-warning p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -72,12 +72,12 @@ export function LoginPage() {
           <div>
             <label
               htmlFor="email"
-              className="block text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] mb-2 ml-1"
+              className="block text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-2 ml-1"
             >
               E-mail de Acesso
             </label>
             <div className="relative group">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
                 <Mail size={18} />
               </div>
               <input
@@ -96,16 +96,16 @@ export function LoginPage() {
             <div className="flex items-center justify-between mb-2 ml-1">
               <label
                 htmlFor="password"
-                className="block text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]"
+                className="block text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]"
               >
                 Sua Senha
               </label>
-              <button type="button" className="text-[10px] font-black text-primary-600 uppercase tracking-widest hover:underline decoration-2 underline-offset-4">
+              <button type="button" className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline decoration-2 underline-offset-4">
                 Esqueci a senha
               </button>
             </div>
             <div className="relative group">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors">
                 <Lock size={18} />
               </div>
               <input
@@ -124,7 +124,7 @@ export function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="btn-primary w-full h-12 text-sm uppercase tracking-[0.2em] group relative overflow-hidden"
+          className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed text-sm uppercase tracking-[0.2em] font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group relative overflow-hidden disabled:pointer-events-none"
         >
           <span className={`flex items-center justify-center gap-2 transition-all ${loading ? 'opacity-0 scale-90' : 'opacity-100 scale-100'}`}>
             Acessar Painel
@@ -133,14 +133,14 @@ export function LoginPage() {
           
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin text-primary-foreground" />
             </div>
           )}
         </button>
 
         <div className="pt-2 text-center">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-            Não tem uma conta? <button type="button" className="text-primary-600 hover:underline decoration-2 underline-offset-4">Solicite uma demonstração</button>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+            Não tem uma conta? <button type="button" className="text-primary hover:underline decoration-2 underline-offset-4">Solicite uma demonstração</button>
           </p>
         </div>
       </form>

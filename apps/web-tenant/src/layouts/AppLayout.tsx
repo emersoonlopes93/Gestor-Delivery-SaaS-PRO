@@ -308,9 +308,14 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
  */
 export function AppLayout() {
   const { user, clearUser } = useAuthStore();
-  const { theme, setTheme } = useThemeStore();
+  const { theme, setTheme, initializeTheme } = useThemeStore();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Inicializar tema apenas para rotas autenticadas
+  useEffect(() => {
+    initializeTheme();
+  }, [initializeTheme]);
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [desktopSearch, setDesktopSearch] = useState('');

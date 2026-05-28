@@ -263,7 +263,7 @@ export function ProductsPage() {
                 <div className="font-bold text-foreground truncate">{product.name}</div>
                 <div className="text-xs text-muted-foreground truncate hidden sm:block">{product.shortDescription || 'Sem descrição'}</div>
                 <div className="mt-1 flex items-center gap-2">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-secondary text-foreground border-border'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-secondary text-foreground border-border'}`}>
                     {typeLabel}
                   </span>
                   {pubLabel ? (
@@ -316,7 +316,7 @@ export function ProductsPage() {
               <button
                 onClick={() => handleDuplicate(product.id)}
                 disabled={savingMap[`duplicate-${product.id}`]}
-                className="p-2 text-muted-foreground hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-lg transition-all disabled:opacity-50"
+                className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all disabled:opacity-70"
                 title={savingMap[`duplicate-${product.id}`] ? 'Duplicando...' : 'Duplicar'}
                 type="button"
               >
@@ -389,7 +389,7 @@ export function ProductsPage() {
                 <div className="font-black text-foreground truncate text-sm md:text-base leading-tight">{product.name}</div>
                 <div className="text-[10px] md:text-xs text-muted-foreground font-bold mt-0.5 truncate">{categoryName}</div>
                 <div className="mt-2 flex flex-wrap items-center gap-1">
-                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-500/30' : 'bg-secondary text-foreground border-border'}`}>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-secondary text-foreground border-border'}`}>
                     {product.type === 'simple' ? 'Individual' : product.type === 'configurable' ? 'Personalizado' : 'Combo'}
                   </span>
                   {pubLabel && (
@@ -432,7 +432,7 @@ export function ProductsPage() {
               <button
                 onClick={() => handleDuplicate(product.id)}
                 disabled={savingMap[`duplicate-${product.id}`]}
-                className="p-1.5 md:p-2 text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors disabled:opacity-70"
+                className="p-1.5 md:p-2 text-primary bg-primary/10 rounded-xl hover:bg-primary/20 transition-colors disabled:opacity-70"
                 title="Duplicar"
               >
                 <Copy size={14} />

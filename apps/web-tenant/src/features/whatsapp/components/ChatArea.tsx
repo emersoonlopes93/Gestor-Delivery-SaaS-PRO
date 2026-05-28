@@ -217,9 +217,9 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       case 'customer':
         return 'text-muted-foreground';
       case 'ai':
-        return 'text-purple-600 dark:text-purple-400';
+        return 'text-primary';
       case 'human':
-        return 'text-blue-600 dark:text-blue-400';
+        return 'text-status-info';
       case 'system':
         return 'text-amber-600 dark:text-amber-500';
       default:
@@ -272,10 +272,10 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
             <div className="flex items-center gap-2">
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                 session.state === 'closed' 
-                  ? 'bg-muted text-muted-foreground dark:bg-muted dark:text-muted-foreground'
+                  ? 'bg-muted text-muted-foreground'
                   : session.handoffActive
-                  ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400'
-                  : 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
+                  ? 'bg-status-warning/10 text-status-warning'
+                  : 'bg-status-success/10 text-status-success'
               }`}>
                 {session.state === 'closed' ? 'Encerrado' : session.handoffActive ? 'Atendimento Humano' : 'Bot Ativo'}
               </span>
@@ -286,7 +286,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
           <button
             onClick={handleActivateHandoff}
             disabled={handoffMutation.isPending || session.handoffActive}
-            className="px-3 py-1.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 text-sm font-medium rounded-lg hover:bg-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-1.5 bg-status-warning/10 text-status-warning text-sm font-medium rounded-lg hover:bg-status-warning/20 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
           >
             {session.handoffActive ? 'Já em atendimento' : 'Transferir'}
           </button>
@@ -301,7 +301,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
           <button
             onClick={() => closeSessionMutation.mutate()}
             disabled={closeSessionMutation.isPending}
-            className="px-3 py-1.5 bg-destructive/10 text-destructive dark:text-destructive text-sm font-medium rounded-lg hover:bg-destructive/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-1.5 bg-destructive/10 text-destructive dark:text-destructive text-sm font-medium rounded-lg hover:bg-destructive/20 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
           >
             Encerrar
           </button>
@@ -323,7 +323,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
             <button
               onClick={() => deactivateHandoffMutation.mutate()}
               disabled={deactivateHandoffMutation.isPending}
-              className="px-2.5 py-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
+              className="px-2.5 py-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs font-semibold rounded-lg transition-colors disabled:opacity-70"
             >
               {deactivateHandoffMutation.isPending ? 'Reativando...' : 'Reativar IA'}
             </button>
@@ -430,14 +430,14 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
               disabled={session?.state === 'closed' || sendMessageMutation.isPending}
               placeholder={session?.state === 'closed' ? 'Conversa encerrada' : 'Digite uma mensagem...'}
               rows={1}
-              className="w-full px-4 py-2 border border-input rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-card text-foreground placeholder:text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+              className="w-full px-4 py-2 border border-input rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-card text-foreground placeholder:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
               style={{ minHeight: '40px', maxHeight: '120px' }}
             />
           </div>
           <button
             onClick={handleSend}
             disabled={!message.trim() || session?.state === 'closed' || sendMessageMutation.isPending}
-            className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
           >
             {sendMessageMutation.isPending ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />

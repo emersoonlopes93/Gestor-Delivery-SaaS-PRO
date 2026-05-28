@@ -499,7 +499,7 @@ export default function PosPage() {
                   <button 
                     onClick={handleSaveDraft}
                     disabled={!tableNumber || cart.length === 0 || upsertDraft.isPending}
-                    className="bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 border border-blue-600/20 rounded-xl py-3 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:opacity-30"
+                    className="bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl py-3 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                      <Save size={14} />
                      {upsertDraft.isPending ? 'Salvando...' : 'Lançar Comanda'}
@@ -524,14 +524,14 @@ export default function PosPage() {
                </div>
                <div className="flex justify-between items-end">
                   <span className="text-sm font-black text-muted-foreground900 dark:text-white uppercase italic">Total Líquido</span>
-                  <span className="text-4xl font-black text-emerald-400 tracking-tighter italic leading-none">{formatCurrency(total)}</span>
+                  <span className="text-4xl font-black text-foreground tracking-tighter italic leading-none">{formatCurrency(total)}</span>
                </div>
             </div>
 
             <button 
               onClick={() => setIsPaymentModalOpen(true)}
               disabled={cart.length === 0 || createSale.isPending}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-muted-foreground900 dark:text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-900/20 flex items-center justify-center gap-2 text-base transition-all active:scale-95 disabled:bg-card dark:bg-muted800 disabled:text-muted-foreground600 dark:text-muted-foreground400"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-black py-4 rounded-2xl shadow-xl shadow-primary/20 flex items-center justify-center gap-2 text-base transition-all active:scale-95 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70"
             >
                {createSale.isPending ? 'PROCESSANDO...' : 'FECHAR CONTA (F4)'}
                <ChevronRight size={20} strokeWidth={3} />

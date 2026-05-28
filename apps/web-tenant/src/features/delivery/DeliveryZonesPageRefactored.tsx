@@ -1209,7 +1209,7 @@ export function DeliveryZonesPageRefactored() {
             type="button"
             onClick={handleSaveZone}
             disabled={savingZone}
-            className="h-12 flex-1 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-black hover:bg-black dark:hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 shadow-md transition-all"
+            className="h-12 flex-1 rounded-xl bg-gray-900 dark:bg-white text-white text-foreground text-sm font-black hover:bg-black dark:hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 shadow-md transition-all"
           >
             {savingZone ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
             Salvar
@@ -1293,7 +1293,7 @@ export function DeliveryZonesPageRefactored() {
                 className={
                   'h-10 rounded-xl border text-sm font-bold transition-all inline-flex items-center justify-center gap-2 shadow-sm ' +
                   (simulationOn
-                    ? 'bg-gray-900 text-white border-gray-900 hover:bg-black dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100'
+                    ? 'bg-gray-900 text-white border-gray-900 hover:bg-black dark:bg-white text-foreground dark:hover:bg-gray-100'
                     : 'bg-card text-gray-800 dark:text-gray-200 border-input hover:bg-gray-50 dark:hover:bg-gray-800')
                 }
               >

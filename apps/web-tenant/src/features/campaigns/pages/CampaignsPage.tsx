@@ -4,6 +4,8 @@ import { Megaphone, Plus, Users, Send, PauseCircle, Play, Square } from 'lucide-
 import { api } from '../../../lib/api-client';
 import type { Campaign } from '@gestor/types';
 import { CreateCampaignModal } from '../components/CreateCampaignModal';
+import { PageHeader, Button, Card, StatusBadge, EmptyState } from '../../../components/ui';
+
 
 export function CampaignsPage() {
   const queryClient = useQueryClient();
@@ -40,22 +42,20 @@ export function CampaignsPage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">Campanhas Ativas</h1>
-          <p className="text-muted-foreground">Envie mensagens em massa segmentadas para sua base de clientes.</p>
-        </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="btn-primary"
-        >
-          <Plus className="w-4 h-4" />
-          Nova Campanha
-        </button>
-      </div>
+      <PageHeader
+        title="Campanhas Ativas"
+        description="Envie mensagens em massa segmentadas para sua base de clientes."
+        icon={Megaphone}
+        action={
+          <Button onClick={() => setIsModalOpen(true)}>
+            <Plus className="w-4 h-4" />
+            Nova Campanha
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="card-premium p-6">
+        <Card>
           <div className="flex items-center gap-4 mb-4">
             <div className="p-3 bg-primary/10 rounded-xl text-primary">
               <Megaphone className="w-6 h-6" />
@@ -67,8 +67,8 @@ export function CampaignsPage() {
               </h3>
             </div>
           </div>
-        </div>
-        <div className="card-premium p-6">
+        </Card>
+        <Card>
           <div className="flex items-center gap-4 mb-4">
             <div className="p-3 bg-status-success/10 rounded-xl text-status-success">
               <Send className="w-6 h-6" />
@@ -80,8 +80,8 @@ export function CampaignsPage() {
               </h3>
             </div>
           </div>
-        </div>
-        <div className="card-premium p-6">
+        </Card>
+        <Card>
           <div className="flex items-center gap-4 mb-4">
             <div className="p-3 bg-accent/10 rounded-xl text-accent-foreground">
               <Users className="w-6 h-6" />
@@ -99,7 +99,7 @@ export function CampaignsPage() {
               </h3>
             </div>
           </div>
-        </div>
+        </Card>
       </div>
 
       {isLoading ? (
@@ -107,37 +107,39 @@ export function CampaignsPage() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
         </div>
       ) : (
-        <div className="card-premium overflow-hidden">
+        <Card className="overflow-hidden">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-border bg-muted/30">
+              <tr className="border-b border-border bg-muted">
                 <th className="py-4 px-6 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Campanha</th>
                 <th className="py-4 px-6 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
                 <th className="py-4 px-6 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Progresso</th>
                 <th className="py-4 px-6 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Data Criação</th>
-                <th className="py-4 px-6 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-right">Ações</th>
+                <th className="py-4 px-6 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">Ações</th>
               </tr>
             </thead>
           <tbody className="divide-y divide-border">
             {campaigns.map(c => (
-              <tr key={c.id} className="hover:bg-muted/50 transition-colors">
+              <tr key={c.id} className="hover:bg-muted transition-colors">
                 <td className="py-4 px-6">
                   <span className="font-medium text-foreground">{c.name}</span>
                 </td>
                 <td className="py-4 px-6">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    c.status === 'running' ? 'bg-status-success/10 text-status-success' : 
-                    c.status === 'paused' ? 'bg-status-warning/10 text-status-warning' :
-                    c.status === 'completed' ? 'bg-primary/10 text-primary' :
-                    c.status === 'cancelled' ? 'bg-destructive/10 text-destructive' :
-                    'bg-muted text-muted-foreground'
-                  }`}>
-                    {c.status === 'running' ? 'Em execução' :
+                  <StatusBadge
+                    status={
+                      c.status === 'running' ? 'success' : 
+                      c.status === 'paused' ? 'warning' :
+                      c.status === 'completed' ? 'info' :
+                      c.status === 'cancelled' ? 'error' :
+                      'neutral'
+                    }
+                  >
+                    {c.status === 'running' ? 'Em execução' : 
                      c.status === 'paused' ? 'Pausada' :
                      c.status === 'completed' ? 'Concluída' :
                      c.status === 'cancelled' ? 'Cancelada' :
                      'Rascunho'}
-                  </span>
+                  </StatusBadge>
                 </td>
                 <td className="py-4 px-6">
                   <div className="flex items-center gap-3">
@@ -190,13 +192,13 @@ export function CampaignsPage() {
           </tbody>
         </table>
         {campaigns.length === 0 && !isLoading && (
-          <div className="p-16 text-center text-muted-foreground">
-            <Megaphone className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg font-medium mb-2">Nenhuma campanha encontrada</p>
-            <p className="text-sm">Crie sua primeira campanha para começar a enviar mensagens em massa.</p>
-          </div>
+          <EmptyState
+            icon={Megaphone}
+            title="Nenhuma campanha encontrada"
+            description="Crie sua primeira campanha para começar a enviar mensagens em massa."
+          />
         )}
-        </div>
+        </Card>
       )}
 
       {/* Modal de Criação de Campanha */}

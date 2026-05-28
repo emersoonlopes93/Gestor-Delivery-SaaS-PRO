@@ -30,9 +30,10 @@ function applyTheme(theme: Theme) {
     theme === 'dark' ||
     (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
+  // Usar atributo data-theme para melhor isolamento entre domínios
   if (isDark) {
-    root.classList.add('dark');
+    root.setAttribute('data-theme', 'dark');
   } else {
-    root.classList.remove('dark');
+    root.setAttribute('data-theme', 'light');
   }
 }

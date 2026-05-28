@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './features/auth/LoginPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
@@ -48,19 +48,15 @@ import { EmployeesPage } from './features/management/employees/EmployeesPage';
 import { WhatsAppConfigPage } from './features/whatsapp/pages/WhatsAppConfigPage';
 import { InboxPage } from './features/whatsapp/pages/InboxPage';
 import { CampaignsPage } from './features/campaigns/pages/CampaignsPage';
+import { AuthThemeBoundary } from './components/AuthThemeBoundary';
 
-import { useThemeStore } from './stores/theme.store';
 
 export function App() {
-  const initTheme = useThemeStore((s) => s.initializeTheme);
-  useEffect(() => {
-    initTheme();
-  }, [initTheme]);
 
   return (
     <Routes>
       {/* Public routes */}
-      <Route element={<AuthLayout />}>
+      <Route element={<AuthThemeBoundary><AuthLayout /></AuthThemeBoundary>}>
         <Route path="/login" element={<LoginPage />} />
       </Route>
 

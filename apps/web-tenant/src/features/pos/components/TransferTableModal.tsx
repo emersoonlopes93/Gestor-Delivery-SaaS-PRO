@@ -106,7 +106,7 @@ export const TransferTableModal: React.FC<TransferTableModalProps> = ({
                  </button>
               ))}
               {filteredTables.length === 0 && (
-                <div className="col-span-3 py-10 text-center opacity-20">
+                <div className="col-span-3 py-10 text-center opacity-50">
                    <p className="text-xs font-bold uppercase">Nenhuma mesa livre encontrada</p>
                 </div>
               )}

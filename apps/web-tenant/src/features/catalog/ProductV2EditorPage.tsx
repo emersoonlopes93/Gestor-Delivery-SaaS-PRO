@@ -1043,7 +1043,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             type="button"
             onClick={() => setTab('personalizacao')}
             disabled={isProductWizard && productWizardIndex < 1}
-            className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'personalizacao' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-muted disabled:opacity-50'}`}
+            className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'personalizacao' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-muted disabled:opacity-70'}`}
           >
             {isProductWizard ? '2. Complementos' : 'Complementos'}
             <InfoTooltip text="Adicione grupos de opções como adicionais, tamanhos ou ingredientes." />
@@ -1054,7 +1054,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             type="button"
             onClick={() => setTab('combo')}
             disabled={isComboWizard && comboWizardIndex < 1}
-            className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'combo' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-muted disabled:opacity-50'}`}
+            className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'combo' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-muted disabled:opacity-70'}`}
           >
             {isComboWizard ? '2. Itens do Combo' : 'Itens do Combo'}
             <InfoTooltip text="Defina os produtos que podem ser escolhidos neste combo." />
@@ -1064,7 +1064,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           type="button"
           onClick={() => setTab('vendas')}
           disabled={isNew}
-          className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'vendas' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-muted disabled:opacity-50'}`}
+          className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'vendas' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-muted disabled:opacity-70'}`}
         >
           {isComboWizard ? '3. Upsells' : 'Upsells / Ofertas'}
           <InfoTooltip text="Configurar sugestões de venda (compre também) para este produto." />
@@ -1073,7 +1073,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           type="button"
           onClick={() => setTab('publicacao')}
           disabled={(isComboWizard && comboWizardIndex < 2) || (isProductWizard && productWizardIndex < 2)}
-          className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'publicacao' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-muted disabled:opacity-50'}`}
+          className={`px-4 py-2 rounded-xl text-sm font-black whitespace-nowrap transition-all ${tab === 'publicacao' ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-muted disabled:opacity-70'}`}
         >
           {isComboWizard ? '4. Disponibilidade' : (isProductWizard ? '3. Disponibilidade' : 'Disponibilidade')}
           <InfoTooltip text="Controle em quais horários e canais (Delivery, Balcão) este item está ativo." />
@@ -1167,7 +1167,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {allUpsells.length === 0 ? (
                     <div className="col-span-full py-12 text-center text-muted-foreground border-2 border-dashed border-border rounded-2xl flex flex-col items-center gap-2">
-                      <Sparkles className="h-8 w-8 text-muted-foreground/50" />
+                      <Sparkles className="h-8 w-8 text-muted-foreground" />
                       <span className="font-bold">Nenhuma oferta cadastrada.</span>
                     </div>
                   ) : (
@@ -1185,8 +1185,8 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                         >
                           <div className="flex items-center justify-between mb-2">
                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                               u.pricingType === 'fixed_price' ? 'bg-orange-100 text-orange-700' :
-                               u.pricingType.startsWith('discount') ? 'bg-green-100 text-green-700' :
+                               u.pricingType === 'fixed_price' ? 'bg-status-warning/10 text-status-warning' :
+                               u.pricingType.startsWith('discount') ? 'bg-status-success/10 text-status-success' :
                                'bg-muted text-muted-foreground'
                              }`}>
                                {u.pricingType === 'normal' ? 'Preço Normal' : 
@@ -1246,7 +1246,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               type="button"
               onClick={addGroupLink}
               disabled={savingStates.addGroupLink || availableGroupsToAdd.length === 0}
-              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {savingStates.addGroupLink && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
               Vincular
@@ -1295,7 +1295,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               type="button"
               onClick={createComplementAndLink}
               disabled={savingStates.createComplementAndLink || !newComplementForm.name.trim()}
-              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {savingStates.createComplementAndLink && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
               Criar e vincular
@@ -1374,7 +1374,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               type="button"
               onClick={saveBundleItem}
               disabled={savingStates.saveBundleItem || !bundleItemForm.productId || selectableBundleProducts.length === 0 || comboModeState !== 'bundle'}
-              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {savingStates.saveBundleItem && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
               Salvar item
@@ -1442,7 +1442,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               type="button"
               onClick={saveLinkOverrides}
               disabled={savingStates.saveLinkOverrides}
-              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {savingStates.saveLinkOverrides && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
               Salvar
@@ -1521,7 +1521,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               type="button"
               onClick={saveSlot}
               disabled={savingStates.saveSlot}
-              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {savingStates.saveSlot && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
               Salvar
@@ -1595,7 +1595,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               type="button"
               onClick={saveAllowed}
               disabled={savingStates.saveAllowed}
-              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {savingStates.saveAllowed && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
               {editingAllowed ? 'Salvar' : 'Adicionar'}
@@ -1649,7 +1649,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               type="button"
               onClick={saveRule}
               disabled={savingStates.saveRule}
-              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {savingStates.saveRule && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
               Salvar
@@ -1771,7 +1771,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               </button>
               <button
                 onClick={confirmModal.onConfirm}
-                className="px-6 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700"
+                className="px-6 py-2 bg-destructive text-destructive-foreground rounded-xl font-bold hover:bg-destructive/90"
               >
                 Confirmar
               </button>

@@ -377,7 +377,7 @@ export function SettingsPage() {
                       {settings.logoUrl ? (
                         <img src={settings.logoUrl} alt="Logo preview" className="w-full h-full object-contain" />
                       ) : (
-                        <span className="text-muted-foreground/50 text-2xl">🖼️</span>
+                        <span className="text-muted-foreground text-2xl">🖼️</span>
                       )}
                     </div>
                     <div className="flex flex-col gap-2 text-left">
@@ -390,7 +390,7 @@ export function SettingsPage() {
                           <button 
                             type="button"
                             onClick={() => setSettings({...settings, logoUrl: ''})}
-                            className="text-red-500 hover:text-red-600 font-medium text-xs px-2 py-1"
+                            className="text-destructive hover:text-destructive/80 font-medium text-xs px-2 py-1"
                           >
                             Remover
                           </button>
@@ -702,7 +702,7 @@ export function SettingsPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="bg-primary-600 hover:bg-primary-700 text-white font-bold py-2.5 px-8 rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50"
+                className="bg-primary-600 hover:bg-primary-700 text-white font-bold py-2.5 px-8 rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-70"
               >
                 {saving ? 'Salvando...' : 'Salvar Dados Básicos'}
               </button>
@@ -778,7 +778,7 @@ export function SettingsPage() {
             <button
               onClick={handleSaveHours}
               disabled={saving}
-              className="w-full mt-6 bg-primary border border-primary text-primary-foreground font-bold py-3 px-4 rounded-xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
+              className="w-full mt-6 bg-primary border border-primary text-primary-foreground font-bold py-3 px-4 rounded-xl hover:bg-primary/90 transition-all flex items-center justify-center gap-2 group disabled:opacity-70"
             >
               <Save className="w-4 h-4 group-hover:scale-110 transition-transform" />
               {saving ? 'Salvando...' : 'Salvar Horários'}

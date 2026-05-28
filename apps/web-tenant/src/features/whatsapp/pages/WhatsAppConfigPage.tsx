@@ -253,8 +253,8 @@ export function WhatsAppConfigPage() {
         {instance && (
           <div className={`flex items-center gap-2 px-4 py-2 rounded-full border ${
             status?.status === 'connected' 
-              ? 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20' 
-              : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20'
+              ? 'bg-status-success/10 text-status-success border-status-success/20' 
+              : 'bg-status-warning/10 text-status-warning border-status-warning/20'
           }`}>
             <span className="relative flex h-3 w-3">
               {status?.status === 'connected' && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>}
@@ -331,7 +331,7 @@ export function WhatsAppConfigPage() {
                       <button 
                         onClick={() => disconnectMutation.mutate()}
                         disabled={disconnectMutation.isPending}
-                        className="px-4 py-2 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-4 py-2 bg-destructive/10 text-destructive hover:bg-destructive/20 rounded-lg text-sm font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                       >
                         {disconnectMutation.isPending ? 'Desconectando...' : 'Desconectar'}
                       </button>
@@ -340,7 +340,7 @@ export function WhatsAppConfigPage() {
                         <button 
                           onClick={() => connectMutation.mutate()}
                           disabled={connectMutation.isPending}
-                          className="px-4 py-2 bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/20 rounded-lg text-sm font-medium transition-colors"
+                          className="px-4 py-2 bg-status-success/10 text-status-success hover:bg-status-success/20 rounded-lg text-sm font-medium transition-colors"
                         >
                           {connectMutation.isPending ? 'Conectando...' : 'Conectar'}
                         </button>
@@ -448,8 +448,8 @@ export function WhatsAppConfigPage() {
                                   {pairingCode}
                                 </div>
                               </div>
-                              <div className="space-y-1 text-left bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50">
-                                <p className="text-xs text-blue-700 dark:text-blue-300 font-bold uppercase mb-2">Instruções:</p>
+                              <div className="space-y-1 text-left bg-muted p-4 rounded-xl border border-border">
+                                <p className="text-xs text-foreground font-bold uppercase mb-2">Instruções:</p>
                                 <p className="text-[11px] text-gray-600 dark:text-gray-400">1. Abra o WhatsApp no celular</p>
                                 <p className="text-[11px] text-gray-600 dark:text-gray-400">2. Vá em <b>Aparelhos Conectados</b></p>
                                 <p className="text-[11px] text-gray-600 dark:text-gray-400">3. Clique em <b>Conectar um aparelho</b></p>
@@ -490,7 +490,7 @@ export function WhatsAppConfigPage() {
 
         {/* Card Configuração do Agente IA */}
         <div className="card-premium p-6 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-blue-500/10" />
+          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-primary/10" />
           <div className="flex items-start justify-between mb-6">
             <div className="flex items-start gap-4">
               <div className="p-3 bg-gray-100 dark:bg-gray-800/50 rounded-xl">

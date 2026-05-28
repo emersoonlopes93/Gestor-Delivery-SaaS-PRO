@@ -128,12 +128,12 @@ export function DispatchPage() {
 
                 {/* Entregador já atribuído */}
                 {o.deliveryDriverName ? (
-                  <div className="mt-3 px-3 py-2 bg-primary/10 rounded-lg border border-primary/20">
-                    <p className="text-xs font-semibold text-primary">
+                  <div className="mt-3 px-3 py-2 bg-muted rounded-lg border border-border">
+                    <p className="text-xs font-semibold text-foreground">
                       🏍 Entregador: {o.deliveryDriverName}
                     </p>
                     {o.deliveryDriverStatus === 'busy' && (
-                      <p className="text-xs text-primary/70">Status: Em rota</p>
+                      <p className="text-xs text-muted-foreground">Status: Em rota</p>
                     )}
                   </div>
                 ) : (
@@ -161,7 +161,7 @@ export function DispatchPage() {
                     </select>
                     <button
                       onClick={() => handleAssignDriver(o.id)}
-                      className="text-xs font-semibold text-primary hover:text-primary/80 whitespace-nowrap border border-primary/30 px-2 py-1.5 rounded"
+                      className="text-xs font-semibold text-primary hover:text-foreground whitespace-nowrap border border-border px-2 py-1.5 rounded"
                     >
                       Atribuir
                     </button>
@@ -221,7 +221,7 @@ export function DispatchPage() {
                     {o.deliveryAddress?.street}, {o.deliveryAddress?.number}
                   </span>
                 </div>
-                <div className="text-sm font-semibold text-foreground bg-primary/10 p-2 rounded truncate">
+                <div className="text-sm font-semibold text-foreground bg-muted p-2 rounded truncate">
                   🏍 Entregador: {o.deliveryDriverName || 'Desconhecido'}
                 </div>
 

@@ -131,7 +131,7 @@ export function KdsPage() {
         <div className="text-center py-12 text-muted-foreground font-bold text-lg">Carregando painel KDS...</div>
       ) : printJobs.length === 0 ? (
         <div className="flex flex-col items-center justify-center grow pb-20">
-          <ChefHat className="w-16 h-16 text-muted-foreground/60 mb-4" />
+          <ChefHat className="w-16 h-16 text-muted-foreground mb-4" />
           <h2 className="text-2xl font-black text-foreground">Nenhum pedido para este setor!</h2>
         </div>
       ) : (
@@ -149,11 +149,11 @@ export function KdsPage() {
                 <header className={`p-4 rounded-t-2xl flex justify-between items-start shrink-0 ${isUrgent ? 'bg-destructive' : 'bg-secondary'}`}>
                   <div>
                     <h2 className="text-3xl font-black text-destructive-foreground">{order?.orderNumber || '---'}</h2>
-                    <span className="text-destructive-foreground/70 text-xs font-medium uppercase tracking-wider">
+                    <span className="text-destructive-foreground text-xs font-medium uppercase tracking-wider">
                       {job.station} - {order?.fulfillmentType === 'delivery' ? 'Entrega' : 'Salão'}
                     </span>
                   </div>
-                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg font-black text-sm bg-card/20 text-destructive-foreground`}>
+                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg font-black text-sm bg-muted text-destructive-foreground border border-border`}>
                     <Clock className="w-4 h-4" /> {elapsed}m
                   </div>
                 </header>
@@ -167,7 +167,7 @@ export function KdsPage() {
                 <footer className="p-4 bg-card rounded-b-2xl border-t border-border shrink-0 flex flex-col gap-2">
                   <button
                     onClick={() => handlePrint(job.content)}
-                    className="w-full bg-primary/10 border border-primary/20 text-primary font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition-colors hover:bg-primary/20"
+                    className="w-full bg-card border border-border text-primary font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition-colors hover:bg-muted hover:text-foreground"
                   >
                     <RefreshCw className="w-4 h-4" /> Imprimir Ticket
                   </button>
