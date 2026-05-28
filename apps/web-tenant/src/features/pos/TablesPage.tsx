@@ -318,7 +318,7 @@ export function TablesPage() {
                     <button 
                       onClick={() => createTableMutation.mutate({ name: newTableName, capacity: newCapacity })}
                       disabled={!newTableName || createTableMutation.isPending}
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-900/20 transition-all active:scale-95"
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed text-white px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-900/20 transition-all active:scale-95"
                     >
                        {createTableMutation.isPending ? 'Salvando...' : 'Salvar Mesa'}
                     </button>

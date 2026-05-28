@@ -9,6 +9,12 @@ import { ProductPersonalization } from './SubComponents/ProductPersonalization';
 import { ComboBuilder } from './SubComponents/ComboBuilder';
 import { PublicationSettings } from './SubComponents/PublicationSettings';
 import { InfoTooltip } from '../../components/InfoTooltip';
+
+
+
+
+
+
 import {
   CatalogAvailabilityRule,
   CatalogPublication,
@@ -1474,7 +1480,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <button
               type="button"
               onClick={() => setLinkForm((p) => ({ ...p, overrideIsRequired: undefined }))}
-              className="ml-auto text-xs font-black text-muted-foreground hover:text-gray-800 dark:text-gray-200"
+              className="ml-auto text-xs font-black text-muted-foreground hover:text-foreground dark:hover:text-foreground"
             >
               limpar
             </button>
@@ -1675,7 +1681,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
                 {(Object.entries(CHANNEL_LABELS) as Array<[string, string]>).map(([value, label]) => {
                   const checked = ruleChannels.includes(value as 'storefront_delivery' | 'storefront_pickup' | 'pos');
                   return (
-                    <label key={value} className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 px-3 py-2 cursor-pointer">
+                    <label key={value} className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 dark:bg-muted/80 px-3 py-2 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={checked}
@@ -1701,7 +1707,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               {DAY_OPTIONS.map((day) => {
                 const isChecked = (ruleForm.daysOfWeek ?? []).includes(day.value);
                 return (
-                  <label key={day.value} className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 px-3 py-2 cursor-pointer">
+                  <label key={day.value} className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 dark:bg-muted/80 px-3 py-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={isChecked}

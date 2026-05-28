@@ -197,20 +197,20 @@ export default function WaiterPage() {
   const subtotal = cart.reduce((sum, item) => sum + item.basePrice * item.quantity, 0);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-64px)] bg-muted text-foreground overflow-hidden">
       
       {/* Top Header Mobile */}
-      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3 flex items-center justify-between shadow-lg">
+      <div className="bg-card border-b border-border px-4 py-3 flex items-center justify-between shadow-lg">
          <div className="flex items-center gap-3">
             <button 
               onClick={() => setViewMode('salon')}
-              className={`p-2 rounded-xl transition-all ${viewMode === 'salon' ? 'bg-emerald-500 text-gray-900 dark:text-white shadow-lg' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}
+              className={`p-2 rounded-xl transition-all ${viewMode === 'salon' ? 'bg-emerald-500 text-foreground shadow-lg' : 'bg-card text-muted-foreground'}`}
             >
                <LayoutGrid size={20} />
             </button>
             <button 
               onPointerDown={() => setViewMode('catalog')}
-              className={`p-2 rounded-xl transition-all ${viewMode === 'catalog' ? 'bg-emerald-500 text-gray-900 dark:text-white shadow-lg' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}
+              className={`p-2 rounded-xl transition-all ${viewMode === 'catalog' ? 'bg-emerald-500 text-foreground shadow-lg' : 'bg-card text-muted-foreground'}`}
             >
                <Store size={20} />
             </button>
@@ -239,11 +239,11 @@ export default function WaiterPage() {
             {/* Catalog & Cart combined for mobile */}
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
                {/* Left: Products */}
-               <div className="flex-1 flex flex-col min-w-0 bg-gray-50 dark:bg-gray-950 border-r border-gray-200 dark:border-gray-900">
-                  <div className="p-3 bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800 flex gap-2 overflow-x-auto scrollbar-hide py-3">
+               <div className="flex-1 flex flex-col min-w-0 bg-muted border-r border-border">
+                  <div className="p-3 bg-muted border-b border-border flex gap-2 overflow-x-auto scrollbar-hide py-3">
                      <button 
                        onClick={() => setSelectedCategoryId(null)}
-                       className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${!selectedCategoryId ? 'bg-emerald-500 text-gray-900 dark:text-white' : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400'}`}
+                       className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${!selectedCategoryId ? 'bg-emerald-500 text-foreground' : 'bg-card text-muted-foreground'}`}
                      >
                         Tudo
                      </button>
@@ -251,7 +251,7 @@ export default function WaiterPage() {
                         <button 
                           key={cat.id}
                           onClick={() => setSelectedCategoryId(cat.id)}
-                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${selectedCategoryId === cat.id ? 'bg-emerald-500 text-gray-900 dark:text-white' : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400'}`}
+                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${selectedCategoryId === cat.id ? 'bg-emerald-500 text-foreground' : 'bg-card text-muted-foreground'}`}
                         >
                            {cat.name}
                         </button>
@@ -262,7 +262,7 @@ export default function WaiterPage() {
                         {filteredProducts.map(p => (
                            <div key={p.id} className="relative active:scale-95 transition-transform" onClick={() => addToCart(p)}>
                               <ProductCard product={p} onAdd={() => {}} />
-                              <div className="absolute top-2 right-2 bg-emerald-500 text-gray-900 dark:text-white p-1 rounded-lg">
+                              <div className="absolute top-2 right-2 bg-emerald-500 text-foreground p-1 rounded-lg">
                                 <Plus size={14} />
                               </div>
                            </div>
@@ -272,10 +272,10 @@ export default function WaiterPage() {
                </div>
 
                {/* Right: Cart (Sticky Bottom on mobile) */}
-               <div className="h-[280px] md:h-full md:w-[320px] bg-white dark:bg-gray-900 flex flex-col shadow-2xl border-t md:border-t-0 md:border-l border-gray-200 dark:border-gray-800">
-                  <div className="px-4 py-3 bg-gray-850/50 flex items-center justify-between border-b border-gray-200 dark:border-gray-800">
-                     <span className="text-[10px] font-black uppercase text-gray-500 dark:text-gray-400 tracking-widest leading-none">Comanda do Pedido</span>
-                     <button onClick={() => setViewMode('salon')} className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:text-white"><X size={16} /></button>
+               <div className="h-[280px] md:h-full md:w-[320px] bg-card flex flex-col shadow-2xl border-t md:border-t-0 md:border-l border-border">
+                  <div className="px-4 py-3 bg-muted flex items-center justify-between border-b border-border">
+                     <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none">Comanda do Pedido</span>
+                     <button onClick={() => setViewMode('salon')} className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
                   </div>
                   
                   <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -285,27 +285,27 @@ export default function WaiterPage() {
                        </div>
                      ) : (
                        cart.map((item) => (
-                         <div key={item.cartLineId} className="bg-white dark:bg-gray-800/40 border border-gray-200 dark:border-gray-800/50 rounded-xl p-3 flex justify-between items-center">
+                         <div key={item.cartLineId} className="bg-card/40 border border-border/50 rounded-xl p-3 flex justify-between items-center">
                             <div className="min-w-0 flex-1 pr-2">
-                               <p className="font-bold text-gray-900 dark:text-gray-100 text-[11px] truncate leading-tight">{item.name}</p>
+                               <p className="font-bold text-foreground text-[11px] truncate leading-tight">{item.name}</p>
                                <p className="text-emerald-400 font-extrabold text-[13px]">{formatCurrency(item.basePrice * item.quantity)}</p>
                             </div>
                             <div className="flex items-center gap-2">
-                               <div className="flex items-center bg-gray-50 dark:bg-gray-950 rounded-lg p-0.5 border border-gray-200 dark:border-gray-800">
-                                  <button onClick={() => updateCartItem(item.cartLineId, { quantity: Math.max(1, item.quantity - 1) })} className="w-6 h-6 flex items-center justify-center text-gray-500 dark:text-gray-400"><Minus size={12} /></button>
+                               <div className="flex items-center bg-muted rounded-lg p-0.5 border border-border">
+                                  <button onClick={() => updateCartItem(item.cartLineId, { quantity: Math.max(1, item.quantity - 1) })} className="w-6 h-6 flex items-center justify-center text-muted-foreground"><Minus size={12} /></button>
                                   <span className="w-6 text-center text-xs font-black">{item.quantity}</span>
-                                  <button onClick={() => updateCartItem(item.cartLineId, { quantity: item.quantity + 1 })} className="w-6 h-6 flex items-center justify-center text-gray-500 dark:text-gray-400"><Plus size={12} /></button>
+                                  <button onClick={() => updateCartItem(item.cartLineId, { quantity: item.quantity + 1 })} className="w-6 h-6 flex items-center justify-center text-muted-foreground"><Plus size={12} /></button>
                                </div>
-                               <button onClick={() => removeFromCart(item.cartLineId)} className="text-gray-700 dark:text-gray-300 hover:text-red-500"><X size={14} /></button>
+                               <button onClick={() => removeFromCart(item.cartLineId)} className="text-muted-foreground hover:text-red-500"><X size={14} /></button>
                             </div>
                          </div>
                        ))
                      )}
                   </div>
 
-                  <div className="p-4 bg-gray-50 dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 flex flex-col gap-3">
+                  <div className="p-4 bg-muted border-t border-border flex flex-col gap-3">
                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase italic">Subtotal</span>
+                        <span className="text-[10px] font-black text-muted-foreground uppercase italic">Subtotal</span>
                         <span className="text-lg font-black text-emerald-400 tracking-tighter italic">{formatCurrency(subtotal)}</span>
                      </div>
                      
@@ -313,7 +313,7 @@ export default function WaiterPage() {
                         <button 
                           onClick={handleRequestBill}
                           disabled={!currentOrderId}
-                          className="flex-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 rounded-xl py-3 text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                          className="flex-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 rounded-xl py-3 text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed"
                         >
                            <Receipt size={14} />
                            Conta
@@ -321,7 +321,7 @@ export default function WaiterPage() {
                         <button 
                           onClick={handleSaveDraft}
                           disabled={cart.length === 0 || upsertDraft.isPending}
-                          className="flex-2 bg-emerald-600 hover:bg-emerald-700 text-gray-900 dark:text-white font-black py-3 rounded-xl shadow-xl flex items-center justify-center gap-2 text-[11px] transition-all disabled:bg-white dark:bg-gray-800 disabled:text-gray-600 dark:text-gray-400 uppercase tracking-widest"
+                          className="flex-2 bg-emerald-600 hover:bg-emerald-700 text-foreground font-black py-3 rounded-xl shadow-xl flex items-center justify-center gap-2 text-[11px] transition-all disabled:bg-card disabled:text-muted-foreground uppercase tracking-widest"
                         >
                            <Printer size={14} />
                            {upsertDraft.isPending ? 'Lançando...' : 'Cozinha'}
@@ -337,9 +337,9 @@ export default function WaiterPage() {
       {/* Floating Action Menu (Mobile) */}
       {viewMode === 'catalog' && cart.length > 0 && (
          <div className="md:hidden fixed bottom-32 right-4 z-50">
-            <div className="bg-emerald-500 text-gray-900 dark:text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl relative">
+            <div className="bg-emerald-500 text-foreground w-14 h-14 rounded-full flex items-center justify-center shadow-2xl relative">
                 <ShoppingCart size={24} />
-                <span className="absolute -top-1 -right-1 bg-white dark:bg-gray-900 text-emerald-600 border-2 border-emerald-500 w-6 h-6 rounded-full text-[10px] font-black flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-card text-emerald-600 border-2 border-emerald-500 w-6 h-6 rounded-full text-[10px] font-black flex items-center justify-center">
                    {cart.reduce((a,b) => a+b.quantity, 0)}
                 </span>
             </div>

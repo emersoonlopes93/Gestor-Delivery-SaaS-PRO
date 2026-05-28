@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { PaymentMethod } from '@gestor/types';
 
+
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -59,50 +60,50 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     <div className="grid grid-cols-1 gap-3 py-4">
       <button
         onClick={() => { setMethod(PaymentMethod.cash); setStep('details'); }}
-        className="flex items-center justify-between p-4 bg-card dark:bg-muted900 border border-border200 dark:border-border800 rounded-2xl hover:border-emerald-500 hover:bg-muted50 dark:hover:bg-muted800 transition-all group"
+        className="flex items-center justify-between p-4 bg-card border border-border rounded-2xl hover:border-primary hover:bg-muted transition-all group"
       >
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform border border-emerald-500/20">
+          <div className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform border border-primary/20">
             <Banknote size={24} />
           </div>
           <div className="text-left">
-            <p className="font-bold text-muted-foreground900 dark:text-white">Dinheiro</p>
-            <p className="text-xs text-muted-foreground500 dark:text-muted-foreground400">Pagamento em espécie</p>
+            <p className="font-bold text-foreground">Dinheiro</p>
+            <p className="text-xs text-muted-foreground">Pagamento em espécie</p>
           </div>
         </div>
-        <ChevronRight size={20} className="text-muted-foreground400 dark:text-muted-foreground500 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all" />
+        <ChevronRight size={20} className="text-muted-foreground dark:text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
       </button>
 
       <button
         onClick={() => { setMethod(PaymentMethod.pix); setStep('details'); }}
-        className="flex items-center justify-between p-4 bg-card dark:bg-muted900 border border-border200 dark:border-border800 rounded-2xl hover:border-indigo-500 hover:bg-muted50 dark:hover:bg-muted800 transition-all group"
+        className="flex items-center justify-between p-4 bg-card  border border-border  rounded-2xl hover:border-indigo-500 hover:bg-muted  transition-all group"
       >
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform border border-indigo-500/20">
+          <div className="w-12 h-12 bg-indigo-500/10 text-indigo-500  rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform border border-indigo-500/20">
             <QrCode size={24} />
           </div>
           <div className="text-left">
-            <p className="font-bold text-muted-foreground900 dark:text-white">PIX</p>
-            <p className="text-xs text-muted-foreground500 dark:text-muted-foreground400">Instantâneo e sem taxas</p>
+            <p className="font-bold text-foreground">PIX</p>
+            <p className="text-xs text-muted-foreground">Instantâneo e sem taxas</p>
           </div>
         </div>
-        <ChevronRight size={20} className="text-muted-foreground400 dark:text-muted-foreground500 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
+        <ChevronRight size={20} className="text-muted-foreground dark:text-muted-foreground group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
       </button>
 
       <div className="grid grid-cols-2 gap-3">
         <button
           onClick={() => { setMethod(PaymentMethod.credit_card); setStep('details'); }}
-          className="flex flex-col items-center justify-center p-4 bg-card dark:bg-muted900 border border-border200 dark:border-border800 rounded-2xl hover:border-amber-500 hover:bg-muted50 dark:hover:bg-muted800 transition-all group"
+          className="flex flex-col items-center justify-center p-4 bg-card  border border-border  rounded-2xl hover:border-amber-500 hover:bg-muted  transition-all group"
         >
-          <CreditCard size={24} className="text-amber-500 dark:text-amber-400 mb-2 group-hover:scale-110 transition-transform" />
-          <p className="font-bold text-muted-foreground900 dark:text-white text-sm">Crédito</p>
+          <CreditCard size={24} className="text-amber-500  mb-2 group-hover:scale-110 transition-transform" />
+          <p className="font-bold text-foreground text-sm">Crédito</p>
         </button>
         <button
           onClick={() => { setMethod(PaymentMethod.debit_card); setStep('details'); }}
-          className="flex flex-col items-center justify-center p-4 bg-card dark:bg-muted900 border border-border200 dark:border-border800 rounded-2xl hover:border-amber-500 hover:bg-muted50 dark:hover:bg-muted800 transition-all group"
+          className="flex flex-col items-center justify-center p-4 bg-card  border border-border  rounded-2xl hover:border-amber-500 hover:bg-muted  transition-all group"
         >
-          <CreditCard size={24} className="text-amber-500 dark:text-amber-400 mb-2 group-hover:scale-110 transition-transform" />
-          <p className="font-bold text-muted-foreground900 dark:text-white text-sm">Débito</p>
+          <CreditCard size={24} className="text-amber-500  mb-2 group-hover:scale-110 transition-transform" />
+          <p className="font-bold text-foreground text-sm">Débito</p>
         </button>
       </div>
     </div>
@@ -110,23 +111,23 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const renderCashDetails = () => (
     <div className="space-y-4 py-2">
-      <div className="text-center bg-muted50 dark:bg-muted950/50 p-4 rounded-2xl border border-border100 dark:border-border800">
-        <p className="text-[10px] text-muted-foreground500 dark:text-muted-foreground400 uppercase font-black tracking-widest mb-1">Total a receber</p>
-        <p className="text-4xl font-black text-emerald-500 dark:text-emerald-400 tracking-tighter">{formatCurrency(total)}</p>
+      <div className="text-center bg-muted p-4 rounded-2xl border border-border ">
+        <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mb-1">Total a receber</p>
+        <p className="text-4xl font-black text-primary  tracking-tighter">{formatCurrency(total)}</p>
       </div>
 
       <div className="space-y-2">
-        <label className="text-[10px] text-muted-foreground500 dark:text-muted-foreground400 uppercase font-black tracking-widest ml-1">Quanto o cliente pagou?</label>
+        <label className="text-[10px] text-muted-foreground uppercase font-black tracking-widest ml-1">Quanto o cliente pagou?</label>
         <div className="relative">
           <input
             type="number"
             autoFocus
             value={cashAmount || ''}
             onChange={(e) => setCashAmount(parseFloat(e.target.value) || 0)}
-            className={`w-full bg-card dark:bg-muted900 border-2 rounded-2xl px-4 py-4 text-2xl font-black text-muted-foreground900 dark:text-white outline-none transition-all ${cashAmount < total && cashAmount !== 0 ? 'border-red-500/50 text-red-400' : 'border-border100 dark:border-border800 focus:border-emerald-500'}`}
+            className={`w-full bg-card  border-2 rounded-2xl px-4 py-4 text-2xl font-black text-foreground outline-none transition-all ${cashAmount < total && cashAmount !== 0 ? 'border-red-500/50 text-red-400' : 'border-border  focus:border-emerald-500'}`}
             placeholder="0,00"
           />
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground400 font-bold">R$</div>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">R$</div>
         </div>
       </div>
 
@@ -134,7 +135,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       <div className="grid grid-cols-4 gap-2">
          <button 
            onClick={() => setCashAmount(total)}
-           className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-500 dark:text-emerald-400 py-2 rounded-xl text-[10px] font-black uppercase transition-all"
+           className="bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary  py-2 rounded-xl text-[10px] font-black uppercase transition-all"
          >
            Exato
          </button>
@@ -142,19 +143,19 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             <button 
               key={val}
               onClick={() => setCashAmount(val)}
-              className="bg-card dark:bg-muted900 hover:bg-muted50 dark:hover:bg-muted800 border border-border200 dark:border-border800 text-muted-foreground700 dark:text-muted-foreground300 py-2 rounded-xl text-[10px] font-black uppercase transition-all"
+              className="bg-card  hover:bg-muted  border border-border  text-muted-foreground700 dark:text-muted-foreground300 py-2 rounded-xl text-[10px] font-black uppercase transition-all"
             >
               R$ {val}
             </button>
          ))}
       </div>
 
-      <div className={`rounded-2xl p-4 flex justify-between items-center transition-all ${cashAmount >= total ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-red-500/10 border border-red-500/20 opacity-50'}`}>
+      <div className={`rounded-2xl p-4 flex justify-between items-center transition-all ${cashAmount >= total ? 'bg-primary/10 border border-primary/20' : 'bg-red-500/10 border border-red-500/20 opacity-50'}`}>
         <div>
-          <p className={`text-[10px] uppercase font-black ${cashAmount >= total ? 'text-emerald-500/70' : 'text-red-500/70'}`}>
+          <p className={`text-[10px] uppercase font-black ${cashAmount >= total ? 'text-primary/70' : 'text-red-500/70'}`}>
             {cashAmount >= total ? 'Troco para devolver' : 'Faltando'}
           </p>
-          <p className={`text-2xl font-black ${cashAmount >= total ? 'text-emerald-500 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
+          <p className={`text-2xl font-black ${cashAmount >= total ? 'text-primary ' : 'text-red-500 dark:text-red-400'}`}>
             {formatCurrency(Math.abs(cashAmount - total))}
           </p>
         </div>
@@ -170,7 +171,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       <button
         onClick={() => onConfirm(PaymentMethod.cash, { cashAmount })}
         disabled={isPending || cashAmount < total}
-        className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-muted100 dark:disabled:bg-muted800 disabled:text-muted-foreground400 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
+        className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-muted100 dark:disabled:bg-muted800 disabled:text-muted-foreground text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
       >
         {isPending ? 'FINALIZANDO...' : 'CONFIRMAR RECEBIMENTO'}
         <CheckCircle2 size={20} />
@@ -180,8 +181,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const renderPixDetails = () => (
     <div className="space-y-6 py-4 text-center">
-      <div className="bg-card dark:bg-muted800 p-4 rounded-3xl inline-block shadow-2xl border border-border100 dark:border-border700">
-        <div className="w-48 h-48 bg-muted50 dark:bg-muted900 rounded-2xl flex items-center justify-center overflow-hidden border border-border100 dark:border-border700">
+      <div className="bg-card dark:bg-muted800 p-4 rounded-3xl inline-block shadow-2xl border border-border dark:border-border700">
+        <div className="w-48 h-48 bg-muted50  rounded-2xl flex items-center justify-center overflow-hidden border border-border dark:border-border700">
            {/* Mock QR CODE */}
            <div className="relative">
              <QrCode size={160} className="text-muted-foreground900 dark:text-muted-foreground100" />
@@ -195,22 +196,22 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       </div>
 
       <div className="space-y-2">
-        <p className="text-muted-foreground900 dark:text-white font-black text-xl">{formatCurrency(total)}</p>
-        <p className="text-muted-foreground500 dark:text-muted-foreground400 text-xs font-bold uppercase tracking-widest">Escaneie o QR Code acima ou copie a chave</p>
+        <p className="text-foreground font-black text-xl">{formatCurrency(total)}</p>
+        <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest">Escaneie o QR Code acima ou copie a chave</p>
       </div>
 
       <button
         onClick={handleCopyPix}
-        className="w-full bg-muted50 dark:bg-muted900 hover:bg-muted100 dark:hover:bg-muted800 border border-border200 dark:border-border700 rounded-2xl px-4 py-3 flex items-center justify-between text-muted-foreground700 dark:text-muted-foreground300 transition-all font-bold text-sm"
+        className="w-full bg-muted50  hover:bg-muted100  border border-border dark:border-border700 rounded-2xl px-4 py-3 flex items-center justify-between text-muted-foreground700 dark:text-muted-foreground300 transition-all font-bold text-sm"
       >
         <span className="truncate mr-4">pix.gestordelivery...</span>
-        {pixCopied ? <Check size={20} className="text-emerald-500" /> : <Copy size={20} className="text-muted-foreground400" />}
+        {pixCopied ? <Check size={20} className="text-primary" /> : <Copy size={20} className="text-muted-foreground" />}
       </button>
 
       <button
         onClick={() => onConfirm(PaymentMethod.pix)}
         disabled={isPending}
-        className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-muted100 dark:disabled:bg-muted800 disabled:text-muted-foreground400 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2"
+        className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-muted100 dark:disabled:bg-muted800 disabled:text-muted-foreground text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2"
       >
         {isPending ? 'Verificando...' : 'Confirmar Pagamento'}
         <CheckCircle2 size={20} />
@@ -224,15 +225,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         <div className="w-20 h-20 bg-amber-500/10 text-amber-500 rounded-3xl flex items-center justify-center mx-auto mb-4 border-2 border-amber-500/20">
           <CreditCard size={40} />
         </div>
-        <p className="text-muted-foreground900 dark:text-white font-black text-xl">Aguardando Máquina</p>
-        <p className="text-muted-foreground500 dark:text-muted-foreground400 text-xs font-bold uppercase tracking-widest mt-2">Insira ou aproxime o cartão na maquininha</p>
-        <p className="text-amber-500 dark:text-amber-400 font-black text-3xl mt-4">{formatCurrency(total)}</p>
+        <p className="text-foreground font-black text-xl">Aguardando Máquina</p>
+        <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest mt-2">Insira ou aproxime o cartão na maquininha</p>
+        <p className="text-amber-500  font-black text-3xl mt-4">{formatCurrency(total)}</p>
       </div>
 
       <button
         onClick={() => onConfirm(method)}
         disabled={isPending}
-        className="w-full bg-amber-600 hover:bg-amber-700 disabled:bg-muted100 dark:disabled:bg-muted800 disabled:text-muted-foreground400 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-amber-900/20 flex items-center justify-center gap-2"
+        className="w-full bg-amber-600 hover:bg-amber-700 disabled:bg-muted100 dark:disabled:bg-muted800 disabled:text-muted-foreground text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-amber-900/20 flex items-center justify-center gap-2"
       >
         {isPending ? 'Confirmando...' : 'Confirmar Transação'}
         <CheckCircle2 size={20} />
@@ -242,25 +243,25 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-card dark:bg-muted900 border border-border100 dark:border-border800 rounded-[2.5rem] shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] w-full max-w-md overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-10 duration-500">
+      <div className="bg-card  border border-border  rounded-[2.5rem] shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] w-full max-w-md overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-10 duration-500">
         
         {/* Header */}
-        <div className="px-8 py-6 border-b border-border100 dark:border-border800 flex items-center gap-4 bg-muted50/50 dark:bg-muted950/50">
+        <div className="px-8 py-6 border-b border-border  flex items-center gap-4 bg-muted50/50 dark:bg-muted950/50">
           {step === 'details' && (
             <button 
               onClick={() => setStep('selection')}
-              className="text-muted-foreground400 dark:text-muted-foreground500 hover:text-muted-foreground900 dark:hover:text-white p-2 hover:bg-card dark:hover:bg-muted800 rounded-full transition-all border border-transparent hover:border-border200 dark:hover:border-border700"
+              className="text-muted-foreground dark:text-muted-foreground hover:text-muted-foreground900 dark:hover:text-white p-2 hover:bg-card  rounded-full transition-all border border-transparent hover:border-border dark:hover:border-border700"
             >
               <ArrowLeft size={20} />
             </button>
           )}
           <div>
-            <h3 className="text-xl font-black text-muted-foreground900 dark:text-white tracking-tight leading-none uppercase">Pagamento</h3>
-            <p className="text-[10px] text-emerald-500 uppercase font-black tracking-[0.2em] mt-1">Status: Aguardando</p>
+            <h3 className="text-xl font-black text-foreground tracking-tight leading-none uppercase">Pagamento</h3>
+            <p className="text-[10px] text-primary uppercase font-black tracking-[0.2em] mt-1">Status: Aguardando</p>
           </div>
           <button
             onClick={onClose}
-            className="ml-auto text-muted-foreground400 dark:text-muted-foreground500 hover:text-muted-foreground900 dark:hover:text-white p-2 hover:bg-card dark:hover:bg-muted800 rounded-full transition-all border border-transparent hover:border-border200 dark:hover:border-border700"
+            className="ml-auto text-muted-foreground dark:text-muted-foreground hover:text-muted-foreground900 dark:hover:text-white p-2 hover:bg-card  rounded-full transition-all border border-transparent hover:border-border dark:hover:border-border700"
           >
             <X className="h-5 w-5" />
           </button>
@@ -277,14 +278,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         </div>
 
         {/* Footer Summary */}
-        <div className="px-8 py-4 bg-muted50 dark:bg-muted950/50 border-t border-border100 dark:border-border800 flex justify-between items-center">
+        <div className="px-8 py-4 bg-muted border-t border-border  flex justify-between items-center">
           <div className="flex flex-col">
-            <span className="text-[10px] text-muted-foreground500 dark:text-muted-foreground400 uppercase font-black">Subtotal: {formatCurrency(subtotal)}</span>
+            <span className="text-[10px] text-muted-foreground uppercase font-black">Subtotal: {formatCurrency(subtotal)}</span>
             {discount > 0 && <span className="text-[10px] text-amber-500 uppercase font-black">Desconto: -{formatCurrency(discount)}</span>}
           </div>
           <div className="text-right">
-            <span className="text-xs text-muted-foreground500 dark:text-muted-foreground400 block mb-0.5 font-bold uppercase tracking-widest">Total Líquido</span>
-            <span className="text-xl font-black text-muted-foreground900 dark:text-white leading-none">{formatCurrency(total)}</span>
+            <span className="text-xs text-muted-foreground block mb-0.5 font-bold uppercase tracking-widest">Total Líquido</span>
+            <span className="text-xl font-black text-foreground leading-none">{formatCurrency(total)}</span>
           </div>
         </div>
       </div>

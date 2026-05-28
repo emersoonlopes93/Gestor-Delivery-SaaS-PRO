@@ -7,6 +7,12 @@ import { PermissionGate } from '../../components/PermissionGate';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Eye, Pencil, Trash2, FileText, Search, ChevronDown, Send, EyeOff, Copy, Plus } from 'lucide-react';
 
+
+
+
+
+
+
 type ProductsViewMode = 'all' | 'grouped';
 
 type ProductStatusFilter = 'all' | 'active' | 'inactive';
@@ -267,7 +273,7 @@ export function ProductsPage() {
                     {typeLabel}
                   </span>
                   {pubLabel ? (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30' : 'bg-secondary text-muted-foreground border border-border'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-primary/10 dark:bg-primary/10 text-primary dark:text-primary border border-primary/20 dark:border-primary/30' : 'bg-secondary text-muted-foreground border border-border'}`}>
                       {pubLabel}
                     </span>
                   ) : null}
@@ -325,7 +331,7 @@ export function ProductsPage() {
               <PermissionGate permission="catalog.publish" fallback={null}>
                 <button
                   onClick={() => handleTogglePublication(product)}
-                  className={`p-2 rounded-lg transition-all ${product.publication?.publicationStatus === 'published' ? 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-500/10' : 'text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10'}`}
+                  className={`p-2 rounded-lg transition-all ${product.publication?.publicationStatus === 'published' ? 'text-status-success hover:text-status-success hover:bg-status-success/10 dark:hover:bg-status-success/20' : 'text-muted-foreground hover:text-primary hover:bg-primary/10 dark:hover:bg-primary/20'}`}
                   title={product.publication?.publicationStatus === 'published' ? 'Despublicar' : 'Publicar'}
                   type="button"
                 >
@@ -335,7 +341,7 @@ export function ProductsPage() {
               <PermissionGate permission="catalog.publish" fallback={null}>
                 <button
                   onClick={() => handleToggleOperational(product)}
-                  className={`p-2 rounded-lg transition-all ${product.publication?.operationalStatus === 'active' ? 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-500/10' : 'text-muted-foreground hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10'}`}
+                  className={`p-2 rounded-lg transition-all ${product.publication?.operationalStatus === 'active' ? 'text-status-success hover:text-status-success hover:bg-status-success/10 dark:hover:bg-status-success/20' : 'text-muted-foreground hover:text-status-warning hover:bg-status-warning/10 dark:hover:bg-status-warning/20'}`}
                   title={product.publication?.operationalStatus === 'active' ? 'Ocultar' : 'Exibir'}
                   type="button"
                 >
@@ -344,7 +350,7 @@ export function ProductsPage() {
               </PermissionGate>
               <button
                 onClick={() => handleToggleActive(product)}
-                className={`p-2 rounded-lg transition-all ${product.isActive ? 'text-muted-foreground hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-500/10' : 'text-muted-foreground hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-500/10'}`}
+                className={`p-2 rounded-lg transition-all ${product.isActive ? 'text-muted-foreground hover:text-status-warning hover:bg-status-warning/10 dark:hover:bg-status-warning/20' : 'text-muted-foreground hover:text-status-success hover:bg-status-success/10 dark:hover:bg-status-success/20'}`}
                 title={product.isActive ? 'Desativar' : 'Ativar'}
                 type="button"
               >
@@ -352,7 +358,7 @@ export function ProductsPage() {
               </button>
               <button
                 onClick={() => handleDelete(product.id)}
-                className="p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
+                className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 rounded-lg transition-all"
                 title="Excluir"
                 type="button"
               >
@@ -393,7 +399,7 @@ export function ProductsPage() {
                     {product.type === 'simple' ? 'Individual' : product.type === 'configurable' ? 'Personalizado' : 'Combo'}
                   </span>
                   {pubLabel && (
-                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-secondary text-muted-foreground border border-border'}`}>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-secondary text-muted-foreground border border-border'}`}>
                       {pubLabel}
                     </span>
                   )}
@@ -416,7 +422,7 @@ export function ProductsPage() {
             style={{ borderTop: '1px solid var(--border-subtle)' }}
           >
              <div className="flex items-center gap-2">
-               <span className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${product.isActive ? 'bg-green-500 animate-pulse' : 'bg-destructive'}`} />
+               <span className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${product.isActive ? 'bg-status-success animate-pulse' : 'bg-destructive'}`} />
                <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 {product.isActive ? 'Ativo' : 'Inativo'}
               </span>
@@ -650,7 +656,7 @@ export function ProductsPage() {
               <div className="space-y-3 md:hidden">
                 {renderCards(filteredProducts)}
                 {filteredProducts.length === 0 ? (
-                  <div className="bg-card dark:bg-muted900 rounded-2xl shadow-sm border border-border dark:border-border/80 p-6 text-center text-muted-foreground font-medium italic">
+                  <div className="bg-card rounded-2xl shadow-sm border border-border p-6 text-center text-muted-foreground font-medium italic">
                     {searchTerm.trim().length > 0 || statusFilter !== 'all' || typeFilter !== 'all' || publicationFilter !== 'all' || operationalFilter !== 'all' || Boolean(selectedCategoryId)
                       ? 'Nenhum resultado para os filtros atuais.'
                       : 'Nenhum produto cadastrado ainda no cardápio.'}
@@ -716,7 +722,7 @@ export function ProductsPage() {
                         <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-0.5">{group.products.length} {group.products.length === 1 ? 'produto' : 'produtos'}</div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0 ml-4">
-                        <div className={`w-8 h-8 flex items-center justify-center rounded-full bg-card dark:bg-muted900 border border-border dark:border-border/80 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                        <div className={`w-8 h-8 flex items-center justify-center rounded-full bg-card border border-border transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
                           <ChevronDown size={16} className="text-muted-foreground" />
                         </div>
                       </div>
@@ -732,7 +738,7 @@ export function ProductsPage() {
                         {/* Desktop View: Table */}
                         <div className="hidden md:block max-h-[60vh] overflow-auto custom-scrollbar">
                           <table className="w-full text-left border-collapse">
-                            <thead className="bg-card dark:bg-muted900 border-b border-border dark:border-border/80 sticky top-0 z-10">
+                            <thead className="bg-card border-b border-border sticky top-0 z-10">
                               <tr>
                                 <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Produto</th>
                                 <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest hidden lg:table-cell">Categoria</th>
@@ -741,7 +747,7 @@ export function ProductsPage() {
                                 <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Ações</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                            <tbody className="divide-y divide-border dark:divide-border/60">
                               {renderRows(group.products)}
                             </tbody>
                           </table>

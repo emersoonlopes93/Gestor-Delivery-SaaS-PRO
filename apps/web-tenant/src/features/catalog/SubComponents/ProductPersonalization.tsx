@@ -1,6 +1,8 @@
 import React from 'react';
 import { ProductOptionGroupLink, OptionGroup } from '@gestor/types';
 
+
+
 type LinkWithGroup = ProductOptionGroupLink & {
   optionGroup: OptionGroup;
 };
@@ -36,11 +38,11 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
 
   return (
     <section className="space-y-4 text-left">
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm">
+      <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <div className="font-black text-gray-900 dark:text-gray-100">Complementos vinculados</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 font-medium mt-1">
+            <div className="font-black text-foreground">Complementos vinculados</div>
+            <div className="text-sm text-muted-foreground font-medium mt-1">
               Vincule complementos reutilizáveis para personalização deste produto.
             </div>
           </div>
@@ -65,23 +67,23 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
 
       <div className="space-y-3 md:hidden">
         {[...links].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((l) => (
-          <div key={l.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 shadow-sm">
-            <div className="font-black text-gray-900 dark:text-gray-100">{l.optionGroup?.name ?? 'Complemento'}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-1">
+          <div key={l.id} className="bg-card border border-border rounded-2xl p-4 shadow-sm">
+            <div className="font-black text-foreground">{l.optionGroup?.name ?? 'Complemento'}</div>
+            <div className="text-xs text-muted-foreground font-medium mt-1">
               Base: req={String(l.optionGroup?.isRequired)} min={l.optionGroup?.minSelect} max={l.optionGroup?.maxSelect}
             </div>
-            <div className="mt-3 text-xs font-bold text-gray-700 dark:text-gray-300">
+            <div className="mt-3 text-xs font-bold text-foreground/80">
               Overrides: req={String(l.overrideIsRequired ?? '-')}
               {' | '}min={l.overrideMinSelect ?? '-'}
               {' | '}max={l.overrideMaxSelect ?? '-'}
             </div>
-            <div className="mt-1 text-xs font-black text-gray-800 dark:text-gray-200">Axis: {l.pricingAxis}</div>
+            <div className="mt-1 text-xs font-black text-foreground/90">Axis: {l.pricingAxis}</div>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => moveLink(l.id, -1)}
                 disabled={savingStates.reorderLinks}
-                className="px-3 py-2 text-xs font-black text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 disabled:opacity-50 transition-all"
+                className="px-3 py-2 text-xs font-black text-foreground bg-muted/50 dark:bg-muted/80 hover:bg-muted dark:hover:bg-muted/90 rounded-xl border border-border disabled:opacity-50 transition-all"
               >
                 Subir
               </button>
@@ -89,7 +91,7 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
                 type="button"
                 onClick={() => moveLink(l.id, 1)}
                 disabled={savingStates.reorderLinks}
-                className="px-3 py-2 text-xs font-black text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 disabled:opacity-50 transition-all"
+                className="px-3 py-2 text-xs font-black text-foreground bg-muted/50 dark:bg-muted/80 hover:bg-muted dark:hover:bg-muted/90 rounded-xl border border-border disabled:opacity-50 transition-all"
               >
                 Descer
               </button>
@@ -112,61 +114,61 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
           </div>
         ))}
         {links.length === 0 ? (
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 text-center text-gray-400 text-sm italic shadow-sm">
+          <div className="bg-card border border-border rounded-2xl p-6 text-center text-muted-foreground text-sm italic shadow-sm">
             Nenhum complemento vinculado.
           </div>
         ) : null}
       </div>
 
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden hidden md:block shadow-sm">
+      <div className="bg-card border border-border rounded-2xl overflow-hidden hidden md:block shadow-sm">
         <table className="w-full text-left border-collapse">
-          <thead className="bg-gray-50 dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800">
+          <thead className="bg-muted/30 dark:bg-muted/80 border-b border-border">
             <tr>
-              <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Complemento</th>
-              <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Overrides</th>
-              <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Axis</th>
-              <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
+              <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider">Complemento</th>
+              <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider">Overrides</th>
+              <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider">Axis</th>
+              <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider text-right">Ações</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+          <tbody className="divide-y divide-border dark:divide-border/60">
             {[...links].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((l) => (
-              <tr key={l.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/40 transition-colors group">
+              <tr key={l.id} className="hover:bg-muted/50 dark:hover:bg-muted/80 dark:bg-card/40 transition-colors group">
                 <td className="px-6 py-4">
-                  <div className="font-bold text-gray-900 dark:text-gray-100">{l.optionGroup?.name ?? 'Complemento'}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-1">
+                  <div className="font-bold text-foreground">{l.optionGroup?.name ?? 'Complemento'}</div>
+                  <div className="text-xs text-muted-foreground font-medium mt-1">
                     Base: req={String(l.optionGroup?.isRequired)} min={l.optionGroup?.minSelect} max={l.optionGroup?.maxSelect}
                   </div>
                 </td>
-                <td className="px-6 py-4 text-sm font-bold text-gray-700 dark:text-gray-300">
+                <td className="px-6 py-4 text-sm font-bold text-foreground/80">
                   req={String(l.overrideIsRequired ?? '-')}
                   {' | '}min={l.overrideMinSelect ?? '-'}
                   {' | '}max={l.overrideMaxSelect ?? '-'}
                 </td>
-                <td className="px-6 py-4 text-sm font-black text-gray-800 dark:text-gray-200">{l.pricingAxis}</td>
+                <td className="px-6 py-4 text-sm font-black text-foreground/90">{l.pricingAxis}</td>
                 <td className="px-6 py-4 text-right">
                   <div className="flex justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                     <button
                       type="button"
                       onClick={() => moveLink(l.id, -1)}
                       disabled={savingStates.reorderLinks}
-                      className="px-2 py-1 text-xs font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded disabled:opacity-50 transition-all"
+                      className="px-2 py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded disabled:opacity-50 transition-all"
                       title="Subir"
                     >
-                      {savingStates.reorderLinks ? <div className="w-3 h-3 border border-gray-600 border-t-transparent rounded-full animate-spin" /> : '↑'}
+                      {savingStates.reorderLinks ? <div className="w-3 h-3 border border-muted-foreground border-t-transparent rounded-full animate-spin" /> : '↑'}
                     </button>
                     <button
                       type="button"
                       onClick={() => moveLink(l.id, 1)}
                       disabled={savingStates.reorderLinks}
-                      className="px-2 py-1 text-xs font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded disabled:opacity-50 transition-all"
+                      className="px-2 py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded disabled:opacity-50 transition-all"
                       title="Descer"
                     >
-                      {savingStates.reorderLinks ? <div className="w-3 h-3 border border-gray-600 border-t-transparent rounded-full animate-spin" /> : '↓'}
+                      {savingStates.reorderLinks ? <div className="w-3 h-3 border border-muted-foreground border-t-transparent rounded-full animate-spin" /> : '↓'}
                     </button>
                     <button
                       type="button"
                       onClick={() => openEditLinkModal(l)}
-                      className="px-3 py-1 text-xs font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-all"
+                      className="px-3 py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded transition-all"
                     >
                       Overrides
                     </button>
@@ -174,7 +176,7 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
                       type="button"
                       onClick={() => removeGroupLink(l.id)}
                       disabled={savingStates[`remove-${l.id}`]}
-                      className="px-3 py-1 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded disabled:opacity-50 transition-all flex items-center gap-1"
+                      className="px-3 py-1 text-xs font-bold text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 rounded disabled:opacity-50 transition-all flex items-center gap-1"
                     >
                       {savingStates[`remove-${l.id}`] && <div className="w-3 h-3 border border-red-600 border-t-transparent rounded-full animate-spin" />}
                       Remover
@@ -186,10 +188,10 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
           </tbody>
         </table>
         {links.length === 0 && (
-          <div className="bg-white dark:bg-gray-900 border border-dashed border-gray-300 dark:border-gray-700 rounded-2xl p-12 text-center">
+          <div className="bg-card border border-dashed border-border rounded-2xl p-12 text-center">
             <div className="text-3xl mb-4">⚙️</div>
-            <div className="font-black text-gray-900 dark:text-gray-100 mb-1">Nenhum adicional vinculado</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-6 mx-auto max-w-sm">
+            <div className="font-black text-foreground mb-1">Nenhum adicional vinculado</div>
+            <div className="text-sm text-muted-foreground mb-6 mx-auto max-w-sm">
               Vincule um complemento reutilizável (como "Molhos" ou "Ingredientes Extras") para permitir a personalização deste produto.
             </div>
             <button
@@ -208,7 +210,7 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
           <button
             type="button"
             onClick={goPrevWizardStep}
-            className="px-8 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 dark:text-gray-300 font-black rounded-xl transition-all"
+            className="px-8 py-3 bg-muted hover:bg-muted/80 text-foreground font-black rounded-xl transition-all"
           >
             Voltar
           </button>

@@ -1,6 +1,9 @@
 import React from 'react';
 import { ProductCategory, ProductDetails, CreateProductDto, CatalogProductType } from '@gestor/types';
 
+
+
+
 type BundleSummary = {
   subtotal: number;
   discountTotal: number;
@@ -100,7 +103,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                     <button
                       type="button"
                       onClick={onOpenRecipe}
-                      className="text-[10px] font-black uppercase text-primary-600 hover:text-primary-700 flex items-center gap-1"
+                      className="text-[10px] font-black uppercase text-primary hover:text-primary/80 flex items-center gap-1"
                     >
                       <span>Ficha Técnica</span>
                     </button>
@@ -111,10 +114,10 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                   step="0.01"
                   value={productForm.costPrice}
                   onChange={(e) => setProductForm({ ...productForm, costPrice: Number(e.target.value) })}
-                  className="input-premium border-amber-100 dark:border-amber-900/30"
+                  className="input-premium border-status-warning/30"
                   placeholder="Ex: 2.50"
                 />
-                <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-1 font-bold">Usado para cálculo de lucro se não houver ficha técnica.</p>
+                <p className="text-[10px] text-status-warning mt-1 font-bold">Usado para cálculo de lucro se não houver ficha técnica.</p>
               </div>
 
               <div>
@@ -155,9 +158,9 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                 </select>
               </div>
             ) : (
-              <div className="rounded-xl alert-indigo px-4 py-3">
-                <div className="text-xs font-black uppercase tracking-wider text-indigo-700">Tipo</div>
-                <div className="text-sm font-bold text-indigo-900 mt-1">Combo</div>
+              <div className="rounded-xl bg-primary/10 border border-primary/20 px-4 py-3">
+                <div className="text-xs font-black uppercase tracking-wider text-primary">Tipo</div>
+                <div className="text-sm font-bold text-foreground mt-1">Combo</div>
               </div>
             )}
           </div>
@@ -184,7 +187,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                   <button
                     type="button"
                     onClick={() => { setImageFile(null); setImagePreviewUrl(null); setProductForm({ ...productForm, image: '' }); }}
-                    className="text-[10px] font-black uppercase text-red-500 hover:text-red-700"
+                    className="text-[10px] font-black uppercase text-destructive hover:text-destructive/80"
                   >
                     Remover imagem
                   </button>
