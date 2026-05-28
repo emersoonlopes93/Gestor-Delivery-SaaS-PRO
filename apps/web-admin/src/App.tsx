@@ -13,103 +13,108 @@ import { AuthLayout } from './layouts/AuthLayout';
 import { AppLayout } from './layouts/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PermissionGate } from './components/PermissionGate';
+import { ToastProvider } from './contexts/ToastContext';
+import { ToastContainer } from './components/Toast';
 
 export function App() {
   return (
-    <Routes>
-      {/* Public routes */}
-      <Route element={<AuthLayout />}>
-        <Route path="/login" element={<LoginPage />} />
-      </Route>
+    <ToastProvider>
+      <ToastContainer />
+      <Routes>
+        {/* Public routes */}
+        <Route element={<AuthLayout />}>
+          <Route path="/login" element={<LoginPage />} />
+        </Route>
 
-      {/* Protected routes */}
-      <Route
-        element={
-          <ProtectedRoute>
-            <AppLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route path="/dashboard" element={<DashboardPage />} />
+        {/* Protected routes */}
         <Route
-          path="/tenants"
           element={
-            <PermissionGate permission="saas.tenants.read">
-              <TenantsPage />
-            </PermissionGate>
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
           }
-        />
-        <Route
-          path="/tenants/:tenantId/modules"
-          element={
-            <PermissionGate permission="saas.modules.read">
-              <TenantModulesPage />
-            </PermissionGate>
-          }
-        />
-        <Route
-          path="/tenants/:tenantId/ai-agent"
-          element={
-            <PermissionGate permission="saas.tenants.ai.read">
-              <TenantAiAgentConfigPage />
-            </PermissionGate>
-          }
-        />
-        <Route
-          path="/ai-agent/global"
-          element={
-            <PermissionGate permission="saas.settings.read">
-              <GlobalAiAgentConfigPage />
-            </PermissionGate>
-          }
-        />
+        >
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route
+            path="/tenants"
+            element={
+              <PermissionGate permission="saas.tenants.read">
+                <TenantsPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="/tenants/:tenantId/modules"
+            element={
+              <PermissionGate permission="saas.modules.read">
+                <TenantModulesPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="/tenants/:tenantId/ai-agent"
+            element={
+              <PermissionGate permission="saas.tenants.ai.read">
+                <TenantAiAgentConfigPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="/ai-agent/global"
+            element={
+              <PermissionGate permission="saas.settings.read">
+                <GlobalAiAgentConfigPage />
+              </PermissionGate>
+            }
+          />
 
-        {/* Billing */}
-        <Route
-          path="/billing"
-          element={
-            <PermissionGate permission="saas.plans.read">
-              <BillingPage />
-            </PermissionGate>
-          }
-        />
+          {/* Billing */}
+          <Route
+            path="/billing"
+            element={
+              <PermissionGate permission="saas.plans.read">
+                <BillingPage />
+              </PermissionGate>
+            }
+          />
 
-        {/* Audit Logs */}
-        <Route
-          path="/audit-logs"
-          element={
-            <PermissionGate permission="saas.audit.read">
-              <AuditLogsPage />
-            </PermissionGate>
-          }
-        />
+          {/* Audit Logs */}
+          <Route
+            path="/audit-logs"
+            element={
+              <PermissionGate permission="saas.audit.read">
+                <AuditLogsPage />
+              </PermissionGate>
+            }
+          />
 
-        {/* Franchise */}
-        <Route
-          path="/franchise"
-          element={
-            <PermissionGate permission="saas.franchise.read">
-              <FranchiseDashboard />
-            </PermissionGate>
-          }
-        />
+          {/* Franchise */}
+          <Route
+            path="/franchise"
+            element={
+              <PermissionGate permission="saas.franchise.read">
+                <FranchiseDashboard />
+              </PermissionGate>
+            }
+          />
 
-        {/* Integrations */}
-        <Route
-          path="/integrations"
-          element={
-            <PermissionGate permission="saas.settings.read">
-              <IntegrationsPage />
-            </PermissionGate>
-          }
-        />
+          {/* Integrations */}
+          <Route
+            path="/integrations"
+            element={
+              <PermissionGate permission="saas.settings.read">
+                <IntegrationsPage />
+              </PermissionGate>
+            }
+          />
 
-        {/* Default redirect */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      </Route>
+          {/* Default redirect */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        </Route>
 
-      {/* Catch-all */}
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+        {/* Catch-all */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </ToastProvider>
   );
 }

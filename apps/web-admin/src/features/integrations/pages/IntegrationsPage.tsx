@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { api } from '../../../lib/api-client';
+import { useToast } from '../../../contexts/ToastContext';
 import { 
   Puzzle, 
   MessageSquare, 
@@ -6,7 +8,6 @@ import {
   Save, 
   RefreshCcw,
   AlertCircle,
-  CheckCircle2,
   Zap
 } from 'lucide-react';
 
@@ -30,11 +31,11 @@ interface SystemConfig {
 }
 
 export default function IntegrationsPage() {
+  const { showToast } = useToast();
   const [config, setConfig] = useState<SystemConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     fetchConfig();
@@ -43,14 +44,12 @@ export default function IntegrationsPage() {
   const fetchConfig = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/admin/integrations/config', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('admin_accessToken')}`
-        }
-      });
-      if (!response.ok) throw new Error('Falha ao carregar configurações');
-      const responseData = await response.json();
-      setConfig(responseData.data || responseData);
+      const response = await api.get<SystemConfig>('/admin/integrations/config');
+      if (response.success) {
+        setConfig(response.data);
+      } else {
+        throw new Error('Falha ao carregar configurações');
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
@@ -65,7 +64,6 @@ export default function IntegrationsPage() {
     try {
       setSaving(true);
       setError(null);
-      setSuccess(false);
 
       const updatePayload = {
         defaultWhatsAppProvider: config.defaultWhatsAppProvider,
@@ -79,19 +77,12 @@ export default function IntegrationsPage() {
         baseAiPrompt: config.baseAiPrompt,
       };
 
-      const response = await fetch('/api/v1/admin/integrations/config', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('admin_accessToken')}`
-        },
-        body: JSON.stringify(updatePayload)
-      });
+      const response = await api.patch('/admin/integrations/config', updatePayload);
 
-      if (!response.ok) throw new Error('Falha ao salvar configurações');
+      if (!response.success) throw new Error('Falha ao salvar configurações');
       
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      showToast('success', 'Configurações salvas com sucesso!');
+
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
@@ -199,122 +190,100 @@ export default function IntegrationsPage() {
                 >
                   <option value="openai">OpenAI (GPT-4/o)</option>
                   <option value="anthropic">Anthropic (Claude 3.5)</option>
-                  <option value="google_ai">Google AI Studio (Gemini)</option>
+                  <option value="google_ai">Google AI (Gemini)</option>
                 </select>
               </div>
 
-              {config?.defaultAiProvider === 'openai' && (
-                <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                  <label className="text-sm font-medium text-gray-700">OpenAI API Key</label>
-                  <input 
+              {config?.defaultAiProvider === 'google_ai' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">Modelo Google AI</label>
+                  <select
+                    className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                    value={config?.googleAiModel || ''}
+                    onChange={(e) => setConfig(prev => prev ? {...prev, googleAiModel: e.target.value} : null)}
+                  >
+                    {GOOGLE_AI_FREE_MODELS.map(model => (
+                      <option key={model.id} value={model.id}>{model.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">API Key OpenAI</label>
+                  <input
                     type="password"
                     placeholder="sk-..."
-                    className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none font-mono text-sm"
+                    className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
                     value={config?.openaiApiKey || ''}
                     onChange={(e) => setConfig(prev => prev ? {...prev, openaiApiKey: e.target.value} : null)}
                   />
                 </div>
-              )}
 
-              {config?.defaultAiProvider === 'anthropic' && (
-                <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                  <label className="text-sm font-medium text-gray-700">Anthropic API Key</label>
-                  <input 
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">API Key Anthropic</label>
+                  <input
                     type="password"
                     placeholder="sk-ant-..."
-                    className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none font-mono text-sm"
+                    className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
                     value={config?.anthropicApiKey || ''}
                     onChange={(e) => setConfig(prev => prev ? {...prev, anthropicApiKey: e.target.value} : null)}
                   />
                 </div>
-              )}
 
-              {config?.defaultAiProvider === 'google_ai' && (
-                <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Google AI Studio API Key</label>
-                    <input 
-                      type="password"
-                      placeholder="AIza..."
-                      className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none font-mono text-sm"
-                      value={config?.googleAiApiKey || ''}
-                      onChange={(e) => setConfig(prev => prev ? {...prev, googleAiApiKey: e.target.value} : null)}
-                    />
-                    <p className="text-xs text-gray-400">
-                      Obtenha em{' '}
-                      <a
-                        href="https://aistudio.google.com/apikey"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary-600 hover:underline"
-                      >
-                        aistudio.google.com/apikey
-                      </a>
-                      . Modelos abaixo usam o tier gratuito.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Modelo Gemini (gratuito)</label>
-                    <select
-                      className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
-                      value={config?.googleAiModel || GOOGLE_AI_FREE_MODELS[0].id}
-                      onChange={(e) => setConfig(prev => prev ? {...prev, googleAiModel: e.target.value} : null)}
-                    >
-                      {GOOGLE_AI_FREE_MODELS.map((m) => (
-                        <option key={m.id} value={m.id}>{m.label}</option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-sm font-medium text-gray-700">API Key Google AI</label>
+                  <input
+                    type="password"
+                    placeholder="AIza..."
+                    className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                    value={config?.googleAiApiKey || ''}
+                    onChange={(e) => setConfig(prev => prev ? {...prev, googleAiApiKey: e.target.value} : null)}
+                  />
                 </div>
-              )}
+              </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 flex items-center justify-between">
-                  Prompt Base Global do Sistema
-                  <span className="text-[10px] text-primary-600 font-bold uppercase tracking-wider">Injetado em todos os agentes</span>
-                </label>
-                <textarea 
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none text-sm font-mono leading-relaxed"
-                  rows={6}
-                  placeholder="Diretrizes mestre para todos os atendentes..."
+                <label className="text-sm font-medium text-gray-700">Prompt Base (Global)</label>
+                <textarea
+                  rows={4}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none resize-none"
+                  placeholder="Instruções base que serão aplicadas a todos os agentes IA do sistema..."
                   value={config?.baseAiPrompt || ''}
                   onChange={(e) => setConfig(prev => prev ? {...prev, baseAiPrompt: e.target.value} : null)}
                 />
-                <p className="text-[10px] text-gray-500 italic">Este prompt define o comportamento core que nenhum tenant pode alterar.</p>
+                <p className="text-xs text-gray-400">Este prompt será combinado com as instruções específicas de cada tenant.</p>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Footer / Actions */}
-        <div className="flex items-center justify-between p-6 bg-gray-50 rounded-2xl border border-gray-100">
-          <div className="flex items-center gap-2">
-            {error && (
-              <div className="flex items-center gap-2 text-red-600 text-sm font-medium">
-                <AlertCircle className="h-4 w-4" />
-                {error}
-              </div>
-            )}
-            {success && (
-              <div className="flex items-center gap-2 text-green-600 text-sm font-medium">
-                <CheckCircle2 className="h-4 w-4" />
-                Configurações salvas com sucesso!
-              </div>
-            )}
-          </div>
+        {/* Actions */}
+        <div className="flex items-center justify-between">
+          {error && (
+            <div className="flex items-center gap-2 text-red-600 bg-red-50 px-4 py-2 rounded-lg">
+              <AlertCircle className="h-5 w-5" />
+              <span className="text-sm font-medium">{error}</span>
+            </div>
+          )}
 
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center gap-2 px-8 py-3 bg-primary-600 text-white rounded-xl font-bold hover:bg-primary-700 active:scale-95 transition-all shadow-lg shadow-primary-200 disabled:opacity-50 disabled:active:scale-100"
+            className="ml-auto flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? (
-              <RefreshCcw className="h-5 w-5 animate-spin" />
+              <>
+                <RefreshCcw className="h-5 w-5 animate-spin" />
+                Salvando...
+              </>
             ) : (
-              <Save className="h-5 w-5" />
+              <>
+                <Save className="h-5 w-5" />
+                Salvar Configurações
+              </>
             )}
-            Salvar Alterações
           </button>
         </div>
       </form>

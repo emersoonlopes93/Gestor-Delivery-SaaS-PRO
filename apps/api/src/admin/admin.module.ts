@@ -16,7 +16,9 @@ import { AdminBillingController } from './billing/admin-billing.controller';
 import { AdminFranchiseController } from './franchise/admin-franchise.controller';
 import { AdminFranchiseService } from './franchise/admin-franchise.service';
 import { AdminIntegrationsController } from './integrations/admin-integrations.controller';
+import { AdminDashboardController } from './dashboard/admin-dashboard.controller';
 import { SystemConfigService } from './services/system-config.service';
+import { AdminDashboardService } from './dashboard/admin-dashboard.service';
 import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
 import { AdminModulesModule } from './modules/admin-modules.module';
@@ -42,6 +44,7 @@ import { AiAgentPlanPresetService } from './ai-agent/ai-agent-plan-preset.servic
     AdminBillingController,
     AdminFranchiseController,
     AdminIntegrationsController,
+    AdminDashboardController,
     AdminDebugAiAgentController,
     AdminAiAgentController,
   ],
@@ -54,6 +57,7 @@ import { AiAgentPlanPresetService } from './ai-agent/ai-agent-plan-preset.servic
     AdminAuditLogsService,
     AdminFranchiseService,
     SystemConfigService,
+    AdminDashboardService,
     AiAgentPlanPresetService,
   ],
   exports: [AdminAuthService, AdminRbacService, AdminModulesModule],

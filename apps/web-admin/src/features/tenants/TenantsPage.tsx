@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Tenant, PaginatedResponse } from '@gestor/types';
 import { api } from '../../lib/api-client';
 import { ExternalLink, Bot } from 'lucide-react';
@@ -11,6 +12,7 @@ interface TenantListItem extends Tenant {
  * Tenants management page — lists all tenants in the platform.
  */
 export function TenantsPage() {
+  const navigate = useNavigate();
   const [tenants, setTenants] = useState<TenantListItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -117,13 +119,13 @@ export function TenantsPage() {
                         Loja
                       </button>
                       <button
-                        onClick={() => window.location.href = `/tenants/${tenant.id}/modules`}
+                        onClick={() => navigate(`/tenants/${tenant.id}/modules`)}
                         className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
                       >
                         Módulos
                       </button>
                       <button
-                        onClick={() => window.location.href = `/tenants/${tenant.id}/ai-agent`}
+                        onClick={() => navigate(`/tenants/${tenant.id}/ai-agent`)}
                         className="text-purple-600 hover:text-purple-900 text-sm font-medium flex items-center gap-1"
                         title="Configurar Agente IA"
                       >
@@ -192,13 +194,13 @@ export function TenantsPage() {
                   Acessar Loja
                 </button>
                 <button
-                  onClick={() => window.location.href = `/tenants/${tenant.id}/modules`}
+                  onClick={() => navigate(`/tenants/${tenant.id}/modules`)}
                   className="flex-1 py-2.5 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold"
                 >
                   Módulos
                 </button>
                 <button
-                  onClick={() => window.location.href = `/tenants/${tenant.id}/ai-agent`}
+                  onClick={() => navigate(`/tenants/${tenant.id}/ai-agent`)}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-purple-50 text-purple-700 rounded-lg text-xs font-bold"
                 >
                   <Bot size={14} />
