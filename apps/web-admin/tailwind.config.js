@@ -5,7 +5,15 @@ export default {
   theme: {
     extend: {
       colors: {
+        background: 'var(--background)',
+        foreground: 'var(--foreground)',
+        card: 'var(--card)',
+        'card-foreground': 'var(--card-foreground)',
+        popover: 'var(--popover)',
+        'popover-foreground': 'var(--popover-foreground)',
         primary: {
+          DEFAULT: 'var(--primary)',
+          foreground: 'var(--primary-foreground)',
           50: '#faf5ff',
           100: '#f3e8ff',
           200: '#e9d5ff',
@@ -18,15 +26,6 @@ export default {
           900: '#581c87',
           950: '#3b0764',
         },
-        // Tokens semânticos (shadcn/ui compatible)
-        background: 'var(--background)',
-        foreground: 'var(--foreground)',
-        card: 'var(--card)',
-        'card-foreground': 'var(--card-foreground)',
-        popover: 'var(--popover)',
-        'popover-foreground': 'var(--popover-foreground)',
-        primary: 'var(--primary)',
-        'primary-foreground': 'var(--primary-foreground)',
         secondary: 'var(--secondary)',
         'secondary-foreground': 'var(--secondary-foreground)',
         muted: 'var(--muted)',
