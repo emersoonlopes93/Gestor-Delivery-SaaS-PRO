@@ -42,6 +42,22 @@
     
     --radius: 0.75rem;                /* border-radius padrão - 12px */
     
+    /* === SHELL TOKENS (sidebar, topbar, surface) === */
+    --surface-base: #ffffff;         /* base da sidebar */
+    --surface-page: #f8fafc;          /* fundo da página */
+    --border-default: #e2e8f0;        /* borda padrão do shell */
+    --border-strong: #cbd5e1;         /* borda forte - slate-300 */
+    --sidebar-bg: #ffffff;            /* fundo da sidebar */
+    --sidebar-foreground: #0f172a;    /* texto da sidebar */
+    --sidebar-border: #e2e8f0;        /* borda da sidebar */
+    --sidebar-hover: #f1f5f9;         /* hover na sidebar */
+    --sidebar-active: #e2e8f0;        /* item ativo na sidebar */
+    --topbar-bg: #ffffff;             /* fundo da topbar */
+    --topbar-foreground: #0f172a;    /* texto da topbar */
+    --topbar-border: #e2e8f0;         /* borda da topbar */
+    --surface-1: #ffffff;             /* superfície nivel 1 */
+    --surface-2: #f8fafc;            /* superfície nivel 2 */
+    
     /* === SOMBRAS === */
     --shadow-card:        0 1px 3px 0 rgb(15 23 42 / 0.07), 0 1px 2px -1px rgb(15 23 42 / 0.05);
     --shadow-card-hover:  0 4px 12px 0 rgb(15 23 42 / 0.10), 0 2px 4px -1px rgb(15 23 42 / 0.06);
@@ -78,6 +94,22 @@
     --border: #1e293b;               /* borda padrão dark - slate-800 */
     --input: #1e293b;                /* borda de inputs dark - slate-800 */
     --ring: #0c93e9;                 /* ring de foco dark (mantido) */
+    
+    /* === SHELL TOKENS DARK === */
+    --surface-base: #0a0f1a;         /* base da sidebar dark */
+    --surface-page: #0f172a;         /* fundo da página dark */
+    --border-default: #1e293b;       /* borda padrão do shell dark */
+    --border-strong: #334155;        /* borda forte dark - slate-700 */
+    --sidebar-bg: #0a0f1a;           /* fundo da sidebar dark */
+    --sidebar-foreground: #f8fafc;   /* texto da sidebar dark */
+    --sidebar-border: #1e293b;       /* borda da sidebar dark */
+    --sidebar-hover: #1e293b;        /* hover na sidebar dark */
+    --sidebar-active: #1e293b;       /* item ativo na sidebar dark */
+    --topbar-bg: #0a0f1a;            /* fundo da topbar dark */
+    --topbar-foreground: #f8fafc;    /* texto da topbar dark */
+    --topbar-border: #1e293b;        /* borda da topbar dark */
+    --surface-1: #111827;            /* superfície nivel 1 dark */
+    --surface-2: #0f172a;           /* superfície nivel 2 dark */
     
     /* === SOMBRAS DARK === */
     --shadow-card:        0 1px 3px 0 rgb(0 0 0 / 0.40), 0 1px 2px -1px rgb(0 0 0 / 0.30);

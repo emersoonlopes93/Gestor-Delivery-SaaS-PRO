@@ -224,7 +224,7 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
           onClick={() => onToggle(group.id)}
           className={`w-full flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-300 group ${isAnyItemActive
               ? 'bg-primary-50/50 dark:bg-primary-500/5 text-primary-700 dark:text-primary-400'
-              : 'text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
+              : 'text-muted-foreground hover:text-foreground'
             }`}
         >
           <span className="text-[10px] font-black uppercase tracking-[0.25em] transition-colors">
@@ -256,12 +256,12 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
                   rel="noopener noreferrer"
                   className="group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                 >
-                  <span className="w-6 flex items-center justify-center text-gray-400 group-hover:text-gray-600 dark:text-gray-400 transition-colors" aria-hidden>
+                  <span className="w-6 flex items-center justify-center text-muted-foreground group-hover:text-foreground transition-colors" aria-hidden>
                     <item.icon className="h-4 w-4" aria-hidden />
                   </span>
                   {!collapsed ? <span className="truncate">{item.label}</span> : null}
                   <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                    <LayoutGrid className="w-3 h-3 text-gray-400 rotate-45" />
+                    <LayoutGrid className="w-3 h-3 text-muted-foreground rotate-45" />
                   </span>
                 </a>
               );
@@ -274,18 +274,18 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
                 className={({ isActive }) => {
                   return `group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-300 ${isActive
                       ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
-                      : 'text-muted-foreground hover:bg-muted/40 hover:text-gray-900 dark:hover:text-gray-100'
+                      : 'text-muted-foreground hover:bg-muted/40 hover:text-foreground'
                     } ${collapsed ? 'justify-center' : ''}`;
                 }}
               >
                 {({ isActive }) => (
                   <>
-                    <span className={`flex items-center justify-center transition-colors duration-300 ${isActive ? 'text-white' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-700 dark:group-hover:text-gray-200'}`} aria-hidden>
+                    <span className={`flex items-center justify-center transition-colors duration-300 ${isActive ? 'text-white' : 'text-muted-foreground group-hover:text-foreground'}`} aria-hidden>
                       <item.icon className="h-[18px] w-[18px] stroke-[2.5px]" aria-hidden />
                     </span>
                     {!collapsed ? <span className="truncate">{item.label}</span> : null}
                     {collapsed ? (
-                      <span className="pointer-events-none absolute left-full ml-4 whitespace-nowrap rounded-xl bg-gray-900 dark:bg-gray-800 border border-gray-800 dark:border-gray-700 px-3.5 py-2 text-xs font-black text-white opacity-0 shadow-2xl transition-all duration-300 translate-x-[-8px] group-hover:translate-x-0 group-hover:opacity-100 z-50">
+                      <span className="pointer-events-none absolute left-full ml-4 whitespace-nowrap rounded-xl bg-gray-900 dark:bg-gray-950 border border-border px-3.5 py-2 text-xs font-black text-white opacity-0 shadow-2xl transition-all duration-300 translate-x-[-8px] group-hover:translate-x-0 group-hover:opacity-100 z-50">
                         {item.label}
                       </span>
                     ) : null}
@@ -653,7 +653,7 @@ export function AppLayout() {
                   href={publicMenuUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-border bg-white dark:bg-gray-800/40 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-primary-500/30 transition-all group shadow-sm"
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-border bg-card hover:bg-muted/50 hover:border-primary-500/30 transition-all group shadow-sm"
                 >
                   <Globe className="w-4 h-4 text-primary-500 group-hover:scale-110 transition-transform" />
                   <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">Cardápio</span>
@@ -661,7 +661,7 @@ export function AppLayout() {
                 <button
                   type="button"
                   onClick={() => navigate('/settings/qr-codes')}
-                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-border bg-white dark:bg-gray-800/40 hover:bg-gray-50 dark:hover:bg-gray-800 hover:border-primary-500/30 transition-all group shadow-sm"
+                  className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-border bg-card hover:bg-muted/50 hover:border-primary-500/30 transition-all group shadow-sm"
                 >
                   <QrCode className="w-4 h-4 text-primary-500 group-hover:scale-110 transition-transform" />
                   <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">QR Code</span>
@@ -691,7 +691,7 @@ export function AppLayout() {
         <div className="p-4" style={{ borderTop: '1px solid var(--border-default)' }}>
           <button
             onClick={handleLogout}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all active:scale-95 ${collapsed ? 'justify-center' : ''
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50/10 dark:hover:bg-red-500/10 transition-all active:scale-95 ${collapsed ? 'justify-center' : ''
               }`}
             title={collapsed ? 'Sair' : undefined}
           >
@@ -702,12 +702,12 @@ export function AppLayout() {
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="hidden md:flex sticky top-0 z-30 backdrop-blur-xl" style={{ backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-strong)' }}>
+        <header className="hidden md:flex sticky top-0 z-30 backdrop-blur-xl" style={{ backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
           <div className="h-16 px-6 flex items-center gap-4 w-full">
             <button
               type="button"
               onClick={toggleCollapsed}
-              className="inline-flex items-center justify-center rounded-xl p-2 text-gray-400 hover:text-foreground dark:hover:text-gray-100 hover:bg-muted dark:hover:bg-gray-800 transition-all"
+              className="inline-flex items-center justify-center rounded-xl p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
               aria-label="Alternar sidebar"
               title={collapsed ? 'Expandir sidebar' : 'Recolher sidebar'}
             >
@@ -747,7 +747,7 @@ export function AppLayout() {
 
             <button
               type="button"
-              className="btn-ghost w-10 h-10 p-0 rounded-full bg-muted/50 dark:bg-gray-800"
+              className="btn-ghost w-10 h-10 p-0 rounded-full bg-muted/50"
               title="Notificações"
               aria-label="Notificações"
             >
@@ -756,10 +756,10 @@ export function AppLayout() {
 
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1 sm:pr-3 text-sm font-bold text-foreground hover:bg-gray-50 dark:hover:bg-gray-800 transition-all shadow-sm"
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1 sm:pr-3 text-sm font-bold text-foreground hover:bg-muted transition-all shadow-sm"
               title="Perfil"
             >
-              <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-primary-50 dark:bg-primary-500/20 text-primary-700 dark:text-primary-300 flex items-center justify-center">
                 <UserCircle className="h-5 w-5" aria-hidden />
               </div>
               <span className="hidden lg:inline truncate max-w-[120px] xl:max-w-[180px]">{user?.name || 'Conta'}</span>
@@ -767,12 +767,12 @@ export function AppLayout() {
           </div>
         </header>
 
-        <header className="md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors" style={{ backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-strong)' }}>
+        <header className="md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors" style={{ backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
           <div className="h-14 px-4 flex items-center justify-between">
             <button
               type="button"
               onClick={openMobile}
-              className="inline-flex items-center justify-center rounded-xl border border-border bg-card w-10 h-10 text-foreground hover:bg-gray-50 dark:hover:bg-gray-800 transition-all active:scale-95"
+              className="inline-flex items-center justify-center rounded-xl border border-border bg-card w-10 h-10 text-foreground hover:bg-muted transition-all active:scale-95"
               aria-label="Abrir menu"
             >
               <Menu className="h-5 w-5" aria-hidden />
@@ -786,7 +786,7 @@ export function AppLayout() {
             <button
               type="button"
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800 text-muted-foreground transition-all active:scale-95"
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-muted text-muted-foreground transition-all active:scale-95"
             >
                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
@@ -794,7 +794,7 @@ export function AppLayout() {
         </header>
 
 
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto bg-background">
           <Outlet />
         </main>
       </div>

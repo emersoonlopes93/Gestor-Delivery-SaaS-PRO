@@ -42,8 +42,8 @@ export function EmployeesPage() {
     <div className="p-6 max-w-7xl mx-auto text-left">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">Funcionários</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Gerencie sua equipe e suas permissões de acesso.</p>
+          <h1 className="text-3xl font-bold text-foreground tracking-tight">Funcionários</h1>
+          <p className="text-muted-foreground mt-1">Gerencie sua equipe e suas permissões de acesso.</p>
         </div>
         <button
           onClick={() => handleOpenModal()}
@@ -58,26 +58,26 @@ export function EmployeesPage() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
         </div>
       ) : error ? (
-        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl">
+        <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-400 p-4 rounded-xl">
           {error}
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+        <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50 dark:bg-gray-900/50/50 border-b border-gray-100 dark:border-gray-800">
+            <thead className="bg-muted border-b border-border">
               <tr>
-                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Nome / E-mail</th>
-                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Cargos</th>
-                <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-wider">Nome / E-mail</th>
+                <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-wider">Cargos</th>
+                <th className="px-6 py-4 text-xs font-black text-muted-foreground uppercase tracking-wider">Status</th>
                 <th className="px-6 py-4 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            <tbody className="divide-y divide-border">
               {employees.map((employee) => (
-                <tr key={employee.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50/50 transition-colors group">
+                <tr key={employee.id} className="hover:bg-muted/50 transition-colors group">
                   <td className="px-6 py-4">
-                    <div className="font-bold text-gray-900 dark:text-gray-100">{employee.name}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">{employee.email}</div>
+                    <div className="font-bold text-foreground">{employee.name}</div>
+                    <div className="text-xs text-muted-foreground">{employee.email}</div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1">
@@ -85,13 +85,13 @@ export function EmployeesPage() {
                         employee.userRoles.map((ur) => (
                           <span
                             key={ur.role.id}
-                            className="px-2 py-0.5 rounded-lg bg-gray-100 text-gray-600 dark:text-gray-400 text-[10px] font-bold border border-gray-200 dark:border-gray-800"
+                            className="px-2 py-0.5 rounded-lg bg-muted text-foreground text-[10px] font-bold border border-border"
                           >
                             {ur.role.name}
                           </span>
                         ))
                       ) : (
-                        <span className="text-xs text-gray-400 italic">Sem cargo</span>
+                        <span className="text-xs text-muted-foreground italic">Sem cargo</span>
                       )}
                     </div>
                   </td>

@@ -372,7 +372,7 @@ export function DeliveryRatesPage() {
       <div className="p-6">
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-          <span className="ml-2 text-gray-500 dark:text-gray-400">Carregando...</span>
+          <span className="ml-2 text-muted-foreground">Carregando...</span>
         </div>
       </div>
     );
@@ -382,8 +382,8 @@ export function DeliveryRatesPage() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Taxas de Entrega</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          <h1 className="text-2xl font-bold text-foreground">Taxas de Entrega</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Configure as regras para cálculo de taxa de entrega
           </p>
         </div>
@@ -405,10 +405,10 @@ export function DeliveryRatesPage() {
       {rules.length === 0 ? (
         <div className="text-center py-12">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <MapPin className="w-8 h-8 text-gray-400" />
+            <MapPin className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Nenhuma regra configurada</h3>
-          <p className="text-gray-500 dark:text-gray-400 mb-4">
+          <h3 className="text-lg font-medium text-foreground mb-2">Nenhuma regra configurada</h3>
+          <p className="text-muted-foreground mb-4">
             Crie sua primeira regra de taxa de entrega para começar a usar o sistema
           </p>
           <button
@@ -430,20 +430,20 @@ export function DeliveryRatesPage() {
             return (
               <div
                 key={rule.id}
-                className={`bg-white dark:bg-gray-900 rounded-lg border p-4 ${
-                  rule.isActive ? 'border-gray-200 dark:border-gray-800' : 'border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50'
+                className={`bg-card rounded-lg border p-4 ${
+                  rule.isActive ? 'border-border' : 'border-border bg-muted/50'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      rule.isActive ? 'bg-primary-100 text-primary-600' : 'bg-gray-200 text-gray-400'
+                      rule.isActive ? 'bg-primary-100 dark:bg-primary-500/20 text-primary-600 dark:text-primary-300' : 'bg-muted text-muted-foreground'
                     }`}>
                       <Icon className="w-5 h-5" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900 dark:text-gray-100">
+                        <span className="font-medium text-foreground">
                           {TYPE_LABELS[rule.type]}
                         </span>
                         {rule.type === 'polygon' ? (
@@ -457,7 +457,7 @@ export function DeliveryRatesPage() {
                         <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                           rule.isActive
                             ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-600 dark:text-gray-400'
+                            : 'bg-muted text-muted-foreground'
                         }`}>
                           {rule.isActive ? 'Ativa' : 'Inativa'}
                         </span>
@@ -470,11 +470,11 @@ export function DeliveryRatesPage() {
                           #{index + 1}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      <p className="text-sm text-muted-foreground mt-1">
                         {formatRuleDescription(rule)}
                       </p>
                       {typeof rule.priority === 'number' ? (
-                        <p className="text-xs text-gray-400 mt-1">Prioridade: {rule.priority}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Prioridade: {rule.priority}</p>
                       ) : null}
                     </div>
                   </div>
@@ -485,8 +485,8 @@ export function DeliveryRatesPage() {
                         disabled={!canMoveUp}
                         className={`p-1 rounded transition-colors ${
                           canMoveUp
-                            ? 'text-gray-400 hover:text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                            : 'text-gray-200 cursor-not-allowed'
+                            ? 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                            : 'text-muted-foreground/50 cursor-not-allowed'
                         }`}
                         title="Mover para cima"
                       >
@@ -497,8 +497,8 @@ export function DeliveryRatesPage() {
                         disabled={!canMoveDown}
                         className={`p-1 rounded transition-colors ${
                           canMoveDown
-                            ? 'text-gray-400 hover:text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                            : 'text-gray-200 cursor-not-allowed'
+                            ? 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                            : 'text-muted-foreground/50 cursor-not-allowed'
                         }`}
                         title="Mover para baixo"
                       >
@@ -509,7 +509,7 @@ export function DeliveryRatesPage() {
                       onClick={() => handleToggleActive(rule)}
                       className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                         rule.isActive
-                          ? 'bg-gray-100 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                          ? 'bg-muted text-foreground hover:bg-muted/80'
                           : 'bg-green-100 text-green-700 hover:bg-green-200'
                       }`}
                     >
@@ -517,13 +517,13 @@ export function DeliveryRatesPage() {
                     </button>
                     <button
                       onClick={() => handleEdit(rule)}
-                      className="p-1 text-gray-400 hover:text-gray-600 dark:text-gray-400 transition-colors"
+                      className="p-1 text-muted-foreground hover:text-foreground transition-colors"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(rule)}
-                      className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                      className="p-1 text-muted-foreground hover:text-red-600 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -670,14 +670,14 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-gray-900 rounded-lg max-w-md w-full p-6">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+      <div className="bg-card rounded-lg max-w-md w-full p-6">
+        <h2 className="text-lg font-semibold text-foreground mb-4">
           {rule ? 'Editar Regra' : 'Nova Regra de Entrega'}
         </h2>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-foreground mb-1">
               Tipo de Regra
             </label>
             <select
@@ -700,7 +700,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Prioridade</label>
+              <label className="block text-sm font-medium text-foreground mb-1">Prioridade</label>
               <input
                 type="number"
                 min="0"
@@ -710,7 +710,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
               />
             </div>
             <div className="flex items-end">
-              <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <label className="flex items-center gap-2 text-sm text-foreground">
                 <input
                   type="checkbox"
                   checked={!!formData.isFallback}
@@ -725,7 +725,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
           {formData.type === 'neighborhood' && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Bairro
                 </label>
                 <input
@@ -738,7 +738,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Taxa (R$)
                 </label>
                 <input
@@ -759,7 +759,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Distância Mínima (km)
                   </label>
                   <input
@@ -773,7 +773,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-foreground mb-1">
                     Distância Máxima (km)
                   </label>
                   <input
@@ -788,7 +788,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-foreground mb-1">
                   Taxa por km (R$)
                 </label>
                 <input
@@ -807,7 +807,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
 
           {formData.type === 'fixed' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-foreground mb-1">
                 Taxa Fixa (R$)
               </label>
               <input
@@ -827,7 +827,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
             <>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nome da zona</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">Nome da zona</label>
                   <input
                     type="text"
                     value={zoneName}
@@ -837,7 +837,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cor</label>
+                  <label className="block text-sm font-medium text-foreground mb-1">Cor</label>
                   <input
                     type="color"
                     value={zoneColor}
@@ -848,9 +848,9 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
               </div>
 
               <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
-                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900/50 text-xs text-gray-600 dark:text-gray-400 flex items-center justify-between">
+                <div className="px-3 py-2 bg-muted text-xs text-muted-foreground flex items-center justify-between">
                   <span>Desenhe a zona no mapa (polígono)</span>
-                  <span className="text-gray-500 dark:text-gray-400">Arraste os pontos para editar • Lixeira para remover</span>
+                  <span className="text-muted-foreground">Arraste os pontos para editar • Lixeira para remover</span>
                 </div>
                 <div className="h-[320px]">
                   <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }}>
@@ -886,7 +886,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
               onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
               className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-gray-700 rounded"
             />
-            <label htmlFor="isActive" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+            <label htmlFor="isActive" className="ml-2 block text-sm text-foreground">
               Regra ativa
             </label>
           </div>
@@ -895,7 +895,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 transition-colors"
+              className="flex-1 px-4 py-2 border border-input text-foreground bg-card rounded-md hover:bg-muted transition-colors"
             >
               Cancelar
             </button>
