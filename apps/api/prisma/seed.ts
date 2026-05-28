@@ -140,13 +140,70 @@ async function seedSystemConfig() {
     update: {},
     create: {
       id: 'global',
-      evolutionUrl: 'http://localhost:8080', // Default local evolution url
+      evolutionUrl: 'http://localhost:8080',
       evolutionGlobalToken: 'global_token_here',
       defaultWhatsAppProvider: 'evolution_go',
+      // --- Configuração Global do Agente IA ---
+      aiDefaultAgentName: 'Assistente',
+      aiDefaultTone: 'friendly',
+      aiMemoryEnabled: false,
+      aiRememberCustomerName: false,
+      aiRememberAddresses: false,
+      aiRememberLastOrder: false,
+      aiRememberPreferences: false,
+      aiAllowRepeatLastOrder: false,
+      aiMemoryRetentionDays: 180,
+      aiDebounceMs: 10000,
+      aiSimulateTyping: true,
+      aiRequireCustomerName: false,
+      aiRequireConfirmation: true,
+      aiEnableUpsell: false,
+      aiEnableHumanHandoff: true,
     },
   });
 
   console.log('   ✅ System config seeded');
+}
+
+async function seedAiPlanPresets() {
+  console.log('🤖 Seeding AI agent plan presets...');
+
+  const presets = [
+    {
+      plan: 'basic',
+      memoryAllowed: false,
+      repeatLastOrderAllowed: false,
+      maxRetentionDays: 30,
+      advancedToolsAllowed: false,
+      customPromptAllowed: false,
+    },
+    {
+      plan: 'pro',
+      memoryAllowed: true,
+      repeatLastOrderAllowed: true,
+      maxRetentionDays: 90,
+      advancedToolsAllowed: false,
+      customPromptAllowed: true,
+    },
+    {
+      plan: 'premium',
+      memoryAllowed: true,
+      repeatLastOrderAllowed: true,
+      maxRetentionDays: 365,
+      advancedToolsAllowed: true,
+      customPromptAllowed: true,
+    },
+  ];
+
+  for (const preset of presets) {
+    await prisma.aiAgentPlanPreset.upsert({
+      where: { plan: preset.plan },
+      update: preset,
+      create: preset,
+    });
+  }
+
+  console.log(`   ✅ ${presets.length} AI plan presets seeded (basic / pro / premium)`);
 }
 
 async function seedDemoTenant() {
@@ -543,6 +600,7 @@ async function main() {
   await seedAdminRoles();
   await seedSuperAdmin();
   await seedSystemConfig();
+  await seedAiPlanPresets();
   await seedDemoTenant();
   await seedDineInTables();
 

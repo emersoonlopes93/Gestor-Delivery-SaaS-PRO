@@ -5,6 +5,7 @@ import { TenantsPage } from './features/tenants/TenantsPage';
 import { TenantModulesPage } from './features/tenants/TenantModulesPage';
 import { TenantAiAgentConfigPage } from './features/tenants/TenantAiAgentConfigPage';
 import { BillingPage } from './features/billing/BillingPage';
+import { GlobalAiAgentConfigPage } from './features/ai-agent/GlobalAiAgentConfigPage';
 import { AuditLogsPage } from './features/audit/AuditLogsPage';
 import { FranchiseDashboard } from './features/franchise/FranchiseDashboard';
 import IntegrationsPage from './features/integrations/pages/IntegrationsPage';
@@ -51,6 +52,14 @@ export function App() {
           element={
             <PermissionGate permission="saas.tenants.ai.read">
               <TenantAiAgentConfigPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/ai-agent/global"
+          element={
+            <PermissionGate permission="saas.settings.read">
+              <GlobalAiAgentConfigPage />
             </PermissionGate>
           }
         />

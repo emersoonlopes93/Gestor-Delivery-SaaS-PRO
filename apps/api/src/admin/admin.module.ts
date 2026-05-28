@@ -23,6 +23,7 @@ import { AdminModulesModule } from './modules/admin-modules.module';
 import { AiAgentModule } from '../ai-agent/ai-agent.module';
 import { AdminDebugAiAgentController } from '../ai-agent/controllers/admin-debug-ai-agent.controller';
 import { AdminAiAgentController } from './ai-agent/admin-ai-agent.controller';
+import { AiAgentPlanPresetService } from './ai-agent/ai-agent-plan-preset.service';
 
 @Module({
   imports: [
@@ -52,7 +53,8 @@ import { AdminAiAgentController } from './ai-agent/admin-ai-agent.controller';
     AdminHealthService, 
     AdminAuditLogsService,
     AdminFranchiseService,
-    SystemConfigService
+    SystemConfigService,
+    AiAgentPlanPresetService,
   ],
   exports: [AdminAuthService, AdminRbacService, AdminModulesModule],
 })
