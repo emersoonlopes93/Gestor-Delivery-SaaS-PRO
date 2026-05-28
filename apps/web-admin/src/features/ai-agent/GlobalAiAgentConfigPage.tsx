@@ -31,7 +31,7 @@ export function GlobalAiAgentConfigPage() {
 
   useEffect(() => {
     api
-      .get<GlobalAiConfig>('/admin/ai-agent/global/config')
+      .get<GlobalAiConfig>('/admin/ai-agent/global-config')
       .then((res) => {
         if (res.success) setConfig(res.data);
         else setError('Falha ao carregar configuração global');
@@ -51,7 +51,7 @@ export function GlobalAiAgentConfigPage() {
     setMsg(null);
     setError(null);
     try {
-      const res = await api.patch('/admin/ai-agent/global/config', config);
+      const res = await api.patch('/admin/ai-agent/global-config', config);
       if (res.success) setMsg('Configuração salva com sucesso');
       else setError('Falha ao salvar configuração');
     } catch (e) {
