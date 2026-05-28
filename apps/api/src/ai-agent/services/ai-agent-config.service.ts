@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { 
-  IsBoolean, 
-  IsString, 
-  IsOptional, 
-  IsNumber, 
-  IsEnum, 
-  Min, 
-  Max 
+import {
+  IsBoolean,
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsEnum,
+  Min,
+  Max,
 } from 'class-validator';
 
 export class UpdateAiAgentConfigDto {
@@ -98,6 +98,44 @@ export class UpdateAiAgentConfigDto {
   @Min(7)
   @Max(365)
   memoryRetentionDays?: number;
+
+  /** Quando true o tenant herda config global; quando false usa override próprio */
+  @IsOptional()
+  @IsBoolean()
+  useGlobalDefaults?: boolean;
+}
+
+/** Configuração efetiva resolvida pelas 3 camadas: global → plano → override */
+export interface EffectiveAiAgentConfig {
+  tenantId: string;
+  useGlobalDefaults: boolean;
+  isEnabled: boolean;
+  agentName: string;
+  greetingMessage: string | null;
+  tone: string;
+  customInstructions: string | null;
+  operatingMode: string;
+  handoffPolicy: string;
+  fallbackMessage: string | null;
+  maxRetries: number;
+  sessionTimeoutMin: number;
+  dailyMessageLimit: number;
+  customerCooldownMin: number;
+  simulateTyping: boolean;
+  debounceMs: number;
+  memoryEnabled: boolean;
+  rememberCustomerName: boolean;
+  rememberAddresses: boolean;
+  rememberLastOrder: boolean;
+  rememberPreferences: boolean;
+  allowRepeatLastOrder: boolean;
+  memoryRetentionDays: number;
+  tenant: { name: string };
+  /** Metadados de resolução para diagnóstico */
+  _resolution: {
+    source: 'global_only' | 'plan_override' | 'tenant_override';
+    planPreset: string | null;
+  };
 }
 
 @Injectable()
@@ -108,21 +146,23 @@ export class AiAgentConfigService {
 
   /**
    * Obtém a configuração de IA do tenant, criando uma default se não existir.
+   * Para compatibilidade legada — retorna o registro raw do banco.
    */
   async getConfig(tenantId: string) {
     let config = await this.prisma.aiAgentConfig.findUnique({
       where: { tenantId },
       include: {
         tenant: {
-          select: { name: true }
-        }
-      }
+          select: { name: true },
+        },
+      },
     });
 
     if (!config) {
       config = await this.prisma.aiAgentConfig.create({
         data: {
           tenantId,
+          useGlobalDefaults: true,
           isEnabled: false,
           agentName: 'Assistente',
           tone: 'friendly',
@@ -147,14 +187,175 @@ export class AiAgentConfigService {
         },
         include: {
           tenant: {
-            select: { name: true }
-          }
-        }
+            select: { name: true },
+          },
+        },
       });
       this.logger.log(`Default AI Config created for tenant ${tenantId}`);
     }
 
     return config;
+  }
+
+  /**
+   * Resolve a configuração efetiva do Agente IA combinando:
+   * 1. Config global (SystemConfig)
+   * 2. Preset do plano (AiAgentPlanPreset via TenantSubscription)
+   * 3. Override por tenant (AiAgentConfig)
+   *
+   * Logs:
+   * [AI_CONFIG] global_loaded
+   * [AI_CONFIG] plan_loaded
+   * [AI_CONFIG] tenant_override_loaded
+   * [AI_CONFIG] effective_config_resolved
+   */
+  async getEffectiveAiAgentConfig(tenantId: string): Promise<EffectiveAiAgentConfig> {
+    // --- 1. Config Global ---
+    const globalCfg = await this.prisma.systemConfig.findUnique({
+      where: { id: 'global' },
+    });
+    this.logger.log(`[AI_CONFIG] global_loaded tenantId=${tenantId}`);
+
+    const globalDefaults = {
+      agentName: globalCfg?.aiDefaultAgentName ?? 'Assistente',
+      tone: globalCfg?.aiDefaultTone ?? 'friendly',
+      memoryEnabled: globalCfg?.aiMemoryEnabled ?? false,
+      rememberCustomerName: globalCfg?.aiRememberCustomerName ?? false,
+      rememberAddresses: globalCfg?.aiRememberAddresses ?? false,
+      rememberLastOrder: globalCfg?.aiRememberLastOrder ?? false,
+      rememberPreferences: globalCfg?.aiRememberPreferences ?? false,
+      allowRepeatLastOrder: globalCfg?.aiAllowRepeatLastOrder ?? false,
+      memoryRetentionDays: globalCfg?.aiMemoryRetentionDays ?? 180,
+      debounceMs: globalCfg?.aiDebounceMs ?? 10000,
+      simulateTyping: globalCfg?.aiSimulateTyping ?? true,
+    };
+
+    // --- 2. Preset do Plano ---
+    let planPresetName: string | null = null;
+    const subscription = await this.prisma.tenantSubscription.findUnique({
+      where: { tenantId },
+      select: { plan: true },
+    });
+
+    let planOverrides: Partial<typeof globalDefaults> = {};
+
+    if (subscription?.plan) {
+      const preset = await this.prisma.aiAgentPlanPreset.findUnique({
+        where: { plan: subscription.plan },
+      });
+      if (preset) {
+        planPresetName = subscription.plan;
+        // O preset do plano restringe o que é permitido, não substitui direto
+        if (!preset.memoryAllowed) {
+          planOverrides.memoryEnabled = false;
+          planOverrides.rememberCustomerName = false;
+          planOverrides.rememberAddresses = false;
+          planOverrides.rememberLastOrder = false;
+          planOverrides.rememberPreferences = false;
+          planOverrides.allowRepeatLastOrder = false;
+        }
+        if (!preset.repeatLastOrderAllowed) {
+          planOverrides.allowRepeatLastOrder = false;
+        }
+        if (preset.maxRetentionDays < globalDefaults.memoryRetentionDays) {
+          planOverrides.memoryRetentionDays = preset.maxRetentionDays;
+        }
+        this.logger.log(
+          `[AI_CONFIG] plan_loaded plan=${planPresetName} memoryAllowed=${preset.memoryAllowed}`,
+        );
+      } else {
+        this.logger.log(`[AI_CONFIG] plan_loaded plan=${subscription.plan} preset=not_found`);
+      }
+    } else {
+      this.logger.log(`[AI_CONFIG] plan_loaded subscription=none`);
+    }
+
+    // --- 3. Override por Tenant ---
+    const tenantCfg = await this.getConfig(tenantId);
+    this.logger.log(
+      `[AI_CONFIG] tenant_override_loaded tenantId=${tenantId} useGlobalDefaults=${tenantCfg.useGlobalDefaults}`,
+    );
+
+    // --- Resolução Final ---
+    let resolved: EffectiveAiAgentConfig;
+
+    if (tenantCfg.useGlobalDefaults) {
+      // Herda global + restrições do plano
+      const merged = { ...globalDefaults, ...planOverrides };
+      resolved = {
+        tenantId,
+        useGlobalDefaults: true,
+        isEnabled: tenantCfg.isEnabled, // isEnabled sempre vem do tenant (liga/desliga agente)
+        agentName: merged.agentName,
+        greetingMessage: tenantCfg.greetingMessage,
+        tone: merged.tone,
+        customInstructions: tenantCfg.customInstructions,
+        operatingMode: tenantCfg.operatingMode,
+        handoffPolicy: tenantCfg.handoffPolicy,
+        fallbackMessage: tenantCfg.fallbackMessage,
+        maxRetries: tenantCfg.maxRetries,
+        sessionTimeoutMin: tenantCfg.sessionTimeoutMin,
+        dailyMessageLimit: tenantCfg.dailyMessageLimit,
+        customerCooldownMin: tenantCfg.customerCooldownMin,
+        simulateTyping: merged.simulateTyping,
+        debounceMs: merged.debounceMs,
+        memoryEnabled: merged.memoryEnabled,
+        rememberCustomerName: merged.rememberCustomerName,
+        rememberAddresses: merged.rememberAddresses,
+        rememberLastOrder: merged.rememberLastOrder,
+        rememberPreferences: merged.rememberPreferences,
+        allowRepeatLastOrder: merged.allowRepeatLastOrder,
+        memoryRetentionDays: merged.memoryRetentionDays,
+        tenant: tenantCfg.tenant,
+        _resolution: {
+          source: planPresetName ? 'plan_override' : 'global_only',
+          planPreset: planPresetName,
+        },
+      };
+    } else {
+      // Override próprio do tenant — usa config local, mas ainda aplica restrições de plano
+      const localMemory = {
+        memoryEnabled: tenantCfg.memoryEnabled,
+        rememberCustomerName: tenantCfg.rememberCustomerName,
+        rememberAddresses: tenantCfg.rememberAddresses,
+        rememberLastOrder: tenantCfg.rememberLastOrder,
+        rememberPreferences: tenantCfg.rememberPreferences,
+        allowRepeatLastOrder: tenantCfg.allowRepeatLastOrder,
+        memoryRetentionDays: tenantCfg.memoryRetentionDays,
+      };
+      const withPlanRestrictions = { ...localMemory, ...planOverrides };
+
+      resolved = {
+        tenantId,
+        useGlobalDefaults: false,
+        isEnabled: tenantCfg.isEnabled,
+        agentName: tenantCfg.agentName ?? globalDefaults.agentName,
+        greetingMessage: tenantCfg.greetingMessage,
+        tone: tenantCfg.tone,
+        customInstructions: tenantCfg.customInstructions,
+        operatingMode: tenantCfg.operatingMode,
+        handoffPolicy: tenantCfg.handoffPolicy,
+        fallbackMessage: tenantCfg.fallbackMessage,
+        maxRetries: tenantCfg.maxRetries,
+        sessionTimeoutMin: tenantCfg.sessionTimeoutMin,
+        dailyMessageLimit: tenantCfg.dailyMessageLimit,
+        customerCooldownMin: tenantCfg.customerCooldownMin,
+        simulateTyping: tenantCfg.simulateTyping,
+        debounceMs: tenantCfg.debounceMs,
+        ...withPlanRestrictions,
+        tenant: tenantCfg.tenant,
+        _resolution: {
+          source: 'tenant_override',
+          planPreset: planPresetName,
+        },
+      };
+    }
+
+    this.logger.log(
+      `[AI_CONFIG] effective_config_resolved tenantId=${tenantId} source=${resolved._resolution.source} memoryEnabled=${resolved.memoryEnabled} isEnabled=${resolved.isEnabled}`,
+    );
+
+    return resolved;
   }
 
   /**
@@ -187,11 +388,12 @@ export class AiAgentConfigService {
       rememberPreferences: dto.rememberPreferences,
       allowRepeatLastOrder: dto.allowRepeatLastOrder,
       memoryRetentionDays: dto.memoryRetentionDays,
+      useGlobalDefaults: dto.useGlobalDefaults,
     };
 
     // Remove campos apenas se forem undefined (PATCH semântico)
     const cleanData = Object.fromEntries(
-      Object.entries(allowedFields).filter(([_, value]) => value !== undefined)
+      Object.entries(allowedFields).filter(([, value]) => value !== undefined),
     );
 
     const updated = await this.prisma.aiAgentConfig.update({
@@ -199,7 +401,9 @@ export class AiAgentConfigService {
       data: cleanData,
     });
 
-    this.logger.log(`AI Config updated for tenant ${tenantId}`);
+    this.logger.log(
+      `AI Config updated for tenant ${tenantId} useGlobalDefaults=${updated.useGlobalDefaults}`,
+    );
     return updated;
   }
 }

@@ -1,5 +1,5 @@
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
-import { AiAgentConfigService } from './ai-agent-config.service';
+import { AiAgentConfigService, type EffectiveAiAgentConfig } from './ai-agent-config.service';
 import { ConversationService } from './conversation.service';
 import { AgentToolsService } from './agent-tools.service';
 import { WhatsAppSenderService } from '../../whatsapp-channel/services/whatsapp-sender.service';
@@ -92,7 +92,7 @@ export class AiOrchestratorService {
       return;
     }
 
-    const config = await this.configService.getConfig(tenantId);
+    const config = await this.configService.getEffectiveAiAgentConfig(tenantId);
     this.logger.log(`[AI_MEMORY] config_loaded tenantId=${tenantId} memoryEnabled=${config.memoryEnabled}`);
     const systemConfig = await this.prisma.systemConfig.findUnique({
       where: { id: 'global' },
@@ -122,7 +122,6 @@ export class AiOrchestratorService {
 
     AiFlowLogger.flow('ai_config_loaded', flowTrace, {
       tenantId,
-      agentConfigId: config.id,
       agentName: config.agentName,
       isEnabled: config.isEnabled,
       provider: providerType,
@@ -132,6 +131,7 @@ export class AiOrchestratorService {
       debounceMs: config.debounceMs ?? 1000,
       operatingMode: config.operatingMode,
       handoffActive: false,
+      configSource: config._resolution.source,
     });
 
     if (!config.isEnabled) {
@@ -234,7 +234,7 @@ export class AiOrchestratorService {
     tenantId: string,
     sessionId: string,
     customerPhone: string,
-    config: Awaited<ReturnType<AiAgentConfigService['getConfig']>>,
+    config: EffectiveAiAgentConfig,
     options: ProcessMessageOptions,
   ) {
     const { trace } = options;
@@ -434,7 +434,7 @@ export class AiOrchestratorService {
       };
     }
 
-    const config = await this.configService.getConfig(tenant.id);
+    const config = await this.configService.getEffectiveAiAgentConfig(tenant.id);
     push(`ai_config enabled=${config.isEnabled}`);
 
     if (!config.isEnabled) {
@@ -490,7 +490,7 @@ export class AiOrchestratorService {
     sessionId: string,
     customerPhone: string,
     _content: string,
-    config: Awaited<ReturnType<AiAgentConfigService['getConfig']>>,
+    config: EffectiveAiAgentConfig,
     options: ProcessMessageOptions,
   ): Promise<{ contentPreview?: string } | void> {
     const { trace, dryRun } = options;
