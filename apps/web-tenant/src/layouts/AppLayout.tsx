@@ -613,42 +613,42 @@ export function AppLayout() {
                 onClick={handleToggleStore}
                 disabled={toggleStoreMutation.isPending}
                 className={`w-full flex items-center justify-between p-2.5 rounded-2xl border transition-all duration-300 group hover:shadow-md active:scale-[0.98] ${
-                  storeStatus === 'open' 
-                    ? 'bg-status-open/10 border-status-open/20 text-status-open' 
-                    : storeStatus === 'paused'
-                    ? 'bg-status-closed/10 border-status-closed/20 text-status-closed'
-                    : 'bg-status-pending/10 border-status-pending/20 text-status-pending'
+                  storeStatus === 'open'
+                    ? 'bg-status-success/10 text-status-success border-status-success/30'
+                    : storeStatus === 'closed'
+                    ? 'bg-status-warning/10 text-status-warning border-status-warning/30'
+                    : 'bg-destructive/10 text-destructive border-destructive/30'
                 } ${toggleStoreMutation.isPending ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
                 <div className="flex items-center gap-2.5">
                   <div className="relative flex h-2 w-2">
                     {storeStatus === 'open' && (
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-open opacity-75"></span>
+                      <span className="animate-ping absolute inset-0 rounded-full bg-status-success opacity-75" />
                     )}
                     <span className={`relative inline-flex rounded-full h-2 w-2 ${
-                      storeStatus === 'open' 
-                        ? 'bg-status-open' 
-                        : storeStatus === 'paused'
-                        ? 'bg-status-closed'
-                        : 'bg-status-pending'
-                    }`}></span>
+                      storeStatus === 'open'
+                        ? 'bg-status-success'
+                        : storeStatus === 'closed'
+                        ? 'bg-status-warning'
+                        : 'bg-destructive'
+                    }`} />
                   </div>
                   <span className="text-[10px] font-black tracking-widest uppercase">
-                    {storeStatus === 'open' 
-                      ? 'Loja Aberta' 
+                    {storeStatus === 'open'
+                      ? 'Loja Aberta'
                       : storeStatus === 'paused'
                       ? 'Loja Pausada'
                       : 'Loja Fechada'}
                   </span>
                 </div>
-                <div className={`w-8 h-4 rounded-full relative transition-colors duration-300 ${
-                  storeStatus === 'open' 
-                    ? 'bg-status-open' 
-                    : storeStatus === 'paused'
-                    ? 'bg-status-closed/40'
-                    : 'bg-status-pending/40'
+                <div className={`w-9 h-5 rounded-full relative transition-colors duration-300 ${
+                  storeStatus === 'open'
+                    ? 'bg-status-success/20'
+                    : storeStatus === 'closed'
+                    ? 'bg-status-warning/20'
+                    : 'bg-destructive/20'
                 }`}>
-                   <div className={`absolute top-1 w-2 h-2 rounded-full bg-foreground transition-all duration-300 ${storeStatus === 'open' ? 'right-1' : 'left-1'}`} />
+                   <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-foreground border border-border transition-all duration-300 ${storeStatus === 'open' ? 'right-0.5' : 'left-0.5'}`} />
                 </div>
               </button>
 

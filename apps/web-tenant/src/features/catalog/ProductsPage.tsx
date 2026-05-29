@@ -249,11 +249,8 @@ export function ProductsPage() {
       const pubLabel = pub ? pub.publicationStatus : null;
       const opLabel = pub ? pub.operationalStatus : null;
       return (
-        <tr key={product.id} className="transition-colors duration-150 group" style={{ height: 64, backgroundColor: 'var(--surface-base)' }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--surface-subtle)'; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--surface-base)'; }}
-        >
-          <td className="px-6 py-2">
+        <tr key={product.id} className="border-b border-border last:border-b-0 bg-card text-card-foreground transition-colors duration-150 hover:bg-muted/40">
+          <td className="px-6 py-4">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-12 h-12 rounded-lg bg-muted/50 dark:bg-muted/80 border border-border overflow-hidden shrink-0">
                 {product.image ? (
@@ -268,17 +265,17 @@ export function ProductsPage() {
               <div className="min-w-0">
                 <div className="font-bold text-foreground truncate">{product.name}</div>
                 <div className="text-xs text-muted-foreground truncate hidden sm:block">{product.shortDescription || 'Sem descrição'}</div>
-                <div className="mt-1 flex items-center gap-2">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-secondary text-foreground border-border'}`}>
+                <div className="mt-1 flex items-center gap-2 flex-wrap">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${product.type === 'combo' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-card text-foreground border-border'}`}>
                     {typeLabel}
                   </span>
                   {pubLabel ? (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-primary/10 dark:bg-primary/10 text-primary dark:text-primary border border-primary/20 dark:border-primary/30' : 'bg-secondary text-muted-foreground border border-border'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${pubLabel === 'published' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-card text-muted-foreground border-border'}`}>
                       {pubLabel}
                     </span>
                   ) : null}
                   {opLabel ? (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${opLabel === 'active' ? 'status-badge-success' : opLabel === 'inactive' ? 'status-badge-neutral' : opLabel === 'hidden' ? 'status-badge-warning' : 'status-badge-danger'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${opLabel === 'active' ? 'bg-status-success/10 text-status-success border-status-success/20' : opLabel === 'inactive' ? 'bg-status-danger/10 text-status-danger border-status-danger/20' : opLabel === 'hidden' ? 'bg-status-warning/10 text-status-warning border-status-warning/20' : 'bg-status-warning/10 text-status-warning border-status-warning/20'}`}>
                       {opLabel}
                     </span>
                   ) : null}
@@ -287,25 +284,25 @@ export function ProductsPage() {
             </div>
           </td>
 
-          <td className="px-6 py-2 text-sm text-muted-foreground font-medium hidden lg:table-cell">
+          <td className="px-6 py-4 text-sm text-muted-foreground font-medium hidden lg:table-cell">
             {categoryName}
           </td>
 
-          <td className="px-6 py-2 text-sm font-black text-foreground whitespace-nowrap">
+          <td className="px-6 py-4 text-sm font-black text-foreground whitespace-nowrap text-right">
             {formatMoney(product.basePrice)}
           </td>
 
-          <td className="px-6 py-2 text-sm whitespace-nowrap">
-            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${product.isActive ? 'status-badge-success' : 'status-badge-danger'}`}>
+          <td className="px-6 py-4 text-sm whitespace-nowrap">
+            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${product.isActive ? 'bg-status-success/10 text-status-success border-status-success/20' : 'bg-status-danger/10 text-status-danger border-status-danger/20'}`}>
               {product.isActive ? 'Ativo' : 'Inativo'}
             </span>
           </td>
 
-          <td className="px-6 py-2 text-sm text-right">
-            <div className="flex justify-end gap-1.5 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+          <td className="px-6 py-4 text-sm text-right">
+            <div className="flex justify-end gap-1.5">
               <button
                 onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
-                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded-lg transition-all"
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors"
                 title="Ficha técnica"
                 type="button"
               >
@@ -313,7 +310,7 @@ export function ProductsPage() {
               </button>
               <button
                 onClick={() => navigate(`/catalog/products/${product.id}/v2`)}
-                className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                 title="Editar"
                 type="button"
               >
@@ -322,7 +319,7 @@ export function ProductsPage() {
               <button
                 onClick={() => handleDuplicate(product.id)}
                 disabled={savingMap[`duplicate-${product.id}`]}
-                className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all disabled:opacity-70"
+                className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                 title={savingMap[`duplicate-${product.id}`] ? 'Duplicando...' : 'Duplicar'}
                 type="button"
               >
@@ -331,7 +328,7 @@ export function ProductsPage() {
               <PermissionGate permission="catalog.publish" fallback={null}>
                 <button
                   onClick={() => handleTogglePublication(product)}
-                  className={`p-2 rounded-lg transition-all ${product.publication?.publicationStatus === 'published' ? 'text-status-success hover:text-status-success hover:bg-status-success/10 dark:hover:bg-status-success/20' : 'text-muted-foreground hover:text-primary hover:bg-primary/10 dark:hover:bg-primary/20'}`}
+                  className={`p-2 rounded-lg transition-colors ${product.publication?.publicationStatus === 'published' ? 'text-status-success hover:text-status-success hover:bg-status-success/10' : 'text-muted-foreground hover:text-primary hover:bg-primary/10'}`}
                   title={product.publication?.publicationStatus === 'published' ? 'Despublicar' : 'Publicar'}
                   type="button"
                 >
@@ -341,7 +338,7 @@ export function ProductsPage() {
               <PermissionGate permission="catalog.publish" fallback={null}>
                 <button
                   onClick={() => handleToggleOperational(product)}
-                  className={`p-2 rounded-lg transition-all ${product.publication?.operationalStatus === 'active' ? 'text-status-success hover:text-status-success hover:bg-status-success/10 dark:hover:bg-status-success/20' : 'text-muted-foreground hover:text-status-warning hover:bg-status-warning/10 dark:hover:bg-status-warning/20'}`}
+                  className={`p-2 rounded-lg transition-colors ${product.publication?.operationalStatus === 'active' ? 'text-status-success hover:text-status-success hover:bg-status-success/10' : 'text-muted-foreground hover:text-status-warning hover:bg-status-warning/10'}`}
                   title={product.publication?.operationalStatus === 'active' ? 'Ocultar' : 'Exibir'}
                   type="button"
                 >
@@ -350,7 +347,7 @@ export function ProductsPage() {
               </PermissionGate>
               <button
                 onClick={() => handleToggleActive(product)}
-                className={`p-2 rounded-lg transition-all ${product.isActive ? 'text-muted-foreground hover:text-status-warning hover:bg-status-warning/10 dark:hover:bg-status-warning/20' : 'text-muted-foreground hover:text-status-success hover:bg-status-success/10 dark:hover:bg-status-success/20'}`}
+                className={`p-2 rounded-lg transition-colors ${product.isActive ? 'text-muted-foreground hover:text-status-warning hover:bg-status-warning/10' : 'text-muted-foreground hover:text-status-success hover:bg-status-success/10'}`}
                 title={product.isActive ? 'Desativar' : 'Ativar'}
                 type="button"
               >
@@ -358,7 +355,7 @@ export function ProductsPage() {
               </button>
               <button
                 onClick={() => handleDelete(product.id)}
-                className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 rounded-lg transition-all"
+                className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
                 title="Excluir"
                 type="button"
               >
@@ -518,16 +515,16 @@ export function ProductsPage() {
         <div className="flex items-center gap-2 w-full md:w-auto">
           <button
             onClick={() => navigate('/catalog/simulation')}
-            className="btn-secondary flex-1 md:flex-none flex items-center justify-center gap-2 h-10 px-4 text-xs"
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 h-10 px-4 text-xs font-black uppercase tracking-wider rounded-2xl border border-border bg-card text-foreground hover:bg-muted transition-colors shadow-sm"
             type="button"
           >
-            <Search size={14} className="hidden sm:block" /> 
+            <Search size={14} className="hidden sm:block" />
             <span>Simulador</span>
           </button>
 
           <button
             onClick={() => navigate('/catalog/products/new/v2')}
-            className="btn-primary flex-1 md:flex-none flex items-center justify-center gap-2 h-10 px-4 text-xs"
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 h-10 px-4 text-xs font-black uppercase tracking-wider rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
             type="button"
           >
             <Plus size={14} className="hidden sm:block" />
@@ -552,16 +549,13 @@ export function ProductsPage() {
               />
             </div>
 
-            <div
-              className="flex items-center p-1 rounded-xl w-full md:w-auto shrink-0"
-              style={{ background: 'var(--surface-inset)', border: '1px solid var(--border-default)' }}
-            >
+            <div className="flex items-center p-1 rounded-xl w-full md:w-auto shrink-0 bg-muted border border-border">
               <button
                 onClick={() => setViewMode('all')}
                 className={`flex-1 md:flex-none md:px-6 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
                   viewMode === 'all'
-                    ? 'bg-card text-primary shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-card text-foreground shadow-sm ring-1 ring-inset ring-border'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                 }`}
                 type="button"
               >
@@ -571,8 +565,8 @@ export function ProductsPage() {
                 onClick={() => setViewMode('grouped')}
                 className={`flex-1 md:flex-none md:px-6 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
                   viewMode === 'grouped'
-                    ? 'bg-card text-primary shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-card text-foreground shadow-sm ring-1 ring-inset ring-border'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                 }`}
                 type="button"
               >
@@ -592,10 +586,10 @@ export function ProductsPage() {
                 <button
                   key={t.id}
                   onClick={() => setTypeFilter(t.id as ProductTypeFilter)}
-                  className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border ${
+                  className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
                     typeFilter === t.id
-                      ? 'bg-primary/10 border-primary/20 text-primary'
-                      : 'bg-card border border-border text-muted-foreground hover:text-foreground'
+                      ? 'bg-primary text-primary-foreground border border-primary shadow-sm'
+                      : 'bg-card border border-border text-foreground hover:bg-muted'
                   }`}
                 >
                   {t.label}
@@ -612,7 +606,7 @@ export function ProductsPage() {
               <select
                 value={selectedCategoryId ?? ''}
                 onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : null)}
-                className="h-8 pl-2 pr-6 bg-card border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
+                className="h-8 pl-2 pr-6 bg-card text-foreground border border-input text-[10px] font-black uppercase tracking-widest focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-inset hover:bg-muted rounded-lg cursor-pointer transition-all"
               >
                 <option value="">Categorias</option>
                 {categories.map((c) => (
@@ -624,7 +618,7 @@ export function ProductsPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as ProductStatusFilter)}
-                className="h-8 pl-2 pr-6 bg-card border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
+                className="h-8 pl-2 pr-6 bg-card text-foreground border border-input text-[10px] font-black uppercase tracking-widest focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-inset hover:bg-muted rounded-lg cursor-pointer transition-all"
               >
                 <option value="all">Status</option>
                 <option value="active">Ativos</option>
@@ -634,7 +628,7 @@ export function ProductsPage() {
               <select
                 value={publicationFilter}
                 onChange={(e) => setPublicationFilter(e.target.value as PublicationFilter)}
-                className="h-8 pl-2 pr-6 bg-card border border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 rounded-lg cursor-pointer transition-all"
+                className="h-8 pl-2 pr-6 bg-card text-foreground border border-input text-[10px] font-black uppercase tracking-widest focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-inset hover:bg-muted rounded-lg cursor-pointer transition-all"
               >
                 <option value="all">Publicação</option>
                 <option value="draft">Rascunho</option>
@@ -665,19 +659,19 @@ export function ProductsPage() {
               </div>
 
 
-              <div className="card-premium hidden md:block overflow-hidden">
+              <div className="card-premium hidden md:block overflow-hidden bg-card border border-border">
                 <div ref={tableScrollRef} className="max-h-[70vh] overflow-auto custom-scrollbar">
-                  <table className="table-premium">
-                    <thead>
+                  <table className="w-full min-w-full border-separate border-spacing-0">
+                    <thead className="bg-muted/50 border-b border-border">
                       <tr>
-                        <th>Produto</th>
-                        <th className="hidden lg:table-cell">Categoria</th>
-                        <th>Preço</th>
-                        <th>Status</th>
-                        <th className="text-right">Ações</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-left">Produto</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest hidden lg:table-cell text-left">Categoria</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Preço</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-left">Status</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Ações</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y" style={{ borderColor: 'var(--border-subtle)' }}>
+                    <tbody>
                       {filteredProducts.length > 0 && virtualAll.topSpacer > 0 && (
                         <tr>
                           <td colSpan={5} style={{ height: virtualAll.topSpacer }} className="p-0 border-0" />
@@ -711,11 +705,11 @@ export function ProductsPage() {
                 const title = group.category?.name ?? 'Sem categoria';
                 const isExpanded = expandedGroups[group.key] ?? true;
                 return (
-                  <section key={group.key} className="card-premium border-none shadow-sm">
+                  <section key={group.key} className="card-premium border border-border bg-card shadow-sm overflow-hidden">
                     <button
                       type="button"
                       onClick={() => toggleGroupExpanded(group.key)}
-                      className="w-full px-4 py-4 bg-muted/20 dark:bg-muted/80 flex items-center justify-between hover:bg-muted/70 dark:hover:bg-muted/90 transition-all"
+                      className="w-full px-4 py-4 bg-card flex items-center justify-between border-b border-border hover:bg-muted/20 transition-all"
                     >
                       <div className="text-left min-w-0 flex-1">
                         <div className="text-sm font-black text-foreground uppercase tracking-tight truncate">{title}</div>
@@ -723,7 +717,7 @@ export function ProductsPage() {
                       </div>
                       <div className="flex items-center gap-3 shrink-0 ml-4">
                         <div className={`w-8 h-8 flex items-center justify-center rounded-full bg-card border border-border transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
-                          <ChevronDown size={16} className="text-muted-foreground" />
+                          <ChevronDown size={16} className="text-foreground" />
                         </div>
                       </div>
                     </button>
