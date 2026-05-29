@@ -6,6 +6,8 @@ import { api } from '../../../lib/api-client';
 import type { ChatMessage, ChatSession } from '@gestor/types';
 import { QuickReplies } from './QuickReplies';
 
+
+
 interface ChatAreaProps {
   session: ChatSession | null;
   onBack: () => void;
@@ -189,9 +191,9 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       case 'sent':
         return <Check className="w-4 h-4 text-muted-foreground" />;
       case 'delivered':
-        return <CheckCircle className="w-4 h-4 text-blue-500" />;
+        return <CheckCircle className="w-4 h-4 text-status-info" />;
       case 'read':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className="w-4 h-4 text-status-success" />;
       default:
         return <Clock className="w-4 h-4 text-muted-foreground" />;
     }
@@ -221,7 +223,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       case 'human':
         return 'text-status-info';
       case 'system':
-        return 'text-amber-600 dark:text-amber-500';
+        return 'text-status-warning';
       default:
         return 'text-muted-foreground';
     }
@@ -377,7 +379,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
               className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
                 msg.direction === 'outbound'
                   ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-foreground border border-border'
+                  : 'bg-card text-card-foreground border border-border'
               }`}
             >
               {msg.senderType && msg.senderType !== 'customer' && (

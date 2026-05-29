@@ -6,6 +6,10 @@ import L from 'leaflet';
 import 'leaflet-draw';
 import type { LatLngExpression } from 'leaflet';
 
+
+
+
+
 type PolygonCoordinates = Array<[number, number]>; // [[lng,lat],...]
 
 type DeliveryRateRuleType = 'neighborhood' | 'distance' | 'fixed' | 'polygon';
@@ -404,7 +408,7 @@ export function DeliveryRatesPage() {
 
       {rules.length === 0 ? (
         <div className="text-center py-12">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
             <MapPin className="w-8 h-8 text-muted-foreground" />
           </div>
           <h3 className="text-lg font-medium text-foreground mb-2">Nenhuma regra configurada</h3>
@@ -456,7 +460,7 @@ export function DeliveryRatesPage() {
                         ) : null}
                         <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                           rule.isActive
-                            ? 'bg-green-100 text-green-800'
+                            ? 'bg-status-success/10 text-status-success'
                             : 'bg-muted text-muted-foreground'
                         }`}>
                           {rule.isActive ? 'Ativa' : 'Inativa'}
@@ -466,7 +470,7 @@ export function DeliveryRatesPage() {
                             Fallback
                           </span>
                         ) : null}
-                        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-primary/10 text-primary">
                           #{index + 1}
                         </span>
                       </div>
@@ -486,7 +490,7 @@ export function DeliveryRatesPage() {
                         className={`p-1 rounded transition-colors ${
                           canMoveUp
                             ? 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                            : 'text-muted-foreground/50 cursor-not-allowed'
+                            : 'text-muted-foreground cursor-not-allowed'
                         }`}
                         title="Mover para cima"
                       >
@@ -498,7 +502,7 @@ export function DeliveryRatesPage() {
                         className={`p-1 rounded transition-colors ${
                           canMoveDown
                             ? 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                            : 'text-muted-foreground/50 cursor-not-allowed'
+                            : 'text-muted-foreground cursor-not-allowed'
                         }`}
                         title="Mover para baixo"
                       >
@@ -510,7 +514,7 @@ export function DeliveryRatesPage() {
                       className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                         rule.isActive
                           ? 'bg-muted text-foreground hover:bg-muted/80'
-                          : 'bg-green-100 text-green-700 hover:bg-green-200'
+                          : 'bg-status-success/10 text-status-success hover:bg-status-success/20'
                       }`}
                     >
                       {rule.isActive ? 'Desativar' : 'Ativar'}
@@ -688,7 +692,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                   setFormData({ ...formData, type: v });
                 }
               }}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               disabled={!!rule}
             >
               <option value="neighborhood">Por Bairro</option>
@@ -715,7 +719,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                   type="checkbox"
                   checked={!!formData.isFallback}
                   onChange={(e) => setFormData({ ...formData, isFallback: e.target.checked })}
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-gray-700 rounded"
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-input rounded"
                 />
                 Usar como fallback
               </label>
@@ -842,7 +846,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                     type="color"
                     value={zoneColor}
                     onChange={(e) => setZoneColor(e.target.value)}
-                    className="w-full h-[42px] px-2 py-2 border border-gray-300 dark:border-gray-700 rounded-md"
+                    className="w-full h-[42px] px-2 py-2 border border-input rounded-md"
                   />
                 </div>
               </div>
@@ -884,7 +888,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
               id="isActive"
               checked={formData.isActive}
               onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-gray-700 rounded"
+              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-input rounded"
             />
             <label htmlFor="isActive" className="ml-2 block text-sm text-foreground">
               Regra ativa

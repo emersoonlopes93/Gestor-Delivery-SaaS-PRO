@@ -11,6 +11,8 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { Tenant } from '@gestor/types';
 
+
+
 export function QrCodesPage() {
   const [tenantSlug, setTenantSlug] = useState('');
   const [tenantName, setTenantName] = useState('');
@@ -92,29 +94,29 @@ export function QrCodesPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8 text-left">
       <header>
-        <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tight">Marketing e Acesso</h1>
-        <p className="text-gray-500 dark:text-gray-400 font-medium uppercase text-[10px] tracking-widest mt-1">Gerencie o acesso público à sua loja e gere materiais de divulgação</p>
+        <h1 className="text-3xl font-black text-foreground tracking-tight">Marketing e Acesso</h1>
+        <p className="text-muted-foreground dark:text-muted-foreground font-medium uppercase text-[10px] tracking-widest mt-1">Gerencie o acesso público à sua loja e gere materiais de divulgação</p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Link Section */}
         <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-[2.5rem] p-8 shadow-sm">
+          <div className="bg-card border border-border rounded-[2.5rem] p-8 shadow-sm">
             <div className="flex items-center gap-4 mb-6">
                <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 rounded-2xl flex items-center justify-center">
                   <Globe size={24} />
                </div>
                <div>
-                  <h3 className="font-black text-gray-900 dark:text-white">Link do Cardápio</h3>
-                  <p className="text-xs text-gray-500 font-bold uppercase tracking-tighter">Seu endereço web exclusivo</p>
+                  <h3 className="font-black text-foreground">Link do Cardápio</h3>
+                  <p className="text-xs text-muted-foreground font-bold uppercase tracking-tighter">Seu endereço web exclusivo</p>
                </div>
             </div>
 
-            <div className="flex items-center gap-2 p-4 bg-gray-50 dark:bg-gray-950 rounded-2xl border border-gray-100 dark:border-gray-800 mb-6">
-               <span className="text-sm font-bold text-gray-600 dark:text-gray-400 truncate flex-1">{publicUrl}</span>
+            <div className="flex items-center gap-2 p-4 bg-muted rounded-2xl border border-border mb-6">
+               <span className="text-sm font-bold text-muted-foreground truncate flex-1">{publicUrl}</span>
                <button 
                  onClick={handleCopy}
-                 className={`p-2 rounded-xl transition-all ${copied ? 'text-emerald-500 bg-emerald-500/10' : 'text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+                 className={`p-2 rounded-xl transition-all ${copied ? 'text-status-success bg-status-success/10' : 'text-muted-foreground hover:text-foreground'}`}
                >
                   {copied ? <CheckCircle2 size={20} /> : <Copy size={20} />}
                </button>
@@ -124,7 +126,7 @@ export function QrCodesPage() {
               href={publicUrl} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="w-full bg-gray-900 dark:bg-gray-800 hover:bg-black text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-xl shadow-gray-900/20"
+              className="w-full bg-card hover:bg-card text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-xl shadow-gray-900/20"
             >
                Testar Cardápio Online
                <ExternalLink size={14} />
@@ -143,13 +145,13 @@ export function QrCodesPage() {
         </div>
 
         {/* QR Code Section */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-[2.5rem] p-8 shadow-sm flex flex-col items-center">
+        <div className="bg-card border border-border rounded-[2.5rem] p-8 shadow-sm flex flex-col items-center">
           <div className="text-center mb-8">
-             <h3 className="font-black text-gray-900 dark:text-white mb-1">QR Code de Delivery</h3>
-             <p className="text-xs text-gray-500 font-bold uppercase tracking-tighter">Ideal para adesivos e mesas</p>
+             <h3 className="font-black text-foreground mb-1">QR Code de Delivery</h3>
+             <p className="text-xs text-muted-foreground font-bold uppercase tracking-tighter">Ideal para adesivos e mesas</p>
           </div>
 
-          <div className="bg-white p-8 rounded-[3rem] shadow-2xl border border-gray-50 mb-8">
+          <div className="bg-white p-8 rounded-[3rem] shadow-2xl border border-border mb-8">
              <QRCodeSVG 
                id="main-qr"
                value={publicUrl} 
@@ -167,7 +169,7 @@ export function QrCodesPage() {
              Baixar QR Code Alta Resolução
           </button>
 
-          <p className="mt-6 text-[10px] text-gray-400 font-black uppercase tracking-widest">Formato PNG • 1200x1200px</p>
+          <p className="mt-6 text-[10px] text-muted-foreground font-black uppercase tracking-widest">Formato PNG • 1200x1200px</p>
         </div>
       </div>
     </div>

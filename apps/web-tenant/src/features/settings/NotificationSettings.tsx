@@ -12,6 +12,8 @@ import {
 import toast from 'react-hot-toast';
 import { api } from '../../lib/api-client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+
 import { useNotificationAudio, AVAILABLE_SOUNDS } from '../../hooks/useNotificationAudio';
 import { Tenant, TenantSettings } from '@gestor/types';
 
@@ -123,13 +125,13 @@ export function NotificationSettings() {
     <div className="p-8 max-w-4xl mx-auto animate-in fade-in duration-500">
       <header className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-gray-900 dark:text-gray-100 flex items-center gap-3">
+          <h1 className="text-2xl font-black text-foreground flex items-center gap-3">
             <div className="p-2 bg-emerald-600 rounded-xl text-white shadow-lg shadow-emerald-600/20">
               <MessageSquare className="w-6 h-6" />
             </div>
             Notificações WhatsApp
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1 font-medium">
+          <p className="text-muted-foreground  mt-1 font-medium">
             Configure o envio automático de mensagens de status para seus clientes.
           </p>
         </div>
@@ -145,20 +147,20 @@ export function NotificationSettings() {
 
       <div className="space-y-8">
         {/* Toggle Principal */}
-        <section className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 p-8 shadow-sm">
+        <section className="bg-card rounded-3xl border border-border p-8 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="flex gap-4">
-              <div className={`p-3 rounded-2xl transition-colors ${enabled ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'}`}>
+              <div className={`p-3 rounded-2xl transition-colors ${enabled ? 'bg-status-success/10 text-status-success' : 'bg-muted text-muted-foreground'}`}>
                 <Bell className="w-6 h-6" />
               </div>
               <div>
-                <h2 className="text-lg font-black text-gray-900 dark:text-gray-100">Status das Notificações</h2>
-                <p className="text-sm text-gray-500 font-medium">Ative para enviar mensagens automaticamente conforme o pedido avança.</p>
+                <h2 className="text-lg font-black text-foreground">Status das Notificações</h2>
+                <p className="text-sm text-muted-foreground font-medium">Ative para enviar mensagens automaticamente conforme o pedido avança.</p>
               </div>
             </div>
             <button
               onClick={() => setEnabled(!enabled)}
-              className={`w-14 h-8 rounded-full relative transition-colors duration-300 ${enabled ? 'bg-emerald-500' : 'bg-gray-200 dark:bg-gray-800'}`}
+              className={`w-14 h-8 rounded-full relative transition-colors duration-300 ${enabled ? 'bg-status-success' : 'bg-muted'}`}
             >
               <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${enabled ? 'right-1' : 'left-1'}`} />
             </button>
@@ -166,20 +168,20 @@ export function NotificationSettings() {
         </section>
 
         {/* Notificações Sonoras */}
-        <section className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 p-8 shadow-sm">
+        <section className="bg-card rounded-3xl border border-border p-8 shadow-sm">
            <div className="flex items-center justify-between mb-8">
             <div className="flex gap-4">
-              <div className={`p-3 rounded-2xl transition-colors ${audioEnabled ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-400'}`}>
+              <div className={`p-3 rounded-2xl transition-colors ${audioEnabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
                 {audioEnabled ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
               </div>
               <div>
-                <h2 className="text-lg font-black text-gray-900 dark:text-gray-100">Alertas Sonoros</h2>
-                <p className="text-sm text-gray-500 font-medium">Toque um som sempre que um novo pedido chegar.</p>
+                <h2 className="text-lg font-black text-foreground">Alertas Sonoros</h2>
+                <p className="text-sm text-muted-foreground font-medium">Toque um som sempre que um novo pedido chegar.</p>
               </div>
             </div>
             <button
               onClick={() => setAudioEnabled(!audioEnabled)}
-              className={`w-14 h-8 rounded-full relative transition-colors duration-300 ${audioEnabled ? 'bg-primary-500' : 'bg-gray-200 dark:bg-gray-800'}`}
+              className={`w-14 h-8 rounded-full relative transition-colors duration-300 ${audioEnabled ? 'bg-primary' : 'bg-muted'}`}
             >
               <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${audioEnabled ? 'right-1' : 'left-1'}`} />
             </button>
@@ -188,22 +190,22 @@ export function NotificationSettings() {
           <div className={`space-y-6 transition-opacity ${audioEnabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
             <div className="flex flex-col gap-2">
               <div className="flex justify-between items-center">
-                <label className="text-xs font-black uppercase tracking-widest text-gray-400">Volume do Alerta</label>
-                <span className="text-xs font-bold text-gray-900 dark:text-gray-100">{Math.round(volume * 100)}%</span>
+                <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Volume do Alerta</label>
+                <span className="text-xs font-bold text-foreground">{Math.round(volume * 100)}%</span>
               </div>
               <input 
                 type="range" 
                 min="0" max="1" step="0.1" 
                 value={volume}
                 onChange={(e) => setVolume(parseFloat(e.target.value))}
-                className="w-full h-2 bg-gray-100 dark:bg-gray-800 rounded-lg appearance-none cursor-pointer accent-primary-600"
+                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary-600"
               />
             </div>
 
             {/* Seletor de som — Novo Pedido */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-black uppercase tracking-widest text-gray-400">Som de Novo Pedido</label>
+                <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Som de Novo Pedido</label>
                 <div className="flex gap-2">
                   <select
                     value={newOrderSound}
@@ -226,7 +228,7 @@ export function NotificationSettings() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-black uppercase tracking-widest text-gray-400">Som de Cancelamento</label>
+                <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Som de Cancelamento</label>
                 <div className="flex gap-2">
                   <select
                     value={cancellationSound}
@@ -240,7 +242,7 @@ export function NotificationSettings() {
                   <button
                     onClick={handleTestCancellation}
                     title="Testar som de cancelamento"
-                    className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-xs hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-muted text-foreground rounded-xl font-bold text-xs hover:bg-muted transition-all"
                   >
                     <Play className="w-3.5 h-3.5" />
                     Testar
@@ -254,27 +256,27 @@ export function NotificationSettings() {
         {/* Templates */}
         <section className={`transition-opacity duration-300 ${enabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
           <div className="flex items-center gap-2 mb-6">
-            <h2 className="text-sm font-black uppercase tracking-widest text-gray-400">Personalização de Mensagens</h2>
-            <div className="h-px flex-1 bg-gray-100 dark:bg-gray-800" />
+            <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground">Personalização de Mensagens</h2>
+            <div className="h-px flex-1 bg-muted" />
           </div>
 
           <div className="grid gap-6">
             {Object.entries(templates).map(([status, content]) => (
-              <div key={status} className="bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 p-6 shadow-sm hover:border-emerald-500/30 transition-all">
+              <div key={status} className="bg-card rounded-3xl border border-border p-6 shadow-sm hover:border-emerald-500/30 transition-all">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                    <span className="text-xs font-black uppercase tracking-widest text-gray-500">{status.replace(/_/g, ' ')}</span>
+                    <div className="w-2 h-2 rounded-full bg-status-success" />
+                    <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">{status.replace(/_/g, ' ')}</span>
                   </div>
                   <div className="flex gap-2">
-                     <span className="text-[10px] font-bold text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded">{"{{orderNumber}}"}</span>
-                     <span className="text-[10px] font-bold text-gray-400 bg-gray-50 dark:bg-gray-800 px-2 py-1 rounded">{"{{restaurantName}}"}</span>
+                     <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-1 rounded">{"{{orderNumber}}"}</span>
+                     <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-1 rounded">{"{{restaurantName}}"}</span>
                   </div>
                 </div>
                 <textarea
                   value={content}
                   onChange={(e) => setTemplates(prev => ({ ...prev, [status]: e.target.value }))}
-                  className="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[100px]"
+                  className="w-full bg-muted/50 border border-border rounded-2xl p-4 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[100px]"
                   placeholder="Digite a mensagem..."
                 />
               </div>

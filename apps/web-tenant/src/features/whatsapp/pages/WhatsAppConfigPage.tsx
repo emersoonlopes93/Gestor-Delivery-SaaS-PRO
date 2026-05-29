@@ -4,6 +4,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import { toast } from 'react-hot-toast';
 
+
+
+
+
 interface WhatsAppInstance {
   id: string;
   status: string;
@@ -240,15 +244,15 @@ export function WhatsAppConfigPage() {
   };
 
   if (loadingInstance || loadingAi) {
-    return <div className="p-8 text-center text-gray-400">Carregando configurações...</div>;
+    return <div className="p-8 text-center text-muted-foreground">Carregando configurações...</div>;
   }
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white mb-2">WhatsApp & Agente IA</h1>
-          <p className="text-gray-500 dark:text-gray-400">Personalize o atendimento automatizado da sua loja.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">WhatsApp & Agente IA</h1>
+          <p className="text-muted-foreground">Personalize o atendimento automatizado da sua loja.</p>
         </div>
         {instance && (
           <div className={`flex items-center gap-2 px-4 py-2 rounded-full border ${
@@ -258,7 +262,7 @@ export function WhatsAppConfigPage() {
           }`}>
             <span className="relative flex h-3 w-3">
               {status?.status === 'connected' && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>}
-              <span className={`relative inline-flex rounded-full h-3 w-3 ${status?.status === 'connected' ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
+              <span className={`relative inline-flex rounded-full h-3 w-3 ${status?.status === 'connected' ? 'bg-status-success' : 'bg-status-warning'}`}></span>
             </span>
             <span className="text-sm font-medium">
               {status?.status === 'connected' ? 'Conectado' : 'Aguardando Conexão'}
@@ -268,17 +272,17 @@ export function WhatsAppConfigPage() {
       </div>
 
       {hasHandoffActive && (
-        <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/30 rounded-xl p-4 flex items-start gap-3 animate-in fade-in duration-300">
-          <div className="flex-shrink-0 text-yellow-600 dark:text-yellow-400">
+        <div className="bg-status-warning/10 dark:bg-status-warning/5 border border-status-warning/20 dark:border-status-warning/30 rounded-xl p-4 flex items-start gap-3 animate-in fade-in duration-300">
+          <div className="flex-shrink-0 text-status-warning">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
           <div>
-            <h4 className="text-sm font-semibold text-yellow-800 dark:text-yellow-300 mb-1">
+            <h4 className="text-sm font-semibold text-status-warning mb-1">
               Atendimento Humano em Andamento
             </h4>
-            <p className="text-xs text-yellow-700 dark:text-yellow-400">
+            <p className="text-xs text-status-warning">
               Existem conversas em atendimento humano. A IA não responderá essas conversas até serem reativadas na Caixa de Entrada.
             </p>
           </div>
@@ -288,26 +292,26 @@ export function WhatsAppConfigPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Card Instância WhatsApp */}
         <div className="card-premium p-6 relative overflow-hidden group flex flex-col">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/5 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-green-500/10" />
+          <div className="absolute top-0 right-0 w-32 h-32 bg-status-success/5 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-status-success/10" />
           <div className="flex items-start gap-4 mb-6">
-            <div className="p-3 bg-gray-100 dark:bg-gray-800/50 rounded-xl">
-              <Smartphone className="w-6 h-6 text-green-600 dark:text-green-400" />
+            <div className="p-3 bg-muted rounded-xl">
+              <Smartphone className="w-6 h-6 text-status-success" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Conexão WhatsApp</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Canal de mensageria da loja</p>
+              <h2 className="text-xl font-semibold text-foreground">Conexão WhatsApp</h2>
+              <p className="text-sm text-muted-foreground">Canal de mensageria da loja</p>
             </div>
           </div>
           
           <div className="flex-1 space-y-4">
             {!instance ? (
-              <div className="p-8 text-center space-y-4 bg-gray-50 dark:bg-black/20 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800">
-                <div className="p-4 bg-gray-100 dark:bg-gray-800/50 rounded-full w-16 h-16 mx-auto flex items-center justify-center">
-                  <QrIcon className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+              <div className="p-8 text-center space-y-4 bg-muted/50 rounded-2xl border border-dashed border-border">
+                <div className="p-4 bg-muted rounded-full w-16 h-16 mx-auto flex items-center justify-center">
+                  <QrIcon className="w-8 h-8 text-muted-foreground " />
                 </div>
                 <div>
-                  <p className="text-gray-900 dark:text-white font-medium">Nenhuma conexão ativa</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Gere uma nova instância para começar a atender via WhatsApp.</p>
+                  <p className="text-foreground font-medium">Nenhuma conexão ativa</p>
+                  <p className="text-sm text-muted-foreground mt-1">Gere uma nova instância para começar a atender via WhatsApp.</p>
                 </div>
                 <button 
                   onClick={() => generateInstanceMutation.mutate()}
@@ -319,10 +323,10 @@ export function WhatsAppConfigPage() {
               </div>
             ) : (
               <>
-                <div className="p-4 bg-gray-50 dark:bg-black/20 rounded-xl border border-gray-100 dark:border-gray-800/50 flex items-center justify-between">
+                <div className="p-4 bg-muted/50 rounded-xl border border-border/50 flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Status atual</p>
-                    <p className={`${status?.status === 'connected' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'} font-medium`}>
+                    <p className="text-sm text-muted-foreground mb-1">Status atual</p>
+                    <p className={`${status?.status === 'connected' ? 'text-status-success' : 'text-status-warning'} font-medium`}>
                       {status?.status === 'connected' ? 'Online' : 'Desconectado'}
                     </p>
                   </div>
@@ -347,7 +351,7 @@ export function WhatsAppConfigPage() {
                         <button 
                           onClick={() => devResetMutation.mutate()}
                           disabled={devResetMutation.isPending}
-                          className="px-4 py-2 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-500/20 rounded-lg text-sm font-medium transition-colors"
+                          className="px-4 py-2 bg-status-warning/10 text-status-warning hover:bg-status-warning/20 rounded-lg text-sm font-medium transition-colors"
                         >
                           {devResetMutation.isPending ? 'Resetando...' : 'Dev Reset'}
                         </button>
@@ -359,13 +363,13 @@ export function WhatsAppConfigPage() {
                 {status?.status !== 'connected' && (
                   <div className="mt-4 space-y-4">
                     {/* Tabs para escolher entre QR Code e Código de Pareamento */}
-                    <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                    <div className="flex bg-muted rounded-lg p-1">
                       <button
                         onClick={() => setActiveTab('qr')}
                         className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                           activeTab === 'qr'
-                            ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
-                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                            ? 'bg-card text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
                         }`}
                       >
                         QR Code
@@ -374,8 +378,8 @@ export function WhatsAppConfigPage() {
                         onClick={() => setActiveTab('pairing')}
                         className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                           activeTab === 'pairing'
-                            ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm'
-                            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                            ? 'bg-card text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
                         }`}
                       >
                         Código 8 Dígitos
@@ -384,10 +388,10 @@ export function WhatsAppConfigPage() {
 
                     {/* QR Code */}
                     {activeTab === 'qr' && (
-                      <div className="p-4 bg-white dark:bg-gray-900 rounded-xl flex flex-col items-center border border-gray-100 dark:border-gray-800">
+                      <div className="p-4 bg-card rounded-xl flex flex-col items-center border border-border">
                         {qrCode ? (
                           <>
-                            <p className="text-xs text-gray-500 mb-4 font-bold uppercase tracking-widest">Escaneie o QR Code</p>
+                            <p className="text-xs text-muted-foreground mb-4 font-bold uppercase tracking-widest">Escaneie o QR Code</p>
                             <img src={qrCode} alt="WhatsApp QR Code" className="w-48 h-48" />
                             <button 
                               onClick={refreshQrCode}
@@ -412,13 +416,13 @@ export function WhatsAppConfigPage() {
                     
                     {/* Código de Pareamento */}
                     {activeTab === 'pairing' && (
-                      <div className="p-4 bg-white dark:bg-gray-900 rounded-xl flex flex-col items-center border border-gray-100 dark:border-gray-800">
-                        <p className="text-xs text-gray-500 mb-4 font-bold uppercase tracking-widest">Use o Código de Pareamento</p>
+                      <div className="p-4 bg-card rounded-xl flex flex-col items-center border border-border">
+                        <p className="text-xs text-muted-foreground mb-4 font-bold uppercase tracking-widest">Use o Código de Pareamento</p>
                         
                         <div className="space-y-4 w-full max-w-sm">
                           {!pairingCode && (
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                              <label className="block text-sm font-medium text-foreground mb-2">
                                 Seu número (ex: 5511999999999)
                               </label>
                               <input
@@ -426,7 +430,7 @@ export function WhatsAppConfigPage() {
                                 value={phoneNumber}
                                 onChange={(e) => setPhoneNumber(e.target.value)}
                                 placeholder="5511999999999"
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white"
+                                className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-card text-foreground"
                               />
                             </div>
                           )}
@@ -443,18 +447,18 @@ export function WhatsAppConfigPage() {
 
                           {pairingCode && (
                             <div className="text-center space-y-4">
-                              <div className="p-4 bg-gray-50 dark:bg-black/40 rounded-2xl border border-primary-500/20">
+                              <div className="p-4 bg-muted/50 rounded-2xl border border-primary-500/20">
                                 <div className="text-3xl font-mono font-black text-primary-600 dark:text-primary-400 tracking-[0.2em]">
                                   {pairingCode}
                                 </div>
                               </div>
                               <div className="space-y-1 text-left bg-muted p-4 rounded-xl border border-border">
                                 <p className="text-xs text-foreground font-bold uppercase mb-2">Instruções:</p>
-                                <p className="text-[11px] text-gray-600 dark:text-gray-400">1. Abra o WhatsApp no celular</p>
-                                <p className="text-[11px] text-gray-600 dark:text-gray-400">2. Vá em <b>Aparelhos Conectados</b></p>
-                                <p className="text-[11px] text-gray-600 dark:text-gray-400">3. Clique em <b>Conectar um aparelho</b></p>
-                                <p className="text-[11px] text-gray-600 dark:text-gray-400">4. Selecione <b>Link com código</b> na parte inferior</p>
-                                <p className="text-[11px] text-gray-600 dark:text-gray-400">5. Digite o código acima</p>
+                                <p className="text-[11px] text-muted-foreground">1. Abra o WhatsApp no celular</p>
+                                <p className="text-[11px] text-muted-foreground">2. Vá em <b>Aparelhos Conectados</b></p>
+                                <p className="text-[11px] text-muted-foreground">3. Clique em <b>Conectar um aparelho</b></p>
+                                <p className="text-[11px] text-muted-foreground">4. Selecione <b>Link com código</b> na parte inferior</p>
+                                <p className="text-[11px] text-muted-foreground">5. Digite o código acima</p>
                               </div>
                               <div className="flex gap-2">
                                 <button
@@ -462,7 +466,7 @@ export function WhatsAppConfigPage() {
                                     setPairingCode(null);
                                     setPhoneNumber('');
                                   }}
-                                  className="flex-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-medium py-2 transition-colors"
+                                  className="flex-1 text-xs text-muted-foreground hover:text-foreground font-medium py-2 transition-colors"
                                 >
                                   🔄 Gerar outro
                                 </button>
@@ -484,7 +488,7 @@ export function WhatsAppConfigPage() {
             )}
           </div>
           {instance && (
-            <p className="mt-4 text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-widest">ID: {instance.instanceName}</p>
+            <p className="mt-4 text-[10px] text-muted-foreground  uppercase tracking-widest">ID: {instance.instanceName}</p>
           )}
         </div>
 
@@ -493,12 +497,12 @@ export function WhatsAppConfigPage() {
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-primary/10" />
           <div className="flex items-start justify-between mb-6">
             <div className="flex items-start gap-4">
-              <div className="p-3 bg-gray-100 dark:bg-gray-800/50 rounded-xl">
+              <div className="p-3 bg-muted rounded-xl">
                 <Bot className="w-6 h-6 text-primary-600 dark:text-blue-400" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Agente Inteligente</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Personalidade e Comportamento</p>
+                <h2 className="text-xl font-semibold text-foreground">Agente Inteligente</h2>
+                <p className="text-sm text-muted-foreground">Personalidade e Comportamento</p>
               </div>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
@@ -508,14 +512,14 @@ export function WhatsAppConfigPage() {
                 checked={formAi?.isEnabled || false} 
                 onChange={(e) => toggleAiEnabled(e.target.checked)}
               />
-              <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+              <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
             </label>
           </div>
           
           <div className="space-y-4">
              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Nome do Agente</label>
+                  <label className="text-sm font-medium text-foreground">Nome do Agente</label>
                   <input 
                     placeholder="Ex: Bella"
                     className="input-premium"
@@ -524,7 +528,7 @@ export function WhatsAppConfigPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Tom de Voz</label>
+                  <label className="text-sm font-medium text-foreground">Tom de Voz</label>
                   <select 
                     className="input-premium"
                     value={formAi?.tone || 'friendly'}
@@ -540,7 +544,7 @@ export function WhatsAppConfigPage() {
              </div>
 
              <div className="space-y-2">
-               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Mensagem de Saudação</label>
+               <label className="text-sm font-medium text-foreground">Mensagem de Saudação</label>
                <textarea 
                  className="input-premium h-20 resize-none"
                  placeholder="Como o agente deve cumprimentar o cliente?"
@@ -550,21 +554,21 @@ export function WhatsAppConfigPage() {
              </div>
 
              <div className="space-y-2">
-               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Sobre o Restaurante (Instruções)</label>
+               <label className="text-sm font-medium text-foreground">Sobre o Restaurante (Instruções)</label>
                <textarea 
                  placeholder="Ex: Não trabalhamos com reservas aos domingos. O prato mais pedido é a Pizza de Calabresa."
                  className="input-premium h-24 resize-none"
                  value={formAi?.customInstructions || ''}
                  onChange={(e) => setFormAi(prev => prev ? {...prev, customInstructions: e.target.value} : null)}
                />
-               <p className="text-[10px] text-gray-500 italic">Forneça detalhes que a IA deve saber sobre seu negócio.</p>
+               <p className="text-[10px] text-muted-foreground italic">Forneça detalhes que a IA deve saber sobre seu negócio.</p>
              </div>
 
-             <div className="pt-4 border-t border-gray-100 dark:border-gray-800 space-y-4">
+             <div className="pt-4 border-t border-border space-y-4">
                <div className="flex items-center justify-between">
                  <div className="space-y-0.5">
-                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Simular Digitação</label>
-                   <p className="text-xs text-gray-500">Mostra "digitando..." antes de responder</p>
+                   <label className="text-sm font-medium text-foreground">Simular Digitação</label>
+                   <p className="text-xs text-muted-foreground">Mostra "digitando..." antes de responder</p>
                  </div>
                  <label className="relative inline-flex items-center cursor-pointer">
                    <input 
@@ -573,13 +577,13 @@ export function WhatsAppConfigPage() {
                      checked={formAi?.simulateTyping || false} 
                      onChange={(e) => setFormAi(prev => prev ? {...prev, simulateTyping: e.target.checked} : null)}
                    />
-                   <div className="w-9 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                   <div className="w-9 h-5 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                  </label>
                </div>
 
                <div className="space-y-2">
                  <div className="flex justify-between items-center">
-                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Atraso de Resposta (Debounce)</label>
+                   <label className="text-sm font-medium text-foreground">Atraso de Resposta (Debounce)</label>
                    <span className="text-xs font-mono text-blue-600 dark:text-blue-400">{formAi?.debounceMs || 1000}ms</span>
                  </div>
                  <input 
@@ -587,11 +591,11 @@ export function WhatsAppConfigPage() {
                    min="500"
                    max="5000"
                    step="500"
-                   className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                   className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-600"
                    value={formAi?.debounceMs || 1000}
                    onChange={(e) => setFormAi(prev => prev ? {...prev, debounceMs: parseInt(e.target.value)} : null)}
                  />
-                 <p className="text-[10px] text-gray-500 italic">Tempo de espera após a última mensagem do cliente antes da IA começar a processar.</p>
+                 <p className="text-[10px] text-muted-foreground italic">Tempo de espera após a última mensagem do cliente antes da IA começar a processar.</p>
                </div>
              </div>
 

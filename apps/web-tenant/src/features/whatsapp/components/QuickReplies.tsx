@@ -3,6 +3,8 @@ import { MessageCircle, Plus, Edit, Trash2, Save } from 'lucide-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api-client';
 
+
+
 interface QuickReply {
   id: string;
   text: string;
@@ -95,14 +97,14 @@ export function QuickReplies({ onReplySelect, className = '' }: QuickRepliesProp
 
   if (isEditing) {
     return (
-      <div className={`bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4 ${className}`}>
+      <div className={`bg-card border-t border-border p-4 ${className}`}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-900 dark:text-white">Respostas Rápidas</h3>
+          <h3 className="font-semibold text-foreground">Respostas Rápidas</h3>
           <button
             onClick={() => setIsEditing(false)}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
           >
-            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -116,7 +118,7 @@ export function QuickReplies({ onReplySelect, className = '' }: QuickRepliesProp
               value={newReply}
               onChange={(e) => setNewReply(e.target.value)}
               placeholder="Nova resposta rápida..."
-              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-white"
+              className="flex-1 px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-card text-foreground"
             />
             <button
               onClick={handleCreateReply}
@@ -132,27 +134,27 @@ export function QuickReplies({ onReplySelect, className = '' }: QuickRepliesProp
         <div className="space-y-2 max-h-48 overflow-y-auto">
           {Object.entries(groupedReplies).map(([category, replies]) => (
             <div key={category}>
-              <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{category}</h4>
+              <h4 className="text-xs font-medium text-muted-foreground mb-1">{category}</h4>
               {replies.map((reply) => (
-                <div key={reply.id} className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div key={reply.id} className="flex items-center gap-2 p-2 bg-muted rounded-lg">
                   {editingReply === reply.id ? (
                     <>
                       <input
                         type="text"
                         value={editText}
                         onChange={(e) => setEditText(e.target.value)}
-                        className="flex-1 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-700 dark:text-white text-sm"
+                        className="flex-1 px-2 py-1 border border-input rounded focus:outline-none focus:ring-2 focus:ring-primary-500 bg-card text-foreground text-sm"
                       />
                       <button
                         onClick={handleUpdateReply}
                         disabled={!editText.trim() || updateReplyMutation.isPending}
-                        className="p-1 text-green-600 hover:text-green-700 transition-colors"
+                        className="p-1 text-status-success hover:text-status-success transition-colors"
                       >
                         <Save className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => setEditingReply(null)}
-                        className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                        className="p-1 text-muted-foreground hover:text-foreground transition-colors"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -161,18 +163,18 @@ export function QuickReplies({ onReplySelect, className = '' }: QuickRepliesProp
                     </>
                   ) : (
                     <>
-                      <span className="flex-1 text-sm text-gray-900 dark:text-white">{reply.text}</span>
+                      <span className="flex-1 text-sm text-foreground">{reply.text}</span>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleEditReply(reply)}
-                          className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                          className="p-1 text-muted-foreground hover:text-primary transition-colors"
                         >
                           <Edit className="w-3 h-3" />
                         </button>
                         <button
                           onClick={() => handleDeleteReply(reply.id)}
                           disabled={deleteReplyMutation.isPending}
-                          className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                          className="p-1 text-muted-foreground hover:text-destructive transition-colors"
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
@@ -189,12 +191,12 @@ export function QuickReplies({ onReplySelect, className = '' }: QuickRepliesProp
   }
 
   return (
-    <div className={`bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4 ${className}`}>
+    <div className={`bg-card border-t border-border p-4 ${className}`}>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-gray-900 dark:text-white">Respostas Rápidas</h3>
+        <h3 className="font-semibold text-foreground">Respostas Rápidas</h3>
         <button
           onClick={() => setIsEditing(true)}
-          className="p-1 text-gray-400 hover:text-primary-600 transition-colors"
+          className="p-1 text-muted-foreground hover:text-primary transition-colors"
           title="Editar respostas"
         >
           <Edit className="w-4 h-4" />
@@ -206,7 +208,7 @@ export function QuickReplies({ onReplySelect, className = '' }: QuickRepliesProp
           <button
             key={reply.id}
             onClick={() => onReplySelect(reply.text)}
-            className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            className="px-3 py-1.5 bg-muted text-foreground text-sm rounded-full hover:bg-muted transition-colors"
           >
             {reply.text}
           </button>
@@ -214,7 +216,7 @@ export function QuickReplies({ onReplySelect, className = '' }: QuickRepliesProp
         {quickReplies.length > 8 && (
           <button
             onClick={() => setIsEditing(true)}
-            className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-sm rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            className="px-3 py-1.5 bg-muted text-muted-foreground text-sm rounded-full hover:bg-muted transition-colors"
           >
             +{quickReplies.length - 8} mais
           </button>
@@ -223,8 +225,8 @@ export function QuickReplies({ onReplySelect, className = '' }: QuickRepliesProp
 
       {quickReplies.length === 0 && (
         <div className="text-center py-4">
-          <MessageCircle className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <MessageCircle className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">
             Nenhuma resposta rápida configurada
           </p>
           <button

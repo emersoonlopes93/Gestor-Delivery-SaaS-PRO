@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
 import { Tenant, TenantSettings } from '@gestor/types';
 
+
+
+
+
+
 interface OperatingHourForm {
   id?: string;
   dayOfWeek: number;
@@ -328,7 +333,7 @@ export function SettingsPage() {
       <div className={`bg-card rounded-2xl shadow-sm border p-6 transition-all ${settings.isStorePaused ? 'border-amber-200 bg-amber-50/30' : 'border-border'}`}>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
-            <div className={`p-3 rounded-xl ${settings.isStorePaused ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'}`}>
+            <div className={`p-3 rounded-xl ${settings.isStorePaused ? 'bg-status-warning/10 text-status-warning' : 'bg-status-success/10 text-status-success'}`}>
               <Pause className="w-6 h-6" />
             </div>
             <div>
@@ -350,7 +355,7 @@ export function SettingsPage() {
               onClick={handleTogglePause}
               className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm ${
                 settings.isStorePaused 
-                  ? 'bg-green-600 text-white hover:bg-green-700' 
+                  ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
                   : 'bg-amber-500 text-white hover:bg-amber-600'
               }`}
             >
@@ -426,7 +431,7 @@ export function SettingsPage() {
 
             <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
-                <span className="p-1.5 bg-blue-50 text-blue-600 rounded-lg text-sm"><MapPin className="w-4 h-4" /></span>
+                <span className="p-1.5 bg-primary/10 text-primary rounded-lg text-sm"><MapPin className="w-4 h-4" /></span>
                 Endereço da Loja
               </h2>
               <div className="space-y-6">
@@ -590,7 +595,7 @@ export function SettingsPage() {
 
             <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
-                <span className="p-1.5 bg-green-50 text-green-600 rounded-lg text-sm">💰</span>
+                <span className="p-1.5 bg-status-success/10 text-status-success rounded-lg text-sm">💰</span>
                 Configuração de Pagamento
               </h2>
               <div className="space-y-4">
@@ -761,7 +766,7 @@ export function SettingsPage() {
                           onChange={(e) => updateDay(i, 'openTime', e.target.value)}
                           className="flex-1 px-2 py-1.5 bg-muted border border-border rounded-lg text-sm outline-none focus:border-primary-300"
                         />
-                        <span className="text-gray-300 text-xs">até</span>
+                        <span className="text-muted-foreground text-xs">até</span>
                         <input 
                           type="time" 
                           value={day.closeTime || '22:00'}

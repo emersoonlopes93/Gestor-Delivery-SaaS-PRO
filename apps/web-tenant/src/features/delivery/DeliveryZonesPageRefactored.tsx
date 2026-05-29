@@ -24,6 +24,10 @@ import { Tenant } from '@gestor/types';
 import { BottomSheet } from './components/BottomSheet';
 import { FloatingButtons } from './components/FloatingButtons';
 
+
+
+
+
 type CoverageConfig = {
   id: string;
   tenantId: string;
@@ -993,7 +997,7 @@ export function DeliveryZonesPageRefactored() {
               className={
                 'w-full h-11 px-3 rounded-xl border text-sm font-bold inline-flex items-center justify-center gap-2 transition-all shadow-sm ' +
                 (zoneForm.isActive
-                  ? 'border-green-500 bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400'
+                  ? 'border-status-success bg-status-success/10 text-status-success dark:bg-status-success/10 dark:text-status-success'
                   : 'border-input bg-muted text-muted-foreground')
               }
             >
@@ -1085,7 +1089,7 @@ export function DeliveryZonesPageRefactored() {
         ) : null}
 
         {zoneForm.zoneKind !== 'blocked_zone' && zoneForm.pricingMode === 'free' ? (
-          <div className="rounded-xl border border-green-200 dark:border-green-900/30 bg-green-50 dark:bg-green-500/10 p-4 text-sm text-green-800 dark:text-green-400 flex items-center gap-3">
+          <div className="rounded-xl border border-status-success/20 dark:border-status-success/30 bg-status-success/10 dark:bg-status-success/10 p-4 text-sm text-status-success flex items-center gap-3">
             <CheckCircle className="h-5 w-5 shrink-0" />
             <div>
               <div className="font-bold">Entrega grátis</div>
@@ -1118,7 +1122,7 @@ export function DeliveryZonesPageRefactored() {
             </div>
 
             {zoneForm.distanceTiers.length === 0 && (
-              <div className="text-sm text-muted-foreground italic bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-border">
+              <div className="text-sm text-muted-foreground italic bg-muted/50 p-3 rounded-lg border border-border">
                 Nenhuma faixa configurada. Adicione faixas para cobrar.
               </div>
             )}
@@ -1209,7 +1213,7 @@ export function DeliveryZonesPageRefactored() {
             type="button"
             onClick={handleSaveZone}
             disabled={savingZone}
-            className="h-12 flex-1 rounded-xl bg-gray-900 dark:bg-white text-white text-foreground text-sm font-black hover:bg-black dark:hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 shadow-md transition-all"
+            className="h-12 flex-1 rounded-xl bg-card text-primary-foreground text-sm font-black hover:bg-card disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 shadow-md transition-all"
           >
             {savingZone ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
             Salvar
@@ -1219,7 +1223,7 @@ export function DeliveryZonesPageRefactored() {
         <button
           type="button"
           onClick={closeEditor}
-          className="h-12 w-full rounded-xl bg-card border border-input text-sm font-black text-foreground hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
+          className="h-12 w-full rounded-xl bg-card border border-input text-sm font-black text-foreground hover:bg-muted transition-all"
         >
           Cancelar
         </button>
@@ -1239,7 +1243,7 @@ export function DeliveryZonesPageRefactored() {
   }
 
   const renderDesktopContent = () => (
-    <div className="h-full flex overflow-hidden bg-gray-50 dark:bg-gray-900/50">
+    <div className="h-full flex overflow-hidden bg-muted/50">
       <div className="w-[420px] shrink-0 h-full border-r border-border bg-card flex flex-col z-10 shadow-sm relative">
         <div className="p-6 pb-4 border-b border-border shrink-0">
           <h1 className="text-2xl font-black text-foreground">Zonas de Entrega</h1>
@@ -1275,7 +1279,7 @@ export function DeliveryZonesPageRefactored() {
               <button
                 type="button"
                 onClick={() => setFitToStoreSeq((v) => v + 1)}
-                className="h-10 rounded-xl bg-card border border-input text-sm font-bold text-foreground hover:bg-gray-50 dark:hover:bg-gray-800 inline-flex items-center justify-center gap-2 transition-all shadow-sm"
+                className="h-10 rounded-xl bg-card border border-input text-sm font-bold text-foreground hover:bg-muted inline-flex items-center justify-center gap-2 transition-all shadow-sm"
               >
                 <Crosshair className="h-4 w-4" />
                 Localizar loja
@@ -1293,8 +1297,8 @@ export function DeliveryZonesPageRefactored() {
                 className={
                   'h-10 rounded-xl border text-sm font-bold transition-all inline-flex items-center justify-center gap-2 shadow-sm ' +
                   (simulationOn
-                    ? 'bg-gray-900 text-white border-gray-900 hover:bg-black dark:bg-white text-foreground dark:hover:bg-gray-100'
-                    : 'bg-card text-gray-800 dark:text-gray-200 border-input hover:bg-gray-50 dark:hover:bg-gray-800')
+                    ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90 bg-card text-foreground hover:bg-card'
+                    : 'bg-card text-foreground border-input hover:bg-muted')
                 }
               >
                 <Target className="h-4 w-4" />
@@ -1316,7 +1320,7 @@ export function DeliveryZonesPageRefactored() {
                     onChange={() => setCoverageDraft((d) => ({ ...d, isDeliveryEnabled: !d.isDeliveryEnabled }))}
                   />
                   <div
-                    className={`w-11 h-6 rounded-full transition-colors relative ${coverageDraft.isDeliveryEnabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'}`}
+                    className={`w-11 h-6 rounded-full transition-colors relative ${coverageDraft.isDeliveryEnabled ? 'bg-primary-600' : 'bg-muted'}`}
                   >
                     <div
                       className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${coverageDraft.isDeliveryEnabled ? 'translate-x-5' : 'translate-x-0'}`}
@@ -1360,7 +1364,7 @@ export function DeliveryZonesPageRefactored() {
               type="button"
               onClick={handleSaveCoverage}
               disabled={savingCoverage}
-              className="w-full h-10 rounded-lg bg-gray-100 dark:bg-gray-800 text-foreground text-sm font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all inline-flex items-center justify-center gap-2"
+              className="w-full h-10 rounded-lg bg-muted text-foreground text-sm font-bold hover:bg-muted transition-all inline-flex items-center justify-center gap-2"
             >
               {savingCoverage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Salvar cobertura base
@@ -1376,8 +1380,8 @@ export function DeliveryZonesPageRefactored() {
             <div className="mt-4">
               {visibleZones.length === 0 ? (
                 <div className="text-center py-8 rounded-xl border border-dashed border-input">
-                  <MapPin className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                  <div className="text-sm font-semibold text-gray-500">Sem zonas criadas</div>
+                  <MapPin className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <div className="text-sm font-semibold text-muted-foreground">Sem zonas criadas</div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1391,7 +1395,7 @@ export function DeliveryZonesPageRefactored() {
                           isSelected
                             ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-500/10 shadow-sm ring-1 ring-primary-500'
                             : isHovered
-                              ? 'border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800'
+                              ? 'border-input bg-muted'
                               : 'border-input bg-card'
                         }`}
                         onClick={() => setSelectedZoneId(z.id)}
@@ -1421,7 +1425,7 @@ export function DeliveryZonesPageRefactored() {
                                 setSelectedZoneId(z.id);
                                 setEditorOpen(true);
                               }}
-                              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
+                              className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"
                             >
                               <Edit2 className="h-4 w-4" />
                             </button>
@@ -1447,7 +1451,7 @@ export function DeliveryZonesPageRefactored() {
         </div>
       </div>
 
-      <div className="flex-1 min-w-0 h-full bg-gray-50 dark:bg-gray-900/50 relative" style={{ isolation: 'isolate' }}>
+      <div className="flex-1 min-w-0 h-full bg-muted/50 relative" style={{ isolation: 'isolate' }}>
         <div className="absolute inset-0">
           <MapContainer
             center={mapCenter}
@@ -1496,7 +1500,7 @@ export function DeliveryZonesPageRefactored() {
                     className: 'delivery-sim-marker',
                     html:
                       '<div class="w-9 h-9 rounded-full bg-card shadow-md border border-input flex items-center justify-center">' +
-                      '<div class="w-3 h-3 rounded-full bg-gray-900 dark:bg-white"></div>' +
+                      '<div class="w-3 h-3 rounded-full bg-card"></div>' +
                       '</div>',
                     iconSize: [36, 36],
                     iconAnchor: [18, 18],
@@ -1508,20 +1512,20 @@ export function DeliveryZonesPageRefactored() {
                   offset={[0, -14]}
                   opacity={1}
                   permanent
-                  className="!bg-transparent !border-0 !shadow-none"
+                  className="!bg-card !border-0 !shadow-none"
                 >
                   <div
                     className={
                       'w-[260px] rounded-xl border p-3 shadow-md backdrop-blur-md ' +
                       (simulationDecision
                         ? simulationDecision.canDeliver
-                          ? 'bg-green-50/90 dark:bg-green-900/80 border-green-300 dark:border-green-700'
+                          ? 'bg-status-success/90 dark:bg-status-success/80 border-status-success dark:border-status-success'
                           : 'bg-red-50/90 dark:bg-red-900/80 border-red-300 dark:border-red-700'
                         : 'bg-card/85 border-input')
                     }
                   >
                     {simulationLoading ? (
-                      <div className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-200">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Calculando entrega...
                       </div>
@@ -1531,14 +1535,14 @@ export function DeliveryZonesPageRefactored() {
                           <AlertCircle className="h-5 w-5" />
                           Entrega indisponível
                         </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400">{simulationError}</div>
+                        <div className="text-xs text-muted-foreground">{simulationError}</div>
                       </div>
                     ) : simulationDecision ? (
                       <div className="space-y-2">
                         <div
                           className={
                             'flex items-center gap-2 text-base font-black ' +
-                            (simulationDecision.canDeliver ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400')
+                            (simulationDecision.canDeliver ? 'text-status-success' : 'text-destructive')
                           }
                         >
                           {simulationDecision.canDeliver ? (
@@ -1572,7 +1576,7 @@ export function DeliveryZonesPageRefactored() {
                     ) : (
                       <div>
                         <div className="text-sm font-black text-foreground">Clique no mapa</div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                        <div className="text-xs text-muted-foreground mt-1">
                           Selecione um ponto para simular a entrega.
                         </div>
                       </div>
@@ -1635,19 +1639,19 @@ export function DeliveryZonesPageRefactored() {
         <div className="hidden lg:block absolute bottom-6 right-6 z-[1000] pointer-events-none">
           <div className="bg-card/90 backdrop-blur-md border border-input rounded-xl shadow-lg p-4 space-y-3">
             <div className="text-xs font-bold text-foreground mb-1 uppercase tracking-wider">Legenda</div>
-            <div className="flex items-center gap-3 text-xs font-semibold text-gray-600 dark:text-gray-400">
+            <div className="flex items-center gap-3 text-xs font-semibold text-muted-foreground">
               <div className="w-3.5 h-3.5 rounded-full bg-blue-500 border border-blue-600" />
               <span>Cobertura padrão</span>
             </div>
-            <div className="flex items-center gap-3 text-xs font-semibold text-gray-600 dark:text-gray-400">
+            <div className="flex items-center gap-3 text-xs font-semibold text-muted-foreground">
               <div className="w-3.5 h-3.5 rounded-full bg-green-500 border border-green-600" />
               <span>Entrega grátis</span>
             </div>
-            <div className="flex items-center gap-3 text-xs font-semibold text-gray-600 dark:text-gray-400">
+            <div className="flex items-center gap-3 text-xs font-semibold text-muted-foreground">
               <div className="w-3.5 h-3.5 rounded-full bg-yellow-500 border border-yellow-600" />
               <span>Zona com taxa</span>
             </div>
-            <div className="flex items-center gap-3 text-xs font-semibold text-gray-600 dark:text-gray-400">
+            <div className="flex items-center gap-3 text-xs font-semibold text-muted-foreground">
               <div className="w-3.5 h-3.5 rounded-full bg-red-500 border border-red-600" />
               <span>Área bloqueada</span>
             </div>
@@ -1774,8 +1778,8 @@ export function DeliveryZonesPageRefactored() {
 
             {visibleZones.length === 0 ? (
               <div className="text-center py-8">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                  <MapPin className="h-6 w-6 text-gray-400" />
+                <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
+                  <MapPin className="h-6 w-6 text-muted-foreground" />
                 </div>
                 <div className="text-sm font-semibold text-foreground mb-2">
                   Nenhuma zona personalizada ainda
@@ -1822,7 +1826,7 @@ export function DeliveryZonesPageRefactored() {
                               setSelectedZoneId(z.id);
                               fitSelectedZone(z.id);
                             }}
-                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                            className="p-2 rounded-lg hover:bg-muted transition-colors"
                           >
                             <Crosshair className="h-4 w-4 text-muted-foreground" />
                           </button>
@@ -1832,7 +1836,7 @@ export function DeliveryZonesPageRefactored() {
                               setSelectedZoneId(z.id);
                               setEditorOpen(true);
                             }}
-                            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                            className="p-2 rounded-lg hover:bg-muted transition-colors"
                           >
                             <Edit2 className="h-4 w-4 text-muted-foreground" />
                           </button>
