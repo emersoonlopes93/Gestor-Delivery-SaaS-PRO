@@ -67,7 +67,7 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
       {/* Salon Stats */}
       <div className="p-6 bg-card border-b border-border flex items-center gap-8 shadow-xl">
          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-emerald-500/10 text-emerald-500 rounded-2xl flex items-center justify-center border border-emerald-500/20">
+            <div className="w-12 h-12 bg-status-success/10 text-status-success rounded-2xl flex items-center justify-center border border-status-success/20">
                <LayoutGrid size={24} />
             </div>
             <div>
@@ -81,9 +81,9 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
                <p className="text-[9px] font-black text-muted-foreground uppercase">Livres</p>
                <p className="text-xl font-black text-foreground">{stats.free}</p>
             </div>
-            <div className="bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-xl text-center min-w-[80px]">
-               <p className="text-[9px] font-black text-emerald-500 uppercase tracking-tighter">Ocupadas</p>
-               <p className="text-xl font-black text-emerald-400">{stats.occupied}</p>
+            <div className="bg-status-success/10 border border-status-success/20 px-4 py-2 rounded-xl text-center min-w-[80px]">
+              <p className="text-[9px] font-black text-status-success uppercase tracking-tighter">Ocupadas</p>
+              <p className="text-xl font-black text-status-success">{stats.occupied}</p>
             </div>
             <div className="bg-muted border border-border px-4 py-2 rounded-xl text-center min-w-[80px]">
                <p className="text-[9px] font-black text-muted-foreground uppercase">Total</p>
@@ -107,13 +107,13 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
                   relative group flex flex-col items-center justify-center p-4 rounded-[2rem] border-2 transition-all duration-300
                   ${isOccupied 
                     ? isWaiting
-                      ? 'bg-amber-500/10 border-amber-500 text-amber-500 shadow-lg shadow-amber-500/10' 
-                      : 'bg-emerald-500/10 border-emerald-500 text-emerald-500 shadow-lg shadow-emerald-500/10'
+                      ? 'bg-status-warning/10 border-status-warning text-status-warning shadow-lg shadow-status-warning/10' 
+                      : 'bg-status-success/10 border-status-success text-status-success shadow-lg shadow-status-success/10'
                     : 'bg-card border-border text-muted-foreground hover:border-border hover:bg-card'}
                 `}
               >
                 {/* Badge Status */}
-                <span className={`absolute top-4 right-4 w-3 h-3 rounded-full border-2 border-border animate-pulse ${isOccupied ? (isWaiting ? 'bg-amber-500' : 'bg-emerald-500') : 'bg-muted'}`} />
+                <span className={`absolute top-4 right-4 w-3 h-3 rounded-full border-2 border-border animate-pulse ${isOccupied ? (isWaiting ? 'bg-status-warning' : 'bg-status-success') : 'bg-muted'}`} />
 
                 <div className="mb-2 transition-transform group-hover:scale-110">
                    <Users size={32} strokeWidth={isOccupied ? 2.5 : 1.5} />
@@ -125,7 +125,7 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
 
                 {isOccupied && table.order ? (
                   <div className="mt-3 text-center animate-in fade-in zoom-in-95 duration-300">
-                    <p className={`text-[10px] font-bold truncate max-w-[100px] mb-1 ${isWaiting ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    <p className={`text-[10px] font-bold truncate max-w-[100px] mb-1 ${isWaiting ? 'text-status-warning' : 'text-status-success'}`}>
                       {table.order.customerName || 'Cliente'}
                     </p>
                     <div className="flex flex-col items-center gap-1">
@@ -146,7 +146,7 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
                 )}
 
                 {/* Hover Action */}
-                <div className="absolute inset-0 bg-emerald-500 rounded-[2rem] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity translate-y-4 group-hover:translate-y-0 duration-300 pointer-events-none">
+                 <div className="absolute inset-0 bg-status-success rounded-[2rem] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity translate-y-4 group-hover:translate-y-0 duration-300 pointer-events-none">
                    <div className="flex flex-col items-center text-foreground">
                       <ChevronRight size={32} />
                       <span className="text-[10px] font-black uppercase">Atender</span>
@@ -160,7 +160,7 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
                        e.stopPropagation();
                        onTransferTable?.(table);
                      }}
-                     className="absolute -top-1 -left-1 w-8 h-8 bg-card border border-border rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-blue-600 hover:border-blue-500 transition-all z-20"
+                     className="absolute -top-1 -left-1 w-8 h-8 bg-card border border-border rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-primary/90 hover:border-primary transition-all z-20"
                      title="Transferir Mesa"
                    >
                       <ArrowLeftRight size={14} />
@@ -174,15 +174,15 @@ export const PosSalonView: React.FC<PosSalonViewProps> = ({ tables, onSelectTabl
 
       {/* Footer Legend */}
       <div className="p-4 bg-card border-t border-border flex justify-center gap-6 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
-         <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-muted" /> Livre
-         </div>
-         <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50" /> Ocupada / Atendimento
-         </div>
-         <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-lg shadow-amber-500/50" /> Aguardando Conta
-         </div>
+      <div className="flex items-center gap-2">
+        <span className="w-2.5 h-2.5 rounded-full bg-muted" /> Livre
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="w-2.5 h-2.5 rounded-full bg-status-success shadow-lg shadow-status-success/50" /> Ocupada / Atendimento
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="w-2.5 h-2.5 rounded-full bg-status-warning shadow-lg shadow-status-warning/50" /> Aguardando Conta
+      </div>
       </div>
     </div>
   );

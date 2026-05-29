@@ -349,23 +349,23 @@ export default function PosPage() {
     });
   };
 
-  if (sessionLoading) return <div className="flex flex-col items-center justify-center h-screen bg-muted50 dark:bg-muted950 text-muted-foreground500 dark:text-muted-foreground400 italic uppercase font-black animate-pulse">Carregando Sessão...</div>;
+  if (sessionLoading) return <div className="flex flex-col items-center justify-center h-screen bg-background dark:bg-muted950 text-muted-foreground500 dark:text-muted-foreground400 italic uppercase font-black animate-pulse">Carregando Sessão...</div>;
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] bg-muted50 dark:bg-muted950 text-muted-foreground900 dark:text-muted-foreground100 overflow-hidden font-sans">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] bg-background dark:bg-muted950 text-foreground overflow-hidden font-sans">
       
       {/* ========== LEFT: NAVIGATION ========== */}
       <div className="hidden lg:flex w-16 flex-col bg-card dark:bg-muted900 border-r border-border200 dark:border-border800 py-4 gap-4 items-center">
         <button 
           onClick={() => setViewMode('catalog')}
-          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'catalog' ? 'bg-emerald-500 text-muted-foreground900 dark:text-white shadow-lg' : 'bg-card dark:bg-muted800 text-muted-foreground500 dark:text-muted-foreground400 hover:bg-muted100 dark:bg-muted700'}`}
+          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'catalog' ? 'bg-status-success text-foreground shadow-lg' : 'bg-card dark:bg-muted800 text-muted-foreground500 dark:text-muted-foreground400 hover:bg-muted100 dark:bg-muted700'}`}
           title="Catálogo"
         >
           <Store size={20} />
         </button>
         <button 
           onClick={() => { setViewMode('salon'); queryClient.invalidateQueries({ queryKey: ['posSalon'] }); }}
-          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'salon' ? 'bg-emerald-500 text-muted-foreground900 dark:text-white shadow-lg' : 'bg-card dark:bg-muted800 text-muted-foreground500 dark:text-muted-foreground400 hover:bg-muted100 dark:bg-muted700'}`}
+          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'salon' ? 'bg-status-success text-foreground shadow-lg' : 'bg-card dark:bg-muted800 text-muted-foreground500 dark:text-muted-foreground400 hover:bg-muted100 dark:bg-muted700'}`}
           title="Salão"
         >
           <LayoutGrid size={20} />
@@ -377,16 +377,16 @@ export default function PosPage() {
       </div>
 
       {/* ========== CENTER: CONTENT ========== */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-muted50 dark:bg-muted950">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-background dark:bg-muted950">
         {viewMode === 'catalog' ? (
            <>
             <div className="p-3 bg-card dark:bg-muted900 border-b border-border200 dark:border-border800 flex flex-col xl:flex-row gap-3 items-center">
               <div className="relative flex-1 group w-full">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground600 dark:text-muted-foreground400 group-focus-within:text-emerald-500" size={16} />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground600 dark:text-muted-foreground400 group-focus-within:text-status-success" size={16} />
                 <input
                   ref={searchInputRef}
                   type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-card dark:bg-muted800 border border-border200 dark:border-border700 rounded-xl pl-12 pr-4 py-2.5 text-sm outline-none focus:border-emerald-500 transition-all"
+                  className="w-full bg-card dark:bg-muted800 border border-border200 dark:border-border700 rounded-xl pl-12 pr-4 py-2.5 text-sm outline-none focus:border-status-success transition-all"
                   placeholder="F2 para buscar..."
                 />
               </div>
@@ -405,10 +405,10 @@ export default function PosPage() {
 
       {/* ========== RIGHT: CART ========== */}
       <div className={`w-full md:w-[380px] lg:w-[420px] flex flex-col bg-card dark:bg-muted900 border-l border-border200 dark:border-border800 shadow-2xl z-10 transition-transform ${viewMode === 'salon' ? 'translate-x-full md:translate-x-0' : ''}`}>
-        <div className="px-4 py-3 bg-emerald-500/5 flex items-center justify-between border-b border-border200 dark:border-border800">
+        <div className="px-4 py-3 bg-card flex items-center justify-between border-b border-border200 dark:border-border800">
            <div className="flex items-center gap-2">
-             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-             <span className="text-[10px] font-black uppercase text-emerald-500">OPERADOR: {activeSession?.operatorName || 'N/A'}</span>
+             <div className="w-2 h-2 rounded-full bg-status-success animate-pulse" />
+             <span className="text-[10px] font-black uppercase text-status-success">OPERADOR: {activeSession?.operatorName || 'N/A'}</span>
            </div>
            <div className="flex gap-2">
              {currentOrderId && (
@@ -430,18 +430,18 @@ export default function PosPage() {
                </>
              )}
              {currentOrderId && (
-               <span className="bg-amber-500/10 text-amber-500 text-[9px] font-black uppercase px-2 py-0.5 rounded border border-amber-500/20 shadow-sm">Comanda Aberta</span>
+               <span className="bg-status-warning/10 text-status-warning text-[9px] font-black uppercase px-2 py-0.5 rounded border border-status-warning/20 shadow-sm">Comanda Aberta</span>
              )}
            </div>
         </div>
 
-        <div className="px-4 py-3 bg-muted50 dark:bg-muted850/30 border-b border-border200 dark:border-border800">
+          <div className="px-4 py-3 bg-card border-b border-border200 dark:border-border800">
            <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-black uppercase text-muted-foreground500 dark:text-muted-foreground400 tracking-widest flex items-center gap-1.5 leading-none">
-                 <User size={12} className="text-emerald-500" />
-                 {customerName || 'Identificar Cliente'}
+                <User size={12} className="text-status-success" />
+                {customerName || 'Identificar Cliente'}
               </span>
-              <button onClick={() => setShowCustomerSearch(!showCustomerSearch)} className="text-muted-foreground500 dark:text-muted-foreground400 hover:text-emerald-500 transition-colors">
+              <button onClick={() => setShowCustomerSearch(!showCustomerSearch)} className="text-muted-foreground500 dark:text-muted-foreground400 hover:text-status-success transition-colors">
                 <Search size={16} />
               </button>
            </div>
@@ -450,7 +450,7 @@ export default function PosPage() {
               <div className="relative mb-3 animate-in fade-in slide-in-from-top-2">
                  <input autoFocus className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white" placeholder="Nome ou Telefone..." value={customerSearchTerm} onChange={(e) => setCustomerSearchTerm(e.target.value)} />
                  {foundCustomers && foundCustomers.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 bg-card dark:bg-muted800 border border-border200 dark:border-border700 rounded-xl mt-1 shadow-2xl z-50">
+                      <div className="absolute top-full left-0 right-0 bg-card dark:bg-muted800 border border-border200 dark:border-border700 rounded-xl mt-1 shadow-2xl z-50">
                        {foundCustomers.map(c => <button key={c.id} onClick={() => { setCustomerName(c.name); setCustomerPhone(c.phone); setShowCustomerSearch(false); }} className="w-full text-left px-4 py-3 hover:bg-muted100 dark:bg-muted750 transition-colors border-b border-border200 dark:border-border700 last:border-0"><p className="font-bold text-xs text-muted-foreground900 dark:text-white">{c.name}</p></button>)}
                     </div>
                  )}
@@ -458,31 +458,31 @@ export default function PosPage() {
            )}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-muted50/50 dark:bg-muted900/50 scrollbar-hide">
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-card/50 dark:bg-muted900/50 scrollbar-hide">
              {cart.length === 0 ? (
-               <div className="h-full flex flex-col items-center justify-center opacity-10">
-                  <ShoppingCart size={48} strokeWidth={1} />
-                  <p className="font-black mt-2 text-[10px] uppercase">Aguardando Itens</p>
-               </div>
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                <ShoppingCart size={48} strokeWidth={1} />
+                <p className="font-black mt-2 text-[10px] uppercase">Aguardando Itens</p>
+              </div>
              ) : (
                cart.map((item) => (
-                <div key={item.cartLineId} className="bg-card dark:bg-muted800/40 border border-border200 dark:border-border800/50 rounded-2xl p-4 group transition-all hover:bg-muted50 hover:bg-muted100 dark:bg-muted800/60 dark:hover:bg-card dark:bg-muted800/80">
-                   <div className="flex justify-between items-start gap-4 mb-3">
-                      <p className="font-bold text-muted-foreground900 dark:text-muted-foreground100 text-[13px] leading-tight">{item.name}</p>
-                      <button onClick={() => removeFromCart(item.cartLineId)} className="text-muted-foreground600 dark:text-muted-foreground400 hover:text-red-500 transition-colors"><X size={16} /></button>
-                   </div>
+               <div key={item.cartLineId} className="bg-card border border-border rounded-2xl p-4 group transition-all hover:bg-muted">
+                 <div className="flex justify-between items-start gap-4 mb-3">
+                   <p className="font-bold text-foreground text-[13px] leading-tight">{item.name}</p>
+                   <button onClick={() => removeFromCart(item.cartLineId)} className="text-muted-foreground hover:text-destructive transition-colors"><X size={16} /></button>
+                 </div>
                    {item.compositionLabel ? (
                      <div className="text-[10px] text-muted-foreground500 dark:text-muted-foreground400 font-bold mb-2 line-clamp-2">
                        {item.compositionLabel}
                      </div>
                    ) : null}
                    <div className="flex items-center justify-between">
-                      <div className="flex items-center bg-muted50 dark:bg-muted950 rounded-xl p-1 border border-border200 dark:border-border800/50">
-                         <button onClick={() => updateCartItem(item.cartLineId, { quantity: Math.max(1, item.quantity - 1) })} className="w-7 h-7 flex items-center justify-center text-muted-foreground500 dark:text-muted-foreground400 hover:text-muted-foreground900 dark:text-white"><Minus size={14} strokeWidth={3} /></button>
-                         <span className="w-8 text-center font-black text-sm text-muted-foreground900 dark:text-white">{item.quantity}</span>
-                         <button onClick={() => updateCartItem(item.cartLineId, { quantity: item.quantity + 1 })} className="w-7 h-7 flex items-center justify-center text-muted-foreground500 dark:text-muted-foreground400 hover:text-muted-foreground900 dark:text-white"><Plus size={14} strokeWidth={3} /></button>
-                      </div>
-                      <p className="text-emerald-400 font-extrabold text-lg">{formatCurrency(item.basePrice * item.quantity)}</p>
+                     <div className="flex items-center bg-card rounded-xl p-1 border border-border">
+                       <button onClick={() => updateCartItem(item.cartLineId, { quantity: Math.max(1, item.quantity - 1) })} className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground"><Minus size={14} strokeWidth={3} /></button>
+                       <span className="w-8 text-center font-black text-sm text-foreground">{item.quantity}</span>
+                       <button onClick={() => updateCartItem(item.cartLineId, { quantity: item.quantity + 1 })} className="w-7 h-7 flex items-center justify-center text-muted-foreground hover:text-foreground"><Plus size={14} strokeWidth={3} /></button>
+                     </div>
+                     <p className="text-status-success font-extrabold text-lg">{formatCurrency(item.basePrice * item.quantity)}</p>
                    </div>
                 </div>
               ))
@@ -494,12 +494,12 @@ export default function PosPage() {
                <div className="grid grid-cols-2 gap-3">
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground600 dark:text-muted-foreground400"><Hash size={14} /></span>
-                    <input className="w-full bg-card dark:bg-muted900 border border-border200 dark:border-border800 rounded-xl pl-9 pr-4 py-3 text-xs font-bold text-muted-foreground900 dark:text-white outline-none focus:border-blue-500" placeholder="Nº Mesa" value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} />
+                  <input className="w-full bg-card dark:bg-muted900 border border-border200 dark:border-border800 rounded-xl pl-9 pr-4 py-3 text-xs font-bold text-muted-foreground900 dark:text-white outline-none focus:border-status-success" placeholder="Nº Mesa" value={tableNumber} onChange={(e) => setTableNumber(e.target.value)} />
                   </div>
                   <button 
                     onClick={handleSaveDraft}
                     disabled={!tableNumber || cart.length === 0 || upsertDraft.isPending}
-                    className="bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl py-3 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl py-3 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed"
                   >
                      <Save size={14} />
                      {upsertDraft.isPending ? 'Salvando...' : 'Lançar Comanda'}

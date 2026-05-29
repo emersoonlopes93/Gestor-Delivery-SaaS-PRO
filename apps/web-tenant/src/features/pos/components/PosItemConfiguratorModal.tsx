@@ -514,35 +514,35 @@ export function PosItemConfiguratorModal(props: {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4">
-      <div className="bg-white dark:bg-gray-900 w-full max-w-2xl sm:rounded-3xl flex flex-col max-h-[92vh] border border-gray-200 dark:border-gray-800 shadow-2xl">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center gap-3 bg-gray-50/50 dark:bg-gray-950/50">
+      <div className="bg-card dark:bg-muted900 w-full max-w-2xl sm:rounded-3xl flex flex-col max-h-[92vh] border border-border dark:border-border800 shadow-2xl">
+        <div className="px-6 py-4 border-b border-border dark:border-border800 flex items-center gap-3 bg-card">
           <div className="flex-1 min-w-0">
-            <div className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 leading-none">Configurar item</div>
-            <div className="text-gray-900 dark:text-white font-black text-lg truncate mt-1 leading-none uppercase tracking-tight">{detail?.name ?? 'Carregando...'}</div>
+            <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground leading-none">Configurar item</div>
+            <div className="text-foreground font-black text-lg truncate mt-1 leading-none uppercase tracking-tight">{detail?.name ?? 'Carregando...'}</div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl text-gray-400 hover:text-gray-900 dark:text-gray-500 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-all">
+          <button onClick={onClose} className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-card dark:hover:bg-muted800 transition-all">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
           {loading ? (
-            <div className="py-10 text-center text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest animate-pulse">Carregando...</div>
+            <div className="py-10 text-center text-muted-foreground font-bold uppercase tracking-widest animate-pulse">Carregando...</div>
           ) : error ? (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl text-sm font-bold flex items-center gap-2">
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-2xl text-sm font-bold flex items-center gap-2">
               <AlertCircle className="w-4 h-4" />
               {error}
             </div>
           ) : detail ? (
             <>
               {isPizzaTemplate && (
-                <div className="bg-gray-50 dark:bg-gray-950/40 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 space-y-4">
+                <div className="bg-card dark:bg-muted900/40 border border-border dark:border-border800 rounded-2xl p-4 space-y-4">
                   <div className="flex items-start justify-between">
                     <div>
-                      <div className="text-gray-900 dark:text-white font-black text-sm uppercase tracking-wider">Sabores</div>
-                      <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold italic">Selecione até 4 sabores para compor sua pizza</div>
+                      <div className="text-foreground font-black text-sm uppercase tracking-wider">Sabores</div>
+                      <div className="text-[10px] text-muted-foreground font-bold italic">Selecione até 4 sabores para compor sua pizza</div>
                     </div>
-                    <div className="text-[10px] font-black uppercase text-gray-600 dark:text-gray-400">{selectedPizzaFlavors.length}/4</div>
+                    <div className="text-[10px] font-black uppercase text-muted-foreground">{selectedPizzaFlavors.length}/4</div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-2">
@@ -553,10 +553,10 @@ export function PosItemConfiguratorModal(props: {
                           key={f.id}
                           onClick={() => togglePizzaFlavor({ id: f.id, name: f.name })}
                           className={`p-3 rounded-xl border text-left transition-all ${
-                            isSelected ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:border-gray-200 dark:border-gray-700'
+                            isSelected ? 'bg-status-success/10 border-status-success/20' : 'bg-card dark:bg-muted900 border-border dark:border-border800 hover:border-border'
                           }`}
                         >
-                          <div className="text-gray-900 dark:text-white font-bold text-[11px] truncate">{f.name}</div>
+                          <div className="text-foreground font-bold text-[11px] truncate">{f.name}</div>
                         </button>
                       );
                     })}
@@ -569,16 +569,16 @@ export function PosItemConfiguratorModal(props: {
                   {(detail.comboSlots ?? []).map((slot) => {
                     const selected = slotState.find((s) => s.comboSlotId === slot.id)?.items ?? [];
                     return (
-                      <div key={slot.id} className="bg-gray-50 dark:bg-gray-950/40 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
+                      <div key={slot.id} className="bg-card dark:bg-muted900/40 border border-border dark:border-border800 rounded-2xl p-4">
                         <div className="flex items-start justify-between gap-4 mb-3">
                           <div>
-                            <div className="text-gray-900 dark:text-white font-black text-sm uppercase tracking-wider">{slot.name}</div>
-                            <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">
+                            <div className="text-foreground font-black text-sm uppercase tracking-wider">{slot.name}</div>
+                            <div className="text-[10px] text-muted-foreground font-bold">
                               {slot.isRequired ? `Obrigatório • ` : ''}
                               {slot.minSelect === slot.maxSelect ? `Escolha ${slot.minSelect}` : `Escolha ${slot.minSelect} a ${slot.maxSelect}`}
                             </div>
                           </div>
-                          <div className="text-[10px] font-black uppercase text-gray-600 dark:text-gray-400">{selected.length}/{slot.maxSelect}</div>
+                          <div className="text-[10px] font-black uppercase text-muted-foreground">{selected.length}/{slot.maxSelect}</div>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -591,21 +591,21 @@ export function PosItemConfiguratorModal(props: {
                                   key={ai.id}
                                   onClick={() => toggleSlotItem(slot.id, ai.productId, slot.maxSelect)}
                                   className={`p-3 rounded-xl border text-left transition-all ${
-                                    isSelected
-                                      ? 'bg-emerald-500/10 border-emerald-500/30'
-                                      : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:border-gray-200 dark:border-gray-700'
-                                  }`}
+                                      isSelected
+                                        ? 'bg-status-success/10 border-status-success/20'
+                                        : 'bg-card dark:bg-muted900 border-border dark:border-border800 hover:border-border'
+                                    }`}
                                 >
                                   <div className="flex items-center justify-between gap-3">
                                     <div className="min-w-0">
-                                      <div className="text-gray-900 dark:text-white font-bold text-xs truncate">{ai.product?.name}</div>
-                                      <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">
+                                      <div className="text-foreground font-bold text-xs truncate">{ai.product?.name}</div>
+                                      <div className="text-[10px] text-muted-foreground font-bold">
                                         + {formatCurrency(Number(ai.additionalPrice ?? 0))}
                                       </div>
                                     </div>
-                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${isSelected ? 'bg-emerald-500 border-emerald-500 text-gray-900 dark:text-white' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300'}`}>
-                                      {isSelected ? <ChevronRight className="w-4 h-4" /> : null}
-                                    </div>
+                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${isSelected ? 'bg-status-success border-status-success text-foreground' : 'border-border dark:border-border700 text-muted-foreground'}`}>
+                                        {isSelected ? <ChevronRight className="w-4 h-4" /> : null}
+                                      </div>
                                   </div>
                                 </button>
                               );
@@ -632,16 +632,16 @@ export function PosItemConfiguratorModal(props: {
                       const selectedIds = new Set((state?.items ?? []).map((i) => i.optionItemId));
 
                       return (
-                        <div key={group.id} className="bg-gray-50 dark:bg-gray-950/40 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
+                        <div key={group.id} className="bg-card dark:bg-muted900/40 border border-border dark:border-border800 rounded-2xl p-4">
                           <div className="flex items-start justify-between gap-4 mb-3">
                             <div>
-                              <div className="text-gray-900 dark:text-white font-black text-sm uppercase tracking-wider">{groupName}</div>
-                              <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">
+                              <div className="text-foreground font-black text-sm uppercase tracking-wider">{groupName}</div>
+                                <div className="text-[10px] text-muted-foreground font-bold">
                                 {isRequired ? `Obrigatório • ` : ''}
                                 {group.selectionType === 'single' ? 'Escolha 1' : `Escolha até ${maxSelect}`}
                               </div>
                             </div>
-                            <div className="text-[10px] font-black uppercase text-gray-600 dark:text-gray-400">
+                            <div className="text-[10px] font-black uppercase text-muted-foreground">
                               {(state?.items ?? []).length}/{maxSelect}
                             </div>
                           </div>
@@ -654,24 +654,24 @@ export function PosItemConfiguratorModal(props: {
                                 const priceImpactValue = Number(i.priceImpactValue ?? 0);
 
                                 return (
-                                  <div key={i.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-3">
+                                  <div key={i.id} className="bg-card dark:bg-muted900 border border-border dark:border-border800 rounded-xl p-3">
                                     <button
                                       onClick={() => toggleOption(group.id, i.id, group.selectionType, Number(maxSelect ?? 0))}
                                       className="w-full text-left"
                                     >
                                       <div className="flex items-center justify-between gap-3">
                                         <div className="min-w-0">
-                                          <div className="text-gray-900 dark:text-white font-bold text-xs truncate">{i.name}</div>
-                                          <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">
+                                          <div className="text-foreground font-bold text-xs truncate">{i.name}</div>
+                                          <div className="text-[10px] text-muted-foreground font-bold">
                                             {i.priceImpactType === 'fixed' ? `+ ${formatCurrency(priceImpactValue)}` :
                                               i.priceImpactType === 'percentage' ? `+ ${priceImpactValue}%` :
                                                 i.priceImpactType === 'replace' ? `Preço: ${formatCurrency(priceImpactValue)}` :
                                                   ''}
                                           </div>
                                         </div>
-                                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${isSelected ? 'bg-emerald-500 border-emerald-500 text-gray-900 dark:text-white' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300'}`}>
-                                          {isSelected ? <ChevronRight className="w-4 h-4" /> : null}
-                                        </div>
+                                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${isSelected ? 'bg-status-success border-status-success text-foreground' : 'border-border dark:border-border700 text-muted-foreground'}`}>
+                                                      {isSelected ? <ChevronRight className="w-4 h-4" /> : null}
+                                                    </div>
                                       </div>
                                     </button>
 
@@ -682,11 +682,11 @@ export function PosItemConfiguratorModal(props: {
                                             const current = state?.items.find((x) => x.optionItemId === i.id)?.qty ?? 1;
                                             setQuantityOption(group.id, i.id, Math.max(1, current - 1));
                                           }}
-                                          className="w-8 h-8 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 flex items-center justify-center"
+                                          className="w-8 h-8 rounded-xl bg-card border border-border text-muted-foreground flex items-center justify-center"
                                         >
                                           <Minus className="w-4 h-4" />
                                         </button>
-                                        <div className="text-gray-900 dark:text-white font-black">
+                                        <div className="text-foreground font-black">
                                           {state?.items.find((x) => x.optionItemId === i.id)?.qty ?? 1}
                                         </div>
                                         <button
@@ -694,7 +694,7 @@ export function PosItemConfiguratorModal(props: {
                                             const current = state?.items.find((x) => x.optionItemId === i.id)?.qty ?? 1;
                                             setQuantityOption(group.id, i.id, current + 1);
                                           }}
-                                          className="w-8 h-8 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 flex items-center justify-center"
+                                          className="w-8 h-8 rounded-xl bg-card border border-border text-muted-foreground flex items-center justify-center"
                                         >
                                           <Plus className="w-4 h-4" />
                                         </button>
@@ -705,7 +705,7 @@ export function PosItemConfiguratorModal(props: {
                               })}
                           </div>
 
-                          <div className="mt-3 text-[10px] text-gray-500 dark:text-gray-400 font-bold">
+                          <div className="mt-3 text-[10px] text-muted-foreground font-bold">
                             {Number(minSelect ?? 0) > 0 ? `Mínimo: ${minSelect}. ` : ''}
                             Máximo: {maxSelect}.
                           </div>
@@ -721,16 +721,16 @@ export function PosItemConfiguratorModal(props: {
                     const group = link.group;
                     const selected = selectedComplements.filter((s) => s.groupId === group.id);
                     return (
-                      <div key={group.id} className="bg-gray-50 dark:bg-gray-950/40 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
+                      <div key={group.id} className="bg-card dark:bg-muted900/40 border border-border dark:border-border800 rounded-2xl p-4">
                         <div className="flex items-start justify-between gap-4 mb-3">
                           <div>
-                            <div className="text-gray-900 dark:text-white font-black text-sm uppercase tracking-wider">{group.name}</div>
-                            <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">
+                            <div className="text-foreground font-black text-sm uppercase tracking-wider">{group.name}</div>
+                            <div className="text-[10px] text-muted-foreground font-bold">
                               {group.isRequired ? `Obrigatório • ` : ''}
                               {group.maxSelect === 1 ? 'Escolha 1' : `Escolha até ${group.maxSelect}`}
                             </div>
                           </div>
-                          <div className="text-[10px] font-black uppercase text-gray-600 dark:text-gray-400">{selected.length}/{group.maxSelect}</div>
+                          <div className="text-[10px] font-black uppercase text-muted-foreground">{selected.length}/{group.maxSelect}</div>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -739,21 +739,21 @@ export function PosItemConfiguratorModal(props: {
                             .map((i) => {
                               const isSelected = selected.some((s) => s.itemId === i.id);
                               return (
-                                <button
+                                  <button
                                   key={i.id}
                                   onClick={() => toggleComplement(group.id, i.id, group.maxSelect)}
                                   className={`p-3 rounded-xl border text-left transition-all ${
                                     isSelected
-                                      ? 'bg-emerald-500/10 border-emerald-500/30'
-                                      : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:border-gray-200 dark:border-gray-700'
+                                      ? 'bg-status-success/10 border-status-success/20'
+                                      : 'bg-card dark:bg-muted900 border-border dark:border-border800 hover:border-border'
                                   }`}
                                 >
                                   <div className="flex items-center justify-between gap-3">
                                     <div className="min-w-0">
-                                      <div className="text-gray-900 dark:text-white font-bold text-xs truncate">{i.name}</div>
-                                      <div className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">+ {formatCurrency(Number(i.additionalPrice ?? 0))}</div>
+                                      <div className="text-foreground font-bold text-xs truncate">{i.name}</div>
+                                      <div className="text-[10px] text-muted-foreground font-bold">+ {formatCurrency(Number(i.additionalPrice ?? 0))}</div>
                                     </div>
-                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${isSelected ? 'bg-emerald-500 border-emerald-500 text-gray-900 dark:text-white' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300'}`}>
+                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${isSelected ? 'bg-status-success border-status-success text-foreground' : 'border-border dark:border-border700 text-muted-foreground'}`}>
                                       {isSelected ? <ChevronRight className="w-4 h-4" /> : null}
                                     </div>
                                   </div>
@@ -767,8 +767,8 @@ export function PosItemConfiguratorModal(props: {
                 </div>
               ) : null}
 
-              <div className="bg-gray-50 dark:bg-gray-950/40 border border-gray-200 dark:border-gray-800 rounded-2xl p-4">
-                <div className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">Observações</div>
+              <div className="bg-card dark:bg-muted900/40 border border-border dark:border-border800 rounded-2xl p-4">
+                <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Observações</div>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -780,19 +780,19 @@ export function PosItemConfiguratorModal(props: {
           ) : null}
         </div>
 
-        <div className="px-6 py-6 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950/50">
+        <div className="px-6 py-6 border-t border-border dark:border-border800 bg-card/50 dark:bg-muted900/50">
           <div className="flex items-center gap-4">
-            <div className="flex items-center bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-2xl p-1 h-14 shadow-sm">
+            <div className="flex items-center bg-card dark:bg-muted900 border border-border dark:border-border800 rounded-2xl p-1 h-14 shadow-sm">
               <button
                 onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                className="w-12 h-12 flex items-center justify-center text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-colors"
+                className="w-12 h-12 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card dark:hover:bg-muted800 rounded-xl transition-colors"
               >
                 <Minus className="w-5 h-5" />
               </button>
-              <span className="w-10 text-center font-black text-gray-900 dark:text-white text-lg">{quantity}</span>
+              <span className="w-10 text-center font-black text-foreground text-lg">{quantity}</span>
               <button
                 onClick={() => setQuantity((q) => q + 1)}
-                className="w-12 h-12 flex items-center justify-center text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl transition-colors"
+                className="w-12 h-12 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card dark:hover:bg-muted800 rounded-xl transition-colors"
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -829,8 +829,8 @@ export function PosItemConfiguratorModal(props: {
               }}
               className={`flex-1 h-14 rounded-2xl flex items-center justify-between px-6 transition-all shadow-xl active:scale-95 ${
                 currentValidationError || loading || !detail
-                ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed shadow-none' 
-                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-900/20'
+                ? 'bg-muted100 dark:bg-muted800 text-muted-foreground cursor-not-allowed shadow-none' 
+                : 'bg-primary hover:bg-primary/90 text-white shadow-primary/20'
               }`}
             >
               <div className="text-left">
@@ -845,7 +845,7 @@ export function PosItemConfiguratorModal(props: {
           </div>
           
           {currentValidationError && (
-            <div className="mt-4 flex items-center justify-center gap-2 text-amber-500 font-bold text-[10px] uppercase tracking-widest bg-amber-500/5 py-2 rounded-xl border border-amber-500/10">
+            <div className="mt-4 flex items-center justify-center gap-2 text-status-warning font-bold text-[10px] uppercase tracking-widest bg-status-warning/5 py-2 rounded-xl border border-status-warning/10">
               <AlertCircle className="w-3 h-3" />
               {currentValidationError}
             </div>

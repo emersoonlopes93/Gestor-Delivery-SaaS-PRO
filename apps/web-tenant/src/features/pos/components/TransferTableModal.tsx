@@ -58,9 +58,9 @@ export const TransferTableModal: React.FC<TransferTableModalProps> = ({
       <div className="bg-card border border-border w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
         
         {/* Header */}
-        <div className="p-6 border-b border-border flex items-center justify-between bg-muted">
+        <div className="p-6 border-b border-border flex items-center justify-between bg-card">
            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-500/10 text-blue-500 rounded-2xl flex items-center justify-center border border-blue-500/20">
+              <div className="w-10 h-10 bg-primary/10 text-primary rounded-2xl flex items-center justify-center border border-primary/20">
                  <ArrowLeftRight size={20} />
               </div>
               <div>
@@ -68,7 +68,7 @@ export const TransferTableModal: React.FC<TransferTableModalProps> = ({
                  <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Origem: {sourceTableName}</p>
               </div>
            </div>
-           <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-2 hover:bg-muted rounded-xl transition-all">
+           <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-2 hover:bg-card rounded-xl transition-all">
               <X size={20} />
            </button>
         </div>
@@ -76,11 +76,11 @@ export const TransferTableModal: React.FC<TransferTableModalProps> = ({
         {/* Search */}
         <div className="p-4">
            <div className="relative group">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-blue-500 transition-colors" size={16} />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={16} />
               <input 
                 type="text" 
                 placeholder="Buscar mesa de destino..."
-                className="w-full bg-muted border border-border rounded-2xl pl-12 pr-4 py-3 text-sm text-foreground outline-none focus:border-blue-500 transition-all"
+                className="w-full bg-card border border-border rounded-2xl pl-12 pr-4 py-3 text-sm text-foreground outline-none focus:border-primary transition-all"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -96,9 +96,9 @@ export const TransferTableModal: React.FC<TransferTableModalProps> = ({
                    onClick={() => setSelectedTargetId(table.id)}
                    className={`
                      p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all
-                     ${selectedTargetId === table.id 
-                       ? 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-lg shadow-blue-500/10' 
-                       : 'bg-muted border-border text-muted-foreground hover:border-border'}
+                         ${selectedTargetId === table.id 
+                           ? 'bg-primary/10 border-primary text-primary shadow-lg shadow-primary/10' 
+                           : 'bg-card border-border text-muted-foreground hover:border-border'}
                    `}
                  >
                     <span className="text-xs font-black uppercase">{table.name}</span>
@@ -106,7 +106,7 @@ export const TransferTableModal: React.FC<TransferTableModalProps> = ({
                  </button>
               ))}
               {filteredTables.length === 0 && (
-                <div className="col-span-3 py-10 text-center opacity-50">
+                <div className="col-span-3 py-10 text-center text-muted-foreground">
                    <p className="text-xs font-bold uppercase">Nenhuma mesa livre encontrada</p>
                 </div>
               )}
@@ -114,7 +114,7 @@ export const TransferTableModal: React.FC<TransferTableModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-6 bg-muted border-t border-border flex gap-3">
+        <div className="p-6 bg-card border-t border-border flex gap-3">
            <button 
              onClick={onClose}
              className="flex-1 px-6 py-4 rounded-2xl text-[11px] font-black uppercase text-muted-foreground hover:bg-card transition-colors border border-transparent hover:border-border"

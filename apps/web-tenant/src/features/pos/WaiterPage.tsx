@@ -197,20 +197,20 @@ export default function WaiterPage() {
   const subtotal = cart.reduce((sum, item) => sum + item.basePrice * item.quantity, 0);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-muted text-foreground overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-64px)] bg-background text-foreground overflow-hidden">
       
       {/* Top Header Mobile */}
       <div className="bg-card border-b border-border px-4 py-3 flex items-center justify-between shadow-lg">
          <div className="flex items-center gap-3">
             <button 
               onClick={() => setViewMode('salon')}
-              className={`p-2 rounded-xl transition-all ${viewMode === 'salon' ? 'bg-emerald-500 text-foreground shadow-lg' : 'bg-card text-muted-foreground'}`}
+              className={`p-2 rounded-xl transition-all ${viewMode === 'salon' ? 'bg-status-success text-foreground shadow-lg' : 'bg-card text-muted-foreground'}`}
             >
                <LayoutGrid size={20} />
             </button>
             <button 
               onPointerDown={() => setViewMode('catalog')}
-              className={`p-2 rounded-xl transition-all ${viewMode === 'catalog' ? 'bg-emerald-500 text-foreground shadow-lg' : 'bg-card text-muted-foreground'}`}
+              className={`p-2 rounded-xl transition-all ${viewMode === 'catalog' ? 'bg-status-success text-foreground shadow-lg' : 'bg-card text-muted-foreground'}`}
             >
                <Store size={20} />
             </button>
@@ -218,11 +218,11 @@ export default function WaiterPage() {
          
          <div className="flex items-center gap-2">
             {tableNumber && (
-              <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest">
+              <span className="bg-status-success/10 text-status-success border border-status-success/20 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest">
                 Mesa: {tableNumber}
               </span>
             )}
-            {upsertDraft.isPending && <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />}
+            {upsertDraft.isPending && <div className="w-2 h-2 bg-status-success rounded-full animate-pulse" />}
          </div>
       </div>
 
@@ -240,10 +240,10 @@ export default function WaiterPage() {
             <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
                {/* Left: Products */}
                <div className="flex-1 flex flex-col min-w-0 bg-muted border-r border-border">
-                  <div className="p-3 bg-muted border-b border-border flex gap-2 overflow-x-auto scrollbar-hide py-3">
+                  <div className="p-3 bg-card border-b border-border flex gap-2 overflow-x-auto scrollbar-hide py-3">
                      <button 
                        onClick={() => setSelectedCategoryId(null)}
-                       className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${!selectedCategoryId ? 'bg-emerald-500 text-foreground' : 'bg-card text-muted-foreground'}`}
+                      className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${!selectedCategoryId ? 'bg-status-success text-foreground' : 'bg-card text-muted-foreground'}`}
                      >
                         Tudo
                      </button>
@@ -251,7 +251,7 @@ export default function WaiterPage() {
                         <button 
                           key={cat.id}
                           onClick={() => setSelectedCategoryId(cat.id)}
-                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${selectedCategoryId === cat.id ? 'bg-emerald-500 text-foreground' : 'bg-card text-muted-foreground'}`}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase whitespace-nowrap transition-all ${selectedCategoryId === cat.id ? 'bg-status-success text-foreground' : 'bg-card text-muted-foreground'}`}
                         >
                            {cat.name}
                         </button>
@@ -260,43 +260,44 @@ export default function WaiterPage() {
                   <div className="flex-1 overflow-y-auto p-3 scrollbar-hide">
                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {filteredProducts.map(p => (
-                           <div key={p.id} className="relative active:scale-95 transition-transform" onClick={() => addToCart(p)}>
-                              <ProductCard product={p} onAdd={() => {}} />
-                              <div className="absolute top-2 right-2 bg-emerald-500 text-foreground p-1 rounded-lg">
-                                <Plus size={14} />
-                              </div>
-                           </div>
+                          <div key={p.id} className="relative active:scale-95 transition-transform" onClick={() => addToCart(p)}>
+                            <ProductCard product={p} onAdd={() => {}} />
+                            <div className="absolute top-2 right-2 bg-status-success text-foreground p-1 rounded-lg">
+                              <Plus size={14} />
+                            </div>
+                          </div>
                         ))}
                      </div>
                   </div>
                </div>
 
                {/* Right: Cart (Sticky Bottom on mobile) */}
-               <div className="h-[280px] md:h-full md:w-[320px] bg-card flex flex-col shadow-2xl border-t md:border-t-0 md:border-l border-border">
-                  <div className="px-4 py-3 bg-muted flex items-center justify-between border-b border-border">
+              <div className="h-[280px] md:h-full md:w-[320px] bg-card flex flex-col shadow-2xl border-t md:border-t-0 md:border-l border-border">
+                <div className="px-4 py-3 bg-card flex items-center justify-between border-b border-border">
                      <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none">Comanda do Pedido</span>
                      <button onClick={() => setViewMode('salon')} className="text-muted-foreground hover:text-foreground"><X size={16} /></button>
                   </div>
                   
                   <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                     {cart.length === 0 ? (
-                       <div className="h-full flex flex-col items-center justify-center opacity-10">
-                          <ShoppingCart size={48} strokeWidth={1} />
-                       </div>
-                     ) : (
+                    {cart.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                        <ShoppingCart size={48} strokeWidth={1} />
+                        <p className="font-black mt-2 text-[10px] uppercase">Sem itens</p>
+                      </div>
+                    ) : (
                        cart.map((item) => (
-                         <div key={item.cartLineId} className="bg-card/40 border border-border/50 rounded-xl p-3 flex justify-between items-center">
+                       <div key={item.cartLineId} className="bg-card border border-border rounded-xl p-3 flex justify-between items-center">
                             <div className="min-w-0 flex-1 pr-2">
-                               <p className="font-bold text-foreground text-[11px] truncate leading-tight">{item.name}</p>
-                               <p className="text-emerald-400 font-extrabold text-[13px]">{formatCurrency(item.basePrice * item.quantity)}</p>
+                           <p className="font-bold text-foreground text-[11px] truncate leading-tight">{item.name}</p>
+                           <p className="text-status-success font-extrabold text-[13px]">{formatCurrency(item.basePrice * item.quantity)}</p>
                             </div>
                             <div className="flex items-center gap-2">
-                               <div className="flex items-center bg-muted rounded-lg p-0.5 border border-border">
-                                  <button onClick={() => updateCartItem(item.cartLineId, { quantity: Math.max(1, item.quantity - 1) })} className="w-6 h-6 flex items-center justify-center text-muted-foreground"><Minus size={12} /></button>
-                                  <span className="w-6 text-center text-xs font-black">{item.quantity}</span>
-                                  <button onClick={() => updateCartItem(item.cartLineId, { quantity: item.quantity + 1 })} className="w-6 h-6 flex items-center justify-center text-muted-foreground"><Plus size={12} /></button>
-                               </div>
-                               <button onClick={() => removeFromCart(item.cartLineId)} className="text-muted-foreground hover:text-red-500"><X size={14} /></button>
+                           <div className="flex items-center bg-card rounded-lg p-0.5 border border-border">
+                             <button onClick={() => updateCartItem(item.cartLineId, { quantity: Math.max(1, item.quantity - 1) })} className="w-6 h-6 flex items-center justify-center text-muted-foreground"><Minus size={12} /></button>
+                             <span className="w-6 text-center text-xs font-black">{item.quantity}</span>
+                             <button onClick={() => updateCartItem(item.cartLineId, { quantity: item.quantity + 1 })} className="w-6 h-6 flex items-center justify-center text-muted-foreground"><Plus size={12} /></button>
+                           </div>
+                           <button onClick={() => removeFromCart(item.cartLineId)} className="text-muted-foreground hover:text-destructive"><X size={14} /></button>
                             </div>
                          </div>
                        ))
@@ -304,27 +305,27 @@ export default function WaiterPage() {
                   </div>
 
                   <div className="p-4 bg-muted border-t border-border flex flex-col gap-3">
-                     <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black text-muted-foreground uppercase italic">Subtotal</span>
-                        <span className="text-lg font-black text-emerald-400 tracking-tighter italic">{formatCurrency(subtotal)}</span>
-                     </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black text-muted-foreground uppercase italic">Subtotal</span>
+                      <span className="text-lg font-black text-status-success tracking-tighter italic">{formatCurrency(subtotal)}</span>
+                    </div>
                      
                      <div className="grid grid-cols-2 gap-2">
                         <button 
                           onClick={handleRequestBill}
                           disabled={!currentOrderId}
-                          className="flex-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 rounded-xl py-3 text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed"
+                          className="flex-1 bg-status-warning/10 hover:bg-status-warning/20 text-status-warning border border-status-warning/20 rounded-xl py-3 text-[10px] font-black uppercase flex items-center justify-center gap-2 transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed"
                         >
-                           <Receipt size={14} />
-                           Conta
+                          <Receipt size={14} />
+                          Conta
                         </button>
                         <button 
                           onClick={handleSaveDraft}
                           disabled={cart.length === 0 || upsertDraft.isPending}
-                          className="flex-2 bg-emerald-600 hover:bg-emerald-700 text-foreground font-black py-3 rounded-xl shadow-xl flex items-center justify-center gap-2 text-[11px] transition-all disabled:bg-card disabled:text-muted-foreground uppercase tracking-widest"
+                          className="flex-2 bg-primary hover:bg-primary/90 text-primary-foreground font-black py-3 rounded-xl shadow-xl flex items-center justify-center gap-2 text-[11px] transition-all disabled:bg-card disabled:text-muted-foreground uppercase tracking-widest"
                         >
-                           <Printer size={14} />
-                           {upsertDraft.isPending ? 'Lançando...' : 'Cozinha'}
+                          <Printer size={14} />
+                          {upsertDraft.isPending ? 'Lançando...' : 'Cozinha'}
                         </button>
                      </div>
                   </div>
@@ -336,14 +337,14 @@ export default function WaiterPage() {
 
       {/* Floating Action Menu (Mobile) */}
       {viewMode === 'catalog' && cart.length > 0 && (
-         <div className="md:hidden fixed bottom-32 right-4 z-50">
-            <div className="bg-emerald-500 text-foreground w-14 h-14 rounded-full flex items-center justify-center shadow-2xl relative">
-                <ShoppingCart size={24} />
-                <span className="absolute -top-1 -right-1 bg-card text-emerald-600 border-2 border-emerald-500 w-6 h-6 rounded-full text-[10px] font-black flex items-center justify-center">
-                   {cart.reduce((a,b) => a+b.quantity, 0)}
-                </span>
-            </div>
-         </div>
+        <div className="md:hidden fixed bottom-32 right-4 z-50">
+          <div className="bg-primary text-primary-foreground w-14 h-14 rounded-full flex items-center justify-center shadow-2xl relative">
+             <ShoppingCart size={24} />
+             <span className="absolute -top-1 -right-1 bg-card text-status-success border-2 border-status-success w-6 h-6 rounded-full text-[10px] font-black flex items-center justify-center">
+               {cart.reduce((a,b) => a+b.quantity, 0)}
+             </span>
+          </div>
+        </div>
       )}
 
       {sourceTableForTransfer && (

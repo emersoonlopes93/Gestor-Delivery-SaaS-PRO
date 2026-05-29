@@ -147,7 +147,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
     <div className="grid grid-cols-1 gap-4 py-4">
       <button
         onClick={() => setMode('people')}
-        className="flex items-center gap-4 p-6 bg-card border border-border rounded-3xl hover:border-emerald-500 hover:bg-muted hover:bg-muted transition-all text-left group"
+        className="flex items-center gap-4 p-6 bg-card border border-border rounded-3xl hover:border-status-success hover:bg-muted transition-all text-left group"
       >
         <div className="w-14 h-14 bg-primary/10 text-primary dark:text-primary rounded-2xl flex items-center justify-center border border-primary/20 group-hover:scale-110 transition-transform">
           <Users size={28} />
@@ -160,7 +160,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
 
       <button
         onClick={() => setMode('items')}
-        className="flex items-center gap-4 p-6 bg-card border border-border rounded-3xl hover:border-blue-500 hover:bg-muted hover:bg-muted transition-all text-left group"
+        className="flex items-center gap-4 p-6 bg-card border border-border rounded-3xl hover:border-primary hover:bg-muted transition-all text-left group"
       >
         <div className="w-14 h-14 bg-primary/10 text-primary dark:text-primary rounded-2xl flex items-center justify-center border border-primary/20 group-hover:scale-110 transition-transform">
           <ListChecks size={28} />
@@ -174,48 +174,48 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
       {splits.length > 0 && (
         <button
           onClick={() => setMode('splits')}
-          className="flex items-center gap-4 p-6 bg-primary/10 border border-primary/20 rounded-3xl hover:bg-emerald-500/20 transition-all text-left"
+          className="flex items-center gap-4 p-6 bg-primary/10 border border-primary/20 rounded-3xl hover:bg-primary/20 transition-all text-left"
         >
-          <div className="w-14 h-14 bg-emerald-500 text-foreground rounded-2xl flex items-center justify-center shadow-lg">
+          <div className="w-14 h-14 bg-status-success text-foreground rounded-2xl flex items-center justify-center shadow-lg">
             <CheckCircle2 size={28} />
           </div>
           <div>
-            <h4 className="font-black text-primary uppercase tracking-tight">Gerenciar Divisões ({splits.length})</h4>
-            <p className="text-xs text-primary/70 mt-1">Líquidar pagamentos pendentes</p>
+            <h4 className="font-black text-foreground uppercase tracking-tight">Gerenciar Divisões ({splits.length})</h4>
+            <p className="text-xs text-muted-foreground mt-1">Líquidar pagamentos pendentes</p>
           </div>
         </button>
       )}
 
       {/* Placeholder para fechamento parcial */}
-      <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl flex items-start gap-3 mt-2">
-         <AlertCircle size={16} className="text-amber-500 shrink-0 mt-0.5" />
-         <p className="text-[10px] text-amber-600/70 leading-relaxed uppercase font-black">
-            Ao dividir a conta, o pedido permanecerá em aberto até que todos os splits sejam liquidados.
-         </p>
+      <div className="p-4 bg-status-warning/10 border border-status-warning/20 rounded-2xl flex items-start gap-3 mt-2">
+        <AlertCircle size={16} className="text-status-warning shrink-0 mt-0.5" />
+        <p className="text-[10px] text-status-warning/70 leading-relaxed uppercase font-black">
+          Ao dividir a conta, o pedido permanecerá em aberto até que todos os splits sejam liquidados.
+        </p>
       </div>
     </div>
   );
 
   const renderPeopleSelector = () => (
     <div className="space-y-6 py-4">
-      <div className="text-center">
+        <div className="text-center">
         <p className="text-muted-foreground text-[10px] uppercase font-black tracking-widest mb-4">Quantas pessoas na mesa?</p>
         <div className="flex items-center justify-center gap-8">
           <button 
             onClick={() => setNumberOfPeople(Math.max(2, numberOfPeople - 1))}
-            className="w-12 h-12 bg-muted rounded-full flex items-center justify-center text-foreground hover:bg-card transition-all border border-transparent hover:border-border shadow-sm"
+            className="w-12 h-12 bg-card rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-all border border-transparent hover:border-border shadow-sm"
           >
             <Minus size={24} />
           </button>
           <span className="text-6xl font-black text-primary dark:text-primary tracking-tighter italic">{numberOfPeople}</span>
           <button 
             onClick={() => setNumberOfPeople(numberOfPeople + 1)}
-            className="w-12 h-12 bg-muted rounded-full flex items-center justify-center text-foreground hover:bg-card transition-all border border-transparent hover:border-border shadow-sm"
+            className="w-12 h-12 bg-card rounded-full flex items-center justify-center text-foreground hover:bg-muted transition-all border border-transparent hover:border-border shadow-sm"
           >
             <Plus size={24} />
           </button>
         </div>
-        <div className="mt-6 p-4 bg-muted rounded-2xl border border-border">
+        <div className="mt-6 p-4 bg-card rounded-2xl border border-border">
            <p className="text-[10px] text-muted-foreground uppercase font-black mb-1">Valor por pessoa</p>
            <p className="text-2xl font-black text-foreground">{(orderTotal / numberOfPeople).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
         </div>
@@ -236,22 +236,22 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
     <div className="space-y-4 py-2 flex flex-col max-h-[60vh]">
       <div className="flex-1 overflow-y-auto pr-2 space-y-2">
         {items.map((item) => (
-          <div key={item.id} className="flex items-center justify-between p-4 bg-muted border border-border rounded-2xl">
+       <div key={item.id} className="flex items-center justify-between p-4 bg-card border border-border rounded-2xl">
              <div className="flex-1 min-w-0">
                 <p className="text-xs font-black text-foreground truncate uppercase tracking-tight">{item.snapshotName}</p>
                 <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-1">Saldo: {item.quantity} un x {item.unitPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
              </div>
-             <div className="flex items-center gap-3 ml-4 bg-card p-1.5 rounded-xl border border-border shadow-sm">
+         <div className="flex items-center gap-3 ml-4 bg-card p-1.5 rounded-xl border border-border shadow-sm">
                 <button 
                    onClick={() => setItemSelections(prev => ({ ...prev, [item.id]: Math.max(0, (prev[item.id] || 0) - 1) }))}
-                   className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+             className="w-8 h-8 bg-card rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <Minus size={14} />
                 </button>
                 <span className="w-4 text-center text-xs font-black text-primary dark:text-primary">{itemSelections[item.id] || 0}</span>
                 <button 
                    onClick={() => setItemSelections(prev => ({ ...prev, [item.id]: Math.min(item.quantity, (prev[item.id] || 0) + 1) }))}
-                   className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+             className="w-8 h-8 bg-card rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <Plus size={14} />
                 </button>
@@ -282,23 +282,23 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
   );
 
   const renderSplitsList = () => (
-    <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-2">
+        <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-2">
       {splits.map((split) => {
         const isPaid = split.status === 'confirmed';
         const pendingPayment = split.payments?.find((p) => !p.isPaid);
         
         return (
-          <div key={split.id} className={`p-5 rounded-3xl border-2 transition-all ${isPaid ? 'bg-emerald-500/5 border-primary/20' : 'bg-card border-border'}`}>
+          <div key={split.id} className={`p-5 rounded-3xl border-2 transition-all ${isPaid ? 'bg-status-success/5 border-status-success/20' : 'bg-card border-border'}`}>
             <div className="flex justify-between items-start mb-4">
               <div>
-                <p className={`font-black uppercase tracking-tight ${isPaid ? 'text-primary' : 'text-foreground'}`}>
+                <p className={`font-black uppercase tracking-tight ${isPaid ? 'text-foreground' : 'text-foreground'}`}>
                   {split.description || `Split ${split.id.substring(0,4)}`}
                 </p>
                 <p className="text-2xl font-black text-foreground mt-1">
                   {Number(split.totalAmount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </p>
               </div>
-              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${isPaid ? 'bg-emerald-500 text-foreground' : 'bg-amber-500/20 text-amber-500'}`}>
+              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${isPaid ? 'bg-status-success text-foreground' : 'bg-status-warning/20 text-status-warning'}`}>
                 {isPaid ? 'PAGO' : 'PENDENTE'}
               </span>
             </div>
@@ -307,13 +307,13 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <button 
                   onClick={() => handlePaySplit(split.id, PaymentMethod.cash)}
-                  className="flex flex-col items-center gap-2 p-3 bg-card border border-border rounded-2xl hover:border-emerald-500 transition-all text-xs font-bold text-muted-foreground hover:text-foreground"
+                  className="flex flex-col items-center gap-2 p-3 bg-card border border-border rounded-2xl hover:border-status-success transition-all text-xs font-bold text-muted-foreground hover:text-foreground"
                 >
                   <Banknote size={20} /> Dinheiro
                 </button>
                 <button 
                   onClick={() => handlePaySplit(split.id, PaymentMethod.pix)}
-                  className="flex flex-col items-center gap-2 p-3 bg-card border border-border rounded-2xl hover:border-indigo-500 transition-all text-xs font-bold text-muted-foreground hover:text-foreground"
+                  className="flex flex-col items-center gap-2 p-3 bg-card border border-border rounded-2xl hover:border-primary transition-all text-xs font-bold text-muted-foreground hover:text-foreground"
                 >
                   <QrCode size={20} /> PIX
                 </button>
@@ -321,11 +321,11 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
             )}
 
             {pendingPayment && !isPaid && (
-              <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex flex-col items-center gap-3">
-                 <p className="text-[10px] font-black text-amber-500 uppercase">Aguardando Confirmação ({pendingPayment.paymentMethod})</p>
+              <div className="p-4 bg-status-warning/10 border border-status-warning/20 rounded-2xl flex flex-col items-center gap-3">
+                 <p className="text-[10px] font-black text-status-warning uppercase">Aguardando Confirmação ({pendingPayment.paymentMethod})</p>
                  <button 
                    onClick={() => handleConfirmCash(pendingPayment.id)}
-                   className="w-full bg-amber-500 text-black font-black py-2 rounded-xl text-xs uppercase"
+                   className="w-full bg-status-warning text-foreground font-black py-2 rounded-xl text-xs uppercase"
                  >
                    Confirmar Recebimento
                  </button>
@@ -333,7 +333,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
             )}
             
             {isPaid && (
-              <div className="flex items-center gap-1.5 mt-2 text-primary/70 text-[10px] font-black uppercase">
+              <div className="flex items-center gap-1.5 mt-2 text-muted-foreground text-[10px] font-black uppercase">
                  <CheckCircle2 size={14} /> Pago em {split.confirmedAt ? new Date(split.confirmedAt).toLocaleDateString() : '---'}
               </div>
             )}
@@ -368,7 +368,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
 
         <div className="p-8">
            {error && (
-             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold rounded-xl flex items-center gap-2">
+             <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 text-destructive text-xs font-bold rounded-xl flex items-center gap-2">
                <AlertCircle size={14} /> {error}
              </div>
            )}

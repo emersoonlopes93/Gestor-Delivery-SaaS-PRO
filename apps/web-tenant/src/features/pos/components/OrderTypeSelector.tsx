@@ -44,9 +44,9 @@ export const OrderTypeSelector: React.FC<OrderTypeSelectorProps> = ({
         const Icon = type.icon;
         const isActive = currentType === type.id;
         const colors = {
-          emerald: 'bg-emerald-500/10 border-emerald-500 text-emerald-400 shadow-emerald-500/10',
-          indigo: 'bg-indigo-500/10 border-indigo-500 text-indigo-400 shadow-indigo-500/10',
-          amber: 'bg-amber-500/10 border-amber-500 text-amber-400 shadow-amber-500/10',
+          emerald: 'bg-status-success/10 border-status-success text-status-success shadow-status-success/10',
+          indigo: 'bg-primary/10 border-primary text-primary shadow-primary/10',
+          amber: 'bg-status-warning/10 border-status-warning text-status-warning shadow-status-warning/10',
         };
 
         return (

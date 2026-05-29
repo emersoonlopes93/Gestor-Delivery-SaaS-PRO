@@ -124,7 +124,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             autoFocus
             value={cashAmount || ''}
             onChange={(e) => setCashAmount(parseFloat(e.target.value) || 0)}
-            className={`w-full bg-card  border-2 rounded-2xl px-4 py-4 text-2xl font-black text-foreground outline-none transition-all ${cashAmount < total && cashAmount !== 0 ? 'border-red-500/50 text-red-400' : 'border-border  focus:border-emerald-500'}`}
+            className={`w-full bg-card  border-2 rounded-2xl px-4 py-4 text-2xl font-black text-foreground outline-none transition-all ${cashAmount < total && cashAmount !== 0 ? 'border-destructive/50 text-destructive' : 'border-border  focus:border-status-success'}`}
             placeholder="0,00"
           />
           <div className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">R$</div>
@@ -150,28 +150,28 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
          ))}
       </div>
 
-      <div className={`rounded-2xl p-4 flex justify-between items-center transition-all ${cashAmount >= total ? 'bg-primary/10 border border-primary/20' : 'bg-red-500/10 border border-red-500/20 opacity-50'}`}>
+      <div className={`rounded-2xl p-4 flex justify-between items-center transition-all ${cashAmount >= total ? 'bg-primary/10 border border-primary/20' : 'bg-destructive/10 border border-destructive/20 opacity-80'}`}>
         <div>
-          <p className={`text-[10px] uppercase font-black ${cashAmount >= total ? 'text-primary/70' : 'text-red-500/70'}`}>
+          <p className={`text-[10px] uppercase font-black ${cashAmount >= total ? 'text-primary/70' : 'text-destructive/70'}`}>
             {cashAmount >= total ? 'Troco para devolver' : 'Faltando'}
           </p>
-          <p className={`text-2xl font-black ${cashAmount >= total ? 'text-primary ' : 'text-red-500 dark:text-red-400'}`}>
+          <p className={`text-2xl font-black ${cashAmount >= total ? 'text-primary ' : 'text-destructive'}`}>
             {formatCurrency(Math.abs(cashAmount - total))}
           </p>
         </div>
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${cashAmount >= total ? 'bg-emerald-500 text-white' : 'bg-red-500/20 text-red-500'}`}>
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${cashAmount >= total ? 'bg-status-success text-white' : 'bg-destructive/20 text-destructive'}`}>
           <Banknote size={20} />
         </div>
       </div>
       
       {cashAmount < total && cashAmount !== 0 && (
-        <p className="text-center text-red-400 text-[10px] font-black uppercase animate-pulse">Atenção: Valor insuficiente</p>
+        <p className="text-center text-destructive text-[10px] font-black uppercase animate-pulse">Atenção: Valor insuficiente</p>
       )}
 
       <button
         onClick={() => onConfirm(PaymentMethod.cash, { cashAmount })}
         disabled={isPending || cashAmount < total}
-        className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-muted100 dark:disabled:bg-muted800 disabled:text-muted-foreground text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
+        className="w-full bg-primary hover:bg-primary/90 disabled:bg-muted100 dark:disabled:bg-muted800 disabled:text-muted-foreground text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
       >
         {isPending ? 'FINALIZANDO...' : 'CONFIRMAR RECEBIMENTO'}
         <CheckCircle2 size={20} />
