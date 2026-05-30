@@ -64,12 +64,12 @@ export class CheckoutValidatorService {
   async validate(
     slug: string,
     items: CreateOrderItemDTO[],
-    options?: { 
-      customerId?: string | null; 
-      couponCode?: string; 
+    options?: {
+      customerId?: string | null;
+      couponCode?: string;
       useCashbackAmount?: number;
       deliveryAddress?: DeliveryAddressDTO | null;
-      channel?: 'storefront_delivery' | 'storefront_pickup';
+      channel?: 'storefront_delivery' | 'storefront_pickup' | 'whatsapp_ai';
       payment?: PaymentInput;
       scheduledFor?: Date;
       timeSlotId?: string;
@@ -128,14 +128,25 @@ export class CheckoutValidatorService {
     }
 
     const validatedLines: ValidatedLine[] = [];
+    // whatsapp_ai behaves like storefront_delivery for availability checks,
+    // but skips sellableOnline validation so agent can sell any active product.
     const channel = options?.channel ?? 'storefront_delivery';
+    const resolvedCheckChannel: 'storefront_delivery' | 'storefront_pickup' | 'pos' =
+      channel === 'whatsapp_ai' ? 'storefront_delivery' : channel;
+    const checkSellableOnline = channel !== 'whatsapp_ai';
 
     for (const item of items) {
       if (item.lineType === 'product') {
-        const line = await this.validateProductLine(tenantId, item, true, channel, availabilityContext);
+        const line = await this.validateProductLine(
+          tenantId,
+          item,
+          checkSellableOnline,
+          resolvedCheckChannel,
+          availabilityContext,
+        );
         validatedLines.push(line);
       } else if (item.lineType === 'combo') {
-        const line = await this.validateComboLine(tenantId, item, channel, availabilityContext);
+        const line = await this.validateComboLine(tenantId, item, resolvedCheckChannel, availabilityContext);
         validatedLines.push(line);
       } else {
         throw new BadRequestException('Tipo de linha inválido.');
@@ -172,37 +183,49 @@ export class CheckoutValidatorService {
 
     const total = Math.round((itemsSubtotal - discountTotal) * 100) / 100;
 
-    // 5. Calcular taxa de entrega apenas se for delivery
-    const isDelivery = options?.channel === 'storefront_delivery';
+    // 5. Calcular taxa de entrega apenas se for delivery ou whatsapp_ai delivery
+    const isDelivery = channel === 'storefront_delivery' || channel === 'whatsapp_ai';
     let deliveryFee = 0;
 
-    if (isDelivery) {
-      if (!options?.deliveryAddress?.lat || !options?.deliveryAddress?.lng) {
-        throw new BadRequestException('Localização (latitude/longitude) é obrigatória para entrega.');
-      }
-
+    if (isDelivery && options?.deliveryAddress) {
+      const hasCoords = Boolean(options.deliveryAddress.lat && options.deliveryAddress.lng);
       const hasCoverage = await this.deliveryRateService.hasCoverageConfig(tenantId);
-      const decision = hasCoverage
-        ? await this.deliveryRateService.calculateDeliveryDecision({
-            tenantId,
-            address: options?.deliveryAddress,
-            distanceKm: null,
-          })
-        : null;
 
-      if (decision && !decision.canDeliver) {
-        throw new BadRequestException(decision.reason || 'Não entregamos nesta região.');
-      }
-
-      const deliveryFeeCalculation = decision
-        ? { fee: decision.fee }
-        : await this.deliveryRateService.calculateRate({
+      if (hasCoverage) {
+        if (hasCoords) {
+          // Full calculation with coordinates
+          const decision = await this.deliveryRateService.calculateDeliveryDecision({
             tenantId,
-            address: options?.deliveryAddress,
+            address: options.deliveryAddress,
             distanceKm: null,
           });
-
-      deliveryFee = deliveryFeeCalculation.fee;
+          if (!decision.canDeliver) {
+            throw new BadRequestException(decision.reason || 'Não entregamos nesta região.');
+          }
+          deliveryFee = decision.fee ?? 0;
+        } else {
+          // No coords (whatsapp_ai without Google Maps): try rate by neighborhood/fixed
+          const rateResult = await this.deliveryRateService.calculateRate({
+            tenantId,
+            address: options.deliveryAddress,
+            distanceKm: null,
+          });
+          deliveryFee = rateResult.fee ?? 0;
+        }
+      } else if (!hasCoords) {
+        // No coverage config and no coords: use zero delivery fee (will be adjusted manually)
+        deliveryFee = 0;
+      } else {
+        const rateResult = await this.deliveryRateService.calculateRate({
+          tenantId,
+          address: options.deliveryAddress,
+          distanceKm: null,
+        });
+        deliveryFee = rateResult.fee ?? 0;
+      }
+    } else if (isDelivery && channel === 'storefront_delivery' && !options?.deliveryAddress) {
+      // storefront_delivery without address is an error
+      throw new BadRequestException('Endereço de entrega é obrigatório para pedidos de entrega.');
     }
 
     const finalTotal = Math.round((total + deliveryFee) * 100) / 100;

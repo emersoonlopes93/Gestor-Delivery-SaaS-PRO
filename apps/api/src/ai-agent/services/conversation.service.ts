@@ -1,6 +1,6 @@
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { ChatState, MessageDirection } from '@prisma/client';
+import { ChatState, MessageDirection, ChatSession, ChatMessage } from '@prisma/client';
 
 import { Prisma } from '@prisma/client';
 import type { AgentSessionContext } from './agent-tools.service';
@@ -339,29 +339,88 @@ export class ConversationService {
   /**
    * Encontra a sessão ativa ou cria uma nova.
    */
-  async getOrCreateSession(tenantId: string, customerPhone: string) {
-    const session = await this.prisma.chatSession.upsert({
-      where: {
-        tenantId_customerPhone: { tenantId, customerPhone },
-      },
-      create: {
-        tenantId,
-        customerPhone,
-        state: 'greeting',
-        lastMessageAt: new Date(),
-      },
-      update: {
-        lastMessageAt: new Date(),
-      },
-    });
+  private isSessionExpired(
+    session: { state: ChatState; expiresAt: Date | null; lastMessageAt: Date },
+    sessionTimeoutMin?: number,
+  ) {
+    // Verifica se sessão já está em estado terminal
+    if (session.state === 'closed') {
+      return true;
+    }
 
-    // Se estiver fechada ou já passada do tempo limite, pode precisar de reabertura (lógica tratada pelo orquestrador)
-    return session;
+    const timeout = sessionTimeoutMin ?? 120;
+    if (timeout <= 0) {
+      return false;
+    }
+
+    const expiresAt = session.expiresAt ?? new Date(session.lastMessageAt.getTime() + timeout * 60000);
+    return expiresAt.getTime() <= Date.now();
   }
 
-  /**
-   * Carrega o histórico recente de mensagens de uma sessão.
-   */
+  async getOrCreateSession(
+    tenantId: string,
+    customerPhone: string,
+    options?: {
+      customerId?: string;
+      displayName?: string;
+      remoteJid?: string;
+      sessionTimeoutMin?: number;
+    },
+  ) {
+    const now = new Date();
+    const activeSession = await this.prisma.chatSession.findFirst({
+      where: {
+        tenantId,
+        customerPhone,
+        state: { notIn: ['closed'] }, // Remove 'expired' which is not ChatState in older schemas
+        closedAt: null,
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    if (activeSession) {
+      if (this.isSessionExpired(activeSession, options?.sessionTimeoutMin)) {
+        await this.expireSession(activeSession.id, 'timeout');
+      } else {
+        const updateData: Prisma.ChatSessionUpdateInput = {
+          lastMessageAt: now,
+        };
+        if (options?.displayName) updateData.displayName = options.displayName;
+        if (options?.remoteJid) updateData.remoteJid = options.remoteJid;
+        if (options?.customerId) {
+          updateData.customer = { connect: { id: options.customerId } };
+        }
+        if (options?.sessionTimeoutMin !== undefined) {
+          updateData.expiresAt = new Date(now.getTime() + options.sessionTimeoutMin * 60000);
+        }
+
+        return this.prisma.chatSession.update({
+          where: { id: activeSession.id },
+          data: updateData,
+        });
+      }
+    }
+
+    const data: Prisma.ChatSessionCreateInput = {
+      customerPhone,
+      displayName: options?.displayName,
+      remoteJid: options?.remoteJid,
+      state: 'greeting',
+      lastMessageAt: now,
+      tenant: { connect: { id: tenantId } },
+      expiresAt:
+        options?.sessionTimeoutMin !== undefined
+          ? new Date(now.getTime() + options.sessionTimeoutMin * 60000)
+          : undefined,
+    };
+
+    if (options?.customerId) {
+      data.customer = { connect: { id: options.customerId } };
+    }
+
+    return this.prisma.chatSession.create({ data });
+  }
+
   async getRecentHistory(sessionId: string, limit: number = 20) {
     return this.prisma.chatMessage.findMany({
       where: { sessionId },
@@ -395,9 +454,13 @@ export class ConversationService {
       },
     });
 
-    // Emit WebSocket event for new message
-    const session = await this.prisma.chatSession.findUnique({
+    const session = await this.prisma.chatSession.update({
       where: { id: dto.sessionId },
+      data: {
+        lastMessageAt: timestamp,
+        ...(dto.direction === 'inbound' ? { lastCustomerMessageAt: timestamp } : {}),
+        ...(dto.direction === 'outbound' ? { lastAgentMessageAt: timestamp } : {}),
+      },
       select: { tenantId: true },
     });
 
@@ -460,15 +523,14 @@ export class ConversationService {
     return session;
   }
 
-  /**
-   * Encerra o Handoff (volta para bot) ou encerra a sessão.
-   */
   async deactivateHandoff(sessionId: string) {
     const session = await this.prisma.chatSession.update({
       where: { id: sessionId },
       data: {
         handoffActive: false,
         handoffOperator: null,
+        handoffReason: null,
+        state: 'greeting',
       },
     });
     this.logger.log(`[CHAT_INBOX] handoff_deactivated sessionId=${sessionId}`);
@@ -481,7 +543,7 @@ export class ConversationService {
       sessionId,
       direction: 'outbound',
       senderType: 'system',
-      content: 'Atendimento retomado pelo assistente virtual',
+      content: 'Atendimento retornado para a Inteligência Artificial',
       messageType: 'system',
       externalStatus: 'sent',
       timestamp: new Date(),
@@ -491,18 +553,82 @@ export class ConversationService {
   }
 
   /**
+   * Remove o contexto temporário de IA que não deve ser preservado entre sessões.
+   */
+  async clearSessionTemporaryAiMemory(sessionId: string): Promise<void> {
+    const session = await this.prisma.chatSession.findUnique({
+      where: { id: sessionId },
+      select: { metadata: true },
+    });
+
+    const metadata = this.asJsonObject<Record<string, unknown>>(session?.metadata);
+    const ai = this.asJsonObject<MetadataAi>(metadata.ai);
+    const nextAi = { ...ai } as Record<string, unknown>;
+
+    delete nextAi.lastAiProcessedAt;
+    delete nextAi.lastProcessedMessageId;
+    delete nextAi.pendingCustomerMessageIds;
+    delete nextAi.currentIntent;
+    delete nextAi.orderDraft;
+    delete nextAi.toolFailures;
+
+    metadata.ai = nextAi;
+
+    await this.prisma.chatSession.update({
+      where: { id: sessionId },
+      data: { metadata: metadata as Prisma.InputJsonObject },
+    });
+  }
+
+  async expireSession(sessionId: string, reason: string = 'timeout') {
+    await this.clearSessionTemporaryAiMemory(sessionId);
+
+    const session = await this.prisma.chatSession.update({
+      where: { id: sessionId },
+      data: {
+        state: 'expired',
+        closedAt: new Date(),
+        closeReason: reason,
+        handoffActive: false,
+      },
+    });
+
+    this.logger.log(`[CHAT_INBOX] session_expired sessionId=${sessionId} reason=${reason}`);
+    this.chatGateway.emitSessionUpdated(session.tenantId, session);
+
+    await this.addMessage({
+      sessionId,
+      direction: 'outbound',
+      senderType: 'system',
+      content: 'Sessão expirada por inatividade. Envie uma nova mensagem para iniciar um novo atendimento.',
+      messageType: 'system',
+      externalStatus: 'sent',
+      metadata: {
+        type: 'system',
+        hiddenFromInbox: true,
+      },
+      timestamp: new Date(),
+    });
+
+    return session;
+  }
+
+  /**
    * Encerra a sessão totalmente.
    */
-  async closeSession(sessionId: string) {
+  async closeSession(sessionId: string, reason?: string) {
+    await this.clearSessionTemporaryAiMemory(sessionId);
+
     const session = await this.prisma.chatSession.update({
       where: { id: sessionId },
       data: {
         state: 'closed',
         closedAt: new Date(),
+        closeReason: reason ?? 'manual',
         handoffActive: false,
       },
     });
-    this.logger.log(`[CHAT_INBOX] session_closed sessionId=${sessionId}`);
+    this.logger.log(`[CHAT_INBOX] session_closed sessionId=${sessionId} reason=${reason ?? 'manual'}`);
 
     // Emit WebSocket event for session update
     this.chatGateway.emitSessionUpdated(session.tenantId, session);
@@ -515,6 +641,10 @@ export class ConversationService {
       content: 'Conversa encerrada',
       messageType: 'system',
       externalStatus: 'sent',
+      metadata: {
+        type: 'system',
+        hiddenFromInbox: true,
+      },
       timestamp: new Date(),
     });
 
@@ -666,5 +796,64 @@ export class ConversationService {
     const withinWindow = Date.now() - lastAtMs <= input.windowMs;
     const sameSignature = lastSignatureHash === input.signatureHash;
     return withinWindow && sameSignature && count >= input.maxFailures;
+  }
+
+  /**
+   * Encerra sessão porque o cliente usou comando de saída (ex: #Sair).
+   * Preserva memória persistente, limpa temporária, envia mensagem de confirmação.
+   */
+  async closeSessionByCustomerExit(sessionId: string, exitCommand: string): Promise<{ session: ChatSession; message: ChatMessage }> {
+    const now = new Date();
+
+    // Limpa contexto temporário
+    await this.clearSessionTemporaryAiMemory(sessionId);
+
+    // Marca sessão como fechada
+    const session = await this.prisma.chatSession.update({
+      where: { id: sessionId },
+      data: {
+        state: 'closed',
+        closedAt: now,
+        closeReason: 'customer_exit',
+        handoffActive: false,
+      },
+    });
+
+    this.logger.log(
+      `[AI_SESSION] exit_command_received sessionId=${sessionId} command="${exitCommand}" closeReason=customer_exit`,
+    );
+    this.chatGateway.emitSessionUpdated(session.tenantId, session);
+
+    // Registra o comando do cliente como mensagem
+    const customerMessage = await this.addMessage({
+      sessionId,
+      direction: 'inbound',
+      senderType: 'customer',
+      content: exitCommand,
+      messageType: 'text',
+      externalStatus: 'delivered',
+      timestamp: now,
+    });
+
+    // Envia mensagem de confirmação
+    const responseMessage = await this.addMessage({
+      sessionId,
+      direction: 'outbound',
+      senderType: 'system',
+      content: 'Atendimento encerrado conforme solicitado. Quando quiser, é só mandar uma nova mensagem 😊',
+      messageType: 'text',
+      externalStatus: 'sent',
+      timestamp: new Date(now.getTime() + 100), // Slight delay para ordem
+      metadata: {
+        type: 'system',
+        isConfirmation: true,
+      },
+    });
+
+    this.logger.log(
+      `[AI_SESSION] session_closed_by_customer sessionId=${sessionId} customerId=${session.customerId}`,
+    );
+
+    return { session, message: responseMessage };
   }
 }

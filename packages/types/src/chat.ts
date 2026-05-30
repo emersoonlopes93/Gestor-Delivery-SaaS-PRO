@@ -1,4 +1,13 @@
-export type ChatState = 'greeting' | 'browsing_menu' | 'checkout' | 'payment' | 'handoff_human' | 'closed';
+export type ChatState =
+  | 'greeting'
+  | 'browsing_menu'
+  | 'building_cart'
+  | 'collecting_address'
+  | 'awaiting_confirmation'
+  | 'order_created'
+  | 'handoff_human'
+  | 'closed'
+  | 'expired';
 
 export type MessageDirection = 'inbound' | 'outbound';
 
@@ -16,14 +25,18 @@ export interface ChatSession {
   remoteJid?: string;
   state: ChatState;
   cartData?: unknown;
+  lastCustomerMessageAt?: string;
+  lastAgentMessageAt?: string;
   lastMessageAt: string;
-  handoffActive: boolean;
-  handoffReason?: string;
-  handoffAt?: string;
-  handoffOperator?: string;
+  expiresAt?: string;
   unreadCount: number;
   closedAt?: string;
+  closeReason?: string;
   metadata?: unknown;
+  handoffActive: boolean;
+  handoffReason?: string;
+  handoffOperator?: string;
+  handoffAt?: string;
   createdAt: string;
   updatedAt: string;
 }

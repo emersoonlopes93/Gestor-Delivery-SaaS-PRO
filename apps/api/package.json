@@ -46,6 +46,8 @@
 
     "enable:ai-agent-demo": "ts-node -r tsconfig-paths/register scripts/enable-ai-agent-demo.ts",
 
+    "ai:e2e:order": "ts-node -r tsconfig-paths/register scripts/e2e-ai-agent-order.ts",
+
     "prisma:studio": "prisma studio",
 
     "clean": "pnpm exec rimraf dist"

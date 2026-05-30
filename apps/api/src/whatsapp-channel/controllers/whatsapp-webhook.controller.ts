@@ -14,11 +14,14 @@ import { WhatsAppProviderRegistryService } from '../services/whatsapp-provider-r
 import type { WhatsAppWebhookEvent } from '../interfaces/whatsapp-provider.interface';
 import { WhatsAppInstanceStatus } from '@prisma/client';
 import { AiOrchestratorService } from '../../ai-agent/services/ai-orchestrator.service';
+import { AiAgentConfigService } from '../../ai-agent/services/ai-agent-config.service';
+import { ConversationService } from '../../ai-agent/services/conversation.service';
 import { AiFlowLogger, createAiTrace } from '../../common/logging/ai-flow-logger';
 import {
   isInboundMessageWebhookEvent,
   isNonActionableWebhookEvent,
 } from '../../common/utils/whatsapp-presence.util';
+import { isExitCommand } from '../../ai-agent/constants/session.constants';
 
 
 /**
@@ -31,6 +34,8 @@ export class WhatsAppWebhookController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly providerRegistry: WhatsAppProviderRegistryService,
+    private readonly configService: AiAgentConfigService,
+    private readonly conversationService: ConversationService,
     @Inject(forwardRef(() => AiOrchestratorService))
     private readonly aiOrchestrator: AiOrchestratorService,
   ) {}
@@ -304,25 +309,20 @@ export class WhatsAppWebhookController {
         displayName = pushName.trim();
       }
 
-      const session = await this.prisma.chatSession.upsert({
-        where: {
-          tenantId_customerPhone: { tenantId, customerPhone: phone },
-        },
-        create: {
-          tenantId,
-          customerPhone: phone,
-          customerId,
-          displayName,
-          channel: 'whatsapp',
-          remoteJid: chatJid,
-          state: 'greeting',
-          lastMessageAt: new Date(),
-        },
-        update: {
+      const config = await this.configService.getEffectiveAiAgentConfig(tenantId);
+      const session = await this.conversationService.getOrCreateSession(tenantId, phone, {
+        customerId,
+        displayName,
+        remoteJid: chatJid,
+        sessionTimeoutMin: config.sessionTimeoutMin,
+      });
+
+      await this.prisma.chatSession.update({
+        where: { id: session.id },
+        data: {
           customerId: customerId || undefined,
           displayName: displayName || undefined,
           remoteJid: chatJid,
-          lastMessageAt: new Date(),
           closedAt: null,
           unreadCount: { increment: 1 },
         },
@@ -361,6 +361,24 @@ export class WhatsAppWebhookController {
       if (session.handoffActive) {
         AiFlowLogger.ignored('human_handoff', trace, { sessionId: session.id });
         return;
+      }
+
+      // Detecta comando de saída do cliente (ex: #Sair, sair, encerrar)
+      if (isExitCommand(content)) {
+        AiFlowLogger.flow('exit_command_detected', trace, {
+          sessionId: session.id,
+          command: content.trim(),
+        });
+
+        try {
+          await this.conversationService.closeSessionByCustomerExit(session.id, content.trim());
+          return;
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          AiFlowLogger.error('exit_command_close_session', trace, { error: msg });
+          this.logger.error(`Failed to close session by customer exit: ${msg}`);
+          return;
+        }
       }
 
       AiFlowLogger.flow('orchestrator_dispatch_start', trace);

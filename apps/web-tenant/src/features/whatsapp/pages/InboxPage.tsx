@@ -141,9 +141,19 @@ export function InboxPage() {
               <p className="text-xs text-muted-foreground truncate mb-2">{s.lastMessage || 'Sem mensagens'}</p>
               <div className="flex items-center gap-2">
                 <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
-                  s.handoffActive ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'
+                  s.state === 'closed' || s.state === 'expired'
+                    ? 'bg-muted/10 text-muted-foreground'
+                    : s.handoffActive
+                      ? 'bg-destructive/10 text-destructive'
+                      : 'bg-primary/10 text-primary'
                 }`}>
-                  {s.handoffActive ? 'Atendimento Humano' : 'Bot Ativo'}
+                  {s.state === 'closed'
+                    ? 'Encerrado'
+                    : s.state === 'expired'
+                      ? 'Expirada'
+                      : s.handoffActive
+                        ? 'Atendimento Humano'
+                        : 'Bot Ativo'}
                 </span>
               </div>
             </div>

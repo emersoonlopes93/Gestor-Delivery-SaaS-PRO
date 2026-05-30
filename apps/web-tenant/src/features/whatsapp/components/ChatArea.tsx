@@ -273,13 +273,19 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
             </h3>
             <div className="flex items-center gap-2">
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                session.state === 'closed' 
+                session.state === 'closed' || session.state === 'expired'
                   ? 'bg-muted text-muted-foreground'
                   : session.handoffActive
                   ? 'bg-status-warning/10 text-status-warning'
                   : 'bg-status-success/10 text-status-success'
               }`}>
-                {session.state === 'closed' ? 'Encerrado' : session.handoffActive ? 'Atendimento Humano' : 'Bot Ativo'}
+                {session.state === 'closed'
+                  ? 'Encerrado'
+                  : session.state === 'expired'
+                  ? 'Expirada'
+                  : session.handoffActive
+                  ? 'Atendimento Humano'
+                  : 'Bot Ativo'}
               </span>
             </div>
           </div>
@@ -429,8 +435,14 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              disabled={session?.state === 'closed' || sendMessageMutation.isPending}
-              placeholder={session?.state === 'closed' ? 'Conversa encerrada' : 'Digite uma mensagem...'}
+              disabled={
+                session?.state === 'closed' || session?.state === 'expired' || sendMessageMutation.isPending
+              }
+              placeholder={
+                session?.state === 'closed' || session?.state === 'expired'
+                  ? 'Conversa encerrada'
+                  : 'Digite uma mensagem...'
+              }
               rows={1}
               className="w-full px-4 py-2 border border-input rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-card text-foreground placeholder:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
               style={{ minHeight: '40px', maxHeight: '120px' }}
@@ -438,7 +450,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
           </div>
           <button
             onClick={handleSend}
-            disabled={!message.trim() || session?.state === 'closed' || sendMessageMutation.isPending}
+            disabled={!message.trim() || session?.state === 'closed' || session?.state === 'expired' || sendMessageMutation.isPending}
             className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
           >
             {sendMessageMutation.isPending ? (

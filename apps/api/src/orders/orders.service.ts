@@ -100,24 +100,32 @@ export class OrdersService {
     }
 
     // 1. Validate everything server-side
+    // Resolve channel: whatsapp_ai orders use the whatsapp_ai channel to bypass sellableOnline check
+    const validatorChannel: 'storefront_delivery' | 'storefront_pickup' | 'whatsapp_ai' =
+      dto.sourceChannel === 'whatsapp_ai'
+        ? 'whatsapp_ai'
+        : dto.fulfillmentType === 'delivery'
+          ? 'storefront_delivery'
+          : 'storefront_pickup';
+
     const validation = await this.checkoutValidator.validate(slug, dto.items, {
       customerId,
       couponCode: dto.couponCode,
       useCashbackAmount: dto.useCashbackAmount,
       deliveryAddress: dto.deliveryAddress,
       payment: dto.payment,
-      channel: dto.fulfillmentType === 'delivery' ? 'storefront_delivery' : 'storefront_pickup',
+      channel: validatorChannel,
       scheduledFor: dto.scheduledFor ? new Date(dto.scheduledFor) : undefined,
       timeSlotId: dto.timeSlotId,
     });
     const { tenantId, lines, itemsSubtotal, discountTotal, deliveryFee, total, couponId, cashbackUsed } = validation;
 
     this.logger.debug(
-      `createOrder: fulfillmentType=${dto.fulfillmentType} hasAddress=${!!dto.deliveryAddress}`,
+      `createOrder: fulfillmentType=${dto.fulfillmentType} hasAddress=${!!dto.deliveryAddress} channel=${validatorChannel}`,
     );
 
-    // 2. Check delivery address required for delivery
-    if (dto.fulfillmentType === 'delivery' && !dto.deliveryAddress) {
+    // 2. Check delivery address required for delivery (except whatsapp_ai which already validated above)
+    if (dto.fulfillmentType === 'delivery' && !dto.deliveryAddress && dto.sourceChannel !== 'whatsapp_ai') {
       throw new BadRequestException('Endereço de entrega é obrigatório para pedidos de entrega.');
     }
 

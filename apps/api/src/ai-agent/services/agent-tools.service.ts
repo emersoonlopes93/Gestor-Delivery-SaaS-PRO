@@ -51,6 +51,7 @@ const CriarPedidoSchema = z.object({
     quantity: z.number().int(),
     notes: z.string().optional(),
   })),
+  fulfillmentType: z.enum(['delivery', 'pickup']).default('delivery'),
   endereco: z.object({
     street: z.string(),
     number: z.string(),
@@ -61,7 +62,7 @@ const CriarPedidoSchema = z.object({
     complement: z.string().optional(),
     lat: z.number().optional(),
     lng: z.number().optional(),
-  }),
+  }).optional(),
   formaPagamento: z.string(),
   troco: z.number().optional(),
   scheduledFor: z.string().optional(),
@@ -182,10 +183,15 @@ export class AgentToolsService {
       },
       {
         name: 'criar_pedido',
-        description: 'Cria um pedido final no sistema. Só chame esta função quando o cliente confirmar todos os itens, endereço e forma de pagamento.',
+        description: 'Cria um pedido final no sistema. Só chame esta função quando o cliente confirmar explicitamente todos os itens, endereço (para delivery) e forma de pagamento. Para pickup (retirada no balcão), omita o campo endereco.',
         parameters: {
           type: 'object',
           properties: {
+            fulfillmentType: {
+              type: 'string',
+              enum: ['delivery', 'pickup'],
+              description: 'Tipo de entrega: delivery (entrega no endereço) ou pickup (retirada no balcão)',
+            },
             itens: {
               type: 'array',
               items: {
@@ -200,21 +206,24 @@ export class AgentToolsService {
             },
             endereco: {
               type: 'object',
+              description: 'Obrigatório para delivery. Omitir para pickup.',
               properties: {
-                street: { type: 'string' },
-                number: { type: 'string' },
-                neighborhood: { type: 'string' },
-                city: { type: 'string' },
+                street: { type: 'string', description: 'Nome da rua' },
+                number: { type: 'string', description: 'Número do imóvel' },
+                neighborhood: { type: 'string', description: 'Bairro (obrigatório para calcular entrega)' },
+                city: { type: 'string', description: 'Cidade' },
                 state: { type: 'string' },
                 zipCode: { type: 'string' },
+                complement: { type: 'string' },
               },
               required: ['street', 'number', 'neighborhood', 'city'],
             },
-            formaPagamento: { type: 'string', enum: ['pix', 'credit_card', 'cash'] },
+            formaPagamento: { type: 'string', enum: ['pix', 'credit_card', 'cash'], description: 'Forma de pagamento confirmada pelo cliente' },
+            troco: { type: 'number', description: 'Valor para troco quando formaPagamento=cash (ex: 100 para troco de R$100)' },
             scheduledFor: { type: 'string', description: 'Data/hora para agendamento (ISO string) se aplicável' },
             timeSlotId: { type: 'string', description: 'ID do slot de tempo se for agendado' },
           },
-          required: ['itens', 'endereco', 'formaPagamento'],
+          required: ['itens', 'fulfillmentType', 'formaPagamento'],
         },
       },
       {
@@ -564,6 +573,7 @@ export class AgentToolsService {
   private async geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
     const apiKey = process.env.GOOGLE_MAPS_KEY || process.env.VITE_GOOGLE_MAPS_KEY;
     if (!apiKey) {
+      this.logger.warn('[AI_ORDER] geocoding_skipped reason=no_google_maps_key');
       return null;
     }
 
@@ -578,18 +588,24 @@ export class AgentToolsService {
 
       if (response.data.status === 'OK' && response.data.results.length > 0) {
         const location = response.data.results[0].geometry.location;
+        this.logger.log(`[AI_ORDER] geocoding_success address="${address}"`);
         return { lat: location.lat, lng: location.lng };
       }
+      this.logger.warn(`[AI_ORDER] geocoding_no_results address="${address}" status=${response.data.status}`);
     } catch (error) {
-      this.logger.warn(`Geocoding failed for address ${address}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      this.logger.warn(`[AI_ORDER] geocoding_failed address="${address}" error=${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
     return null;
   }
 
+  /**
+   * Resolve o endereço de entrega. Geocoding é best-effort:
+   * se não tiver Google Maps Key ou se falhar, prossegue com lat/lng nulo.
+   * O CheckoutValidatorService calculará a taxa por bairro/fixo.
+   */
   private async resolveDeliveryAddress(
-    tenantId: string,
-    endereco: z.infer<typeof CriarPedidoSchema>['endereco'],
+    endereco: NonNullable<z.infer<typeof CriarPedidoSchema>['endereco']>,
   ): Promise<DeliveryAddressDTO> {
     const address: DeliveryAddressDTO = {
       street: endereco.street,
@@ -605,20 +621,33 @@ export class AgentToolsService {
     };
 
     if (!address.lat || !address.lng) {
-      const fullAddress = `${address.street}, ${address.number}, ${address.neighborhood}, ${address.city}${address.state ? `, ${address.state}` : ''}${address.zipCode ? `, ${address.zipCode}` : ''}`;
+      const fullAddress = [
+        address.street,
+        address.number,
+        address.neighborhood,
+        address.city,
+        address.state,
+        address.zipCode,
+      ].filter(Boolean).join(', ');
       const coords = await this.geocodeAddress(fullAddress);
-      if (!coords) {
-        throw new Error('Não foi possível localizar o endereço. Por favor, confirme o CEP ou forneça o endereço completo novamente.');
+      if (coords) {
+        address.lat = coords.lat;
+        address.lng = coords.lng;
+      } else {
+        // Best-effort: continua sem coordenadas; CheckoutValidator usará taxa por bairro/fixa
+        this.logger.warn(`[AI_ORDER] geocoding_best_effort_failed address="${fullAddress}" — proceeding without coords`);
       }
-      address.lat = coords.lat;
-      address.lng = coords.lng;
     }
 
     return address;
   }
 
   private async executeCriarPedido(tenantId: string, args: z.infer<typeof CriarPedidoSchema>, sessionContext?: AgentSessionContext) {
-    this.logger.log(`[AI_ORDER] executeCriarPedido called with args: ${JSON.stringify(args)}, sessionContext: ${JSON.stringify(sessionContext)}`);
+    const fulfillmentType = args.fulfillmentType ?? 'delivery';
+    this.logger.log(
+      `[AI_ORDER] create_order_start tenantId=${tenantId} fulfillmentType=${fulfillmentType} itemsCount=${args.itens?.length ?? 0}`,
+    );
+
     let ctx = sessionContext;
     if (!ctx?.customerId && ctx?.customerPhone) {
       const cleanPhone = ctx.customerPhone.replace(/\D/g, '');
@@ -635,7 +664,9 @@ export class AgentToolsService {
         customerPhone: customer.phone,
       };
     }
+
     if (!ctx?.customerId) {
+      this.logger.warn('[AI_ORDER_ERROR] missing_required_fields fields=[customerId]');
       return {
         status: 'error',
         code: 'CUSTOMER_NOT_IDENTIFIED',
@@ -643,18 +674,21 @@ export class AgentToolsService {
       };
     }
 
-    // Validate required fields for order creation
+    // Validate required fields
     const missingFields: string[] = [];
     if (!args.itens || args.itens.length === 0) missingFields.push('itens');
-    if (!args.endereco?.street) missingFields.push('rua do endereço');
-    if (!args.endereco?.number) missingFields.push('número do endereço');
-    if (!args.endereco?.neighborhood) missingFields.push('bairro do endereço');
-    if (!args.endereco?.city) missingFields.push('cidade do endereço');
     if (!args.formaPagamento) missingFields.push('forma de pagamento');
-    if (!ctx.customerName) missingFields.push('nome do cliente');
     if (!ctx.customerPhone) missingFields.push('telefone do cliente');
 
+    if (fulfillmentType === 'delivery') {
+      if (!args.endereco?.street) missingFields.push('rua do endereço');
+      if (!args.endereco?.number) missingFields.push('número do endereço');
+      if (!args.endereco?.neighborhood) missingFields.push('bairro do endereço');
+      if (!args.endereco?.city) missingFields.push('cidade do endereço');
+    }
+
     if (missingFields.length > 0) {
+      this.logger.warn(`[AI_ORDER_ERROR] missing_required_fields fields=[${missingFields.join(',')}]`);
       return {
         status: 'error',
         code: 'MISSING_REQUIRED_FIELDS',
@@ -676,7 +710,14 @@ export class AgentToolsService {
         };
       }
 
-      const deliveryAddress = await this.resolveDeliveryAddress(tenantId, args.endereco);
+      // Resolve delivery address (geocoding is best-effort — won't throw if Maps key is absent)
+      let deliveryAddress: DeliveryAddressDTO | undefined;
+      if (fulfillmentType === 'delivery' && args.endereco) {
+        deliveryAddress = await this.resolveDeliveryAddress(args.endereco);
+        this.logger.log(
+          `[AI_ORDER] delivery_address_resolved hasCoords=${Boolean(deliveryAddress.lat && deliveryAddress.lng)}`,
+        );
+      }
 
       const orderDto: CreateOrderDTO = {
         idempotencyKey: Math.random().toString(36).substring(7),
@@ -688,7 +729,7 @@ export class AgentToolsService {
         })),
         customerName: ctx.customerName || 'Cliente WhatsApp',
         customerPhone: ctx.customerPhone || '00000000000',
-        fulfillmentType: 'delivery',
+        fulfillmentType,
         deliveryAddress,
         payment: {
           method: paymentMethod,
@@ -699,12 +740,16 @@ export class AgentToolsService {
         sourceChannel: 'whatsapp_ai',
       };
 
+      this.logger.log(`[AI_ORDER] checkout_validator_called tenantId=${tenantId} slug=${tenant.slug}`);
+
       const order = await this.ordersService.createOrder(
         tenant.slug,
         orderDto,
       );
 
-      this.logger.log(`[AI_ORDER] create_order_success orderId=${order.id} orderNumber=${order.orderNumber}`);
+      this.logger.log(
+        `[AI_ORDER] create_order_success orderId=${order.id} orderNumber=${order.orderNumber} total=${order.total}`,
+      );
 
       return {
         status: 'success',
@@ -716,8 +761,8 @@ export class AgentToolsService {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`[AI_ORDER] create_order_error message=${message}`);
-      return { status: 'error', message: `Erro ao criar pedido: ${message}` };
+      this.logger.error(`[AI_ORDER_ERROR] create_order_failed tenantId=${tenantId} error=${message}`);
+      return { status: 'error', code: 'ORDER_CREATION_FAILED', message: `Erro ao criar pedido: ${message}` };
     }
   }
 

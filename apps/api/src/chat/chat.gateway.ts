@@ -136,6 +136,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   emitMessageCreated(tenantId: string, sessionId: string, message: ChatMessage) {
+    if (!this.server) {
+      this.logger.warn(`[CHAT_WS] server_not_initialized skipping emitMessageCreated sessionId=${sessionId}`);
+      return;
+    }
     const event: ChatMessageCreatedEvent = {
       sessionId,
       message,
@@ -146,6 +150,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   emitSessionUpdated(tenantId: string, session: ChatSession) {
+    if (!this.server) {
+      this.logger.warn(`[CHAT_WS] server_not_initialized skipping emitSessionUpdated sessionId=${session.id}`);
+      return;
+    }
     const event: SessionUpdatedEvent = {
       session,
     };

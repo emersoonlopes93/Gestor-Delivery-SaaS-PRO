@@ -1635,25 +1635,28 @@ model ChatSession {
   customerPhone   String        @map("customer_phone") @db.VarChar(30)
   customerId      String?       @map("customer_id")
   displayName     String?       @map("display_name") @db.VarChar(150)
-  channel         String        @default("whatsapp") @db.VarChar(30)
-  remoteJid       String?       @map("remote_jid") @db.VarChar(100)
-  state           ChatState     @default(greeting)
-  cartData        Json?         @map("cart_data")
-  handoffActive   Boolean       @default(false) @map("handoff_active")
-  handoffOperator String?       @map("handoff_operator")
-  handoffReason   String?       @map("handoff_reason")
-  handoffAt       DateTime?     @map("handoff_at")
-  lastMessageAt   DateTime      @default(now()) @map("last_message_at")
-  unreadCount     Int           @default(0) @map("unread_count")
-  closedAt        DateTime?     @map("closed_at")
-  metadata        Json?
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
-  messages        ChatMessage[]
-  customer        Customer?     @relation(fields: [customerId], references: [id])
-  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  channel               String        @default("whatsapp") @db.VarChar(30)
+  remoteJid             String?       @map("remote_jid") @db.VarChar(100)
+  state                 ChatState     @default(greeting)
+  cartData              Json?         @map("cart_data")
+  handoffActive         Boolean       @default(false) @map("handoff_active")
+  handoffOperator       String?       @map("handoff_operator")
+  handoffReason         String?       @map("handoff_reason")
+  handoffAt             DateTime?     @map("handoff_at")
+  lastCustomerMessageAt DateTime?     @map("last_customer_message_at")
+  lastAgentMessageAt    DateTime?     @map("last_agent_message_at")
+  lastMessageAt         DateTime      @default(now()) @map("last_message_at")
+  expiresAt             DateTime?     @map("expires_at")
+  unreadCount           Int           @default(0) @map("unread_count")
+  closedAt              DateTime?     @map("closed_at")
+  closeReason           String?       @map("close_reason")
+  metadata              Json?
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+  messages              ChatMessage[]
+  customer              Customer?     @relation(fields: [customerId], references: [id])
+  tenant                Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, customerPhone])
   @@index([tenantId])
   @@index([tenantId, state])
   @@map("chat_sessions")
@@ -2178,6 +2181,7 @@ enum ChatState {
   order_created
   handoff_human
   closed
+  expired
 }
 
 enum MessageDirection {

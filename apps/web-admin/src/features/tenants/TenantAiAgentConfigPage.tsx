@@ -26,6 +26,9 @@ interface AiAgentConfig {
   customerCooldownMin: number;
   simulateTyping: boolean;
   debounceMs: number;
+  closeOnExitCommand?: boolean;
+  exitCommands?: string[];
+  resetDraftOnSessionClose?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -38,6 +41,10 @@ interface UpdateConfigDto {
   rememberPreferences?: boolean;
   allowRepeatLastOrder?: boolean;
   memoryRetentionDays?: number;
+  sessionTimeoutMin?: number;
+  closeOnExitCommand?: boolean;
+  exitCommands?: string[];
+  resetDraftOnSessionClose?: boolean;
 }
 
 export function TenantAiAgentConfigPage() {
@@ -83,6 +90,17 @@ export function TenantAiAgentConfigPage() {
     setConfig(prev => prev ? { ...prev, memoryRetentionDays: parseInt(value, 10) } : null);
   };
 
+  const handleSessionTimeoutChange = (value: string) => {
+    if (!config) return;
+    setConfig(prev => prev ? { ...prev, sessionTimeoutMin: parseInt(value, 10) } : null);
+  };
+
+  const handleExitCommandsChange = (value: string) => {
+    if (!config) return;
+    const commands = value.split(',').map(cmd => cmd.trim()).filter(cmd => cmd.length > 0);
+    setConfig(prev => prev ? { ...prev, exitCommands: commands } : null);
+  };
+
   const handleSave = async () => {
     if (!tenantId || !config) return;
 
@@ -99,6 +117,10 @@ export function TenantAiAgentConfigPage() {
         rememberPreferences: config.rememberPreferences,
         allowRepeatLastOrder: config.allowRepeatLastOrder,
         memoryRetentionDays: config.memoryRetentionDays,
+        sessionTimeoutMin: config.sessionTimeoutMin,
+        closeOnExitCommand: config.closeOnExitCommand,
+        exitCommands: config.exitCommands,
+        resetDraftOnSessionClose: config.resetDraftOnSessionClose,
       };
 
       const res = await api.patch(`/admin/ai-agent/tenants/${tenantId}/config`, dto);
@@ -179,7 +201,7 @@ export function TenantAiAgentConfigPage() {
               Quando ativada, a memória permite que o agente lembre nome, endereço e último pedido do cliente para agilizar atendimentos futuros.
             </p>
           </div>
-          <div className="p-6">
+          <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-base font-medium text-gray-900">Ativar memória do agente</h3>
@@ -196,6 +218,22 @@ export function TenantAiAgentConfigPage() {
                 />
                 <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
               </label>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-medium text-gray-900">Tempo de sessão</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Tempo em minutos para expirar a sessão por inatividade do cliente.
+                </p>
+              </div>
+              <input
+                type="number"
+                min={1}
+                value={config.sessionTimeoutMin}
+                onChange={(e) => handleSessionTimeoutChange(e.target.value)}
+                className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+              />
             </div>
           </div>
         </div>
@@ -321,6 +359,85 @@ export function TenantAiAgentConfigPage() {
                   className="sr-only peer"
                 />
                 <div className={`w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${config.memoryEnabled ? 'peer-checked:bg-indigo-600' : 'opacity-50 cursor-not-allowed'}`}></div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Sessão e Encerramento */}
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">Sessão e Encerramento</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Configure como as sessões de conversa são gerenciadas e encerradas
+            </p>
+          </div>
+          <div className="divide-y divide-gray-100">
+            <div className="p-6 flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-medium text-gray-900">Expiração de sessão</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Tempo em minutos para expirar a sessão por inatividade do cliente
+                </p>
+              </div>
+              <input
+                type="number"
+                min={1}
+                max={10080}
+                value={config.sessionTimeoutMin}
+                onChange={(e) => handleSessionTimeoutChange(e.target.value)}
+                className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+              />
+            </div>
+            <div className="p-6 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-medium text-gray-900">Ativar comando #Sair</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Permite que o cliente encerre a conversa com comandos como #sair, sair, encerrar
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.closeOnExitCommand ?? false}
+                  onChange={() => handleToggle('closeOnExitCommand')}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+            {config.closeOnExitCommand && (
+              <div className="p-6">
+                <div>
+                  <h3 className="text-base font-medium text-gray-900">Comandos customizados (opcional)</h3>
+                  <p className="text-sm text-gray-500 mt-1 mb-2">
+                    Separe comandos por vírgula. Deixe vazio para usar padrões: #sair, sair, encerrar, etc.
+                  </p>
+                  <textarea
+                    value={(config.exitCommands ?? []).join(', ')}
+                    onChange={(e) => handleExitCommandsChange(e.target.value)}
+                    placeholder="#sair, sair, encerrar, cancelar"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                    rows={2}
+                  />
+                </div>
+              </div>
+            )}
+            <div className="p-6 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-medium text-gray-900">Limpar pedido em andamento</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  Remove o rascunho de pedido ao encerrar ou expirar a sessão (memória persistente é preservada)
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.resetDraftOnSessionClose ?? true}
+                  onChange={() => handleToggle('resetDraftOnSessionClose')}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
               </label>
             </div>
           </div>

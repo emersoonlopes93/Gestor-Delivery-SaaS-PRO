@@ -516,6 +516,28 @@ export class AiOrchestratorService {
         state: session.state,
       });
 
+      const normalizedContent = _content.trim().toLowerCase();
+      if (normalizedContent === '#sair') {
+        AiFlowLogger.flow('customer_exit_command', trace, {
+          sessionId: session.id,
+          customerPhone,
+        });
+        await this.conversationService.closeSession(session.id, 'customer_exit');
+
+        if (!dryRun) {
+          await this.sendFinalResponse(
+            tenantId,
+            session.id,
+            customerPhone,
+            'Sessão encerrada. Quando quiser iniciar outra conversa, envie uma nova mensagem.',
+            trace,
+            config.simulateTyping,
+          );
+        }
+
+        return;
+      }
+
       if (!config.memoryEnabled) {
         AiFlowLogger.flow('AI_MEMORY memory_disabled', trace, {
           sessionId: session.id,
