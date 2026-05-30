@@ -430,36 +430,102 @@ export class ConversationService {
   }
 
   /**
-   * Registra uma nova mensagem no banco de dados.
+   * Helpers para criação centralizada de mensagens internas (tool calls e tool results)
    */
-  async addMessage(dto: CreateMessageDto) {
-    const senderType =
-      dto.senderType ?? (dto.direction === 'inbound' ? 'customer' : 'system');
-    const externalStatus =
-      dto.externalStatus ?? (dto.direction === 'inbound' ? 'delivered' : 'sent');
-    const timestamp = dto.timestamp ?? new Date();
-
-    const message = await this.prisma.chatMessage.create({
-      data: {
-        sessionId: dto.sessionId,
-        direction: dto.direction,
-        senderType,
-        content: dto.content,
-        messageType: dto.messageType || 'text',
-        externalId: dto.externalId,
-        externalStatus,
-        timestamp,
-        toolCalls: dto.toolCalls,
-        metadata: dto.metadata,
+  async createInternalToolCallMessage(sessionId: string, toolCalls: Prisma.InputJsonValue[]) {
+    return this.addMessage({
+      sessionId,
+      direction: 'outbound',
+      senderType: 'system',
+      content: '',
+      messageType: 'tool_call',
+      externalStatus: 'sent',
+      timestamp: new Date(),
+      toolCalls,
+      metadata: {
+        type: 'tool_call',
+        hiddenFromInbox: true,
       },
     });
+  }
+
+  async createInternalToolResultMessage(
+    sessionId: string,
+    content: string,
+    toolCallName: string,
+    status: string,
+  ) {
+    return this.addMessage({
+      sessionId,
+      direction: 'outbound',
+      senderType: 'system',
+      content,
+      messageType: 'tool_result',
+      externalStatus: 'sent',
+      timestamp: new Date(),
+      metadata: {
+        type: 'tool_result',
+        hiddenFromInbox: true,
+        toolName: toolCallName,
+        status,
+      },
+    });
+  }
+
+  /**
+   * Registra uma nova mensagem no banco de dados com defaults seguros.
+   */
+  async addMessage(dto: CreateMessageDto) {
+    // 1. Determinar se é uma mensagem interna de tool call ou tool result
+    const isToolCall =
+      dto.messageType === 'tool_call' ||
+      (dto.metadata &&
+        typeof dto.metadata === 'object' &&
+        (dto.metadata as Record<string, unknown>).type === 'tool_call');
+
+    const isToolResult =
+      dto.messageType === 'tool_result' ||
+      (dto.metadata &&
+        typeof dto.metadata === 'object' &&
+        (dto.metadata as Record<string, unknown>).type === 'tool_result');
+
+    const direction = dto.direction ?? 'outbound';
+
+    // Se for tool call ou result, o senderType deve obrigatoriamente ser 'system'
+    let senderType: 'customer' | 'ai' | 'human' | 'system' = 'system';
+    if (!isToolCall && !isToolResult) {
+      senderType = dto.senderType ?? (direction === 'inbound' ? 'customer' : 'system');
+    }
+
+    // Prefere externalStatus explícito ou infere conforme direção
+    const externalStatus: 'sent' | 'delivered' | 'read' | 'failed' =
+      dto.externalStatus ?? (direction === 'inbound' ? 'delivered' : 'sent');
+
+    const timestamp = dto.timestamp ?? new Date();
+    const messageType = dto.messageType ?? (isToolCall ? 'tool_call' : isToolResult ? 'tool_result' : 'text');
+
+    // 2. Construir objeto de criação do Prisma omitindo chaves com valores undefined
+    const data: Prisma.ChatMessageCreateInput = {
+      session: { connect: { id: dto.sessionId } },
+      direction,
+      senderType,
+      content: dto.content ?? '',
+      messageType,
+      externalStatus,
+      ...(timestamp ? { timestamp } : {}),
+      ...(dto.externalId ? { externalId: dto.externalId } : {}),
+      ...(dto.toolCalls ? { toolCalls: dto.toolCalls } : {}),
+      ...(dto.metadata ? { metadata: dto.metadata } : {}),
+    };
+
+    const message = await this.prisma.chatMessage.create({ data });
 
     const session = await this.prisma.chatSession.update({
       where: { id: dto.sessionId },
       data: {
         lastMessageAt: timestamp,
-        ...(dto.direction === 'inbound' ? { lastCustomerMessageAt: timestamp } : {}),
-        ...(dto.direction === 'outbound' ? { lastAgentMessageAt: timestamp } : {}),
+        ...(direction === 'inbound' ? { lastCustomerMessageAt: timestamp } : {}),
+        ...(direction === 'outbound' ? { lastAgentMessageAt: timestamp } : {}),
       },
       select: { tenantId: true },
     });
@@ -468,7 +534,9 @@ export class ConversationService {
       this.chatGateway.emitMessageCreated(session.tenantId, dto.sessionId, message);
     }
 
-    this.logger.log(`[CHAT_INBOX] message_saved sessionId=${dto.sessionId} senderType=${message.senderType} direction=${message.direction}`);
+    this.logger.log(
+      `[CHAT_INBOX] message_saved sessionId=${dto.sessionId} senderType=${message.senderType} direction=${message.direction}`,
+    );
 
     return message;
   }

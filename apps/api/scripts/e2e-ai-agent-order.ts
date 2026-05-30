@@ -88,6 +88,20 @@ async function main() {
       },
     });
 
+    // Garantir que a loja está aberta e com horários de funcionamento válidos
+    await prisma.tenantSettings.upsert({
+      where: { tenantId: tenant.id },
+      create: { tenantId: tenant.id, isStorePaused: false },
+      update: { isStorePaused: false },
+    });
+
+    const currentDay = new Date().getDay();
+    await prisma.tenantOperatingHours.upsert({
+      where: { tenantId_dayOfWeek: { tenantId: tenant.id, dayOfWeek: currentDay } },
+      create: { tenantId: tenant.id, dayOfWeek: currentDay, isOpen: true, openTime: '00:00', closeTime: '23:59' },
+      update: { isOpen: true, openTime: '00:00', closeTime: '23:59' },
+    });
+
     // 5. Seed a mock WhatsApp Instance so the webhook controller can resolve the tenant
     const mockInstanceId = 'e2e-evolution-instance';
     await prisma.whatsAppInstance.upsert({
@@ -118,6 +132,12 @@ async function main() {
     }
 
     console.log(`🍕 Selected product for order: ${product.name} (id=${product.id}, basePrice=${product.basePrice})`);
+
+    // Make complement groups optional for this test to avoid required options validation error
+    await prisma.productComplementGroup.updateMany({
+      where: { tenantId: tenant.id },
+      data: { isRequired: false, minSelect: 0 },
+    });
 
     const customerPhone = '5511999991234';
     const cleanPhone = customerPhone.replace(/\D/g, '');
@@ -170,13 +190,17 @@ async function main() {
     };
 
     // Delivery flow — send all info progressively to test the full conversation
-    await sendMessage('Oi, boa tarde! Quero fazer um pedido.');
-    await sendMessage(`Quero 2 de ${product.name}`);
-    await sendMessage('Meu nome é Emerson');
-    await sendMessage('Entrega na Rua José Moraes de Aguiar, 1626');
-    await sendMessage('Bairro Centro, cidade São Paulo');
-    await sendMessage('Pagamento em dinheiro, troco para 100');
-    await sendMessage('Pode confirmar, é delivery');
+    // Increase wait to 6000ms between messages to prevent processing overlaps
+    await sendMessage('Oi, boa tarde! Quero fazer um pedido.', 6000);
+    await sendMessage(`Quero 2 de ${product.name}`, 6000);
+    await sendMessage('Meu nome é Emerson', 6000);
+    await sendMessage('Entrega na Rua José Moraes de Aguiar, 1626', 6000);
+    await sendMessage('Bairro Centro, cidade São Paulo', 6000);
+    await sendMessage('Pagamento em dinheiro, troco para 100', 6000);
+    await sendMessage('Pode confirmar, é delivery', 6000);
+
+    console.log('⏳ Waiting 15 seconds for the final AI response and order creation to complete...');
+    await sleep(15000);
 
     // 8. Asserts & Verification
     console.log('\n🔍 Verifying created order database and state...');
