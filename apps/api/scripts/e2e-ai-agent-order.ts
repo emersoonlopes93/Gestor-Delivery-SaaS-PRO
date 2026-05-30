@@ -133,11 +133,57 @@ async function main() {
 
     console.log(`🍕 Selected product for order: ${product.name} (id=${product.id}, basePrice=${product.basePrice})`);
 
-    // Make complement groups optional for this test to avoid required options validation error
-    await prisma.productComplementGroup.updateMany({
-      where: { tenantId: tenant.id },
-      data: { isRequired: false, minSelect: 0 },
+    // 6b. Seed required complement group "Escolha a Borda" with item "Catupiry"
+    //     This ensures the LLM can find real groupId/itemId via consultar_detalhe_produto
+    //     and include them in criar_pedido.
+    const BORDA_GROUP_NAME = 'Escolha a Borda (E2E Test)';
+    const CATUPIRY_ITEM_NAME = 'Catupiry';
+
+    // Remove previous E2E complement group link + group for idempotency
+    const prevGroup = await prisma.productComplementGroup.findFirst({
+      where: { tenantId: tenant.id, name: BORDA_GROUP_NAME },
     });
+    if (prevGroup) {
+      await prisma.productComplementGroupLink.deleteMany({ where: { complementGroupId: prevGroup.id } });
+      await prisma.productComplementItem.deleteMany({ where: { groupId: prevGroup.id } });
+      await prisma.productComplementGroup.delete({ where: { id: prevGroup.id } });
+    }
+
+    const complementGroup = await prisma.productComplementGroup.create({
+      data: {
+        tenantId: tenant.id,
+        name: BORDA_GROUP_NAME,
+        minSelect: 1,
+        maxSelect: 1,
+        isRequired: true,
+        order: 99,
+        items: {
+          create: [
+            { tenantId: tenant.id, name: CATUPIRY_ITEM_NAME, additionalPrice: 5, isActive: true, order: 0 },
+            { tenantId: tenant.id, name: 'Sem Borda', additionalPrice: 0, isActive: true, order: 1 },
+          ],
+        },
+      },
+      include: { items: true },
+    });
+
+    // Link the complement group to the selected product
+    await prisma.productComplementGroupLink.create({
+      data: {
+        tenantId: tenant.id,
+        productId: product.id,
+        complementGroupId: complementGroup.id,
+        order: 99,
+      },
+    });
+
+    const catupiryItem = complementGroup.items.find((i) => i.name === CATUPIRY_ITEM_NAME);
+    if (!catupiryItem) throw new Error('Complement item Catupiry not found after seed!');
+
+    console.log(`✅ Complement group seeded: "${BORDA_GROUP_NAME}" (id=${complementGroup.id})`);
+    console.log(`   - Catupiry item id: ${catupiryItem.id}`);
+    console.log(`   - Group linked to product: ${product.name} (id=${product.id})`);
+
 
     const customerPhone = '5511999991234';
     const cleanPhone = customerPhone.replace(/\D/g, '');
@@ -159,6 +205,7 @@ async function main() {
     });
 
     console.log('\n🧪 === TEST: Delivery Order Flow ===');
+
 
     // 7. Simulating Webhook inbound messages step by step
     // Debounce is 500ms, LLM call + tool call can take ~5-10s each turn
@@ -190,17 +237,18 @@ async function main() {
     };
 
     // Delivery flow — send all info progressively to test the full conversation
-    // Increase wait to 6000ms between messages to prevent processing overlaps
-    await sendMessage('Oi, boa tarde! Quero fazer um pedido.', 6000);
-    await sendMessage(`Quero 2 de ${product.name}`, 6000);
-    await sendMessage('Meu nome é Emerson', 6000);
-    await sendMessage('Entrega na Rua José Moraes de Aguiar, 1626', 6000);
-    await sendMessage('Bairro Centro, cidade São Paulo', 6000);
-    await sendMessage('Pagamento em dinheiro, troco para 100', 6000);
-    await sendMessage('Pode confirmar, é delivery', 6000);
+    // Increased wait times: LLM now needs extra round-trips for consultar_detalhe_produto + criar_pedido
+    const TURN_WAIT_MS = 8000;
+    await sendMessage('Oi, boa tarde! Quero fazer um pedido.', TURN_WAIT_MS);
+    await sendMessage(`Quero 2 de ${product.name} com borda de Catupiry, por favor`, TURN_WAIT_MS);
+    await sendMessage('Meu nome é Emerson', TURN_WAIT_MS);
+    await sendMessage('Entrega na Rua José Moraes de Aguiar, 1626', TURN_WAIT_MS);
+    await sendMessage('Bairro Centro, cidade São Paulo', TURN_WAIT_MS);
+    await sendMessage('Pagamento em dinheiro, troco para 100', TURN_WAIT_MS);
+    await sendMessage('Pode confirmar, é delivery', TURN_WAIT_MS);
 
-    console.log('⏳ Waiting 15 seconds for the final AI response and order creation to complete...');
-    await sleep(15000);
+    console.log('⏳ Waiting 25 seconds for the final AI response and order creation to complete...');
+    await sleep(25000);
 
     // 8. Asserts & Verification
     console.log('\n🔍 Verifying created order database and state...');
@@ -212,7 +260,11 @@ async function main() {
         customerPhone: cleanPhone,
       },
       include: {
-        items: true,
+        items: {
+          include: {
+            complements: true,
+          },
+        },
         deliveryAddress: true,
         timeline: true,
       },
@@ -252,6 +304,22 @@ async function main() {
       // Verify fulfillmentType
       const isDelivery = order.fulfillmentType === 'delivery';
       console.log(`   - FulfillmentType is delivery: ${isDelivery ? 'YES ✅' : `NO ❌ (got: ${order.fulfillmentType})`}`);
+
+      // Verify items and complements
+      for (const item of order.items) {
+        console.log(`   - Item: ${item.snapshotName} x${item.quantity}`);
+        if (item.complements && item.complements.length > 0) {
+          for (const comp of item.complements) {
+            console.log(`     • Complement: ${comp.snapshotName} (R$ ${comp.snapshotPrice})`);
+          }
+        } else {
+          console.log('     • Complements: NONE');
+          if (item.snapshotName.includes('Calabresa')) {
+            console.error('   ❌ Pizza de Calabresa has NO complements! Expected required choice validation.');
+            testFailed = true;
+          }
+        }
+      }
 
       // Verify Timeline
       console.log(`   - Timeline entries: ${order.timeline.length}`);

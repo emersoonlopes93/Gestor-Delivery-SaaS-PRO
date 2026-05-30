@@ -45,29 +45,128 @@ const ConsultarTaxaEntregaSchema = z.object({
   cep: z.string().optional(),
 });
 
-const CriarPedidoSchema = z.object({
-  itens: z.array(z.object({
-    productId: z.string(),
-    quantity: z.number().int(),
-    notes: z.string().optional(),
-  })),
-  fulfillmentType: z.enum(['delivery', 'pickup']).default('delivery'),
-  endereco: z.object({
-    street: z.string(),
-    number: z.string(),
-    neighborhood: z.string(),
-    city: z.string(),
-    state: z.string().optional(),
-    zipCode: z.string().optional(),
-    complement: z.string().optional(),
-    lat: z.number().optional(),
-    lng: z.number().optional(),
-  }).optional(),
-  formaPagamento: z.string(),
-  troco: z.number().optional(),
-  scheduledFor: z.string().optional(),
-  timeSlotId: z.string().optional(),
-});
+/**
+ * Normaliza campos enviados pelo LLM em snake_case para camelCase.
+ * O Gemini serializa campos camelCase como snake_case ao invocar tools
+ * (ex: `forma_pagamento` em vez de `formaPagamento`).
+ */
+function normalizeCriarPedidoArgs(raw: unknown): unknown {
+  if (typeof raw !== 'object' || raw === null) return raw;
+  const obj = raw as Record<string, unknown>;
+
+  // Normaliza campos top-level
+  const normalized: Record<string, unknown> = { ...obj };
+  if (obj['forma_pagamento'] !== undefined && obj['formaPagamento'] === undefined) {
+    normalized['formaPagamento'] = obj['forma_pagamento'];
+    delete normalized['forma_pagamento'];
+  }
+  if (obj['fulfillment_type'] !== undefined && obj['fulfillmentType'] === undefined) {
+    normalized['fulfillmentType'] = obj['fulfillment_type'];
+    delete normalized['fulfillment_type'];
+  }
+  if (obj['scheduled_for'] !== undefined && obj['scheduledFor'] === undefined) {
+    normalized['scheduledFor'] = obj['scheduled_for'];
+    delete normalized['scheduled_for'];
+  }
+  if (obj['time_slot_id'] !== undefined && obj['timeSlotId'] === undefined) {
+    normalized['timeSlotId'] = obj['time_slot_id'];
+    delete normalized['time_slot_id'];
+  }
+
+  // Normaliza campos dentro de cada item
+  if (Array.isArray(obj['itens'])) {
+    normalized['itens'] = obj['itens'].map((item: unknown) => {
+      if (typeof item !== 'object' || item === null) return item;
+      const it = item as Record<string, unknown>;
+      const normItem: Record<string, unknown> = { ...it };
+      if (it['product_id'] !== undefined && it['productId'] === undefined) {
+        normItem['productId'] = it['product_id'];
+        delete normItem['product_id'];
+      }
+      if (it['combo_id'] !== undefined && it['comboId'] === undefined) {
+        normItem['comboId'] = it['combo_id'];
+        delete normItem['combo_id'];
+      }
+      if (it['combo_selections'] !== undefined && it['comboSelections'] === undefined) {
+        normItem['comboSelections'] = it['combo_selections'];
+        delete normItem['combo_selections'];
+      }
+      // Normaliza dentro de complements
+      if (Array.isArray(it['complements'])) {
+        normItem['complements'] = it['complements'].map((c: unknown) => {
+          if (typeof c !== 'object' || c === null) return c;
+          const comp = c as Record<string, unknown>;
+          const normComp: Record<string, unknown> = { ...comp };
+          if (comp['group_id'] !== undefined && comp['groupId'] === undefined) {
+            normComp['groupId'] = comp['group_id'];
+            delete normComp['group_id'];
+          }
+          if (comp['item_id'] !== undefined && comp['itemId'] === undefined) {
+            normComp['itemId'] = comp['item_id'];
+            delete normComp['item_id'];
+          }
+          return normComp;
+        });
+      }
+      // Normaliza dentro de comboSelections
+      if (Array.isArray(normItem['comboSelections'])) {
+        normItem['comboSelections'] = (normItem['comboSelections'] as unknown[]).map((s: unknown) => {
+          if (typeof s !== 'object' || s === null) return s;
+          const sel = s as Record<string, unknown>;
+          const normSel: Record<string, unknown> = { ...sel };
+          if (sel['block_id'] !== undefined && sel['blockId'] === undefined) {
+            normSel['blockId'] = sel['block_id'];
+            delete normSel['block_id'];
+          }
+          if (sel['block_item_id'] !== undefined && sel['blockItemId'] === undefined) {
+            normSel['blockItemId'] = sel['block_item_id'];
+            delete normSel['block_item_id'];
+          }
+          return normSel;
+        });
+      }
+      return normItem;
+    });
+  }
+
+  return normalized;
+}
+
+const CriarPedidoSchema = z.preprocess(
+  normalizeCriarPedidoArgs,
+  z.object({
+    itens: z.array(z.object({
+      productId: z.string().optional(),
+      comboId: z.string().optional(),
+      quantity: z.number().int(),
+      notes: z.string().optional(),
+      complements: z.array(z.object({
+        groupId: z.string(),
+        itemId: z.string(),
+      })).optional(),
+      comboSelections: z.array(z.object({
+        blockId: z.string(),
+        blockItemId: z.string(),
+      })).optional(),
+    })),
+    fulfillmentType: z.enum(['delivery', 'pickup']).default('delivery'),
+    endereco: z.object({
+      street: z.string(),
+      number: z.string(),
+      neighborhood: z.string(),
+      city: z.string(),
+      state: z.string().optional(),
+      zipCode: z.string().optional(),
+      complement: z.string().optional(),
+      lat: z.number().optional(),
+      lng: z.number().optional(),
+    }).optional(),
+    formaPagamento: z.string(),
+    troco: z.number().optional(),
+    scheduledFor: z.string().optional(),
+    timeSlotId: z.string().optional(),
+  }),
+);
 
 const TransferirAtendimentoSchema = z.object({
   motivo: z.string().optional(),
@@ -183,7 +282,7 @@ export class AgentToolsService {
       },
       {
         name: 'criar_pedido',
-        description: 'Cria um pedido final no sistema. Só chame esta função quando o cliente confirmar explicitamente todos os itens, endereço (para delivery) e forma de pagamento. Para pickup (retirada no balcão), omita o campo endereco.',
+        description: 'Cria um pedido final no sistema. Só chame esta função quando o cliente confirmar explicitamente todos os itens, endereço (para delivery) e forma de pagamento. Para pickup (retirada no balcão), omita o campo endereco. IMPORTANTE: se o produto tiver complementos obrigatórios (ex: escolha de borda de pizza), você DEVE chamar consultar_detalhe_produto antes para obter os groupId e itemId corretos e incluí-los no campo complements do item. Nunca crie o pedido sem os complementos obrigatórios.',
         parameters: {
           type: 'object',
           properties: {
@@ -194,14 +293,40 @@ export class AgentToolsService {
             },
             itens: {
               type: 'array',
+              description: 'Lista de itens do pedido. Para produtos com complementos obrigatórios, inclua o campo complements com os IDs obtidos via consultar_detalhe_produto.',
               items: {
                 type: 'object',
                 properties: {
-                  productId: { type: 'string' },
-                  quantity: { type: 'integer' },
-                  notes: { type: 'string' },
+                  productId: { type: 'string', description: 'ID do produto (use consultar_cardapio ou consultar_detalhe_produto para obter)' },
+                  comboId: { type: 'string', description: 'ID do combo — use este OU productId, nunca ambos' },
+                  quantity: { type: 'integer', description: 'Quantidade solicitada pelo cliente' },
+                  notes: { type: 'string', description: 'Observações do item (ex: sem cebola, bem passado)' },
+                  complements: {
+                    type: 'array',
+                    description: 'Seleções de complementos (borda, tamanho, adicionais). Obrigatório quando o produto tem grupos obrigatórios. Use consultar_detalhe_produto para obter groupId e itemId.',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        groupId: { type: 'string', description: 'ID do grupo de complemento (ex: grupo "Escolha a Borda")' },
+                        itemId: { type: 'string', description: 'ID do item dentro do grupo (ex: item "Catupiry")' },
+                      },
+                      required: ['groupId', 'itemId'],
+                    },
+                  },
+                  comboSelections: {
+                    type: 'array',
+                    description: 'Seleções de blocos do combo. Use consultar_detalhe_produto para obter blockId e blockItemId.',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        blockId: { type: 'string', description: 'ID do bloco do combo' },
+                        blockItemId: { type: 'string', description: 'ID do item selecionado no bloco' },
+                      },
+                      required: ['blockId', 'blockItemId'],
+                    },
+                  },
                 },
-                required: ['productId', 'quantity'],
+                required: ['quantity'],
               },
             },
             endereco: {
@@ -722,10 +847,19 @@ export class AgentToolsService {
       const orderDto: CreateOrderDTO = {
         idempotencyKey: Math.random().toString(36).substring(7),
         items: args.itens.map((i) => ({
-          lineType: 'product',
-          productId: i.productId,
+          lineType: i.comboId ? 'combo' : 'product',
+          productId: i.productId || undefined,
+          comboId: i.comboId || undefined,
           quantity: i.quantity,
-          notes: i.notes,
+          notes: i.notes || undefined,
+          complements: i.complements?.map((c) => ({
+            groupId: c.groupId,
+            itemId: c.itemId,
+          })),
+          comboSelections: i.comboSelections?.map((c) => ({
+            blockId: c.blockId,
+            blockItemId: c.blockItemId,
+          })),
         })),
         customerName: ctx.customerName || 'Cliente WhatsApp',
         customerPhone: ctx.customerPhone || '00000000000',
@@ -762,6 +896,71 @@ export class AgentToolsService {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`[AI_ORDER_ERROR] create_order_failed tenantId=${tenantId} error=${message}`);
+
+      // When the error is about missing required complements, return the complement groups
+      // with their IDs so the LLM can retry with the correct complement selections.
+      const isComplementError = message.includes('Selecione pelo menos') ||
+        message.toLowerCase().includes('complement') ||
+        message.toLowerCase().includes('opções em');
+
+      if (isComplementError) {
+        try {
+          const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+          if (tenant) {
+            const payload = await this.storefrontService.getStorefrontPayload(tenant.slug);
+            // Collect missing complement groups for the items that were in the order
+            const itemProductIds = args.itens
+              .map((i) => i.productId)
+              .filter((id): id is string => Boolean(id));
+
+            const missingGroups: Array<{
+              productName: string;
+              groupId: string;
+              groupName: string;
+              required: boolean;
+              options: Array<{ id: string; name: string; additionalPrice: number }>;
+            }> = [];
+
+            for (const cat of payload.categories) {
+              for (const prod of cat.products) {
+                if (!itemProductIds.includes(prod.id)) continue;
+                for (const comp of prod.complements) {
+                  if (!comp.isRequired) continue;
+                  const alreadySelected = args.itens.some((i) =>
+                    i.productId === prod.id &&
+                    i.complements?.some((c) => c.groupId === comp.id),
+                  );
+                  if (!alreadySelected) {
+                    missingGroups.push({
+                      productName: prod.name,
+                      groupId: comp.id,
+                      groupName: comp.name,
+                      required: true,
+                      options: comp.items
+                        .filter((item) => item.isAvailable)
+                        .map((item) => ({ id: item.id, name: item.name, additionalPrice: item.additionalPrice })),
+                    });
+                  }
+                }
+              }
+            }
+
+            if (missingGroups.length > 0) {
+              this.logger.warn(`[AI_ORDER_ERROR] missing_complements count=${missingGroups.length} groups=${missingGroups.map((g) => g.groupName).join(',')}`);
+              return {
+                status: 'error',
+                code: 'MISSING_REQUIRED_COMPLEMENTS',
+                message: `Complementos obrigatórios faltando. Chame criar_pedido novamente incluindo as seleções abaixo no campo complements de cada item.`,
+                missingComplements: missingGroups,
+                instruction: 'Para cada grupo abaixo, escolha uma opção e inclua {groupId, itemId} no array complements do item correspondente em itens[].',
+              };
+            }
+          }
+        } catch (lookupError) {
+          this.logger.warn(`[AI_ORDER_ERROR] complement_lookup_failed error=${lookupError instanceof Error ? lookupError.message : 'Unknown'}`);
+        }
+      }
+
       return { status: 'error', code: 'ORDER_CREATION_FAILED', message: `Erro ao criar pedido: ${message}` };
     }
   }
@@ -1215,12 +1414,14 @@ export class AgentToolsService {
       basePrice: Number(combo.basePrice),
       isAvailable: true,
       blocks: combo.blocks.map((block) => ({
+        blockId: block.id,
         name: block.name,
         minSelect: block.minSelect,
         maxSelect: block.maxSelect,
         items: block.items
           .filter((item) => item.product.isActive && item.product.deletedAt === null)
           .map((item) => ({
+            blockItemId: item.id,
             productId: item.productId,
             name: item.product.name,
             additionalPrice: Number(item.additionalPrice),

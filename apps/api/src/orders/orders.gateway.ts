@@ -52,6 +52,10 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   emitOrderStatusUpdated(token: string, orderNumber: string, status: OrderStatus, note?: string) {
+    if (!this.server) {
+      this.logger.warn('WebSocket server not initialized. Skipping emitOrderStatusUpdated.');
+      return;
+    }
     const event: OrderStatusUpdatedEvent = {
       orderId: '', // Não temos o ID aqui mas o token/number bastam para o front
       orderNumber,
@@ -63,6 +67,10 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   emitNewOrder(tenantId: string, order: OrderListItemDTO) {
+    if (!this.server) {
+      this.logger.warn('WebSocket server not initialized. Skipping emitNewOrder.');
+      return;
+    }
     this.server.to(`tenant:${tenantId}`).emit('newOrder', {
       order,
       timestamp: new Date().toISOString(),

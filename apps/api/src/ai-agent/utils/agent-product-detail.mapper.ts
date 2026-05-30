@@ -4,12 +4,15 @@ import type {
 } from '@gestor/types';
 
 export interface AgentProductOption {
+  /** Use este id como `itemId` em complements ao criar o pedido */
   id: string;
   name: string;
   additionalPrice: number;
 }
 
 export interface AgentProductOptionGroup {
+  /** Use este id como `groupId` em complements ao criar o pedido */
+  groupId: string;
   name: string;
   required: boolean;
   minSelect: number;
@@ -29,12 +32,16 @@ export interface AgentProductDetailResult {
 }
 
 export interface AgentComboBlockItem {
+  /** Use este id como `blockItemId` em comboSelections ao criar o pedido */
+  blockItemId: string;
   productId: string;
   name: string;
   additionalPrice: number;
 }
 
 export interface AgentComboBlock {
+  /** Use este id como `blockId` em comboSelections ao criar o pedido */
+  blockId: string;
   name: string;
   minSelect: number;
   maxSelect: number;
@@ -67,6 +74,7 @@ export function mapStorefrontProductToAgentDetail(
   for (const complement of product.complements) {
     const activeItems = complement.items.filter((item) => item.isAvailable);
     optionGroups.push({
+      groupId: complement.id,
       name: complement.name,
       required: complement.isRequired,
       minSelect: complement.minSelect,
@@ -86,6 +94,7 @@ export function mapStorefrontProductToAgentDetail(
     }
     const activeItems = group.items.filter((item) => item.isActive);
     optionGroups.push({
+      groupId: group.id,
       name: link.overrideName ?? group.name,
       required: link.overrideIsRequired ?? group.isRequired,
       minSelect: link.overrideMinSelect ?? group.minSelect,
@@ -117,10 +126,12 @@ export function mapStorefrontComboToAgentDetail(
   combo: StorefrontComboPayload,
 ): AgentComboDetailResult {
   const blocks: AgentComboBlock[] = (combo.blocks ?? []).map((block) => ({
+    blockId: block.id,
     name: block.name,
     minSelect: block.minSelect,
     maxSelect: block.maxSelect,
     items: block.items.map((item) => ({
+      blockItemId: item.id,
       productId: item.productId,
       name: item.productName,
       additionalPrice: item.additionalPrice,

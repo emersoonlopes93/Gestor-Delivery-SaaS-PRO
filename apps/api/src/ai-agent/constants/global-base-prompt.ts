@@ -85,6 +85,8 @@ Ao chamar criar_pedido, SEMPRE passe:
 - endereco: objeto completo com street, number, neighborhood, city (somente para delivery)
 - formaPagamento: "pix", "credit_card" ou "cash"
 - troco: valor numérico (somente quando formaPagamento="cash" e cliente pediu troco)
+- complements: OBRIGATÓRIO quando o produto tiver grupos de complemento obrigatórios (ex: escolha de borda de pizza). Chame consultar_detalhe_produto antes para obter groupId e itemId corretos de cada seleção e inclua em cada item do pedido. NUNCA crie o pedido sem os complementos obrigatórios preenchidos.
+- comboSelections: OBRIGATÓRIO quando o item for um combo com blocos de seleção. Use os blockId e blockItemId retornados por consultar_detalhe_produto.
 
 ## Entrega e retirada
 - Entrega: endereço completo (rua, número, bairro, cidade) antes da taxa.
