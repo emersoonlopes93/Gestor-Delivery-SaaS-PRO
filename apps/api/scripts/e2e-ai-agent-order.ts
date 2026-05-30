@@ -244,11 +244,11 @@ async function main() {
     await sendMessage('Meu nome é Emerson', TURN_WAIT_MS);
     await sendMessage('Entrega na Rua José Moraes de Aguiar, 1626', TURN_WAIT_MS);
     await sendMessage('Bairro Centro, cidade São Paulo', TURN_WAIT_MS);
-    await sendMessage('Pagamento em dinheiro, troco para 100', TURN_WAIT_MS);
-    await sendMessage('Pode confirmar, é delivery', TURN_WAIT_MS);
+    await sendMessage('Pagamento em dinheiro, troco para 150', TURN_WAIT_MS);
+    await sendMessage('Sim, tudo certo. Pode confirmar o pedido.', 15000);
 
-    console.log('⏳ Waiting 25 seconds for the final AI response and order creation to complete...');
-    await sleep(25000);
+    console.log('⏳ Waiting 35 seconds for the final AI response and order creation to complete...');
+    await sleep(35000);
 
     // 8. Asserts & Verification
     console.log('\n🔍 Verifying created order database and state...');
