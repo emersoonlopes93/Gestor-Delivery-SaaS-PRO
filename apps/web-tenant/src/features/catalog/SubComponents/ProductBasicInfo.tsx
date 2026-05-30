@@ -272,21 +272,21 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
             return (
               <div className="mt-8 pt-8 border-t border-border animate-in fade-in slide-in-from-bottom-2 duration-500">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 bg-primary-100 dark:bg-primary-500/20 rounded-xl flex items-center justify-center text-xl">🍕</div>
+                  <div className="w-10 h-10 bg-primary/10 dark:bg-primary/20 rounded-xl flex items-center justify-center text-xl">🍕</div>
                   <div>
                     <h3 className="text-sm font-black text-foreground uppercase tracking-widest">Configuração de Sabor</h3>
                     <p className="text-[10px] text-primary font-bold uppercase tracking-wider mt-0.5">Preço por tamanho</p>
                   </div>
                 </div>
 
-                <div className="alert-info rounded-3xl p-6 sm:p-8">
-                  <p className="text-sm font-medium mb-8 leading-relaxed">
+                <div className="bg-muted/40 border border-border rounded-3xl p-6 sm:p-8">
+                  <p className="text-sm font-medium mb-8 leading-relaxed text-foreground">
                     Este produto pertence a uma categoria de <strong>Pizzas</strong>. Defina abaixo o valor deste sabor para cada tamanho disponível.
                   </p>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {pizzaSizes.map(size => (
-                      <div key={size.id} className="bg-card p-6 rounded-2xl border border-border shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all group">
+                      <div key={size.id} className="bg-card p-6 rounded-2xl border border-border shadow-sm hover:shadow-md hover:scale-[1.02] transition-all group">
                         <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 group-hover:text-primary transition-colors">
                           {size.name}
                         </label>
@@ -297,7 +297,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                             step="0.01"
                             value={pizzaPrices[size.id] || ''}
                             onChange={(e) => setPizzaPrices({...pizzaPrices, [size.id]: Number(e.target.value)})}
-                            className="w-full pl-12 pr-4 py-3.5 bg-card border border-input rounded-xl outline-none text-base font-black focus:ring-2 focus:ring-primary transition-all placeholder:text-muted-foreground"
+                            className="w-full pl-12 pr-4 py-3.5 bg-card text-foreground border border-input rounded-xl outline-none text-base font-black focus:ring-2 focus:ring-primary transition-all placeholder:text-muted-foreground"
                             placeholder={productForm.basePrice.toString()}
                           />
                         </div>
@@ -325,9 +325,9 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
               type="button"
               onClick={handleSaveProduct}
               disabled={savingStates.saveProduct}
-              className="px-8 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-black rounded-xl shadow-lg shadow-primary/20 transition-all disabled:opacity-50 flex items-center gap-3"
+              className="px-8 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-black rounded-xl shadow-lg shadow-primary/20 transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-3"
             >
-              {savingStates.saveProduct && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+              {savingStates.saveProduct && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
               {isNew ? 'CRIAR PRODUTO' : 'SALVAR ALTERAÇÕES'}
             </button>
           )}

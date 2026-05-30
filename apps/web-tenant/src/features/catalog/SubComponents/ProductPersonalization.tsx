@@ -50,14 +50,14 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
             <button
               type="button"
               onClick={openAddGroupModal}
-              className="px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl transition-all"
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-all"
             >
               Vincular complemento
             </button>
             <button
               type="button"
               onClick={() => setIsCreateComplementModalOpen(true)}
-              className="px-4 py-2 text-sm font-bold alert-info rounded-xl transition-all"
+              className="px-4 py-2 text-sm font-bold bg-muted text-foreground border border-border hover:bg-muted/80 rounded-xl transition-all"
             >
               Criar novo complemento
             </button>
@@ -83,7 +83,7 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
                 type="button"
                 onClick={() => moveLink(l.id, -1)}
                 disabled={savingStates.reorderLinks}
-                className="px-3 py-2 text-xs font-black text-foreground bg-muted/50 dark:bg-muted/80 hover:bg-muted dark:hover:bg-muted/90 rounded-xl border border-border disabled:opacity-50 transition-all"
+                className="px-3 py-2 text-xs font-black text-foreground bg-card hover:bg-muted rounded-xl border border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
               >
                 Subir
               </button>
@@ -91,14 +91,14 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
                 type="button"
                 onClick={() => moveLink(l.id, 1)}
                 disabled={savingStates.reorderLinks}
-                className="px-3 py-2 text-xs font-black text-foreground bg-muted/50 dark:bg-muted/80 hover:bg-muted dark:hover:bg-muted/90 rounded-xl border border-border disabled:opacity-50 transition-all"
+                className="px-3 py-2 text-xs font-black text-foreground bg-card hover:bg-muted rounded-xl border border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
               >
                 Descer
               </button>
               <button
                 type="button"
                 onClick={() => openEditLinkModal(l)}
-                className="px-3 py-2 text-xs font-black alert-info rounded-xl transition-all"
+                className="px-3 py-2 text-xs font-black bg-muted text-foreground hover:bg-muted/80 rounded-xl transition-all"
               >
                 Overrides
               </button>
@@ -106,7 +106,7 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
                 type="button"
                 onClick={() => removeGroupLink(l.id)}
                 disabled={savingStates[`remove-${l.id}`]}
-                className="px-3 py-2 text-xs font-black alert-danger rounded-xl disabled:opacity-50 transition-all"
+                className="px-3 py-2 text-xs font-black bg-destructive/10 text-destructive hover:bg-destructive/20 rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
               >
                 Remover
               </button>
@@ -151,7 +151,7 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
                       type="button"
                       onClick={() => moveLink(l.id, -1)}
                       disabled={savingStates.reorderLinks}
-                      className="px-2 py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded disabled:opacity-50 transition-all"
+                      className="px-2 py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
                       title="Subir"
                     >
                       {savingStates.reorderLinks ? <div className="w-3 h-3 border border-muted-foreground border-t-transparent rounded-full animate-spin" /> : '↑'}
@@ -160,7 +160,7 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
                       type="button"
                       onClick={() => moveLink(l.id, 1)}
                       disabled={savingStates.reorderLinks}
-                      className="px-2 py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded disabled:opacity-50 transition-all"
+                      className="px-2 py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
                       title="Descer"
                     >
                       {savingStates.reorderLinks ? <div className="w-3 h-3 border border-muted-foreground border-t-transparent rounded-full animate-spin" /> : '↓'}
@@ -176,7 +176,7 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
                       type="button"
                       onClick={() => removeGroupLink(l.id)}
                       disabled={savingStates[`remove-${l.id}`]}
-                      className="px-3 py-1 text-xs font-bold text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 rounded disabled:opacity-50 transition-all flex items-center gap-1"
+                      className="px-3 py-1 text-xs font-bold text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 rounded disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center gap-1"
                     >
                       {savingStates[`remove-${l.id}`] && <div className="w-3 h-3 border border-red-600 border-t-transparent rounded-full animate-spin" />}
                       Remover
@@ -197,7 +197,7 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
             <button
               type="button"
               onClick={openAddGroupModal}
-              className="px-6 py-2.5 text-sm font-black alert-info rounded-xl transition-all"
+              className="px-6 py-2.5 text-sm font-black text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-all"
             >
               Vincular meu primeiro complemento
             </button>
@@ -210,14 +210,14 @@ export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
           <button
             type="button"
             onClick={goPrevWizardStep}
-            className="px-8 py-3 bg-muted hover:bg-muted/80 text-foreground font-black rounded-xl transition-all"
+            className="px-8 py-3 bg-card border border-border text-foreground hover:bg-muted font-black rounded-xl transition-all"
           >
             Voltar
           </button>
           <button
             type="button"
             onClick={goNextWizardStep}
-            className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-xl shadow-lg shadow-primary-200 transition-all"
+            className="px-8 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-black rounded-xl shadow-lg shadow-primary/20 transition-all"
           >
             Próximo
           </button>

@@ -46,7 +46,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
               type="button"
               onClick={() => patchPublication({ publicationStatus: 'draft' })}
               disabled={savingStates.patchPublication}
-              className="px-3 py-2 text-sm font-bold text-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded-xl border border-border bg-card disabled:opacity-50 transition-all flex items-center gap-2"
+              className="px-3 py-2 text-sm font-bold text-foreground bg-card hover:bg-muted rounded-xl border border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center gap-2"
             >
               {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />}
               Rascunho
@@ -55,16 +55,16 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
               type="button"
               onClick={() => patchPublication({ publicationStatus: 'published' })}
               disabled={savingStates.patchPublication}
-              className="px-3 py-2 text-sm font-bold text-white bg-primary hover:bg-primary/90 rounded-xl disabled:opacity-50 transition-all flex items-center gap-2"
+              className="px-3 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center gap-2"
             >
-              {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+              {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
               Publicar
             </button>
             <button
               type="button"
               onClick={() => patchPublication({ operationalStatus: 'active' })}
               disabled={savingStates.patchPublication}
-              className="px-3 py-2 text-sm font-bold text-white bg-status-success hover:bg-status-success/90 rounded-xl disabled:opacity-50 transition-all flex items-center gap-2"
+              className="px-3 py-2 text-sm font-bold text-white bg-status-success hover:bg-status-success/90 rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center gap-2"
             >
               {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
               Ativo
@@ -73,25 +73,25 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
               type="button"
               onClick={() => patchPublication({ operationalStatus: 'hidden' })}
               disabled={savingStates.patchPublication}
-              className="px-3 py-2 text-sm font-bold alert-warning rounded-xl disabled:opacity-50 transition-all flex items-center gap-2"
+              className="px-3 py-2 text-sm font-bold bg-status-warning/10 text-status-warning hover:bg-status-warning/20 border border-status-warning/20 rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center gap-2"
             >
-              {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-amber-700 border-t-transparent rounded-full animate-spin" />}
+              {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-status-warning border-t-transparent rounded-full animate-spin" />}
               Oculto
             </button>
             <button
               type="button"
               onClick={() => patchPublication({ operationalStatus: 'sold_out_manual' })}
               disabled={savingStates.patchPublication}
-              className="px-3 py-2 text-sm font-bold alert-danger rounded-xl disabled:opacity-50 transition-all flex items-center gap-2"
+              className="px-3 py-2 text-sm font-bold bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center gap-2"
             >
-              {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-red-700 border-t-transparent rounded-full animate-spin" />}
+              {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-destructive border-t-transparent rounded-full animate-spin" />}
               Esgotado
             </button>
             <button
               type="button"
               onClick={() => patchPublication({ operationalStatus: 'inactive' })}
               disabled={savingStates.patchPublication}
-              className="px-3 py-2 text-sm font-bold text-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded-xl border border-border bg-card disabled:opacity-50 transition-all flex items-center gap-2"
+              className="px-3 py-2 text-sm font-bold text-foreground bg-card hover:bg-muted rounded-xl border border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center gap-2"
             >
               {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />}
               Inativo
@@ -114,7 +114,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
           <button
             type="button"
             onClick={() => openRuleModal()}
-            className="px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-lg transition-all"
+            className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl shadow-lg transition-all"
           >
             Nova regra
           </button>
@@ -141,7 +141,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
                   {r.startTime} - {r.endTime}
                 </td>
                 <td className="px-6 py-4">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${r.isActive ? 'status-badge-success' : 'status-badge-danger'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${r.isActive ? 'bg-status-success/10 text-status-success border border-status-success/20' : 'bg-destructive/10 text-destructive border border-destructive/20'}`}>
                     {r.isActive ? 'Ativo' : 'Inativo'}
                   </span>
                 </td>
@@ -158,7 +158,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
                       type="button"
                       onClick={() => deleteRule(r.id)}
                       disabled={savingStates[`delete-rule-${r.id}`]}
-                      className="px-3 py-1 text-xs font-bold text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 rounded disabled:opacity-50 transition-all flex items-center gap-1"
+                      className="px-3 py-1 text-xs font-bold text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 rounded disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center gap-1"
                     >
                       {savingStates[`delete-rule-${r.id}`] && <div className="w-3 h-3 border border-red-600 border-t-transparent rounded-full animate-spin" />}
                       Excluir
@@ -182,7 +182,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
             <button
               type="button"
               onClick={goPrevWizardStep}
-              className="px-8 py-3 bg-muted hover:bg-muted/80 text-foreground font-black rounded-xl transition-all"
+              className="px-8 py-3 bg-card border border-border text-foreground hover:bg-muted font-black rounded-xl transition-all"
             >
               Voltar
             </button>
@@ -190,9 +190,9 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
               type="button"
               onClick={handleSaveProduct}
               disabled={savingStates.saveProduct}
-              className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-xl shadow-lg transition-all flex items-center gap-2"
+              className="px-8 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-black rounded-xl shadow-lg shadow-primary/20 transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              {savingStates.saveProduct && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+              {savingStates.saveProduct && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
               {isComboWizard ? 'Finalizar Combo' : 'Finalizar Produto'}
             </button>
           </div>

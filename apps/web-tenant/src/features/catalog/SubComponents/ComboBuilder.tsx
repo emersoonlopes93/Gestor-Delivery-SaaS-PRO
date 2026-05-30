@@ -76,7 +76,7 @@ export const ComboBuilder: React.FC<ComboBuilderProps> = ({
   return (
     <section className="space-y-4 text-left">
       {productForm.type !== 'combo' ? (
-        <div className="alert-warning rounded-2xl p-8 text-center shadow-sm">
+        <div className="bg-status-warning/10 border border-status-warning/20 text-status-warning rounded-2xl p-8 text-center shadow-sm">
           <div className="text-3xl mb-4">🍱</div>
           <div className="font-black text-lg mb-2">Este produto não é um Combo</div>
           <div className="text-sm mb-6 mx-auto max-w-md">
@@ -96,7 +96,7 @@ export const ComboBuilder: React.FC<ComboBuilderProps> = ({
               <button
                 type="button"
                 onClick={() => openBundleItemModal()}
-                className="px-6 py-2.5 text-sm font-black text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-lg shadow-primary-100 transition-all flex items-center gap-2 whitespace-nowrap"
+                className="px-6 py-2.5 text-sm font-black text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center gap-2 whitespace-nowrap"
               >
                 <span>➕</span> Adicionar item do cardápio
               </button>
@@ -104,7 +104,7 @@ export const ComboBuilder: React.FC<ComboBuilderProps> = ({
           </div>
 
           {comboModeState !== 'bundle' ? (
-            <div className="alert-warning rounded-2xl p-4">
+            <div className="bg-status-warning/10 border border-status-warning/20 text-status-warning rounded-2xl p-4">
               <div className="font-black">Este combo está em modo legado (slot)</div>
               <p className="text-sm mt-1">
                 Para usar "Itens do Combo" e estratégia de preço, converta este combo para modo bundle.
@@ -113,7 +113,7 @@ export const ComboBuilder: React.FC<ComboBuilderProps> = ({
                 type="button"
                 onClick={convertComboToBundle}
                 disabled={savingStates.convertBundle}
-                className="mt-3 px-4 py-2 text-sm font-bold text-white bg-status-warning hover:bg-status-warning/90 rounded-xl disabled:opacity-50 flex items-center gap-2"
+                className="mt-3 px-4 py-2 text-sm font-bold text-white bg-status-warning hover:bg-status-warning/90 rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {savingStates.convertBundle && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                 Converter para bundle
@@ -145,9 +145,9 @@ export const ComboBuilder: React.FC<ComboBuilderProps> = ({
                 type="button"
                 onClick={updateComboPricing}
                 disabled={savingStates.updateComboPricing || comboModeState !== 'bundle'}
-                className="px-4 py-2.5 text-sm font-black text-white bg-primary-600 hover:bg-primary-700 rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+                className="px-4 py-2.5 text-sm font-black text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                {savingStates.updateComboPricing && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {savingStates.updateComboPricing && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
                 Aplicar estratégia
               </button>
             </div>
@@ -194,7 +194,7 @@ export const ComboBuilder: React.FC<ComboBuilderProps> = ({
                               type="button"
                               onClick={() => deleteBundleItem(item.id)}
                               disabled={savingStates[`delete-bundle-${item.id}`]}
-                              className="px-3 py-1 text-xs font-bold text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 rounded disabled:opacity-50 transition-all"
+                              className="px-3 py-1 text-xs font-bold text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 rounded disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
                             >
                               Excluir
                             </button>
@@ -230,7 +230,7 @@ export const ComboBuilder: React.FC<ComboBuilderProps> = ({
                   {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(bundleSummary?.discountTotal ?? 0))}
                 </div>
               </div>
-              <div className="rounded-xl alert-info p-3">
+              <div className="rounded-xl bg-primary/10 border border-primary/20 text-primary p-3">
                 <div className="font-bold">Preço final do combo</div>
                 <div className="text-lg font-black mt-1">
                   {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(bundleSummary?.finalPrice ?? productForm.basePrice ?? 0))}
@@ -254,7 +254,7 @@ export const ComboBuilder: React.FC<ComboBuilderProps> = ({
                       type="button"
                       onClick={() => moveSlot(s.id, -1)}
                       disabled={savingStates.reorderSlots}
-                      className="px-3 py-2 sm:px-2 sm:py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded-xl sm:rounded disabled:opacity-50 transition-all"
+                      className="px-3 py-2 sm:px-2 sm:py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded-xl sm:rounded disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
                     >
                       {savingStates.reorderSlots ? <div className="w-3 h-3 border border-muted-foreground border-t-transparent rounded-full animate-spin" /> : '↑'}
                     </button>
@@ -262,14 +262,14 @@ export const ComboBuilder: React.FC<ComboBuilderProps> = ({
                       type="button"
                       onClick={() => moveSlot(s.id, 1)}
                       disabled={savingStates.reorderSlots}
-                      className="px-3 py-2 sm:px-2 sm:py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded-xl sm:rounded disabled:opacity-50 transition-all"
+                      className="px-3 py-2 sm:px-2 sm:py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded-xl sm:rounded disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
                     >
                       {savingStates.reorderSlots ? <div className="w-3 h-3 border border-muted-foreground border-t-transparent rounded-full animate-spin" /> : '↓'}
                     </button>
                     <button
                       type="button"
                       onClick={() => openAllowedModal(s.id)}
-                      className="px-3 py-2 sm:py-1 text-xs font-bold text-primary-700 hover:bg-primary-50 rounded-xl sm:rounded transition-all"
+                      className="px-3 py-2 sm:py-1 text-xs font-bold text-primary hover:bg-primary/10 rounded-xl sm:rounded transition-all"
                     >
                       Adicionar produto
                     </button>
@@ -284,7 +284,7 @@ export const ComboBuilder: React.FC<ComboBuilderProps> = ({
                       type="button"
                       onClick={() => deleteSlot(s.id)}
                       disabled={savingStates[`delete-slot-${s.id}`]}
-                      className="col-span-2 sm:col-auto px-3 py-2 sm:py-1 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl sm:rounded disabled:opacity-50 transition-all flex items-center justify-center gap-1"
+                      className="col-span-2 sm:col-auto px-3 py-2 sm:py-1 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl sm:rounded disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1"
                     >
                       {savingStates[`delete-slot-${s.id}`] && <div className="w-3 h-3 border border-red-600 border-t-transparent rounded-full animate-spin" />}
                       Excluir
@@ -327,7 +327,7 @@ export const ComboBuilder: React.FC<ComboBuilderProps> = ({
               <button
                 type="button"
                 onClick={goNextWizardStep}
-                className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white font-black rounded-xl shadow-lg transition-all"
+                className="px-8 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-black rounded-xl shadow-lg transition-all"
               >
                 Próximo
               </button>
