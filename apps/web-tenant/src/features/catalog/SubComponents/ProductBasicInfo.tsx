@@ -295,8 +295,14 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                           <input
                             type="number"
                             step="0.01"
-                            value={pizzaPrices[size.id] || ''}
-                            onChange={(e) => setPizzaPrices({...pizzaPrices, [size.id]: Number(e.target.value)})}
+                            value={Reflect.get(pizzaPrices, size.id) || ''}
+                            onChange={(e) => {
+                              const nextPrices = { ...pizzaPrices };
+                              if (size.id !== '__proto__' && size.id !== 'constructor') {
+                                Reflect.set(nextPrices, size.id, Number(e.target.value));
+                              }
+                              setPizzaPrices(nextPrices);
+                            }}
                             className="w-full pl-12 pr-4 py-3.5 bg-card text-foreground border border-input rounded-xl outline-none text-base font-black focus:ring-2 focus:ring-primary transition-all placeholder:text-muted-foreground"
                             placeholder={productForm.basePrice.toString()}
                           />

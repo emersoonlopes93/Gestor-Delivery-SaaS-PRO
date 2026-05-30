@@ -79,11 +79,11 @@ type ProductV2EditorPageProps = {
 const COMBO_WIZARD_TABS: TabKey[] = ['geral', 'combo', 'publicacao'];
 const PRODUCT_WIZARD_TABS: TabKey[] = ['geral', 'personalizacao', 'publicacao'];
 
-const CHANNEL_LABELS: Record<string, string> = {
-  storefront_delivery: 'Delivery',
-  storefront_pickup: 'Retirada',
-  pos: 'Balcao / PDV',
-};
+const CHANNEL_LABELS = new Map<string, string>([
+  ['storefront_delivery', 'Delivery'],
+  ['storefront_pickup', 'Retirada'],
+  ['pos', 'Balcao / PDV'],
+]);
 
 const DAY_OPTIONS = [
   { value: 1, label: 'Segunda-feira' },
@@ -95,7 +95,7 @@ const DAY_OPTIONS = [
   { value: 0, label: 'Domingo' },
 ];
 
-const formatChannelLabel = (channel?: string | null) => CHANNEL_LABELS[channel ?? ''] ?? String(channel ?? '-');
+const formatChannelLabel = (channel?: string | null) => CHANNEL_LABELS.get(channel ?? '') ?? String(channel ?? '-');
 
 const formatDaysLabel = (days: number[] = []) => {
   const set = new Set(days);
@@ -282,7 +282,9 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
         if (prodRes.data.optionItemPrices) {
           const pricesMap: Record<string, number> = {};
           prodRes.data.optionItemPrices.forEach((p) => {
-            pricesMap[p.optionItemId] = Number(p.price);
+            if (p.optionItemId !== '__proto__' && p.optionItemId !== 'constructor') {
+              Reflect.set(pricesMap, p.optionItemId, Number(p.price));
+            }
           });
           setPizzaPrices(pricesMap);
         }

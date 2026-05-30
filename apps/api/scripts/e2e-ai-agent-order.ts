@@ -343,7 +343,7 @@ async function main() {
 
     // Check last outbound sent message to ensure no technical leak
     if (sentMessages.length > 0) {
-      const lastSentMessage = sentMessages[sentMessages.length - 1];
+      const lastSentMessage = sentMessages.at(-1);
       const hasTechnicalDetails = /tool_outputs|tool_result|tool_call|json|{/i.test(lastSentMessage?.text ?? '');
       console.log(`\n   - Last AI response has technical leaks: ${hasTechnicalDetails ? 'YES ❌ (FAIL)' : 'NO ✅ (PASS)'}`);
       if (hasTechnicalDetails) {

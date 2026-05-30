@@ -6,17 +6,17 @@ interface OrderTimelineSectionProps {
   timeline: OrderTimelineEntryDTO[];
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pedido Recebido',
-  confirmed: 'Pedido Confirmado',
-  preparing: 'Iniciado Preparo',
-  ready_for_pickup: 'Pronto p/ Retirada',
-  ready_for_delivery: 'Pronto p/ Entrega',
-  out_for_delivery: 'Saiu para Entrega',
-  completed: 'Pedido Entregue',
-  cancelled: 'Pedido Cancelado',
-  draft: 'Rascunho',
-};
+const STATUS_LABELS = new Map<string, string>([
+  ['pending', 'Pedido Recebido'],
+  ['confirmed', 'Pedido Confirmado'],
+  ['preparing', 'Iniciado Preparo'],
+  ['ready_for_pickup', 'Pronto p/ Retirada'],
+  ['ready_for_delivery', 'Pronto p/ Entrega'],
+  ['out_for_delivery', 'Saiu para Entrega'],
+  ['completed', 'Pedido Entregue'],
+  ['cancelled', 'Pedido Cancelado'],
+  ['draft', 'Rascunho'],
+]);
 
 export const OrderTimelineSection = memo(function OrderTimelineSection({ timeline }: OrderTimelineSectionProps) {
   
@@ -59,7 +59,7 @@ export const OrderTimelineSection = memo(function OrderTimelineSection({ timelin
               <div className="pb-6">
                 <div className="flex items-center gap-2">
                   <p className={`text-xs font-black uppercase tracking-tight ${isLast ? 'text-foreground' : 'text-muted-foreground'}`}>
-                    {STATUS_LABELS[entry.status] || entry.status}
+                    {STATUS_LABELS.get(entry.status) || entry.status}
                   </p>
                   <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-1">
                     <Clock className="w-3 h-3 text-primary" />
