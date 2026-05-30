@@ -109,7 +109,7 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto">
-      <div className="bg-card rounded-xl shadow-xl w-full max-w-md my-8">
+      <div className="bg-card text-card-foreground border border-border rounded-2xl shadow-xl w-full max-w-md my-8">
         <div className="border-b border-border px-6 py-4 flex items-center justify-between">
           <h2 className="text-lg font-bold text-foreground">
             {driver ? 'Editar Entregador' : 'Novo Entregador'}
@@ -125,18 +125,18 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
 
         {generatedPin ? (
           <div className="p-6 space-y-6">
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-xl p-4 flex gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+            <div className="bg-status-warning/10 dark:bg-status-warning/10 border border-status-warning/20 dark:border-status-warning/30 rounded-xl p-4 flex gap-3">
+              <AlertCircle className="w-5 h-5 text-status-warning shrink-0" />
               <div>
-                <p className="text-sm font-bold text-amber-900 dark:text-amber-100">Código de Acesso Gerado</p>
-                <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                <p className="text-sm font-bold text-status-warning">Código de Acesso Gerado</p>
+                <p className="text-xs text-status-warning/80 mt-1">
                   Este código será exibido **apenas uma vez**. Copie e envie agora para o entregador.
                 </p>
               </div>
             </div>
 
             <div className="flex flex-col items-center justify-center py-4 space-y-4">
-              <div className="text-4xl font-black tracking-widest text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-8 py-4 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700">
+              <div className="text-4xl font-black tracking-widest text-foreground bg-muted px-8 py-4 rounded-2xl border-2 border-dashed border-border">
                 {generatedPin}
               </div>
               
@@ -155,7 +155,7 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
               </p>
               <button
                 onClick={onClose}
-                className="w-full py-3 bg-slate-900 dark:bg-white text-white text-foreground rounded-xl font-bold shadow-lg active:scale-[0.98] transition-all"
+                className="w-full py-3 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-bold shadow-lg active:scale-[0.98] transition-all"
               >
                 Concluir e Fechar
               </button>
@@ -170,7 +170,7 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="mt-1 block w-full rounded-md border border-input px-3 py-2 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm bg-card text-foreground"
+                className="input-premium mt-1"
               />
             </div>
 
@@ -182,7 +182,7 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
                 onChange={(e) => setPhone(e.target.value)}
                 required
                 placeholder="(00) 00000-0000"
-                className="mt-1 block w-full rounded-md border border-input px-3 py-2 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm bg-card text-foreground"
+                className="input-premium mt-1"
               />
             </div>
 
@@ -191,7 +191,7 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
               <select
                 value={vehicleType}
                 onChange={(e) => setVehicleType(e.target.value as DriverVehicleType)}
-                className="mt-1 block w-full rounded-md border border-input px-3 py-2 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm bg-card text-foreground"
+                className="input-premium mt-1"
               >
                 <option value="motorcycle">Moto</option>
                 <option value="bicycle">Bicicleta</option>
@@ -206,7 +206,7 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value as DriverStatus)}
-                    className="mt-1 block w-full rounded-md border border-input px-3 py-2 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm bg-card text-foreground"
+                    className="input-premium mt-1"
                   >
                     <option value="available">Disponível</option>
                     <option value="busy">Ocupado (Em rota / Ocupado logicamente)</option>
@@ -246,7 +246,7 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}
-                className="mt-1 block w-full rounded-md border border-input px-3 py-2 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm bg-card text-foreground"
+                className="input-premium mt-1 min-h-[80px]"
               />
             </div>
 
@@ -255,14 +255,14 @@ export function DriverFormModal({ isOpen, onClose, driver }: Props) {
                 type="button"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="px-4 py-2 text-sm font-medium text-foreground hover:bg-muted bg-card border border-input rounded-md shadow-sm transition-colors disabled:opacity-50"
+                className="px-4 py-2 text-sm font-semibold text-foreground bg-card border border-border rounded-xl hover:bg-muted transition-colors disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md shadow-sm transition-colors disabled:opacity-50"
+                className="px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-colors disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
               >
                 {isSubmitting ? 'Salvando...' : 'Salvar'}
               </button>

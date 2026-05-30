@@ -1213,7 +1213,7 @@ export function DeliveryZonesPageRefactored() {
             type="button"
             onClick={handleSaveZone}
             disabled={savingZone}
-            className="h-12 flex-1 rounded-xl bg-card text-primary-foreground text-sm font-black hover:bg-card disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 shadow-md transition-all"
+            className="h-12 flex-1 rounded-xl bg-primary text-primary-foreground text-sm font-black hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 shadow-md transition-all"
           >
             {savingZone ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
             Salvar
@@ -1269,7 +1269,7 @@ export function DeliveryZonesPageRefactored() {
             <button
               type="button"
               onClick={openNewZone}
-              className="h-12 w-full rounded-xl bg-primary-600 text-white text-sm font-black hover:bg-primary-700 transition-all shadow-md inline-flex items-center justify-center gap-2"
+              className="h-12 w-full rounded-xl bg-primary text-primary-foreground text-sm font-black hover:bg-primary/90 transition-all shadow-md inline-flex items-center justify-center gap-2"
             >
               <Plus className="h-5 w-5" />
               Desenhar nova zona
@@ -1297,8 +1297,8 @@ export function DeliveryZonesPageRefactored() {
                 className={
                   'h-10 rounded-xl border text-sm font-bold transition-all inline-flex items-center justify-center gap-2 shadow-sm ' +
                   (simulationOn
-                    ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90 bg-card text-foreground hover:bg-card'
-                    : 'bg-card text-foreground border-input hover:bg-muted')
+                    ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90'
+                    : 'bg-card text-foreground border border-border hover:bg-muted')
                 }
               >
                 <Target className="h-4 w-4" />
@@ -1320,7 +1320,7 @@ export function DeliveryZonesPageRefactored() {
                     onChange={() => setCoverageDraft((d) => ({ ...d, isDeliveryEnabled: !d.isDeliveryEnabled }))}
                   />
                   <div
-                    className={`w-11 h-6 rounded-full transition-colors relative ${coverageDraft.isDeliveryEnabled ? 'bg-primary-600' : 'bg-muted'}`}
+                    className={`w-11 h-6 rounded-full transition-colors relative ${coverageDraft.isDeliveryEnabled ? 'bg-primary' : 'bg-muted border border-border'}`}
                   >
                     <div
                       className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${coverageDraft.isDeliveryEnabled ? 'translate-x-5' : 'translate-x-0'}`}
@@ -1341,7 +1341,7 @@ export function DeliveryZonesPageRefactored() {
                   step={0.1}
                   value={coverageDraft.maxRadiusKm}
                   onChange={(e) => setCoverageDraft((d) => ({ ...d, maxRadiusKm: Number(e.target.value) }))}
-                  className="w-full h-10 px-3 rounded-lg border border-input bg-card focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                  className="input-premium"
                 />
               </div>
               <div>
@@ -1356,7 +1356,7 @@ export function DeliveryZonesPageRefactored() {
                   onChange={(e) =>
                     setCoverageDraft((d) => ({ ...d, defaultPricePerKm: Number(e.target.value) }))
                   }
-                  className="w-full h-10 px-3 rounded-lg border border-input bg-card focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                  className="input-premium"
                 />
               </div>
             </div>
@@ -1364,7 +1364,7 @@ export function DeliveryZonesPageRefactored() {
               type="button"
               onClick={handleSaveCoverage}
               disabled={savingCoverage}
-              className="w-full h-10 rounded-lg bg-muted text-foreground text-sm font-bold hover:bg-muted transition-all inline-flex items-center justify-center gap-2"
+              className="w-full h-10 rounded-xl bg-card text-foreground border border-border text-sm font-bold hover:bg-muted transition-all inline-flex items-center justify-center gap-2 shadow-sm"
             >
               {savingCoverage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Salvar cobertura base
@@ -1379,9 +1379,9 @@ export function DeliveryZonesPageRefactored() {
             
             <div className="mt-4">
               {visibleZones.length === 0 ? (
-                <div className="text-center py-8 rounded-xl border border-dashed border-input">
-                  <MapPin className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                  <div className="text-sm font-semibold text-muted-foreground">Sem zonas criadas</div>
+                <div className="text-center py-8 bg-muted/20 border border-dashed border-border text-muted-foreground rounded-2xl p-4">
+                  <MapPin className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <div className="text-sm font-bold">Sem zonas criadas</div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1516,12 +1516,12 @@ export function DeliveryZonesPageRefactored() {
                 >
                   <div
                     className={
-                      'w-[260px] rounded-xl border p-3 shadow-md backdrop-blur-md ' +
+                      'w-[280px] rounded-2xl border p-4 shadow-lg backdrop-blur-md bg-card text-card-foreground ' +
                       (simulationDecision
                         ? simulationDecision.canDeliver
-                          ? 'bg-status-success/90 dark:bg-status-success/80 border-status-success dark:border-status-success'
-                          : 'bg-red-50/90 dark:bg-red-900/80 border-red-300 dark:border-red-700'
-                        : 'bg-card/85 border-input')
+                          ? 'border-status-success/30 border-l-4 border-l-status-success'
+                          : 'border-destructive/30 border-l-4 border-l-destructive'
+                        : 'border-border')
                     }
                   >
                     {simulationLoading ? (
@@ -1637,7 +1637,7 @@ export function DeliveryZonesPageRefactored() {
         )}
 
         <div className="hidden lg:block absolute bottom-6 right-6 z-[1000] pointer-events-none">
-          <div className="bg-card/90 backdrop-blur-md border border-input rounded-xl shadow-lg p-4 space-y-3">
+          <div className="bg-card/90 backdrop-blur-md border border-border rounded-2xl shadow-lg p-4 space-y-3">
             <div className="text-xs font-bold text-foreground mb-1 uppercase tracking-wider">Legenda</div>
             <div className="flex items-center gap-3 text-xs font-semibold text-muted-foreground">
               <div className="w-3.5 h-3.5 rounded-full bg-blue-500 border border-blue-600" />
@@ -1790,7 +1790,7 @@ export function DeliveryZonesPageRefactored() {
                 <button
                   type="button"
                   onClick={openNewZone}
-                  className="w-full h-11 px-4 rounded-xl bg-primary-600 text-white text-sm font-black hover:bg-primary-700 transition-all duration-200 shadow-sm inline-flex items-center justify-center gap-2"
+                  className="w-full h-11 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-black hover:bg-primary/90 transition-all duration-200 shadow-sm inline-flex items-center justify-center gap-2"
                 >
                   <Plus className="h-5 w-5" />
                   Criar primeira zona

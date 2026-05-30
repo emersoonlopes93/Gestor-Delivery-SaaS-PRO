@@ -16,6 +16,7 @@ interface OperatingHourForm {
 }
 
 import { Clock, Pause, Save, Copy, Calendar, MapPin, Building2 } from 'lucide-react';
+import { PageHeader } from '../../components/ui/PageHeader';
 
 async function geocodeNominatim(address: string): Promise<{ lat: number; lng: number } | null> {
   try {
@@ -307,10 +308,10 @@ export function SettingsPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto text-left space-y-8">
-      <div>
-        <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Configurações da Loja</h1>
-        <p className="text-muted-foreground mt-1 font-medium">Gerencie o funcionamento e informações do seu estabelecimento.</p>
-      </div>
+      <PageHeader
+        title="Configurações da Loja"
+        description="Gerencie o funcionamento e informações do seu estabelecimento."
+      />
 
       {settings.businessGroupId && (
         <div className="bg-indigo-600 rounded-2xl shadow-lg p-5 text-white flex items-center justify-between">
@@ -330,7 +331,7 @@ export function SettingsPage() {
       )}
 
       {/* Pausa Manual */}
-      <div className={`bg-card rounded-2xl shadow-sm border p-6 transition-all ${settings.isStorePaused ? 'border-amber-200 bg-amber-50/30' : 'border-border'}`}>
+      <div className={`bg-card rounded-2xl shadow-sm border p-6 transition-all ${settings.isStorePaused ? 'border-status-warning/20 bg-status-warning/5 dark:border-status-warning/30 dark:bg-status-warning/5' : 'border-border'}`}>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
             <div className={`p-3 rounded-xl ${settings.isStorePaused ? 'bg-status-warning/10 text-status-warning' : 'bg-status-success/10 text-status-success'}`}>
@@ -348,7 +349,7 @@ export function SettingsPage() {
                 placeholder="Motivo da pausa (opcional)"
                 value={settings.storePauseReason || ''}
                 onChange={(e) => setSettings({ ...settings, storePauseReason: e.target.value })}
-                className="input-premium border-amber-200 dark:border-amber-500/30 focus:border-amber-500 w-64 !py-2"
+                className="input-premium border-status-warning/20 dark:border-status-warning/30 focus:border-status-warning w-64 !py-2"
               />
             )}
             <button
@@ -356,7 +357,7 @@ export function SettingsPage() {
               className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm ${
                 settings.isStorePaused 
                   ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
-                  : 'bg-amber-500 text-white hover:bg-amber-600'
+                  : 'bg-status-warning text-slate-950 hover:bg-status-warning/90'
               }`}
             >
               {settings.isStorePaused ? '▶️ Reabrir Loja' : '⏸️ Pausar Agora'}
@@ -371,7 +372,7 @@ export function SettingsPage() {
           <form onSubmit={handleSaveSettings} className="space-y-6">
             <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
-                <span className="p-1.5 bg-primary-50 text-primary-600 rounded-lg text-sm">🏪</span>
+                <span className="p-1.5 bg-primary/10 text-primary rounded-lg text-sm">🏪</span>
                 Identidade e Contato
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -387,7 +388,7 @@ export function SettingsPage() {
                     </div>
                     <div className="flex flex-col gap-2 text-left">
                       <div className="flex items-center gap-2">
-                        <label className="cursor-pointer bg-card hover:bg-muted text-foreground font-bold py-2 px-4 border border-input rounded-lg text-sm shadow-sm transition-all active:scale-95">
+                        <label className="cursor-pointer bg-card text-foreground border border-border hover:bg-muted font-bold py-2 px-4 rounded-xl text-sm shadow-sm transition-all active:scale-95">
                           <span>{uploading ? 'Enviando...' : 'Selecionar Imagem'}</span>
                           <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} disabled={uploading} />
                         </label>
@@ -516,7 +517,7 @@ export function SettingsPage() {
 
             <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
-                <span className="p-1.5 bg-purple-50 text-purple-600 rounded-lg text-sm"><Building2 className="w-4 h-4" /></span>
+                <span className="p-1.5 bg-purple-500/10 text-purple-500 rounded-lg text-sm"><Building2 className="w-4 h-4" /></span>
                 Dados Fiscais & Integração
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -674,7 +675,7 @@ export function SettingsPage() {
 
             <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
-                <span className="p-1.5 bg-amber-50 text-amber-600 rounded-lg text-sm">🌍</span>
+                <span className="p-1.5 bg-status-warning/10 text-status-warning rounded-lg text-sm">🌍</span>
                 Configurações Regionais
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -707,7 +708,7 @@ export function SettingsPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="bg-primary-600 hover:bg-primary-700 text-white font-bold py-2.5 px-8 rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-70"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold py-2.5 px-8 rounded-xl shadow-md transition-all active:scale-95 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed"
               >
                 {saving ? 'Salvando...' : 'Salvar Dados Básicos'}
               </button>
@@ -764,14 +765,14 @@ export function SettingsPage() {
                           type="time" 
                           value={day.openTime || '08:00'}
                           onChange={(e) => updateDay(i, 'openTime', e.target.value)}
-                          className="flex-1 px-2 py-1.5 bg-muted border border-border rounded-lg text-sm outline-none focus:border-primary-300"
+                          className="flex-1 px-2 py-1.5 bg-card text-foreground border border-input rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                         />
                         <span className="text-muted-foreground text-xs">até</span>
                         <input 
                           type="time" 
                           value={day.closeTime || '22:00'}
                           onChange={(e) => updateDay(i, 'closeTime', e.target.value)}
-                          className="flex-1 px-2 py-1.5 bg-muted border border-border rounded-lg text-sm outline-none focus:border-primary-300"
+                          className="flex-1 px-2 py-1.5 bg-card text-foreground border border-input rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary focus:border-primary"
                         />
                       </div>
                     )}

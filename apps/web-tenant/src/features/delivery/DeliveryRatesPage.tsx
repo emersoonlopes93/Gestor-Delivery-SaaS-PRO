@@ -393,7 +393,7 @@ export function DeliveryRatesPage() {
         </div>
         <button
           onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors shadow-sm"
         >
           <Plus className="w-4 h-4" />
           Nova Regra
@@ -417,7 +417,7 @@ export function DeliveryRatesPage() {
           </p>
           <button
             onClick={handleCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors shadow-sm"
           >
             <Plus className="w-4 h-4" />
             Criar Regra
@@ -434,7 +434,7 @@ export function DeliveryRatesPage() {
             return (
               <div
                 key={rule.id}
-                className={`bg-card rounded-lg border p-4 ${
+                className={`bg-card rounded-2xl border p-4 shadow-sm transition-all ${
                   rule.isActive ? 'border-border' : 'border-border bg-muted/50'
                 }`}
               >
@@ -466,7 +466,7 @@ export function DeliveryRatesPage() {
                           {rule.isActive ? 'Ativa' : 'Inativa'}
                         </span>
                         {rule.isFallback ? (
-                          <span className="px-2 py-0.5 text-xs font-black rounded-full bg-amber-100 text-amber-800">
+                          <span className="px-2 py-0.5 text-xs font-black rounded-full bg-status-warning/10 text-status-warning border border-status-warning/20">
                             Fallback
                           </span>
                         ) : null}
@@ -673,8 +673,8 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-card rounded-lg max-w-md w-full p-6">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-card text-card-foreground border border-border rounded-2xl shadow-xl max-w-md w-full p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">
           {rule ? 'Editar Regra' : 'Nova Regra de Entrega'}
         </h2>
@@ -692,7 +692,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                   setFormData({ ...formData, type: v });
                 }
               }}
-              className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="input-premium focus-visible:ring-ring"
               disabled={!!rule}
             >
               <option value="neighborhood">Por Bairro</option>
@@ -710,7 +710,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                 min="0"
                 value={formData.priority ?? 1000}
                 onChange={(e) => setFormData({ ...formData, priority: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-input bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="input-premium"
               />
             </div>
             <div className="flex items-end">
@@ -736,7 +736,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                   type="text"
                   value={formData.neighborhood}
                   onChange={(e) => setFormData({ ...formData, neighborhood: e.target.value })}
-                  className="w-full px-3 py-2 border border-input bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="input-premium"
                   placeholder="Ex: Centro"
                   required
                 />
@@ -751,7 +751,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                   min="0"
                   value={formData.rate}
                   onChange={(e) => setFormData({ ...formData, rate: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-input bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="input-premium"
                   placeholder="0.00"
                   required
                 />
@@ -772,7 +772,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                     min="0"
                     value={formData.minKm}
                     onChange={(e) => setFormData({ ...formData, minKm: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-input bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="input-premium"
                     required
                   />
                 </div>
@@ -786,7 +786,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                     min="0"
                     value={formData.maxKm}
                     onChange={(e) => setFormData({ ...formData, maxKm: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-input bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="input-premium"
                     required
                   />
                 </div>
@@ -801,7 +801,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                   min="0"
                   value={formData.ratePerKm}
                   onChange={(e) => setFormData({ ...formData, ratePerKm: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-input bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="input-premium"
                   placeholder="0.00"
                   required
                 />
@@ -820,7 +820,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                 min="0"
                 value={formData.fixedRate}
                 onChange={(e) => setFormData({ ...formData, fixedRate: parseFloat(e.target.value) || 0 })}
-                className="w-full px-3 py-2 border border-input bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="input-premium"
                 placeholder="0.00"
                 required
               />
@@ -836,7 +836,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                     type="text"
                     value={zoneName}
                     onChange={(e) => setZoneName(e.target.value)}
-                    className="w-full px-3 py-2 border border-input bg-card text-foreground rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="input-premium"
                     placeholder="Ex: Zona Centro"
                   />
                 </div>
@@ -846,12 +846,12 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                     type="color"
                     value={zoneColor}
                     onChange={(e) => setZoneColor(e.target.value)}
-                    className="w-full h-[42px] px-2 py-2 border border-input rounded-md"
+                    className="w-full h-[42px] px-1 py-1 bg-card border border-input rounded-xl cursor-pointer"
                   />
                 </div>
               </div>
 
-              <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-800">
+              <div className="rounded-xl overflow-hidden border border-border">
                 <div className="px-3 py-2 bg-muted text-xs text-muted-foreground flex items-center justify-between">
                   <span>Desenhe a zona no mapa (polígono)</span>
                   <span className="text-muted-foreground">Arraste os pontos para editar • Lixeira para remover</span>
@@ -899,14 +899,14 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-input text-foreground bg-card rounded-md hover:bg-muted transition-colors"
+              className="flex-1 px-4 py-2 border border-border text-foreground bg-card rounded-xl hover:bg-muted transition-colors font-semibold text-sm"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 transition-colors"
+              className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-colors font-semibold text-sm shadow-md"
             >
               {saving ? 'Salvando...' : rule ? 'Atualizar' : 'Criar'}
             </button>
