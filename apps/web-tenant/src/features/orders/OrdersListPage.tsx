@@ -227,41 +227,49 @@ export function OrdersListPage() {
               <button
                 key={order.id}
                 onClick={() => setSelectedOrderId(order.id)}
-                className="w-full bg-card border border-border rounded-3xl p-5 flex flex-col md:flex-row md:items-center justify-between text-left group hover:bg-muted/30 hover:scale-[1.005] hover:shadow-md transition-all duration-200 outline-none focus:ring-2 focus:ring-primary/20"
+                className="w-full bg-card border border-border rounded-2xl p-5 flex flex-col md:grid md:grid-cols-[72px_minmax(200px,1fr)_minmax(250px,1.2fr)_150px_56px] md:items-center gap-4 text-left group hover:bg-muted/30 hover:scale-[1.005] hover:shadow-md transition-all duration-200 outline-none focus:ring-2 focus:ring-primary/20"
               >
-                <div className="flex items-center gap-4 min-w-0 flex-1">
-                  <div
-                    className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 bg-muted border border-border font-black text-foreground text-base shadow-sm"
-                  >
+                {/* 1. Coluna do pedido: badge #0005 */}
+                <div className="shrink-0 flex items-center">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-muted border border-border font-black text-foreground text-base shadow-sm">
                     #{order.orderNumber}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-black text-foreground text-base truncate leading-tight">{order.customerName}</h3>
-                    
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <span className={`badge-premium ${STATUS_COLORS[order.status]} text-[10px] font-black uppercase tracking-wider py-1 px-2 rounded-lg`}>
-                        {STATUS_LABELS[order.status]}
-                      </span>
-                      <span className="text-xs px-2 py-1 rounded-lg bg-muted text-foreground border border-border font-bold flex items-center gap-1.5 shadow-sm">
-                        <span>{order.fulfillmentType === 'delivery' ? '📦 Entrega' : '🏪 Retirada'}</span>
-                      </span>
-                      <span className="text-xs px-2 py-1 rounded-lg bg-muted text-muted-foreground border border-border/50 font-bold">
-                        {CHANNEL_LABELS[order.sourceChannel] || order.sourceChannel}
-                      </span>
-                      <span className="text-xs text-muted-foreground font-bold flex items-center gap-1.5 ml-1">
-                        <Clock className="w-3.5 h-3.5 text-primary" />
-                        {fmtDate(order.createdAt)}
-                      </span>
-                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between md:justify-end gap-6 shrink-0 mt-4 md:mt-0 pt-4 md:pt-0 border-t md:border-t-0 border-border">
-                  <div className="text-left md:text-right">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground leading-none mb-1">Total Geral</p>
-                    <span className="font-black text-foreground text-xl leading-none">{fmt(order.total)}</span>
-                    <p className="text-[10px] font-bold text-muted-foreground mt-1">{order.itemCount} {order.itemCount === 1 ? 'item' : 'itens'}</p>
+                {/* 2. Coluna cliente: nome em destaque e metadados de entrega */}
+                <div className="min-w-0">
+                  <h3 className="font-black text-foreground text-base truncate leading-tight">{order.customerName}</h3>
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <span className="text-xs px-2 py-0.5 rounded-lg bg-muted text-foreground border border-border font-bold shadow-sm">
+                      {order.fulfillmentType === 'delivery' ? '📦 Entrega' : '🏪 Retirada'}
+                    </span>
                   </div>
+                </div>
+
+                {/* 3. Coluna status/metadados: status, canal, horário */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`badge-premium ${STATUS_COLORS[order.status]} text-[10px] font-black uppercase tracking-wider py-1 px-2 rounded-lg`}>
+                    {STATUS_LABELS[order.status]}
+                  </span>
+                  <span className="text-xs px-2 py-1 rounded-lg bg-muted text-muted-foreground border border-border/50 font-bold">
+                    {CHANNEL_LABELS[order.sourceChannel] || order.sourceChannel}
+                  </span>
+                  <span className="text-xs text-muted-foreground font-bold flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-primary" />
+                    {fmtDate(order.createdAt)}
+                  </span>
+                </div>
+
+                {/* 4. Coluna valor: Total Geral */}
+                <div className="text-left md:text-right">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground leading-none mb-1">Total Geral</p>
+                  <span className="font-black text-foreground text-xl leading-none">{fmt(order.total)}</span>
+                  <p className="text-[10px] font-bold text-muted-foreground mt-1">{order.itemCount} {order.itemCount === 1 ? 'item' : 'itens'}</p>
+                </div>
+
+                {/* 5. Coluna ação: Chevron */}
+                <div className="flex items-center justify-between md:justify-center border-t md:border-t-0 border-border pt-4 md:pt-0 mt-4 md:mt-0">
+                  <span className="md:hidden text-xs font-bold text-muted-foreground">Ver detalhes do pedido</span>
                   <div className="w-10 h-10 rounded-xl bg-muted border border-border flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-all duration-200">
                     <ChevronRight className="w-5 h-5" />
                   </div>

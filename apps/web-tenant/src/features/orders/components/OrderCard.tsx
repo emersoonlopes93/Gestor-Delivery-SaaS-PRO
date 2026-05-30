@@ -116,6 +116,7 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
       {...listeners}
     >
       <div className={compact ? 'p-3' : 'p-4'}>
+        {/* 1. Header (Código e Timer) */}
         <div className="flex items-center justify-between mb-3">
           <span className={`font-black text-foreground ${compact ? 'text-[12px] md:text-[13px]' : 'text-sm'}`}>
             #{order.orderNumber}
@@ -123,29 +124,31 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
           <TimerBadge minutes={elapsedMin} compact={compact} />
         </div>
 
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <h3
-              className={`font-black text-foreground leading-snug line-clamp-1 ${
-                compact ? 'text-xs' : 'text-sm'
-              }`}
-            >
-              {order.customerName}
-            </h3>
-            <p className={`text-muted-foreground mt-1 line-clamp-1 font-bold text-[10px]`}>
-              {order.fulfillmentType === 'delivery' ? '📦 Entrega' : '🏪 Retirada'}
-              {' · '}
-              {CHANNEL_LABELS[order.sourceChannel || ''] || order.sourceChannel || 'Online'}
-            </p>
-          </div>
-          <div className="shrink-0 flex flex-col items-end gap-2">
-            <StatusBadge status={order.status as OrderStatus} />
-            <span className={`font-black text-foreground ${compact ? 'text-xs' : 'text-sm'}`}>
-              {totalLabel}
-            </span>
-          </div>
+        {/* 2. Cliente e Canal */}
+        <div className="min-w-0 mb-3">
+          <h3
+            className={`font-black text-foreground leading-snug line-clamp-1 ${
+              compact ? 'text-xs' : 'text-sm'
+            }`}
+          >
+            {order.customerName}
+          </h3>
+          <p className={`text-muted-foreground mt-1 line-clamp-1 font-bold text-[10px]`}>
+            {order.fulfillmentType === 'delivery' ? '📦 Entrega' : '🏪 Retirada'}
+            {' · '}
+            {CHANNEL_LABELS[order.sourceChannel || ''] || order.sourceChannel || 'Online'}
+          </p>
         </div>
 
+        {/* 3. Status e Valor */}
+        <div className="flex items-center justify-between gap-3 pt-2.5 pb-2.5 border-t border-b border-border/40">
+          <StatusBadge status={order.status as OrderStatus} />
+          <span className={`font-black text-foreground ${compact ? 'text-xs' : 'text-sm'}`}>
+            {totalLabel}
+          </span>
+        </div>
+
+        {/* 4. Entregador e Itens */}
         {order.fulfillmentType === 'delivery' && (
           <div className="mt-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-wider">
             <div className={`shrink-0 w-6 h-6 rounded-lg flex items-center justify-center ${order.deliveryDriverName ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400' : 'bg-muted text-muted-foreground'}`}>
