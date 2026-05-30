@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import { Package, type LucideIcon } from 'lucide-react';
 import type { OrderBoardItemDTO, OrderStatus } from '@gestor/types';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -52,31 +52,32 @@ export const KanbanColumn = memo(function KanbanColumn(props: KanbanColumnProps)
   });
 
   return (
-    <section className={`kanban-col ${column.colCls} ${column.accentCol} ${isOver ? 'ring-2 ring-primary-500/50' : ''}`}>
-      <header className={`flex items-start justify-between shrink-0 px-4 py-3 border-b ${column.headerBorder}`}>
-        <div className="min-w-0 flex items-center gap-2.5">
-          <Icon className={`shrink-0 opacity-60 ${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} text-muted-foreground`} />
+    <section className={`flex flex-col h-full rounded-[24px] bg-card border border-border overflow-hidden transition-all ${isOver ? 'ring-2 ring-primary/45 shadow-lg' : 'shadow-sm'}`}>
+      <header className="flex items-center justify-between shrink-0 px-5 py-4 border-b border-border bg-muted/20">
+        <div className="min-w-0 flex items-center gap-3">
+          <Icon className={`shrink-0 text-primary ${compact ? 'w-4 h-4' : 'w-5 h-5'}`} />
           <div className="min-w-0">
-            <h2 className={`font-black text-foreground uppercase tracking-wide ${compact ? 'text-[11px]' : 'text-[13px]'}`}>
+            <h2 className={`font-black text-foreground uppercase tracking-wider ${compact ? 'text-xs' : 'text-sm'}`}>
               {column.title}
             </h2>
             {!compact && (
-              <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">
+              <p className="text-[10px] text-muted-foreground mt-0.5 font-bold uppercase tracking-wider">
                 {column.subtitle}
               </p>
             )}
           </div>
         </div>
-        <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${column.countCls} ml-2 shrink-0`}>
+        <span className="text-xs font-black px-2.5 py-1 rounded-lg bg-background border border-border text-foreground shadow-sm shrink-0">
           {orders.length}
         </span>
       </header>
 
-      <div ref={setNodeRef} className={`${compact ? 'p-2' : 'p-3'} overflow-y-auto space-y-2.5 grow min-h-0 custom-scrollbar`}>
+      <div ref={setNodeRef} className={`${compact ? 'p-3' : 'p-4'} overflow-y-auto space-y-3 grow min-h-0 custom-scrollbar bg-card/40`}>
         {isEmpty ? (
           viewMode === 'standard' ? (
-            <div className="h-16 flex items-center justify-center border-2 border-dashed border-border rounded-xl">
-              <span className="text-[11px] font-bold text-muted-foreground">
+            <div className="h-28 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-2xl bg-muted/10 gap-2 p-4 text-center">
+              <Package className="w-6 h-6 text-muted-foreground opacity-30" />
+              <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
                 Solte pedidos aqui
               </span>
             </div>

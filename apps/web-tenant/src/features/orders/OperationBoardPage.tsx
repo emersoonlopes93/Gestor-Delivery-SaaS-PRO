@@ -333,37 +333,42 @@ export function OperationBoardPage() {
   };
 
   return (
-    <div className="p-3 md:p-6 h-screen md:h-[calc(100vh-64px)] flex flex-col overflow-hidden bg-background">
-      {/* ── Toolbar / Header ── */}
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 md:mb-5 shrink-0 gap-4">
+    <div className="p-4 md:p-6 h-screen md:h-[calc(100vh-64px)] flex flex-col overflow-hidden bg-background max-w-[1600px] mx-auto w-full space-y-4">
+      {/* ── Toolbar / Header Premium ── */}
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between shrink-0 gap-4 bg-card border border-border p-5 rounded-[24px] shadow-sm">
         <div className="flex items-center justify-between sm:block">
           <div>
-            <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight">
-              Kanban Operacional
+            <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight flex items-center gap-2">
+              <span className="w-2.5 h-6 rounded-md bg-primary block" />
+              <span>Painel de Operações</span>
             </h1>
-            <p className="text-[11px] md:text-sm text-muted-foreground font-medium">
-              Atualizado a cada 15s
+            <p className="text-[11px] md:text-xs text-muted-foreground font-bold uppercase tracking-wider mt-1">
+              Sincronização Ativa (15s)
             </p>
           </div>
           <button
             onClick={fetchBoard}
             disabled={loading}
-            className="sm:hidden btn-icon w-8 h-8"
+            className="sm:hidden btn-icon w-9 h-9 bg-muted border border-border rounded-xl flex items-center justify-center active:scale-95 transition-all"
             title="Atualizar agora"
             type="button"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
           <div className="shrink-0">
             <SegmentedControl value={viewMode} onChange={setViewMode} />
           </div>
           
           <button
             onClick={enableAudio}
-            className={`btn-icon ${isAudioEnabled ? 'text-primary' : 'text-muted-foreground'}`}
+            className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all duration-200 active:scale-95 shadow-sm ${
+              isAudioEnabled 
+                ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20' 
+                : 'bg-card text-muted-foreground border-border hover:bg-muted'
+            }`}
             title={isAudioEnabled ? 'Sons Ativados' : 'Ativar Sons (Clique aqui)'}
           >
             {isAudioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
@@ -372,7 +377,7 @@ export function OperationBoardPage() {
           <button
             onClick={fetchBoard}
             disabled={loading}
-            className="hidden sm:inline-flex btn-icon"
+            className="hidden sm:flex w-10 h-10 rounded-xl bg-card border border-border text-foreground hover:bg-muted items-center justify-center transition-all active:scale-95 shadow-sm shrink-0"
             title="Atualizar agora"
             type="button"
           >

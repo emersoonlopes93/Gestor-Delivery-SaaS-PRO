@@ -28,7 +28,7 @@ export const OrderTimelineSection = memo(function OrderTimelineSection({ timelin
 
   return (
     <section>
-      <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-5">Linha do Tempo</h3>
+      <h3 className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-5">Linha do Tempo</h3>
       
       <div className="space-y-0 pl-2">
         {sortedTimeline.map((entry, index) => {
@@ -39,42 +39,42 @@ export const OrderTimelineSection = memo(function OrderTimelineSection({ timelin
             <div key={entry.id} className="flex gap-4 relative">
               {/* Linha conectora */}
               {!isLast && (
-                <div className="absolute top-6 left-2.5 w-px h-[calc(100%-12px)] bg-slate-200 dark:bg-slate-800" />
+                <div className="absolute top-6 left-2.5 w-px h-[calc(100%-12px)] bg-border" />
               )}
               
               {/* Ícone / Ponto */}
               <div className="relative z-10 shrink-0 mt-1">
                 {isLast ? (
-                  <div className="w-5 h-5 rounded-full bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center ring-4 ring-white dark:ring-slate-900">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" />
+                  <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center ring-4 ring-background">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
                   </div>
                 ) : (
-                  <div className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center ring-4 ring-white dark:ring-slate-900">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                  <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center ring-4 ring-background">
+                    <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60" />
                   </div>
                 )}
               </div>
               
               {/* Conteúdo */}
-              <div className={`pb-6 ${isLast ? '' : ''}`}>
+              <div className="pb-6">
                 <div className="flex items-center gap-2">
-                  <p className={`text-xs font-black uppercase tracking-tight ${isLast ? 'text-slate-900 dark:text-white' : 'text-slate-500'}`}>
+                  <p className={`text-xs font-black uppercase tracking-tight ${isLast ? 'text-foreground' : 'text-muted-foreground'}`}>
                     {STATUS_LABELS[entry.status] || entry.status}
                   </p>
-                  <span className="text-[10px] font-medium text-slate-400 flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
+                  <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-primary" />
                     {new Date(entry.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
                 
                 {entry.note && (
-                  <p className="text-[11px] text-slate-500 mt-1 italic leading-relaxed">
+                  <p className="text-[11px] text-muted-foreground mt-1 italic leading-relaxed">
                     {entry.note}
                   </p>
                 )}
                 
                 {isFirst && (
-                  <p className="text-[10px] text-slate-400 mt-1">
+                  <p className="text-[10px] text-muted-foreground mt-1">
                     {new Date(entry.createdAt).toLocaleDateString('pt-BR')}
                   </p>
                 )}
