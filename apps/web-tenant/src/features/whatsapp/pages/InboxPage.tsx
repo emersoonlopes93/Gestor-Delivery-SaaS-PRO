@@ -114,50 +114,57 @@ export function InboxPage() {
         </div>
         
         <div className="flex-1 overflow-y-auto">
-          {filteredSessions.map(s => (
-            <div 
-              key={s.id} 
-              onClick={() => handleSessionSelect(s)}
-              className="p-4 border-b border-muted/50 hover:bg-muted/30 dark:hover:bg-muted/30 cursor-pointer transition-colors relative"
-            >
-              {s.handoffActive && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-destructive rounded-r-full" />
-              )}
-              <div className="flex items-start justify-between mb-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-foreground">
-                    {s.displayName || s.name || `Cliente ${s.customerPhone}`}
-                  </h3>
-                  {s.unreadCount && s.unreadCount > 0 && (
-                    <span className="bg-destructive text-destructive-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                      {s.unreadCount}
-                    </span>
-                  )}
+          {filteredSessions.map(s => {
+            const isActive = selectedSession?.id === s.id;
+            return (
+              <div 
+                key={s.id} 
+                onClick={() => handleSessionSelect(s)}
+                className={`p-4 border-b cursor-pointer transition-colors relative ${
+                  isActive
+                    ? 'bg-primary/10 text-foreground border-primary/20'
+                    : 'bg-card text-card-foreground hover:bg-muted/40 border-border'
+                }`}
+              >
+                {s.handoffActive && (
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-destructive rounded-r-full" />
+                )}
+                <div className="flex items-start justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-foreground">
+                      {s.displayName || s.name || `Cliente ${s.customerPhone}`}
+                    </h3>
+                    {s.unreadCount && s.unreadCount > 0 ? (
+                      <span className="bg-destructive text-destructive-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                        {s.unreadCount}
+                      </span>
+                    ) : null}
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {s.time || new Date(s.lastMessageAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </div>
-                <span className="text-xs text-muted-foreground">
-                  {s.time || new Date(s.lastMessageAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground truncate mb-2">{s.lastMessage || 'Sem mensagens'}</p>
-              <div className="flex items-center gap-2">
-                <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
-                  s.state === 'closed' || s.state === 'expired'
-                    ? 'bg-muted/10 text-muted-foreground'
-                    : s.handoffActive
-                      ? 'bg-destructive/10 text-destructive'
-                      : 'bg-primary/10 text-primary'
-                }`}>
-                  {s.state === 'closed'
-                    ? 'Encerrado'
-                    : s.state === 'expired'
-                      ? 'Expirada'
+                <p className="text-xs text-muted-foreground truncate mb-2">{s.lastMessage || 'Sem mensagens'}</p>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${
+                    s.state === 'closed' || s.state === 'expired'
+                      ? 'bg-muted text-muted-foreground border-border'
                       : s.handoffActive
-                        ? 'Atendimento Humano'
-                        : 'Bot Ativo'}
-                </span>
+                        ? 'bg-destructive/10 text-destructive border-destructive/20'
+                        : 'bg-status-success/10 text-status-success border-status-success/20'
+                  }`}>
+                    {s.state === 'closed'
+                      ? 'Encerrado'
+                      : s.state === 'expired'
+                        ? 'Expirada'
+                        : s.handoffActive
+                          ? 'Atendimento Humano'
+                          : 'Bot Ativo'}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

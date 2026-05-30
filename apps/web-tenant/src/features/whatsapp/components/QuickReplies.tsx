@@ -118,12 +118,12 @@ export function QuickReplies({ onReplySelect, className = '' }: QuickRepliesProp
               value={newReply}
               onChange={(e) => setNewReply(e.target.value)}
               placeholder="Nova resposta rápida..."
-              className="flex-1 px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-card text-foreground"
+              className="flex-1 px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring bg-card text-foreground"
             />
             <button
               onClick={handleCreateReply}
               disabled={!newReply.trim() || createReplyMutation.isPending}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -143,12 +143,12 @@ export function QuickReplies({ onReplySelect, className = '' }: QuickRepliesProp
                         type="text"
                         value={editText}
                         onChange={(e) => setEditText(e.target.value)}
-                        className="flex-1 px-2 py-1 border border-input rounded focus:outline-none focus:ring-2 focus:ring-primary-500 bg-card text-foreground text-sm"
+                        className="flex-1 px-2 py-1 border border-input rounded focus:outline-none focus:ring-2 focus:ring-ring bg-card text-foreground text-sm"
                       />
                       <button
                         onClick={handleUpdateReply}
                         disabled={!editText.trim() || updateReplyMutation.isPending}
-                        className="p-1 text-status-success hover:text-status-success transition-colors"
+                        className="p-1 text-status-success hover:text-status-success/80 transition-colors"
                       >
                         <Save className="w-4 h-4" />
                       </button>
@@ -169,14 +169,14 @@ export function QuickReplies({ onReplySelect, className = '' }: QuickRepliesProp
                           onClick={() => handleEditReply(reply)}
                           className="p-1 text-muted-foreground hover:text-primary transition-colors"
                         >
-                          <Edit className="w-3 h-3" />
+                          <Edit className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDeleteReply(reply.id)}
                           disabled={deleteReplyMutation.isPending}
                           className="p-1 text-muted-foreground hover:text-destructive transition-colors"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </>
@@ -208,7 +208,7 @@ export function QuickReplies({ onReplySelect, className = '' }: QuickRepliesProp
           <button
             key={reply.id}
             onClick={() => onReplySelect(reply.text)}
-            className="px-3 py-1.5 bg-muted text-foreground text-sm rounded-full hover:bg-muted transition-colors"
+            className="px-3 py-1.5 bg-muted text-foreground text-sm rounded-full hover:bg-muted/80 transition-colors"
           >
             {reply.text}
           </button>
@@ -216,7 +216,7 @@ export function QuickReplies({ onReplySelect, className = '' }: QuickRepliesProp
         {quickReplies.length > 8 && (
           <button
             onClick={() => setIsEditing(true)}
-            className="px-3 py-1.5 bg-muted text-muted-foreground text-sm rounded-full hover:bg-muted transition-colors"
+            className="px-3 py-1.5 bg-muted text-muted-foreground text-sm rounded-full hover:bg-muted/80 transition-colors"
           >
             +{quickReplies.length - 8} mais
           </button>
@@ -231,7 +231,7 @@ export function QuickReplies({ onReplySelect, className = '' }: QuickRepliesProp
           </p>
           <button
             onClick={() => setIsEditing(true)}
-            className="mt-2 text-primary-600 hover:text-primary-700 text-sm font-medium"
+            className="mt-2 text-primary hover:text-primary/80 text-sm font-medium"
           >
             Criar respostas rápidas
           </button>

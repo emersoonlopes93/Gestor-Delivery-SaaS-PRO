@@ -248,7 +248,7 @@ export function WhatsAppConfigPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="p-6 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500 bg-background text-foreground">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">WhatsApp & Agente IA</h1>
@@ -291,7 +291,7 @@ export function WhatsAppConfigPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Card Instância WhatsApp */}
-        <div className="card-premium p-6 relative overflow-hidden group flex flex-col">
+        <div className="bg-card text-card-foreground border border-border rounded-xl shadow-sm p-6 relative overflow-hidden group flex flex-col">
           <div className="absolute top-0 right-0 w-32 h-32 bg-status-success/5 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-status-success/10" />
           <div className="flex items-start gap-4 mb-6">
             <div className="p-3 bg-muted rounded-xl">
@@ -307,16 +307,16 @@ export function WhatsAppConfigPage() {
             {!instance ? (
               <div className="p-8 text-center space-y-4 bg-muted/50 rounded-2xl border border-dashed border-border">
                 <div className="p-4 bg-muted rounded-full w-16 h-16 mx-auto flex items-center justify-center">
-                  <QrIcon className="w-8 h-8 text-muted-foreground " />
+                  <QrIcon className="w-8 h-8 text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="text-foreground font-medium">Nenhuma conexão ativa</p>
+                  <p className="text-foreground font-medium">Nenhuma conexão active</p>
                   <p className="text-sm text-muted-foreground mt-1">Gere uma nova instância para começar a atender via WhatsApp.</p>
                 </div>
                 <button 
                   onClick={() => generateInstanceMutation.mutate()}
                   disabled={generateInstanceMutation.isPending}
-                  className="btn-primary w-full py-3"
+                  className="w-full py-3 bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {generateInstanceMutation.isPending ? 'Gerando...' : 'Gerar Nova Conexão'}
                 </button>
@@ -335,7 +335,7 @@ export function WhatsAppConfigPage() {
                       <button 
                         onClick={() => disconnectMutation.mutate()}
                         disabled={disconnectMutation.isPending}
-                        className="px-4 py-2 bg-destructive/10 text-destructive hover:bg-destructive/20 rounded-lg text-sm font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                        className="px-4 py-2 bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20 rounded-lg text-sm font-medium transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                       >
                         {disconnectMutation.isPending ? 'Desconectando...' : 'Desconectar'}
                       </button>
@@ -344,14 +344,14 @@ export function WhatsAppConfigPage() {
                         <button 
                           onClick={() => connectMutation.mutate()}
                           disabled={connectMutation.isPending}
-                          className="px-4 py-2 bg-status-success/10 text-status-success hover:bg-status-success/20 rounded-lg text-sm font-medium transition-colors"
+                          className="px-4 py-2 bg-status-success/10 text-status-success border border-status-success/20 hover:bg-status-success/20 rounded-lg text-sm font-medium transition-colors"
                         >
                           {connectMutation.isPending ? 'Conectando...' : 'Conectar'}
                         </button>
                         <button 
                           onClick={() => devResetMutation.mutate()}
                           disabled={devResetMutation.isPending}
-                          className="px-4 py-2 bg-status-warning/10 text-status-warning hover:bg-status-warning/20 rounded-lg text-sm font-medium transition-colors"
+                          className="px-4 py-2 bg-status-warning/10 text-status-warning border border-status-warning/20 hover:bg-status-warning/20 rounded-lg text-sm font-medium transition-colors"
                         >
                           {devResetMutation.isPending ? 'Resetando...' : 'Dev Reset'}
                         </button>
@@ -395,7 +395,7 @@ export function WhatsAppConfigPage() {
                             <img src={qrCode} alt="WhatsApp QR Code" className="w-48 h-48" />
                             <button 
                               onClick={refreshQrCode}
-                              className="mt-4 flex items-center gap-2 text-xs text-primary-600 hover:text-primary-700 font-bold"
+                              className="mt-4 flex items-center gap-2 text-xs text-primary hover:text-primary/80 font-bold"
                             >
                               <RefreshCw className="w-3 h-3" /> Atualizar QR
                             </button>
@@ -405,7 +405,7 @@ export function WhatsAppConfigPage() {
                             <button
                               onClick={() => connectMutation.mutate()}
                               disabled={connectMutation.isPending}
-                              className="btn-primary"
+                              className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-lg text-sm transition-colors"
                             >
                               {connectMutation.isPending ? 'Gerando...' : 'Gerar QR Code'}
                             </button>
@@ -430,7 +430,7 @@ export function WhatsAppConfigPage() {
                                 value={phoneNumber}
                                 onChange={(e) => setPhoneNumber(e.target.value)}
                                 placeholder="5511999999999"
-                                className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-card text-foreground"
+                                className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring bg-card text-foreground"
                               />
                             </div>
                           )}
@@ -439,7 +439,7 @@ export function WhatsAppConfigPage() {
                             <button
                               onClick={() => generatePairingCodeMutation.mutate(phoneNumber || undefined)}
                               disabled={generatePairingCodeMutation.isPending}
-                              className="w-full btn-primary"
+                              className="w-full py-2 bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-lg transition-colors"
                             >
                               {generatePairingCodeMutation.isPending ? 'Gerando...' : 'Gerar Código de 8 Dígitos'}
                             </button>
@@ -447,8 +447,8 @@ export function WhatsAppConfigPage() {
 
                           {pairingCode && (
                             <div className="text-center space-y-4">
-                              <div className="p-4 bg-muted/50 rounded-2xl border border-primary-500/20">
-                                <div className="text-3xl font-mono font-black text-primary-600 dark:text-primary-400 tracking-[0.2em]">
+                              <div className="p-4 bg-muted/50 rounded-2xl border border-primary/20">
+                                <div className="text-3xl font-mono font-black text-primary tracking-[0.2em]">
                                   {pairingCode}
                                 </div>
                               </div>
@@ -472,7 +472,7 @@ export function WhatsAppConfigPage() {
                                 </button>
                                 <button
                                   onClick={() => navigator.clipboard.writeText(pairingCode)}
-                                  className="flex-1 text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-bold py-2 transition-colors"
+                                  className="flex-1 text-xs text-primary hover:text-primary/80 font-bold py-2 transition-colors"
                                 >
                                   📋 Copiar Código
                                 </button>
@@ -488,17 +488,17 @@ export function WhatsAppConfigPage() {
             )}
           </div>
           {instance && (
-            <p className="mt-4 text-[10px] text-muted-foreground  uppercase tracking-widest">ID: {instance.instanceName}</p>
+            <p className="mt-4 text-[10px] text-muted-foreground uppercase tracking-widest">ID: {instance.instanceName}</p>
           )}
         </div>
 
         {/* Card Configuração do Agente IA */}
-        <div className="card-premium p-6 relative overflow-hidden group">
+        <div className="bg-card text-card-foreground border border-border rounded-xl shadow-sm p-6 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-primary/10" />
           <div className="flex items-start justify-between mb-6">
             <div className="flex items-start gap-4">
               <div className="p-3 bg-muted rounded-xl">
-                <Bot className="w-6 h-6 text-primary-600 dark:text-blue-400" />
+                <Bot className="w-6 h-6 text-primary" />
               </div>
               <div>
                 <h2 className="text-xl font-semibold text-foreground">Agente Inteligente</h2>
@@ -512,7 +512,7 @@ export function WhatsAppConfigPage() {
                 checked={formAi?.isEnabled || false} 
                 onChange={(e) => toggleAiEnabled(e.target.checked)}
               />
-              <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+              <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
             </label>
           </div>
           
@@ -522,7 +522,7 @@ export function WhatsAppConfigPage() {
                   <label className="text-sm font-medium text-foreground">Nome do Agente</label>
                   <input 
                     placeholder="Ex: Bella"
-                    className="input-premium"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring bg-card text-foreground"
                     value={formAi?.agentName || ''}
                     onChange={(e) => setFormAi(prev => prev ? {...prev, agentName: e.target.value} : null)}
                   />
@@ -530,7 +530,7 @@ export function WhatsAppConfigPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">Tom de Voz</label>
                   <select 
-                    className="input-premium"
+                    className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring bg-card text-foreground"
                     value={formAi?.tone || 'friendly'}
                     onChange={(e) => setFormAi(prev => prev ? {...prev, tone: e.target.value} : null)}
                   >
@@ -546,7 +546,7 @@ export function WhatsAppConfigPage() {
              <div className="space-y-2">
                <label className="text-sm font-medium text-foreground">Mensagem de Saudação</label>
                <textarea 
-                 className="input-premium h-20 resize-none"
+                 className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring bg-card text-foreground h-20 resize-none"
                  placeholder="Como o agente deve cumprimentar o cliente?"
                  value={formAi?.greetingMessage || ''}
                  onChange={(e) => setFormAi(prev => prev ? {...prev, greetingMessage: e.target.value} : null)}
@@ -557,7 +557,7 @@ export function WhatsAppConfigPage() {
                <label className="text-sm font-medium text-foreground">Sobre o Restaurante (Instruções)</label>
                <textarea 
                  placeholder="Ex: Não trabalhamos com reservas aos domingos. O prato mais pedido é a Pizza de Calabresa."
-                 className="input-premium h-24 resize-none"
+                 className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring bg-card text-foreground h-24 resize-none"
                  value={formAi?.customInstructions || ''}
                  onChange={(e) => setFormAi(prev => prev ? {...prev, customInstructions: e.target.value} : null)}
                />
@@ -584,14 +584,14 @@ export function WhatsAppConfigPage() {
                <div className="space-y-2">
                  <div className="flex justify-between items-center">
                    <label className="text-sm font-medium text-foreground">Atraso de Resposta (Debounce)</label>
-                   <span className="text-xs font-mono text-blue-600 dark:text-blue-400">{formAi?.debounceMs || 1000}ms</span>
+                   <span className="text-xs font-mono text-primary">{formAi?.debounceMs || 1000}ms</span>
                  </div>
                  <input 
                    type="range"
                    min="500"
                    max="5000"
                    step="500"
-                   className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-600"
+                   className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
                    value={formAi?.debounceMs || 1000}
                    onChange={(e) => setFormAi(prev => prev ? {...prev, debounceMs: parseInt(e.target.value)} : null)}
                  />
@@ -602,7 +602,7 @@ export function WhatsAppConfigPage() {
              <button 
                onClick={() => formAi && updateAiMutation.mutate(formAi)}
                disabled={updateAiMutation.isPending}
-               className="btn-primary w-full py-3"
+               className="w-full py-3 bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
              >
                <Settings className="w-4 h-4" />
                {updateAiMutation.isPending ? 'Salvando...' : 'Salvar Personalização'}

@@ -271,13 +271,13 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
             <h3 className="font-semibold text-foreground">
               {session.displayName || `Cliente ${session.customerPhone}`}
             </h3>
-            <div className="flex items-center gap-2">
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${
                 session.state === 'closed' || session.state === 'expired'
-                  ? 'bg-muted text-muted-foreground'
+                  ? 'bg-muted text-muted-foreground border-border'
                   : session.handoffActive
-                  ? 'bg-status-warning/10 text-status-warning'
-                  : 'bg-status-success/10 text-status-success'
+                  ? 'bg-status-warning/10 text-status-warning border-status-warning/20'
+                  : 'bg-status-success/10 text-status-success border-status-success/20'
               }`}>
                 {session.state === 'closed'
                   ? 'Encerrado'
@@ -291,25 +291,25 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleActivateHandoff}
-            disabled={handoffMutation.isPending || session.handoffActive}
-            className="px-3 py-1.5 bg-status-warning/10 text-status-warning text-sm font-medium rounded-lg hover:bg-status-warning/20 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
-          >
-            {session.handoffActive ? 'Já em atendimento' : 'Transferir'}
-          </button>
           {!session.handoffActive && (
             <input
               value={handoffReason}
               onChange={(e) => setHandoffReason(e.target.value)}
-              placeholder="Motivo da transferência (opcional)"
-              className="ml-3 flex-1 min-w-0 rounded-lg input-premium focus:border-primary-500 focus:ring-2 focus:ring-primary-200/50 dark:focus:border-primary-500 dark:focus:ring-primary-500/20"
+              placeholder="Motivo da transferência..."
+              className="ml-3 w-48 rounded-lg bg-card text-foreground placeholder:text-muted-foreground border border-input focus:outline-none focus:ring-2 focus:ring-ring px-3 py-1.5 text-xs"
             />
           )}
           <button
+            onClick={handleActivateHandoff}
+            disabled={handoffMutation.isPending || session.handoffActive}
+            className="px-3 py-1.5 bg-status-warning/10 text-status-warning border border-status-warning/20 hover:bg-status-warning/20 disabled:opacity-70 disabled:cursor-not-allowed text-xs font-semibold rounded-lg transition-colors"
+          >
+            {session.handoffActive ? 'Humano Ativo' : 'Transferir'}
+          </button>
+          <button
             onClick={() => closeSessionMutation.mutate()}
             disabled={closeSessionMutation.isPending}
-            className="px-3 py-1.5 bg-destructive/10 text-destructive dark:text-destructive text-sm font-medium rounded-lg hover:bg-destructive/20 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-1.5 bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20 disabled:opacity-70 disabled:cursor-not-allowed text-xs font-semibold rounded-lg transition-colors"
           >
             Encerrar
           </button>
@@ -323,7 +323,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive"></span>
             </span>
-            <p className="text-xs font-medium text-destructive dark:text-destructive">
+            <p className="text-xs font-medium text-destructive">
               Atendimento humano ativo. O Agente IA está silenciado para esta conversa.
             </p>
           </div>
@@ -347,20 +347,20 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       )}
 
       {session.handoffActive && (session.handoffReason || session.handoffOperator || session.handoffAt) && (
-        <div className="px-4 py-3 border-b border-border bg-muted text-sm text-foreground space-y-1">
+        <div className="px-4 py-3 border-b border-border bg-muted text-xs text-foreground space-y-1">
           {session.handoffReason && (
             <p>
-              <span className="font-semibold">Motivo:</span> {session.handoffReason}
+              <span className="font-semibold text-muted-foreground">Motivo:</span> {session.handoffReason}
             </p>
           )}
           {session.handoffOperator && (
             <p>
-              <span className="font-semibold">Operador:</span> {session.handoffOperator}
+              <span className="font-semibold text-muted-foreground">Operador:</span> {session.handoffOperator}
             </p>
           )}
           {session.handoffAt && (
             <p>
-              <span className="font-semibold">Iniciado em:</span>{' '}
+              <span className="font-semibold text-muted-foreground">Iniciado em:</span>{' '}
               {new Date(session.handoffAt).toLocaleString('pt-BR', {
                 dateStyle: 'short',
                 timeStyle: 'short',
@@ -376,33 +376,45 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto p-4 space-y-4"
       >
-        {visibleMessages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
-          >
+        {visibleMessages.map((msg) => {
+          const isSystem = msg.senderType === 'system';
+          const isOutbound = msg.direction === 'outbound';
+          
+          let bubbleClasses = '';
+          if (isSystem) {
+            bubbleClasses = 'bg-muted text-muted-foreground border border-border';
+          } else if (isOutbound) {
+            bubbleClasses = 'bg-primary text-primary-foreground';
+          } else {
+            bubbleClasses = 'bg-card text-card-foreground border border-border';
+          }
+
+          return (
             <div
-              className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
-                msg.direction === 'outbound'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-card text-card-foreground border border-border'
-              }`}
+              key={msg.id}
+              className={`flex ${isSystem ? 'justify-center' : isOutbound ? 'justify-end' : 'justify-start'}`}
             >
-              {msg.senderType && msg.senderType !== 'customer' && (
-                <p className={`text-[10px] uppercase font-semibold mb-1 ${getSenderColor(msg.senderType)}`}>
-                  {getSenderLabel(msg.senderType)}
-                </p>
-              )}
-              <p className="text-sm">{msg.content}</p>
-              <div className={`flex items-center gap-2 mt-1 text-xs ${
-                msg.direction === 'outbound' ? 'text-primary-foreground/80' : 'text-muted-foreground'
-              }`}>
-                {getStatusIcon(msg.externalStatus || 'sent')}
-                <span>{formatTime(msg.timestamp || msg.createdAt)}</span>
+              <div
+                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${bubbleClasses}`}
+              >
+                {msg.senderType && msg.senderType !== 'customer' && (
+                  <p className={`text-[10px] uppercase font-bold mb-1 ${
+                    isOutbound ? 'text-primary-foreground/95' : getSenderColor(msg.senderType)
+                  }`}>
+                    {getSenderLabel(msg.senderType)}
+                  </p>
+                )}
+                <p className="text-sm break-words whitespace-pre-wrap">{msg.content}</p>
+                <div className={`flex items-center gap-1.5 mt-1 text-[10px] justify-end ${
+                  isOutbound ? 'text-primary-foreground/80' : 'text-muted-foreground'
+                }`}>
+                  {!isSystem && isOutbound && getStatusIcon(msg.externalStatus || 'sent')}
+                  <span>{formatTime(msg.timestamp || msg.createdAt)}</span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
 
@@ -410,11 +422,11 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       <QuickReplies onReplySelect={handleQuickReply} />
 
       {/* Input */}
-      <div className="p-4 border-t border-border">
+      <div className="p-4 border-t border-border bg-card">
         <div className="flex items-end gap-2">
           <button
             onClick={handleFileUpload}
-            className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
           >
             <Paperclip className="w-5 h-5" />
           </button>
@@ -426,7 +438,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
             className="hidden"
           />
           <button
-            className="p-2 text-muted-foreground hover:text-foreground transition-colors"
+            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
           >
             <Smile className="w-5 h-5" />
           </button>
@@ -444,17 +456,17 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
                   : 'Digite uma mensagem...'
               }
               rows={1}
-              className="w-full px-4 py-2 border border-input rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-card text-foreground placeholder:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+              className="w-full px-4 py-2 border border-input rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-card text-foreground placeholder:text-muted-foreground disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed disabled:bg-muted"
               style={{ minHeight: '40px', maxHeight: '120px' }}
             />
           </div>
           <button
             onClick={handleSend}
             disabled={!message.trim() || session?.state === 'closed' || session?.state === 'expired' || sendMessageMutation.isPending}
-            className="p-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
+            className="p-2 text-primary hover:text-primary/80 hover:bg-primary/10 rounded-lg disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
           >
             {sendMessageMutation.isPending ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             ) : (
               <Send className="w-5 h-5" />
             )}
