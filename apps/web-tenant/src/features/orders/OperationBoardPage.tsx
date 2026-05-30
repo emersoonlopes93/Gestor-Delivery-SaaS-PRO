@@ -82,8 +82,8 @@ const SegmentedControl = memo(function SegmentedControl(props: {
             onClick={() => onChange(item.id)}
             className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 focus:outline-none ${
               active
-                ? 'bg-slate-900 dark:bg-slate-100 text-white text-foreground shadow-sm'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
             {item.label}
@@ -338,10 +338,10 @@ export function OperationBoardPage() {
       <header className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 md:mb-5 shrink-0 gap-4">
         <div className="flex items-center justify-between sm:block">
           <div>
-            <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+            <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight">
               Kanban Operacional
             </h1>
-            <p className="text-[11px] md:text-sm text-slate-500 dark:text-slate-400 font-medium">
+            <p className="text-[11px] md:text-sm text-muted-foreground font-medium">
               Atualizado a cada 15s
             </p>
           </div>
@@ -363,7 +363,7 @@ export function OperationBoardPage() {
           
           <button
             onClick={enableAudio}
-            className={`btn-icon ${isAudioEnabled ? 'text-primary-600' : 'text-slate-400'}`}
+            className={`btn-icon ${isAudioEnabled ? 'text-primary' : 'text-muted-foreground'}`}
             title={isAudioEnabled ? 'Sons Ativados' : 'Ativar Sons (Clique aqui)'}
           >
             {isAudioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
@@ -382,7 +382,7 @@ export function OperationBoardPage() {
       </header>
 
       {/* ── Mobile Tabs Selector ── */}
-      <div className="md:hidden flex items-center gap-1.5 p-1 bg-slate-200/50 dark:bg-slate-900/50 rounded-xl mb-4 shrink-0">
+      <div className="md:hidden flex items-center gap-1.5 p-1 bg-muted rounded-xl mb-4 shrink-0">
         {KANBAN_COLUMNS.map((col) => {
           const isActive = activeColumn === col.id;
           const count = ordersByColumnId[col.id]?.length || 0;
@@ -392,8 +392,8 @@ export function OperationBoardPage() {
               onClick={() => setActiveColumn(col.id)}
               className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg transition-all duration-200 ${
                 isActive
-                  ? 'bg-white dark:bg-slate-800 shadow-sm text-slate-900 dark:text-white'
-                  : 'text-slate-500 dark:text-slate-400'
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground'
               }`}
             >
               <span className={`text-[10px] font-black uppercase tracking-wider ${isActive ? 'opacity-100' : 'opacity-60'}`}>
@@ -432,7 +432,7 @@ export function OperationBoardPage() {
       {loading && orders.length === 0 && (
         <div className="flex-1 flex flex-col items-center justify-center gap-4">
           <div className="w-12 h-12 rounded-full border-2 border-primary-600/20 border-t-primary-600 animate-spin" />
-          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+          <p className="text-sm text-muted-foreground font-medium">
             Carregando pedidos...
           </p>
         </div>

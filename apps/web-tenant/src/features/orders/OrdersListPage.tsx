@@ -135,10 +135,10 @@ export function OrdersListPage() {
           <button
             onClick={() => { setStatusFilter(''); setPage(1); }}
             disabled={loading}
-            className={`whitespace-nowrap px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all disabled:opacity-50 ${
+            className={`whitespace-nowrap px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed ${
               statusFilter === ''
-                ? 'bg-primary-600 text-white border-primary-600 shadow-sm shadow-primary-500/20'
-                : 'bg-card text-muted-foreground border-border hover:bg-muted'
+                ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                : 'bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground'
             }`}
           >
             Todos
@@ -148,10 +148,10 @@ export function OrdersListPage() {
               key={status}
               onClick={() => { setStatusFilter(status); setPage(1); }}
               disabled={loading}
-              className={`whitespace-nowrap px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all disabled:opacity-50 ${
+              className={`whitespace-nowrap px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed ${
                 statusFilter === status
-                  ? 'bg-primary-600 text-white border-primary-600 shadow-sm shadow-primary-500/20'
-                  : 'bg-card text-muted-foreground border-border hover:bg-muted'
+                  ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                  : 'bg-card text-muted-foreground border-border hover:bg-muted hover:text-foreground'
               }`}
             >
               {STATUS_LABELS[status]}
@@ -160,14 +160,14 @@ export function OrdersListPage() {
         </div>
         
         {/* Additional Filters */}
-        <div className="flex gap-4 mt-4 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+        <div className="flex gap-4 mt-4 bg-card p-3 rounded-xl border border-border">
           <div className="flex-1">
-            <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Período</label>
+            <label className="block text-[10px] font-black uppercase text-muted-foreground mb-1">Período</label>
             <select
               value={dateFilter}
               onChange={(e) => { setDateFilter(e.target.value as 'hoje' | 'ontem' | 'ultimos7' | 'todos'); setPage(1); }}
               disabled={loading}
-              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-primary-500"
+              className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-sm font-bold text-foreground outline-none focus:border-primary"
             >
               <option value="hoje">Hoje</option>
               <option value="ontem">Ontem</option>
@@ -176,12 +176,12 @@ export function OrdersListPage() {
             </select>
           </div>
           <div className="flex-1">
-            <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Canal de Venda</label>
+            <label className="block text-[10px] font-black uppercase text-muted-foreground mb-1">Canal de Venda</label>
             <select
               value={channelFilter}
               onChange={(e) => { setChannelFilter(e.target.value); setPage(1); }}
               disabled={loading}
-              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 dark:text-slate-300 outline-none focus:border-primary-500"
+              className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-sm font-bold text-foreground outline-none focus:border-primary"
             >
               <option value="">Todos os canais</option>
               {Object.entries(CHANNEL_LABELS).map(([val, label]) => (

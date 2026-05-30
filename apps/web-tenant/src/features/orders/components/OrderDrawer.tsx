@@ -180,7 +180,7 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
           </div>
           <button 
             onClick={onClose} 
-            className="p-2.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-2xl transition-all active:scale-90"
+            className="p-2.5 hover:bg-muted rounded-2xl transition-all active:scale-90"
           >
             <X className="w-6 h-6 text-muted-foreground" />
           </button>
@@ -193,11 +193,11 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
               <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Buscando detalhes...</p>
             </div>
           ) : error ? (
-            <div className="bg-red-50 dark:bg-red-900/20 p-6 rounded-3xl border border-red-100 dark:border-red-900/30 text-center">
-              <p className="text-sm font-bold text-red-600 dark:text-red-400 mb-4">{error}</p>
+            <div className="bg-destructive/10 p-6 rounded-3xl border border-destructive/20 text-center">
+              <p className="text-sm font-bold text-destructive mb-4">{error}</p>
               <button 
                 onClick={() => fetchDetail()}
-                className="px-6 py-2.5 bg-red-600 text-white rounded-xl font-black text-xs uppercase tracking-widest"
+                className="px-6 py-2.5 bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl font-black text-xs uppercase tracking-widest"
               >
                 Tentar Novamente
               </button>

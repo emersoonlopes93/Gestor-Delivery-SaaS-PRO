@@ -241,15 +241,15 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-card dark:bg-muted900 rounded-[32px] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh] border border-border200 dark:border-border800">
+      <div className="bg-card rounded-[32px] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh] border border-border">
         
-        <header className="px-8 py-6 border-b border-border100 dark:border-border800 flex items-center justify-between bg-muted50/50 dark:bg-muted800/50 shrink-0">
+        <header className="px-8 py-6 border-b border-border flex items-center justify-between bg-muted/50 shrink-0">
           <div>
-            <h2 className="text-xl font-black text-muted-foreground900 dark:text-white">Editar Pedido #{order.orderNumber}</h2>
-            <p className="text-xs text-muted-foreground500 font-bold uppercase tracking-widest mt-1">Gerenciamento de Itens e Quantidades</p>
+            <h2 className="text-xl font-black text-foreground">Editar Pedido #{order.orderNumber}</h2>
+            <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest mt-1">Gerenciamento de Itens e Quantidades</p>
           </div>
-          <button onClick={onClose} disabled={isSaving} className="p-3 hover:bg-muted200 dark:hover:bg-muted700 rounded-2xl transition-all">
-            <X className="w-6 h-6 text-muted-foreground500" />
+          <button onClick={onClose} disabled={isSaving} className="p-3 hover:bg-muted rounded-2xl transition-all">
+            <X className="w-6 h-6 text-muted-foreground" />
           </button>
         </header>
 
@@ -273,16 +273,16 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
               </button>
 
               {showProductSearch && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-card dark:bg-muted800 border border-border200 dark:border-border700 rounded-2xl shadow-2xl z-50 p-4 animate-in slide-in-from-top-2">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-card border border-border rounded-2xl shadow-2xl z-50 p-4 animate-in slide-in-from-top-2">
                   <div className="relative mb-4">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground400 w-4 h-4" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
                     <input 
                       autoFocus
                       type="text"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       placeholder="Buscar produto pelo nome..."
-                      className="w-full pl-10 pr-4 py-3 bg-muted50 dark:bg-muted900 border border-border200 dark:border-border700 rounded-xl text-sm outline-none focus:border-primary-500"
+                      className="w-full pl-10 pr-4 py-3 bg-muted border border-border rounded-xl text-sm outline-none focus:border-primary-500"
                     />
                   </div>
 
@@ -291,20 +291,20 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
                       <button 
                         key={p.id}
                         onClick={() => handleAddProduct(p)}
-                        className="w-full p-3 flex items-center justify-between hover:bg-muted100 dark:hover:bg-muted700 rounded-xl transition-colors"
+                        className="w-full p-3 flex items-center justify-between hover:bg-muted rounded-xl transition-colors"
                       >
                         <div className="text-left">
-                          <p className="text-sm font-bold text-muted-foreground900 dark:text-white">{p.name}</p>
-                          <p className="text-xs text-muted-foreground500">R$ {p.basePrice.toFixed(2)}</p>
+                          <p className="text-sm font-bold text-foreground">{p.name}</p>
+                          <p className="text-xs text-muted-foreground">R$ {p.basePrice.toFixed(2)}</p>
                         </div>
-                        <Plus className="w-4 h-4 text-primary-500" />
+                        <Plus className="w-4 h-4 text-primary" />
                       </button>
                     ))}
                     {searchTerm.length >= 2 && products?.length === 0 && (
-                      <p className="text-center py-4 text-xs text-muted-foreground500 font-medium">Nenhum produto encontrado.</p>
+                      <p className="text-center py-4 text-xs text-muted-foreground font-medium">Nenhum produto encontrado.</p>
                     )}
                     {searchTerm.length < 2 && (
-                      <p className="text-center py-4 text-xs text-muted-foreground500 font-medium">Digite pelo menos 2 letras...</p>
+                      <p className="text-center py-4 text-xs text-muted-foreground font-medium">Digite pelo menos 2 letras...</p>
                     )}
                   </div>
                 </div>
@@ -313,20 +313,20 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground400 mb-2">Itens do Pedido</h3>
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-2">Itens do Pedido</h3>
             {items.map(item => (
-              <div key={item.id} className="p-5 rounded-3xl bg-card dark:bg-muted800/40 border border-border200 dark:border-border700 shadow-sm hover:shadow-md transition-all group">
+              <div key={item.id} className="p-5 rounded-3xl bg-card border border-border shadow-sm hover:shadow-md transition-all group">
                 <div className="flex gap-5">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="font-black text-muted-foreground900 dark:text-white text-base truncate">
+                      <p className="font-black text-foreground text-base truncate">
                         {item.name}
                       </p>
                       {item.isNew && (
                         <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase rounded-lg">Novo</span>
                       )}
                     </div>
-                    <p className="text-xs font-bold text-muted-foreground400 mt-1">
+                    <p className="text-xs font-bold text-muted-foreground mt-1">
                       Unitário: R$ {item.unitPrice.toFixed(2)}
                     </p>
                     {item.notes && (
@@ -338,15 +338,15 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
                   </div>
                   
                   <div className="shrink-0 flex flex-col items-end gap-4">
-                    <p className="font-black text-muted-foreground900 dark:text-white text-lg">
+                    <p className="font-black text-foreground text-lg">
                       R$ {item.lineTotal.toFixed(2)}
                     </p>
                     
-                    <div className="flex items-center gap-1 bg-muted100 dark:bg-muted800 p-1 rounded-2xl border border-border200 dark:border-border700">
+                    <div className="flex items-center gap-1 bg-muted p-1 rounded-2xl border border-border">
                       <button
                         type="button"
                         onClick={() => handleUpdateQuantity(item.id, -1)}
-                        className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-card dark:hover:bg-muted700 text-muted-foreground600 dark:text-muted-foreground300 transition-all active:scale-90"
+                        className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-card text-foreground transition-all active:scale-90"
                       >
                         <Minus className="w-4 h-4" />
                       </button>
@@ -356,7 +356,7 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
                       <button
                         type="button"
                         onClick={() => handleUpdateQuantity(item.id, 1)}
-                        className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-card dark:hover:bg-muted700 text-muted-foreground600 dark:text-muted-foreground300 transition-all active:scale-90"
+                        className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-card text-foreground transition-all active:scale-90"
                       >
                         <Plus className="w-4 h-4" />
                       </button>
@@ -376,28 +376,28 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
           </div>
 
           {/* Motivo da Alteração */}
-          <div className="mt-8 pt-8 border-t border-border100 dark:border-border800">
-            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground400 block mb-3">Motivo da Alteração (Obrigatório)</label>
+          <div className="mt-8 pt-8 border-t border-border">
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground block mb-3">Motivo da Alteração (Obrigatório)</label>
             <textarea 
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Ex: Cliente solicitou via WhatsApp; Erro na digitação original..."
-              className="w-full p-4 bg-muted50 dark:bg-muted900 border border-border200 dark:border-border700 rounded-2xl text-sm outline-none focus:border-primary-500 min-h-[100px] transition-all"
+              className="w-full p-4 bg-muted border border-border rounded-2xl text-sm outline-none focus:border-primary min-h-[100px] transition-all"
             />
           </div>
         </div>
 
         {/* Resumo Financeiro no Footer */}
-        <footer className="p-8 bg-muted50 dark:bg-muted900/80 border-t border-border200 dark:border-border800 flex flex-col md:flex-row items-center gap-6 shrink-0">
+        <footer className="p-8 bg-muted dark:bg-muted/40 border-t border-border flex flex-col md:flex-row items-center gap-6 shrink-0">
           <div className="flex-1 flex gap-8 items-center">
             <div className="text-center md:text-left">
-              <p className="text-[9px] font-black uppercase text-muted-foreground400 tracking-widest mb-1">Total Anterior</p>
-              <p className="text-lg font-bold text-muted-foreground500 line-through decoration-slate-300">R$ {currentTotal.toFixed(2)}</p>
+              <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest mb-1">Total Anterior</p>
+              <p className="text-lg font-bold text-muted-foreground line-through decoration-muted">R$ {currentTotal.toFixed(2)}</p>
             </div>
-            <div className="w-px h-10 bg-muted200 dark:bg-muted800 hidden md:block" />
+            <div className="w-px h-10 bg-border hidden md:block" />
             <div className="text-center md:text-left">
-              <p className="text-[9px] font-black uppercase text-primary-500 tracking-widest mb-1">Novo Total (Est.)</p>
-              <p className="text-2xl font-black text-muted-foreground900 dark:text-white">R$ {estimatedNewTotal.toFixed(2)}</p>
+              <p className="text-[9px] font-black uppercase text-primary tracking-widest mb-1">Novo Total (Est.)</p>
+              <p className="text-2xl font-black text-foreground">R$ {estimatedNewTotal.toFixed(2)}</p>
             </div>
             <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${totalDifference >= 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
               {totalDifference >= 0 ? '+' : ''} R$ {totalDifference.toFixed(2)}
@@ -408,14 +408,14 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
             <button
               onClick={onClose}
               disabled={isSaving}
-              className="flex-1 md:flex-none px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-muted-foreground600 dark:text-muted-foreground400 hover:bg-muted200 dark:hover:bg-muted800 transition-all active:scale-95"
+              className="flex-1 md:flex-none px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-muted-foreground hover:bg-muted transition-all active:scale-95"
             >
               Cancelar
             </button>
             <button
               onClick={handleSave}
               disabled={isSaving || !reason.trim()}
-              className="flex-1 md:flex-none px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest bg-primary-600 text-white hover:bg-primary-700 flex items-center justify-center gap-3 shadow-lg shadow-primary-900/20 transition-all active:scale-95 disabled:opacity-50 disabled:grayscale"
+              className="flex-1 md:flex-none px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center gap-3 shadow-lg shadow-primary-950/20 transition-all active:scale-95 disabled:opacity-50 disabled:grayscale"
             >
               {isSaving ? (
                 <div className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />

@@ -58,8 +58,8 @@ export const TimerBadge = memo(function TimerBadge({ minutes, compact }: { minut
     <span
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black ring-1 ${
         urgent
-          ? 'bg-red-50 text-red-700 ring-red-200 dark:bg-red-900/30 dark:text-red-400 dark:ring-red-800/50'
-          : 'bg-slate-50 text-slate-600 ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700'
+          ? 'bg-destructive/10 text-destructive ring-destructive/20'
+          : 'bg-muted text-muted-foreground ring-border'
       }`}
     >
       <Clock className={compact ? 'w-2.5 h-2.5' : 'w-3 h-3'} />
@@ -117,7 +117,7 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
     >
       <div className={compact ? 'p-2.5 md:p-3' : 'p-3 md:p-3.5'}>
         <div className="flex items-center justify-between mb-2">
-          <span className={`font-black text-slate-900 dark:text-slate-100 ${compact ? 'text-[12px] md:text-[13px]' : 'text-sm'}`}>
+          <span className={`font-black text-foreground ${compact ? 'text-[12px] md:text-[13px]' : 'text-sm'}`}>
             #{order.orderNumber}
           </span>
           <TimerBadge minutes={elapsedMin} compact={compact} />
@@ -126,13 +126,13 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <h3
-              className={`font-bold text-slate-900 dark:text-slate-100 leading-tight line-clamp-1 ${
+              className={`font-bold text-foreground leading-tight line-clamp-1 ${
                 compact ? 'text-[11px]' : 'text-xs md:text-sm'
               }`}
             >
               {order.customerName}
             </h3>
-            <p className={`text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1 ${compact ? 'text-[9px]' : 'text-[10px] md:text-[11px]'}`}>
+            <p className={`text-muted-foreground mt-0.5 line-clamp-1 ${compact ? 'text-[9px]' : 'text-[10px] md:text-[11px]'}`}>
               {order.fulfillmentType === 'delivery' ? 'Entrega' : 'Retirada'}
               {' · '}
               {CHANNEL_LABELS[order.sourceChannel || ''] || order.sourceChannel || 'Online'}
@@ -140,7 +140,7 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
           </div>
           <div className="shrink-0 flex flex-col items-end gap-1.5">
             <StatusBadge status={order.status as OrderStatus} />
-            <span className={`font-black text-slate-900 dark:text-slate-100 ${compact ? 'text-[10px] md:text-[11px]' : 'text-xs md:text-sm'}`}>
+            <span className={`font-black text-foreground ${compact ? 'text-[10px] md:text-[11px]' : 'text-xs md:text-sm'}`}>
               {totalLabel}
             </span>
           </div>
@@ -148,10 +148,10 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
 
         {order.fulfillmentType === 'delivery' && (
           <div className="mt-2.5 flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold">
-            <div className={`shrink-0 w-5 h-5 rounded-md flex items-center justify-center ${order.deliveryDriverName ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400' : 'bg-slate-100 text-slate-400 dark:bg-slate-800'}`}>
+            <div className={`shrink-0 w-5 h-5 rounded-md flex items-center justify-center ${order.deliveryDriverName ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400' : 'bg-muted text-muted-foreground'}`}>
               <User className="w-3 h-3" />
             </div>
-            <span className={order.deliveryDriverName ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 italic'}>
+            <span className={order.deliveryDriverName ? 'text-indigo-600 dark:text-indigo-400' : 'text-muted-foreground italic'}>
               {order.deliveryDriverName || 'Sem entregador atribuído'}
             </span>
             {order.deliveryDriverStatus === 'busy' && (
@@ -165,7 +165,7 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
             className="mt-2.5 rounded-lg px-2.5 py-1.5 md:px-3 md:py-2"
             style={{ background: 'var(--surface-inset)', border: '1px solid var(--border-subtle)' }}
           >
-            <p className="text-[10px] md:text-[11px] text-slate-600 dark:text-slate-400 italic line-clamp-2">
+            <p className="text-[10px] md:text-[11px] text-muted-foreground italic line-clamp-2">
               {order.itemsSummary || `${order.itemCount} ${order.itemCount === 1 ? 'item' : 'itens'}`}
             </p>
           </div>
