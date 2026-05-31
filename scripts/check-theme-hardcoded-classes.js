@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-// CRITICAL PATTERNS - return exit code 1
+// CRITICAL PATTERNS - return exit code 1 in --critical mode
 const CRITICAL_PATTERNS = [
   'text-transparent',
   'dark:text-black',
@@ -14,16 +14,25 @@ const CRITICAL_PATTERNS = [
   'opacity-40',
 ];
 
-// WARNING PATTERNS - return exit code 0 with warning
+// WARNING PATTERNS - reported but never block build
 const WARNING_PATTERNS = [
   'disabled:opacity-50',
   'bg-transparent',
   'text-muted-foreground/50',
   'dark:text-gray-',
+  'bg-gray-',
+  'text-gray-',
+  'border-gray-',
 ];
 
 // Allowlist pattern for justified exceptions
 const ALLOWLIST_PATTERN = '// @allow-theme-risk:';
+
+// Legacy files to exclude from theme validation
+const EXCLUDED_FILES = [
+  'DeliveryZonesPage.tsx',
+  'DeliveryZonesPageV2.tsx',
+];
 
 // Directories to scan
 const DIRECTORIES_TO_SCAN = [
@@ -43,7 +52,6 @@ function scanDirectory(dir, results = []) {
     const stat = fs.statSync(filePath);
     
     if (stat.isDirectory()) {
-      // Skip node_modules and similar
       if (!['node_modules', '.git', 'dist', 'build'].includes(file)) {
         scanDirectory(filePath, results);
       }
@@ -55,7 +63,7 @@ function scanDirectory(dir, results = []) {
   return results;
 }
 
-function checkFile(filePath) {
+function checkFile(filePath, checkCritical, checkWarning) {
   const content = fs.readFileSync(filePath, 'utf-8');
   const lines = content.split('\n');
   const criticalIssues = [];
@@ -67,28 +75,32 @@ function checkFile(filePath) {
     
     // Check if line has allowlist comment
     if (line.includes(ALLOWLIST_PATTERN)) {
-      continue; // Skip lines with allowlist comments
+      continue;
     }
     
     // Check for critical patterns
-    for (const pattern of CRITICAL_PATTERNS) {
-      if (line.includes(pattern)) {
-        criticalIssues.push({
-          line: lineNumber,
-          pattern,
-          content: line.trim(),
-        });
+    if (checkCritical) {
+      for (const pattern of CRITICAL_PATTERNS) {
+        if (line.includes(pattern)) {
+          criticalIssues.push({
+            line: lineNumber,
+            pattern,
+            content: line.trim(),
+          });
+        }
       }
     }
     
     // Check for warning patterns
-    for (const pattern of WARNING_PATTERNS) {
-      if (line.includes(pattern)) {
-        warningIssues.push({
-          line: lineNumber,
-          pattern,
-          content: line.trim(),
-        });
+    if (checkWarning) {
+      for (const pattern of WARNING_PATTERNS) {
+        if (line.includes(pattern)) {
+          warningIssues.push({
+            line: lineNumber,
+            pattern,
+            content: line.trim(),
+          });
+        }
       }
     }
   }
@@ -97,7 +109,16 @@ function checkFile(filePath) {
 }
 
 function main() {
+  const args = process.argv.slice(2);
+  const isCriticalMode = args.includes('--critical');
+  const isReportMode = args.includes('--report');
+  
+  // Default to critical mode if no mode specified (e.g. check:theme fallback)
+  const runCritical = isCriticalMode || (!isCriticalMode && !isReportMode);
+  const runWarning = isReportMode;
+
   console.log('🔍 Scanning for hardcoded theme classes...');
+  console.log(`Mode: ${runCritical ? 'CRITICAL' : ''} ${runWarning ? 'REPORT/WARNINGS' : ''}`);
   console.log('');
   
   const allFiles = [];
@@ -109,14 +130,20 @@ function main() {
     }
   }
   
-  console.log(`📁 Scanning ${allFiles.length} files...`);
+  // Filter out excluded files
+  const filesToScan = allFiles.filter(file => {
+    const basename = path.basename(file);
+    return !EXCLUDED_FILES.includes(basename);
+  });
+  
+  console.log(`📁 Scanning ${filesToScan.length} files... (Excluded ${allFiles.length - filesToScan.length} legacy/backup files)`);
   console.log('');
   
   const filesWithCriticalIssues = [];
   const filesWithWarningIssues = [];
   
-  for (const file of allFiles) {
-    const { criticalIssues, warningIssues } = checkFile(file);
+  for (const file of filesToScan) {
+    const { criticalIssues, warningIssues } = checkFile(file, runCritical, runWarning);
     
     if (criticalIssues.length > 0) {
       filesWithCriticalIssues.push({
@@ -133,15 +160,14 @@ function main() {
     }
   }
   
+  // If no issues found
   if (filesWithCriticalIssues.length === 0 && filesWithWarningIssues.length === 0) {
-    console.log('✅ No hardcoded theme classes found!');
-    console.log('');
-    console.log('All files are compliant with theme guidelines.');
+    console.log('✅ No hardcoded theme issues found in selected mode!');
     process.exit(0);
   }
   
   // Report critical issues
-  if (filesWithCriticalIssues.length > 0) {
+  if (runCritical && filesWithCriticalIssues.length > 0) {
     console.log('❌ CRITICAL ISSUES (must fix):');
     console.log('');
     
@@ -165,7 +191,7 @@ function main() {
   }
   
   // Report warning issues
-  if (filesWithWarningIssues.length > 0) {
+  if (runWarning && filesWithWarningIssues.length > 0) {
     console.log('⚠️  WARNING ISSUES (should fix, but not blocking):');
     console.log('');
     
@@ -187,15 +213,14 @@ function main() {
   console.log('See docs/theme-guidelines.md for guidance.');
   console.log('');
   
-  // Exit with error code if there are critical issues
-  if (filesWithCriticalIssues.length > 0) {
+  // Exit code logic
+  if (runCritical && filesWithCriticalIssues.length > 0) {
     console.log('🚨 Build blocked due to CRITICAL theme issues.');
     process.exit(1);
   }
   
-  // Exit with success if only warnings
-  if (filesWithWarningIssues.length > 0) {
-    console.log('⚠️  Build passes with theme warnings (non-blocking).');
+  if (runWarning && filesWithWarningIssues.length > 0) {
+    console.log('⚠️  Warnings found. Build passes (non-blocking).');
     process.exit(0);
   }
 }

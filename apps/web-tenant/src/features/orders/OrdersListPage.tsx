@@ -144,7 +144,7 @@ export function OrdersListPage() {
             <button
               onClick={() => { setStatusFilter(''); setPage(1); }}
               disabled={loading}
-              className={`whitespace-nowrap px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`whitespace-nowrap px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed ${
                 statusFilter === ''
                   ? 'bg-primary text-primary-foreground border-primary shadow-md'
                   : 'bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground'
@@ -157,7 +157,7 @@ export function OrdersListPage() {
                 key={status}
                 onClick={() => { setStatusFilter(status); setPage(1); }}
                 disabled={loading}
-                className={`whitespace-nowrap px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`whitespace-nowrap px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed ${
                   statusFilter === status
                     ? 'bg-primary text-primary-foreground border-primary shadow-md'
                     : 'bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground'
@@ -286,7 +286,7 @@ export function OrdersListPage() {
           <button
             disabled={page === 1}
             onClick={() => setPage((p) => p - 1)}
-            className="px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest bg-card border border-border text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
+            className="px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest bg-card border border-border text-foreground hover:bg-muted disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
           >
             Anterior
           </button>
@@ -294,7 +294,7 @@ export function OrdersListPage() {
           <button
             disabled={page * 20 >= total}
             onClick={() => setPage((p) => p + 1)}
-            className="px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest bg-card border border-border text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
+            className="px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest bg-card border border-border text-foreground hover:bg-muted disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
           >
             Próxima
           </button>

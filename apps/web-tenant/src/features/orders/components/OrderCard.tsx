@@ -106,7 +106,7 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative border border-border bg-background rounded-[20px] transition-all duration-200 hover:shadow-md hover:scale-[1.005] ${isDragging ? 'opacity-40 z-50 ring-2 ring-primary scale-105 cursor-grabbing' : 'cursor-grab hover:border-primary/30'}`}
+      className={`relative border border-border bg-background rounded-[20px] transition-all duration-200 hover:shadow-md hover:scale-[1.005] ${isDragging ? 'opacity-40 z-50 ring-2 ring-primary scale-105 cursor-grabbing' : 'cursor-grab hover:border-primary/30'}`} // @allow-theme-risk: opacidade reduzida necessaria para indicar elemento sendo arrastado (isDragging) no drag and drop
       onClick={() => {
         // Ignorar click se estiver arrastando
         if (isDragging) return;
@@ -186,7 +186,7 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
             }}
             disabled={updating}
             onPointerDown={(e) => e.stopPropagation()} // Previne drag ao clicar no botão
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl font-black uppercase tracking-widest text-[9px] bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-[0.97] disabled:opacity-50 shadow-sm"
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl font-black uppercase tracking-widest text-[9px] bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-[0.97] disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
           >
             <ArrowRight className="w-3.5 h-3.5 md:w-3 md:h-3" />
             <span>

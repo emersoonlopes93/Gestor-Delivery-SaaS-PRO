@@ -415,7 +415,7 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
             <button
               onClick={handleSave}
               disabled={isSaving || !reason.trim()}
-              className="flex-1 md:flex-none px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center gap-3 shadow-lg shadow-primary-950/20 transition-all active:scale-95 disabled:opacity-50 disabled:grayscale"
+              className="flex-1 md:flex-none px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center gap-3 shadow-lg shadow-primary-950/20 transition-all active:scale-95 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isSaving ? (
                 <div className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />

@@ -316,7 +316,7 @@ export function WhatsAppConfigPage() {
                 <button 
                   onClick={() => generateInstanceMutation.mutate()}
                   disabled={generateInstanceMutation.isPending}
-                  className="w-full py-3 bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-3 bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {generateInstanceMutation.isPending ? 'Gerando...' : 'Gerar Nova Conexão'}
                 </button>
@@ -602,7 +602,7 @@ export function WhatsAppConfigPage() {
              <button 
                onClick={() => formAi && updateAiMutation.mutate(formAi)}
                disabled={updateAiMutation.isPending}
-               className="w-full py-3 bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+               className="w-full py-3 bg-primary text-primary-foreground hover:bg-primary/90 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed"
              >
                <Settings className="w-4 h-4" />
                {updateAiMutation.isPending ? 'Salvando...' : 'Salvar Personalização'}

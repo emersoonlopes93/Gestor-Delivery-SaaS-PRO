@@ -55,7 +55,7 @@ export const OrderActionsBar = memo(function OrderActionsBar({
         <button 
           onClick={onAdvance}
           disabled={isUpdating}
-          className={`w-full py-3.5 ${nextAction.color} rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-50 shadow-md`}
+          className={`w-full py-3.5 ${nextAction.color} rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed shadow-md`}
         >
           {isUpdating ? (
             <RefreshCw className="w-4 h-4 animate-spin" />

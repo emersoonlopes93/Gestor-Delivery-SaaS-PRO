@@ -24,7 +24,9 @@
     "start:web-admin": "pnpm --filter @gestor/web-admin preview",
     "start:web-storefront": "pnpm --filter @gestor/web-storefront preview",
     "check:no-any": "node scripts/check-no-any.js",
-    "check:theme": "node scripts/check-theme-hardcoded-classes.js"
+    "check:theme:critical": "node scripts/check-theme-hardcoded-classes.js --critical",
+    "check:theme:report": "node scripts/check-theme-hardcoded-classes.js --report",
+    "check:theme": "pnpm check:theme:critical"
   },
   "engines": {
     "node": ">=20.0.0",

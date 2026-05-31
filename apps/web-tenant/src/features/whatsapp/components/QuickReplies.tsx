@@ -123,7 +123,7 @@ export function QuickReplies({ onReplySelect, className = '' }: QuickRepliesProp
             <button
               onClick={handleCreateReply}
               disabled={!newReply.trim() || createReplyMutation.isPending}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
             >
               <Plus className="w-4 h-4" />
             </button>
