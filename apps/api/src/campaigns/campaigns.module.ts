@@ -8,7 +8,16 @@ import { CampaignsController } from './controllers/campaigns.controller';
 import { BullModule } from '@nestjs/bullmq';
 import { RbacModule } from '../rbac/rbac.module';
 
-const enableCampaignDispatch = process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true';
+const enableCampaignDispatch = 
+  process.env.REDIS_ENABLED !== 'false' && 
+  process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true';
+
+// Log campaign dispatcher status at startup
+if (!enableCampaignDispatch && process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true') {
+  console.log('[QUEUE] campaign_dispatch_disabled - redis_disabled_for_dev');
+} else if (enableCampaignDispatch) {
+  console.log('[QUEUE] campaign_dispatch_enabled');
+}
 
 @Module({
   imports: [

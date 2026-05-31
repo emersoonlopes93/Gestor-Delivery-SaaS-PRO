@@ -35,10 +35,15 @@ const baseEnvSchema = z.object({
   MERCADO_PAGO_WEBHOOK_SECRET: z.string().default(''),
 
   // Redis
+  REDIS_ENABLED: z.enum(['true', 'false']).default('true'),
   REDIS_HOST: z.string().default('localhost'),
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
   REDIS_PASSWORD: z.string().default(''),
   REDIS_TLS: z.enum(['true', 'false']).default('false'),
+
+  // Feature Flags
+  BULLMQ_ENABLED: z.enum(['true', 'false']).default('false'),
+  CAMPAIGNS_DISPATCH_ENABLED: z.enum(['true', 'false']).default('false'),
 
   // Storage Driver & Cloudflare R2
   STORAGE_DRIVER: z.enum(['local', 'r2']).optional(),
@@ -91,6 +96,14 @@ const envSchema = baseEnvSchema
     }
 
     if (isProduction) {
+      if (data.REDIS_ENABLED === 'false') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['REDIS_ENABLED'],
+          message: `REDIS_ENABLED must be 'true' in production.`,
+        });
+      }
+
       if (!data.REDIS_HOST || data.REDIS_HOST === 'localhost' || data.REDIS_HOST === '127.0.0.1') {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

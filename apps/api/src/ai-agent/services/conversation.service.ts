@@ -348,25 +348,25 @@ export class ConversationService {
 
     // Merge profundo para orderDraft: evita substituição rasa que perde campos
     if (update.orderDraft !== undefined) {
-      const existingDraft = this.asJsonObject(ai.orderDraft);
-      const incomingDraft = update.orderDraft as unknown as Record<string, unknown>;
+      const existingDraft = this.asJsonObject<MetadataOrderDraft>(ai.orderDraft);
+      const incomingDraft = this.asJsonObject<MetadataOrderDraft>(update.orderDraft);
 
       // Merge profundo de deliveryAddress
-      const existingAddr = this.asJsonObject(existingDraft.deliveryAddress);
-      const incomingAddr = this.asJsonObject((incomingDraft.deliveryAddress as unknown) ?? {});
+      const existingAddr = this.asJsonObject<MetadataDeliveryAddress>(existingDraft.deliveryAddress);
+      const incomingAddr = this.asJsonObject<MetadataDeliveryAddress>(incomingDraft.deliveryAddress ?? {});
       const mergedAddr = { ...existingAddr, ...incomingAddr };
 
       // Merge profundo de payment
-      const existingPayment = this.asJsonObject(existingDraft.payment);
-      const incomingPayment = this.asJsonObject((incomingDraft.payment as unknown) ?? {});
+      const existingPayment = this.asJsonObject<MetadataPayment>(existingDraft.payment);
+      const incomingPayment = this.asJsonObject<MetadataPayment>(incomingDraft.payment ?? {});
       const mergedPayment = { ...existingPayment, ...incomingPayment };
 
-      // items: substitui apenas se vier preenchido
-      const mergedItems = Array.isArray(incomingDraft.items) && incomingDraft.items.length > 0
-        ? incomingDraft.items
-        : existingDraft.items ?? [];
+      // items: se a propriedade items veio no incomingDraft (mesmo vazia, indicando limpeza explícita ou substituição total), usa ela. Caso contrário, mantém os existentes.
+      const mergedItems = 'items' in incomingDraft
+        ? (Array.isArray(incomingDraft.items) ? incomingDraft.items : [])
+        : (existingDraft.items ?? []);
 
-      const mergedDraft: Record<string, unknown> = {
+      const mergedDraft: MetadataOrderDraft = {
         ...existingDraft,
         ...incomingDraft,
         items: mergedItems,
@@ -395,10 +395,9 @@ export class ConversationService {
     const current = await this.getSessionAiMemory(sessionId);
     const existing = current.orderDraft;
 
-    const mergedItems =
-      partialDraft.items && partialDraft.items.length > 0
-        ? partialDraft.items
-        : existing.items;
+    const mergedItems = 'items' in partialDraft && partialDraft.items
+      ? partialDraft.items
+      : existing.items;
 
     const mergedAddress = {
       ...existing.deliveryAddress,

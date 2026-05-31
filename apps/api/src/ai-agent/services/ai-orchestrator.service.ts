@@ -626,7 +626,12 @@ export class AiOrchestratorService {
       this.logger.log(`[AI_MEMORY] last_order_loaded hasLastOrder=${Boolean(aiMemory.lastOrderId)}`);
 
       if (config.memoryEnabled) {
-        const extractedName = this.extractCustomerNameFromText(_content);
+        let extractedName = this.extractCustomerNameFromText(_content);
+        // Fallback: se a mensagem tiver exatamente 2 palavras iniciadas por maiúscula (ex: "Emerson Lopes"), assume que é o nome
+        if (!extractedName && /^[A-ZÀ-Ÿ][a-zÀ-ÿ]+\s+[A-ZÀ-Ÿ][a-zÀ-ÿ]+$/.test(_content.trim())) {
+          extractedName = _content.trim();
+        }
+        
         if (config.rememberCustomerName && extractedName) {
           await this.conversationService.saveCustomerName(
             tenantId,
@@ -636,6 +641,10 @@ export class AiOrchestratorService {
           await this.conversationService.updateSessionAiMemory(session.id, {
             lastKnownCustomerName: extractedName,
             lastKnownCustomerNameAt: new Date().toISOString(),
+          });
+          // Salva também no draft
+          await this.conversationService.updateOrderDraft(session.id, {
+            customerName: extractedName,
           });
         }
 
@@ -739,15 +748,6 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
         }
       }
 
-      // Injetar CURRENT_ORDER_DRAFT no contexto (independente de memoryEnabled)
-      const draftBlock = buildOrderDraftPromptBlock(aiMemory.orderDraft);
-      if (draftBlock) {
-        messages.push({ role: 'system', content: draftBlock });
-        this.logger.log(
-          `[AI_DRAFT] loaded items=${aiMemory.orderDraft.items.length} missing=[${aiMemory.orderDraft.missingFields.join(',')}] ready=${aiMemory.orderDraft.readyToConfirm} sessionId=${session.id}`,
-        );
-      }
-
       const agentSessionCtx = await this.conversationService.resolveAgentSessionContext(
         tenantId,
         session.id,
@@ -765,6 +765,18 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
           customerPhone: customerPhone.replace(/\D/g, ''),
           customerName: aiMemory.orderDraft.customerName || agentSessionCtx.customerName || null,
         });
+      }
+
+      // Recarregar memória do AI atualizada do banco para obter o draft correto
+      const freshAiMemory = await this.conversationService.getSessionAiMemory(session.id);
+
+      // Injetar CURRENT_ORDER_DRAFT no contexto (independente de memoryEnabled)
+      const draftBlock = buildOrderDraftPromptBlock(freshAiMemory.orderDraft);
+      if (draftBlock) {
+        messages.push({ role: 'system', content: draftBlock });
+        this.logger.log(
+          `[AI_DRAFT] loaded items=${freshAiMemory.orderDraft.items.length} missing=[${freshAiMemory.orderDraft.missingFields.join(',')}] ready=${freshAiMemory.orderDraft.readyToConfirm} sessionId=${session.id}`,
+        );
       }
 
       for (const msg of history) {
@@ -1062,6 +1074,7 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
           toolId: toolCall.id,
           toolName: toolCall.name,
         });
+        this.logger.log(`[AI_ORDER] create_order_start sessionId=${sessionId}`);
       }
 
       const result = await this.toolsService.executeTool(
@@ -1080,6 +1093,7 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
           const totalAmount = result && typeof result === 'object' && 'totalAmount' in result ? Number((result as Record<string, unknown>).totalAmount) : undefined;
           if (orderId) {
             createdOrderResult = { orderId, orderNumber, totalAmount };
+            this.logger.log(`[AI_ORDER] create_order_success orderId=${orderId} sessionId=${sessionId}`);
           }
         }
       }
@@ -1116,6 +1130,32 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
           signatureHash,
         },
       });
+
+      // Logs obrigatórios adicionais
+      if (toolCall.name === 'adicionar_item_pedido' && toolStatus === 'success') {
+        this.logger.log(`[AI_DRAFT] item_added sessionId=${sessionId}`);
+      }
+      if (toolCall.name === 'definir_entrega_retirada' && toolStatus === 'success') {
+        const payload = toolCall.arguments as { tipo?: string };
+        this.logger.log(`[AI_DRAFT] fulfillment_set ${payload.tipo || ''} sessionId=${sessionId}`);
+      }
+      if (toolCall.name === 'definir_endereco_entrega' && toolStatus === 'success') {
+        this.logger.log(`[AI_DRAFT] address_updated sessionId=${sessionId}`);
+      }
+      if (toolCall.name === 'definir_forma_pagamento' && toolStatus === 'success') {
+        const payload = toolCall.arguments as { metodo?: string; troco?: number };
+        this.logger.log(`[AI_DRAFT] payment_set ${payload.metodo || ''} sessionId=${sessionId}`);
+        if (payload.troco !== undefined) {
+          this.logger.log(`[AI_DRAFT] change_for_set sessionId=${sessionId}`);
+        }
+      }
+      if (toolCall.name === 'consultar_resumo_pedido' && toolStatus === 'success') {
+        this.logger.log(`[AI_DRAFT] missing_fields sessionId=${sessionId}`);
+        const res = result as { readyToConfirm?: boolean };
+        if (res.readyToConfirm) {
+          this.logger.log(`[AI_DRAFT] ready_to_confirm sessionId=${sessionId}`);
+        }
+      }
 
       if (
         toolCall.name === 'repetir_ultimo_pedido' &&
@@ -1303,6 +1343,8 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
       const confirmationMessage = createdOrderResult.orderNumber
         ? `Seu pedido ${createdOrderResult.orderNumber} foi criado com sucesso!${formattedTotal ? ` O total é${formattedTotal}.` : ''} Em breve enviaremos atualizações pelo WhatsApp.`
         : `Seu pedido foi criado com sucesso!${formattedTotal ? ` O total é${formattedTotal}.` : ''} Em breve enviaremos atualizações pelo WhatsApp.`;
+
+      this.logger.log(`[AI_ORDER] confirmation_requested sessionId=${sessionId}`);
 
       await this.sendFinalResponse(
         tenantId,
@@ -1573,6 +1615,9 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
 
     sanitized = removeAllJsonBlocksAnywhere(sanitized);
 
+    // Limpar crases/backticks residuais caso a resposta venha cercada por blocos de código markdown vazios
+    sanitized = sanitized.replace(/`/g, '').trim();
+
     sanitized = sanitized.trim();
     if (!sanitized) {
       removedToolOutput = true;
@@ -1661,7 +1706,9 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
 
     AiFlowLogger.flow('whatsapp_send_start', trace, {
       textLength: sanitized.length,
+      text: sanitized,
     });
+    this.logger.log(`[AI_RESPONSE] send_text text="${sanitized}" sessionId=${sessionId}`);
 
     try {
       // Duplicate suppression: check last outbound AI message

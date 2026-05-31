@@ -42,6 +42,15 @@ import { AiAgentModule } from './ai-agent/ai-agent.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { ChatModule } from './chat/chat.module';
 
+// Log Redis initialization status at startup
+if (process.env.REDIS_ENABLED === 'false') {
+  console.log('[REDIS] disabled_for_dev');
+} else if (process.env.REDIS_HOST && process.env.REDIS_HOST !== 'localhost') {
+  console.log(`[REDIS] attempting_connection host=${process.env.REDIS_HOST} port=${process.env.REDIS_PORT || 6379}`);
+} else if (!process.env.REDIS_HOST) {
+  console.log('[REDIS] no_host_configured_will_use_cache_fallback');
+}
+
 @Module({
   imports: [
     // Configuration — loads .env
@@ -70,7 +79,7 @@ import { ChatModule } from './chat/chat.module';
       },
     ]),
 
-    ...(process.env.BULLMQ_ENABLED === 'true' || process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true'
+    ...(process.env.REDIS_ENABLED !== 'false' && (process.env.BULLMQ_ENABLED === 'true' || process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true')
       ? [
           BullModule.forRoot({
             connection: {
@@ -92,20 +101,38 @@ import { ChatModule } from './chat/chat.module';
         ]
       : []),
 
-    // Cache (Redis)
+    // Cache (Redis com fallback local in-memory se falhar ou estiver sem credenciais)
     CacheModule.registerAsync({
       isGlobal: true,
-      useFactory: async () => ({
-        store: await redisStore({
-          socket: {
-            host: process.env.REDIS_HOST || 'localhost',
-            port: Number(process.env.REDIS_PORT || 6379),
-            tls: process.env.REDIS_TLS === 'true' ? true : undefined,
-          },
-          password: process.env.REDIS_PASSWORD || undefined,
-          ttl: 60000, // Default 60s
-        }),
-      }),
+      useFactory: async () => {
+        try {
+          if (process.env.REDIS_ENABLED === 'false') {
+            console.log('[CACHE] forced_in_memory - redis_disabled');
+            return {};
+          }
+          if (!process.env.REDIS_HOST) {
+            console.log('[CACHE] fallback_in_memory - no_redis_host');
+            return {};
+          }
+          const store = await redisStore({
+            socket: {
+              host: process.env.REDIS_HOST,
+              port: Number(process.env.REDIS_PORT || 6379),
+              tls: process.env.REDIS_TLS === 'true' ? true : undefined,
+              connectTimeout: 3000,
+            },
+            password: process.env.REDIS_PASSWORD || undefined,
+            ttl: 60000, // Default 60s
+          }) as { client: { ping(): Promise<string> } };
+          // Testa ping
+          await store.client.ping();
+          console.log('[CACHE] redis_connected');
+          return { store };
+        } catch (err) {
+          console.warn('[CACHE] redis_connection_failed - using_fallback_in_memory:', err instanceof Error ? err.message : err);
+          return {};
+        }
+      },
     }),
 
     // Database (Prisma)
