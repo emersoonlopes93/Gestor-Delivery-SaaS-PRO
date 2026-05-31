@@ -165,6 +165,108 @@ async function seedSystemConfig() {
   console.log('   ✅ System config seeded');
 }
 
+async function seedBillingFoundation() {
+  console.log('💳 Seeding billing foundation...');
+
+  const plan = await prisma.billingPlan.upsert({
+    where: { slug: 'revenue-growth' },
+    update: {
+      name: 'Crescimento por Faturamento',
+      description: 'Plano novo para faturamento por receita mensal',
+      type: 'revenue_tiered',
+      cycleInterval: 'monthly',
+      isActive: true,
+      isPublic: true,
+      currency: 'BRL',
+      trialDays: 7,
+      requiresPaymentMethod: false,
+      allowAllModules: true,
+    },
+    create: {
+      name: 'Crescimento por Faturamento',
+      slug: 'revenue-growth',
+      description: 'Plano novo para faturamento por receita mensal',
+      type: 'revenue_tiered',
+      cycleInterval: 'monthly',
+      isActive: true,
+      isPublic: true,
+      currency: 'BRL',
+      trialDays: 7,
+      requiresPaymentMethod: false,
+      allowAllModules: true,
+    },
+  });
+
+  const tiers = [
+    { minRevenue: 0, maxRevenue: 1500, price: 0, label: 'Até R$ 1.500', sortOrder: 0 },
+    { minRevenue: 1500.01, maxRevenue: 4000, price: 100, label: 'R$ 1.500,01 até R$ 4.000', sortOrder: 1 },
+    { minRevenue: 4000.01, maxRevenue: 6000, price: 200, label: 'R$ 4.000,01 até R$ 6.000', sortOrder: 2 },
+    { minRevenue: 6000.01, maxRevenue: null, price: 300, label: 'Acima de R$ 6.000', sortOrder: 3 },
+  ];
+
+  for (const tier of tiers) {
+    await prisma.billingRevenueTier.upsert({
+      where: {
+        planId_sortOrder: {
+          planId: plan.id,
+          sortOrder: tier.sortOrder,
+        },
+      },
+      update: {
+        minRevenue: tier.minRevenue,
+        maxRevenue: tier.maxRevenue,
+        price: tier.price,
+        label: tier.label,
+      },
+      create: {
+        planId: plan.id,
+        minRevenue: tier.minRevenue,
+        maxRevenue: tier.maxRevenue,
+        price: tier.price,
+        label: tier.label,
+        sortOrder: tier.sortOrder,
+      },
+    });
+  }
+
+  await prisma.billingSettings.upsert({
+    where: { id: 'global' },
+    update: {
+      includeDeliveryFeeByDefault: false,
+      includeServiceFeeByDefault: false,
+      countStorefrontOrders: true,
+      countPosOrders: true,
+      countWhatsappAiOrders: true,
+      countManualOrders: false,
+      countConfirmedOrders: true,
+      countCompletedOrders: true,
+      excludeCancelledOrders: true,
+      discountReducesRevenue: true,
+      defaultGracePeriodDays: 7,
+      defaultTrialDays: 7,
+      requirePaymentMethodForPaidPlans: false,
+    },
+    create: {
+      id: 'global',
+      includeDeliveryFeeByDefault: false,
+      includeServiceFeeByDefault: false,
+      countStorefrontOrders: true,
+      countPosOrders: true,
+      countWhatsappAiOrders: true,
+      countManualOrders: false,
+      countConfirmedOrders: true,
+      countCompletedOrders: true,
+      excludeCancelledOrders: true,
+      discountReducesRevenue: true,
+      defaultGracePeriodDays: 7,
+      defaultTrialDays: 7,
+      requirePaymentMethodForPaidPlans: false,
+    },
+  });
+
+  console.log('   ✅ Billing foundation seeded');
+}
+
 async function seedAiPlanPresets() {
   console.log('🤖 Seeding AI agent plan presets...');
 
@@ -600,6 +702,7 @@ async function main() {
   await seedAdminRoles();
   await seedSuperAdmin();
   await seedSystemConfig();
+  await seedBillingFoundation();
   await seedAiPlanPresets();
   await seedDemoTenant();
   await seedDineInTables();

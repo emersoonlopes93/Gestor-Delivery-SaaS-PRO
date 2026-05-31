@@ -6,11 +6,12 @@ import { TenantContextService } from '../common/context/tenant-context.service';
 import { RbacModule } from '../rbac/rbac.module';
 import { AsaasService } from './asaas.service';
 import { BillingWebhookController } from './billing-webhook.controller';
+import { BillingDomainModule } from './billing-domain.module';
 
 @Module({
-  imports: [RbacModule],
+  imports: [RbacModule, BillingDomainModule],
   controllers: [BillingController, BillingWebhookController],
   providers: [BillingService, AsaasService, PrismaService, TenantContextService],
-  exports: [BillingService],
+  exports: [BillingService, BillingDomainModule],
 })
 export class BillingModule {}

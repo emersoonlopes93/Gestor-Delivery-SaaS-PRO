@@ -30,6 +30,9 @@
 
     "smoke:orders": "ts-node scripts/smoke-test-orders.ts",
 
+    "smoke:billing": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-domain.ts",
+    "smoke:billing-usage": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-usage.ts",
+
     "smoke:logistics": "ts-node -r tsconfig-paths/register scripts/smoke-test-logistics-flow.ts",
 
     "smoke:all": "pnpm smoke:auth && pnpm smoke:combos && pnpm smoke:delivery-rate && pnpm smoke:inventory && pnpm smoke:orders",

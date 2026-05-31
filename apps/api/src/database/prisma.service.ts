@@ -45,6 +45,12 @@ export class PrismaService
         'TenantSubscription',
         'ChatMessage',
         'SystemConfig',
+        'BillingPlan',
+        'BillingRevenueTier',
+        'BillingPlanModule',
+        'BillingModuleAddon',
+        'BillingSettings',
+        'InvoiceItem',
       ];
 
       const model = params.model ?? '';
