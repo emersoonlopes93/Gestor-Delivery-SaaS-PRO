@@ -14,7 +14,7 @@ const CRITICAL_PATTERNS = [
   'opacity-40',
 ];
 
-// WARNING PATTERNS - reported but never block build
+// WARNING PATTERNS - reported but never block build unless --baseline is active
 const WARNING_PATTERNS = [
   'disabled:opacity-50',
   'bg-transparent',
@@ -43,6 +43,9 @@ const DIRECTORIES_TO_SCAN = [
 
 // File extensions to scan
 const FILE_EXTENSIONS = ['.tsx', '.jsx', '.ts', '.js'];
+
+// Path to baseline JSON
+const BASELINE_FILE_PATH = path.join(__dirname, '..', 'theme-warnings-baseline.json');
 
 function scanDirectory(dir, results = []) {
   const files = fs.readdirSync(dir);
@@ -108,17 +111,46 @@ function checkFile(filePath, checkCritical, checkWarning) {
   return { criticalIssues, warningIssues };
 }
 
+function loadBaseline() {
+  if (!fs.existsSync(BASELINE_FILE_PATH)) {
+    return [];
+  }
+  try {
+    return JSON.parse(fs.readFileSync(BASELINE_FILE_PATH, 'utf-8'));
+  } catch (err) {
+    console.error('⚠️ Failed to parse baseline file. Treating as empty.', err);
+    return [];
+  }
+}
+
+function writeBaseline(warnings) {
+  const formattedWarnings = warnings.map(w => ({
+    file: path.relative(path.join(__dirname, '..'), w.file).replace(/\\/g, '/'),
+    line: w.line,
+    pattern: w.pattern,
+    content: w.content,
+    category: 'warning',
+    date: new Date().toISOString().split('T')[0]
+  }));
+  
+  fs.writeFileSync(BASELINE_FILE_PATH, JSON.stringify(formattedWarnings, null, 2), 'utf-8');
+  console.log(`✅ Baseline successfully updated in ${BASELINE_FILE_PATH}`);
+  console.log(`Mappeado total de ${formattedWarnings.length} warnings.`);
+}
+
 function main() {
   const args = process.argv.slice(2);
   const isCriticalMode = args.includes('--critical');
   const isReportMode = args.includes('--report');
+  const isBaselineMode = args.includes('--baseline');
+  const shouldWriteBaseline = args.includes('--write-baseline');
   
-  // Default to critical mode if no mode specified (e.g. check:theme fallback)
-  const runCritical = isCriticalMode || (!isCriticalMode && !isReportMode);
-  const runWarning = isReportMode;
+  // Default to critical mode if no mode specified
+  const runCritical = isCriticalMode || (!isCriticalMode && !isReportMode && !isBaselineMode && !shouldWriteBaseline);
+  const runWarning = isReportMode || isBaselineMode || shouldWriteBaseline;
 
   console.log('🔍 Scanning for hardcoded theme classes...');
-  console.log(`Mode: ${runCritical ? 'CRITICAL' : ''} ${runWarning ? 'REPORT/WARNINGS' : ''}`);
+  console.log(`Mode: ${runCritical ? 'CRITICAL' : ''} ${runWarning ? 'WARNINGS' : ''} ${isBaselineMode ? '(BASELINE COMPARISON)' : ''}`);
   console.log('');
   
   const allFiles = [];
@@ -140,7 +172,7 @@ function main() {
   console.log('');
   
   const filesWithCriticalIssues = [];
-  const filesWithWarningIssues = [];
+  const allWarnings = [];
   
   for (const file of filesToScan) {
     const { criticalIssues, warningIssues } = checkFile(file, runCritical, runWarning);
@@ -153,15 +185,63 @@ function main() {
     }
     
     if (warningIssues.length > 0) {
-      filesWithWarningIssues.push({
-        file,
-        issues: warningIssues,
-      });
+      for (const issue of warningIssues) {
+        allWarnings.push({
+          file,
+          ...issue
+        });
+      }
     }
   }
   
-  // If no issues found
-  if (filesWithCriticalIssues.length === 0 && filesWithWarningIssues.length === 0) {
+  // 1. Write baseline mode
+  if (shouldWriteBaseline) {
+    writeBaseline(allWarnings);
+    process.exit(0);
+  }
+  
+  // 2. Baseline comparison mode
+  if (isBaselineMode) {
+    const baseline = loadBaseline();
+    const newWarnings = [];
+    
+    for (const w of allWarnings) {
+      const relativePath = path.relative(path.join(__dirname, '..'), w.file).replace(/\\/g, '/');
+      const isKnown = baseline.some(b => 
+        b.file === relativePath && 
+        b.pattern === w.pattern && 
+        b.content === w.content
+      );
+      
+      if (!isKnown) {
+        newWarnings.push(w);
+      }
+    }
+    
+    if (newWarnings.length > 0) {
+      console.log('❌ NEW WARNINGS INTRODUCED (not present in baseline):');
+      console.log('');
+      
+      for (const w of newWarnings) {
+        console.log(`📄 ${w.file}`);
+        console.log(`   Line ${w.line}: ${w.pattern}`);
+        console.log(`   ${w.content}`);
+        console.log('');
+      }
+      
+      console.log(`🚨 Build blocked: Found ${newWarnings.length} new theme warnings outside baseline.`);
+      console.log('To update the baseline, run: pnpm check:theme:write-baseline');
+      console.log('');
+      process.exit(1);
+    } else {
+      console.log('✅ Baseline verification passed! No new warnings introduced.');
+      console.log(`Total active warnings in baseline: ${allWarnings.length}`);
+      process.exit(0);
+    }
+  }
+  
+  // If no issues found in normal run
+  if (filesWithCriticalIssues.length === 0 && allWarnings.length === 0) {
     console.log('✅ No hardcoded theme issues found in selected mode!');
     process.exit(0);
   }
@@ -184,43 +264,33 @@ function main() {
     console.log('');
     console.log(`❌ Found ${filesWithCriticalIssues.length} files with ${filesWithCriticalIssues.reduce((sum, f) => sum + f.issues.length, 0)} CRITICAL issues.`);
     console.log('');
-    console.log('Critical patterns cause invisible text/elements in dark mode.');
-    console.log('Please fix these issues or add allowlist comments:');
-    console.log('  // @allow-theme-risk: clear justification here');
-    console.log('');
-  }
-  
-  // Report warning issues
-  if (runWarning && filesWithWarningIssues.length > 0) {
-    console.log('⚠️  WARNING ISSUES (should fix, but not blocking):');
-    console.log('');
-    
-    for (const { file, issues } of filesWithWarningIssues) {
-      console.log(`📄 ${file}`);
-      
-      for (const issue of issues) {
-        console.log(`   Line ${issue.line}: ${issue.pattern}`);
-        console.log(`   ${issue.content}`);
-        console.log('');
-      }
-    }
-    
-    console.log('');
-    console.log(`⚠️  Found ${filesWithWarningIssues.length} files with ${filesWithWarningIssues.reduce((sum, f) => sum + f.issues.length, 0)} WARNING issues.`);
-    console.log('');
-  }
-  
-  console.log('See docs/theme-guidelines.md for guidance.');
-  console.log('');
-  
-  // Exit code logic
-  if (runCritical && filesWithCriticalIssues.length > 0) {
-    console.log('🚨 Build blocked due to CRITICAL theme issues.');
     process.exit(1);
   }
   
-  if (runWarning && filesWithWarningIssues.length > 0) {
-    console.log('⚠️  Warnings found. Build passes (non-blocking).');
+  // Report warning issues in standard report mode
+  if (isReportMode && allWarnings.length > 0) {
+    console.log('⚠️  WARNING ISSUES (should fix, but not blocking):');
+    console.log('');
+    
+    // Group warnings by file to print cleanly
+    const grouped = {};
+    for (const w of allWarnings) {
+      if (!grouped[w.file]) grouped[w.file] = [];
+      grouped[w.file].push(w);
+    }
+    
+    for (const file of Object.keys(grouped)) {
+      console.log(`📄 ${file}`);
+      for (const w of grouped[file]) {
+        console.log(`   Line ${w.line}: ${w.pattern}`);
+        console.log(`   ${w.content}`);
+      }
+      console.log('');
+    }
+    
+    console.log(`⚠️  Found ${allWarnings.length} WARNING issues.`);
+    console.log('See docs/theme-guidelines.md for guidance.');
+    console.log('');
     process.exit(0);
   }
 }
