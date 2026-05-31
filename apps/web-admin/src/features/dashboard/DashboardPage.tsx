@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../../stores/auth.store';
-import { api, ApiError } from '../../lib/api-client';
+import { api } from '../../lib/api-client';
 
 interface DashboardStats {
   activeTenants: number;

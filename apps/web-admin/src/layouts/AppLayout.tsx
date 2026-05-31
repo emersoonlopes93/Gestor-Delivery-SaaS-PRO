@@ -4,7 +4,6 @@ import { hasPermission } from '@gestor/auth';
 import {
   Bell,
   ChevronRight,
-  CornerDownRight,
   CreditCard,
   LayoutGrid,
   Menu,
@@ -17,7 +16,6 @@ import {
   Sun,
   LogOut,
   Globe,
-  ArrowRight,
   Bot
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -54,7 +52,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     label: 'Plataforma',
     items: [
       { id: 'franchise', label: 'Franquias', to: '/franchise', icon: Globe, permission: 'saas.franchise.read' },
-      { id: 'billing', label: 'Planos & Assinaturas', to: '/billing', icon: CreditCard, permission: 'saas.plans.read' },
+      { id: 'billing', label: 'Billing Console', to: '/billing', icon: CreditCard, permission: 'saas.billing.read' },
       { id: 'integrations', label: 'Marketplace & IA', to: '/integrations', icon: Puzzle, permission: 'saas.settings.read' },
       { id: 'ai-global', label: 'Agente IA Global', to: '/ai-agent/global', icon: Bot, permission: 'saas.ai.read' },
       { id: 'audit-logs', label: 'Auditoria', to: '/audit-logs', icon: Shield, permission: 'saas.audit.read' },

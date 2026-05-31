@@ -4,7 +4,7 @@ import { DashboardPage } from './features/dashboard/DashboardPage';
 import { TenantsPage } from './features/tenants/TenantsPage';
 import { TenantModulesPage } from './features/tenants/TenantModulesPage';
 import { TenantAiAgentConfigPage } from './features/tenants/TenantAiAgentConfigPage';
-import { BillingPage } from './features/billing/BillingPage';
+import { BillingConsolePage } from './features/billing/BillingConsolePage';
 import { GlobalAiAgentConfigPage } from './features/ai-agent/GlobalAiAgentConfigPage';
 import { AuditLogsPage } from './features/audit/AuditLogsPage';
 import { FranchiseDashboard } from './features/franchise/FranchiseDashboard';
@@ -72,8 +72,8 @@ export function App() {
           <Route
             path="/billing"
             element={
-              <PermissionGate permission="saas.plans.read">
-                <BillingPage />
+              <PermissionGate permission="saas.billing.read">
+                <BillingConsolePage />
               </PermissionGate>
             }
           />
