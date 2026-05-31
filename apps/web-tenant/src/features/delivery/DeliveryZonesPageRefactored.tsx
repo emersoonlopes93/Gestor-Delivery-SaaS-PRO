@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Circle, MapContainer, Marker, Polygon, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet-draw';
+import { useThemeStore } from '@/stores/theme.store';
 import {
   AlertCircle,
   Ban,
@@ -462,6 +463,9 @@ async function geocodeNominatim(address: string): Promise<{ lat: number; lng: nu
 }
 
 export function DeliveryZonesPageRefactored() {
+  const { theme } = useThemeStore();
+  const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
   const [coverage, setCoverage] = useState<CoverageConfig | null>(null);
   const [coverageDraft, setCoverageDraft] = useState({
     isDeliveryEnabled: true,
@@ -1462,8 +1466,11 @@ export function DeliveryZonesPageRefactored() {
             <MapRefSync mapRef={mapRef} />
             <SimulationClickLayer enabled={simulationOn} onPick={runSimulationAt} />
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+              url={isDark 
+                ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+              }
             />
             <Marker
               position={storePosition}
@@ -1678,8 +1685,11 @@ export function DeliveryZonesPageRefactored() {
           <MapRefSync mapRef={mapRef} />
           <SimulationClickLayer enabled={simulationOn} onPick={runSimulationAt} />
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            url={isDark 
+              ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            }
           />
           <Marker
             position={storePosition}

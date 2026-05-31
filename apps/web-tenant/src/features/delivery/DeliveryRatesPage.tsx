@@ -4,6 +4,7 @@ import { api } from '../../lib/api-client';
 import { MapContainer, TileLayer, FeatureGroup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet-draw';
+import { useThemeStore } from '../../stores/theme.store';
 import type { LatLngExpression } from 'leaflet';
 
 
@@ -563,6 +564,9 @@ interface DeliveryRateModalProps {
 }
 
 function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModalProps) {
+  const { theme } = useThemeStore();
+  const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
   const [formData, setFormData] = useState<CreateRuleDto>(() => ({
     type: 'neighborhood',
     neighborhood: '',
@@ -859,8 +863,11 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                 <div className="h-[320px]">
                   <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }}>
                     <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                      url={isDark 
+                        ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                        : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                      }
                     />
                     <FeatureGroup>
                       <PolygonDrawControl
