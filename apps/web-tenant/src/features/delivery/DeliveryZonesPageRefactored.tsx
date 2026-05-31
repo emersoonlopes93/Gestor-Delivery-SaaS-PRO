@@ -2,7 +2,6 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Circle, MapContainer, Marker, Polygon, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet-draw';
-import { useThemeStore } from '@/stores/theme.store';
 import {
   AlertCircle,
   Ban,
@@ -463,9 +462,6 @@ async function geocodeNominatim(address: string): Promise<{ lat: number; lng: nu
 }
 
 export function DeliveryZonesPageRefactored() {
-  const { theme } = useThemeStore();
-  const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-
   const [coverage, setCoverage] = useState<CoverageConfig | null>(null);
   const [coverageDraft, setCoverageDraft] = useState({
     isDeliveryEnabled: true,
@@ -1206,8 +1202,8 @@ export function DeliveryZonesPageRefactored() {
             onClick={() => setDrawMode((m) => (m === 'drawing' ? 'idle' : 'drawing'))}
             className={'h-12 flex-1 rounded-xl text-sm font-black transition-all inline-flex items-center justify-center gap-2 ' +
               (drawMode === 'drawing'
-                 ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400'
-                 : 'bg-primary-50 text-primary-700 hover:bg-primary-100 dark:bg-primary-500/10 dark:text-primary-400')}
+                ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400'
+                : 'bg-primary-50 text-primary-700 hover:bg-primary-100 dark:bg-primary-500/10 dark:text-primary-400')}
           >
             {drawMode === 'drawing' ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
             {drawMode === 'drawing' ? 'Parar desenho' : 'Editar área'}
@@ -1288,7 +1284,7 @@ export function DeliveryZonesPageRefactored() {
                 <Crosshair className="h-4 w-4" />
                 Localizar loja
               </button>
-              
+
               <button
                 type="button"
                 onClick={() => {
@@ -1380,7 +1376,7 @@ export function DeliveryZonesPageRefactored() {
               title="Zonas Mapeadas"
               subtitle="Áreas desenhadas com regras exclusivas."
             />
-            
+
             <div className="mt-4">
               {visibleZones.length === 0 ? (
                 <div className="text-center py-8 bg-muted/20 border border-dashed border-border text-muted-foreground rounded-2xl p-4">
@@ -1395,13 +1391,12 @@ export function DeliveryZonesPageRefactored() {
                     return (
                       <div
                         key={z.id}
-                        className={`group p-3 rounded-xl border cursor-pointer transition-all ${
-                          isSelected
+                        className={`group p-3 rounded-xl border cursor-pointer transition-all ${isSelected
                             ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-500/10 shadow-sm ring-1 ring-primary-500'
                             : isHovered
                               ? 'border-input bg-muted'
                               : 'border-input bg-card'
-                        }`}
+                          }`}
                         onClick={() => setSelectedZoneId(z.id)}
                         onMouseEnter={() => setHoveredZoneId(z.id)}
                         onMouseLeave={() => setHoveredZoneId(null)}
@@ -1466,11 +1461,8 @@ export function DeliveryZonesPageRefactored() {
             <MapRefSync mapRef={mapRef} />
             <SimulationClickLayer enabled={simulationOn} onPick={runSimulationAt} />
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-              url={isDark 
-                ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-              }
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             <Marker
               position={storePosition}
@@ -1643,27 +1635,27 @@ export function DeliveryZonesPageRefactored() {
           </div>
         )}
 
-        <div className="hidden lg:block absolute bottom-6 right-6 z-[1000] pointer-events-none">
-          <div className="bg-card/95 backdrop-blur-md border border-border rounded-2xl shadow-xl p-5 space-y-3.5 min-w-[180px] pointer-events-auto">
-            <div className="text-xs font-bold text-foreground mb-1 uppercase tracking-wide">LEGENDA</div>
-            
-            <div className="flex items-center gap-3 text-xs font-semibold text-foreground">
-              <div className="w-3.5 h-3.5 rounded-full bg-primary border border-primary-600 shadow-sm shrink-0" />
+        <div className="hidden lg:block absolute bottom-6 right-6 z-[1000]">
+          <div className="bg-white/95 dark:bg-slate-950/95 text-slate-950 dark:text-white border border-slate-200 dark:border-white/15 rounded-2xl shadow-xl dark:shadow-2xl backdrop-blur-md absolute bottom-0 right-0 min-w-[180px] p-4 space-y-3">
+            <div className="text-xs font-black text-slate-950 dark:text-white mb-1 uppercase tracking-wide">LEGENDA</div>
+
+            <div className="flex items-center gap-3 text-xs font-semibold text-slate-800 dark:text-slate-100">
+              <div className="w-3.5 h-3.5 rounded-full bg-primary border border-primary shadow-sm shrink-0" />
               <span>Cobertura padrão</span>
             </div>
-            
-            <div className="flex items-center gap-3 text-xs font-semibold text-foreground">
-              <div className="w-3.5 h-3.5 rounded-full bg-status-success border border-emerald-600 shadow-sm shrink-0" />
+
+            <div className="flex items-center gap-3 text-xs font-semibold text-slate-800 dark:text-slate-100">
+              <div className="w-3.5 h-3.5 rounded-full bg-status-success border border-status-success shadow-sm shrink-0" />
               <span>Entrega grátis</span>
             </div>
-            
-            <div className="flex items-center gap-3 text-xs font-semibold text-foreground">
-              <div className="w-3.5 h-3.5 rounded-full bg-status-warning border border-amber-600 shadow-sm shrink-0" />
+
+            <div className="flex items-center gap-3 text-xs font-semibold text-slate-800 dark:text-slate-100">
+              <div className="w-3.5 h-3.5 rounded-full bg-status-warning border border-status-warning shadow-sm shrink-0" />
               <span>Zona com taxa</span>
             </div>
-            
-            <div className="flex items-center gap-3 text-xs font-semibold text-foreground">
-              <div className="w-3.5 h-3.5 rounded-full bg-status-danger border border-red-600 shadow-sm shrink-0" />
+
+            <div className="flex items-center gap-3 text-xs font-semibold text-slate-800 dark:text-slate-100">
+              <div className="w-3.5 h-3.5 rounded-full bg-destructive border border-destructive shadow-sm shrink-0" />
               <span>Área bloqueada</span>
             </div>
           </div>
@@ -1685,11 +1677,8 @@ export function DeliveryZonesPageRefactored() {
           <MapRefSync mapRef={mapRef} />
           <SimulationClickLayer enabled={simulationOn} onPick={runSimulationAt} />
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-            url={isDark 
-              ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-              : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-            }
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <Marker
             position={storePosition}
