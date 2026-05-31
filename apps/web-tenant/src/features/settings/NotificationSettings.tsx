@@ -138,7 +138,7 @@ export function NotificationSettings() {
         <button
           onClick={handleSave}
           disabled={mutation.isPending}
-          className="btn-primary px-8 py-3 rounded-2xl flex items-center gap-2 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 px-8 py-3 rounded-2xl flex items-center gap-2 shadow-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed font-semibold transition-colors"
         >
           {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           {mutation.isPending ? 'Salvando...' : 'Salvar Alterações'}
@@ -160,9 +160,9 @@ export function NotificationSettings() {
             </div>
             <button
               onClick={() => setEnabled(!enabled)}
-              className={`w-14 h-8 rounded-full relative transition-colors duration-300 ${enabled ? 'bg-status-success' : 'bg-muted'}`}
+              className={`w-14 h-8 rounded-full border transition-colors duration-300 relative ${enabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
             >
-              <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${enabled ? 'right-1' : 'left-1'}`} />
+              <div className={`absolute top-[3px] w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${enabled ? 'right-1' : 'left-1'}`} />
             </button>
           </div>
         </section>
@@ -181,16 +181,16 @@ export function NotificationSettings() {
             </div>
             <button
               onClick={() => setAudioEnabled(!audioEnabled)}
-              className={`w-14 h-8 rounded-full relative transition-colors duration-300 ${audioEnabled ? 'bg-primary' : 'bg-muted'}`}
+              className={`w-14 h-8 rounded-full border transition-colors duration-300 relative ${audioEnabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
             >
-              <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${audioEnabled ? 'right-1' : 'left-1'}`} />
+              <div className={`absolute top-[3px] w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${audioEnabled ? 'right-1' : 'left-1'}`} />
             </button>
           </div>
 
           <div className={`space-y-6 transition-opacity ${audioEnabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
             <div className="flex flex-col gap-2">
               <div className="flex justify-between items-center">
-                <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Volume do Alerta</label>
+                <label className="text-xs font-black uppercase tracking-widest text-foreground">Volume do Alerta</label>
                 <span className="text-xs font-bold text-foreground">{Math.round(volume * 100)}%</span>
               </div>
               <input 
@@ -198,14 +198,14 @@ export function NotificationSettings() {
                 min="0" max="1" step="0.1" 
                 value={volume}
                 onChange={(e) => setVolume(parseFloat(e.target.value))}
-                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary-600"
+                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
               />
             </div>
 
             {/* Seletor de som — Novo Pedido */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Som de Novo Pedido</label>
+                <label className="text-xs font-black uppercase tracking-widest text-foreground">Som de Novo Pedido</label>
                 <div className="flex gap-2">
                   <select
                     value={newOrderSound}
@@ -217,9 +217,10 @@ export function NotificationSettings() {
                     ))}
                   </select>
                   <button
+                    type="button"
                     onClick={handleTestNewOrder}
                     title="Testar som de novo pedido"
-                    className="flex items-center gap-1.5 px-3 py-2 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 border border-primary-200 dark:border-primary-800 rounded-xl font-bold text-xs hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-all"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
                   >
                     <Play className="w-3.5 h-3.5" />
                     Testar
@@ -228,7 +229,7 @@ export function NotificationSettings() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Som de Cancelamento</label>
+                <label className="text-xs font-black uppercase tracking-widest text-foreground">Som de Cancelamento</label>
                 <div className="flex gap-2">
                   <select
                     value={cancellationSound}
@@ -240,9 +241,10 @@ export function NotificationSettings() {
                     ))}
                   </select>
                   <button
+                    type="button"
                     onClick={handleTestCancellation}
                     title="Testar som de cancelamento"
-                    className="flex items-center gap-1.5 px-3 py-2 bg-muted text-foreground rounded-xl font-bold text-xs hover:bg-muted transition-all"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
                   >
                     <Play className="w-3.5 h-3.5" />
                     Testar
@@ -285,7 +287,7 @@ export function NotificationSettings() {
         </section>
 
         {/* Info Box */}
-        <div className="bg-primary-50 dark:bg-primary-900/10 border border-primary-100 dark:border-primary-900/30 p-6 rounded-3xl flex gap-4">
+        <div className="bg-primary/5 border border-primary/20 p-6 rounded-3xl flex gap-4 text-foreground">
           <Info className="w-6 h-6 text-primary-600 shrink-0" />
           <div className="text-sm text-primary-800 dark:text-primary-400 leading-relaxed font-medium">
             <strong>Como funciona?</strong> As variáveis em chaves duplas como <code>{"{{orderNumber}}"}</code> serão substituídas automaticamente pelos dados reais do pedido antes do envio. Certifique-se de que sua instância de WhatsApp está conectada para que os disparos ocorram.

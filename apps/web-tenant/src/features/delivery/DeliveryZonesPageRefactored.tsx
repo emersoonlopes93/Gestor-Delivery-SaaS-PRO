@@ -1637,22 +1637,26 @@ export function DeliveryZonesPageRefactored() {
         )}
 
         <div className="hidden lg:block absolute bottom-6 right-6 z-[1000] pointer-events-none">
-          <div className="bg-card/90 backdrop-blur-md border border-border rounded-2xl shadow-lg p-4 space-y-3">
-            <div className="text-xs font-bold text-foreground mb-1 uppercase tracking-wider">Legenda</div>
-            <div className="flex items-center gap-3 text-xs font-semibold text-muted-foreground">
-              <div className="w-3.5 h-3.5 rounded-full bg-blue-500 border border-blue-600" />
+          <div className="bg-card/95 backdrop-blur-md border border-border rounded-2xl shadow-xl p-5 space-y-3.5 min-w-[180px] pointer-events-auto">
+            <div className="text-xs font-bold text-foreground mb-1 uppercase tracking-wide">LEGENDA</div>
+            
+            <div className="flex items-center gap-3 text-xs font-semibold text-foreground">
+              <div className="w-3.5 h-3.5 rounded-full bg-primary border border-primary-600 shadow-sm shrink-0" />
               <span>Cobertura padrão</span>
             </div>
-            <div className="flex items-center gap-3 text-xs font-semibold text-muted-foreground">
-              <div className="w-3.5 h-3.5 rounded-full bg-green-500 border border-green-600" />
+            
+            <div className="flex items-center gap-3 text-xs font-semibold text-foreground">
+              <div className="w-3.5 h-3.5 rounded-full bg-status-success border border-emerald-600 shadow-sm shrink-0" />
               <span>Entrega grátis</span>
             </div>
-            <div className="flex items-center gap-3 text-xs font-semibold text-muted-foreground">
-              <div className="w-3.5 h-3.5 rounded-full bg-yellow-500 border border-yellow-600" />
+            
+            <div className="flex items-center gap-3 text-xs font-semibold text-foreground">
+              <div className="w-3.5 h-3.5 rounded-full bg-status-warning border border-amber-600 shadow-sm shrink-0" />
               <span>Zona com taxa</span>
             </div>
-            <div className="flex items-center gap-3 text-xs font-semibold text-muted-foreground">
-              <div className="w-3.5 h-3.5 rounded-full bg-red-500 border border-red-600" />
+            
+            <div className="flex items-center gap-3 text-xs font-semibold text-foreground">
+              <div className="w-3.5 h-3.5 rounded-full bg-status-danger border border-red-600 shadow-sm shrink-0" />
               <span>Área bloqueada</span>
             </div>
           </div>
