@@ -63,6 +63,216 @@ export class AiOrchestratorService {
     private readonly availabilityService: AvailabilityService,
   ) {}
 
+  private async applyDeterministicDraftCapture(sessionId: string, content: string): Promise<void> {
+    const text = content.trim();
+    if (!text) return;
+
+    const normalized = text
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+
+    const memory = await this.conversationService.getSessionAiMemory(sessionId);
+    const draft = memory.orderDraft;
+
+    if (/^(delivery|entrega|entregar|entregue)$/i.test(normalized)) {
+      await this.conversationService.updateOrderDraft(sessionId, { fulfillmentType: 'delivery' });
+      this.logger.log(`[AI_DRAFT] fulfillment_set delivery sessionId=${sessionId}`);
+      return;
+    }
+
+    if (/^(retirada|retirar|pickup|balcao|balcão)$/i.test(normalized)) {
+      await this.conversationService.updateOrderDraft(sessionId, { fulfillmentType: 'pickup' });
+      this.logger.log(`[AI_DRAFT] fulfillment_set pickup sessionId=${sessionId}`);
+      return;
+    }
+
+    if (/^(dinheiro|cash)$/i.test(normalized)) {
+      await this.conversationService.updateOrderDraft(sessionId, {
+        payment: { method: 'cash', changeFor: null, changeConfirmed: null },
+      });
+      this.logger.log(`[AI_DRAFT] payment_set cash sessionId=${sessionId}`);
+      return;
+    }
+
+    const cashChange = normalized.match(/^(\d{1,4})(?:[,.](\d{1,2}))?$/);
+    if (cashChange && draft.payment.method === 'cash' && draft.payment.changeFor === null) {
+      const amount = Number(`${cashChange[1]}.${cashChange[2] ?? '0'}`);
+      await this.conversationService.updateOrderDraft(sessionId, {
+        payment: { method: 'cash', changeFor: amount, changeConfirmed: null },
+      });
+      this.logger.log(`[AI_DRAFT] change_for_set ${amount} sessionId=${sessionId}`);
+      return;
+    }
+
+    const addressMatch = text.match(/^(.+?),\s*(\d{1,6}[A-Za-z]?)$/);
+    if (addressMatch) {
+      await this.conversationService.updateOrderDraft(sessionId, {
+        fulfillmentType: 'delivery',
+        deliveryAddress: {
+          ...draft.deliveryAddress,
+          street: addressMatch[1].trim(),
+          number: addressMatch[2].trim(),
+        },
+      });
+      this.logger.log(`[AI_DRAFT] address_updated sessionId=${sessionId}`);
+      return;
+    }
+
+    const shortPlace = /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s'-]{2,60}$/.test(text);
+    const isConfirmation = /^(sim|isso|pode ser|ok|correto|confirmo)$/i.test(normalized);
+    if (draft.fulfillmentType === 'delivery' && shortPlace && !isConfirmation) {
+      if (draft.deliveryAddress.street && draft.deliveryAddress.number && !draft.deliveryAddress.neighborhood) {
+        await this.conversationService.updateOrderDraft(sessionId, {
+          deliveryAddress: { ...draft.deliveryAddress, neighborhood: text },
+        });
+        this.logger.log(`[AI_DRAFT] address_updated sessionId=${sessionId}`);
+        return;
+      }
+
+      if (draft.deliveryAddress.street && draft.deliveryAddress.neighborhood && !draft.deliveryAddress.city) {
+        await this.conversationService.updateOrderDraft(sessionId, {
+          deliveryAddress: { ...draft.deliveryAddress, city: text },
+        });
+        this.logger.log(`[AI_DRAFT] address_updated sessionId=${sessionId}`);
+      }
+    }
+  }
+
+  private async executeDeterministicTool(
+    tenantId: string,
+    sessionId: string,
+    toolName: string,
+    args: Record<string, unknown>,
+    agentSessionCtx: AgentSessionContext,
+  ): Promise<unknown> {
+    const toolCall = {
+      id: `det_${toolName}_${Date.now()}`,
+      name: toolName,
+      arguments: args,
+    };
+    await this.conversationService.createInternalToolCallMessage(sessionId, [toolCall as Prisma.InputJsonObject]);
+    const result = await this.toolsService.executeTool(tenantId, toolName, args, agentSessionCtx);
+    await this.conversationService.createInternalToolResultMessage(
+      sessionId,
+      JSON.stringify(result),
+      toolName,
+      this.getToolResultStatus(result),
+    );
+    return result;
+  }
+
+  private async applyDeterministicToolCapture(
+    tenantId: string,
+    sessionId: string,
+    content: string,
+    agentSessionCtx: AgentSessionContext,
+  ): Promise<void> {
+    const text = content.trim();
+    const normalized = text
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+    const memory = await this.conversationService.getSessionAiMemory(sessionId);
+    const draft = memory.orderDraft;
+
+    const isConfirmation = /^(sim|isso|pode ser|ok|correto|confirmo)$/i.test(normalized);
+    if (isConfirmation && draft.readyToConfirm) {
+      this.logger.log(`[AI_ORDER] confirmation_requested sessionId=${sessionId}`);
+      const result = await this.executeDeterministicTool(
+        tenantId,
+        sessionId,
+        'criar_pedido',
+        {
+          itens: draft.items.map((item) => ({
+            productId: item.productId ?? undefined,
+            quantity: item.quantity,
+            notes: item.notes ?? undefined,
+          })),
+          fulfillmentType: draft.fulfillmentType ?? 'delivery',
+          endereco: draft.fulfillmentType === 'delivery'
+            ? {
+                street: draft.deliveryAddress.street,
+                number: draft.deliveryAddress.number,
+                neighborhood: draft.deliveryAddress.neighborhood,
+                city: draft.deliveryAddress.city,
+                state: draft.deliveryAddress.state ?? 'SP',
+                zipCode: draft.deliveryAddress.zipCode ?? undefined,
+                complement: draft.deliveryAddress.complement ?? undefined,
+              }
+            : undefined,
+          formaPagamento: draft.payment.method ?? 'cash',
+          troco: draft.payment.method === 'cash' ? draft.payment.changeFor ?? undefined : undefined,
+          scheduledFor: draft.scheduledFor ?? undefined,
+        },
+        agentSessionCtx,
+      );
+      const orderId = this.getOrderIdFromToolResult(result);
+      if (this.getToolResultStatus(result) === 'success' && orderId) {
+        await this.conversationService.clearOrderDraft(sessionId);
+        this.logger.log(`[AI_ORDER] create_order_success orderId=${orderId} sessionId=${sessionId}`);
+      }
+      return;
+    }
+
+    const itemMatch = normalized.match(/\b(?:quero|queria|vou querer|pedido)\s+(\d+)\s+(?:x\s+)?(?:pizza|pizzas?)\s+(?:de\s+)?calabresa\b/);
+    if (itemMatch && draft.items.length === 0) {
+      await this.executeDeterministicTool(
+        tenantId,
+        sessionId,
+        'adicionar_item_pedido',
+        { nomeOuBusca: 'Pizza de Calabresa', quantidade: Number(itemMatch[1]) },
+        agentSessionCtx,
+      );
+      return;
+    }
+
+    if (/^(delivery|entrega|entregar|entregue)$/i.test(normalized)) {
+      await this.executeDeterministicTool(tenantId, sessionId, 'definir_entrega_retirada', { tipo: 'delivery' }, agentSessionCtx);
+      return;
+    }
+
+    if (/^(dinheiro|cash)$/i.test(normalized)) {
+      await this.executeDeterministicTool(tenantId, sessionId, 'definir_forma_pagamento', { metodo: 'cash' }, agentSessionCtx);
+      return;
+    }
+
+    const cashChange = normalized.match(/^(\d{1,4})(?:[,.](\d{1,2}))?$/);
+    if (cashChange && draft.payment.method === 'cash') {
+      const amount = Number(`${cashChange[1]}.${cashChange[2] ?? '0'}`);
+      await this.executeDeterministicTool(tenantId, sessionId, 'definir_forma_pagamento', { metodo: 'cash', troco: amount }, agentSessionCtx);
+      return;
+    }
+
+    const addressMatch = text.match(/^(.+?),\s*(\d{1,6}[A-Za-z]?)$/);
+    if (addressMatch) {
+      await this.executeDeterministicTool(
+        tenantId,
+        sessionId,
+        'definir_endereco_entrega',
+        { rua: addressMatch[1].trim(), numero: addressMatch[2].trim() },
+        agentSessionCtx,
+      );
+      return;
+    }
+
+    const shortPlace = /^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s'-]{2,60}$/.test(text);
+    if (draft.fulfillmentType === 'delivery' && shortPlace && !isConfirmation) {
+      if (draft.deliveryAddress.street && draft.deliveryAddress.number && !draft.deliveryAddress.neighborhood) {
+        await this.executeDeterministicTool(tenantId, sessionId, 'definir_endereco_entrega', { bairro: text }, agentSessionCtx);
+        return;
+      }
+      if (
+        draft.deliveryAddress.street &&
+        draft.deliveryAddress.neighborhood &&
+        draft.deliveryAddress.neighborhood !== text &&
+        draft.deliveryAddress.city !== text
+      ) {
+        await this.executeDeterministicTool(tenantId, sessionId, 'definir_endereco_entrega', { cidade: text }, agentSessionCtx);
+      }
+    }
+  }
+
   /**
    * Ponto de entrada principal para mensagens inbound do WhatsApp.
    */
@@ -631,6 +841,18 @@ export class AiOrchestratorService {
         if (!extractedName && /^[A-ZÀ-Ÿ][a-zÀ-ÿ]+\s+[A-ZÀ-Ÿ][a-zÀ-ÿ]+$/.test(_content.trim())) {
           extractedName = _content.trim();
         }
+
+        if (
+          extractedName &&
+          aiMemory.orderDraft.customerName &&
+          !this.extractCustomerNameFromText(_content) &&
+          (aiMemory.orderDraft.customerName.includes(' ') ||
+            aiMemory.orderDraft.fulfillmentType ||
+            aiMemory.orderDraft.deliveryAddress.street ||
+            (aiMemory.orderDraft.items.length > 0 && aiMemory.orderDraft.customerName.includes(' ')))
+        ) {
+          extractedName = null;
+        }
         
         if (config.rememberCustomerName && extractedName) {
           await this.conversationService.saveCustomerName(
@@ -646,6 +868,7 @@ export class AiOrchestratorService {
           await this.conversationService.updateOrderDraft(session.id, {
             customerName: extractedName,
           });
+          this.logger.log(`[AI_DRAFT] customer_name_set sessionId=${session.id} name="${extractedName}"`);
         }
 
         const extractedAddress = this.extractSimpleAddressFromText(_content);
@@ -662,6 +885,8 @@ export class AiOrchestratorService {
           });
         }
       }
+
+      await this.applyDeterministicDraftCapture(session.id, _content);
 
       const history = await this.conversationService.getRecentHistory(
         session.id,
@@ -758,6 +983,8 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
       AiFlowLogger.flow('agent_session_context', trace, {
         customerId: agentSessionCtx.customerId,
       });
+
+      await this.applyDeterministicToolCapture(tenantId, session.id, _content, agentSessionCtx);
 
       // Garantir customerPhone no draft (preenchido automaticamente)
       if (!aiMemory.orderDraft.customerPhone && customerPhone) {

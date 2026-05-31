@@ -5,6 +5,7 @@ import { ChatState, MessageDirection, ChatSession, ChatMessage } from '@prisma/c
 import { Prisma } from '@prisma/client';
 import type { AgentSessionContext } from './agent-tools.service';
 import { ChatGateway } from '../../chat/chat.gateway';
+import { validateOrderDraft } from '../utils/order-draft-validator.util';
 
 export interface AiOrderDraft {
   items: Array<{
@@ -409,7 +410,7 @@ export class ConversationService {
       ...(partialDraft.payment ?? {}),
     };
 
-    const mergedDraft: AiOrderDraft = {
+    const draftBeforeValidation: AiOrderDraft = {
       ...existing,
       ...partialDraft,
       items: mergedItems,
@@ -417,7 +418,21 @@ export class ConversationService {
       payment: mergedPayment as AiOrderDraft['payment'],
     };
 
+    const missingFields = validateOrderDraft(draftBeforeValidation);
+    const readyToConfirm = missingFields.length === 0 && draftBeforeValidation.items.length > 0;
+    const mergedDraft: AiOrderDraft = {
+      ...draftBeforeValidation,
+      missingFields,
+      readyToConfirm,
+    };
+
     await this.updateSessionAiMemory(sessionId, { orderDraft: mergedDraft });
+    this.logger.log(
+      `[AI_DRAFT] missing_fields fields=[${missingFields.join(',')}] ready=${readyToConfirm} sessionId=${sessionId}`,
+    );
+    if (readyToConfirm) {
+      this.logger.log(`[AI_DRAFT] ready_to_confirm true sessionId=${sessionId}`);
+    }
   }
 
   /**

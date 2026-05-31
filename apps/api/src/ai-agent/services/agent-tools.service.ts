@@ -1424,6 +1424,7 @@ export class AgentToolsService {
 
     const term = args.nomeOuBusca?.trim().toLowerCase() ?? '';
     const matches = this.searchCatalogMatches(payload, term);
+    const bestMatch = this.pickBestCatalogMatch(matches, term);
 
     if (matches.length === 0) {
       return {
@@ -1433,7 +1434,7 @@ export class AgentToolsService {
       };
     }
 
-    if (matches.length > 1) {
+    if (matches.length > 1 && !bestMatch) {
       return {
         status: 'multiple',
         matches: matches.slice(0, 8).map((m) => ({
@@ -1444,7 +1445,7 @@ export class AgentToolsService {
       };
     }
 
-    const single = matches[0];
+    const single = bestMatch ?? matches[0];
     const detail = await this.resolveCatalogDetailById(tenantId, payload, single.id);
     if (detail) {
       return detail;
@@ -1464,16 +1465,54 @@ export class AgentToolsService {
     };
   }
 
+  private normalizeCatalogSearchText(value: string): string {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private pickBestCatalogMatch(
+    matches: Array<{ id: string; name: string; kind: 'product' | 'combo' }>,
+    term: string,
+  ): { id: string; name: string; kind: 'product' | 'combo' } | null {
+    if (matches.length === 0) return null;
+    if (matches.length === 1) return matches[0];
+
+    const normalizedTerm = this.normalizeCatalogSearchText(term);
+    const exact = matches.filter((match) => this.normalizeCatalogSearchText(match.name) === normalizedTerm);
+    if (exact.length > 0) return exact[0];
+
+    const words = normalizedTerm.split(' ').filter((word) => word.length > 2);
+    const wordMatches = matches
+      .filter((match) => {
+        const normalizedName = this.normalizeCatalogSearchText(match.name);
+        return words.length > 0 && words.every((word) => normalizedName.includes(word));
+      })
+      .sort((a, b) => a.name.length - b.name.length);
+
+    if (wordMatches.length === 1) return wordMatches[0];
+    if (wordMatches.length > 1 && this.normalizeCatalogSearchText(wordMatches[0].name) !== this.normalizeCatalogSearchText(wordMatches[1].name)) {
+      return wordMatches[0];
+    }
+
+    return null;
+  }
+
   private searchCatalogMatches(
     payload: StorefrontPayload,
     term: string,
   ): Array<{ id: string; name: string; kind: 'product' | 'combo' }> {
     const results: Array<{ id: string; name: string; kind: 'product' | 'combo' }> = [];
+    const normalizedTerm = this.normalizeCatalogSearchText(term);
 
     for (const category of payload.categories) {
       for (const product of category.products) {
-        const haystack = `${product.name} ${product.shortDescription ?? ''} ${product.longDescription ?? ''}`.toLowerCase();
-        if (haystack.includes(term)) {
+        const haystack = this.normalizeCatalogSearchText(`${product.name} ${product.shortDescription ?? ''} ${product.longDescription ?? ''}`);
+        const words = normalizedTerm.split(' ').filter((word) => word.length > 2);
+        if (haystack.includes(normalizedTerm) || words.every((word) => haystack.includes(word))) {
           results.push({
             id: product.id,
             name: product.name,
@@ -1484,8 +1523,9 @@ export class AgentToolsService {
     }
 
     for (const combo of payload.combos) {
-      const haystack = `${combo.name} ${combo.description ?? ''}`.toLowerCase();
-      if (haystack.includes(term)) {
+      const haystack = this.normalizeCatalogSearchText(`${combo.name} ${combo.description ?? ''}`);
+      const words = normalizedTerm.split(' ').filter((word) => word.length > 2);
+      if (haystack.includes(normalizedTerm) || words.every((word) => haystack.includes(word))) {
         results.push({ id: combo.id, name: combo.name, kind: 'combo' });
       }
     }
@@ -1658,9 +1698,10 @@ export class AgentToolsService {
       // Busca por nome
       const term = args.nomeOuBusca.trim().toLowerCase();
       const matches = this.searchCatalogMatches(payload, term);
-      if (matches.length === 1) {
-        resolvedId = matches[0].id;
-        resolvedName = matches[0].name;
+      const bestMatch = this.pickBestCatalogMatch(matches, term);
+      if (bestMatch) {
+        resolvedId = bestMatch.id;
+        resolvedName = bestMatch.name;
         // Buscar preço
         for (const cat of payload.categories) {
           const found = cat.products.find((p) => p.id === resolvedId);
@@ -1695,10 +1736,11 @@ export class AgentToolsService {
     let updatedItems: typeof existingItems;
 
     if (existingIndex >= 0) {
-      // Atualizar quantidade do item existente
+      // Atualizar quantidade do item existente. Em runtime alguns providers podem
+      // emitir a mesma tool duas vezes no mesmo turno; usar max evita duplicar.
       updatedItems = existingItems.map((item, idx) =>
         idx === existingIndex
-          ? { ...item, quantity: item.quantity + args.quantidade, notes: args.notas ?? item.notes }
+          ? { ...item, quantity: Math.max(item.quantity, args.quantidade), notes: args.notas ?? item.notes }
           : item,
       );
     } else {
