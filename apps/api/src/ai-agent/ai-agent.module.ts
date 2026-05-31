@@ -60,6 +60,7 @@ import { AiConfigDiagnosticsService } from './services/ai-config-diagnostics.ser
   exports: [
     AiAgentConfigService,
     ConversationService,
+    AgentToolsService,
     AiOrchestratorService,
     AiProviderRegistryService,
   ],

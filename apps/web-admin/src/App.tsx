@@ -62,7 +62,7 @@ export function App() {
           <Route
             path="/ai-agent/global"
             element={
-              <PermissionGate permission="saas.settings.read">
+              <PermissionGate permission="saas.ai.read">
                 <GlobalAiAgentConfigPage />
               </PermissionGate>
             }

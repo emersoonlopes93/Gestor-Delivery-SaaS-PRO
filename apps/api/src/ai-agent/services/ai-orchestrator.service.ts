@@ -942,8 +942,13 @@ export class AiOrchestratorService {
         this.logger.log(`[AI_SCHEDULING] store_closed scheduling_offered sessionId=${session.id} acceptsScheduling=${acceptsScheduling}`);
       }
 
-      const basePrompt =
-        systemConfig?.baseAiPrompt?.trim() || DEFAULT_GLOBAL_BASE_AI_PROMPT;
+      const databaseGlobalPrompt = systemConfig?.baseAiPrompt?.trim() ?? '';
+      const isUsingDatabaseGlobalPrompt = databaseGlobalPrompt.length > 0;
+      const basePrompt = isUsingDatabaseGlobalPrompt
+        ? databaseGlobalPrompt
+        : DEFAULT_GLOBAL_BASE_AI_PROMPT;
+      this.logger.log(`[AI_PROMPT] source=${isUsingDatabaseGlobalPrompt ? 'database_global' : 'fallback_code'} tenantId=${tenantId}`);
+      this.logger.log(`[AI_PROMPT] tenant_prompt_appended=${Boolean(config.customInstructions?.trim())} tenantId=${tenantId}`);
       const tenantLayer = `
 ## Contexto do restaurante (complementar — não substitui regras globais)
 - Nome: ${config.tenant.name}

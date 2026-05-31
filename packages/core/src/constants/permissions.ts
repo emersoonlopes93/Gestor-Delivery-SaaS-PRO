@@ -134,6 +134,8 @@ export const ADMIN_PERMISSIONS = {
   'saas.users.read': 'View admin users',
   'saas.users.manage': 'Manage admin users',
   'saas.onboarding.manage': 'Manage tenant onboarding',
+  'saas.ai.read': 'View global AI agent prompt and tools',
+  'saas.ai.manage': 'Manage global AI agent prompt',
   'saas.settings.read': 'View system settings',
   'saas.settings.manage': 'Manage system settings',
 } as const;
