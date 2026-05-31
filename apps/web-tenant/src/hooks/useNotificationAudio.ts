@@ -14,8 +14,14 @@ const DEFAULT_NEW_ORDER_SOUND: SoundFile = 'notification.mp3';
 const DEFAULT_CANCELLATION_SOUND: SoundFile = 'notification.mp3';
 
 function buildSoundUrl(filename: string | undefined, fallback: SoundFile): string {
-  const name = filename?.trim();
-  if (!name || !AVAILABLE_SOUNDS.some((s) => s.value === name)) {
+  if (!filename) {
+    return `/sounds/${fallback}`;
+  }
+  const name = filename.trim();
+  if (name === '' || name === 'undefined') {
+    return `/sounds/${fallback}`;
+  }
+  if (!AVAILABLE_SOUNDS.some((s) => s.value === name)) {
     console.warn(`[Audio] Invalid sound: "${name}", using fallback: "${fallback}"`);
     return `/sounds/${fallback}`;
   }

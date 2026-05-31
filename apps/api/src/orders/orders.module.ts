@@ -15,6 +15,7 @@ import { CatalogModule } from '../catalog/catalog.module';
 import { PaymentGatewayModule } from '../payment-gateway/payment-gateway.module';
 import { SchedulingModule } from '../scheduling/scheduling.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { KdsModule } from '../kds/kds.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     PaymentGatewayModule,
     SchedulingModule,
     forwardRef(() => NotificationsModule),
+    KdsModule,
   ],
   controllers: [OrdersController, PublicOrdersController],
   providers: [OrdersService, CheckoutValidatorService, OrdersGateway],

@@ -359,7 +359,14 @@ export class KdsService {
    */
   async createProductionJobs(orderId: string) {
     const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) return;
+    if (!tenantId) return [];
+
+    const existingJobs = await this.prisma.printJob.count({
+      where: { tenantId, orderId },
+    });
+    if (existingJobs > 0) {
+      return [];
+    }
 
     const order = await this.prisma.order.findUnique({
       where: { id: orderId, tenantId },

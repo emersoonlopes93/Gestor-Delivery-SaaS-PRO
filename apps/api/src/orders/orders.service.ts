@@ -35,6 +35,7 @@ import type {
 import { ORDER_STATUS_TRANSITIONS, UpdateOrderStatusDTO } from '@gestor/types';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
 import { OrdersGateway } from './orders.gateway';
+import { KdsService } from '../kds/kds.service';
 
 @Injectable()
 export class OrdersService {
@@ -68,6 +69,7 @@ export class OrdersService {
     @Inject(forwardRef(() => WhatsappService))
     private readonly whatsappService: WhatsappService,
     private readonly ordersGateway: OrdersGateway,
+    private readonly kdsService: KdsService,
   ) {}
 
   async createOrder(slug: string, dto: CreateOrderDTO): Promise<OrderResponseDTO> {
@@ -793,6 +795,12 @@ export class OrdersService {
             data: { status: 'available' },
           });
         }
+      }
+
+      if (nextStatus === 'confirmed' || nextStatus === 'preparing') {
+        await this.kdsService.createProductionJobs(orderId).catch((err) => {
+          this.logger.error(`Error creating production jobs for order ${orderId}: ${err.message}`);
+        });
       }
 
       await tx.orderTimeline.create({

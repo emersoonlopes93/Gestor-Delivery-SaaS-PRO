@@ -73,6 +73,20 @@ export class PrismaService
         ].includes(params.action)
       ) {
         const where = ensureRecord(argsRecord.where);
+        
+        // Achata chaves compostas no where (ex: tenantId_phone: { tenantId, phone } -> { tenantId, phone })
+        for (const key of Object.keys(where)) {
+          const val = where[key];
+          if (val && typeof val === 'object' && !Array.isArray(val)) {
+            const valKeys = Object.keys(val);
+            const isPrismaFilter = valKeys.some(k => ['equals', 'in', 'not', 'notIn', 'lt', 'lte', 'gt', 'gte', 'contains', 'startsWith', 'endsWith', 'mode'].includes(k));
+            if (!isPrismaFilter) {
+              Object.assign(where, val);
+              delete where[key];
+            }
+          }
+        }
+
         argsRecord.where = { ...where, tenantId };
 
         // findUnique cannot accept non-unique fields; convert to findFirst
@@ -84,6 +98,20 @@ export class PrismaService
       // Write operations (where-based)
       else if (['update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(params.action)) {
         const where = ensureRecord(argsRecord.where);
+
+        // Achata chaves compostas no where para operações de escrita também
+        for (const key of Object.keys(where)) {
+          const val = where[key];
+          if (val && typeof val === 'object' && !Array.isArray(val)) {
+            const valKeys = Object.keys(val);
+            const isPrismaFilter = valKeys.some(k => ['equals', 'in', 'not', 'notIn', 'lt', 'lte', 'gt', 'gte', 'contains', 'startsWith', 'endsWith', 'mode'].includes(k));
+            if (!isPrismaFilter) {
+              Object.assign(where, val);
+              delete where[key];
+            }
+          }
+        }
+
         argsRecord.where = { ...where, tenantId };
       }
 
