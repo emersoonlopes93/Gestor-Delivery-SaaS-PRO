@@ -8,10 +8,15 @@ import { ChatGateway } from '../../chat/chat.gateway';
 
 export interface AiOrderDraft {
   items: Array<{
-    productId: string;
+    productId: string | null;
     quantity: number;
     notes?: string | null;
+    /** Nome legível do produto (ex: Pizza de Calabresa) */
+    name?: string | null;
+    /** Alias legado mantido por compatibilidade */
     productName?: string | null;
+    /** Preço unitário real do produto */
+    unitPrice?: number | null;
   }>;
   fulfillmentType: 'delivery' | 'pickup' | null;
   customerName: string | null;
@@ -31,6 +36,8 @@ export interface AiOrderDraft {
   payment: {
     method: string | null;
     changeFor: number | null;
+    /** true = cliente confirmou que não precisa de troco */
+    changeConfirmed?: boolean | null;
   };
   deliveryFee: number | null;
   subtotal: number | null;
@@ -38,6 +45,10 @@ export interface AiOrderDraft {
   missingFields: string[];
   readyToConfirm: boolean;
   confirmationAskedAt: string | null;
+  /** Data/hora ISO para pedido agendado (loja fechada) */
+  scheduledFor: string | null;
+  /** true = cliente confirmou explicitamente não precisa troco */
+  changeConfirmed?: boolean | null;
 }
 
 // Tipos auxiliares para dados do metadata (JSON)
@@ -70,6 +81,8 @@ interface MetadataOrderDraft {
   missingFields?: unknown;
   readyToConfirm?: unknown;
   confirmationAskedAt?: unknown;
+  scheduledFor?: unknown;
+  changeConfirmed?: unknown;
 }
 
 interface MetadataDeliveryAddress {
@@ -88,6 +101,7 @@ interface MetadataDeliveryAddress {
 interface MetadataPayment {
   method?: unknown;
   changeFor?: unknown;
+  changeConfirmed?: unknown;
 }
 
 interface MetadataLastKnownAddress {
@@ -249,10 +263,12 @@ export class ConversationService {
       orderDraft: {
         items: Array.isArray(draft.items)
           ? (draft.items as Array<{
-              productId: string;
+              productId: string | null;
               quantity: number;
-              notes?: string;
-              productName?: string;
+              notes?: string | null;
+              productName?: string | null;
+              name?: string | null;
+              unitPrice?: number | null;
             }>)
           : [],
         fulfillmentType:
@@ -286,6 +302,8 @@ export class ConversationService {
         readyToConfirm: draft.readyToConfirm === true,
         confirmationAskedAt:
           typeof draft.confirmationAskedAt === 'string' ? draft.confirmationAskedAt : null,
+        scheduledFor: typeof draft.scheduledFor === 'string' ? draft.scheduledFor : null,
+        changeConfirmed: draft.changeConfirmed === true ? true : null,
       },
       lastKnownCustomerName:
         typeof ai.lastKnownCustomerName === 'string' ? ai.lastKnownCustomerName : null,
@@ -327,13 +345,107 @@ export class ConversationService {
 
     const metadata = this.asJsonObject(session?.metadata);
     const ai = this.asJsonObject(metadata.ai);
-    const nextAi = { ...ai, ...update } as Record<string, unknown>;
-    metadata.ai = nextAi;
+
+    // Merge profundo para orderDraft: evita substituição rasa que perde campos
+    if (update.orderDraft !== undefined) {
+      const existingDraft = this.asJsonObject(ai.orderDraft);
+      const incomingDraft = update.orderDraft as unknown as Record<string, unknown>;
+
+      // Merge profundo de deliveryAddress
+      const existingAddr = this.asJsonObject(existingDraft.deliveryAddress);
+      const incomingAddr = this.asJsonObject((incomingDraft.deliveryAddress as unknown) ?? {});
+      const mergedAddr = { ...existingAddr, ...incomingAddr };
+
+      // Merge profundo de payment
+      const existingPayment = this.asJsonObject(existingDraft.payment);
+      const incomingPayment = this.asJsonObject((incomingDraft.payment as unknown) ?? {});
+      const mergedPayment = { ...existingPayment, ...incomingPayment };
+
+      // items: substitui apenas se vier preenchido
+      const mergedItems = Array.isArray(incomingDraft.items) && incomingDraft.items.length > 0
+        ? incomingDraft.items
+        : existingDraft.items ?? [];
+
+      const mergedDraft: Record<string, unknown> = {
+        ...existingDraft,
+        ...incomingDraft,
+        items: mergedItems,
+        deliveryAddress: mergedAddr,
+        payment: mergedPayment,
+      };
+
+      const nextAi = { ...ai, ...update, orderDraft: mergedDraft } as Record<string, unknown>;
+      metadata.ai = nextAi;
+    } else {
+      const nextAi = { ...ai, ...update } as Record<string, unknown>;
+      metadata.ai = nextAi;
+    }
 
     await this.prisma.chatSession.update({
       where: { id: sessionId },
       data: { metadata: metadata as Prisma.InputJsonObject },
     });
+  }
+
+  /**
+   * Atualiza apenas campos específicos do orderDraft com merge profundo.
+   * Use este método nas tools de coleta de pedido.
+   */
+  async updateOrderDraft(sessionId: string, partialDraft: Partial<AiOrderDraft>): Promise<void> {
+    const current = await this.getSessionAiMemory(sessionId);
+    const existing = current.orderDraft;
+
+    const mergedItems =
+      partialDraft.items && partialDraft.items.length > 0
+        ? partialDraft.items
+        : existing.items;
+
+    const mergedAddress = {
+      ...existing.deliveryAddress,
+      ...(partialDraft.deliveryAddress ?? {}),
+    };
+
+    const mergedPayment = {
+      ...existing.payment,
+      ...(partialDraft.payment ?? {}),
+    };
+
+    const mergedDraft: AiOrderDraft = {
+      ...existing,
+      ...partialDraft,
+      items: mergedItems,
+      deliveryAddress: mergedAddress as AiOrderDraft['deliveryAddress'],
+      payment: mergedPayment as AiOrderDraft['payment'],
+    };
+
+    await this.updateSessionAiMemory(sessionId, { orderDraft: mergedDraft });
+  }
+
+  /**
+   * Limpa o orderDraft após criação bem-sucedida do pedido.
+   */
+  async clearOrderDraft(sessionId: string): Promise<void> {
+    const emptyDraft: AiOrderDraft = {
+      items: [],
+      fulfillmentType: null,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: {
+        street: null, number: null, neighborhood: null, city: null,
+        state: null, zipCode: null, complement: null, reference: null,
+        lat: null, lng: null,
+      },
+      payment: { method: null, changeFor: null, changeConfirmed: null },
+      deliveryFee: null,
+      subtotal: null,
+      total: null,
+      missingFields: [],
+      readyToConfirm: false,
+      confirmationAskedAt: null,
+      scheduledFor: null,
+    };
+    await this.updateSessionAiMemory(sessionId, { orderDraft: emptyDraft });
+    this.logger.log(`[AI_DRAFT] draft_cleared sessionId=${sessionId}`);
   }
 
   /**

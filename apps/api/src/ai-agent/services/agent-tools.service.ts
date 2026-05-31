@@ -26,6 +26,8 @@ import {
   type AgentProductDetailResult,
 } from '../utils/agent-product-detail.mapper';
 import { buildAgentPaymentMethodsResult } from '../utils/agent-payment-methods.util';
+import { ConversationService } from './conversation.service';
+import { validateOrderDraft } from '../utils/order-draft-validator.util';
 
 export interface AgentSessionContext {
   customerId?: string;
@@ -188,7 +190,37 @@ const VerificarIngredienteSchema = z.object({
 
 const ConsultarSlotsSchema = z.object({
   data: z.string().optional(),
+  fulfillmentType: z.enum(['delivery', 'pickup']).optional(),
 });
+
+const AdicionarItemPedidoSchema = z.object({
+  productId: z.string().optional(),
+  nomeOuBusca: z.string().optional(),
+  quantidade: z.number().int().min(1),
+  notas: z.string().optional(),
+});
+
+const DefinirEntregaRetiradaSchema = z.object({
+  tipo: z.enum(['delivery', 'pickup']),
+});
+
+const DefinirEnderecoEntregaSchema = z.object({
+  rua: z.string().optional(),
+  numero: z.string().optional(),
+  bairro: z.string().optional(),
+  cidade: z.string().optional(),
+  estado: z.string().optional(),
+  cep: z.string().optional(),
+  complemento: z.string().optional(),
+  referencia: z.string().optional(),
+});
+
+const DefinirFormaPagamentoSchema = z.object({
+  metodo: z.string(),
+  troco: z.number().optional(),
+  semTroco: z.boolean().optional(),
+});
+
 
 const ConsultarDetalheProdutoSchema = z
   .object({
@@ -225,6 +257,8 @@ export class AgentToolsService {
     @Inject(forwardRef(() => SchedulingService))
     private readonly schedulingService: SchedulingService,
     private readonly toolsFilterService: AgentToolsFilterService,
+    @Inject(forwardRef(() => ConversationService))
+    private readonly conversationService: ConversationService,
   ) {}
 
   /**
@@ -453,6 +487,77 @@ export class AgentToolsService {
           properties: {},
         },
       },
+      {
+        name: 'adicionar_item_pedido',
+        description: 'Adiciona um item ao rascunho do pedido (orderDraft) e persiste no backend. Use IMEDIATAMENTE quando o cliente informar o que quer pedir. Resolve o produto real no cardápio antes de adicionar.',
+        parameters: {
+          type: 'object',
+          properties: {
+            productId: { type: 'string', description: 'ID do produto (se conhecido). Prefira este campo.' },
+            nomeOuBusca: { type: 'string', description: 'Nome ou termo para buscar no cardápio quando o ID não for conhecido' },
+            quantidade: { type: 'integer', description: 'Quantidade solicitada pelo cliente' },
+            notas: { type: 'string', description: 'Observações do item (ex: sem cebola)' },
+          },
+          required: ['quantidade'],
+        },
+      },
+      {
+        name: 'definir_entrega_retirada',
+        description: 'Define se o pedido será entrega (delivery) ou retirada (pickup) no balcão. Salva no orderDraft. Use quando o cliente informar o tipo de entrega.',
+        parameters: {
+          type: 'object',
+          properties: {
+            tipo: {
+              type: 'string',
+              enum: ['delivery', 'pickup'],
+              description: 'delivery = entrega no endereço; pickup = retirada no balcão',
+            },
+          },
+          required: ['tipo'],
+        },
+      },
+      {
+        name: 'definir_endereco_entrega',
+        description: 'Define ou atualiza o endereço de entrega no orderDraft. Mantenha fulfillmentType=delivery. Use sempre que o cliente informar qualquer parte do endereço.',
+        parameters: {
+          type: 'object',
+          properties: {
+            rua: { type: 'string', description: 'Nome da rua' },
+            numero: { type: 'string', description: 'Número do imóvel' },
+            bairro: { type: 'string', description: 'Bairro (obrigatório para delivery)' },
+            cidade: { type: 'string', description: 'Cidade' },
+            estado: { type: 'string', description: 'Estado (sigla)' },
+            cep: { type: 'string', description: 'CEP (opcional)' },
+            complemento: { type: 'string', description: 'Complemento (apto, bloco, etc.)' },
+            referencia: { type: 'string', description: 'Ponto de referência' },
+          },
+        },
+      },
+      {
+        name: 'definir_forma_pagamento',
+        description: 'Define a forma de pagamento e o troco no orderDraft. Use quando o cliente informar como vai pagar.',
+        parameters: {
+          type: 'object',
+          properties: {
+            metodo: {
+              type: 'string',
+              enum: ['pix', 'credit_card', 'debit_card', 'cash'],
+              description: 'Forma de pagamento: pix, credit_card, debit_card ou cash (dinheiro)',
+            },
+            troco: { type: 'number', description: 'Valor para troco quando metodo=cash (ex: 100 para troco de R$100). Use 0 se não precisar de troco.' },
+            semTroco: { type: 'boolean', description: 'true se o cliente confirmar que não precisa de troco' },
+          },
+          required: ['metodo'],
+        },
+      },
+      {
+        name: 'consultar_resumo_pedido',
+        description: 'Retorna o resumo atual do orderDraft com todos os campos preenchidos e os campos faltantes. Use para verificar o estado do pedido antes de mostrar o resumo final.',
+        parameters: {
+          type: 'object',
+          properties: {},
+        },
+      },
     ];
   }
 
@@ -546,6 +651,29 @@ export class AgentToolsService {
 
         case 'consultar_ofertas_checkout':
           return await this.executeConsultarOfertasCheckout(tenantId);
+
+        case 'adicionar_item_pedido': {
+          const parsedArgs = AdicionarItemPedidoSchema.parse(args || {});
+          return await this.executeAdicionarItemPedido(tenantId, parsedArgs, sessionContext);
+        }
+
+        case 'definir_entrega_retirada': {
+          const parsedArgs = DefinirEntregaRetiradaSchema.parse(args || {});
+          return await this.executeDefinirEntregaRetirada(parsedArgs, sessionContext);
+        }
+
+        case 'definir_endereco_entrega': {
+          const parsedArgs = DefinirEnderecoEntregaSchema.parse(args || {});
+          return await this.executeDefinirEnderecoEntrega(parsedArgs, sessionContext);
+        }
+
+        case 'definir_forma_pagamento': {
+          const parsedArgs = DefinirFormaPagamentoSchema.parse(args || {});
+          return await this.executeDefinirFormaPagamento(parsedArgs, sessionContext);
+        }
+
+        case 'consultar_resumo_pedido':
+          return await this.executeConsultarResumoPedido(sessionContext);
 
         default:
           throw new Error(`Tool desconhecida: ${toolName}`);
@@ -1143,19 +1271,74 @@ export class AgentToolsService {
   }
 
   private async executeConsultarSlots(tenantId: string, args: z.infer<typeof ConsultarSlotsSchema>) {
-    const date = args.data ? new Date(args.data) : new Date();
+    // Buscar timezone do tenant (TenantSettings)
+    const tenantSettings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+      select: { timezone: true } as { timezone: true },
+    }).catch(() => null);
+
+    // Fallback para America/Sao_Paulo se não configurado
+    const timezone = (tenantSettings as { timezone?: string } | null)?.timezone || 'America/Sao_Paulo';
+
+    let date: Date;
+    if (args.data) {
+      // Interpretar a data no timezone do tenant para evitar off-by-one
+      const [year, month, day] = args.data.split('-').map(Number);
+      // Cria a data às 00:00 no timezone do tenant
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+      // Usar a data informada diretamente
+      date = new Date(year, (month ?? 1) - 1, day ?? 1, 12, 0, 0);
+    } else {
+      // Data atual no timezone do tenant
+      const nowInTz = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date());
+      const [y, m, d] = nowInTz.split('-').map(Number);
+      date = new Date(y, (m ?? 1) - 1, d ?? 1, 12, 0, 0);
+    }
+
     const slots = await this.schedulingService.getAvailableTimeSlots(date, tenantId);
 
+    // Formatar horários no timezone do tenant
+    const timeFormatter = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    const dateLabel = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: timezone,
+      weekday: 'long',
+      day: '2-digit',
+      month: 'long',
+    }).format(date);
+
+    const slotsFormatados = slots.map((s) => ({
+      id: s.id,
+      horario: timeFormatter.format(new Date(s.startTime)),
+      vagas: s.availableCapacity,
+    }));
+
+    this.logger.log(
+      `[AI_SCHEDULING] slots_consulted date=${args.data ?? 'today'} tz=${timezone} count=${slots.length} fulfillmentType=${args.fulfillmentType ?? 'any'}`,
+    );
+
     return {
-      data: date.toISOString().split('T')[0],
-      slotsDisponiveis: slots.map(s => ({
-        id: s.id,
-        horario: new Date(s.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-        vagas: s.availableCapacity
-      })),
-      mensagem: slots.length > 0 
-        ? `Temos ${slots.length} horários disponíveis para agendamento nesta data.` 
-        : 'Infelizmente não há horários disponíveis para a data selecionada.'
+      data: new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date),
+      dataLabel: dateLabel,
+      timezone,
+      slotsDisponiveis: slotsFormatados,
+      mensagem: slots.length > 0
+        ? `Temos ${slots.length} horários disponíveis para agendamento em ${dateLabel}: ${slotsFormatados.map((s) => s.horario).join(', ')}.`
+        : `Infelizmente não há horários disponíveis para ${dateLabel}.`,
     };
   }
 
@@ -1427,6 +1610,296 @@ export class AgentToolsService {
             additionalPrice: Number(item.additionalPrice),
           })),
       })),
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Novas tools de coleta do orderDraft
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private async executeAdicionarItemPedido(
+    tenantId: string,
+    args: z.infer<typeof AdicionarItemPedidoSchema>,
+    sessionContext?: AgentSessionContext,
+  ) {
+    const sessionId = typeof sessionContext?.sessionId === 'string' ? sessionContext.sessionId : null;
+    if (!sessionId) {
+      return { status: 'error', code: 'NO_SESSION', message: 'Sessão não identificada.' };
+    }
+
+    // Resolver produto no catálogo
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) return { status: 'error', code: 'TENANT_NOT_FOUND', message: 'Loja não encontrada.' };
+
+    const payload = await this.storefrontService.getStorefrontPayload(tenant.slug);
+
+    let resolvedId: string | null = args.productId?.trim() || null;
+    let resolvedName: string | null = null;
+    let resolvedPrice: number | null = null;
+
+    if (resolvedId) {
+      // Buscar por ID direto
+      for (const cat of payload.categories) {
+        const found = cat.products.find((p) => p.id === resolvedId && p.isAvailable);
+        if (found) {
+          resolvedName = found.name;
+          resolvedPrice = Number(found.basePrice);
+          break;
+        }
+      }
+      if (!resolvedName) {
+        const foundCombo = payload.combos.find((c) => c.id === resolvedId && c.isAvailable);
+        if (foundCombo) {
+          resolvedName = foundCombo.name;
+          resolvedPrice = Number(foundCombo.basePrice);
+        }
+      }
+    } else if (args.nomeOuBusca) {
+      // Busca por nome
+      const term = args.nomeOuBusca.trim().toLowerCase();
+      const matches = this.searchCatalogMatches(payload, term);
+      if (matches.length === 1) {
+        resolvedId = matches[0].id;
+        resolvedName = matches[0].name;
+        // Buscar preço
+        for (const cat of payload.categories) {
+          const found = cat.products.find((p) => p.id === resolvedId);
+          if (found) { resolvedPrice = Number(found.basePrice); break; }
+        }
+        if (!resolvedPrice) {
+          const foundCombo = payload.combos.find((c) => c.id === resolvedId);
+          if (foundCombo) resolvedPrice = Number(foundCombo.basePrice);
+        }
+      } else if (matches.length > 1) {
+        return {
+          status: 'multiple_matches',
+          message: `Encontrei ${matches.length} produtos com esse nome. Qual você quer?`,
+          matches: matches.slice(0, 5).map((m) => ({ id: m.id, nome: m.name })),
+        };
+      } else {
+        return { status: 'error', code: 'NOT_FOUND', message: `Produto "${args.nomeOuBusca}" não encontrado no cardápio. Use consultar_cardapio para ver os itens disponíveis.` };
+      }
+    } else {
+      return { status: 'error', code: 'INVALID_ARGS', message: 'Informe productId ou nomeOuBusca.' };
+    }
+
+    if (!resolvedId || !resolvedName) {
+      return { status: 'error', code: 'NOT_FOUND', message: 'Produto não encontrado ou indisponível no cardápio.' };
+    }
+
+    // Carregar draft atual e adicionar/atualizar item
+    const memory = await this.conversationService.getSessionAiMemory(sessionId);
+    const existingItems = memory.orderDraft.items;
+
+    const existingIndex = existingItems.findIndex((i) => i.productId === resolvedId);
+    let updatedItems: typeof existingItems;
+
+    if (existingIndex >= 0) {
+      // Atualizar quantidade do item existente
+      updatedItems = existingItems.map((item, idx) =>
+        idx === existingIndex
+          ? { ...item, quantity: item.quantity + args.quantidade, notes: args.notas ?? item.notes }
+          : item,
+      );
+    } else {
+      // Adicionar novo item
+      updatedItems = [
+        ...existingItems,
+        {
+          productId: resolvedId,
+          name: resolvedName,
+          productName: resolvedName,
+          quantity: args.quantidade,
+          unitPrice: resolvedPrice,
+          notes: args.notas ?? null,
+        },
+      ];
+    }
+
+    // Recalcular subtotal
+    const subtotal = updatedItems.reduce((acc, item) => {
+      const price = typeof item.unitPrice === 'number' ? item.unitPrice : 0;
+      return acc + price * item.quantity;
+    }, 0);
+
+    // Atualizar draft
+    await this.conversationService.updateOrderDraft(sessionId, {
+      items: updatedItems,
+      subtotal,
+      customerPhone: memory.orderDraft.customerPhone || sessionContext?.customerPhone || null,
+    });
+
+    this.logger.log(
+      `[AI_DRAFT] item_added product=${resolvedName} qty=${args.quantidade} sessionId=${sessionId} subtotal=${subtotal}`,
+    );
+
+    return {
+      status: 'success',
+      mensagem: `${args.quantidade}x ${resolvedName} adicionado ao pedido.`,
+      item: { productId: resolvedId, nome: resolvedName, quantidade: args.quantidade, precoUnitario: resolvedPrice },
+      subtotalAtual: subtotal,
+    };
+  }
+
+  private async executeDefinirEntregaRetirada(
+    args: z.infer<typeof DefinirEntregaRetiradaSchema>,
+    sessionContext?: AgentSessionContext,
+  ) {
+    const sessionId = typeof sessionContext?.sessionId === 'string' ? sessionContext.sessionId : null;
+    if (!sessionId) return { status: 'error', code: 'NO_SESSION', message: 'Sessão não identificada.' };
+
+    await this.conversationService.updateOrderDraft(sessionId, {
+      fulfillmentType: args.tipo,
+    });
+
+    this.logger.log(`[AI_DRAFT] fulfillment_set ${args.tipo} sessionId=${sessionId}`);
+
+    const msg = args.tipo === 'delivery'
+      ? 'Entrega em domicílio confirmada! Qual é o seu endereço?'
+      : 'Retirada no balcão confirmada!';
+
+    return { status: 'success', tipo: args.tipo, mensagem: msg };
+  }
+
+  private async executeDefinirEnderecoEntrega(
+    args: z.infer<typeof DefinirEnderecoEntregaSchema>,
+    sessionContext?: AgentSessionContext,
+  ) {
+    const sessionId = typeof sessionContext?.sessionId === 'string' ? sessionContext.sessionId : null;
+    if (!sessionId) return { status: 'error', code: 'NO_SESSION', message: 'Sessão não identificada.' };
+
+    const memory = await this.conversationService.getSessionAiMemory(sessionId);
+    const existing = memory.orderDraft.deliveryAddress;
+
+    const merged = {
+      street: args.rua ?? existing.street,
+      number: args.numero ?? existing.number,
+      neighborhood: args.bairro ?? existing.neighborhood,
+      city: args.cidade ?? existing.city,
+      state: args.estado ?? existing.state,
+      zipCode: args.cep ?? existing.zipCode,
+      complement: args.complemento ?? existing.complement,
+      reference: args.referencia ?? existing.reference,
+      lat: existing.lat,
+      lng: existing.lng,
+    };
+
+    await this.conversationService.updateOrderDraft(sessionId, {
+      deliveryAddress: merged,
+      // Garantir que o tipo de entrega permanece delivery
+      fulfillmentType: 'delivery',
+    });
+
+    this.logger.log(`[AI_DRAFT] address_updated sessionId=${sessionId} street=${merged.street ?? ''} neighborhood=${merged.neighborhood ?? ''} city=${merged.city ?? ''}`);
+
+    const partsPreenchidos = [
+      merged.street ? `Rua: ${merged.street}` : null,
+      merged.number ? `Nº ${merged.number}` : null,
+      merged.neighborhood ? `Bairro: ${merged.neighborhood}` : null,
+      merged.city ? `Cidade: ${merged.city}` : null,
+    ].filter(Boolean);
+
+    return {
+      status: 'success',
+      fulfillmentType: 'delivery',
+      enderecoAtual: merged,
+      mensagem: `Endereço atualizado: ${partsPreenchidos.join(', ')}.`,
+    };
+  }
+
+  private async executeDefinirFormaPagamento(
+    args: z.infer<typeof DefinirFormaPagamentoSchema>,
+    sessionContext?: AgentSessionContext,
+  ) {
+    const sessionId = typeof sessionContext?.sessionId === 'string' ? sessionContext.sessionId : null;
+    if (!sessionId) return { status: 'error', code: 'NO_SESSION', message: 'Sessão não identificada.' };
+
+    const method = this.normalizePaymentMethod(args.metodo);
+    if (!method) {
+      return { status: 'error', code: 'INVALID_METHOD', message: 'Forma de pagamento inválida. Use pix, credit_card, debit_card ou cash.' };
+    }
+
+    const payment: { method: string; changeFor: number | null; changeConfirmed?: boolean | null } = {
+      method,
+      changeFor: null,
+      changeConfirmed: null,
+    };
+
+    if (method === PaymentMethod.cash) {
+      if (args.semTroco === true) {
+        payment.changeFor = 0;
+        payment.changeConfirmed = true;
+        this.logger.log(`[AI_DRAFT] change_for_set 0 (sem_troco) sessionId=${sessionId}`);
+      } else if (typeof args.troco === 'number') {
+        payment.changeFor = args.troco;
+        this.logger.log(`[AI_DRAFT] change_for_set ${args.troco} sessionId=${sessionId}`);
+      }
+    }
+
+    await this.conversationService.updateOrderDraft(sessionId, { payment });
+
+    this.logger.log(`[AI_DRAFT] payment_set ${method} sessionId=${sessionId}`);
+
+    const methodLabels: Record<string, string> = {
+      cash: 'Dinheiro',
+      pix: 'Pix',
+      credit_card: 'Cartão de crédito',
+      debit_card: 'Cartão de débito',
+    };
+
+    const needsChange = method === PaymentMethod.cash && payment.changeFor === null;
+    return {
+      status: 'success',
+      metodo: method,
+      methodLabel: methodLabels[method] ?? method,
+      troco: payment.changeFor,
+      mensagem: needsChange
+        ? `Pagamento em dinheiro confirmado. Precisa de troco? Para quanto?`
+        : `Forma de pagamento definida: ${methodLabels[method] ?? method}${payment.changeFor ? ` (troco para R$${payment.changeFor})` : payment.changeFor === 0 ? ' (sem troco)' : ''}.`,
+    };
+  }
+
+  private async executeConsultarResumoPedido(sessionContext?: AgentSessionContext) {
+    const sessionId = typeof sessionContext?.sessionId === 'string' ? sessionContext.sessionId : null;
+    if (!sessionId) return { status: 'error', code: 'NO_SESSION', message: 'Sessão não identificada.' };
+
+    const memory = await this.conversationService.getSessionAiMemory(sessionId);
+    const draft = memory.orderDraft;
+
+    const missingFields = validateOrderDraft(draft);
+    const readyToConfirm = missingFields.length === 0 && draft.items.length > 0;
+
+    // Atualizar missingFields e readyToConfirm no draft
+    await this.conversationService.updateOrderDraft(sessionId, {
+      missingFields,
+      readyToConfirm,
+    });
+
+    this.logger.log(
+      `[AI_DRAFT] missing_fields fields=[${missingFields.join(',')}] ready=${readyToConfirm} sessionId=${sessionId}`,
+    );
+    if (readyToConfirm) {
+      this.logger.log(`[AI_DRAFT] ready_to_confirm true sessionId=${sessionId}`);
+    }
+
+    return {
+      status: 'success',
+      draft: {
+        items: draft.items.map((i) => ({ nome: i.name ?? i.productName ?? i.productId, quantidade: i.quantity, preco: i.unitPrice })),
+        cliente: draft.customerName,
+        fulfillmentType: draft.fulfillmentType,
+        endereco: draft.deliveryAddress,
+        pagamento: draft.payment,
+        taxaEntrega: draft.deliveryFee,
+        subtotal: draft.subtotal,
+        total: draft.total,
+        agendadoPara: draft.scheduledFor,
+      },
+      missingFields,
+      readyToConfirm,
+      mensagem: readyToConfirm
+        ? 'Pedido pronto para confirmação! Mostre o resumo ao cliente e peça confirmação.'
+        : `Dados faltantes: ${missingFields.join(', ')}.`,
     };
   }
 }

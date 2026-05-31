@@ -19,6 +19,7 @@ import {
   buildStoreStatusPromptBlock,
   resolveStoreOperationalStatus,
 } from '../utils/store-status-context.util';
+import { buildOrderDraftPromptBlock } from '../utils/order-draft-validator.util';
 
 import { PrismaService } from '../../database/prisma.service';
 
@@ -318,7 +319,7 @@ export class AiOrchestratorService {
     config: EffectiveAiAgentConfig,
   ): string | null {
     const memoryLines: string[] = [
-      '## Memória do cliente e sessão (apenas contexto interno)',
+      '## Memória persistente do cliente (entre sessões)',
     ];
 
     const isRecentName = this.isMemoryEntryFresh(
@@ -326,7 +327,7 @@ export class AiOrchestratorService {
       config.memoryRetentionDays,
     );
     if (config.rememberCustomerName && aiMemory.lastKnownCustomerName && isRecentName) {
-      memoryLines.push(`- Nome do cliente: ${aiMemory.lastKnownCustomerName}`);
+      memoryLines.push(`- Nome anterior do cliente: ${aiMemory.lastKnownCustomerName}`);
     }
 
     const isRecentAddress = this.isMemoryEntryFresh(
@@ -347,12 +348,7 @@ export class AiOrchestratorService {
       memoryLines.push(`- Último pedido salvo: ${aiMemory.lastOrderSummary}`);
     }
 
-    if (config.rememberPreferences && aiMemory.orderDraft.items.length > 0) {
-      const favorites = aiMemory.orderDraft.items
-        .map((item) => `${item.quantity}x ${item.productName || item.productId}`)
-        .join(', ');
-      memoryLines.push(`- Preferências da conversa atual: ${favorites}`);
-    }
+    // NOTA: não usar orderDraft como "preferências" aqui — o draft tem seu próprio bloco CURRENT_ORDER_DRAFT
 
     if (memoryLines.length <= 1) {
       return null;
@@ -371,6 +367,71 @@ export class AiOrchestratorService {
     if (Number.isNaN(entryDate.getTime())) return false;
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
     return entryDate >= cutoff;
+  }
+
+  /**
+   * Gera bloco de contexto de data/hora atual no timezone do tenant.
+   * Injeta hoje, amanhã, dia da semana e hora local para evitar alucinações em agendamentos.
+   */
+  private buildDateTimeContextBlock(tenantId: string): string {
+    // Usar timezone padrão Brasil como fallback enquanto não há campo no schema
+    const timezone = 'America/Sao_Paulo';
+
+    const now = new Date();
+
+    const dtFormatter = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+
+    const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+
+    const weekdayFormatter = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: timezone,
+      weekday: 'long',
+    });
+
+    const todayIso = dateFormatter.format(now);
+    const tomorrowDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const tomorrowIso = dateFormatter.format(tomorrowDate);
+
+    const weekdayToday = weekdayFormatter.format(now);
+    const weekdayTomorrow = weekdayFormatter.format(tomorrowDate);
+
+    // Formatar datetime atual como ISO com offset
+    const dtParts = dtFormatter.formatToParts(now);
+    const getPart = (type: string) => dtParts.find((p) => p.type === type)?.value ?? '';
+    const currentDateTime = `${getPart('year')}-${getPart('month')}-${getPart('day')}T${getPart('hour')}:${getPart('minute')}:${getPart('second')}`;
+
+    const contextJson = JSON.stringify({
+      currentDateTime,
+      timezone,
+      today: todayIso,
+      tomorrow: tomorrowIso,
+      weekdayToday,
+      weekdayTomorrow,
+    });
+
+    this.logger.log(`[AI_TIME] context_injected tenantId=${tenantId} now=${currentDateTime} tz=${timezone}`);
+
+    return [
+      '## Contexto de data/hora atual (use para agendamentos — não calcule datas sozinho)',
+      '```json',
+      contextJson,
+      '```',
+      'REGRA: Nunca afirme uma data sem usar estes valores. Para agendamento, sempre use consultar_slots_agendamento com a data correta calculada daqui.',
+    ].join('\n');
   }
 
   private extractCustomerNameFromText(text: string): string | null {
@@ -617,6 +678,13 @@ export class AiOrchestratorService {
         select: { isStorePaused: true },
       });
       const storeStatusRaw = await this.availabilityService.getStoreStatus(tenantId);
+
+      // Detectar primeira mensagem da sessão (histórico de IA vazio ou estado greeting)
+      const isFirstMessage = session.state === 'greeting' || !aiMemory.lastAiProcessedAt;
+
+      // Verificar se a loja aceita agendamentos (default true quando fechada)
+      const acceptsScheduling = storeStatusRaw.isOpen === false;
+
       const storeSnapshot = {
         storeStatus: resolveStoreOperationalStatus({
           isStorePaused: tenantSettings?.isStorePaused ?? false,
@@ -626,11 +694,19 @@ export class AiOrchestratorService {
         message: storeStatusRaw.message,
         nextOpenAt: storeStatusRaw.nextOpenAt ?? null,
         reason: storeStatusRaw.reason,
+        acceptsScheduling,
+        isFirstMessage,
       };
       const storeStatusBlock = buildStoreStatusPromptBlock(storeSnapshot);
       AiFlowLogger.flow('store_status_injected', trace, {
         storeStatus: storeSnapshot.storeStatus,
+        isFirstMessage,
+        acceptsScheduling,
       });
+
+      if (isFirstMessage && storeSnapshot.storeStatus !== 'open') {
+        this.logger.log(`[AI_SCHEDULING] store_closed scheduling_offered sessionId=${session.id} acceptsScheduling=${acceptsScheduling}`);
+      }
 
       const basePrompt =
         systemConfig?.baseAiPrompt?.trim() || DEFAULT_GLOBAL_BASE_AI_PROMPT;
@@ -647,6 +723,7 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
       const systemContent = [
         basePrompt,
         storeStatusBlock,
+        this.buildDateTimeContextBlock(tenantId),
         tenantLayer,
         buildToolsManifestForPrompt(tools),
       ].join('\n\n');
@@ -662,6 +739,15 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
         }
       }
 
+      // Injetar CURRENT_ORDER_DRAFT no contexto (independente de memoryEnabled)
+      const draftBlock = buildOrderDraftPromptBlock(aiMemory.orderDraft);
+      if (draftBlock) {
+        messages.push({ role: 'system', content: draftBlock });
+        this.logger.log(
+          `[AI_DRAFT] loaded items=${aiMemory.orderDraft.items.length} missing=[${aiMemory.orderDraft.missingFields.join(',')}] ready=${aiMemory.orderDraft.readyToConfirm} sessionId=${session.id}`,
+        );
+      }
+
       const agentSessionCtx = await this.conversationService.resolveAgentSessionContext(
         tenantId,
         session.id,
@@ -672,6 +758,14 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
       AiFlowLogger.flow('agent_session_context', trace, {
         customerId: agentSessionCtx.customerId,
       });
+
+      // Garantir customerPhone no draft (preenchido automaticamente)
+      if (!aiMemory.orderDraft.customerPhone && customerPhone) {
+        await this.conversationService.updateOrderDraft(session.id, {
+          customerPhone: customerPhone.replace(/\D/g, ''),
+          customerName: aiMemory.orderDraft.customerName || agentSessionCtx.customerName || null,
+        });
+      }
 
       for (const msg of history) {
         if (msg.messageType !== 'text' && msg.messageType !== 'tool_result') {
@@ -1068,6 +1162,7 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
             missingFields: [],
             readyToConfirm: false,
             confirmationAskedAt: null,
+            scheduledFor: null,
           },
           lastOrderSummary: orderId ? `Pedido repetido ${orderId}` : 'Pedido repetido',
         });
@@ -1149,6 +1244,11 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
             lastOrderCreatedAt: new Date().toISOString(),
           });
         }
+
+        // Limpar o orderDraft após criação bem-sucedida
+        await this.conversationService.clearOrderDraft(sessionId);
+        AiFlowLogger.flow('order_draft_cleared', trace, { sessionId, orderId: toolResultOrderId });
+        this.logger.log(`[AI_ORDER] create_order_success orderId=${toolResultOrderId} sessionId=${sessionId}`);
       }
 
       if (toolStatus === 'success') {
