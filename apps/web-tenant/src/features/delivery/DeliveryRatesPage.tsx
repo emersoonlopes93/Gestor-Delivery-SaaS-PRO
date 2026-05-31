@@ -4,7 +4,6 @@ import { api } from '../../lib/api-client';
 import { MapContainer, TileLayer, FeatureGroup, Polygon, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet-draw';
-import { useThemeStore } from '../../stores/theme.store';
 import type { LatLngExpression } from 'leaflet';
 
 
@@ -239,7 +238,7 @@ export function DeliveryRatesPage() {
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await api.get<DeliveryRateRule[]>('/delivery/rates');
       if (response.success) {
         setRules(response.data || []);
@@ -288,13 +287,13 @@ export function DeliveryRatesPage() {
   const handleSubmit = async (data: CreateRuleDto) => {
     try {
       setSaving(true);
-      
+
       if (editingRule) {
         await api.put(`/delivery/rates/${editingRule.id}`, data);
       } else {
         await api.post('/delivery/rates', data);
       }
-      
+
       await fetchRules();
       setShowModal(false);
       setEditingRule(null);
@@ -309,20 +308,20 @@ export function DeliveryRatesPage() {
   const handleMoveUp = async (rule: DeliveryRateRule) => {
     const sortedRules = [...rules].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
     const currentIndex = sortedRules.findIndex(r => r.id === rule.id);
-    
+
     if (currentIndex <= 0) return; // Já está no topo
-    
+
     const previousRule = sortedRules[currentIndex - 1];
     const currentPriority = rule.priority ?? currentIndex;
     const previousPriority = previousRule.priority ?? (currentIndex - 1);
-    
+
     try {
       // Trocar prioridades
       await Promise.all([
         api.put(`/delivery/rates/${rule.id}`, { ...rule, priority: previousPriority }),
         api.put(`/delivery/rates/${previousRule.id}`, { ...previousRule, priority: currentPriority })
       ]);
-      
+
       await fetchRules();
     } catch (err) {
       console.error('Erro ao mover regra para cima:', err);
@@ -333,20 +332,20 @@ export function DeliveryRatesPage() {
   const handleMoveDown = async (rule: DeliveryRateRule) => {
     const sortedRules = [...rules].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
     const currentIndex = sortedRules.findIndex(r => r.id === rule.id);
-    
+
     if (currentIndex >= sortedRules.length - 1) return; // Já está no final
-    
+
     const nextRule = sortedRules[currentIndex + 1];
     const currentPriority = rule.priority ?? currentIndex;
     const nextPriority = nextRule.priority ?? (currentIndex + 1);
-    
+
     try {
       // Trocar prioridades
       await Promise.all([
         api.put(`/delivery/rates/${rule.id}`, { ...rule, priority: nextPriority }),
         api.put(`/delivery/rates/${nextRule.id}`, { ...nextRule, priority: currentPriority })
       ]);
-      
+
       await fetchRules();
     } catch (err) {
       console.error('Erro ao mover regra para baixo:', err);
@@ -431,19 +430,17 @@ export function DeliveryRatesPage() {
             const meta = rule.type === 'polygon' ? getZoneMeta(rule) : null;
             const canMoveUp = index > 0;
             const canMoveDown = index < sortedRules.length - 1;
-            
+
             return (
               <div
                 key={rule.id}
-                className={`bg-card rounded-2xl border p-4 shadow-sm transition-all ${
-                  rule.isActive ? 'border-border' : 'border-border bg-muted/50'
-                }`}
+                className={`bg-card rounded-2xl border p-4 shadow-sm transition-all ${rule.isActive ? 'border-border' : 'border-border bg-muted/50'
+                  }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      rule.isActive ? 'bg-primary-100 dark:bg-primary-500/20 text-primary-600 dark:text-primary-300' : 'bg-muted text-muted-foreground'
-                    }`}>
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${rule.isActive ? 'bg-primary-100 dark:bg-primary-500/20 text-primary-600 dark:text-primary-300' : 'bg-muted text-muted-foreground'
+                      }`}>
                       <Icon className="w-5 h-5" />
                     </div>
                     <div>
@@ -459,11 +456,10 @@ export function DeliveryRatesPage() {
                             Polygon
                           </span>
                         ) : null}
-                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                          rule.isActive
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${rule.isActive
                             ? 'bg-status-success/10 text-status-success'
                             : 'bg-muted text-muted-foreground'
-                        }`}>
+                          }`}>
                           {rule.isActive ? 'Ativa' : 'Inativa'}
                         </span>
                         {rule.isFallback ? (
@@ -488,11 +484,10 @@ export function DeliveryRatesPage() {
                       <button
                         onClick={() => handleMoveUp(rule)}
                         disabled={!canMoveUp}
-                        className={`p-1 rounded transition-colors ${
-                          canMoveUp
+                        className={`p-1 rounded transition-colors ${canMoveUp
                             ? 'text-muted-foreground hover:text-foreground hover:bg-muted'
                             : 'text-muted-foreground cursor-not-allowed'
-                        }`}
+                          }`}
                         title="Mover para cima"
                       >
                         <ChevronUp className="w-4 h-4" />
@@ -500,11 +495,10 @@ export function DeliveryRatesPage() {
                       <button
                         onClick={() => handleMoveDown(rule)}
                         disabled={!canMoveDown}
-                        className={`p-1 rounded transition-colors ${
-                          canMoveDown
+                        className={`p-1 rounded transition-colors ${canMoveDown
                             ? 'text-muted-foreground hover:text-foreground hover:bg-muted'
                             : 'text-muted-foreground cursor-not-allowed'
-                        }`}
+                          }`}
                         title="Mover para baixo"
                       >
                         <ChevronDown className="w-4 h-4" />
@@ -512,11 +506,10 @@ export function DeliveryRatesPage() {
                     </div>
                     <button
                       onClick={() => handleToggleActive(rule)}
-                      className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                        rule.isActive
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${rule.isActive
                           ? 'bg-muted text-foreground hover:bg-muted/80'
                           : 'bg-status-success/10 text-status-success hover:bg-status-success/20'
-                      }`}
+                        }`}
                     >
                       {rule.isActive ? 'Desativar' : 'Ativar'}
                     </button>
@@ -564,9 +557,6 @@ interface DeliveryRateModalProps {
 }
 
 function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModalProps) {
-  const { theme } = useThemeStore();
-  const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-
   const [formData, setFormData] = useState<CreateRuleDto>(() => ({
     type: 'neighborhood',
     neighborhood: '',
@@ -630,18 +620,18 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validação básica
     if (formData.type === 'neighborhood' && (!formData.neighborhood || (formData.rate ?? 0) <= 0)) {
       alert('Preencha o bairro e o valor da taxa');
       return;
     }
-    
+
     if (formData.type === 'distance' && ((formData.minKm ?? 0) <= 0 || (formData.maxKm ?? 0) <= (formData.minKm ?? 0) || (formData.ratePerKm ?? 0) <= 0)) {
       alert('Preencha os campos de distância corretamente');
       return;
     }
-    
+
     if (formData.type === 'fixed' && (formData.fixedRate ?? 0) <= 0) {
       alert('Preencha o valor da taxa fixa');
       return;
@@ -672,7 +662,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
       });
       return;
     }
-    
+
     onSubmit(formData);
   };
 
@@ -682,7 +672,7 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
         <h2 className="text-lg font-semibold text-foreground mb-4">
           {rule ? 'Editar Regra' : 'Nova Regra de Entrega'}
         </h2>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">
@@ -863,11 +853,8 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                 <div className="h-[320px]">
                   <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }}>
                     <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-                      url={isDark 
-                        ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                        : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-                      }
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
                     <FeatureGroup>
                       <PolygonDrawControl
