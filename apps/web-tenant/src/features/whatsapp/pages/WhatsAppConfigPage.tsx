@@ -584,15 +584,15 @@ export function WhatsAppConfigPage() {
                <div className="space-y-2">
                  <div className="flex justify-between items-center">
                    <label className="text-sm font-medium text-foreground">Atraso de Resposta (Debounce)</label>
-                   <span className="text-xs font-mono text-primary">{formAi?.debounceMs || 10000}ms</span>
+                   <span className="text-xs font-mono text-primary">{formAi?.debounceMs || 5000}ms</span>
                  </div>
                  <input 
                    type="range"
-                   min="10000"
-                   max="30000"
+                   min="5000"
+                   max="20000"
                    step="5000"
                    className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
-                   value={formAi?.debounceMs || 10000}
+                   value={formAi?.debounceMs || 5000}
                    onChange={(e) => setFormAi(prev => prev ? {...prev, debounceMs: parseInt(e.target.value)} : null)}
                  />
                  <p className="text-[10px] text-muted-foreground italic">Tempo de espera após a última mensagem do cliente antes da IA começar a processar.</p>

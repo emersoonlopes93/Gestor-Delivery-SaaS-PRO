@@ -65,8 +65,8 @@ export class UpdateAiAgentConfigDto {
 
   @IsOptional()
   @IsNumber()
-  @Min(10000)
-  @Max(30000)
+  @Min(5000)
+  @Max(20000)
   debounceMs?: number;
 
   @IsOptional()
