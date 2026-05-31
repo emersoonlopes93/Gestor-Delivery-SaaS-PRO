@@ -1119,6 +1119,7 @@ model BillingCycleRecord {
 
   @@index([tenantId])
   @@index([subscriptionId])
+  @@unique([subscriptionId, startedAt, endedAt])
   @@map("billing_cycles")
 }
 
@@ -1141,6 +1142,7 @@ model BillingUsageSnapshot {
 
   @@index([tenantId])
   @@index([cycleId])
+  @@unique([tenantId, cycleId, periodStart, periodEnd])
   @@map("billing_usage_snapshots")
 }
 
@@ -1170,6 +1172,7 @@ model Invoice {
   paymentAttempts     PaymentAttempt[]
 
   @@unique([number])
+  @@unique([tenantId, subscriptionId, cycleId])
   @@index([tenantId])
   @@index([subscriptionId])
   @@index([cycleId])
@@ -1189,6 +1192,7 @@ model InvoiceItem {
   invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
+  @@unique([invoiceId, type])
   @@map("invoice_items")
 }
 

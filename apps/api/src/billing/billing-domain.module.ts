@@ -7,6 +7,7 @@ import { BillingSubscriptionLifecycleService } from './billing-subscription-life
 import { BillingRatingService } from './billing-rating.service';
 import { BillingUsageService } from './billing-usage.service';
 import { InvoiceService } from './invoice.service';
+import { BillingCycleService } from './billing-cycle.service';
 
 @Module({
   providers: [
@@ -18,6 +19,7 @@ import { InvoiceService } from './invoice.service';
     BillingRatingService,
     BillingUsageService,
     InvoiceService,
+    BillingCycleService,
   ],
   exports: [
     BillingPlansService,
@@ -26,6 +28,7 @@ import { InvoiceService } from './invoice.service';
     BillingRatingService,
     BillingUsageService,
     InvoiceService,
+    BillingCycleService,
   ],
 })
 export class BillingDomainModule {}

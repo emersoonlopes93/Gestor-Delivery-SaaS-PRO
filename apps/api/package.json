@@ -32,6 +32,7 @@
 
     "smoke:billing": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-domain.ts",
     "smoke:billing-usage": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-usage.ts",
+    "smoke:billing-cycle": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-cycle.ts",
 
     "smoke:logistics": "ts-node -r tsconfig-paths/register scripts/smoke-test-logistics-flow.ts",
 

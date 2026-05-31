@@ -137,6 +137,18 @@ export class BillingUsageService {
     periodStart: Date;
     periodEnd: Date;
     planId?: string;
+    tx?: Prisma.TransactionClient;
+  }): Promise<BillingUsageSnapshot> {
+    return this.getOrCreateUsageSnapshot(input);
+  }
+
+  async getOrCreateUsageSnapshot(input: {
+    tenantId: string;
+    cycleId?: string;
+    periodStart: Date;
+    periodEnd: Date;
+    planId?: string;
+    tx?: Prisma.TransactionClient;
   }): Promise<BillingUsageSnapshot> {
     const preview = await this.getBillableRevenuePreview({
       tenantId: input.tenantId,
@@ -145,19 +157,40 @@ export class BillingUsageService {
       planId: input.planId,
     });
 
-    return this.prisma.billingUsageSnapshot.create({
+    const client = input.tx ?? this.prisma;
+    const existing = await client.billingUsageSnapshot.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        cycleId: input.cycleId ?? null,
+        periodStart: input.periodStart,
+        periodEnd: input.periodEnd,
+      },
+    });
+
+    const data = {
+      sourceChannel: preview.includedChannels.join(','),
+      ordersCount: preview.ordersCount,
+      grossOrdersAmount: preview.grossOrdersAmount,
+      discountsAmount: preview.discountsAmount,
+      deliveryFeeAmount: preview.deliveryFeeAmount,
+      serviceFeeAmount: preview.serviceFeeAmount,
+      billableAmount: preview.billableAmount,
+    };
+
+    if (existing) {
+      return client.billingUsageSnapshot.update({
+        where: { id: existing.id },
+        data,
+      });
+    }
+
+    return client.billingUsageSnapshot.create({
       data: {
         tenantId: preview.tenantId,
         cycleId: input.cycleId,
         periodStart: preview.periodStart,
         periodEnd: preview.periodEnd,
-        sourceChannel: preview.includedChannels.join(','),
-        ordersCount: preview.ordersCount,
-        grossOrdersAmount: preview.grossOrdersAmount,
-        discountsAmount: preview.discountsAmount,
-        deliveryFeeAmount: preview.deliveryFeeAmount,
-        serviceFeeAmount: preview.serviceFeeAmount,
-        billableAmount: preview.billableAmount,
+        ...data,
       },
     });
   }
