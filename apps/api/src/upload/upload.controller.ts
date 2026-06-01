@@ -7,6 +7,8 @@ import {
   UseGuards,
   UseInterceptors,
   Query,
+  Delete,
+  Param,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request as ExpressRequest } from 'express';
@@ -14,6 +16,7 @@ import { memoryStorage } from 'multer';
 import { randomUUID } from 'crypto';
 import { ImageOptimizerService } from './image-optimizer.service';
 import { StorageService } from './storage.service';
+import { UploadService } from './upload.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
@@ -35,7 +38,59 @@ export class UploadController {
   constructor(
     private readonly optimizer: ImageOptimizerService,
     private readonly storageService: StorageService,
+    private readonly uploadService: UploadService,
   ) {}
+
+  /**
+   * New endpoint for Storefront Background Upload.
+   * Leverages the new MediaAsset architecture.
+   */
+  @Post('storefront-background')
+  @RequirePermissions('settings.manage')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB limit for backgrounds
+      },
+      fileFilter: (_req: ExpressRequest, file: MulterFileLike, cb: FileFilterCallback) => {
+        const allowedMime = new Set(['image/jpeg', 'image/png', 'image/webp']);
+        if (!allowedMime.has(file.mimetype)) {
+          cb(new BadRequestException('Formato de imagem inválido. Use JPG, PNG ou WEBP.'), false);
+          return;
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async uploadStorefrontBackground(
+    @Request() req: ExpressRequest & { user: TenantJwtPayload },
+    @UploadedFile() file: any,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Arquivo não enviado');
+    }
+
+    return this.uploadService.createMediaAsset({
+      tenantId: req.user.tenantId,
+      scope: 'storefront_background',
+      file: {
+        buffer: file.buffer,
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
+      },
+    });
+  }
+
+  @Delete('media/:id')
+  @RequirePermissions('settings.manage')
+  async deleteMedia(
+    @Request() req: ExpressRequest & { user: TenantJwtPayload },
+    @Param('id') id: string,
+  ) {
+    return this.uploadService.deleteMediaAsset(req.user.tenantId, id);
+  }
 
   @Post('image')
   @RequirePermissions('catalog.update')

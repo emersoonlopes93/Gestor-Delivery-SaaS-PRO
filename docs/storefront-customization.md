@@ -31,6 +31,16 @@ O sistema oferece presets comerciais prontos para uso, facilitando a configuraç
 - `executive-clean`: Visual limpo em lista, ideal para cardápios executivos.
 - `minimal-clean`: Otimizado para velocidade com layout `compact`.
 
+### Background Premium
+
+O Storefront suporta imagens de fundo personalizadas para o modo "Premium" e outros estilos. 
+
+- **Formatos**: JPG, PNG, WebP (SVG bloqueado por segurança).
+- **Limite**: 5MB por arquivo.
+- **Otimização**: Todas as imagens são convertidas para WebP e redimensionadas para um máximo de 1920px de largura/altura.
+- **Armazenamento**: Gerenciado via `MediaAsset` no banco de dados e salvo no driver configurado (`local` ou `r2`).
+- **Overlay**: É possível configurar a intensidade do overlay (Leve, Médio, Forte) para garantir o contraste do texto sobre imagens muito claras ou detalhadas.
+
 ### Versionamento e Segurança
 
 - **Versão**: As configurações agora possuem um campo `version: 1`. Isso permite futuras migrações de esquema sem quebrar lojas existentes.

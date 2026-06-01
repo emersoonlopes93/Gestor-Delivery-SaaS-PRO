@@ -100,6 +100,7 @@ model Tenant {
   operatingHours              TenantOperatingHours[]
   roles                       TenantRole[]
   settings                    TenantSettings?
+  mediaAssets                 MediaAsset[]
   users                       TenantUser[]
   businessGroup               BusinessGroup?               @relation(fields: [businessGroupId], references: [id])
   timeSlots                   TimeSlot[]
@@ -365,6 +366,36 @@ model TenantSettings {
   tenant                       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_settings")
+}
+
+model MediaAsset {
+  id           String   @id @default(cuid())
+  tenantId     String?  @map("tenant_id")
+  scope        String   @db.VarChar(50) // e.g., "storefront_background", "product_image"
+  source       String   @db.VarChar(20) // "upload", "url"
+  category     String?  @db.VarChar(50)
+  filename     String   @db.VarChar(255)
+  originalName String?  @map("original_name") @db.VarChar(255)
+  mimeType     String   @map("mime_type") @db.VarChar(100)
+  sizeBytes    Int      @map("size_bytes")
+  width        Int?
+  height       Int?
+  path         String   @db.Text // internal path or key
+  publicUrl    String   @map("public_url") @db.Text
+  altText      String?  @map("alt_text") @db.VarChar(255)
+  metadataJson Json?    @map("metadata_json")
+  isSystem     Boolean  @default(false) @map("is_system")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([scope])
+  @@index([isSystem])
+  @@index([category])
+  @@map("media_assets")
 }
 
 model TenantOperatingHours {

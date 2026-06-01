@@ -94,6 +94,18 @@ async function main() {
     console.error('❌ Security validation failed - harmful fields found!', verifySecurityData.theme);
   }
 
+  // 7. Test Background Image Fallback
+  const updateBg = await api('PATCH', '/tenant/storefront-customization', {
+    theme: { ...verifyPresetData.theme, backgroundImageUrl: 'https://images.com/bg.jpg', backgroundOverlay: 'invalid-mode' }
+  }, token);
+  
+  const verifyBg = await api('GET', '/tenant/storefront-customization', undefined, token);
+  if (verifyBg.data.theme.backgroundImageUrl === 'https://images.com/bg.jpg' && verifyBg.data.theme.backgroundOverlay === 'none') {
+    console.log('✅ Background Image normalization works');
+  } else {
+    console.error('❌ Background Image normalization failed:', verifyBg.data.theme);
+  }
+
   console.log('\nSMOKE TEST COMPLETED');
 }
 

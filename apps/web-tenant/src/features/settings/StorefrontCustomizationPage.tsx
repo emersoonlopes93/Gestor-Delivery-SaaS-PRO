@@ -7,7 +7,10 @@ import {
   Save,
   Eye,
   MousePointer2,
-  Zap
+  Zap,
+  Upload,
+  Trash2,
+  Image as ImageIcon
 } from 'lucide-react';
 import { api } from '../../lib/api-client';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -31,6 +34,7 @@ import {
 export function StorefrontCustomizationPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [customization, setCustomization] = useState<{
     theme: StorefrontThemeSettings;
     layout: StorefrontLayoutSettings;
@@ -110,6 +114,43 @@ export function StorefrontCustomizationPage() {
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Basic validation
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Arquivo muito grande. O limite é 5MB.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await api.post<any>('/upload/storefront-background', formData);
+      if (response.success) {
+        updateTheme({ 
+          backgroundImageUrl: response.data.publicUrl,
+          backgroundImageMediaId: response.data.id
+        });
+      }
+    } catch (error) {
+      console.error('Erro no upload:', error);
+      alert('Falha ao enviar imagem.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeBackground = () => {
+    updateTheme({ 
+      backgroundImageUrl: null,
+      backgroundImageMediaId: null
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -167,6 +208,92 @@ export function StorefrontCustomizationPage() {
                   <p className="text-[11px] text-gray-500 leading-tight">{preset.description}</p>
                 </button>
               ))}
+            </div>
+          </Card>
+
+          {/* Background Premium */}
+          <Card className="p-6">
+            <div className="flex items-center gap-2 mb-6">
+              <ImageIcon className="w-5 h-5 text-primary-600" />
+              <h2 className="text-lg font-bold">Background Premium</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium">Imagem de Fundo</label>
+                  <p className="text-xs text-gray-500 mb-2">JPG, PNG ou WebP. Recomendado: 1920x1080px (Máx 5MB).</p>
+                  
+                  {customization.theme.backgroundImageUrl ? (
+                    <div className="relative group rounded-xl overflow-hidden border-2 border-primary-100 aspect-video bg-gray-100">
+                      <img 
+                        src={customization.theme.backgroundImageUrl} 
+                        alt="Background Preview" 
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <Button size="sm" variant="destructive" onClick={removeBackground}>
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Remover
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <input
+                        type="file"
+                        id="bg-upload"
+                        className="hidden"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handleFileUpload}
+                        disabled={uploading}
+                      />
+                      <label 
+                        htmlFor="bg-upload"
+                        className={`flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-200 rounded-2xl cursor-pointer hover:border-primary-400 hover:bg-primary-50 transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {uploading ? (
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+                        ) : (
+                          <>
+                            <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                            <span className="text-sm font-bold text-gray-600">Clique para enviar</span>
+                            <span className="text-xs text-gray-400">ou arraste a imagem aqui</span>
+                          </>
+                        )}
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Intensidade do Overlay</label>
+                  <p className="text-xs text-gray-500 mb-4">Ajuste para garantir que os textos fiquem legíveis sobre a imagem.</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {(['none', 'soft', 'medium', 'strong'] as const).map((o) => (
+                      <button
+                        key={o}
+                        onClick={() => updateTheme({ backgroundOverlay: o })}
+                        className={`px-3 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${
+                          customization.theme.backgroundOverlay === o
+                            ? 'border-primary-600 bg-primary-50 text-primary-700'
+                            : 'border-gray-200 hover:border-gray-300 bg-white'
+                        }`}
+                      >
+                        {o === 'none' ? 'Nenhum' : o === 'soft' ? 'Leve' : o === 'medium' ? 'Médio' : 'Forte'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-primary-50 rounded-xl border border-primary-100">
+                  <p className="text-[11px] text-primary-700 leading-relaxed">
+                    <strong>Dica UX:</strong> Se sua imagem for muito colorida ou detalhada, use o overlay <strong>Médio</strong> ou <strong>Forte</strong> para manter o contraste do cardápio.
+                  </p>
+                </div>
+              </div>
             </div>
           </Card>
 

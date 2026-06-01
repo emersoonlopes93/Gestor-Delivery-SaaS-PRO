@@ -31,6 +31,14 @@ A arquitetura é dividida em três camadas principais para garantir isolamento e
 - `StorefrontBadge`: Badges de destaque para produtos e estados.
 - `StorefrontEmptyState`: Estados vazios estilizados para a vitrine.
 
+## Gestão de Mídia
+
+A arquitetura de mídias utiliza o model `MediaAsset` para centralizar metadados e controle de propriedade (multi-tenant).
+
+- **Storage Drivers**: Suporta `local` (filesystem) e `r2` (Cloudflare R2).
+- **Optimizer**: Usa `sharp` para conversão automática para `.webp` e redimensionamento responsivo.
+- **Segurança**: Validação rigorosa de MIME types e bloqueio de formatos perigosos (SVG, HTML, etc).
+
 ## Princípios de Design
 
 - **Isolamento de Tema**: O storefront utiliza o atributo `data-storefront-theme` e variáveis `--storefront-*`, garantindo que o tema dark do painel administrativo não "vaze" para a loja pública.

@@ -37,6 +37,9 @@ export type StorefrontThemeSettings = {
   secondaryColor?: string;
   accentColor?: string;
   backgroundStyle: 'clean' | 'soft' | 'premium' | 'brand';
+  backgroundImageUrl?: string | null;
+  backgroundImageMediaId?: string | null;
+  backgroundOverlay?: 'none' | 'soft' | 'medium' | 'strong';
   borderRadius: StorefrontRadius;
   fontStyle: 'default' | 'modern' | 'rounded';
 };
@@ -225,6 +228,7 @@ export function normalizeStorefrontTheme(input: any): StorefrontThemeSettings {
 
   const validModes: ThemeMode[] = ['light', 'dark', 'system'];
   const validBackgrounds = ['clean', 'soft', 'premium', 'brand'];
+  const validOverlays = ['none', 'soft', 'medium', 'strong'];
   const validRadius: StorefrontRadius[] = ['sm', 'md', 'lg', 'xl', '2xl'];
   const validFonts = ['default', 'modern', 'rounded'];
 
@@ -235,6 +239,9 @@ export function normalizeStorefrontTheme(input: any): StorefrontThemeSettings {
     secondaryColor: input.secondaryColor ? sanitizeHexColor(input.secondaryColor) : undefined,
     accentColor: input.accentColor ? sanitizeHexColor(input.accentColor) : undefined,
     backgroundStyle: validBackgrounds.includes(input.backgroundStyle) ? input.backgroundStyle : defaults.backgroundStyle,
+    backgroundImageUrl: typeof input.backgroundImageUrl === 'string' ? input.backgroundImageUrl : null,
+    backgroundImageMediaId: typeof input.backgroundImageMediaId === 'string' ? input.backgroundImageMediaId : null,
+    backgroundOverlay: validOverlays.includes(input.backgroundOverlay) ? input.backgroundOverlay : 'none',
     borderRadius: validRadius.includes(input.borderRadius) ? input.borderRadius : defaults.borderRadius,
     fontStyle: validFonts.includes(input.fontStyle) ? input.fontStyle : defaults.fontStyle,
   };
@@ -274,10 +281,21 @@ export function applyStorefrontThemeVariables(settings: Partial<StorefrontThemeS
   
   const isDark = mode === 'dark';
 
+  const overlayOpacity = {
+    none: '0',
+    soft: '0.2',
+    medium: '0.4',
+    strong: '0.6'
+  }[settings.backgroundOverlay || 'none'];
+
   return {
     '--storefront-primary': primary,
     '--storefront-primary-foreground': getAccessibleForegroundColor(primary),
     '--storefront-radius': radius,
+    
+    // Background Image
+    '--storefront-background-image': settings.backgroundImageUrl ? `url("${settings.backgroundImageUrl}")` : 'none',
+    '--storefront-background-overlay': isDark ? `rgba(0,0,0,${overlayOpacity})` : `rgba(255,255,255,${overlayOpacity})`,
     
     // Semantic backgrounds
     '--storefront-background': isDark ? '#020617' : '#ffffff',

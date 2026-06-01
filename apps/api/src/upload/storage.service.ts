@@ -1,17 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { writeFileSync, mkdirSync, unlinkSync } from 'fs';
-import { join } from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class StorageService {
   private readonly s3Client: S3Client | null = null;
   private readonly driver: 'local' | 'r2';
   private readonly logger = new Logger(StorageService.name);
+  private readonly uploadDir: string;
 
   constructor(private readonly config: ConfigService) {
     this.driver = this.config.get<'local' | 'r2'>('STORAGE_DRIVER') || 'local';
+    this.uploadDir = path.join(process.cwd(), this.config.get<string>('UPLOAD_DIR', 'uploads'));
 
     if (this.driver === 'r2') {
       const rawAccountId = this.config.get<string>('R2_ACCOUNT_ID') || '';
@@ -38,6 +40,30 @@ export class StorageService {
       this.logger.log('StorageService inicializado com driver Cloudflare R2.');
     } else {
       this.logger.log('StorageService inicializado com driver Local.');
+    }
+  }
+
+  async delete(key: string): Promise<void> {
+    if (this.driver === 'r2') {
+      try {
+        await this.s3Client!.send(
+          new DeleteObjectCommand({
+            Bucket: this.config.getOrThrow<string>('R2_BUCKET'),
+            Key: key,
+          }),
+        );
+      } catch (err) {
+        this.logger.error(`Erro ao deletar arquivo no R2: ${key}`, err);
+      }
+    } else {
+      const filePath = path.join(this.uploadDir, key);
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (err) {
+        this.logger.error(`Erro ao deletar arquivo local: ${filePath}`, err);
+      }
     }
   }
 
@@ -68,37 +94,23 @@ export class StorageService {
       return { key: params.key, url };
     } else {
       // Local driver for development
-      const destinationPath = join(process.cwd(), 'uploads', params.key);
-      const directory = join(destinationPath, '..');
+      const destinationPath = path.join(this.uploadDir, params.key);
+      const directory = path.dirname(destinationPath);
 
-      mkdirSync(directory, { recursive: true });
-      writeFileSync(destinationPath, params.buffer);
+      fs.mkdirSync(directory, { recursive: true });
+      fs.writeFileSync(destinationPath, params.buffer);
 
-      const apiPrefix = this.config.get<string>('API_PREFIX', '/api/v1');
       // Replace windows backward slashes with forward slashes for URL path compatibility
       const webPath = params.key.replace(/\\/g, '/');
-      const url = `${apiPrefix}/static/${webPath}`;
+      // Fix: Use correct environment variable or default
+      const baseUrl = this.config.get<string>('MEDIA_PUBLIC_BASE_URL') || `${this.config.get<string>('API_PREFIX', '/api/v1')}/static`;
+      const url = `${baseUrl}/${webPath}`;
 
       return { key: params.key, url };
     }
   }
 
   async deleteObject(key: string): Promise<void> {
-    if (this.driver === 'r2') {
-      const bucket = this.config.get<string>('R2_BUCKET') || '';
-      await this.s3Client!.send(
-        new DeleteObjectCommand({
-          Bucket: bucket,
-          Key: key,
-        }),
-      );
-    } else {
-      const filePath = join(process.cwd(), 'uploads', key);
-      try {
-        unlinkSync(filePath);
-      } catch (err) {
-        this.logger.warn(`Erro ao deletar arquivo local em ${filePath}: ${String(err)}`);
-      }
-    }
+    return this.delete(key);
   }
 }
