@@ -2,6 +2,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './features/auth/LoginPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
+import { BillingPage } from './features/billing/BillingPage';
 import { AuthLayout } from './layouts/AuthLayout';
 import { AppLayout } from './layouts/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -72,6 +73,14 @@ export function App() {
         }
       >
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route
+          path="/billing"
+          element={
+            <PermissionGate permission="billing.read">
+              <BillingPage />
+            </PermissionGate>
+          }
+        />
 
         {/* Catalog module Routes */}
         <Route

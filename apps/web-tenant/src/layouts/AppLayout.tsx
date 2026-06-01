@@ -34,7 +34,8 @@ import {
   MessageSquare,
   Megaphone,
   Bot,
-  Palette
+  Palette,
+  CreditCard
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
@@ -76,6 +77,14 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
         icon: LayoutGrid,
         permission: 'dashboard.view',
         match: (p) => p === '/dashboard',
+      },
+      {
+        id: 'billing-plan',
+        label: 'Plano e Cobrança',
+        to: '/billing',
+        icon: CreditCard,
+        permission: 'billing.read',
+        match: (p) => p === '/billing',
       },
     ],
   },

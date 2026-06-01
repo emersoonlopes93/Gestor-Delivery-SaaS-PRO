@@ -15,6 +15,7 @@ import { BillingPaymentAttemptService } from './billing-payment-attempt.service'
 import { AsaasBillingClientService } from './asaas-billing-client.service';
 import { AsaasBillingPaymentProvider } from './asaas-billing-payment.provider';
 import { TenantBillingResolverService } from './tenant-billing-resolver.service';
+import { TenantBillingPortalService } from './tenant-billing-portal.service';
 
 @Module({
   providers: [
@@ -34,6 +35,7 @@ import { TenantBillingResolverService } from './tenant-billing-resolver.service'
     BillingPaymentGatewayService,
     BillingPaymentAttemptService,
     TenantBillingResolverService,
+    TenantBillingPortalService,
   ],
   exports: [
     BillingPlansService,
@@ -46,6 +48,7 @@ import { TenantBillingResolverService } from './tenant-billing-resolver.service'
     BillingPaymentGatewayService,
     BillingPaymentAttemptService,
     TenantBillingResolverService,
+    TenantBillingPortalService,
   ],
 })
 export class BillingDomainModule {}

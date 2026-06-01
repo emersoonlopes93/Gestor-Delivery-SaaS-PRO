@@ -6,6 +6,7 @@ import { BillingService } from './billing.service';
 import { BillingUsageService } from './billing-usage.service';
 import type { CreatePlanDto, CreateSubscriptionDto, UpdatePlanDto, UpdateSubscriptionDto } from './dto/create-plan.dto';
 import { TenantBillingResolverService } from './tenant-billing-resolver.service';
+import { TenantBillingPortalService } from './tenant-billing-portal.service';
 
 @Controller('billing')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -14,7 +15,29 @@ export class BillingController {
     private readonly billingService: BillingService,
     private readonly tenantBillingResolver: TenantBillingResolverService,
     private readonly billingUsageService: BillingUsageService,
+    private readonly tenantBillingPortalService: TenantBillingPortalService,
   ) {}
+
+  @Get('me')
+  @RequirePermissions('billing.read')
+  async getMyBillingOverview(@CurrentTenant() tenantId: string) {
+    return this.tenantBillingPortalService.getMyBillingOverview(tenantId);
+  }
+
+  @Get('me/invoices')
+  @RequirePermissions('billing.read')
+  async listMyInvoices(@CurrentTenant() tenantId: string) {
+    return this.tenantBillingPortalService.listMyInvoices(tenantId);
+  }
+
+  @Get('me/invoices/:invoiceId')
+  @RequirePermissions('billing.read')
+  async getMyInvoiceDetails(
+    @CurrentTenant() tenantId: string,
+    @Param('invoiceId') invoiceId: string,
+  ) {
+    return this.tenantBillingPortalService.getMyInvoiceDetails(tenantId, invoiceId);
+  }
 
   @Get('plans')
   async listPlans() {
