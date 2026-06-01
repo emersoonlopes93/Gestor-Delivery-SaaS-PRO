@@ -234,7 +234,7 @@ export class TenantBillingPortalService {
       mode: this.resolveDisplayedMode(runtime.mode),
       provider: this.resolveDisplayedProvider(runtime.provider),
       automaticBillingActive: false,
-      message: 'Cobrança automática está desativada. Nenhum gateway será chamado nesta fase.',
+      message: 'Cobrança automática ainda não está ativa. Nenhum gateway será chamado nesta fase.',
     };
   }
 

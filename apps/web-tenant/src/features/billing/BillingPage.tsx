@@ -51,9 +51,19 @@ function booleanLabel(value: boolean): string {
   return value ? 'Sim' : 'Não';
 }
 
+function sourceLabel(source: string | null | undefined): string {
+  if (source === 'billing_v2') return 'Billing V2';
+  if (source === 'legacy_fallback') return 'Fallback legado';
+  return 'Nenhuma';
+}
+
+function normalizeBillingText(value: string): string {
+  return value.replace(/\bAte\b/g, 'Até').replace(/\bate\b/g, 'até');
+}
+
 function tierLabel(tier: { label: string | null; minRevenue: DecimalLike; maxRevenue: DecimalLike | null } | null | undefined): string {
   if (!tier) return 'Sem faixa';
-  if (tier.label) return tier.label;
+  if (tier.label) return normalizeBillingText(tier.label);
   const min = formatCurrency(tier.minRevenue);
   const max = tier.maxRevenue === null ? 'aberto' : formatCurrency(tier.maxRevenue);
   return `${min} até ${max}`;
@@ -188,6 +198,7 @@ export function BillingPage() {
                 <Metric label="Modelo" value={overview?.plan?.type ?? 'Indefinido'} />
                 <Metric label="Trial" value={`${overview?.plan?.trialDays ?? 0} dias`} />
                 <Metric label="Status" value={overview?.subscription?.status ?? 'Sem assinatura'} />
+                <Metric label="Fonte" value={sourceLabel(overview?.source)} />
                 <Metric label="Exige pagamento" value={booleanLabel(overview?.plan?.requiresPaymentMethod ?? false)} />
                 <Metric label="Todos os módulos" value={booleanLabel(overview?.plan?.allowAllModules ?? false)} />
                 <Metric label="Início do trial" value={formatDate(overview?.subscription?.trialStartedAt)} />
@@ -302,7 +313,7 @@ export function BillingPage() {
                     {invoiceDetailsQuery.data.items.map((item) => (
                       <div key={item.id} className="flex flex-col gap-1 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                          <p className="text-sm font-black text-foreground">{item.description}</p>
+                          <p className="text-sm font-black text-foreground">{normalizeBillingText(item.description)}</p>
                           <p className="text-xs font-bold text-muted-foreground">{item.quantity} x {formatCurrency(item.unitAmount)}</p>
                         </div>
                         <span className="text-sm font-black text-foreground">{formatCurrency(item.totalAmount)}</span>
