@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, Inject } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { PrismaService } from '../database/prisma.service';
 import { TenantStatus } from '@gestor/core';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
@@ -8,14 +10,19 @@ import {
   getDefaultStorefrontThemeSettings, 
   getDefaultStorefrontLayoutSettings,
   sanitizeHexColor,
-  getStorefrontPresetById
+  getStorefrontPresetById,
+  normalizeStorefrontTheme,
+  normalizeStorefrontLayout
 } from '@gestor/theme';
 
 @Injectable()
 export class TenantService {
   private readonly logger = new Logger('TenantService');
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {}
 
   /**
    * Find a tenant by ID.
@@ -150,14 +157,8 @@ export class TenantService {
     });
 
     return {
-      theme: {
-        ...getDefaultStorefrontThemeSettings(),
-        ...(settings?.storefrontThemeJson as any || {}),
-      },
-      layout: {
-        ...getDefaultStorefrontLayoutSettings(),
-        ...(settings?.storefrontLayoutJson as any || {}),
-      },
+      theme: normalizeStorefrontTheme(settings?.storefrontThemeJson),
+      layout: normalizeStorefrontLayout(settings?.storefrontLayoutJson),
     };
   }
 
@@ -167,10 +168,11 @@ export class TenantService {
   async updateStorefrontCustomization(tenantId: string, data: any) {
     const updateData: Prisma.TenantSettingsUpdateInput = {};
 
-    // 1. Handle Preset
+    // 1. Handle Preset (Atomically)
     if (data.presetId) {
       const preset = getStorefrontPresetById(data.presetId);
       if (preset) {
+        // Presets are already normalized by definition in theme package
         updateData.storefrontThemeJson = preset.theme as any;
         updateData.storefrontLayoutJson = preset.layout as any;
         
@@ -181,40 +183,40 @@ export class TenantService {
       }
     }
 
-    // 2. Handle Manual Settings with Validation
+    // 2. Handle Manual Settings with Full Normalization (Hardening)
     if (data.theme) {
-      const currentTheme = data.theme;
-      // Force version 1
-      currentTheme.version = 1;
-      // Sanitization
-      if (currentTheme.primaryColor) {
-        currentTheme.primaryColor = sanitizeHexColor(currentTheme.primaryColor);
-      }
-      // Remove potentially harmful fields
-      delete currentTheme.css;
-      delete currentTheme.html;
-      delete currentTheme.script;
-      
-      updateData.storefrontThemeJson = currentTheme;
+      updateData.storefrontThemeJson = normalizeStorefrontTheme(data.theme) as any;
     }
 
     if (data.layout) {
-      const currentLayout = data.layout;
-      currentLayout.version = 1;
-      
-      // Ensure enums are valid or fallback (basic backend safety)
-      const validProductLayouts = ['grid', 'list', 'compact', 'square', 'premium-card'];
-      if (currentLayout.productLayout && !validProductLayouts.includes(currentLayout.productLayout)) {
-        currentLayout.productLayout = 'grid';
-      }
-
-      updateData.storefrontLayoutJson = currentLayout;
+      updateData.storefrontLayoutJson = normalizeStorefrontLayout(data.layout) as any;
     }
 
-    return this.prisma.tenantSettings.update({
+    if (!updateData.storefrontThemeJson && !updateData.storefrontLayoutJson) {
+      return { success: true, message: 'No changes applied' };
+    }
+
+    const updated = await this.prisma.tenantSettings.update({
       where: { tenantId },
       data: updateData,
+      include: { tenant: { select: { slug: true } } }
     });
+
+    // Invalidate public storefront cache for this tenant
+    const slug = updated.tenant.slug;
+    const cacheKeys = [
+      `storefront:${slug}:delivery`,
+      `storefront:${slug}:pickup`
+    ];
+    
+    for (const key of cacheKeys) {
+      await this.cacheManager.del(key);
+    }
+
+    return {
+      theme: normalizeStorefrontTheme(updated.storefrontThemeJson),
+      layout: normalizeStorefrontLayout(updated.storefrontLayoutJson),
+    };
   }
 
   /**

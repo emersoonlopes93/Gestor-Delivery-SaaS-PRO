@@ -66,8 +66,9 @@ export function StorefrontCustomizationPage() {
     try {
       const response = await api.patch('/tenant/storefront-customization', customization);
       if (response.success) {
-        // Success notification could be added here
-        alert('Configurações salvas com sucesso!');
+        setCustomization(response.data as any);
+        // Success notification
+        alert('Configurações salvas com sucesso! As alterações podem levar até 1 minuto para propagar no cardápio público devido ao cache.');
       }
     } catch (error) {
       console.error('Erro ao salvar personalização:', error);

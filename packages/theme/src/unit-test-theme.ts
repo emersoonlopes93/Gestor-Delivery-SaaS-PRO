@@ -4,7 +4,9 @@ import {
   getDefaultStorefrontLayoutSettings,
   getStorefrontPresets,
   getStorefrontPresetById,
-  StorefrontPreset
+  StorefrontPreset,
+  normalizeStorefrontTheme,
+  normalizeStorefrontLayout
 } from './index';
 
 declare const process: any;
@@ -72,6 +74,39 @@ test('getStorefrontPresetById', () => {
 test('defaults have version', () => {
   expect(getDefaultStorefrontThemeSettings().version).toBe(1);
   expect(getDefaultStorefrontLayoutSettings().version).toBe(1);
+});
+
+test('normalizeStorefrontTheme hardening', () => {
+  const defaults = getDefaultStorefrontThemeSettings();
+  
+  // Case: Empty/Invalid input
+  expect(normalizeStorefrontTheme(null).primaryColor).toBe(defaults.primaryColor);
+  expect(normalizeStorefrontTheme({}).primaryColor).toBe(defaults.primaryColor);
+  
+  // Case: Invalid color
+  expect(normalizeStorefrontTheme({ primaryColor: 'hack-red' }).primaryColor).toBe(defaults.primaryColor);
+  
+  // Case: Invalid enum
+  expect(normalizeStorefrontTheme({ colorMode: 'hacker-mode' }).colorMode).toBe(defaults.colorMode);
+  
+  // Case: Valid manual input
+  expect(normalizeStorefrontTheme({ colorMode: 'dark', primaryColor: '#ff0000' }).colorMode).toBe('dark');
+  expect(normalizeStorefrontTheme({ colorMode: 'dark', primaryColor: '#ff0000' }).primaryColor).toBe('#ff0000');
+});
+
+test('normalizeStorefrontLayout hardening', () => {
+  const defaults = getDefaultStorefrontLayoutSettings();
+  
+  // Case: Invalid enum
+  expect(normalizeStorefrontLayout({ productLayout: 'ultra-wide' }).productLayout).toBe(defaults.productLayout);
+  
+  // Case: Invalid types (hacker payload)
+  expect(normalizeStorefrontLayout({ heroEnabled: 'yes-please' }).heroEnabled).toBe(defaults.heroEnabled);
+  expect(normalizeStorefrontLayout({ showBadges: 1 }).showBadges).toBe(defaults.showBadges);
+  
+  // Case: Valid manual input
+  expect(normalizeStorefrontLayout({ productLayout: 'compact', heroEnabled: false }).productLayout).toBe('compact');
+  expect(normalizeStorefrontLayout({ productLayout: 'compact', heroEnabled: false }).heroEnabled).toBe(false);
 });
 
 const failed = results.filter(r => !r.passed);

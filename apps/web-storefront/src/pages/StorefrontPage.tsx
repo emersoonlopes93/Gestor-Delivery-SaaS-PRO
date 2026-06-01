@@ -144,16 +144,21 @@ export function StorefrontPage() {
   const storefrontTheme = useStorefrontThemeStore(s => s.theme);
 
   // Use real settings from backend, with local override for testing in DEV
+  // Backend now guarantees normalization, but we add a safety layer here too.
   const effectiveProductLayout = (import.meta.env.DEV && productLayout !== 'grid') 
     ? productLayout 
     : (customization?.layout?.productLayout || 'grid');
 
+  const effectiveTheme = {
+    ...customization?.theme,
+    colorMode: storefrontTheme === 'system' 
+      ? (customization?.theme?.colorMode || 'light') 
+      : storefrontTheme,
+  };
+
   return (
     <StorefrontThemeProvider 
-      settings={{ 
-        ...customization?.theme,
-        colorMode: storefrontTheme === 'system' ? customization?.theme?.colorMode : storefrontTheme,
-      }}
+      settings={effectiveTheme}
       className="px-4 py-6"
     >
       {/* Store Header */}

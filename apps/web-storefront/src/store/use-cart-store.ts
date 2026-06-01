@@ -92,6 +92,7 @@ export const useCartStore = create<CartState>()(
           basePrice: product.basePrice,
           lineSubtotal,
           extrasDescription: compositionLabel,
+          items: []
         };
 
         const newItem: CartLineItem = {
@@ -100,10 +101,10 @@ export const useCartStore = create<CartState>()(
           comboId: product.type === 'combo' ? product.id : undefined,
           quantity,
           notes,
-          selectedOptions,
-          selections,
-          slots,
-          bundleItems,
+          selectedOptions: selectedOptions as any,
+          selections: selections as any,
+          slots: slots as any,
+          bundleItems: bundleItems as any,
           sourceUpsellId,
           snapshot,
         };

@@ -29,6 +29,8 @@ export function CartDrawer({ onClose, upsells }: CartDrawerProps) {
       isAvailable: true,
       complements: [],
       optionGroupLinks: [],
+      complementGroups: [],
+      upsellLinks: [],
       upsells: [],
     };
     addItem({

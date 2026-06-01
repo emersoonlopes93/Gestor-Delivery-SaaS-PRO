@@ -1,9 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { X, Minus, Plus, AlertCircle, Box, Check } from 'lucide-react';
 import type { 
-  StorefrontComboPayload, 
   CartSelectedComboSlot,
-  StorefrontComboBlockItemPayload,
+  StorefrontComboPayload,
   StorefrontProductPayload
 } from '@gestor/types';
 import { useCartStore } from '../store/use-cart-store';
@@ -31,11 +30,12 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
 
   useEffect(() => {
     if (!isBundle && combo.blocks) {
-      setSlots(combo.blocks.map(b => ({
-        comboSlotId: b.id,
-        name: b.name,
-        items: []
-      })));
+    const initial: CartSelectedComboSlot[] = combo.blocks.map(b => ({
+      blockId: b.id,
+      productId: '',
+      items: []
+    } as any));
+    setSlots(initial);
     }
   }, [combo, isBundle]);
 
@@ -69,7 +69,7 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
     if (isBundle) return null;
 
     for (const block of combo.blocks || []) {
-      const state = slots.find(s => s.comboSlotId === block.id);
+      const state = slots.find(s => (s as any).comboSlotId === block.id || s.blockId === block.id);
       const count = state?.items.length || 0;
       if (count < block.minSelect) return `Selecione pelo menos ${block.minSelect} em "${block.name}"`;
       if (count > block.maxSelect) return `Selecione no máximo ${block.maxSelect} em "${block.name}"`;
@@ -78,35 +78,25 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
     return null;
   }, [combo, slots, isBundle]);
 
-  const toggleSlotItem = (blockId: string, item: StorefrontComboBlockItemPayload, maxSelect: number) => {
+  const toggleSlotItem = (blockId: string, item: any, maxSelect: number) => {
     setSlots(prev => {
-      const slot = prev.find(s => s.comboSlotId === blockId);
+      const slot = prev.find(s => (s as any).comboSlotId === blockId || s.blockId === blockId);
       if (!slot) return prev;
 
-      const isSelected = slot.items.some(i => i.productId === item.productId);
-      let newItems = [...slot.items];
+      const isSelected = slot.items?.some((i: any) => i.productId === item.productId);
+      let newItems = [...(slot.items || [])];
 
       if (isSelected) {
-        newItems = newItems.filter(i => i.productId !== item.productId);
+        newItems = newItems.filter((i: any) => i.productId !== item.productId);
       } else {
         if (maxSelect === 1) {
-          newItems = [{ 
-            productId: item.productId, 
-            name: item.productName, 
-            additionalPrice: item.additionalPrice,
-            qty: 1 
-          }];
+          newItems = [{ productId: item.productId, name: item.productName, additionalPrice: item.additionalPrice, qty: 1 }];
         } else if (newItems.length < maxSelect) {
-          newItems.push({ 
-            productId: item.productId, 
-            name: item.productName, 
-            additionalPrice: item.additionalPrice,
-            qty: 1 
-          });
+          newItems.push({ productId: item.productId, name: item.productName, additionalPrice: item.additionalPrice, qty: 1 });
         }
       }
 
-      return prev.map(s => s.comboSlotId === blockId ? { ...s, items: newItems } : s);
+      return prev.map(s => ((s as any).comboSlotId === blockId || s.blockId === blockId) ? { ...s, items: newItems } : s);
     });
   };
 
@@ -120,12 +110,14 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
       name: combo.name,
       slug: combo.slug,
       type: 'combo',
-      shortDescription: combo.description,
+      shortDescription: combo.description || '',
       basePrice: combo.basePrice,
-      image: combo.image,
+      image: combo.image || '',
       isAvailable: combo.isAvailable,
       complements: [],
       optionGroupLinks: [],
+      complementGroups: [],
+      upsellLinks: [],
       upsells: [],
     };
 
@@ -134,7 +126,7 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
       quantity,
       notes: notes.trim() || undefined,
       slots: !isBundle ? slots : undefined,
-      bundleItems: isBundle ? combo.bundleItems : undefined,
+      bundleItems: isBundle ? combo.bundleItems.map((bi: any) => ({ ...bi, name: bi.productName })) : undefined,
       computedUnitPrice: computed.unitPrice,
       compositionLabel: computed.compositionLabel
     });
@@ -196,7 +188,7 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
                 </div>
               </div>
             ) : (combo.blocks ?? []).map((block) => {
-              const state = slots.find(s => s.comboSlotId === block.id);
+              const state = slots.find(s => (s as any).comboSlotId === block.id || s.blockId === block.id);
               const selectedCount = state?.items.length || 0;
 
               return (

@@ -23,6 +23,7 @@
       "@/*": ["src/*"],
       "@gestor/types": ["../../packages/types/src"],
       "@gestor/core": ["../../packages/core/src"],
+      "@gestor/theme": ["../../packages/theme/src"],
       "@gestor/utils": ["../../packages/utils/src"],
       "@gestor/auth": ["../../packages/auth/src"],
       "@gestor/config": ["../../packages/config/src"]

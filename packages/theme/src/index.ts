@@ -216,6 +216,54 @@ export function getStorefrontPresetById(id: string): StorefrontPreset | undefine
 }
 
 /**
+ * Safely normalizes and fallbacks storefront theme settings.
+ * Ensures no invalid values break the UI.
+ */
+export function normalizeStorefrontTheme(input: any): StorefrontThemeSettings {
+  const defaults = getDefaultStorefrontThemeSettings();
+  if (!input || typeof input !== 'object') return defaults;
+
+  const validModes: ThemeMode[] = ['light', 'dark', 'system'];
+  const validBackgrounds = ['clean', 'soft', 'premium', 'brand'];
+  const validRadius: StorefrontRadius[] = ['sm', 'md', 'lg', 'xl', '2xl'];
+  const validFonts = ['default', 'modern', 'rounded'];
+
+  return {
+    version: 1,
+    colorMode: validModes.includes(input.colorMode) ? input.colorMode : defaults.colorMode,
+    primaryColor: sanitizeHexColor(input.primaryColor, defaults.primaryColor),
+    secondaryColor: input.secondaryColor ? sanitizeHexColor(input.secondaryColor) : undefined,
+    accentColor: input.accentColor ? sanitizeHexColor(input.accentColor) : undefined,
+    backgroundStyle: validBackgrounds.includes(input.backgroundStyle) ? input.backgroundStyle : defaults.backgroundStyle,
+    borderRadius: validRadius.includes(input.borderRadius) ? input.borderRadius : defaults.borderRadius,
+    fontStyle: validFonts.includes(input.fontStyle) ? input.fontStyle : defaults.fontStyle,
+  };
+}
+
+/**
+ * Safely normalizes and fallbacks storefront layout settings.
+ */
+export function normalizeStorefrontLayout(input: any): StorefrontLayoutSettings {
+  const defaults = getDefaultStorefrontLayoutSettings();
+  if (!input || typeof input !== 'object') return defaults;
+
+  const validProductLayouts: StorefrontProductLayout[] = ['list', 'grid', 'compact', 'square', 'premium-card'];
+  const validCategoryLayouts: StorefrontCategoryLayout[] = ['tabs', 'horizontal-scroll', 'sidebar', 'sections'];
+  const validImageModes: StorefrontImageMode[] = ['cover', 'contain', 'hidden'];
+
+  return {
+    version: 1,
+    productLayout: validProductLayouts.includes(input.productLayout) ? input.productLayout : defaults.productLayout,
+    categoryLayout: validCategoryLayouts.includes(input.categoryLayout) ? input.categoryLayout : defaults.categoryLayout,
+    heroEnabled: typeof input.heroEnabled === 'boolean' ? input.heroEnabled : defaults.heroEnabled,
+    productImageMode: validImageModes.includes(input.productImageMode) ? input.productImageMode : defaults.productImageMode,
+    showProductDescription: typeof input.showProductDescription === 'boolean' ? input.showProductDescription : defaults.showProductDescription,
+    showBadges: typeof input.showBadges === 'boolean' ? input.showBadges : defaults.showBadges,
+    stickyCart: typeof input.stickyCart === 'boolean' ? input.stickyCart : defaults.stickyCart,
+  };
+}
+
+/**
  * Safely generates CSS variables for the storefront based on tenant settings.
  * This avoids dynamic tailwind classes and keeps branding isolated.
  */

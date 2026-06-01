@@ -199,11 +199,13 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
       name: item.name,
       slug: `upsell-${item.productId}`,
       basePrice: item.finalPrice,
-      image: item.image,
+      image: item.image || '',
       type: 'simple',
       isAvailable: true,
       complements: [],
       optionGroupLinks: [],
+      complementGroups: [],
+      upsellLinks: [],
       upsells: [],
     };
     

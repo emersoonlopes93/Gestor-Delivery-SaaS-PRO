@@ -10,9 +10,8 @@ import {
   StorefrontCustomizationPayload
 } from '@gestor/types';
 import { 
-  getDefaultStorefrontThemeSettings, 
-  getDefaultStorefrontLayoutSettings,
-  sanitizeHexColor
+  normalizeStorefrontTheme,
+  normalizeStorefrontLayout
 } from '@gestor/theme';
 import { TenantStatus } from '@gestor/core';
 import { Prisma } from '@prisma/client';
@@ -197,6 +196,7 @@ export class StorefrontService {
         id: cat.id,
         name: cat.name,
         slug: cat.slug,
+        order: (cat as any).order ?? 0,
         templateType: cat.templateType,
         products: cat.products
           .map((p) => {
@@ -206,49 +206,38 @@ export class StorefrontService {
               id: p.id,
               name: p.name,
               slug: p.slug,
-              type: p.type as 'simple' | 'configurable' | 'combo',
-              comboMode: p.comboMode ?? undefined,
-              bundleItems: p.comboBundleItems?.map((bi) => ({
-                id: bi.id,
-                productId: bi.productId,
-                productName: bi.product.name,
-                qty: bi.qty,
-                unitPrice: Number(bi.product.basePrice),
-              })),
-              blocks: p.comboSlots?.map((cb) => ({
-                id: cb.id,
-                name: cb.name,
-                minSelect: cb.minSelect,
-                maxSelect: cb.maxSelect,
-                items: cb.allowedItems.map((cbi) => ({
-                  id: cbi.id,
-                  productId: cbi.productId,
-                  productName: cbi.product.name,
-                  additionalPrice: Number(cbi.additionalPrice),
-                })),
-              })),
+              type: p.type as 'simple' | 'combo',
               shortDescription: p.shortDescription,
+              description: (p as any).description,
               longDescription: p.longDescription,
               basePrice: Number(p.basePrice),
               image: p.image,
               isAvailable,
-              complements: (p.complementGroups || []).map((cg) => ({
-                id: cg.group.id,
-                name: cg.group.name,
-                description: cg.group.description,
-                minSelect: cg.group.minSelect,
-                maxSelect: cg.group.maxSelect,
-                isRequired: cg.group.isRequired,
-                items: cg.group.items.map((ci) => ({
-                  id: ci.id,
-                  name: ci.name,
-                  description: ci.description,
-                  additionalPrice: Number(ci.additionalPrice),
-                  isAvailable: ci.isActive,
-                })),
+              complementGroups: (p.complementGroups || []).map((cg) => ({
+                id: cg.id,
+                complementGroupId: cg.complementGroupId,
+                order: cg.order,
+                group: {
+                  id: cg.group.id,
+                  name: cg.group.name,
+                  description: cg.group.description,
+                  minSelect: cg.group.minSelect,
+                  maxSelect: cg.group.maxSelect,
+                  isRequired: cg.group.isRequired,
+                  items: cg.group.items.map((ci) => ({
+                    id: ci.id,
+                    name: ci.name,
+                    description: ci.description,
+                    price: Number(ci.additionalPrice),
+                    isActive: ci.isActive,
+                    isAvailable: ci.isActive,
+                  })),
+                },
               })),
               optionGroupLinks: (p.optionGroupLinks || []).map((ol) => ({
                 id: ol.id,
+                optionGroupId: ol.optionGroupId,
+                order: ol.order,
                 pricingAxis: ol.pricingAxis,
                 overrideName: ol.overrideName,
                 overrideDescription: ol.overrideDescription,
@@ -275,29 +264,32 @@ export class StorefrontService {
                   })),
                 },
               })),
-              upsells: (p.upsellLinks || []).map((l) => ({
-                id: l.upsell.id,
-                name: l.upsell.name,
-                description: l.upsell.description,
-                displayType: l.upsell.displayType as 'inline' | 'cart' | 'both',
-                items: l.upsell.items
-                  .filter((i) => i.product.isActive && i.product.deletedAt === null)
-                  .map((i) => {
-                    const originalPrice = Number(i.product.basePrice);
-                    const finalPrice = this.upsellsService.calculateUpsellPrice(
-                      originalPrice,
-                      l.upsell.pricingType,
-                      Number(l.upsell.pricingValue),
-                    );
-                    return {
-                      productId: i.productId,
-                      name: i.product.name,
-                      image: i.product.image,
-                      originalPrice,
-                      finalPrice,
-                      discountApplied: originalPrice - finalPrice,
-                    };
-                  }),
+              upsellLinks: (p.upsellLinks || []).map((l) => ({
+                id: l.id,
+                upsell: {
+                  id: l.upsell.id,
+                  name: l.upsell.name,
+                  description: l.upsell.description,
+                  displayType: l.upsell.displayType as 'inline' | 'cart' | 'both',
+                  items: l.upsell.items
+                    .filter((i) => i.product.isActive && i.product.deletedAt === null)
+                    .map((i) => {
+                      const originalPrice = Number(i.product.basePrice);
+                      const finalPrice = this.upsellsService.calculateUpsellPrice(
+                        originalPrice,
+                        l.upsell.pricingType,
+                        Number(l.upsell.pricingValue),
+                      );
+                      return {
+                        productId: i.productId,
+                        name: i.product.name,
+                        image: i.product.image,
+                        originalPrice,
+                        finalPrice,
+                        discountApplied: originalPrice - finalPrice,
+                      };
+                    }),
+                },
               })),
             };
           })
@@ -439,26 +431,11 @@ export class StorefrontService {
         }),
     }));
 
-    // 5. Storefront Customization
+    // 5. Storefront Customization (Fully Normalized & Hardened for Public consumption)
     const customization: StorefrontCustomizationPayload = {
-      theme: {
-        ...getDefaultStorefrontThemeSettings(),
-        ...(tenant.settings?.storefrontThemeJson as any || {}),
-      },
-      layout: {
-        ...getDefaultStorefrontLayoutSettings(),
-        ...(tenant.settings?.storefrontLayoutJson as any || {}),
-      },
+      theme: normalizeStorefrontTheme(tenant.settings?.storefrontThemeJson),
+      layout: normalizeStorefrontLayout(tenant.settings?.storefrontLayoutJson),
     };
-
-    // Sanitize colors
-    customization.theme.primaryColor = sanitizeHexColor(customization.theme.primaryColor);
-    if (customization.theme.secondaryColor) {
-      customization.theme.secondaryColor = sanitizeHexColor(customization.theme.secondaryColor);
-    }
-    if (customization.theme.accentColor) {
-      customization.theme.accentColor = sanitizeHexColor(customization.theme.accentColor);
-    }
 
     const payload: StorefrontPayload = {
       tenant: tenantInfo,
@@ -468,8 +445,9 @@ export class StorefrontService {
       customization,
     };
 
-    // Cache for 60 seconds
-    await this.cacheManager.set(cacheKey, payload, 60000);
+    // Cache for configurable TTL (default 60 seconds)
+    const cacheTtl = Number(process.env.STOREFRONT_CACHE_TTL || 60000);
+    await this.cacheManager.set(cacheKey, payload, cacheTtl);
 
     return payload;
   }
