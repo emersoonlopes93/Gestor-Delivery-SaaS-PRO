@@ -41,6 +41,9 @@ import { WhatsAppChannelModule } from './whatsapp-channel/whatsapp-channel.modul
 import { AiAgentModule } from './ai-agent/ai-agent.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { ChatModule } from './chat/chat.module';
+import { getApiEnvFilePaths, loadApiEnvFiles } from './config/env-paths';
+
+loadApiEnvFiles();
 
 // Log Redis initialization status at startup
 if (process.env.REDIS_ENABLED === 'false') {
@@ -53,10 +56,10 @@ if (process.env.REDIS_ENABLED === 'false') {
 
 @Module({
   imports: [
-    // Configuration — loads .env
+    // Configuration - loads env files from absolute, cwd-independent paths.
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env', '../../.env'],
+      envFilePath: getApiEnvFilePaths(),
       validate: validateEnv,
     }),
 

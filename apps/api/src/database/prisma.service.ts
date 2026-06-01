@@ -1,6 +1,10 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { TenantContextService } from '../common/context/tenant-context.service';
+import {
+  resolveBillingDatabasePreflightMode,
+  runBillingDatabasePreflight,
+} from '../billing/billing-database-preflight';
 
 @Injectable()
 export class PrismaService
@@ -147,11 +151,15 @@ export class PrismaService
     try {
       await this.$connect();
       this.logger.log('Database connection established');
+      await runBillingDatabasePreflight({
+        prisma: this,
+        mode: resolveBillingDatabasePreflightMode(process.env),
+        logger: this.logger,
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.warn(
-        `Database connection failed on startup (app will continue running). ${message}`,
-      );
+      this.logger.error(`Database startup check failed. ${message}`);
+      throw err;
     }
   }
 

@@ -5,6 +5,7 @@ const baseEnvSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(3333),
   API_PREFIX: z.string().min(1).default('/api/v1'),
   DATABASE_URL: z.string().min(1),
+  DIRECT_URL: z.string().min(1),
   JWT_SECRET: z.string().min(16),
   JWT_REFRESH_SECRET: z.string().min(16),
   JWT_EXPIRES_IN: z.string().min(1).default('15m'),
@@ -44,6 +45,10 @@ const baseEnvSchema = z.object({
   // Feature Flags
   BULLMQ_ENABLED: z.enum(['true', 'false']).default('false'),
   CAMPAIGNS_DISPATCH_ENABLED: z.enum(['true', 'false']).default('false'),
+  BILLING_DB_PREFLIGHT: z.enum(['strict', 'warn', 'off']).optional(),
+  BILLING_PAYMENTS_ENABLED: z.enum(['true', 'false']).default('false'),
+  BILLING_GATEWAY_PROVIDER: z.enum(['manual', 'asaas', 'mercado_pago', 'stripe']).default('manual'),
+  BILLING_GATEWAY_MODE: z.enum(['disabled', 'sandbox', 'production']).default('disabled'),
 
   // Storage Driver & Cloudflare R2
   STORAGE_DRIVER: z.enum(['local', 'r2']).optional(),
@@ -66,6 +71,22 @@ const envSchema = baseEnvSchema
   })
   .superRefine((data, ctx) => {
     const isProduction = data.NODE_ENV === 'production';
+
+    if (data.BILLING_GATEWAY_MODE === 'production' && !isProduction) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['BILLING_GATEWAY_MODE'],
+        message: `BILLING_GATEWAY_MODE='production' só é permitido com NODE_ENV='production'.`,
+      });
+    }
+
+    if (data.BILLING_PAYMENTS_ENABLED === 'true' && data.BILLING_GATEWAY_MODE === 'disabled') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['BILLING_PAYMENTS_ENABLED'],
+        message: `BILLING_PAYMENTS_ENABLED='true' exige BILLING_GATEWAY_MODE='sandbox' ou 'production'.`,
+      });
+    }
 
     if (isProduction && data.STORAGE_DRIVER === 'local') {
       ctx.addIssue({

@@ -95,8 +95,8 @@ async function seedAdminRoles() {
 async function seedSuperAdmin() {
   console.log('🛡️  Seeding super admin user...');
 
-  const email = 'admin@gestordelivery.com';
-  const password = await bcrypt.hash('Admin@123', 12);
+  const email = 'admin@saas.com';
+  const password = await bcrypt.hash('admin123', 12);
 
   const user = await prisma.adminUser.upsert({
     where: { email },
@@ -423,8 +423,8 @@ async function seedDemoTenant() {
     }
 
     // Create tenant owner user
-    const ownerEmail = 'owner@pizzariademo.com';
-    const ownerPassword = await bcrypt.hash('Owner@123', 12);
+    const ownerEmail = 'demo@demo.com';
+    const ownerPassword = await bcrypt.hash('demo123', 12);
 
     const owner = await prisma.tenantUser.upsert({
       where: {
