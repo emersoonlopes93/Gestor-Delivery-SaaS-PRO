@@ -156,6 +156,9 @@ export type InvoiceSummary = {
   currency: string;
   dueDate: string;
   paidAt: string | null;
+  openedAt: string | null;
+  failedAt: string | null;
+  voidedAt: string | null;
   provider: string;
   providerInvoiceId: string | null;
   providerPaymentUrl: string | null;
@@ -165,6 +168,35 @@ export type InvoiceSummary = {
   cycle?: BillingCycleRecord | null;
   items?: InvoiceItem[];
   subscription?: TenantBillingSubscription & { billingPlan?: BillingPlanV2 };
+  paymentAttempts?: PaymentAttempt[];
+};
+
+export type PaymentAttempt = {
+  id: string;
+  invoiceId: string;
+  tenantId: string;
+  provider: 'manual' | 'mock' | string;
+  status: 'pending' | 'processing' | 'succeeded' | 'failed' | 'canceled' | string;
+  mode: 'manual' | 'sandbox' | 'production' | string;
+  idempotencyKey: string | null;
+  amount: DecimalLike;
+  errorCode: string | null;
+  errorMessage: string | null;
+  providerPaymentId: string | null;
+  metadataJson: Record<string, unknown> | null;
+  requestJson: Record<string, unknown> | null;
+  responseJson: Record<string, unknown> | null;
+  attemptedAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type BillingPaymentConfig = {
+  paymentsEnabled: boolean;
+  provider: 'manual' | 'mock' | string;
+  mode: 'disabled' | 'manual' | 'sandbox' | 'production';
+  productionAllowed: boolean;
+  supportedProviders: string[];
 };
 
 export type UsageRatingPreview = {
@@ -241,6 +273,7 @@ export type BillingOverview = {
 export type InvoiceDetails = {
   invoice: InvoiceSummary;
   items: InvoiceItem[];
+  paymentAttempts: PaymentAttempt[];
   cycle: (BillingCycleRecord & { usageSnapshots?: BillingUsageSnapshot[] }) | null;
   snapshot: BillingUsageSnapshot | null;
   subscription: TenantBillingSubscription & { billingPlan: BillingPlanV2 };
@@ -299,6 +332,10 @@ export const adminBillingApi = {
     const res = await api.get<BillingSettings>('/admin/billing/settings');
     return res.data;
   },
+  getBillingPaymentConfig: async () => {
+    const res = await api.get<BillingPaymentConfig>('/admin/billing/payment-config');
+    return res.data;
+  },
   getTenantBillingSubscription: async (tenantId: string) => {
     const res = await api.get<TenantBillingSubscriptionResponse>(`/admin/billing/tenants/${tenantId}/subscription`);
     return res.data;
@@ -317,6 +354,35 @@ export const adminBillingApi = {
   },
   getInvoiceDetails: async (invoiceId: string) => {
     const res = await api.get<InvoiceDetails>(`/admin/billing/invoices/${invoiceId}`);
+    return res.data;
+  },
+  listInvoicePaymentAttempts: async (invoiceId: string) => {
+    const res = await api.get<PaymentAttempt[]>(`/admin/billing/invoices/${invoiceId}/payment-attempts`);
+    return res.data;
+  },
+  createInvoicePaymentAttempt: async (
+    invoiceId: string,
+    body: {
+      provider: 'manual' | 'mock';
+      mode: 'manual' | 'sandbox' | 'production';
+      idempotencyKey?: string;
+      simulate?: 'success' | 'failure' | 'pending';
+    },
+  ) => {
+    const res = await api.post<PaymentAttempt>(`/admin/billing/invoices/${invoiceId}/payment-attempts`, body);
+    return res.data;
+  },
+  markPaymentAttemptPaid: async (attemptId: string) => {
+    const res = await api.post<PaymentAttempt>(`/admin/billing/payment-attempts/${attemptId}/mark-paid`, {
+      reason: 'admin_billing_console',
+    });
+    return res.data;
+  },
+  markPaymentAttemptFailed: async (attemptId: string) => {
+    const res = await api.post<PaymentAttempt>(`/admin/billing/payment-attempts/${attemptId}/mark-failed`, {
+      errorCode: 'admin_console_failure',
+      errorMessage: 'Marcado como falha pelo console admin.',
+    });
     return res.data;
   },
   getUsagePreview: async (params: UsagePreviewParams) => {

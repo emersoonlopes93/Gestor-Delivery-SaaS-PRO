@@ -104,6 +104,24 @@ BILLING_GATEWAY_MODE=disabled
 
 `BILLING_GATEWAY_MODE=production` só é permitido com `NODE_ENV=production`. Enquanto essas flags estiverem assim, o Billing Console só cria invoice draft manual e não executa cobrança real.
 
+Para testar a fundação local de pagamentos sem gateway real:
+
+```env
+BILLING_PAYMENTS_ENABLED=true
+BILLING_GATEWAY_PROVIDER=mock
+BILLING_GATEWAY_MODE=sandbox
+```
+
+Para tentativas manuais locais:
+
+```env
+BILLING_PAYMENTS_ENABLED=true
+BILLING_GATEWAY_PROVIDER=manual
+BILLING_GATEWAY_MODE=manual
+```
+
+Manual e mock/sandbox apenas registram `PaymentAttempt` e transições de invoice (`draft -> open -> paid/failed`). Nenhum checkout, PDV, storefront, pedido ou gateway externo é acionado.
+
 ## Smokes obrigatórios
 
 Antes de avançar fases de billing:
@@ -130,5 +148,7 @@ pnpm build
 - invoices de Fase 4 seguem `draft`
 - `BILLING_PAYMENTS_ENABLED=false`
 - `BILLING_GATEWAY_MODE=disabled`
+- `BILLING_GATEWAY_PROVIDER=mock` exige `BILLING_GATEWAY_MODE=sandbox`
+- `BILLING_GATEWAY_PROVIDER=manual` exige `BILLING_GATEWAY_MODE=manual` quando pagamentos estão ativos
 - smokes de billing passaram
 - build workspace passou

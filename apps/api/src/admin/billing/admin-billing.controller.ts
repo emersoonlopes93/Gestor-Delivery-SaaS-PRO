@@ -8,6 +8,9 @@ import { BillingUsageService } from '../../billing/billing-usage.service';
 import { BillingCycleService } from '../../billing/billing-cycle.service';
 import { PrismaService } from '../../database/prisma.service';
 import { BillingSettingsService } from '../../billing/billing-settings.service';
+import { BillingPaymentAttemptService } from '../../billing/billing-payment-attempt.service';
+import { BillingPaymentGatewayService } from '../../billing/billing-payment-gateway.service';
+import { BillingGatewayMode, PaymentProvider } from '@prisma/client';
 
 @Controller('admin/billing')
 @UseGuards(AdminAuthGuard, AdminPermissionsGuard)
@@ -18,6 +21,8 @@ export class AdminBillingController {
     private readonly billingCycleService: BillingCycleService,
     private readonly prisma: PrismaService,
     private readonly billingSettingsService: BillingSettingsService,
+    private readonly billingPaymentAttemptService: BillingPaymentAttemptService,
+    private readonly billingPaymentGatewayService: BillingPaymentGatewayService,
   ) {}
 
   @Get('plans')
@@ -120,6 +125,12 @@ export class AdminBillingController {
     return this.billingSettingsService.ensureDefaultSettings();
   }
 
+  @Get('payment-config')
+  @RequireAdminPermissions('saas.billing.read')
+  getBillingPaymentConfig() {
+    return this.billingPaymentGatewayService.getRuntimeConfig();
+  }
+
   @Get('tenants/:tenantId/subscription')
   @RequireAdminPermissions('saas.billing.read')
   async getTenantBillingSubscription(@Param('tenantId') tenantId: string) {
@@ -218,6 +229,84 @@ export class AdminBillingController {
     });
   }
 
+  @Get('invoices/:invoiceId/payment-attempts')
+  @RequireAdminPermissions('saas.billing.read')
+  async listInvoicePaymentAttempts(@Param('invoiceId') invoiceId: string) {
+    return this.billingPaymentAttemptService.listAttemptsForInvoice(invoiceId);
+  }
+
+  @Post('invoices/:invoiceId/payment-attempts')
+  @RequireAdminPermissions('saas.billing.manage')
+  async createInvoicePaymentAttempt(
+    @Param('invoiceId') invoiceId: string,
+    @Body() body: {
+      tenantId?: string;
+      provider?: string;
+      mode?: string;
+      idempotencyKey?: string;
+      simulate?: string;
+    },
+  ) {
+    const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });
+    if (!invoice) {
+      throw new NotFoundException('Invoice nÃ£o encontrada.');
+    }
+
+    return this.billingPaymentAttemptService.createAttemptForInvoice({
+      invoiceId,
+      tenantId: body.tenantId?.trim() || invoice.tenantId,
+      provider: this.parsePaymentProvider(body.provider),
+      mode: this.parseBillingGatewayMode(body.mode),
+      idempotencyKey: body.idempotencyKey,
+      simulate: this.parsePaymentSimulation(body.simulate),
+    });
+  }
+
+  @Post('payment-attempts/:attemptId/mark-paid')
+  @RequireAdminPermissions('saas.billing.manage')
+  async markPaymentAttemptPaid(
+    @Param('attemptId') attemptId: string,
+    @Body() body: { reason?: string },
+  ) {
+    return this.billingPaymentAttemptService.markAttemptSucceeded({
+      attemptId,
+      reason: body.reason,
+    });
+  }
+
+  @Post('payment-attempts/:attemptId/mark-failed')
+  @RequireAdminPermissions('saas.billing.manage')
+  async markPaymentAttemptFailed(
+    @Param('attemptId') attemptId: string,
+    @Body() body: { errorCode?: string; errorMessage?: string },
+  ) {
+    return this.billingPaymentAttemptService.markAttemptFailed({
+      attemptId,
+      errorCode: body.errorCode,
+      errorMessage: body.errorMessage,
+    });
+  }
+
+  @Post('mock-webhooks/payment-status')
+  @RequireAdminPermissions('saas.billing.manage')
+  async applyMockPaymentWebhook(
+    @Body() body: {
+      eventId?: string;
+      providerPaymentId?: string;
+      status?: string;
+    },
+  ) {
+    const eventId = this.requireString(body.eventId, 'eventId');
+    const providerPaymentId = this.requireString(body.providerPaymentId, 'providerPaymentId');
+    const status = this.parseMockWebhookStatus(body.status);
+
+    return this.billingPaymentAttemptService.applyMockPaymentStatusWebhook({
+      eventId,
+      providerPaymentId,
+      status,
+    });
+  }
+
   @Get('invoices/:invoiceId')
   @RequireAdminPermissions('saas.billing.read')
   async getInvoiceDetails(@Param('invoiceId') invoiceId: string) {
@@ -226,6 +315,9 @@ export class AdminBillingController {
       include: {
         tenant: true,
         items: true,
+        paymentAttempts: {
+          orderBy: [{ attemptedAt: 'desc' }, { createdAt: 'desc' }],
+        },
         cycle: {
           include: {
             selectedTier: true,
@@ -256,6 +348,7 @@ export class AdminBillingController {
     return {
       invoice,
       items: invoice.items,
+      paymentAttempts: invoice.paymentAttempts,
       cycle: invoice.cycle,
       snapshot: invoice.cycle?.usageSnapshots[0] ?? null,
       subscription: invoice.subscription,
@@ -403,6 +496,38 @@ export class AdminBillingController {
       throw new BadRequestException('status de invoice inválido.');
     }
     return normalized as typeof allowed[number];
+  }
+
+  private parsePaymentProvider(provider: string | undefined): PaymentProvider {
+    const normalized = provider?.trim();
+    if (normalized === PaymentProvider.manual) return PaymentProvider.manual;
+    if (normalized === PaymentProvider.mock) return PaymentProvider.mock;
+    throw new BadRequestException('provider deve ser manual ou mock nesta fase.');
+  }
+
+  private parseBillingGatewayMode(mode: string | undefined): BillingGatewayMode {
+    const normalized = mode?.trim();
+    if (normalized === BillingGatewayMode.manual) return BillingGatewayMode.manual;
+    if (normalized === BillingGatewayMode.sandbox) return BillingGatewayMode.sandbox;
+    if (normalized === BillingGatewayMode.production) return BillingGatewayMode.production;
+    throw new BadRequestException('mode deve ser manual, sandbox ou production.');
+  }
+
+  private parsePaymentSimulation(simulate: string | undefined): 'success' | 'failure' | 'pending' | undefined {
+    if (!simulate?.trim()) return undefined;
+    const normalized = simulate.trim();
+    if (normalized === 'success' || normalized === 'failure' || normalized === 'pending') {
+      return normalized;
+    }
+    throw new BadRequestException('simulate deve ser success, failure ou pending.');
+  }
+
+  private parseMockWebhookStatus(status: string | undefined): 'succeeded' | 'failed' | 'pending' {
+    const normalized = status?.trim();
+    if (normalized === 'succeeded' || normalized === 'failed' || normalized === 'pending') {
+      return normalized;
+    }
+    throw new BadRequestException('status deve ser succeeded, failed ou pending.');
   }
 
   private calculateSubscriptionStatus(

@@ -26,6 +26,7 @@ import {
   BillingCycleInvoicePreview,
   BillingCycleRecord,
   BillingOverview,
+  BillingPaymentConfig,
   BillingPlanV2,
   BillingSettings,
   BillingUsagePreview,
@@ -33,6 +34,7 @@ import {
   InvoiceDetails,
   InvoiceItem,
   InvoiceSummary,
+  PaymentAttempt,
   TenantBillingSubscriptionResponse,
 } from './admin-billing-api';
 
@@ -54,7 +56,11 @@ const statusLabels: Record<string, string> = {
   closed: 'Fechado',
   invoiced: 'Faturado',
   paid: 'Pago',
+  pending: 'Pendente',
+  processing: 'Processando',
+  succeeded: 'Sucesso',
   past_due: 'Em atraso',
+  failed: 'Falhou',
   suspended: 'Suspenso',
   canceled: 'Cancelado',
   missing_new_billing_subscription: 'Sem billing novo',
@@ -446,8 +452,13 @@ function InvoicesTab(props: {
   loading: boolean;
   onOpenInvoice: (invoiceId: string) => void;
   selectedDetails?: InvoiceDetails;
+  paymentConfig?: BillingPaymentConfig;
   detailsLoading: boolean;
   onCloseDetails: () => void;
+  onCreateAttempt: (invoice: InvoiceSummary) => void;
+  onMarkAttemptPaid: (attemptId: string) => void;
+  onMarkAttemptFailed: (attemptId: string) => void;
+  paymentActionLoading: boolean;
 }) {
   if (props.loading) return <LoadingBlock />;
   if (!props.invoices.length) {
@@ -515,7 +526,14 @@ function InvoicesTab(props: {
             {props.detailsLoading || !props.selectedDetails ? (
               <div className="p-8"><LoadingBlock /></div>
             ) : (
-              <InvoiceDetailsView details={props.selectedDetails} />
+              <InvoiceDetailsView
+                details={props.selectedDetails}
+                paymentConfig={props.paymentConfig}
+                onCreateAttempt={props.onCreateAttempt}
+                onMarkAttemptPaid={props.onMarkAttemptPaid}
+                onMarkAttemptFailed={props.onMarkAttemptFailed}
+                paymentActionLoading={props.paymentActionLoading}
+              />
             )}
           </div>
         </div>
@@ -524,7 +542,15 @@ function InvoicesTab(props: {
   );
 }
 
-function InvoiceDetailsView({ details }: { details: InvoiceDetails }) {
+function InvoiceDetailsView(props: {
+  details: InvoiceDetails;
+  paymentConfig?: BillingPaymentConfig;
+  onCreateAttempt: (invoice: InvoiceSummary) => void;
+  onMarkAttemptPaid: (attemptId: string) => void;
+  onMarkAttemptFailed: (attemptId: string) => void;
+  paymentActionLoading: boolean;
+}) {
+  const { details } = props;
   const firstItem = details.items[0];
   return (
     <div className="space-y-5 p-5">
@@ -535,6 +561,15 @@ function InvoiceDetailsView({ details }: { details: InvoiceDetails }) {
         <InfoPill label="Total" value={money(details.invoice.total)} />
       </div>
       <InvoiceItemsTable items={details.items} />
+      <PaymentAttemptPanel
+        invoice={details.invoice}
+        attempts={details.paymentAttempts}
+        paymentConfig={props.paymentConfig}
+        onCreateAttempt={props.onCreateAttempt}
+        onMarkAttemptPaid={props.onMarkAttemptPaid}
+        onMarkAttemptFailed={props.onMarkAttemptFailed}
+        loading={props.paymentActionLoading}
+      />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <InfoPill label="Measured revenue" value={metadataText(firstItem?.metadata, 'measuredRevenue')} />
         <InfoPill label="Billable revenue" value={metadataText(firstItem?.metadata, 'billableRevenue')} />
@@ -544,6 +579,102 @@ function InvoiceDetailsView({ details }: { details: InvoiceDetails }) {
       <button disabled className="w-full rounded-md border border-dashed border-border bg-muted px-4 py-3 font-black text-muted-foreground">
         Cobrança real indisponível nesta fase
       </button>
+    </div>
+  );
+}
+
+function PaymentAttemptPanel(props: {
+  invoice: InvoiceSummary;
+  attempts: PaymentAttempt[];
+  paymentConfig?: BillingPaymentConfig;
+  onCreateAttempt: (invoice: InvoiceSummary) => void;
+  onMarkAttemptPaid: (attemptId: string) => void;
+  onMarkAttemptFailed: (attemptId: string) => void;
+  loading: boolean;
+}) {
+  const paymentsEnabled = props.paymentConfig?.paymentsEnabled ?? false;
+  const provider = props.paymentConfig?.provider ?? 'manual';
+  const mode = props.paymentConfig?.mode ?? 'disabled';
+  const canCreate = paymentsEnabled && (provider === 'manual' || provider === 'mock') && mode !== 'disabled' && !['paid', 'void', 'failed'].includes(props.invoice.status);
+
+  return (
+    <div className="rounded-lg border border-border bg-background">
+      <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="font-black text-foreground">Payment attempts</p>
+          <p className="mt-1 text-sm font-semibold text-muted-foreground">
+            Esta acao ainda nao cobra automaticamente em producao. Apenas manual/mock sandbox local.
+          </p>
+        </div>
+        <button
+          onClick={() => props.onCreateAttempt(props.invoice)}
+          disabled={!canCreate || props.loading}
+          className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-black text-primary-foreground disabled:opacity-50"
+        >
+          {props.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
+          Criar tentativa manual/sandbox
+        </button>
+      </div>
+      {!paymentsEnabled ? (
+        <div className="border-b border-border bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+          <span className="mr-2 rounded-md border border-amber-200 px-2 py-1 text-xs font-black">Payments OFF</span>
+          Ative sandbox com BILLING_PAYMENTS_ENABLED=true, BILLING_GATEWAY_PROVIDER=mock e BILLING_GATEWAY_MODE=sandbox.
+        </div>
+      ) : null}
+      <div className="grid gap-3 p-4 sm:grid-cols-3">
+        <InfoPill label="Provider ativo" value={provider} />
+        <InfoPill label="Modo ativo" value={mode} />
+        <InfoPill label="Attempts" value={String(props.attempts.length)} />
+      </div>
+      {props.attempts.length ? (
+        <div className="overflow-x-auto border-t border-border">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead className="bg-muted text-left text-xs font-black uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3">Provider</th>
+                <th className="px-4 py-3">Mode</th>
+                <th className="px-4 py-3">Gateway ID</th>
+                <th className="px-4 py-3">Attempted</th>
+                <th className="px-4 py-3 text-right">Acoes</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {props.attempts.map((attempt) => (
+                <tr key={attempt.id}>
+                  <td className="px-4 py-3"><StatusBadge status={attempt.status} /></td>
+                  <td className="px-4 py-3 font-mono text-xs font-bold">{attempt.provider}</td>
+                  <td className="px-4 py-3 font-mono text-xs font-bold">{attempt.mode}</td>
+                  <td className="px-4 py-3 font-mono text-xs font-bold">{attempt.providerPaymentId ?? 'local'}</td>
+                  <td className="px-4 py-3">{formatDate(attempt.attemptedAt)}</td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => props.onMarkAttemptPaid(attempt.id)}
+                        disabled={props.loading || attempt.status === 'succeeded' || props.invoice.status === 'paid'}
+                        className="rounded-md border border-border px-2.5 py-1.5 text-xs font-black disabled:opacity-50"
+                      >
+                        Pago
+                      </button>
+                      <button
+                        onClick={() => props.onMarkAttemptFailed(attempt.id)}
+                        disabled={props.loading || attempt.status === 'failed' || props.invoice.status === 'paid'}
+                        className="rounded-md border border-border px-2.5 py-1.5 text-xs font-black disabled:opacity-50"
+                      >
+                        Falha
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="border-t border-border p-4 text-sm font-semibold text-muted-foreground">
+          Nenhuma tentativa registrada para esta invoice.
+        </div>
+      )}
     </div>
   );
 }
@@ -624,6 +755,7 @@ export function BillingConsolePage() {
   const overviewQuery = useQuery({ queryKey: ['admin-billing-overview'], queryFn: adminBillingApi.getBillingOverview });
   const plansQuery = useQuery({ queryKey: ['admin-billing-plans-v2'], queryFn: adminBillingApi.listBillingPlansV2 });
   const settingsQuery = useQuery({ queryKey: ['admin-billing-settings'], queryFn: adminBillingApi.getBillingSettings });
+  const paymentConfigQuery = useQuery({ queryKey: ['admin-billing-payment-config'], queryFn: adminBillingApi.getBillingPaymentConfig });
   const draftInvoicesQuery = useQuery({ queryKey: ['admin-billing-draft-invoices'], queryFn: adminBillingApi.listDraftInvoices });
 
   const tenantBillingQuery = useQuery({
@@ -730,6 +862,46 @@ export function BillingConsolePage() {
     },
   });
 
+  const refreshInvoiceDetails = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['admin-billing-invoice-details', selectedInvoiceId] }),
+      queryClient.invalidateQueries({ queryKey: ['admin-billing-draft-invoices'] }),
+      queryClient.invalidateQueries({ queryKey: ['admin-billing-overview'] }),
+    ]);
+  };
+
+  const createPaymentAttemptMutation = useMutation({
+    mutationFn: async (invoice: InvoiceSummary) => {
+      const config = paymentConfigQuery.data;
+      if (!config?.paymentsEnabled) throw new Error('Payments estao desativados.');
+      if (config.provider !== 'manual' && config.provider !== 'mock') throw new Error('Provider nao suportado nesta fase.');
+      if (config.mode !== 'manual' && config.mode !== 'sandbox' && config.mode !== 'production') throw new Error('Modo de gateway invalido.');
+      return adminBillingApi.createInvoicePaymentAttempt(invoice.id, {
+        provider: config.provider,
+        mode: config.mode,
+        idempotencyKey: `admin-console:${invoice.id}:${config.provider}:${config.mode}`,
+        simulate: config.provider === 'mock' ? 'pending' : undefined,
+      });
+    },
+    onSuccess: () => {
+      void refreshInvoiceDetails();
+    },
+  });
+
+  const markPaymentAttemptPaidMutation = useMutation({
+    mutationFn: adminBillingApi.markPaymentAttemptPaid,
+    onSuccess: () => {
+      void refreshInvoiceDetails();
+    },
+  });
+
+  const markPaymentAttemptFailedMutation = useMutation({
+    mutationFn: adminBillingApi.markPaymentAttemptFailed,
+    onSuccess: () => {
+      void refreshInvoiceDetails();
+    },
+  });
+
   const tenants = tenantsQuery.data?.items ?? [];
   const revenueGrowthPlans = useMemo(() => {
     const plans = plansQuery.data ?? [];
@@ -809,15 +981,24 @@ export function BillingConsolePage() {
           loading={draftInvoicesQuery.isLoading}
           onOpenInvoice={setSelectedInvoiceId}
           selectedDetails={invoiceDetailsQuery.data}
+          paymentConfig={paymentConfigQuery.data}
           detailsLoading={invoiceDetailsQuery.isLoading}
           onCloseDetails={() => setSelectedInvoiceId('')}
+          onCreateAttempt={(invoice) => createPaymentAttemptMutation.mutate(invoice)}
+          onMarkAttemptPaid={(attemptId) => markPaymentAttemptPaidMutation.mutate(attemptId)}
+          onMarkAttemptFailed={(attemptId) => markPaymentAttemptFailedMutation.mutate(attemptId)}
+          paymentActionLoading={
+            createPaymentAttemptMutation.isPending
+            || markPaymentAttemptPaidMutation.isPending
+            || markPaymentAttemptFailedMutation.isPending
+          }
         />
       ) : null}
       {activeTab === 'settings' ? <SettingsTab settings={settingsQuery.data} loading={settingsQuery.isLoading} /> : null}
 
-      {(createCycleMutation.error || usagePreviewMutation.error || invoicePreviewMutation.error || closeCycleMutation.error) ? (
+      {(createCycleMutation.error || usagePreviewMutation.error || invoicePreviewMutation.error || closeCycleMutation.error || createPaymentAttemptMutation.error || markPaymentAttemptPaidMutation.error || markPaymentAttemptFailedMutation.error) ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 font-bold text-red-700">
-          {(createCycleMutation.error ?? usagePreviewMutation.error ?? invoicePreviewMutation.error ?? closeCycleMutation.error)?.message}
+          {(createCycleMutation.error ?? usagePreviewMutation.error ?? invoicePreviewMutation.error ?? closeCycleMutation.error ?? createPaymentAttemptMutation.error ?? markPaymentAttemptPaidMutation.error ?? markPaymentAttemptFailedMutation.error)?.message}
         </div>
       ) : null}
 

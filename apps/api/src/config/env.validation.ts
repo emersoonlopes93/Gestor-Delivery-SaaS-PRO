@@ -47,8 +47,8 @@ const baseEnvSchema = z.object({
   CAMPAIGNS_DISPATCH_ENABLED: z.enum(['true', 'false']).default('false'),
   BILLING_DB_PREFLIGHT: z.enum(['strict', 'warn', 'off']).optional(),
   BILLING_PAYMENTS_ENABLED: z.enum(['true', 'false']).default('false'),
-  BILLING_GATEWAY_PROVIDER: z.enum(['manual', 'asaas', 'mercado_pago', 'stripe']).default('manual'),
-  BILLING_GATEWAY_MODE: z.enum(['disabled', 'sandbox', 'production']).default('disabled'),
+  BILLING_GATEWAY_PROVIDER: z.enum(['manual', 'mock', 'asaas', 'mercado_pago', 'stripe']).default('manual'),
+  BILLING_GATEWAY_MODE: z.enum(['disabled', 'manual', 'sandbox', 'production']).default('disabled'),
 
   // Storage Driver & Cloudflare R2
   STORAGE_DRIVER: z.enum(['local', 'r2']).optional(),
@@ -84,7 +84,23 @@ const envSchema = baseEnvSchema
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['BILLING_PAYMENTS_ENABLED'],
-        message: `BILLING_PAYMENTS_ENABLED='true' exige BILLING_GATEWAY_MODE='sandbox' ou 'production'.`,
+        message: `BILLING_PAYMENTS_ENABLED='true' exige BILLING_GATEWAY_MODE='manual', 'sandbox' ou 'production'.`,
+      });
+    }
+
+    if (data.BILLING_GATEWAY_PROVIDER === 'mock' && data.BILLING_GATEWAY_MODE !== 'sandbox') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['BILLING_GATEWAY_PROVIDER'],
+        message: `BILLING_GATEWAY_PROVIDER='mock' exige BILLING_GATEWAY_MODE='sandbox'.`,
+      });
+    }
+
+    if (data.BILLING_GATEWAY_PROVIDER === 'manual' && data.BILLING_GATEWAY_MODE !== 'disabled' && data.BILLING_GATEWAY_MODE !== 'manual') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['BILLING_GATEWAY_PROVIDER'],
+        message: `BILLING_GATEWAY_PROVIDER='manual' exige BILLING_GATEWAY_MODE='manual' quando pagamentos estao ativos.`,
       });
     }
 

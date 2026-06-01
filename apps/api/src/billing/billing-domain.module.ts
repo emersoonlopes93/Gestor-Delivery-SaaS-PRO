@@ -8,6 +8,10 @@ import { BillingRatingService } from './billing-rating.service';
 import { BillingUsageService } from './billing-usage.service';
 import { InvoiceService } from './invoice.service';
 import { BillingCycleService } from './billing-cycle.service';
+import { BillingPaymentGatewayService } from './billing-payment-gateway.service';
+import { ManualBillingPaymentProvider } from './manual-billing-payment.provider';
+import { MockBillingPaymentProvider } from './mock-billing-payment.provider';
+import { BillingPaymentAttemptService } from './billing-payment-attempt.service';
 
 @Module({
   providers: [
@@ -20,6 +24,10 @@ import { BillingCycleService } from './billing-cycle.service';
     BillingUsageService,
     InvoiceService,
     BillingCycleService,
+    ManualBillingPaymentProvider,
+    MockBillingPaymentProvider,
+    BillingPaymentGatewayService,
+    BillingPaymentAttemptService,
   ],
   exports: [
     BillingPlansService,
@@ -29,6 +37,8 @@ import { BillingCycleService } from './billing-cycle.service';
     BillingUsageService,
     InvoiceService,
     BillingCycleService,
+    BillingPaymentGatewayService,
+    BillingPaymentAttemptService,
   ],
 })
 export class BillingDomainModule {}
