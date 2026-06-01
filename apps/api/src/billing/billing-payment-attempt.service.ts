@@ -42,8 +42,6 @@ export class BillingPaymentAttemptService {
         throw new NotFoundException('Invoice nao encontrada para o tenant informado.');
       }
 
-      this.assertInvoiceAllowsAttempt(invoice);
-
       const existing = await tx.paymentAttempt.findFirst({
         where: {
           invoiceId: invoice.id,
@@ -52,6 +50,8 @@ export class BillingPaymentAttemptService {
         },
       });
       if (existing) return existing;
+
+      this.assertInvoiceAllowsAttempt(invoice);
 
       const gatewayResult = await this.gatewayService.createPaymentForInvoice({
         invoice,

@@ -94,17 +94,40 @@ pnpm --filter @gestor/api exec prisma migrate deploy
 
 ## Gateway e cobrança
 
-Antes da Fase 5, mantenha:
+### Pagamentos desligados
 
-```bash
+```env
 BILLING_PAYMENTS_ENABLED=false
 BILLING_GATEWAY_PROVIDER=manual
 BILLING_GATEWAY_MODE=disabled
 ```
 
+Resultado esperado:
+
+- UI mostra pagamentos desativados
+- endpoint de criar tentativa retorna erro claro
+- nenhuma `PaymentAttempt` é criada
+- invoice permanece `draft`
+
 `BILLING_GATEWAY_MODE=production` só é permitido com `NODE_ENV=production`. Enquanto essas flags estiverem assim, o Billing Console só cria invoice draft manual e não executa cobrança real.
 
-Para testar a fundação local de pagamentos sem gateway real:
+### Manual local
+
+```env
+BILLING_PAYMENTS_ENABLED=true
+BILLING_GATEWAY_PROVIDER=manual
+BILLING_GATEWAY_MODE=manual
+```
+
+Resultado esperado:
+
+- cria `PaymentAttempt` manual
+- invoice `draft -> open`
+- admin pode marcar como `paid` ou `failed`
+- `providerPaymentId` e `providerPaymentUrl` permanecem vazios/nulos
+- nenhum gateway externo é chamado
+
+### Mock sandbox
 
 ```env
 BILLING_PAYMENTS_ENABLED=true
@@ -112,13 +135,12 @@ BILLING_GATEWAY_PROVIDER=mock
 BILLING_GATEWAY_MODE=sandbox
 ```
 
-Para tentativas manuais locais:
+Resultado esperado:
 
-```env
-BILLING_PAYMENTS_ENABLED=true
-BILLING_GATEWAY_PROVIDER=manual
-BILLING_GATEWAY_MODE=manual
-```
+- cria `PaymentAttempt` mock
+- `providerPaymentId` começa com `mock_pay_`
+- simulação `success`, `failure` e `pending` funciona
+- nenhum gateway externo é chamado
 
 Manual e mock/sandbox apenas registram `PaymentAttempt` e transições de invoice (`draft -> open -> paid/failed`). Nenhum checkout, PDV, storefront, pedido ou gateway externo é acionado.
 
@@ -135,20 +157,27 @@ pnpm --filter @gestor/api check:billing-db
 pnpm --filter @gestor/api smoke:billing
 pnpm --filter @gestor/api smoke:billing-usage
 pnpm --filter @gestor/api smoke:billing-cycle
+pnpm --filter @gestor/api smoke:billing-payment
 pnpm --filter @gestor/api build
 pnpm build
 ```
 
-## Checklist antes da Fase 5
+## Checklist antes de gateway real / Fase 6
 
 - `diagnose:env` igual via raiz e via `apps/api`
 - `DATABASE_URL` e `DIRECT_URL` no mesmo database/schema
 - preflight billing passou
-- `payment_attempts = 0` antes de testes de gateway
-- invoices de Fase 4 seguem `draft`
+- contraprova `payments disabled` bloqueia tentativa e não cria `PaymentAttempt`
+- contraprova `manual local` cria tentativa local, abre invoice e permite marcação manual
+- contraprova `mock sandbox` cobre `pending`, `success`, `failure` e idempotência
+- mock webhook, quando habilitado, é idempotente por `eventId`
+- RBAC diferencia `saas.billing.read`, `saas.billing.manage` e usuário sem billing
 - `BILLING_PAYMENTS_ENABLED=false`
 - `BILLING_GATEWAY_MODE=disabled`
 - `BILLING_GATEWAY_PROVIDER=mock` exige `BILLING_GATEWAY_MODE=sandbox`
 - `BILLING_GATEWAY_PROVIDER=manual` exige `BILLING_GATEWAY_MODE=manual` quando pagamentos estão ativos
 - smokes de billing passaram
+- `smoke:billing-payment` passou
 - build workspace passou
+- nenhum cartão bruto armazenado em `billing_payment_methods`
+- nenhum HTTP externo para Asaas, Stripe ou Mercado Pago

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -41,11 +41,11 @@ import {
 type TabId = 'overview' | 'plans' | 'tenant' | 'invoices' | 'settings';
 
 const TABS: Array<{ id: TabId; label: string; icon: typeof CreditCard }> = [
-  { id: 'overview', label: 'Visão Geral', icon: TrendingUp },
+  { id: 'overview', label: 'VisÃ£o Geral', icon: TrendingUp },
   { id: 'plans', label: 'Planos por Faturamento', icon: Layers3 },
   { id: 'tenant', label: 'Tenant Billing', icon: Store },
   { id: 'invoices', label: 'Invoices Draft', icon: Receipt },
-  { id: 'settings', label: 'Configurações', icon: Settings },
+  { id: 'settings', label: 'ConfiguraÃ§Ãµes', icon: Settings },
 ];
 
 const statusLabels: Record<string, string> = {
@@ -65,7 +65,7 @@ const statusLabels: Record<string, string> = {
   canceled: 'Cancelado',
   missing_new_billing_subscription: 'Sem billing novo',
   trial_expired_not_enforced: 'Trial expirado sem bloqueio',
-  grace_period_expired_not_enforced: 'Carência expirada sem bloqueio',
+  grace_period_expired_not_enforced: 'CarÃªncia expirada sem bloqueio',
 };
 
 function money(value: DecimalLike | null | undefined, currency = 'BRL'): string {
@@ -74,12 +74,12 @@ function money(value: DecimalLike | null | undefined, currency = 'BRL'): string 
 }
 
 function formatDate(value: string | null | undefined): string {
-  if (!value) return '—';
+  if (!value) return 'â€”';
   return new Date(value).toLocaleDateString('pt-BR');
 }
 
 function shortId(value: string | null | undefined): string {
-  return value ? value.slice(0, 8) : '—';
+  return value ? value.slice(0, 8) : 'â€”';
 }
 
 function statusBadgeClass(status: string): string {
@@ -94,7 +94,7 @@ function metadataText(metadata: Record<string, unknown> | null | undefined, key:
   const value = metadata?.[key];
   if (typeof value === 'string') return value;
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  return '—';
+  return 'â€”';
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -157,19 +157,18 @@ function SafetyAlert() {
       <div className="flex gap-3">
         <ShieldAlert className="mt-0.5 h-5 w-5 flex-shrink-0" />
         <div>
-          <p className="font-black">Operação manual sem cobrança real</p>
+          <p className="font-black">Operacao manual/sandbox sem cobranca real</p>
           <p className="mt-1 text-sm font-semibold">
-            Este console apenas visualiza usage, fecha ciclos e cria invoices em rascunho. Nenhum gateway é chamado, nenhum payment attempt é criado e nenhum tenant é bloqueado.
+            Esta acao ainda nao cobra automaticamente em producao. Manual e mock/sandbox apenas registram tentativas locais, sem gateway real e sem bloquear tenants.
           </p>
         </div>
       </div>
     </div>
   );
 }
-
 function PlansTab({ plans }: { plans: BillingPlanV2[] }) {
   if (!plans.length) {
-    return <EmptyState icon={Layers3} title="Nenhum plano billing v2 encontrado" text="Quando o plano revenue-growth existir, suas faixas aparecerão aqui com dados reais." />;
+    return <EmptyState icon={Layers3} title="Nenhum plano billing v2 encontrado" text="Quando o plano revenue-growth existir, suas faixas aparecerÃ£o aqui com dados reais." />;
   }
 
   return (
@@ -192,8 +191,8 @@ function PlansTab({ plans }: { plans: BillingPlanV2[] }) {
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <InfoPill label="Cartão obrigatório" value={plan.requiresPaymentMethod ? 'Sim' : 'Não'} />
-              <InfoPill label="Todos módulos" value={plan.allowAllModules ? 'Sim' : 'Não'} />
+              <InfoPill label="CartÃ£o obrigatÃ³rio" value={plan.requiresPaymentMethod ? 'Sim' : 'NÃ£o'} />
+              <InfoPill label="Todos mÃ³dulos" value={plan.allowAllModules ? 'Sim' : 'NÃ£o'} />
               <InfoPill label="Ciclo" value={plan.cycleInterval} />
             </div>
 
@@ -211,7 +210,7 @@ function PlansTab({ plans }: { plans: BillingPlanV2[] }) {
                     <tr key={tier.id}>
                       <td className="px-4 py-3 font-bold text-foreground">{tier.label ?? `Faixa ${tier.sortOrder + 1}`}</td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {money(tier.minRevenue)} até {tier.maxRevenue ? money(tier.maxRevenue) : 'acima'}
+                        {money(tier.minRevenue)} atÃ© {tier.maxRevenue ? money(tier.maxRevenue) : 'acima'}
                       </td>
                       <td className="px-4 py-3 text-right font-black text-foreground">{money(tier.price, plan.currency)}</td>
                     </tr>
@@ -239,7 +238,7 @@ function OverviewTab(props: { overview?: BillingOverview; loading: boolean }) {
   const { overview, loading } = props;
   if (loading) return <LoadingBlock />;
   if (!overview) {
-    return <EmptyState icon={TrendingUp} title="Sem dados de overview" text="O backend não retornou métricas para o console de billing." />;
+    return <EmptyState icon={TrendingUp} title="Sem dados de overview" text="O backend nÃ£o retornou mÃ©tricas para o console de billing." />;
   }
 
   return (
@@ -249,7 +248,7 @@ function OverviewTab(props: { overview?: BillingOverview; loading: boolean }) {
         <MetricCard label="Invoices draft" value={overview.draftInvoices} icon={Receipt} />
         <MetricCard label="Ciclos abertos" value={overview.openCycles} icon={CalendarClock} />
         <MetricCard label="Ciclos fechados" value={overview.closedCycles} icon={ClipboardList} />
-        <MetricCard label="Faturamento apurado no mês" value={money(overview.monthBillableRevenue)} icon={TrendingUp} />
+        <MetricCard label="Faturamento apurado no mÃªs" value={money(overview.monthBillableRevenue)} icon={TrendingUp} />
         <MetricCard label="Receita SaaS estimada" value={money(overview.estimatedSaasRevenue)} icon={BadgeDollarSign} />
         <MetricCard label="Tenants em trial" value={overview.trialingSubscriptions} icon={AlertTriangle} tone="text-amber-600" />
         <MetricCard label="Tenants ativos" value={overview.activeSubscriptions} icon={CheckCircle2} tone="text-emerald-600" />
@@ -261,7 +260,7 @@ function OverviewTab(props: { overview?: BillingOverview; loading: boolean }) {
             <p className="mt-1 text-3xl font-black text-foreground">{overview.tenantsWithoutNewBilling}</p>
           </div>
           <p className="max-w-2xl text-sm font-semibold text-muted-foreground">
-            Este número é honesto: tenants legados ou sem assinatura v2 aparecem aqui, sem simular MRR ou cobrança.
+            Este nÃºmero Ã© honesto: tenants legados ou sem assinatura v2 aparecem aqui, sem simular MRR ou cobranÃ§a.
           </p>
         </div>
       </Panel>
@@ -308,7 +307,7 @@ function TenantTab(props: {
               <option value="">Escolha um tenant</option>
               {props.tenants.map((tenant) => (
                 <option key={tenant.id} value={tenant.id}>
-                  {tenant.name} · {tenant.slug}
+                  {tenant.name} Â· {tenant.slug}
                 </option>
               ))}
             </select>
@@ -321,11 +320,11 @@ function TenantTab(props: {
 
       <div className="space-y-4">
         {!props.selectedTenantId ? (
-          <EmptyState icon={Store} title="Nenhum tenant selecionado" text="A operação manual começa selecionando um tenant existente da plataforma." />
+          <EmptyState icon={Store} title="Nenhum tenant selecionado" text="A operaÃ§Ã£o manual comeÃ§a selecionando um tenant existente da plataforma." />
         ) : props.tenantLoading ? (
           <LoadingBlock />
         ) : !subscription ? (
-          <EmptyState icon={AlertTriangle} title="Tenant sem assinatura billing nova" text="Não há TenantBillingSubscription v2 para este tenant. A console não cria cobrança nem inventa assinatura." />
+          <EmptyState icon={AlertTriangle} title="Tenant sem assinatura billing nova" text="NÃ£o hÃ¡ TenantBillingSubscription v2 para este tenant. A console nÃ£o cria cobranÃ§a nem inventa assinatura." />
         ) : (
           <>
             <Panel
@@ -342,17 +341,17 @@ function TenantTab(props: {
               }
             >
               <div className="grid gap-4 p-5 lg:grid-cols-3">
-                <InfoPill label="Plano" value={plan?.name ?? '—'} />
+                <InfoPill label="Plano" value={plan?.name ?? 'â€”'} />
                 <div className="rounded-md border border-border bg-background px-3 py-2">
                   <p className="text-xs font-bold text-muted-foreground">Status</p>
                   <div className="mt-1"><StatusBadge status={tenantBilling?.calculatedStatus ?? subscription.status} /></div>
                 </div>
                 <InfoPill label="Trial termina em" value={formatDate(subscription.trialEndsAt)} />
-                <InfoPill label="Ciclo atual" value={currentCycle ? shortId(currentCycle.id) : 'Não criado'} />
-                <InfoPill label="Período" value={currentCycle ? `${formatDate(currentCycle.startedAt)} até ${formatDate(currentCycle.endedAt)}` : '—'} />
+                <InfoPill label="Ciclo atual" value={currentCycle ? shortId(currentCycle.id) : 'NÃ£o criado'} />
+                <InfoPill label="PerÃ­odo" value={currentCycle ? `${formatDate(currentCycle.startedAt)} atÃ© ${formatDate(currentCycle.endedAt)}` : 'â€”'} />
                 <div className="rounded-md border border-border bg-background px-3 py-2">
                   <p className="text-xs font-bold text-muted-foreground">Status do ciclo</p>
-                  <div className="mt-1">{currentCycle ? <StatusBadge status={currentCycle.status} /> : <span className="font-black text-foreground">—</span>}</div>
+                  <div className="mt-1">{currentCycle ? <StatusBadge status={currentCycle.status} /> : <span className="font-black text-foreground">â€”</span>}</div>
                 </div>
               </div>
             </Panel>
@@ -391,13 +390,13 @@ function TenantTab(props: {
               <div className="grid gap-4 p-5 lg:grid-cols-4">
                 <MetricCard label="Faturamento apurado" value={money(props.usagePreview?.billableAmount)} icon={TrendingUp} />
                 <MetricCard label="Pedidos contados" value={props.usagePreview?.ordersCount ?? 0} icon={ClipboardList} />
-                <MetricCard label="Faixa atual" value={props.usagePreview?.rating?.selectedTier?.label ?? '—'} icon={Layers3} />
+                <MetricCard label="Faixa atual" value={props.usagePreview?.rating?.selectedTier?.label ?? 'â€”'} icon={Layers3} />
                 <MetricCard label="Mensalidade estimada" value={money(props.usagePreview?.rating?.currentMonthlyPrice)} icon={BadgeDollarSign} />
               </div>
               <div className="grid gap-4 border-t border-border p-5 lg:grid-cols-3">
-                <InfoPill label="Próxima faixa" value={props.usagePreview?.rating?.nextTier?.label ?? 'Sem próxima faixa'} />
-                <InfoPill label="Falta para próxima" value={props.usagePreview?.rating?.revenueUntilNextTier ? money(props.usagePreview.rating.revenueUntilNextTier) : '—'} />
-                <InfoPill label="Latest invoice draft" value={latestInvoice ? `${latestInvoice.number} · ${money(latestInvoice.total)}` : 'Nenhuma'} />
+                <InfoPill label="PrÃ³xima faixa" value={props.usagePreview?.rating?.nextTier?.label ?? 'Sem prÃ³xima faixa'} />
+                <InfoPill label="Falta para prÃ³xima" value={props.usagePreview?.rating?.revenueUntilNextTier ? money(props.usagePreview.rating.revenueUntilNextTier) : 'â€”'} />
+                <InfoPill label="Latest invoice draft" value={latestInvoice ? `${latestInvoice.number} Â· ${money(latestInvoice.total)}` : 'Nenhuma'} />
               </div>
             </Panel>
 
@@ -427,7 +426,7 @@ function InvoiceItemsTable({ items }: { items: Array<InvoiceItem | { type: strin
         <thead className="bg-muted text-left text-xs font-black uppercase text-muted-foreground">
           <tr>
             <th className="px-4 py-3">Tipo</th>
-            <th className="px-4 py-3">Descrição</th>
+            <th className="px-4 py-3">DescriÃ§Ã£o</th>
             <th className="px-4 py-3 text-right">Qtd.</th>
             <th className="px-4 py-3 text-right">Total</th>
           </tr>
@@ -462,7 +461,7 @@ function InvoicesTab(props: {
 }) {
   if (props.loading) return <LoadingBlock />;
   if (!props.invoices.length) {
-    return <EmptyState icon={Receipt} title="Nenhuma invoice draft" text="Invoices rascunho aparecerão aqui depois de fechar um ciclo manualmente." />;
+    return <EmptyState icon={Receipt} title="Nenhuma invoice draft" text="Invoices rascunho aparecerÃ£o aqui depois de fechar um ciclo manualmente." />;
   }
 
   return (
@@ -472,14 +471,14 @@ function InvoicesTab(props: {
           <table className="w-full min-w-[860px] text-sm">
             <thead className="bg-muted text-left text-xs font-black uppercase text-muted-foreground">
               <tr>
-                <th className="px-4 py-3">Número</th>
+                <th className="px-4 py-3">NÃºmero</th>
                 <th className="px-4 py-3">Tenant</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Subtotal</th>
                 <th className="px-4 py-3 text-right">Total</th>
                 <th className="px-4 py-3">Vencimento</th>
                 <th className="px-4 py-3">Provider</th>
-                <th className="px-4 py-3 text-right">Ações</th>
+                <th className="px-4 py-3 text-right">AÃ§Ãµes</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -517,7 +516,7 @@ function InvoicesTab(props: {
             <div className="flex items-center justify-between border-b border-border p-5">
               <div>
                 <h2 className="text-xl font-black">Detalhe da invoice</h2>
-                <p className="mt-1 text-sm font-semibold text-muted-foreground">Sem ação de cobrança real nesta fase.</p>
+                <p className="mt-1 text-sm font-semibold text-muted-foreground">Sem aÃ§Ã£o de cobranÃ§a real nesta fase.</p>
               </div>
               <button onClick={props.onCloseDetails} className="rounded-md p-2 hover:bg-muted">
                 <X className="h-5 w-5" />
@@ -557,7 +556,7 @@ function InvoiceDetailsView(props: {
       <div className="grid gap-3 sm:grid-cols-4">
         <InfoPill label="Status" value={statusLabels[details.invoice.status] ?? details.invoice.status} />
         <InfoPill label="Ciclo" value={shortId(details.invoice.cycleId)} />
-        <InfoPill label="Período" value={details.cycle ? `${formatDate(details.cycle.startedAt)} até ${formatDate(details.cycle.endedAt)}` : '—'} />
+        <InfoPill label="PerÃ­odo" value={details.cycle ? `${formatDate(details.cycle.startedAt)} atÃ© ${formatDate(details.cycle.endedAt)}` : 'â€”'} />
         <InfoPill label="Total" value={money(details.invoice.total)} />
       </div>
       <InvoiceItemsTable items={details.items} />
@@ -577,7 +576,7 @@ function InvoiceDetailsView(props: {
         <InfoPill label="Snapshot" value={shortId(details.snapshot?.id)} />
       </div>
       <button disabled className="w-full rounded-md border border-dashed border-border bg-muted px-4 py-3 font-black text-muted-foreground">
-        Cobrança real indisponível nesta fase
+        CobranÃ§a real indisponÃ­vel nesta fase
       </button>
     </div>
   );
@@ -681,7 +680,7 @@ function PaymentAttemptPanel(props: {
 
 function SettingsTab({ settings, loading }: { settings?: BillingSettings; loading: boolean }) {
   if (loading) return <LoadingBlock />;
-  if (!settings) return <EmptyState icon={Settings} title="Configurações indisponíveis" text="Não foi possível carregar BillingSettings global." />;
+  if (!settings) return <EmptyState icon={Settings} title="ConfiguraÃ§Ãµes indisponÃ­veis" text="NÃ£o foi possÃ­vel carregar BillingSettings global." />;
 
   const rows: Array<{ label: string; value: boolean | number }> = [
     { label: 'countStorefrontOrders', value: settings.countStorefrontOrders },
@@ -725,7 +724,7 @@ function CloseCycleModal(props: { open: boolean; loading: boolean; onConfirm: ()
         </div>
         <div className="space-y-4 p-5">
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
-            <p className="font-black">Esta ação NÃO cobra o cliente.</p>
+            <p className="font-black">Esta aÃ§Ã£o NÃƒO cobra o cliente.</p>
             <p className="mt-1 text-sm font-semibold">Ela apenas fecha o ciclo e cria uma fatura rascunho.</p>
           </div>
           <div className="flex gap-3">
@@ -825,7 +824,7 @@ export function BillingConsolePage() {
   const invoicePreviewMutation = useMutation({
     mutationFn: async () => {
       if (!selectedTenantId || !selectedSubscription || !selectedPlan || !selectedCycle) {
-        throw new Error('Tenant, assinatura, plano e ciclo são obrigatórios.');
+        throw new Error('Tenant, assinatura, plano e ciclo sÃ£o obrigatÃ³rios.');
       }
       return adminBillingApi.previewCycleInvoice(selectedCycle.id, {
         tenantId: selectedTenantId,
@@ -839,7 +838,7 @@ export function BillingConsolePage() {
   const closeCycleMutation = useMutation({
     mutationFn: async () => {
       if (!selectedTenantId || !selectedSubscription || !selectedPlan || !selectedCycle) {
-        throw new Error('Tenant, assinatura, plano e ciclo são obrigatórios.');
+        throw new Error('Tenant, assinatura, plano e ciclo sÃ£o obrigatÃ³rios.');
       }
       return adminBillingApi.closeAndDraftInvoice(selectedCycle.id, {
         tenantId: selectedTenantId,
@@ -912,17 +911,17 @@ export function BillingConsolePage() {
     <div className="mx-auto max-w-7xl space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="mb-2 text-sm font-black uppercase tracking-widest text-primary">Billing Phase 4</p>
+          <p className="mb-2 text-sm font-black uppercase tracking-widest text-primary">Billing Phase 5.5</p>
           <h1 className="text-3xl font-black tracking-tight text-foreground">Console SaaS Admin de Billing</h1>
           <p className="mt-2 max-w-3xl text-base font-semibold text-muted-foreground">
-            Visualize planos por faturamento, audite usage, feche ciclos manualmente e gere invoices draft sem ativar cobrança real.
+            Visualize planos por faturamento, audite usage, feche ciclos manualmente e gere invoices draft sem ativar cobranÃ§a real.
           </p>
         </div>
         <div className="rounded-lg border border-border bg-card px-4 py-3">
           <p className="text-xs font-bold text-muted-foreground">Estado da fase</p>
           <p className="mt-1 flex items-center gap-2 font-black text-foreground">
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            Manual, auditável e sem gateway
+            Manual/sandbox, auditavel e sem gateway
           </p>
         </div>
       </div>
@@ -1011,3 +1010,4 @@ export function BillingConsolePage() {
     </div>
   );
 }
+
