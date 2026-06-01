@@ -97,6 +97,11 @@
     --status-closed: #ef4444;        /* fechado/inativo - vermelho */
     --status-pending: #f59e0b;       /* pendente/aguardando - amarelo */
     --status-disabled: #9ca3af;      /* desabilitado - cinza */
+    --status-success: #10b981;
+    --status-warning: #f59e0b;
+    --status-info: #0c93e9;
+    --status-danger: #ef4444;
+    --status-neutral: #6b7280;
     
     /* === SOMBRAS === */
     --shadow-card:        0 1px 3px 0 rgb(15 23 42 / 0.07), 0 1px 2px -1px rgb(15 23 42 / 0.05);
@@ -231,6 +236,11 @@
     --status-closed: #ef4444;        /* fechado/inativo - vermelho (mantida) */
     --status-pending: #f59e0b;       /* pendente/aguardando - amarelo (mantida) */
     --status-disabled: #6b7280;      /* desabilitado - cinza-600 */
+    --status-success: #10b981;
+    --status-warning: #f59e0b;
+    --status-info: #0c93e9;
+    --status-danger: #ef4444;
+    --status-neutral: #6b7280;
     
     /* === SOMBRAS DARK === */
     --shadow-card:        0 1px 3px 0 rgb(0 0 0 / 0.40), 0 1px 2px -1px rgb(0 0 0 / 0.30);

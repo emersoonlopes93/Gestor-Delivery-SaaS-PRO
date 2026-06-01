@@ -31,9 +31,15 @@ export default {
         'muted-foreground': 'var(--storefront-muted-foreground)',
         border: 'var(--storefront-border)',
         input: 'var(--storefront-input)',
+        ring: 'var(--storefront-primary)',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+      },
+      borderRadius: {
+        lg: 'var(--storefront-radius)',
+        md: 'calc(var(--storefront-radius) - 2px)',
+        sm: 'calc(var(--storefront-radius) - 4px)',
       },
     },
   },

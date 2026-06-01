@@ -27,6 +27,7 @@
     
     --storefront-border: #e5e7eb;           /* borda padrão - gray-200 */
     --storefront-input: #e5e7eb;          /* borda de inputs - gray-200 */
+    --storefront-radius: 0.75rem;
   }
 
   /* Escopo específico para storefront - não usa .dark global */
@@ -45,6 +46,7 @@
     
     --storefront-border: #374151;           /* borda padrão dark */
     --storefront-input: #374151;          /* borda de inputs dark */
+    --storefront-radius: 0.75rem;
   }
 
   body {

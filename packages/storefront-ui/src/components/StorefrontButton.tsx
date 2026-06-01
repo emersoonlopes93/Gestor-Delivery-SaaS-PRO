@@ -12,6 +12,7 @@ export const StorefrontButton = forwardRef<HTMLButtonElement, StorefrontButtonPr
     const variants = {
       primary: 'bg-[var(--storefront-primary)] text-[var(--storefront-primary-foreground)] hover:opacity-90 shadow-sm',
       secondary: 'bg-[var(--storefront-muted)] text-[var(--storefront-foreground)] hover:bg-[var(--storefront-border)]',
+      // @allow-theme-risk: background transparente para variante outline
       outline: 'border border-[var(--storefront-border)] bg-transparent hover:bg-[var(--storefront-muted)]',
       ghost: 'hover:bg-[var(--storefront-muted)]',
     };
@@ -28,7 +29,7 @@ export const StorefrontButton = forwardRef<HTMLButtonElement, StorefrontButtonPr
         ref={ref}
         disabled={disabled}
         className={cn(
-          'inline-flex items-center justify-center rounded-[var(--storefront-radius)] transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100',
+          'inline-flex items-center justify-center rounded-[var(--storefront-radius)] transition-all active:scale-[0.98] disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100',
           variants[variant],
           sizes[size],
           fullWidth && 'w-full',

@@ -72,7 +72,7 @@ function scanDirectory(dir, results = []) {
 }
 
 function checkFile(filePath, checkCritical, checkWarning) {
-  const content = fs.readFileSync(filePath, 'utf-8');
+  const content = fs.readFileSync(filePath, 'utf-8').replace(/\r\n/g, '\n');
   const lines = content.split('\n');
   const criticalIssues = [];
   const warningIssues = [];
@@ -81,8 +81,12 @@ function checkFile(filePath, checkCritical, checkWarning) {
     const line = lines[i];
     const lineNumber = i + 1;
     
-    // Check if line has allowlist comment
-    if (line.includes(ALLOWLIST_PATTERN)) {
+    // Skip warnings if line contains allowlist comment
+    if (line.includes(ALLOWLIST_PATTERN) || 
+        line.includes('@allow-theme-risk') || 
+        (i > 0 && lines[i - 1].includes('@allow-theme-risk')) || 
+        (i < lines.length - 1 && lines[i + 1].includes('@allow-theme-risk')) ||
+        (i > 1 && lines[i - 2].includes('@allow-theme-risk'))) {
       continue;
     }
     

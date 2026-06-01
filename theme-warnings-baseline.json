@@ -12001,7 +12001,7 @@
   },
   {
     "file": "apps/web-admin/src/features/audit/AuditLogsPage.tsx",
-    "line": 77,
+    "line": 78,
     "pattern": "bg-gray-",
     "content": "return 'bg-gray-100 text-gray-800';",
     "category": "warning",
@@ -12009,7 +12009,7 @@
   },
   {
     "file": "apps/web-admin/src/features/audit/AuditLogsPage.tsx",
-    "line": 77,
+    "line": 78,
     "pattern": "text-gray-",
     "content": "return 'bg-gray-100 text-gray-800';",
     "category": "warning",
@@ -12017,7 +12017,7 @@
   },
   {
     "file": "apps/web-admin/src/features/audit/AuditLogsPage.tsx",
-    "line": 138,
+    "line": 139,
     "pattern": "text-gray-",
     "content": "<Shield className=\"w-12 h-12 text-gray-300 mx-auto mb-4\" />",
     "category": "warning",
@@ -12025,7 +12025,7 @@
   },
   {
     "file": "apps/web-admin/src/features/audit/AuditLogsPage.tsx",
-    "line": 139,
+    "line": 140,
     "pattern": "text-gray-",
     "content": "<p className=\"text-gray-500 font-medium\">Nenhum log encontrado</p>",
     "category": "warning",
@@ -12033,7 +12033,7 @@
   },
   {
     "file": "apps/web-admin/src/features/audit/AuditLogsPage.tsx",
-    "line": 140,
+    "line": 141,
     "pattern": "text-gray-",
     "content": "<p className=\"text-gray-400 text-sm mt-1\">",
     "category": "warning",
@@ -12041,7 +12041,7 @@
   },
   {
     "file": "apps/web-admin/src/features/audit/AuditLogsPage.tsx",
-    "line": 160,
+    "line": 161,
     "pattern": "text-gray-",
     "content": "<TableCell className=\"text-gray-500 whitespace-nowrap text-xs\">",
     "category": "warning",
@@ -12049,7 +12049,7 @@
   },
   {
     "file": "apps/web-admin/src/features/audit/AuditLogsPage.tsx",
-    "line": 164,
+    "line": 165,
     "pattern": "text-gray-",
     "content": "<div className=\"font-medium text-gray-900 text-xs\">{log.tenant?.name || '—'}</div>",
     "category": "warning",
@@ -12057,7 +12057,7 @@
   },
   {
     "file": "apps/web-admin/src/features/audit/AuditLogsPage.tsx",
-    "line": 165,
+    "line": 166,
     "pattern": "text-gray-",
     "content": "<div className=\"text-[10px] text-gray-400 font-mono\">{log.tenant?.slug || log.tenantId}</div>",
     "category": "warning",
@@ -12065,7 +12065,7 @@
   },
   {
     "file": "apps/web-admin/src/features/audit/AuditLogsPage.tsx",
-    "line": 180,
+    "line": 181,
     "pattern": "text-gray-",
     "content": "<TableCell className=\"text-gray-500 text-xs\">{log.resource || '—'}</TableCell>",
     "category": "warning",
@@ -12073,7 +12073,7 @@
   },
   {
     "file": "apps/web-admin/src/features/audit/AuditLogsPage.tsx",
-    "line": 186,
+    "line": 187,
     "pattern": "text-gray-",
     "content": "<TableCell className=\"text-gray-400 text-xs font-mono\">{log.ip || '—'}</TableCell>",
     "category": "warning",
@@ -12081,7 +12081,7 @@
   },
   {
     "file": "apps/web-admin/src/features/audit/AuditLogsPage.tsx",
-    "line": 193,
+    "line": 194,
     "pattern": "border-gray-",
     "content": "<div className=\"border-t border-gray-200 px-6 py-3 flex items-center justify-between bg-muted/30\">",
     "category": "warning",
@@ -12089,7 +12089,7 @@
   },
   {
     "file": "apps/web-admin/src/features/audit/AuditLogsPage.tsx",
-    "line": 194,
+    "line": 195,
     "pattern": "text-gray-",
     "content": "<div className=\"text-xs text-gray-500\">",
     "category": "warning",
@@ -16300,30 +16300,6 @@
     "line": 367,
     "pattern": "bg-white",
     "content": "<span className=\"absolute -top-2 -right-2 bg-white text-primary-600 text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-sm\">",
-    "category": "warning",
-    "date": "2026-06-01"
-  },
-  {
-    "file": "packages/ui/src/components/Input.tsx",
-    "line": 12,
-    "pattern": "bg-transparent",
-    "content": "'flex h-10 w-full rounded-md border border-input bg-card px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed',",
-    "category": "warning",
-    "date": "2026-06-01"
-  },
-  {
-    "file": "packages/storefront-ui/src/components/StorefrontButton.tsx",
-    "line": 15,
-    "pattern": "bg-transparent",
-    "content": "outline: 'border border-[var(--storefront-border)] bg-transparent hover:bg-[var(--storefront-muted)]',",
-    "category": "warning",
-    "date": "2026-06-01"
-  },
-  {
-    "file": "packages/storefront-ui/src/components/StorefrontButton.tsx",
-    "line": 31,
-    "pattern": "disabled:opacity-50",
-    "content": "'inline-flex items-center justify-center rounded-[var(--storefront-radius)] transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100',",
     "category": "warning",
     "date": "2026-06-01"
   }
