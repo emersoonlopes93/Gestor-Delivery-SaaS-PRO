@@ -34,7 +34,7 @@ export class BillingSettingsService {
 
     return this.prisma.billingSettings.upsert({
       where: { id: DEFAULT_BILLING_SETTINGS_ID },
-      update: defaults,
+      update: {},
       create: defaults,
     });
   }

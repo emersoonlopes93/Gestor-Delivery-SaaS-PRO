@@ -10,7 +10,51 @@ import { PrismaService } from '../../database/prisma.service';
 import { BillingSettingsService } from '../../billing/billing-settings.service';
 import { BillingPaymentAttemptService } from '../../billing/billing-payment-attempt.service';
 import { BillingPaymentGatewayService } from '../../billing/billing-payment-gateway.service';
-import { BillingGatewayMode, PaymentProvider } from '@prisma/client';
+import { BillingGatewayMode, PaymentProvider, Prisma } from '@prisma/client';
+
+type BillingRevenueTierInput = {
+  id?: string;
+  minRevenue?: string | number;
+  maxRevenue?: string | number | null;
+  price?: string | number;
+  label?: string | null;
+};
+
+type UpdateBillingPlanV2Body = {
+  name?: string;
+  description?: string | null;
+  trialDays?: number;
+  requiresPaymentMethod?: boolean;
+  allowAllModules?: boolean;
+  isActive?: boolean;
+  isPublic?: boolean;
+  tiers?: BillingRevenueTierInput[];
+};
+
+type UpdateBillingSettingsBody = {
+  includeDeliveryFeeByDefault?: boolean;
+  includeServiceFeeByDefault?: boolean;
+  countStorefrontOrders?: boolean;
+  countPosOrders?: boolean;
+  countWhatsappAiOrders?: boolean;
+  countManualOrders?: boolean;
+  countConfirmedOrders?: boolean;
+  countCompletedOrders?: boolean;
+  excludeCancelledOrders?: boolean;
+  discountReducesRevenue?: boolean;
+  defaultGracePeriodDays?: number;
+  defaultTrialDays?: number;
+  requirePaymentMethodForPaidPlans?: boolean;
+};
+
+type NormalizedBillingRevenueTier = {
+  id?: string;
+  minRevenue: Prisma.Decimal;
+  maxRevenue: Prisma.Decimal | null;
+  price: Prisma.Decimal;
+  label: string | null;
+  sortOrder: number;
+};
 
 @Controller('admin/billing')
 @UseGuards(AdminAuthGuard, AdminPermissionsGuard)
@@ -53,6 +97,93 @@ export class AdminBillingController {
         },
       },
       orderBy: [{ createdAt: 'asc' }],
+    });
+  }
+
+  @Put('plans-v2/:id')
+  @RequireAdminPermissions('saas.billing.manage')
+  async updateBillingPlanV2(@Param('id') id: string, @Body() body: UpdateBillingPlanV2Body) {
+    const existing = await this.prisma.billingPlan.findUnique({
+      where: { id },
+      include: { revenueTiers: true },
+    });
+    if (!existing) {
+      throw new NotFoundException('Plano de billing não encontrado.');
+    }
+
+    const tiers = body.tiers ? this.normalizeRevenueTiers(body.tiers) : null;
+    if (tiers) {
+      const existingTierIds = new Set(existing.revenueTiers.map((tier) => tier.id));
+      const invalidTier = tiers.find((tier) => tier.id && !existingTierIds.has(tier.id));
+      if (invalidTier) {
+        throw new BadRequestException('Uma das faixas informadas não pertence ao plano.');
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.billingPlan.update({
+        where: { id },
+        data: {
+          ...(body.name !== undefined ? { name: this.parseOptionalString(body.name, 'name', 100) } : {}),
+          ...(body.description !== undefined ? { description: this.parseNullableString(body.description, 'description', 255) } : {}),
+          ...(body.trialDays !== undefined ? { trialDays: this.parseIntegerRange(body.trialDays, 'trialDays', 0, 365) } : {}),
+          ...(body.requiresPaymentMethod !== undefined ? { requiresPaymentMethod: this.requireBoolean(body.requiresPaymentMethod, 'requiresPaymentMethod') } : {}),
+          ...(body.allowAllModules !== undefined ? { allowAllModules: this.requireBoolean(body.allowAllModules, 'allowAllModules') } : {}),
+          ...(body.isActive !== undefined ? { isActive: this.requireBoolean(body.isActive, 'isActive') } : {}),
+          ...(body.isPublic !== undefined ? { isPublic: this.requireBoolean(body.isPublic, 'isPublic') } : {}),
+        },
+      });
+
+      if (tiers) {
+        const incomingIds = tiers.map((tier) => tier.id).filter((tierId): tierId is string => Boolean(tierId));
+        await tx.billingRevenueTier.deleteMany({
+          where: {
+            planId: id,
+            ...(incomingIds.length ? { id: { notIn: incomingIds } } : {}),
+          },
+        });
+
+        for (const tier of tiers) {
+          if (tier.id) {
+            await tx.billingRevenueTier.update({
+              where: { id: tier.id },
+              data: { sortOrder: 10000 + tier.sortOrder },
+            });
+          }
+        }
+
+        for (const tier of tiers) {
+          const data = {
+            minRevenue: tier.minRevenue,
+            maxRevenue: tier.maxRevenue,
+            price: tier.price,
+            label: tier.label,
+            sortOrder: tier.sortOrder,
+          };
+          if (tier.id) {
+            await tx.billingRevenueTier.update({
+              where: { id: tier.id },
+              data,
+            });
+          } else {
+            await tx.billingRevenueTier.create({
+              data: {
+                planId: id,
+                ...data,
+              },
+            });
+          }
+        }
+      }
+
+      return tx.billingPlan.findUniqueOrThrow({
+        where: { id },
+        include: {
+          revenueTiers: {
+            orderBy: [{ sortOrder: 'asc' }],
+          },
+        },
+      });
     });
   }
 
@@ -123,6 +254,30 @@ export class AdminBillingController {
   @RequireAdminPermissions('saas.billing.read')
   async getBillingSettings() {
     return this.billingSettingsService.ensureDefaultSettings();
+  }
+
+  @Put('settings')
+  @RequireAdminPermissions('saas.billing.manage')
+  async updateBillingSettings(@Body() body: UpdateBillingSettingsBody) {
+    const current = await this.billingSettingsService.ensureDefaultSettings();
+    return this.prisma.billingSettings.update({
+      where: { id: current.id },
+      data: {
+        ...(body.includeDeliveryFeeByDefault !== undefined ? { includeDeliveryFeeByDefault: this.requireBoolean(body.includeDeliveryFeeByDefault, 'includeDeliveryFeeByDefault') } : {}),
+        ...(body.includeServiceFeeByDefault !== undefined ? { includeServiceFeeByDefault: this.requireBoolean(body.includeServiceFeeByDefault, 'includeServiceFeeByDefault') } : {}),
+        ...(body.countStorefrontOrders !== undefined ? { countStorefrontOrders: this.requireBoolean(body.countStorefrontOrders, 'countStorefrontOrders') } : {}),
+        ...(body.countPosOrders !== undefined ? { countPosOrders: this.requireBoolean(body.countPosOrders, 'countPosOrders') } : {}),
+        ...(body.countWhatsappAiOrders !== undefined ? { countWhatsappAiOrders: this.requireBoolean(body.countWhatsappAiOrders, 'countWhatsappAiOrders') } : {}),
+        ...(body.countManualOrders !== undefined ? { countManualOrders: this.requireBoolean(body.countManualOrders, 'countManualOrders') } : {}),
+        ...(body.countConfirmedOrders !== undefined ? { countConfirmedOrders: this.requireBoolean(body.countConfirmedOrders, 'countConfirmedOrders') } : {}),
+        ...(body.countCompletedOrders !== undefined ? { countCompletedOrders: this.requireBoolean(body.countCompletedOrders, 'countCompletedOrders') } : {}),
+        ...(body.excludeCancelledOrders !== undefined ? { excludeCancelledOrders: this.requireBoolean(body.excludeCancelledOrders, 'excludeCancelledOrders') } : {}),
+        ...(body.discountReducesRevenue !== undefined ? { discountReducesRevenue: this.requireBoolean(body.discountReducesRevenue, 'discountReducesRevenue') } : {}),
+        ...(body.defaultGracePeriodDays !== undefined ? { defaultGracePeriodDays: this.parseIntegerRange(body.defaultGracePeriodDays, 'defaultGracePeriodDays', 0, 365) } : {}),
+        ...(body.defaultTrialDays !== undefined ? { defaultTrialDays: this.parseIntegerRange(body.defaultTrialDays, 'defaultTrialDays', 0, 365) } : {}),
+        ...(body.requirePaymentMethodForPaidPlans !== undefined ? { requirePaymentMethodForPaidPlans: this.requireBoolean(body.requirePaymentMethodForPaidPlans, 'requirePaymentMethodForPaidPlans') } : {}),
+      },
+    });
   }
 
   @Get('payment-config')
@@ -249,7 +404,7 @@ export class AdminBillingController {
   ) {
     const invoice = await this.prisma.invoice.findUnique({ where: { id: invoiceId } });
     if (!invoice) {
-      throw new NotFoundException('Invoice nÃ£o encontrada.');
+      throw new NotFoundException('Invoice não encontrada.');
     }
 
     return this.billingPaymentAttemptService.createAttemptForInvoice({
@@ -469,6 +624,103 @@ export class AdminBillingController {
     });
   }
 
+  private normalizeRevenueTiers(tiers: BillingRevenueTierInput[]): NormalizedBillingRevenueTier[] {
+    if (!tiers.length) {
+      throw new BadRequestException('O plano precisa ter pelo menos uma faixa de faturamento.');
+    }
+
+    const normalized = tiers.map((tier, index) => {
+      const minRevenue = this.parseDecimal(tier.minRevenue, `tiers.${index}.minRevenue`);
+      const maxRevenue = tier.maxRevenue === null || tier.maxRevenue === undefined || tier.maxRevenue === ''
+        ? null
+        : this.parseDecimal(tier.maxRevenue, `tiers.${index}.maxRevenue`);
+      const price = this.parseDecimal(tier.price, `tiers.${index}.price`);
+
+      if (minRevenue.isNegative()) {
+        throw new BadRequestException(`tiers.${index}.minRevenue não pode ser negativo.`);
+      }
+      if (price.isNegative()) {
+        throw new BadRequestException(`tiers.${index}.price não pode ser negativo.`);
+      }
+      if (maxRevenue && maxRevenue.lt(minRevenue)) {
+        throw new BadRequestException(`tiers.${index}.maxRevenue deve ser maior ou igual ao minRevenue.`);
+      }
+
+      return {
+        ...(tier.id?.trim() ? { id: tier.id.trim() } : {}),
+        minRevenue,
+        maxRevenue,
+        price,
+        label: this.parseNullableString(tier.label ?? null, `tiers.${index}.label`, 100),
+        sortOrder: index,
+      };
+    });
+
+    const sorted = [...normalized].sort((left, right) => left.minRevenue.cmp(right.minRevenue));
+    for (let index = 1; index < sorted.length; index += 1) {
+      const previous = sorted[index - 1];
+      const current = sorted[index];
+      if (!previous.maxRevenue) {
+        throw new BadRequestException('Somente a última faixa pode ficar sem maxRevenue.');
+      }
+      if (current.minRevenue.lte(previous.maxRevenue)) {
+        throw new BadRequestException('As faixas de faturamento não podem se sobrepor.');
+      }
+    }
+
+    return normalized;
+  }
+
+  private parseDecimal(value: string | number | undefined, field: string): Prisma.Decimal {
+    if (value === undefined || value === null || value === '') {
+      throw new BadRequestException(`${field} é obrigatório.`);
+    }
+    const normalized = typeof value === 'number'
+      ? String(value)
+      : value.trim().replace(',', '.');
+    try {
+      const decimal = new Prisma.Decimal(normalized);
+      if (!decimal.isFinite()) {
+        throw new Error('not finite');
+      }
+      return decimal.toDecimalPlaces(2);
+    } catch {
+      throw new BadRequestException(`${field} deve ser um número válido.`);
+    }
+  }
+
+  private parseIntegerRange(value: number, field: string, min: number, max: number): number {
+    if (!Number.isInteger(value) || value < min || value > max) {
+      throw new BadRequestException(`${field} deve ser um inteiro entre ${min} e ${max}.`);
+    }
+    return value;
+  }
+
+  private requireBoolean(value: boolean, field: string): boolean {
+    if (typeof value !== 'boolean') {
+      throw new BadRequestException(`${field} deve ser booleano.`);
+    }
+    return value;
+  }
+
+  private parseOptionalString(value: string, field: string, maxLength: number): string {
+    if (typeof value !== 'string' || !value.trim()) {
+      throw new BadRequestException(`${field} é obrigatório.`);
+    }
+    if (value.trim().length > maxLength) {
+      throw new BadRequestException(`${field} deve ter no máximo ${maxLength} caracteres.`);
+    }
+    return value.trim();
+  }
+
+  private parseNullableString(value: string | null | undefined, field: string, maxLength: number): string | null {
+    if (value === null || value === undefined || value.trim() === '') return null;
+    if (value.length > maxLength) {
+      throw new BadRequestException(`${field} deve ter no máximo ${maxLength} caracteres.`);
+    }
+    return value.trim();
+  }
+
   private parseRequiredDate(value: string | undefined, field: string): Date {
     if (!value) {
       throw new BadRequestException(`${field} é obrigatório.`);
@@ -545,3 +797,4 @@ export class AdminBillingController {
     return subscription.status;
   }
 }
+

@@ -52,6 +52,41 @@ export type BillingSettings = {
   updatedAt: string;
 };
 
+export type BillingRevenueTierInput = {
+  id?: string;
+  minRevenue: DecimalLike;
+  maxRevenue: DecimalLike | null;
+  price: DecimalLike;
+  label: string | null;
+};
+
+export type UpdateBillingPlanV2Body = {
+  name: string;
+  description: string | null;
+  trialDays: number;
+  requiresPaymentMethod: boolean;
+  allowAllModules: boolean;
+  isActive: boolean;
+  isPublic: boolean;
+  tiers: BillingRevenueTierInput[];
+};
+
+export type UpdateBillingSettingsBody = {
+  includeDeliveryFeeByDefault: boolean;
+  includeServiceFeeByDefault: boolean;
+  countStorefrontOrders: boolean;
+  countPosOrders: boolean;
+  countWhatsappAiOrders: boolean;
+  countManualOrders: boolean;
+  countConfirmedOrders: boolean;
+  countCompletedOrders: boolean;
+  excludeCancelledOrders: boolean;
+  discountReducesRevenue: boolean;
+  defaultGracePeriodDays: number;
+  defaultTrialDays: number;
+  requirePaymentMethodForPaidPlans: boolean;
+};
+
 export type AdminTenantListItem = {
   id: string;
   name: string;
@@ -324,12 +359,20 @@ export const adminBillingApi = {
     const res = await api.get<BillingPlanV2[]>('/admin/billing/plans-v2');
     return res.data;
   },
+  updateBillingPlanV2: async (planId: string, body: UpdateBillingPlanV2Body) => {
+    const res = await api.put<BillingPlanV2>(`/admin/billing/plans-v2/${planId}`, body);
+    return res.data;
+  },
   getBillingOverview: async () => {
     const res = await api.get<BillingOverview>('/admin/billing/overview');
     return res.data;
   },
   getBillingSettings: async () => {
     const res = await api.get<BillingSettings>('/admin/billing/settings');
+    return res.data;
+  },
+  updateBillingSettings: async (body: UpdateBillingSettingsBody) => {
+    const res = await api.put<BillingSettings>('/admin/billing/settings', body);
     return res.data;
   },
   getBillingPaymentConfig: async () => {

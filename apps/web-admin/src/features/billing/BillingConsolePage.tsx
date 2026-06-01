@@ -1,7 +1,10 @@
-﻿import { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   BadgeDollarSign,
   CalendarClock,
   CheckCircle2,
@@ -11,13 +14,16 @@ import {
   FileText,
   Layers3,
   Loader2,
+  Plus,
   Receipt,
   RefreshCw,
+  Save,
   Search,
   Settings,
   ShieldAlert,
   Store,
   TrendingUp,
+  Trash2,
   X,
 } from 'lucide-react';
 import {
@@ -28,6 +34,7 @@ import {
   BillingOverview,
   BillingPaymentConfig,
   BillingPlanV2,
+  BillingRevenueTierInput,
   BillingSettings,
   BillingUsagePreview,
   DecimalLike,
@@ -36,16 +43,17 @@ import {
   InvoiceSummary,
   PaymentAttempt,
   TenantBillingSubscriptionResponse,
+  UpdateBillingSettingsBody,
 } from './admin-billing-api';
 
 type TabId = 'overview' | 'plans' | 'tenant' | 'invoices' | 'settings';
 
 const TABS: Array<{ id: TabId; label: string; icon: typeof CreditCard }> = [
-  { id: 'overview', label: 'VisÃ£o Geral', icon: TrendingUp },
+  { id: 'overview', label: 'Visão Geral', icon: TrendingUp },
   { id: 'plans', label: 'Planos por Faturamento', icon: Layers3 },
   { id: 'tenant', label: 'Tenant Billing', icon: Store },
   { id: 'invoices', label: 'Invoices Draft', icon: Receipt },
-  { id: 'settings', label: 'ConfiguraÃ§Ãµes', icon: Settings },
+  { id: 'settings', label: 'Configurações', icon: Settings },
 ];
 
 const statusLabels: Record<string, string> = {
@@ -65,7 +73,7 @@ const statusLabels: Record<string, string> = {
   canceled: 'Cancelado',
   missing_new_billing_subscription: 'Sem billing novo',
   trial_expired_not_enforced: 'Trial expirado sem bloqueio',
-  grace_period_expired_not_enforced: 'CarÃªncia expirada sem bloqueio',
+  grace_period_expired_not_enforced: 'Carência expirada sem bloqueio',
 };
 
 function money(value: DecimalLike | null | undefined, currency = 'BRL'): string {
@@ -74,12 +82,12 @@ function money(value: DecimalLike | null | undefined, currency = 'BRL'): string 
 }
 
 function formatDate(value: string | null | undefined): string {
-  if (!value) return 'â€”';
+  if (!value) return '—';
   return new Date(value).toLocaleDateString('pt-BR');
 }
 
 function shortId(value: string | null | undefined): string {
-  return value ? value.slice(0, 8) : 'â€”';
+  return value ? value.slice(0, 8) : '—';
 }
 
 function statusBadgeClass(status: string): string {
@@ -94,7 +102,7 @@ function metadataText(metadata: Record<string, unknown> | null | undefined, key:
   const value = metadata?.[key];
   if (typeof value === 'string') return value;
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  return 'â€”';
+  return '—';
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -157,71 +165,213 @@ function SafetyAlert() {
       <div className="flex gap-3">
         <ShieldAlert className="mt-0.5 h-5 w-5 flex-shrink-0" />
         <div>
-          <p className="font-black">Operacao manual/sandbox sem cobranca real</p>
+          <p className="font-black">Operação manual/sandbox sem cobrança real</p>
           <p className="mt-1 text-sm font-semibold">
-            Esta acao ainda nao cobra automaticamente em producao. Manual e mock/sandbox apenas registram tentativas locais, sem gateway real e sem bloquear tenants.
+            Esta ação ainda não cobra automaticamente em produção. Manual e mock/sandbox apenas registram tentativas locais, sem gateway real e sem bloquear tenants.
           </p>
         </div>
       </div>
     </div>
   );
 }
-function PlansTab({ plans }: { plans: BillingPlanV2[] }) {
-  if (!plans.length) {
-    return <EmptyState icon={Layers3} title="Nenhum plano billing v2 encontrado" text="Quando o plano revenue-growth existir, suas faixas aparecerÃ£o aqui com dados reais." />;
+type BillingTierForm = BillingRevenueTierInput & { rowId: string };
+
+type BillingPlanFormState = {
+  name: string;
+  description: string;
+  trialDays: number;
+  requiresPaymentMethod: boolean;
+  allowAllModules: boolean;
+  isActive: boolean;
+  isPublic: boolean;
+  tiers: BillingTierForm[];
+};
+
+function planToForm(plan: BillingPlanV2): BillingPlanFormState {
+  return {
+    name: plan.name,
+    description: plan.description ?? '',
+    trialDays: plan.trialDays,
+    requiresPaymentMethod: plan.requiresPaymentMethod,
+    allowAllModules: plan.allowAllModules,
+    isActive: plan.isActive,
+    isPublic: plan.isPublic,
+    tiers: plan.revenueTiers.map((tier) => ({
+      rowId: tier.id,
+      id: tier.id,
+      minRevenue: tier.minRevenue,
+      maxRevenue: tier.maxRevenue,
+      price: tier.price,
+      label: tier.label,
+    })),
+  };
+}
+
+function PlansTab(props: {
+  plans: BillingPlanV2[];
+  saving: boolean;
+  onSave: (planId: string, form: BillingPlanFormState) => void;
+}) {
+  if (!props.plans.length) {
+    return <EmptyState icon={Layers3} title="Nenhum plano billing v2 encontrado" text="Quando o plano revenue-growth existir, suas faixas aparecerão aqui com dados reais." />;
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {plans.map((plan) => (
-        <Panel key={plan.id}>
-          <div className="p-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl font-black text-foreground">{plan.name}</h2>
-                  <StatusBadge status={plan.isActive ? 'active' : 'canceled'} />
-                </div>
-                <p className="mt-1 font-mono text-sm font-bold text-muted-foreground">{plan.slug}</p>
-              </div>
-              <div className="rounded-md bg-muted px-3 py-2 text-right">
-                <p className="text-xs font-bold text-muted-foreground">Trial</p>
-                <p className="font-black text-foreground">{plan.trialDays} dias</p>
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-              <InfoPill label="CartÃ£o obrigatÃ³rio" value={plan.requiresPaymentMethod ? 'Sim' : 'NÃ£o'} />
-              <InfoPill label="Todos mÃ³dulos" value={plan.allowAllModules ? 'Sim' : 'NÃ£o'} />
-              <InfoPill label="Ciclo" value={plan.cycleInterval} />
-            </div>
-
-            <div className="mt-5 overflow-hidden rounded-lg border border-border">
-              <table className="w-full text-sm">
-                <thead className="bg-muted">
-                  <tr className="text-left text-xs font-black uppercase text-muted-foreground">
-                    <th className="px-4 py-3">Faixa</th>
-                    <th className="px-4 py-3">Receita</th>
-                    <th className="px-4 py-3 text-right">Mensalidade</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {plan.revenueTiers.map((tier) => (
-                    <tr key={tier.id}>
-                      <td className="px-4 py-3 font-bold text-foreground">{tier.label ?? `Faixa ${tier.sortOrder + 1}`}</td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {money(tier.minRevenue)} atÃ© {tier.maxRevenue ? money(tier.maxRevenue) : 'acima'}
-                      </td>
-                      <td className="px-4 py-3 text-right font-black text-foreground">{money(tier.price, plan.currency)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </Panel>
+    <div className="space-y-4">
+      {props.plans.map((plan) => (
+        <PlanEditor key={plan.id} plan={plan} saving={props.saving} onSave={props.onSave} />
       ))}
     </div>
+  );
+}
+
+function PlanEditor(props: {
+  plan: BillingPlanV2;
+  saving: boolean;
+  onSave: (planId: string, form: BillingPlanFormState) => void;
+}) {
+  const [form, setForm] = useState<BillingPlanFormState>(() => planToForm(props.plan));
+
+  useEffect(() => {
+    setForm(planToForm(props.plan));
+  }, [props.plan]);
+
+  const updateTier = (rowId: string, patch: Partial<BillingTierForm>) => {
+    setForm((current) => ({
+      ...current,
+      tiers: current.tiers.map((tier) => (tier.rowId === rowId ? { ...tier, ...patch } : tier)),
+    }));
+  };
+
+  const moveTier = (index: number, direction: -1 | 1) => {
+    setForm((current) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= current.tiers.length) return current;
+      const tiers = [...current.tiers];
+      const [tier] = tiers.splice(index, 1);
+      tiers.splice(nextIndex, 0, tier);
+      return { ...current, tiers };
+    });
+  };
+
+  const addTier = () => {
+    setForm((current) => ({
+      ...current,
+      tiers: [
+        ...current.tiers,
+        {
+          rowId: `new-${Date.now()}`,
+          minRevenue: '0.00',
+          maxRevenue: null,
+          price: '0.00',
+          label: '',
+        },
+      ],
+    }));
+  };
+
+  const removeTier = (rowId: string) => {
+    setForm((current) => ({
+      ...current,
+      tiers: current.tiers.filter((tier) => tier.rowId !== rowId),
+    }));
+  };
+
+  return (
+    <Panel
+      title="Plano por faturamento"
+      action={
+        <button
+          onClick={() => props.onSave(props.plan.id, form)}
+          disabled={props.saving}
+          className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-black text-primary-foreground disabled:opacity-60"
+        >
+          {props.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Salvar plano
+        </button>
+      }
+    >
+      <div className="space-y-5 p-5">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px]">
+          <label className="space-y-1">
+            <span className="text-xs font-bold text-muted-foreground">Nome</span>
+            <input
+              value={form.name}
+              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-ring"
+            />
+          </label>
+          <InfoPill label="Slug" value={props.plan.slug} />
+        </div>
+        <label className="space-y-1">
+          <span className="text-xs font-bold text-muted-foreground">Descrição</span>
+          <input
+            value={form.description}
+            onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-ring"
+          />
+        </label>
+        <div className="grid gap-3 md:grid-cols-5">
+          <NumberField label="Trial em dias" value={form.trialDays} onChange={(trialDays) => setForm((current) => ({ ...current, trialDays }))} />
+          <ToggleField label="Exigir método" checked={form.requiresPaymentMethod} onChange={(requiresPaymentMethod) => setForm((current) => ({ ...current, requiresPaymentMethod }))} />
+          <ToggleField label="Todos módulos" checked={form.allowAllModules} onChange={(allowAllModules) => setForm((current) => ({ ...current, allowAllModules }))} />
+          <ToggleField label="Ativo" checked={form.isActive} onChange={(isActive) => setForm((current) => ({ ...current, isActive }))} />
+          <ToggleField label="Público" checked={form.isPublic} onChange={(isPublic) => setForm((current) => ({ ...current, isPublic }))} />
+        </div>
+
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full min-w-[860px] text-sm">
+            <thead className="bg-muted text-left text-xs font-black uppercase text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3">Ordem</th>
+                <th className="px-4 py-3">Faixa</th>
+                <th className="px-4 py-3">Mínimo</th>
+                <th className="px-4 py-3">Máximo</th>
+                <th className="px-4 py-3">Mensalidade</th>
+                <th className="px-4 py-3 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {form.tiers.map((tier, index) => (
+                <tr key={tier.rowId}>
+                  <td className="px-4 py-3 font-black">{index + 1}</td>
+                  <td className="px-4 py-3">
+                    <input
+                      value={tier.label ?? ''}
+                      onChange={(event) => updateTier(tier.rowId, { label: event.target.value })}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 font-bold outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <MoneyInput value={tier.minRevenue} onChange={(minRevenue) => updateTier(tier.rowId, { minRevenue })} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <MoneyInput value={tier.maxRevenue ?? ''} placeholder="Sem limite" onChange={(maxRevenue) => updateTier(tier.rowId, { maxRevenue: maxRevenue === '' ? null : maxRevenue })} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <MoneyInput value={tier.price} onChange={(price) => updateTier(tier.rowId, { price })} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-2">
+                      <IconButton label="Subir faixa" disabled={index === 0} onClick={() => moveTier(index, -1)} icon={ArrowUp} />
+                      <IconButton label="Descer faixa" disabled={index === form.tiers.length - 1} onClick={() => moveTier(index, 1)} icon={ArrowDown} />
+                      <IconButton label="Remover faixa" disabled={form.tiers.length === 1} onClick={() => removeTier(tier.rowId)} icon={Trash2} />
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <button
+          onClick={addTier}
+          className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-black text-foreground"
+        >
+          <Plus className="h-4 w-4" />
+          Adicionar faixa
+        </button>
+      </div>
+    </Panel>
   );
 }
 
@@ -234,11 +384,68 @@ function InfoPill({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ToggleField(props: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <label className="flex min-h-16 items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2">
+      <span className="text-sm font-black text-foreground">{props.label}</span>
+      <input
+        type="checkbox"
+        checked={props.checked}
+        onChange={(event) => props.onChange(event.target.checked)}
+        className="h-5 w-5 rounded border-input text-primary focus:ring-ring"
+      />
+    </label>
+  );
+}
+
+function NumberField(props: { label: string; value: number; onChange: (value: number) => void }) {
+  return (
+    <label className="space-y-1">
+      <span className="text-xs font-bold text-muted-foreground">{props.label}</span>
+      <input
+        type="number"
+        min={0}
+        value={props.value}
+        onChange={(event) => props.onChange(Number(event.target.value))}
+        className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm font-bold outline-none focus:ring-2 focus:ring-ring"
+      />
+    </label>
+  );
+}
+
+function MoneyInput(props: { value: DecimalLike | ''; placeholder?: string; onChange: (value: string) => void }) {
+  return (
+    <input
+      inputMode="decimal"
+      value={String(props.value)}
+      placeholder={props.placeholder}
+      onChange={(event) => props.onChange(event.target.value)}
+      className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm font-bold outline-none focus:ring-2 focus:ring-ring"
+    />
+  );
+}
+
+function IconButton(props: { label: string; icon: typeof CreditCard; disabled?: boolean; onClick: () => void }) {
+  const Icon = props.icon;
+  return (
+    <button
+      type="button"
+      aria-label={props.label}
+      title={props.label}
+      disabled={props.disabled}
+      onClick={props.onClick}
+      className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-foreground disabled:opacity-40"
+    >
+      <Icon className="h-4 w-4" />
+    </button>
+  );
+}
+
 function OverviewTab(props: { overview?: BillingOverview; loading: boolean }) {
   const { overview, loading } = props;
   if (loading) return <LoadingBlock />;
   if (!overview) {
-    return <EmptyState icon={TrendingUp} title="Sem dados de overview" text="O backend nÃ£o retornou mÃ©tricas para o console de billing." />;
+    return <EmptyState icon={TrendingUp} title="Sem dados de overview" text="O backend não retornou métricas para o console de billing." />;
   }
 
   return (
@@ -248,7 +455,7 @@ function OverviewTab(props: { overview?: BillingOverview; loading: boolean }) {
         <MetricCard label="Invoices draft" value={overview.draftInvoices} icon={Receipt} />
         <MetricCard label="Ciclos abertos" value={overview.openCycles} icon={CalendarClock} />
         <MetricCard label="Ciclos fechados" value={overview.closedCycles} icon={ClipboardList} />
-        <MetricCard label="Faturamento apurado no mÃªs" value={money(overview.monthBillableRevenue)} icon={TrendingUp} />
+        <MetricCard label="Faturamento apurado no mês" value={money(overview.monthBillableRevenue)} icon={TrendingUp} />
         <MetricCard label="Receita SaaS estimada" value={money(overview.estimatedSaasRevenue)} icon={BadgeDollarSign} />
         <MetricCard label="Tenants em trial" value={overview.trialingSubscriptions} icon={AlertTriangle} tone="text-amber-600" />
         <MetricCard label="Tenants ativos" value={overview.activeSubscriptions} icon={CheckCircle2} tone="text-emerald-600" />
@@ -260,7 +467,7 @@ function OverviewTab(props: { overview?: BillingOverview; loading: boolean }) {
             <p className="mt-1 text-3xl font-black text-foreground">{overview.tenantsWithoutNewBilling}</p>
           </div>
           <p className="max-w-2xl text-sm font-semibold text-muted-foreground">
-            Este nÃºmero Ã© honesto: tenants legados ou sem assinatura v2 aparecem aqui, sem simular MRR ou cobranÃ§a.
+            Este número é honesto: tenants legados ou sem assinatura v2 aparecem aqui, sem simular MRR ou cobrança.
           </p>
         </div>
       </Panel>
@@ -307,7 +514,7 @@ function TenantTab(props: {
               <option value="">Escolha um tenant</option>
               {props.tenants.map((tenant) => (
                 <option key={tenant.id} value={tenant.id}>
-                  {tenant.name} Â· {tenant.slug}
+                  {tenant.name} · {tenant.slug}
                 </option>
               ))}
             </select>
@@ -320,11 +527,11 @@ function TenantTab(props: {
 
       <div className="space-y-4">
         {!props.selectedTenantId ? (
-          <EmptyState icon={Store} title="Nenhum tenant selecionado" text="A operaÃ§Ã£o manual comeÃ§a selecionando um tenant existente da plataforma." />
+          <EmptyState icon={Store} title="Nenhum tenant selecionado" text="A operação manual começa selecionando um tenant existente da plataforma." />
         ) : props.tenantLoading ? (
           <LoadingBlock />
         ) : !subscription ? (
-          <EmptyState icon={AlertTriangle} title="Tenant sem assinatura billing nova" text="NÃ£o hÃ¡ TenantBillingSubscription v2 para este tenant. A console nÃ£o cria cobranÃ§a nem inventa assinatura." />
+          <EmptyState icon={AlertTriangle} title="Tenant sem assinatura billing nova" text="Não há TenantBillingSubscription v2 para este tenant. A console não cria cobrança nem inventa assinatura." />
         ) : (
           <>
             <Panel
@@ -341,17 +548,17 @@ function TenantTab(props: {
               }
             >
               <div className="grid gap-4 p-5 lg:grid-cols-3">
-                <InfoPill label="Plano" value={plan?.name ?? 'â€”'} />
+                <InfoPill label="Plano" value={plan?.name ?? '—'} />
                 <div className="rounded-md border border-border bg-background px-3 py-2">
                   <p className="text-xs font-bold text-muted-foreground">Status</p>
                   <div className="mt-1"><StatusBadge status={tenantBilling?.calculatedStatus ?? subscription.status} /></div>
                 </div>
                 <InfoPill label="Trial termina em" value={formatDate(subscription.trialEndsAt)} />
-                <InfoPill label="Ciclo atual" value={currentCycle ? shortId(currentCycle.id) : 'NÃ£o criado'} />
-                <InfoPill label="PerÃ­odo" value={currentCycle ? `${formatDate(currentCycle.startedAt)} atÃ© ${formatDate(currentCycle.endedAt)}` : 'â€”'} />
+                <InfoPill label="Ciclo atual" value={currentCycle ? shortId(currentCycle.id) : 'Não criado'} />
+                <InfoPill label="Período" value={currentCycle ? `${formatDate(currentCycle.startedAt)} até ${formatDate(currentCycle.endedAt)}` : '—'} />
                 <div className="rounded-md border border-border bg-background px-3 py-2">
                   <p className="text-xs font-bold text-muted-foreground">Status do ciclo</p>
-                  <div className="mt-1">{currentCycle ? <StatusBadge status={currentCycle.status} /> : <span className="font-black text-foreground">â€”</span>}</div>
+                  <div className="mt-1">{currentCycle ? <StatusBadge status={currentCycle.status} /> : <span className="font-black text-foreground">—</span>}</div>
                 </div>
               </div>
             </Panel>
@@ -390,13 +597,13 @@ function TenantTab(props: {
               <div className="grid gap-4 p-5 lg:grid-cols-4">
                 <MetricCard label="Faturamento apurado" value={money(props.usagePreview?.billableAmount)} icon={TrendingUp} />
                 <MetricCard label="Pedidos contados" value={props.usagePreview?.ordersCount ?? 0} icon={ClipboardList} />
-                <MetricCard label="Faixa atual" value={props.usagePreview?.rating?.selectedTier?.label ?? 'â€”'} icon={Layers3} />
+                <MetricCard label="Faixa atual" value={props.usagePreview?.rating?.selectedTier?.label ?? '—'} icon={Layers3} />
                 <MetricCard label="Mensalidade estimada" value={money(props.usagePreview?.rating?.currentMonthlyPrice)} icon={BadgeDollarSign} />
               </div>
               <div className="grid gap-4 border-t border-border p-5 lg:grid-cols-3">
-                <InfoPill label="PrÃ³xima faixa" value={props.usagePreview?.rating?.nextTier?.label ?? 'Sem prÃ³xima faixa'} />
-                <InfoPill label="Falta para prÃ³xima" value={props.usagePreview?.rating?.revenueUntilNextTier ? money(props.usagePreview.rating.revenueUntilNextTier) : 'â€”'} />
-                <InfoPill label="Latest invoice draft" value={latestInvoice ? `${latestInvoice.number} Â· ${money(latestInvoice.total)}` : 'Nenhuma'} />
+                <InfoPill label="Próxima faixa" value={props.usagePreview?.rating?.nextTier?.label ?? 'Sem próxima faixa'} />
+                <InfoPill label="Falta para próxima" value={props.usagePreview?.rating?.revenueUntilNextTier ? money(props.usagePreview.rating.revenueUntilNextTier) : '—'} />
+                <InfoPill label="Latest invoice draft" value={latestInvoice ? `${latestInvoice.number} · ${money(latestInvoice.total)}` : 'Nenhuma'} />
               </div>
             </Panel>
 
@@ -426,7 +633,7 @@ function InvoiceItemsTable({ items }: { items: Array<InvoiceItem | { type: strin
         <thead className="bg-muted text-left text-xs font-black uppercase text-muted-foreground">
           <tr>
             <th className="px-4 py-3">Tipo</th>
-            <th className="px-4 py-3">DescriÃ§Ã£o</th>
+            <th className="px-4 py-3">Descrição</th>
             <th className="px-4 py-3 text-right">Qtd.</th>
             <th className="px-4 py-3 text-right">Total</th>
           </tr>
@@ -461,7 +668,7 @@ function InvoicesTab(props: {
 }) {
   if (props.loading) return <LoadingBlock />;
   if (!props.invoices.length) {
-    return <EmptyState icon={Receipt} title="Nenhuma invoice draft" text="Invoices rascunho aparecerÃ£o aqui depois de fechar um ciclo manualmente." />;
+    return <EmptyState icon={Receipt} title="Nenhuma invoice draft" text="Invoices rascunho aparecerão aqui depois de fechar um ciclo manualmente." />;
   }
 
   return (
@@ -471,14 +678,14 @@ function InvoicesTab(props: {
           <table className="w-full min-w-[860px] text-sm">
             <thead className="bg-muted text-left text-xs font-black uppercase text-muted-foreground">
               <tr>
-                <th className="px-4 py-3">NÃºmero</th>
+                <th className="px-4 py-3">Número</th>
                 <th className="px-4 py-3">Tenant</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Subtotal</th>
                 <th className="px-4 py-3 text-right">Total</th>
                 <th className="px-4 py-3">Vencimento</th>
                 <th className="px-4 py-3">Provider</th>
-                <th className="px-4 py-3 text-right">AÃ§Ãµes</th>
+                <th className="px-4 py-3 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -516,7 +723,7 @@ function InvoicesTab(props: {
             <div className="flex items-center justify-between border-b border-border p-5">
               <div>
                 <h2 className="text-xl font-black">Detalhe da invoice</h2>
-                <p className="mt-1 text-sm font-semibold text-muted-foreground">Sem aÃ§Ã£o de cobranÃ§a real nesta fase.</p>
+                <p className="mt-1 text-sm font-semibold text-muted-foreground">Sem ação de cobrança real nesta fase.</p>
               </div>
               <button onClick={props.onCloseDetails} className="rounded-md p-2 hover:bg-muted">
                 <X className="h-5 w-5" />
@@ -556,7 +763,7 @@ function InvoiceDetailsView(props: {
       <div className="grid gap-3 sm:grid-cols-4">
         <InfoPill label="Status" value={statusLabels[details.invoice.status] ?? details.invoice.status} />
         <InfoPill label="Ciclo" value={shortId(details.invoice.cycleId)} />
-        <InfoPill label="PerÃ­odo" value={details.cycle ? `${formatDate(details.cycle.startedAt)} atÃ© ${formatDate(details.cycle.endedAt)}` : 'â€”'} />
+        <InfoPill label="Período" value={details.cycle ? `${formatDate(details.cycle.startedAt)} até ${formatDate(details.cycle.endedAt)}` : '—'} />
         <InfoPill label="Total" value={money(details.invoice.total)} />
       </div>
       <InvoiceItemsTable items={details.items} />
@@ -576,7 +783,7 @@ function InvoiceDetailsView(props: {
         <InfoPill label="Snapshot" value={shortId(details.snapshot?.id)} />
       </div>
       <button disabled className="w-full rounded-md border border-dashed border-border bg-muted px-4 py-3 font-black text-muted-foreground">
-        CobranÃ§a real indisponÃ­vel nesta fase
+        Cobrança real indisponível nesta fase
       </button>
     </div>
   );
@@ -596,7 +803,7 @@ function PaymentAttemptPanel(props: {
   const mode = props.paymentConfig?.mode ?? 'disabled';
   const isAsaasSandbox = provider === 'asaas' && mode === 'sandbox';
   const canCreate = paymentsEnabled && (provider === 'manual' || provider === 'mock' || isAsaasSandbox) && mode !== 'disabled' && !['paid', 'void', 'failed'].includes(props.invoice.status);
-  const createLabel = isAsaasSandbox ? 'Gerar cobranca Asaas Sandbox' : 'Criar tentativa manual/sandbox';
+  const createLabel = isAsaasSandbox ? 'Gerar cobrança Asaas Sandbox' : 'Criar tentativa manual/sandbox';
 
   return (
     <div className="rounded-lg border border-border bg-background">
@@ -605,8 +812,8 @@ function PaymentAttemptPanel(props: {
           <p className="font-black text-foreground">Payment attempts</p>
           <p className="mt-1 text-sm font-semibold text-muted-foreground">
             {isAsaasSandbox
-              ? 'Sandbox: nao use em producao. A cobranca usa link hospedado no Asaas.'
-              : 'Esta acao ainda nao cobra automaticamente em producao. Apenas manual/mock sandbox local.'}
+              ? 'Sandbox: não use em produção. A cobrança usa link hospedado no Asaas.'
+              : 'Esta ação ainda não cobra automaticamente em produção. Apenas manual/mock sandbox local.'}
           </p>
         </div>
         <button
@@ -653,7 +860,7 @@ function PaymentAttemptPanel(props: {
                 <th className="px-4 py-3">Mode</th>
                 <th className="px-4 py-3">Gateway ID</th>
                 <th className="px-4 py-3">Attempted</th>
-                <th className="px-4 py-3 text-right">Acoes</th>
+                <th className="px-4 py-3 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -696,37 +903,75 @@ function PaymentAttemptPanel(props: {
   );
 }
 
-function SettingsTab({ settings, loading }: { settings?: BillingSettings; loading: boolean }) {
-  if (loading) return <LoadingBlock />;
-  if (!settings) return <EmptyState icon={Settings} title="ConfiguraÃ§Ãµes indisponÃ­veis" text="NÃ£o foi possÃ­vel carregar BillingSettings global." />;
+function settingsToForm(settings: BillingSettings): UpdateBillingSettingsBody {
+  return {
+    includeDeliveryFeeByDefault: settings.includeDeliveryFeeByDefault,
+    includeServiceFeeByDefault: settings.includeServiceFeeByDefault,
+    countStorefrontOrders: settings.countStorefrontOrders,
+    countPosOrders: settings.countPosOrders,
+    countWhatsappAiOrders: settings.countWhatsappAiOrders,
+    countManualOrders: settings.countManualOrders,
+    countConfirmedOrders: settings.countConfirmedOrders,
+    countCompletedOrders: settings.countCompletedOrders,
+    excludeCancelledOrders: settings.excludeCancelledOrders,
+    discountReducesRevenue: settings.discountReducesRevenue,
+    defaultGracePeriodDays: settings.defaultGracePeriodDays,
+    defaultTrialDays: settings.defaultTrialDays,
+    requirePaymentMethodForPaidPlans: settings.requirePaymentMethodForPaidPlans,
+  };
+}
 
-  const rows: Array<{ label: string; value: boolean | number }> = [
-    { label: 'countStorefrontOrders', value: settings.countStorefrontOrders },
-    { label: 'countPosOrders', value: settings.countPosOrders },
-    { label: 'countWhatsappAiOrders', value: settings.countWhatsappAiOrders },
-    { label: 'countManualOrders', value: settings.countManualOrders },
-    { label: 'countConfirmedOrders', value: settings.countConfirmedOrders },
-    { label: 'countCompletedOrders', value: settings.countCompletedOrders },
-    { label: 'excludeCancelledOrders', value: settings.excludeCancelledOrders },
-    { label: 'includeDeliveryFeeByDefault', value: settings.includeDeliveryFeeByDefault },
-    { label: 'includeServiceFeeByDefault', value: settings.includeServiceFeeByDefault },
-    { label: 'discountReducesRevenue', value: settings.discountReducesRevenue },
-    { label: 'defaultGracePeriodDays', value: settings.defaultGracePeriodDays },
-    { label: 'defaultTrialDays', value: settings.defaultTrialDays },
-    { label: 'requirePaymentMethodForPaidPlans', value: settings.requirePaymentMethodForPaidPlans },
-  ];
+function SettingsTab(props: {
+  settings?: BillingSettings;
+  loading: boolean;
+  saving: boolean;
+  onSave: (body: UpdateBillingSettingsBody) => void;
+}) {
+  const { settings, loading } = props;
+  const [form, setForm] = useState<UpdateBillingSettingsBody | null>(settings ? settingsToForm(settings) : null);
+
+  useEffect(() => {
+    setForm(settings ? settingsToForm(settings) : null);
+  }, [settings]);
+
+  if (loading) return <LoadingBlock />;
+  if (!settings || !form) return <EmptyState icon={Settings} title="Configurações indisponíveis" text="Não foi possível carregar BillingSettings global." />;
+
+  const setBoolean = (key: keyof UpdateBillingSettingsBody, value: boolean) => {
+    setForm((current) => current ? { ...current, [key]: value } : current);
+  };
+  const setNumber = (key: keyof UpdateBillingSettingsBody, value: number) => {
+    setForm((current) => current ? { ...current, [key]: value } : current);
+  };
 
   return (
-    <Panel title="BillingSettings global">
-      <div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">
-        {rows.map((row) => (
-          <div key={row.label} className="flex items-center justify-between rounded-lg border border-border bg-background px-4 py-3">
-            <span className="font-mono text-sm font-bold text-foreground">{row.label}</span>
-            <span className={`rounded-md px-2.5 py-1 text-xs font-black ${typeof row.value === 'boolean' ? (row.value ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700') : 'bg-blue-50 text-blue-700'}`}>
-              {typeof row.value === 'boolean' ? (row.value ? 'true' : 'false') : row.value}
-            </span>
-          </div>
-        ))}
+    <Panel
+      title="BillingSettings global"
+      action={
+        <button
+          onClick={() => props.onSave(form)}
+          disabled={props.saving}
+          className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-black text-primary-foreground disabled:opacity-60"
+        >
+          {props.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Salvar configurações
+        </button>
+      }
+    >
+      <div className="grid gap-3 p-5 md:grid-cols-2 xl:grid-cols-3">
+        <ToggleField label="Contar Storefront" checked={form.countStorefrontOrders} onChange={(value) => setBoolean('countStorefrontOrders', value)} />
+        <ToggleField label="Contar PDV" checked={form.countPosOrders} onChange={(value) => setBoolean('countPosOrders', value)} />
+        <ToggleField label="Contar WhatsApp IA" checked={form.countWhatsappAiOrders} onChange={(value) => setBoolean('countWhatsappAiOrders', value)} />
+        <ToggleField label="Contar pedidos manuais" checked={form.countManualOrders} onChange={(value) => setBoolean('countManualOrders', value)} />
+        <ToggleField label="Contar confirmados" checked={form.countConfirmedOrders} onChange={(value) => setBoolean('countConfirmedOrders', value)} />
+        <ToggleField label="Contar concluídos" checked={form.countCompletedOrders} onChange={(value) => setBoolean('countCompletedOrders', value)} />
+        <ToggleField label="Excluir cancelados" checked={form.excludeCancelledOrders} onChange={(value) => setBoolean('excludeCancelledOrders', value)} />
+        <ToggleField label="Desconto reduz receita" checked={form.discountReducesRevenue} onChange={(value) => setBoolean('discountReducesRevenue', value)} />
+        <ToggleField label="Incluir entrega" checked={form.includeDeliveryFeeByDefault} onChange={(value) => setBoolean('includeDeliveryFeeByDefault', value)} />
+        <ToggleField label="Incluir taxa de serviço" checked={form.includeServiceFeeByDefault} onChange={(value) => setBoolean('includeServiceFeeByDefault', value)} />
+        <ToggleField label="Exigir método em planos pagos" checked={form.requirePaymentMethodForPaidPlans} onChange={(value) => setBoolean('requirePaymentMethodForPaidPlans', value)} />
+        <NumberField label="Trial padrão" value={form.defaultTrialDays} onChange={(value) => setNumber('defaultTrialDays', value)} />
+        <NumberField label="Carência padrão" value={form.defaultGracePeriodDays} onChange={(value) => setNumber('defaultGracePeriodDays', value)} />
       </div>
     </Panel>
   );
@@ -742,7 +987,7 @@ function CloseCycleModal(props: { open: boolean; loading: boolean; onConfirm: ()
         </div>
         <div className="space-y-4 p-5">
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
-            <p className="font-black">Esta aÃ§Ã£o NÃƒO cobra o cliente.</p>
+            <p className="font-black">Esta ação NÃO cobra o cliente.</p>
             <p className="mt-1 text-sm font-semibold">Ela apenas fecha o ciclo e cria uma fatura rascunho.</p>
           </div>
           <div className="flex gap-3">
@@ -842,7 +1087,7 @@ export function BillingConsolePage() {
   const invoicePreviewMutation = useMutation({
     mutationFn: async () => {
       if (!selectedTenantId || !selectedSubscription || !selectedPlan || !selectedCycle) {
-        throw new Error('Tenant, assinatura, plano e ciclo sÃ£o obrigatÃ³rios.');
+        throw new Error('Tenant, assinatura, plano e ciclo são obrigatórios.');
       }
       return adminBillingApi.previewCycleInvoice(selectedCycle.id, {
         tenantId: selectedTenantId,
@@ -856,7 +1101,7 @@ export function BillingConsolePage() {
   const closeCycleMutation = useMutation({
     mutationFn: async () => {
       if (!selectedTenantId || !selectedSubscription || !selectedPlan || !selectedCycle) {
-        throw new Error('Tenant, assinatura, plano e ciclo sÃ£o obrigatÃ³rios.');
+        throw new Error('Tenant, assinatura, plano e ciclo são obrigatórios.');
       }
       return adminBillingApi.closeAndDraftInvoice(selectedCycle.id, {
         tenantId: selectedTenantId,
@@ -891,8 +1136,8 @@ export function BillingConsolePage() {
     mutationFn: async (invoice: InvoiceSummary) => {
       const config = paymentConfigQuery.data;
       if (!config?.paymentsEnabled) throw new Error('Payments estao desativados.');
-      if (config.provider !== 'manual' && config.provider !== 'mock' && config.provider !== 'asaas') throw new Error('Provider nao suportado nesta fase.');
-      if (config.mode !== 'manual' && config.mode !== 'sandbox' && config.mode !== 'production') throw new Error('Modo de gateway invalido.');
+      if (config.provider !== 'manual' && config.provider !== 'mock' && config.provider !== 'asaas') throw new Error('Provider não suportado nesta fase.');
+      if (config.mode !== 'manual' && config.mode !== 'sandbox' && config.mode !== 'production') throw new Error('Modo de gateway inválido.');
       return adminBillingApi.createInvoicePaymentAttempt(invoice.id, {
         provider: config.provider,
         mode: config.mode,
@@ -919,6 +1164,38 @@ export function BillingConsolePage() {
     },
   });
 
+  const updatePlanMutation = useMutation({
+    mutationFn: ({ planId, form }: { planId: string; form: BillingPlanFormState }) => adminBillingApi.updateBillingPlanV2(planId, {
+      name: form.name,
+      description: form.description.trim() ? form.description.trim() : null,
+      trialDays: form.trialDays,
+      requiresPaymentMethod: form.requiresPaymentMethod,
+      allowAllModules: form.allowAllModules,
+      isActive: form.isActive,
+      isPublic: form.isPublic,
+      tiers: form.tiers.map((tier) => ({
+        ...(tier.id ? { id: tier.id } : {}),
+        minRevenue: tier.minRevenue,
+        maxRevenue: tier.maxRevenue === '' ? null : tier.maxRevenue,
+        price: tier.price,
+        label: typeof tier.label === 'string' && tier.label.trim() ? tier.label.trim() : null,
+      })),
+    }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin-billing-plans-v2'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-billing-overview'] }),
+      ]);
+    },
+  });
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: adminBillingApi.updateBillingSettings,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin-billing-settings'] });
+    },
+  });
+
   const tenants = tenantsQuery.data?.items ?? [];
   const revenueGrowthPlans = useMemo(() => {
     const plans = plansQuery.data ?? [];
@@ -932,14 +1209,14 @@ export function BillingConsolePage() {
           <p className="mb-2 text-sm font-black uppercase tracking-widest text-primary">Billing Phase 5.5</p>
           <h1 className="text-3xl font-black tracking-tight text-foreground">Console SaaS Admin de Billing</h1>
           <p className="mt-2 max-w-3xl text-base font-semibold text-muted-foreground">
-            Visualize planos por faturamento, audite usage, feche ciclos manualmente e gere invoices draft sem ativar cobranÃ§a real.
+            Visualize planos por faturamento, audite usage, feche ciclos manualmente e gere invoices draft sem ativar cobrança real.
           </p>
         </div>
         <div className="rounded-lg border border-border bg-card px-4 py-3">
           <p className="text-xs font-bold text-muted-foreground">Estado da fase</p>
           <p className="mt-1 flex items-center gap-2 font-black text-foreground">
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            Manual/sandbox, auditavel e sem gateway
+            Manual/sandbox, auditável e sem gateway
           </p>
         </div>
       </div>
@@ -966,7 +1243,13 @@ export function BillingConsolePage() {
       </div>
 
       {activeTab === 'overview' ? <OverviewTab overview={overviewQuery.data} loading={overviewQuery.isLoading} /> : null}
-      {activeTab === 'plans' ? <PlansTab plans={revenueGrowthPlans} /> : null}
+      {activeTab === 'plans' ? (
+        <PlansTab
+          plans={revenueGrowthPlans}
+          saving={updatePlanMutation.isPending}
+          onSave={(planId, form) => updatePlanMutation.mutate({ planId, form })}
+        />
+      ) : null}
       {activeTab === 'tenant' ? (
         <TenantTab
           tenants={tenants}
@@ -1011,11 +1294,18 @@ export function BillingConsolePage() {
           }
         />
       ) : null}
-      {activeTab === 'settings' ? <SettingsTab settings={settingsQuery.data} loading={settingsQuery.isLoading} /> : null}
+      {activeTab === 'settings' ? (
+        <SettingsTab
+          settings={settingsQuery.data}
+          loading={settingsQuery.isLoading}
+          saving={updateSettingsMutation.isPending}
+          onSave={(body) => updateSettingsMutation.mutate(body)}
+        />
+      ) : null}
 
-      {(createCycleMutation.error || usagePreviewMutation.error || invoicePreviewMutation.error || closeCycleMutation.error || createPaymentAttemptMutation.error || markPaymentAttemptPaidMutation.error || markPaymentAttemptFailedMutation.error) ? (
+      {(createCycleMutation.error || usagePreviewMutation.error || invoicePreviewMutation.error || closeCycleMutation.error || createPaymentAttemptMutation.error || markPaymentAttemptPaidMutation.error || markPaymentAttemptFailedMutation.error || updatePlanMutation.error || updateSettingsMutation.error) ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 font-bold text-red-700">
-          {(createCycleMutation.error ?? usagePreviewMutation.error ?? invoicePreviewMutation.error ?? closeCycleMutation.error ?? createPaymentAttemptMutation.error ?? markPaymentAttemptPaidMutation.error ?? markPaymentAttemptFailedMutation.error)?.message}
+          {(createCycleMutation.error ?? usagePreviewMutation.error ?? invoicePreviewMutation.error ?? closeCycleMutation.error ?? createPaymentAttemptMutation.error ?? markPaymentAttemptPaidMutation.error ?? markPaymentAttemptFailedMutation.error ?? updatePlanMutation.error ?? updateSettingsMutation.error)?.message}
         </div>
       ) : null}
 
@@ -1028,4 +1318,6 @@ export function BillingConsolePage() {
     </div>
   );
 }
+
+
 
