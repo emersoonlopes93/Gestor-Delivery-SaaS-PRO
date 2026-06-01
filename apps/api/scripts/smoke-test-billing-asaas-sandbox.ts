@@ -129,18 +129,21 @@ async function main() {
       idempotencyKey: `asaas-sandbox-smoke:${invoice.id}`,
     });
     const openedInvoice = await prisma.invoice.findUniqueOrThrow({ where: { id: invoice.id } });
+    const persistedSubscription = await prisma.tenantBillingSubscription.findUniqueOrThrow({ where: { id: subscription.id } });
 
     assert(attempt1.id === attempt2.id, 'Asaas sandbox idempotency must return same attempt');
     assert(attempt1.provider === PaymentProvider.asaas, 'Attempt provider must be asaas');
     assert(attempt1.mode === BillingGatewayMode.sandbox, 'Attempt mode must be sandbox');
     assert(Boolean(attempt1.providerPaymentId), 'providerPaymentId must be saved');
     assert(Boolean(openedInvoice.providerPaymentUrl), 'providerPaymentUrl must be saved on invoice');
+    assert(Boolean(persistedSubscription.providerCustomerId), 'providerCustomerId must be saved on subscription');
     assert(openedInvoice.status === InvoiceStatus.open || openedInvoice.status === InvoiceStatus.paid, 'invoice must move from draft to open/paid according to provider status');
     assert(await prisma.paymentAttempt.count({ where: { invoiceId: invoice.id } }) === 1, 'idempotent repeat must not duplicate attempts');
 
     console.log('Billing Asaas sandbox smoke passed:', {
       invoiceId: invoice.id,
       attemptId: attempt1.id,
+      providerCustomerId: persistedSubscription.providerCustomerId,
       providerPaymentId: attempt1.providerPaymentId,
       providerPaymentUrl: openedInvoice.providerPaymentUrl,
       invoiceStatus: openedInvoice.status,

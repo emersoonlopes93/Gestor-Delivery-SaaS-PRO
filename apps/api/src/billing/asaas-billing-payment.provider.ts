@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { BillingGatewayMode, PaymentAttemptStatus, PaymentProvider } from '@prisma/client';
 import {
   AsaasBillingClientService,
+  AsaasBillingCustomerResponse,
   AsaasBillingPaymentResponse,
 } from './asaas-billing-client.service';
 import {
@@ -21,13 +22,18 @@ export class AsaasBillingPaymentProvider implements BillingPaymentGateway {
       throw new BadRequestException('Asaas billing SaaS esta liberado somente em sandbox nesta fase.');
     }
 
+    const customerExternalReference = `tenant:${input.invoice.tenantId}:subscription:${input.invoice.subscriptionId}`;
     const customerRequest = {
       name: `Tenant ${input.invoice.tenantId.slice(0, 8)}`,
       cpfCnpj: this.syntheticCpfCnpj(input.invoice.tenantId),
-      externalReference: `tenant:${input.invoice.tenantId}`,
+      externalReference: customerExternalReference,
       notificationDisabled: true,
     };
-    const customer = await this.asaasClient.createCustomer(customerRequest);
+    const existingProviderCustomerId = input.providerCustomerId?.trim();
+    const customerResolution = existingProviderCustomerId
+      ? { customer: { id: existingProviderCustomerId }, source: 'stored' as const }
+      : await this.findOrCreateCustomer(customerRequest);
+    const customer = customerResolution.customer;
 
     const paymentRequest = {
       customer: customer.id,
@@ -47,12 +53,16 @@ export class AsaasBillingPaymentProvider implements BillingPaymentGateway {
       status,
       providerPaymentId: payment.id,
       providerPaymentUrl,
+      providerCustomerId: customer.id,
       errorCode: null,
       errorMessage: null,
       metadataJson: {
         kind: 'asaas_billing_saas',
         providerStatus: payment.status,
         customerId: customer.id,
+        customerExternalReference,
+        customerSource: customerResolution.source,
+        customerReused: customerResolution.source !== 'created',
         sandboxOnly: true,
       },
       requestJson: {
@@ -73,6 +83,20 @@ export class AsaasBillingPaymentProvider implements BillingPaymentGateway {
 
   private resolvePaymentUrl(payment: AsaasBillingPaymentResponse): string | null {
     return payment.invoiceUrl ?? payment.bankSlipUrl ?? payment.paymentLink ?? null;
+  }
+
+  private async findOrCreateCustomer(customerRequest: {
+    name: string;
+    cpfCnpj: string;
+    externalReference: string;
+    notificationDisabled: boolean;
+  }): Promise<{
+    customer: AsaasBillingCustomerResponse;
+    source: 'external_reference' | 'created';
+  }> {
+    const existing = await this.asaasClient.findCustomerByExternalReference(customerRequest.externalReference);
+    if (existing) return { customer: existing, source: 'external_reference' };
+    return { customer: await this.asaasClient.createCustomer(customerRequest), source: 'created' };
   }
 
   private safePaymentResponse(payment: AsaasBillingPaymentResponse) {

@@ -13,6 +13,7 @@ export type BillingPaymentCreateInput = {
   provider: PaymentProvider;
   mode: BillingGatewayMode;
   idempotencyKey: string;
+  providerCustomerId?: string | null;
   simulate?: BillingPaymentSimulation;
 };
 
@@ -22,6 +23,7 @@ export type BillingPaymentCreateResult = {
   status: PaymentAttemptStatus;
   providerPaymentId: string | null;
   providerPaymentUrl: string | null;
+  providerCustomerId?: string | null;
   errorCode: string | null;
   errorMessage: string | null;
   metadataJson: Prisma.InputJsonObject;

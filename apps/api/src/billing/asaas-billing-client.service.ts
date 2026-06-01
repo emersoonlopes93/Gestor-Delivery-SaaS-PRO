@@ -17,6 +17,11 @@ export type AsaasBillingCustomerResponse = {
   name?: string;
   email?: string;
   cpfCnpj?: string;
+  externalReference?: string | null;
+};
+
+export type AsaasBillingCustomerListResponse = {
+  data?: AsaasBillingCustomerResponse[];
 };
 
 export type AsaasBillingPaymentRequest = {
@@ -42,6 +47,22 @@ export type AsaasBillingPaymentResponse = {
 @Injectable()
 export class AsaasBillingClientService {
   private readonly logger = new Logger(AsaasBillingClientService.name);
+
+  async findCustomerByExternalReference(externalReference: string): Promise<AsaasBillingCustomerResponse | null> {
+    const client = this.createClient();
+    try {
+      const response = await client.get<AsaasBillingCustomerListResponse>('/customers', {
+        headers: this.authHeaders(),
+        params: {
+          externalReference,
+          limit: 1,
+        },
+      });
+      return response.data.data?.[0] ?? null;
+    } catch (error) {
+      throw this.toSafeException(error, 'consulta de cliente');
+    }
+  }
 
   async createCustomer(input: AsaasBillingCustomerRequest): Promise<AsaasBillingCustomerResponse> {
     const client = this.createClient();

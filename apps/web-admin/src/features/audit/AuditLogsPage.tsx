@@ -70,14 +70,6 @@ export function AuditLogsPage() {
     loadData();
   }, [loadData]);
 
-  const actionBadgeColor = (action: string) => {
-    if (action.includes('create') || action.includes('register')) return 'bg-green-100 text-green-800';
-    if (action.includes('delete') || action.includes('remove')) return 'bg-red-100 text-red-800';
-    if (action.includes('update') || action.includes('edit')) return 'bg-blue-100 text-blue-800';
-    if (action.includes('login') || action.includes('auth')) return 'bg-purple-100 text-purple-800';
-    return 'bg-gray-100 text-gray-800';
-  };
-
   return (
     <div className="p-6 space-y-6">
       <PageHeader

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   BillingGatewayMode,
   Invoice,
@@ -26,6 +26,8 @@ export type CreateBillingPaymentAttemptInput = {
 
 @Injectable()
 export class BillingPaymentAttemptService {
+  private readonly logger = new Logger(BillingPaymentAttemptService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly gatewayService: BillingPaymentGatewayService,
@@ -38,6 +40,7 @@ export class BillingPaymentAttemptService {
     return this.prisma.$transaction(async (tx) => {
       const invoice = await tx.invoice.findFirst({
         where: { id: input.invoiceId, tenantId: input.tenantId },
+        include: { subscription: true },
       });
       if (!invoice) {
         throw new NotFoundException('Invoice nao encontrada para o tenant informado.');
@@ -59,8 +62,19 @@ export class BillingPaymentAttemptService {
         provider: input.provider,
         mode: input.mode,
         idempotencyKey,
+        providerCustomerId: invoice.subscription.providerCustomerId,
         simulate: input.simulate,
       });
+
+      if (gatewayResult.providerCustomerId && !invoice.subscription.providerCustomerId) {
+        await tx.tenantBillingSubscription.update({
+          where: { id: invoice.subscriptionId },
+          data: {
+            provider: input.provider,
+            providerCustomerId: gatewayResult.providerCustomerId,
+          },
+        });
+      }
 
       const openedInvoice = await this.openInvoiceForAttempt(tx, invoice, gatewayResult.providerPaymentUrl, input.provider);
       const attempt = await tx.paymentAttempt.create({
@@ -87,6 +101,34 @@ export class BillingPaymentAttemptService {
       if (gatewayResult.status === PaymentAttemptStatus.failed) {
         await this.failInvoiceIfNoPendingAttempts(tx, openedInvoice.id);
       }
+
+      await this.createBillingAuditLog(tx, {
+        tenantId: openedInvoice.tenantId,
+        action: input.provider === PaymentProvider.asaas ? 'billing.asaas_sandbox_charge_created' : 'billing.payment_attempt_created',
+        details: {
+          provider: input.provider,
+          mode: input.mode,
+          invoiceId: openedInvoice.id,
+          paymentAttemptId: attempt.id,
+          providerPaymentId: gatewayResult.providerPaymentId,
+          providerCustomerId: gatewayResult.providerCustomerId ?? invoice.subscription.providerCustomerId ?? null,
+          invoiceStatusBefore: invoice.status,
+          invoiceStatusAfter: gatewayResult.status === PaymentAttemptStatus.succeeded ? InvoiceStatus.paid : openedInvoice.status,
+          attemptStatus: gatewayResult.status,
+          result: 'created',
+        },
+      });
+      this.logger.log({
+        message: 'billing_payment_attempt_created',
+        provider: input.provider,
+        mode: input.mode,
+        tenantId: openedInvoice.tenantId,
+        invoiceId: openedInvoice.id,
+        paymentAttemptId: attempt.id,
+        providerPaymentId: gatewayResult.providerPaymentId,
+        transition: `${invoice.status}->${gatewayResult.status === PaymentAttemptStatus.succeeded ? InvoiceStatus.paid : openedInvoice.status}`,
+        result: 'created',
+      });
 
       return attempt;
     });
@@ -215,9 +257,24 @@ export class BillingPaymentAttemptService {
       }
 
       const eventIds = this.readWebhookEventIds(attempt.metadataJson, 'asaasWebhookEventIds');
-      if (eventIds.includes(input.eventId)) return attempt;
+      if (eventIds.includes(input.eventId)) {
+        this.logger.log({
+          message: 'billing_asaas_webhook_idempotent',
+          provider: PaymentProvider.asaas,
+          mode: attempt.mode,
+          tenantId: attempt.tenantId,
+          invoiceId: attempt.invoiceId,
+          paymentAttemptId: attempt.id,
+          providerPaymentId: attempt.providerPaymentId,
+          eventId: input.eventId,
+          result: 'duplicate_ignored',
+        });
+        return attempt;
+      }
 
       const status = mapAsaasPaymentStatusToAttemptStatus(input.providerStatus);
+      const previousAttemptStatus = attempt.status;
+      const previousInvoiceStatus = attempt.invoice.status;
       await tx.paymentAttempt.update({
         where: { id: attempt.id },
         data: {
@@ -230,15 +287,38 @@ export class BillingPaymentAttemptService {
       });
 
       if (status === PaymentAttemptStatus.succeeded) {
-        return this.markAttemptSucceededInTransaction(tx, attempt.id, `asaas_webhook:${input.eventId}`);
+        const updated = await this.markAttemptSucceededInTransaction(tx, attempt.id, `asaas_webhook:${input.eventId}`);
+        await this.auditAsaasWebhook(tx, {
+          attempt: updated,
+          previousAttemptStatus,
+          previousInvoiceStatus,
+          eventId: input.eventId,
+          eventType: input.eventType,
+          providerStatus: input.providerStatus,
+          nextAttemptStatus: updated.status,
+          nextInvoiceStatus: InvoiceStatus.paid,
+        });
+        return updated;
       }
       if (status === PaymentAttemptStatus.failed) {
-        return this.markAttemptFailedInTransaction(
+        const updated = await this.markAttemptFailedInTransaction(
           tx,
           attempt.id,
           'asaas_payment_failed',
           `Asaas webhook ${input.eventId} status ${input.providerStatus}.`,
         );
+        const invoiceAfterFailure = await tx.invoice.findUniqueOrThrow({ where: { id: attempt.invoiceId } });
+        await this.auditAsaasWebhook(tx, {
+          attempt: updated,
+          previousAttemptStatus,
+          previousInvoiceStatus,
+          eventId: input.eventId,
+          eventType: input.eventType,
+          providerStatus: input.providerStatus,
+          nextAttemptStatus: updated.status,
+          nextInvoiceStatus: invoiceAfterFailure.status,
+        });
+        return updated;
       }
       if (status === PaymentAttemptStatus.canceled) {
         const updated = await tx.paymentAttempt.update({
@@ -250,10 +330,21 @@ export class BillingPaymentAttemptService {
           },
         });
         await this.failInvoiceIfNoPendingAttempts(tx, attempt.invoiceId);
+        const invoiceAfterCancel = await tx.invoice.findUniqueOrThrow({ where: { id: attempt.invoiceId } });
+        await this.auditAsaasWebhook(tx, {
+          attempt: updated,
+          previousAttemptStatus,
+          previousInvoiceStatus,
+          eventId: input.eventId,
+          eventType: input.eventType,
+          providerStatus: input.providerStatus,
+          nextAttemptStatus: updated.status,
+          nextInvoiceStatus: invoiceAfterCancel.status,
+        });
         return updated;
       }
 
-      return tx.paymentAttempt.update({
+      const updated = await tx.paymentAttempt.update({
         where: { id: attempt.id },
         data: {
           status,
@@ -261,6 +352,17 @@ export class BillingPaymentAttemptService {
           errorMessage: null,
         },
       });
+      await this.auditAsaasWebhook(tx, {
+        attempt: updated,
+        previousAttemptStatus,
+        previousInvoiceStatus,
+        eventId: input.eventId,
+        eventType: input.eventType,
+        providerStatus: input.providerStatus,
+        nextAttemptStatus: updated.status,
+        nextInvoiceStatus: previousInvoiceStatus,
+      });
+      return updated;
     });
   }
 
@@ -268,6 +370,91 @@ export class BillingPaymentAttemptService {
     const trimmed = input.idempotencyKey?.trim();
     if (trimmed) return trimmed;
     return `invoice:${input.invoiceId}:provider:${input.provider}:mode:${input.mode}`;
+  }
+
+  private async auditAsaasWebhook(
+    tx: Prisma.TransactionClient,
+    input: {
+      attempt: PaymentAttempt;
+      previousAttemptStatus: PaymentAttemptStatus;
+      previousInvoiceStatus: InvoiceStatus;
+      eventId: string;
+      eventType: string;
+      providerStatus: string;
+      nextAttemptStatus: PaymentAttemptStatus;
+      nextInvoiceStatus: InvoiceStatus;
+    },
+  ): Promise<void> {
+    await this.createBillingAuditLog(tx, {
+      tenantId: input.attempt.tenantId,
+      action: 'billing.asaas_sandbox_webhook_processed',
+      details: {
+        provider: PaymentProvider.asaas,
+        mode: input.attempt.mode,
+        invoiceId: input.attempt.invoiceId,
+        paymentAttemptId: input.attempt.id,
+        providerPaymentId: input.attempt.providerPaymentId,
+        eventId: input.eventId,
+        eventType: input.eventType,
+        providerStatus: input.providerStatus,
+        attemptStatusBefore: input.previousAttemptStatus,
+        attemptStatusAfter: input.nextAttemptStatus,
+        invoiceStatusBefore: input.previousInvoiceStatus,
+        invoiceStatusAfter: input.nextInvoiceStatus,
+        result: 'processed',
+      },
+    });
+
+    if (input.nextInvoiceStatus !== input.previousInvoiceStatus) {
+      await this.createBillingAuditLog(tx, {
+        tenantId: input.attempt.tenantId,
+        action: `billing.invoice_marked_${input.nextInvoiceStatus}`,
+        details: {
+          provider: PaymentProvider.asaas,
+          mode: input.attempt.mode,
+          invoiceId: input.attempt.invoiceId,
+          paymentAttemptId: input.attempt.id,
+          providerPaymentId: input.attempt.providerPaymentId,
+          eventId: input.eventId,
+          invoiceStatusBefore: input.previousInvoiceStatus,
+          invoiceStatusAfter: input.nextInvoiceStatus,
+          result: 'transitioned',
+        },
+      });
+    }
+
+    this.logger.log({
+      message: 'billing_asaas_webhook_processed',
+      provider: PaymentProvider.asaas,
+      mode: input.attempt.mode,
+      tenantId: input.attempt.tenantId,
+      invoiceId: input.attempt.invoiceId,
+      paymentAttemptId: input.attempt.id,
+      providerPaymentId: input.attempt.providerPaymentId,
+      eventId: input.eventId,
+      transition: `${input.previousInvoiceStatus}->${input.nextInvoiceStatus}`,
+      result: 'processed',
+    });
+  }
+
+  private async createBillingAuditLog(
+    tx: Prisma.TransactionClient,
+    input: {
+      tenantId: string;
+      action: string;
+      details: Prisma.InputJsonObject;
+    },
+  ): Promise<void> {
+    await tx.auditLog.create({
+      data: {
+        tenantId: input.tenantId,
+        userId: null,
+        userType: 'system',
+        action: input.action,
+        resource: 'billing',
+        details: input.details,
+      },
+    });
   }
 
   private assertInvoiceAllowsAttempt(invoice: Invoice): void {

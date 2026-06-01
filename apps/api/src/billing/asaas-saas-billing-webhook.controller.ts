@@ -31,6 +31,12 @@ export class AsaasSaasBillingWebhookController {
       throw new BadRequestException('ASAAS_BILLING_WEBHOOK_SECRET nao configurado.');
     }
     if (!token || token !== expectedToken) {
+      this.logger.warn({
+        message: 'billing_asaas_webhook_rejected',
+        provider: 'asaas',
+        mode: 'sandbox',
+        result: 'invalid_token',
+      });
       throw new BadRequestException('Token de webhook Asaas billing invalido.');
     }
 
@@ -53,6 +59,16 @@ export class AsaasSaasBillingWebhookController {
       eventType: payload.event,
       providerPaymentId: payload.payment.id,
       providerStatus: payload.payment.status,
+    });
+
+    this.logger.log({
+      message: 'billing_asaas_webhook_accepted',
+      provider: 'asaas',
+      mode: 'sandbox',
+      paymentAttemptId: attempt.id,
+      providerPaymentId: payload.payment.id,
+      eventId,
+      result: 'accepted',
     });
 
     return {

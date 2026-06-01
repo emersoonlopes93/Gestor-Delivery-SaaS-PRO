@@ -158,6 +158,9 @@ ASAAS_BILLING_WEBHOOK_SECRET=...
 Resultado esperado:
 
 - cria `PaymentAttempt` com provider `asaas` e mode `sandbox`
+- reutiliza `TenantBillingSubscription.providerCustomerId` quando já existir
+- se não houver customer salvo, consulta o Asaas sandbox por `externalReference=tenant:<tenantId>:subscription:<subscriptionId>` antes de criar
+- persiste `providerCustomerId` em `TenantBillingSubscription.providerCustomerId`
 - cria cobrança hospedada no Asaas sandbox via `POST /v3/payments`
 - salva `providerPaymentId` no attempt
 - salva `providerPaymentUrl` na invoice
@@ -191,6 +194,56 @@ Mapeamento de status Asaas:
 - `OVERDUE`, `REFUNDED`, `REFUND_REQUESTED`, `CHARGEBACK_REQUESTED`, `CHARGEBACK_DISPUTE`, `AWAITING_CHARGEBACK_REVERSAL` -> attempt `failed`, invoice `failed` se não houver tentativa pendente
 - `DELETED`, `CANCELLED` -> attempt `canceled`, invoice `failed` se não houver tentativa pendente
 - status desconhecido -> attempt `processing`, invoice permanece aberta
+
+Observabilidade segura:
+
+- logs estruturados registram `provider`, `mode`, `tenantId`, `invoiceId`, `paymentAttemptId`, `providerPaymentId`, `eventId`, transição de status e resultado
+- audit log registra cobrança sandbox criada, webhook Asaas processado e transição de invoice para `paid`/`failed` quando ocorrer
+- não logar API key, webhook secret, CPF/CNPJ completo, dados de cartão ou payload completo do webhook
+
+## Rollback operacional Asaas sandbox
+
+### Desligar Asaas imediatamente
+
+```env
+BILLING_PAYMENTS_ENABLED=false
+BILLING_GATEWAY_PROVIDER=manual
+BILLING_GATEWAY_MODE=disabled
+```
+
+Após alterar as flags, reinicie a API e rode:
+
+```bash
+pnpm --filter @gestor/api diagnose:env
+pnpm --filter @gestor/api check:billing-db
+```
+
+Resultado esperado:
+
+- endpoint de criar tentativa retorna erro claro por pagamentos desligados
+- Billing Console deixa o botão de cobrança desabilitado
+- invoice permanece `draft` ou `open`, sem cobrança automática
+- nenhum tenant é bloqueado e nenhum enforcement é ativado
+
+### Invalidar webhook sandbox
+
+- remova ou desative o webhook no painel Asaas sandbox
+- troque `ASAAS_BILLING_WEBHOOK_SECRET`
+- reinicie a API
+- valide que payload com token antigo é rejeitado em `POST /api/v1/billing/webhooks/asaas-saas`
+
+### Reverter UI
+
+- com `BILLING_PAYMENTS_ENABLED=false`, o Billing Console não deve oferecer ação de cobrança
+- com provider diferente de `asaas`/`sandbox`, não deve existir botão de produção Asaas
+- links já salvos permanecem apenas como histórico de sandbox e não disparam cobrança automática
+
+### Limpar dados de teste
+
+- remova apenas tenants de QA/sandbox criados para validação
+- limpe invoices/attempts sandbox somente se necessário e documentando os IDs
+- não apague dados reais
+- não use `prisma db push`
 
 ## Smokes obrigatórios
 
