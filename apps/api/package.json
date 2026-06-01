@@ -16,7 +16,7 @@
 
     "start": "nest start",
 
-    "start:prod": "node --max-old-space-size=512 dist/main",
+    "start:prod": "node --max-old-space-size=512 dist/apps/api/src/main.js",
 
     "lint": "eslint \"{src,test}/**/*.ts\"",
 
@@ -73,6 +73,8 @@
     "@gestor/config": "workspace:*",
 
     "@gestor/core": "workspace:*",
+
+    "@gestor/theme": "workspace:*",
 
     "@gestor/types": "workspace:*",
 
