@@ -66,6 +66,11 @@ function sameLogicalDatabase(left: UrlDiagnostics, right: UrlDiagnostics): boole
   );
 }
 
+function maskSecretPresence(value: string | undefined): string {
+  if (!value?.trim()) return 'not_configured';
+  return `configured:${value.trim().length}_chars`;
+}
+
 async function getDatabaseIdentity(prisma: PrismaClient): Promise<DatabaseIdentity> {
   const rows = await prisma.$queryRaw<DatabaseIdentity[]>`
     SELECT
@@ -123,6 +128,9 @@ async function main() {
         billingPaymentsEnabled: process.env.BILLING_PAYMENTS_ENABLED ?? 'false',
         billingGatewayProvider: process.env.BILLING_GATEWAY_PROVIDER ?? 'manual',
         billingGatewayMode: process.env.BILLING_GATEWAY_MODE ?? 'disabled',
+        asaasBillingBaseUrl: process.env.ASAAS_BILLING_BASE_URL ?? '(default sandbox)',
+        asaasBillingApiKey: maskSecretPresence(process.env.ASAAS_BILLING_API_KEY),
+        asaasBillingWebhookSecret: maskSecretPresence(process.env.ASAAS_BILLING_WEBHOOK_SECRET),
       },
     };
 

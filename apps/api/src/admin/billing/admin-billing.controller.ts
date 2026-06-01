@@ -502,7 +502,8 @@ export class AdminBillingController {
     const normalized = provider?.trim();
     if (normalized === PaymentProvider.manual) return PaymentProvider.manual;
     if (normalized === PaymentProvider.mock) return PaymentProvider.mock;
-    throw new BadRequestException('provider deve ser manual ou mock nesta fase.');
+    if (normalized === PaymentProvider.asaas) return PaymentProvider.asaas;
+    throw new BadRequestException('provider deve ser manual, mock ou asaas nesta fase.');
   }
 
   private parseBillingGatewayMode(mode: string | undefined): BillingGatewayMode {

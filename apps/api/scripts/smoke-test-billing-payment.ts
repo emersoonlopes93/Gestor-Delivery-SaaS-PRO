@@ -12,6 +12,8 @@ import { BillingPaymentAttemptService } from '../src/billing/billing-payment-att
 import { BillingPaymentGatewayService } from '../src/billing/billing-payment-gateway.service';
 import { ManualBillingPaymentProvider } from '../src/billing/manual-billing-payment.provider';
 import { MockBillingPaymentProvider } from '../src/billing/mock-billing-payment.provider';
+import { AsaasBillingClientService } from '../src/billing/asaas-billing-client.service';
+import { AsaasBillingPaymentProvider } from '../src/billing/asaas-billing-payment.provider';
 
 function assertStringEquals(actual: string, expected: string, label: string): void {
   if (actual !== expected) {
@@ -76,6 +78,7 @@ async function main() {
   const gatewayService = new BillingPaymentGatewayService(
     new ManualBillingPaymentProvider(),
     new MockBillingPaymentProvider(),
+    new AsaasBillingPaymentProvider(new AsaasBillingClientService()),
   );
   const paymentAttemptService = new BillingPaymentAttemptService(prisma, gatewayService);
 

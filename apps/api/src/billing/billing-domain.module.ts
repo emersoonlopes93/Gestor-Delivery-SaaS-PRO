@@ -12,6 +12,8 @@ import { BillingPaymentGatewayService } from './billing-payment-gateway.service'
 import { ManualBillingPaymentProvider } from './manual-billing-payment.provider';
 import { MockBillingPaymentProvider } from './mock-billing-payment.provider';
 import { BillingPaymentAttemptService } from './billing-payment-attempt.service';
+import { AsaasBillingClientService } from './asaas-billing-client.service';
+import { AsaasBillingPaymentProvider } from './asaas-billing-payment.provider';
 
 @Module({
   providers: [
@@ -26,6 +28,8 @@ import { BillingPaymentAttemptService } from './billing-payment-attempt.service'
     BillingCycleService,
     ManualBillingPaymentProvider,
     MockBillingPaymentProvider,
+    AsaasBillingClientService,
+    AsaasBillingPaymentProvider,
     BillingPaymentGatewayService,
     BillingPaymentAttemptService,
   ],

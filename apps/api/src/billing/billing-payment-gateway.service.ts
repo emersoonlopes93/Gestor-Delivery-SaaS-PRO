@@ -7,6 +7,7 @@ import {
 } from './billing-payment-gateway.interface';
 import { ManualBillingPaymentProvider } from './manual-billing-payment.provider';
 import { MockBillingPaymentProvider } from './mock-billing-payment.provider';
+import { AsaasBillingPaymentProvider } from './asaas-billing-payment.provider';
 
 export type BillingPaymentRuntimeConfig = {
   paymentsEnabled: boolean;
@@ -21,6 +22,7 @@ export class BillingPaymentGatewayService {
   constructor(
     private readonly manualProvider: ManualBillingPaymentProvider,
     private readonly mockProvider: MockBillingPaymentProvider,
+    private readonly asaasProvider: AsaasBillingPaymentProvider,
   ) {}
 
   getRuntimeConfig(): BillingPaymentRuntimeConfig {
@@ -29,7 +31,7 @@ export class BillingPaymentGatewayService {
       provider: this.parseProvider(process.env.BILLING_GATEWAY_PROVIDER ?? 'manual'),
       mode: this.parseMode(process.env.BILLING_GATEWAY_MODE ?? 'disabled'),
       productionAllowed: process.env.NODE_ENV === 'production',
-      supportedProviders: [PaymentProvider.manual, PaymentProvider.mock],
+      supportedProviders: [PaymentProvider.manual, PaymentProvider.mock, PaymentProvider.asaas],
     };
   }
 
@@ -68,11 +70,18 @@ export class BillingPaymentGatewayService {
     if (provider === PaymentProvider.manual && mode !== BillingGatewayMode.manual) {
       throw new BadRequestException("Provider manual exige BILLING_GATEWAY_MODE='manual'.");
     }
+    if (provider === PaymentProvider.asaas && mode !== BillingGatewayMode.sandbox) {
+      throw new BadRequestException("Provider asaas esta liberado somente com BILLING_GATEWAY_MODE='sandbox' nesta fase.");
+    }
+    if (provider === PaymentProvider.asaas && !process.env.ASAAS_BILLING_API_KEY?.trim()) {
+      throw new BadRequestException('ASAAS_BILLING_API_KEY nao configurada para billing SaaS sandbox.');
+    }
   }
 
   private resolveProvider(provider: PaymentProvider): BillingPaymentGateway {
     if (provider === PaymentProvider.manual) return this.manualProvider;
     if (provider === PaymentProvider.mock) return this.mockProvider;
+    if (provider === PaymentProvider.asaas) return this.asaasProvider;
     throw new BadRequestException(`Provider de billing nao implementado nesta fase: ${provider}.`);
   }
 

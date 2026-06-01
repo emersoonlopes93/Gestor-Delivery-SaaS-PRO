@@ -49,6 +49,9 @@ const baseEnvSchema = z.object({
   BILLING_PAYMENTS_ENABLED: z.enum(['true', 'false']).default('false'),
   BILLING_GATEWAY_PROVIDER: z.enum(['manual', 'mock', 'asaas', 'mercado_pago', 'stripe']).default('manual'),
   BILLING_GATEWAY_MODE: z.enum(['disabled', 'manual', 'sandbox', 'production']).default('disabled'),
+  ASAAS_BILLING_API_KEY: z.string().default(''),
+  ASAAS_BILLING_BASE_URL: z.string().default('https://api-sandbox.asaas.com/v3'),
+  ASAAS_BILLING_WEBHOOK_SECRET: z.string().default(''),
 
   // Storage Driver & Cloudflare R2
   STORAGE_DRIVER: z.enum(['local', 'r2']).optional(),
@@ -102,6 +105,32 @@ const envSchema = baseEnvSchema
         path: ['BILLING_GATEWAY_PROVIDER'],
         message: `BILLING_GATEWAY_PROVIDER='manual' exige BILLING_GATEWAY_MODE='manual' quando pagamentos estao ativos.`,
       });
+    }
+
+    if (data.BILLING_GATEWAY_PROVIDER === 'asaas' && data.BILLING_GATEWAY_MODE !== 'sandbox') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['BILLING_GATEWAY_PROVIDER'],
+        message: `BILLING_GATEWAY_PROVIDER='asaas' esta liberado somente com BILLING_GATEWAY_MODE='sandbox' nesta fase.`,
+      });
+    }
+
+    if (data.BILLING_GATEWAY_PROVIDER === 'asaas' && data.BILLING_GATEWAY_MODE === 'sandbox') {
+      if (!data.ASAAS_BILLING_BASE_URL.startsWith('https://api-sandbox.asaas.com/v3')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['ASAAS_BILLING_BASE_URL'],
+          message: `ASAAS_BILLING_BASE_URL deve apontar para https://api-sandbox.asaas.com/v3 nesta fase.`,
+        });
+      }
+
+      if (data.BILLING_PAYMENTS_ENABLED === 'true' && !data.ASAAS_BILLING_API_KEY.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['ASAAS_BILLING_API_KEY'],
+          message: `ASAAS_BILLING_API_KEY e obrigatoria quando Asaas billing sandbox esta ativo.`,
+        });
+      }
     }
 
     if (isProduction && data.STORAGE_DRIVER === 'local') {

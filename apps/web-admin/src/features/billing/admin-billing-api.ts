@@ -175,7 +175,7 @@ export type PaymentAttempt = {
   id: string;
   invoiceId: string;
   tenantId: string;
-  provider: 'manual' | 'mock' | string;
+  provider: 'manual' | 'mock' | 'asaas' | string;
   status: 'pending' | 'processing' | 'succeeded' | 'failed' | 'canceled' | string;
   mode: 'manual' | 'sandbox' | 'production' | string;
   idempotencyKey: string | null;
@@ -193,7 +193,7 @@ export type PaymentAttempt = {
 
 export type BillingPaymentConfig = {
   paymentsEnabled: boolean;
-  provider: 'manual' | 'mock' | string;
+  provider: 'manual' | 'mock' | 'asaas' | string;
   mode: 'disabled' | 'manual' | 'sandbox' | 'production';
   productionAllowed: boolean;
   supportedProviders: string[];
@@ -363,7 +363,7 @@ export const adminBillingApi = {
   createInvoicePaymentAttempt: async (
     invoiceId: string,
     body: {
-      provider: 'manual' | 'mock';
+      provider: 'manual' | 'mock' | 'asaas';
       mode: 'manual' | 'sandbox' | 'production';
       idempotencyKey?: string;
       simulate?: 'success' | 'failure' | 'pending';

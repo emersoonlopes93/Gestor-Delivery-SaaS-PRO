@@ -144,6 +144,54 @@ Resultado esperado:
 
 Manual e mock/sandbox apenas registram `PaymentAttempt` e transições de invoice (`draft -> open -> paid/failed`). Nenhum checkout, PDV, storefront, pedido ou gateway externo é acionado.
 
+### Asaas sandbox para billing SaaS
+
+```env
+BILLING_PAYMENTS_ENABLED=true
+BILLING_GATEWAY_PROVIDER=asaas
+BILLING_GATEWAY_MODE=sandbox
+ASAAS_BILLING_API_KEY=...
+ASAAS_BILLING_BASE_URL=https://api-sandbox.asaas.com/v3
+ASAAS_BILLING_WEBHOOK_SECRET=...
+```
+
+Resultado esperado:
+
+- cria `PaymentAttempt` com provider `asaas` e mode `sandbox`
+- cria cobrança hospedada no Asaas sandbox via `POST /v3/payments`
+- salva `providerPaymentId` no attempt
+- salva `providerPaymentUrl` na invoice
+- invoice `draft -> open`, salvo status pago confirmado pelo provider/webhook
+- não armazena cartão bruto
+- não usa envs legadas de pedido/split
+- não chama produção
+
+O webhook SaaS Asaas fica em:
+
+```text
+POST /api/v1/billing/webhooks/asaas-saas
+```
+
+Autenticidade:
+
+- configurar o `authToken` do webhook no Asaas com o mesmo valor de `ASAAS_BILLING_WEBHOOK_SECRET`
+- o Asaas envia esse token no header `asaas-access-token`
+- payload sem token válido é rejeitado
+
+Idempotência:
+
+- se o payload vier com `id`, ele é usado como eventId
+- se não vier, a chave é `event + payment.id + payment.status + dateCreated`
+- eventos já processados ficam registrados no metadata da `PaymentAttempt`
+
+Mapeamento de status Asaas:
+
+- `RECEIVED`, `CONFIRMED`, `RECEIVED_IN_CASH` -> attempt `succeeded`, invoice `paid`
+- `PENDING`, `AWAITING_RISK_ANALYSIS`, `APPROVED_BY_RISK_ANALYSIS`, `AUTHORIZED` -> attempt pending/open
+- `OVERDUE`, `REFUNDED`, `REFUND_REQUESTED`, `CHARGEBACK_REQUESTED`, `CHARGEBACK_DISPUTE`, `AWAITING_CHARGEBACK_REVERSAL` -> attempt `failed`, invoice `failed` se não houver tentativa pendente
+- `DELETED`, `CANCELLED` -> attempt `canceled`, invoice `failed` se não houver tentativa pendente
+- status desconhecido -> attempt `processing`, invoice permanece aberta
+
 ## Smokes obrigatórios
 
 Antes de avançar fases de billing:
@@ -158,9 +206,12 @@ pnpm --filter @gestor/api smoke:billing
 pnpm --filter @gestor/api smoke:billing-usage
 pnpm --filter @gestor/api smoke:billing-cycle
 pnpm --filter @gestor/api smoke:billing-payment
+pnpm --filter @gestor/api smoke:billing-asaas-sandbox
 pnpm --filter @gestor/api build
 pnpm build
 ```
+
+`smoke:billing-asaas-sandbox` pula com mensagem clara quando as credenciais sandbox não estão configuradas; ele não faz parte do build padrão.
 
 ## Checklist antes de gateway real / Fase 6
 
@@ -170,11 +221,14 @@ pnpm build
 - contraprova `payments disabled` bloqueia tentativa e não cria `PaymentAttempt`
 - contraprova `manual local` cria tentativa local, abre invoice e permite marcação manual
 - contraprova `mock sandbox` cobre `pending`, `success`, `failure` e idempotência
+- contraprova Asaas sandbox cobre criação de cobrança hospedada e idempotência quando credenciais estiverem configuradas
 - mock webhook, quando habilitado, é idempotente por `eventId`
 - RBAC diferencia `saas.billing.read`, `saas.billing.manage` e usuário sem billing
 - `BILLING_PAYMENTS_ENABLED=false`
 - `BILLING_GATEWAY_MODE=disabled`
 - `BILLING_GATEWAY_PROVIDER=mock` exige `BILLING_GATEWAY_MODE=sandbox`
+- `BILLING_GATEWAY_PROVIDER=asaas` exige `BILLING_GATEWAY_MODE=sandbox`
+- `ASAAS_BILLING_BASE_URL` aponta para `https://api-sandbox.asaas.com/v3`
 - `BILLING_GATEWAY_PROVIDER=manual` exige `BILLING_GATEWAY_MODE=manual` quando pagamentos estão ativos
 - smokes de billing passaram
 - `smoke:billing-payment` passou

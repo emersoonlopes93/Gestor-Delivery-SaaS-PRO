@@ -11,6 +11,7 @@ import {
 import { PrismaService } from '../database/prisma.service';
 import { BillingPaymentGatewayService } from './billing-payment-gateway.service';
 import { BillingPaymentSimulation } from './billing-payment-gateway.interface';
+import { mapAsaasPaymentStatusToAttemptStatus } from './asaas-billing-payment.provider';
 
 const PENDING_ATTEMPT_STATUSES = [PaymentAttemptStatus.pending, PaymentAttemptStatus.processing];
 
@@ -195,6 +196,74 @@ export class BillingPaymentAttemptService {
     });
   }
 
+  async applyAsaasPaymentWebhook(input: {
+    eventId: string;
+    providerPaymentId: string;
+    eventType: string;
+    providerStatus: string;
+  }): Promise<PaymentAttempt> {
+    return this.prisma.$transaction(async (tx) => {
+      const attempt = await tx.paymentAttempt.findFirst({
+        where: {
+          provider: PaymentProvider.asaas,
+          providerPaymentId: input.providerPaymentId,
+        },
+        include: { invoice: true },
+      });
+      if (!attempt) {
+        throw new NotFoundException('Payment attempt Asaas nao encontrada para o providerPaymentId informado.');
+      }
+
+      const eventIds = this.readWebhookEventIds(attempt.metadataJson, 'asaasWebhookEventIds');
+      if (eventIds.includes(input.eventId)) return attempt;
+
+      const status = mapAsaasPaymentStatusToAttemptStatus(input.providerStatus);
+      await tx.paymentAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          metadataJson: this.mergeMetadata(attempt.metadataJson, {
+            asaasWebhookEventIds: [...eventIds, input.eventId],
+            asaasLastEventType: input.eventType,
+            asaasLastProviderStatus: input.providerStatus,
+          }),
+        },
+      });
+
+      if (status === PaymentAttemptStatus.succeeded) {
+        return this.markAttemptSucceededInTransaction(tx, attempt.id, `asaas_webhook:${input.eventId}`);
+      }
+      if (status === PaymentAttemptStatus.failed) {
+        return this.markAttemptFailedInTransaction(
+          tx,
+          attempt.id,
+          'asaas_payment_failed',
+          `Asaas webhook ${input.eventId} status ${input.providerStatus}.`,
+        );
+      }
+      if (status === PaymentAttemptStatus.canceled) {
+        const updated = await tx.paymentAttempt.update({
+          where: { id: attempt.id },
+          data: {
+            status: PaymentAttemptStatus.canceled,
+            errorCode: 'asaas_payment_canceled',
+            errorMessage: `Asaas webhook ${input.eventId} cancelou a cobranca.`,
+          },
+        });
+        await this.failInvoiceIfNoPendingAttempts(tx, attempt.invoiceId);
+        return updated;
+      }
+
+      return tx.paymentAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          status,
+          errorCode: null,
+          errorMessage: null,
+        },
+      });
+    });
+  }
+
   private resolveIdempotencyKey(input: CreateBillingPaymentAttemptInput): string {
     const trimmed = input.idempotencyKey?.trim();
     if (trimmed) return trimmed;
@@ -352,9 +421,9 @@ export class BillingPaymentAttemptService {
     };
   }
 
-  private readWebhookEventIds(metadata: Prisma.JsonValue | null): string[] {
+  private readWebhookEventIds(metadata: Prisma.JsonValue | null, key = 'mockWebhookEventIds'): string[] {
     if (!this.isJsonObject(metadata)) return [];
-    const value = metadata.mockWebhookEventIds;
+    const value = metadata[key];
     if (!Array.isArray(value)) return [];
     return value.filter((entry): entry is string => typeof entry === 'string');
   }

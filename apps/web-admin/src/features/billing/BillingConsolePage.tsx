@@ -594,7 +594,9 @@ function PaymentAttemptPanel(props: {
   const paymentsEnabled = props.paymentConfig?.paymentsEnabled ?? false;
   const provider = props.paymentConfig?.provider ?? 'manual';
   const mode = props.paymentConfig?.mode ?? 'disabled';
-  const canCreate = paymentsEnabled && (provider === 'manual' || provider === 'mock') && mode !== 'disabled' && !['paid', 'void', 'failed'].includes(props.invoice.status);
+  const isAsaasSandbox = provider === 'asaas' && mode === 'sandbox';
+  const canCreate = paymentsEnabled && (provider === 'manual' || provider === 'mock' || isAsaasSandbox) && mode !== 'disabled' && !['paid', 'void', 'failed'].includes(props.invoice.status);
+  const createLabel = isAsaasSandbox ? 'Gerar cobranca Asaas Sandbox' : 'Criar tentativa manual/sandbox';
 
   return (
     <div className="rounded-lg border border-border bg-background">
@@ -602,7 +604,9 @@ function PaymentAttemptPanel(props: {
         <div>
           <p className="font-black text-foreground">Payment attempts</p>
           <p className="mt-1 text-sm font-semibold text-muted-foreground">
-            Esta acao ainda nao cobra automaticamente em producao. Apenas manual/mock sandbox local.
+            {isAsaasSandbox
+              ? 'Sandbox: nao use em producao. A cobranca usa link hospedado no Asaas.'
+              : 'Esta acao ainda nao cobra automaticamente em producao. Apenas manual/mock sandbox local.'}
           </p>
         </div>
         <button
@@ -611,7 +615,7 @@ function PaymentAttemptPanel(props: {
           className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-black text-primary-foreground disabled:opacity-50"
         >
           {props.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-          Criar tentativa manual/sandbox
+          {createLabel}
         </button>
       </div>
       {!paymentsEnabled ? (
@@ -625,6 +629,20 @@ function PaymentAttemptPanel(props: {
         <InfoPill label="Modo ativo" value={mode} />
         <InfoPill label="Attempts" value={String(props.attempts.length)} />
       </div>
+      {isAsaasSandbox && props.invoice.providerPaymentUrl ? (
+        <div className="border-t border-border p-4">
+          <a
+            href={props.invoice.providerPaymentUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-black text-foreground"
+          >
+            <CreditCard className="h-4 w-4" />
+            Abrir link Asaas sandbox
+          </a>
+          <p className="mt-2 font-mono text-xs font-bold text-muted-foreground">{props.invoice.providerPaymentUrl}</p>
+        </div>
+      ) : null}
       {props.attempts.length ? (
         <div className="overflow-x-auto border-t border-border">
           <table className="w-full min-w-[760px] text-sm">
@@ -650,14 +668,14 @@ function PaymentAttemptPanel(props: {
                     <div className="flex justify-end gap-2">
                       <button
                         onClick={() => props.onMarkAttemptPaid(attempt.id)}
-                        disabled={props.loading || attempt.status === 'succeeded' || props.invoice.status === 'paid'}
+                        disabled={props.loading || attempt.provider === 'asaas' || attempt.status === 'succeeded' || props.invoice.status === 'paid'}
                         className="rounded-md border border-border px-2.5 py-1.5 text-xs font-black disabled:opacity-50"
                       >
                         Pago
                       </button>
                       <button
                         onClick={() => props.onMarkAttemptFailed(attempt.id)}
-                        disabled={props.loading || attempt.status === 'failed' || props.invoice.status === 'paid'}
+                        disabled={props.loading || attempt.provider === 'asaas' || attempt.status === 'failed' || props.invoice.status === 'paid'}
                         className="rounded-md border border-border px-2.5 py-1.5 text-xs font-black disabled:opacity-50"
                       >
                         Falha
@@ -873,7 +891,7 @@ export function BillingConsolePage() {
     mutationFn: async (invoice: InvoiceSummary) => {
       const config = paymentConfigQuery.data;
       if (!config?.paymentsEnabled) throw new Error('Payments estao desativados.');
-      if (config.provider !== 'manual' && config.provider !== 'mock') throw new Error('Provider nao suportado nesta fase.');
+      if (config.provider !== 'manual' && config.provider !== 'mock' && config.provider !== 'asaas') throw new Error('Provider nao suportado nesta fase.');
       if (config.mode !== 'manual' && config.mode !== 'sandbox' && config.mode !== 'production') throw new Error('Modo de gateway invalido.');
       return adminBillingApi.createInvoicePaymentAttempt(invoice.id, {
         provider: config.provider,
