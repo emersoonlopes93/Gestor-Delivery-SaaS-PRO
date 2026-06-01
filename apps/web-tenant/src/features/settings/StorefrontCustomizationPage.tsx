@@ -6,7 +6,8 @@ import {
   RotateCcw, 
   Save,
   Eye,
-  MousePointer2
+  MousePointer2,
+  Zap
 } from 'lucide-react';
 import { api } from '../../lib/api-client';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -14,7 +15,8 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { 
-  getDefaultStorefrontThemeSettings, 
+  getStorefrontPresets,
+  getDefaultStorefrontThemeSettings,
   getDefaultStorefrontLayoutSettings,
   StorefrontThemeSettings,
   StorefrontLayoutSettings,
@@ -22,7 +24,8 @@ import {
   StorefrontCategoryLayout,
   StorefrontImageMode,
   StorefrontRadius,
-  ThemeMode
+  ThemeMode,
+  StorefrontPreset
 } from '@gestor/theme';
 
 export function StorefrontCustomizationPage() {
@@ -97,6 +100,15 @@ export function StorefrontCustomizationPage() {
     }));
   };
 
+  const applyPreset = (preset: StorefrontPreset) => {
+    if (window.confirm(`Deseja aplicar o preset "${preset.name}"? Isso substituirá suas configurações atuais.`)) {
+      setCustomization({
+        theme: { ...preset.theme },
+        layout: { ...preset.layout }
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -129,6 +141,34 @@ export function StorefrontCustomizationPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
+          {/* Presets Rápidos */}
+          <Card className="p-6">
+            <div className="flex items-center gap-2 mb-6">
+              <Zap className="w-5 h-5 text-amber-500" />
+              <h2 className="text-lg font-bold">Presets Rápidos</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {getStorefrontPresets().map((preset) => (
+                <button
+                  key={preset.id}
+                  onClick={() => applyPreset(preset)}
+                  className="flex flex-col p-4 border border-gray-100 rounded-xl hover:border-primary-200 hover:bg-primary-50/30 transition-all text-left group"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div 
+                      className="w-8 h-8 rounded-lg shadow-inner" 
+                      style={{ backgroundColor: preset.theme.primaryColor }}
+                    />
+                    <Badge variant="info" className="text-[10px] uppercase font-black">{preset.layout.productLayout}</Badge>
+                  </div>
+                  <h3 className="font-bold text-sm text-gray-900 mb-1 group-hover:text-primary-700">{preset.name}</h3>
+                  <p className="text-[11px] text-gray-500 leading-tight">{preset.description}</p>
+                </button>
+              ))}
+            </div>
+          </Card>
+
           {/* Aparência */}
           <Card className="p-6">
             <div className="flex items-center gap-2 mb-6">

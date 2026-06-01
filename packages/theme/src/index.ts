@@ -31,6 +31,7 @@ export type StorefrontRadius =
   | '2xl';
 
 export type StorefrontThemeSettings = {
+  version: number;
   colorMode: ThemeMode;
   primaryColor: string;
   secondaryColor?: string;
@@ -41,6 +42,7 @@ export type StorefrontThemeSettings = {
 };
 
 export type StorefrontLayoutSettings = {
+  version: number;
   productLayout: StorefrontProductLayout;
   categoryLayout: StorefrontCategoryLayout;
   heroEnabled: boolean;
@@ -48,6 +50,23 @@ export type StorefrontLayoutSettings = {
   showProductDescription: boolean;
   showBadges: boolean;
   stickyCart: boolean;
+};
+
+export type StorefrontPresetId = 
+  | 'fast-food' 
+  | 'pizza-gourmet' 
+  | 'acai-tropical' 
+  | 'sushi-premium' 
+  | 'burger-dark' 
+  | 'executive-clean' 
+  | 'minimal-clean';
+
+export type StorefrontPreset = {
+  id: StorefrontPresetId;
+  name: string;
+  description: string;
+  theme: StorefrontThemeSettings;
+  layout: StorefrontLayoutSettings;
 };
 
 /**
@@ -104,6 +123,7 @@ export function getStorefrontRadiusValue(radius: StorefrontRadius): string {
  */
 export function getDefaultStorefrontThemeSettings(): StorefrontThemeSettings {
   return {
+    version: 1,
     colorMode: 'light',
     primaryColor: '#0c93e9',
     backgroundStyle: 'clean',
@@ -117,6 +137,7 @@ export function getDefaultStorefrontThemeSettings(): StorefrontThemeSettings {
  */
 export function getDefaultStorefrontLayoutSettings(): StorefrontLayoutSettings {
   return {
+    version: 1,
     productLayout: 'grid',
     categoryLayout: 'sections',
     heroEnabled: true,
@@ -125,6 +146,73 @@ export function getDefaultStorefrontLayoutSettings(): StorefrontLayoutSettings {
     showBadges: true,
     stickyCart: true,
   };
+}
+
+/**
+ * Commercial presets for quick setup.
+ */
+export function getStorefrontPresets(): StorefrontPreset[] {
+  const defaultTheme = getDefaultStorefrontThemeSettings();
+  const defaultLayout = getDefaultStorefrontLayoutSettings();
+
+  return [
+    {
+      id: 'fast-food',
+      name: 'Fast Food',
+      description: 'Cores vibrantes e layout focado em conversão rápida.',
+      theme: { ...defaultTheme, primaryColor: '#e11d48', borderRadius: 'xl' },
+      layout: { ...defaultLayout, productLayout: 'grid', categoryLayout: 'horizontal-scroll' }
+    },
+    {
+      id: 'pizza-gourmet',
+      name: 'Pizzaria Gourmet',
+      description: 'Elegância e destaque para fotos de alta qualidade.',
+      theme: { ...defaultTheme, primaryColor: '#991b1b', borderRadius: '2xl' },
+      layout: { ...defaultLayout, productLayout: 'premium-card', categoryLayout: 'sections' }
+    },
+    {
+      id: 'acai-tropical',
+      name: 'Açaí Tropical',
+      description: 'Visual refrescante e layout em mosaico.',
+      theme: { ...defaultTheme, primaryColor: '#7e22ce', borderRadius: 'lg' },
+      layout: { ...defaultLayout, productLayout: 'square', categoryLayout: 'horizontal-scroll' }
+    },
+    {
+      id: 'sushi-premium',
+      name: 'Sushi Premium',
+      description: 'Sofisticação no modo escuro para experiências exclusivas.',
+      theme: { ...defaultTheme, colorMode: 'dark', primaryColor: '#dc2626', borderRadius: '2xl', backgroundStyle: 'premium' },
+      layout: { ...defaultLayout, productLayout: 'premium-card', categoryLayout: 'sidebar' }
+    },
+    {
+      id: 'burger-dark',
+      name: 'Burger Dark',
+      description: 'Foco na fotografia com alto contraste.',
+      theme: { ...defaultTheme, colorMode: 'dark', primaryColor: '#f59e0b', borderRadius: 'xl' },
+      layout: { ...defaultLayout, productLayout: 'grid' }
+    },
+    {
+      id: 'executive-clean',
+      name: 'Executivo Clean',
+      description: 'Leitura fácil e foco na descrição dos pratos.',
+      theme: { ...defaultTheme, primaryColor: '#0f172a', borderRadius: 'md' },
+      layout: { ...defaultLayout, productLayout: 'list', categoryLayout: 'sections' }
+    },
+    {
+      id: 'minimal-clean',
+      name: 'Minimal Clean',
+      description: 'Otimizado para velocidade e clareza total.',
+      theme: { ...defaultTheme, primaryColor: '#334155', borderRadius: 'sm' },
+      layout: { ...defaultLayout, productLayout: 'compact', showProductDescription: false, showBadges: false }
+    }
+  ];
+}
+
+/**
+ * Get a specific preset by ID with fallback to default.
+ */
+export function getStorefrontPresetById(id: string): StorefrontPreset | undefined {
+  return getStorefrontPresets().find(p => p.id === id);
 }
 
 /**
@@ -157,5 +245,5 @@ export function applyStorefrontThemeVariables(settings: Partial<StorefrontThemeS
     
     // Borders
     '--storefront-border': isDark ? '#1e293b' : '#e2e8f0',
-  } as React.CSSProperties;
+  } as any;
 }

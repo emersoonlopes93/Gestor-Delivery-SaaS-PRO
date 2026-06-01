@@ -7,7 +7,8 @@ import { Prisma } from '@prisma/client';
 import { 
   getDefaultStorefrontThemeSettings, 
   getDefaultStorefrontLayoutSettings,
-  sanitizeHexColor
+  sanitizeHexColor,
+  getStorefrontPresetById
 } from '@gestor/theme';
 
 @Injectable()
@@ -166,16 +167,48 @@ export class TenantService {
   async updateStorefrontCustomization(tenantId: string, data: any) {
     const updateData: Prisma.TenantSettingsUpdateInput = {};
 
-    if (data.theme) {
-      // Basic sanitization
-      if (data.theme.primaryColor) {
-        data.theme.primaryColor = sanitizeHexColor(data.theme.primaryColor);
+    // 1. Handle Preset
+    if (data.presetId) {
+      const preset = getStorefrontPresetById(data.presetId);
+      if (preset) {
+        updateData.storefrontThemeJson = preset.theme as any;
+        updateData.storefrontLayoutJson = preset.layout as any;
+        
+        return this.prisma.tenantSettings.update({
+          where: { tenantId },
+          data: updateData,
+        });
       }
-      updateData.storefrontThemeJson = data.theme;
+    }
+
+    // 2. Handle Manual Settings with Validation
+    if (data.theme) {
+      const currentTheme = data.theme;
+      // Force version 1
+      currentTheme.version = 1;
+      // Sanitization
+      if (currentTheme.primaryColor) {
+        currentTheme.primaryColor = sanitizeHexColor(currentTheme.primaryColor);
+      }
+      // Remove potentially harmful fields
+      delete currentTheme.css;
+      delete currentTheme.html;
+      delete currentTheme.script;
+      
+      updateData.storefrontThemeJson = currentTheme;
     }
 
     if (data.layout) {
-      updateData.storefrontLayoutJson = data.layout;
+      const currentLayout = data.layout;
+      currentLayout.version = 1;
+      
+      // Ensure enums are valid or fallback (basic backend safety)
+      const validProductLayouts = ['grid', 'list', 'compact', 'square', 'premium-card'];
+      if (currentLayout.productLayout && !validProductLayouts.includes(currentLayout.productLayout)) {
+        currentLayout.productLayout = 'grid';
+      }
+
+      updateData.storefrontLayoutJson = currentLayout;
     }
 
     return this.prisma.tenantSettings.update({

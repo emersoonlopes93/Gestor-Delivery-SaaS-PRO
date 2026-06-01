@@ -19,7 +19,29 @@ As configurações de personalização são salvas na tabela `tenant_settings` a
 3. O `web-storefront` solicita o payload público da loja, que agora inclui o objeto `customization`.
 4. O `StorefrontThemeProvider` e o `ProductRenderer` aplicam as configurações em tempo real.
 
-### Cores de Branding
+### Presets de Tema
+
+O sistema oferece presets comerciais prontos para uso, facilitando a configuração inicial:
+
+- `fast-food`: Cores vibrantes, layout `grid` e bordas arredondadas (`xl`).
+- `pizza-gourmet`: Elegante com layout `premium-card` e categorias em seções.
+- `acai-tropical`: Visual refrescante com layout `square` e categorias em scroll horizontal.
+- `sushi-premium`: Modo escuro sofisticado com layout `premium-card` e barra lateral.
+- `burger-dark`: Modo escuro de alto contraste focado na fotografia.
+- `executive-clean`: Visual limpo em lista, ideal para cardápios executivos.
+- `minimal-clean`: Otimizado para velocidade com layout `compact`.
+
+### Versionamento e Segurança
+
+- **Versão**: As configurações agora possuem um campo `version: 1`. Isso permite futuras migrações de esquema sem quebrar lojas existentes.
+- **Sanitização**: Cores inválidas são automaticamente substituídas por padrões seguros.
+- **Hardening**: Campos como `script`, `css` ou `html` são removidos do payload de atualização no backend para evitar ataques XSS ou quebras de layout não autorizadas.
+- **Fallbacks**: Caso uma configuração salva esteja incompleta ou corrompida, o Storefront utiliza automaticamente os valores definidos em `getDefaultStorefrontThemeSettings`.
+
+### Próximos Passos (Roadmap)
+- Upload de imagens de background customizadas (Fase 3).
+- Editor visual real-time com drag-and-drop.
+- Suporte a fontes personalizadas via Google Fonts.
 
 As cores principais são aplicadas através do `StorefrontThemeProvider`.
 Internamente, o helper `applyStorefrontThemeVariables` do pacote `@gestor/theme` converte as configurações do tenant em variáveis CSS seguras:
