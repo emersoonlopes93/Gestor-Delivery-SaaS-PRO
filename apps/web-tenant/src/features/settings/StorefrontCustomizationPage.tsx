@@ -1,0 +1,409 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Palette, 
+  Layout, 
+  Smartphone, 
+  RotateCcw, 
+  Save,
+  Eye,
+  MousePointer2
+} from 'lucide-react';
+import { api } from '../../lib/api-client';
+import { PageHeader } from '../../components/ui/PageHeader';
+import { Card } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
+import { 
+  getDefaultStorefrontThemeSettings, 
+  getDefaultStorefrontLayoutSettings,
+  StorefrontThemeSettings,
+  StorefrontLayoutSettings,
+  StorefrontProductLayout,
+  StorefrontCategoryLayout,
+  StorefrontImageMode,
+  StorefrontRadius,
+  ThemeMode
+} from '@gestor/theme';
+
+export function StorefrontCustomizationPage() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [customization, setCustomization] = useState<{
+    theme: StorefrontThemeSettings;
+    layout: StorefrontLayoutSettings;
+  }>({
+    theme: getDefaultStorefrontThemeSettings(),
+    layout: getDefaultStorefrontLayoutSettings(),
+  });
+
+  useEffect(() => {
+    loadCustomization();
+  }, []);
+
+  const loadCustomization = async () => {
+    setLoading(true);
+    try {
+      const response = await api.get<{
+        theme: StorefrontThemeSettings;
+        layout: StorefrontLayoutSettings;
+      }>('/tenant/storefront-customization');
+      
+      if (response.success) {
+        setCustomization(response.data);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar personalização:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const response = await api.patch('/tenant/storefront-customization', customization);
+      if (response.success) {
+        // Success notification could be added here
+        alert('Configurações salvas com sucesso!');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar personalização:', error);
+      alert('Erro ao salvar configurações.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReset = () => {
+    if (window.confirm('Deseja restaurar todas as configurações para o padrão?')) {
+      setCustomization({
+        theme: getDefaultStorefrontThemeSettings(),
+        layout: getDefaultStorefrontLayoutSettings(),
+      });
+    }
+  };
+
+  const updateTheme = (updates: Partial<StorefrontThemeSettings>) => {
+    setCustomization(prev => ({
+      ...prev,
+      theme: { ...prev.theme, ...updates }
+    }));
+  };
+
+  const updateLayout = (updates: Partial<StorefrontLayoutSettings>) => {
+    setCustomization(prev => ({
+      ...prev,
+      layout: { ...prev.layout, ...updates }
+    }));
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 pb-20">
+      <PageHeader 
+        title="Personalização da Vitrine" 
+        description="Configure a aparência e o comportamento da sua loja pública."
+      >
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleReset} disabled={saving}>
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Restaurar Padrão
+          </Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+            ) : (
+              <Save className="w-4 h-4 mr-2" />
+            )}
+            Salvar Alterações
+          </Button>
+        </div>
+      </PageHeader>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          {/* Aparência */}
+          <Card className="p-6">
+            <div className="flex items-center gap-2 mb-6">
+              <Palette className="w-5 h-5 text-primary-600" />
+              <h2 className="text-lg font-bold">Aparência</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Modo de Cor</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['light', 'dark', 'system'] as ThemeMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => updateTheme({ colorMode: mode })}
+                      className={`px-3 py-2 text-xs font-bold rounded-lg border transition-all ${
+                        customization.theme.colorMode === mode
+                          ? 'border-primary-600 bg-primary-50 text-primary-700'
+                          : 'border-gray-200 hover:border-gray-300 bg-white'
+                      }`}
+                    >
+                      {mode === 'light' ? 'Claro' : mode === 'dark' ? 'Escuro' : 'Sistema'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Cor Principal</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="color" 
+                    value={customization.theme.primaryColor}
+                    onChange={(e) => updateTheme({ primaryColor: e.target.value })}
+                    className="w-10 h-10 rounded-lg cursor-pointer border-none p-0 overflow-hidden"
+                  />
+                  <input 
+                    type="text" 
+                    value={customization.theme.primaryColor}
+                    onChange={(e) => updateTheme({ primaryColor: e.target.value })}
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm uppercase font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Estilo de Fundo</label>
+                <select 
+                  value={customization.theme.backgroundStyle}
+                  onChange={(e) => updateTheme({ backgroundStyle: e.target.value as any })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                >
+                  <option value="clean">Clean (Branco/Preto)</option>
+                  <option value="soft">Soft (Cores suaves)</option>
+                  <option value="premium">Premium (Gradientes)</option>
+                  <option value="brand">Brand (Focado na marca)</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Arredondamento (Radius)</label>
+                <div className="grid grid-cols-5 gap-2">
+                  {(['sm', 'md', 'lg', 'xl', '2xl'] as StorefrontRadius[]).map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => updateTheme({ borderRadius: r })}
+                      className={`px-2 py-2 text-xs font-bold rounded-lg border transition-all ${
+                        customization.theme.borderRadius === r
+                          ? 'border-primary-600 bg-primary-50 text-primary-700'
+                          : 'border-gray-200 hover:border-gray-300 bg-white'
+                      }`}
+                    >
+                      {r.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Estilo de Fonte</label>
+                <select 
+                  value={customization.theme.fontStyle}
+                  onChange={(e) => updateTheme({ fontStyle: e.target.value as any })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                >
+                  <option value="default">Padrão (Inter)</option>
+                  <option value="modern">Moderno (Sans)</option>
+                  <option value="rounded">Arredondado (Quicksand)</option>
+                </select>
+              </div>
+            </div>
+          </Card>
+
+          {/* Layout do Cardápio */}
+          <Card className="p-6">
+            <div className="flex items-center gap-2 mb-6">
+              <Layout className="w-5 h-5 text-primary-600" />
+              <h2 className="text-lg font-bold">Layout do Cardápio</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Layout dos Produtos</label>
+                <select 
+                  value={customization.layout.productLayout}
+                  onChange={(e) => updateLayout({ productLayout: e.target.value as StorefrontProductLayout })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                >
+                  <option value="grid">Grade (Padrão)</option>
+                  <option value="list">Lista (Econômico)</option>
+                  <option value="compact">Compacto (Denso)</option>
+                  <option value="square">Quadrado (Visual)</option>
+                  <option value="premium-card">Premium (Sofisticado)</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Layout das Categorias</label>
+                <select 
+                  value={customization.layout.categoryLayout}
+                  onChange={(e) => updateLayout({ categoryLayout: e.target.value as StorefrontCategoryLayout })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                >
+                  <option value="tabs">Abas superiores</option>
+                  <option value="horizontal-scroll">Scroll Horizontal</option>
+                  <option value="sections">Seções (Anchor)</option>
+                  <option value="sidebar">Barra Lateral (Desktop)</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Modo de Imagem</label>
+                <select 
+                  value={customization.layout.productImageMode}
+                  onChange={(e) => updateLayout({ productImageMode: e.target.value as StorefrontImageMode })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                >
+                  <option value="cover">Preencher (Cover)</option>
+                  <option value="contain">Conter (Contain)</option>
+                  <option value="hidden">Ocultar imagens</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-4 pt-2">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input 
+                    type="checkbox"
+                    checked={customization.layout.showProductDescription}
+                    onChange={(e) => updateLayout({ showProductDescription: e.target.checked })}
+                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Mostrar descrição dos produtos</span>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input 
+                    type="checkbox"
+                    checked={customization.layout.showBadges}
+                    onChange={(e) => updateLayout({ showBadges: e.target.checked })}
+                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Mostrar badges de destaque</span>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input 
+                    type="checkbox"
+                    checked={customization.layout.stickyCart}
+                    onChange={(e) => updateLayout({ stickyCart: e.target.checked })}
+                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Carrinho flutuante (Sticky)</span>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input 
+                    type="checkbox"
+                    checked={customization.layout.heroEnabled}
+                    onChange={(e) => updateLayout({ heroEnabled: e.target.checked })}
+                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Habilitar Banner (Hero)</span>
+                </label>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Preview Sidebar */}
+        <div className="space-y-6">
+          <Card className="p-6 sticky top-24 border-2 border-primary-100 shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <Eye className="w-5 h-5 text-primary-600" />
+                <h2 className="text-lg font-bold">Preview</h2>
+              </div>
+              <Badge variant="info" className="text-[10px]">ADMIN PREVIEW</Badge>
+            </div>
+
+            <div 
+              className={`rounded-2xl border border-gray-200 overflow-hidden shadow-sm transition-all duration-500 ${
+                customization.theme.colorMode === 'dark' ? 'bg-slate-950 text-white' : 'bg-white text-slate-900'
+              }`}
+              style={{
+                '--preview-primary': customization.theme.primaryColor,
+                '--preview-radius': 
+                  customization.theme.borderRadius === 'sm' ? '4px' :
+                  customization.theme.borderRadius === 'md' ? '8px' :
+                  customization.theme.borderRadius === 'lg' ? '12px' :
+                  customization.theme.borderRadius === 'xl' ? '16px' : '24px'
+              } as React.CSSProperties}
+            >
+              {/* Fake Store Header */}
+              <div className="p-4 border-b border-gray-100/10 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-[var(--preview-radius)] bg-gray-200/50 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="h-3 w-24 bg-gray-200/50 rounded mb-2" />
+                  <div className="h-2 w-16 bg-gray-200/30 rounded" />
+                </div>
+              </div>
+
+              {/* Fake Content */}
+              <div className="p-4 space-y-4">
+                <div className="flex gap-2 overflow-hidden">
+                  <div className="px-3 py-1.5 rounded-full bg-[var(--preview-primary)] text-white text-[10px] font-black uppercase">Burgers</div>
+                  <div className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-400 text-[10px] font-black uppercase">Bebidas</div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="h-3 w-32 bg-gray-200/50 rounded" />
+                  
+                  {/* Fake Product Card */}
+                  <div className={`p-3 border rounded-[var(--preview-radius)] border-gray-100 transition-all ${
+                    customization.layout.productLayout === 'premium-card' ? 'shadow-lg border-2 border-[var(--preview-primary)]' : ''
+                  }`}>
+                    <div className={`flex gap-3 ${
+                      ['grid', 'square', 'premium-card'].includes(customization.layout.productLayout) ? 'flex-col' : 'flex-row'
+                    }`}>
+                      {customization.layout.productImageMode !== 'hidden' && (
+                        <div className={`bg-gray-100 rounded-[calc(var(--preview-radius)-4px)] flex-shrink-0 ${
+                          ['grid', 'square', 'premium-card'].includes(customization.layout.productLayout) ? 'aspect-video w-full' : 'w-16 h-16'
+                        }`} />
+                      )}
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 w-full bg-gray-200/50 rounded" />
+                        {customization.layout.showProductDescription && (
+                          <div className="h-2 w-full bg-gray-100/50 rounded" />
+                        )}
+                        <div className="flex justify-between items-center pt-2">
+                          <div className="h-4 w-12 bg-[var(--preview-primary)]/20 rounded" />
+                          <div 
+                            className="h-8 w-16 rounded-[calc(var(--preview-radius)-4px)]" 
+                            style={{ backgroundColor: customization.theme.primaryColor }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-4">
+              <div className="p-3 bg-amber-50 rounded-lg border border-amber-100 text-[11px] text-amber-700 leading-relaxed italic">
+                <MousePointer2 className="w-3 h-3 inline mr-1 mb-0.5" />
+                Este é um preview simplificado. Para ver o resultado real, salve e acesse seu cardápio público.
+              </div>
+              <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                <Smartphone className="w-3 h-3" />
+                <span>As alterações podem levar alguns segundos para propagar.</span>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

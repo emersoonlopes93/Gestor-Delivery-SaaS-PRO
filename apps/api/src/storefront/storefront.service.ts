@@ -2,7 +2,18 @@ import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { PrismaService } from '../database/prisma.service';
-import { StorefrontPayload, StorefrontCategoryPayload, StorefrontComboPayload, StorefrontProductPayload } from '@gestor/types';
+import { 
+  StorefrontPayload, 
+  StorefrontCategoryPayload, 
+  StorefrontComboPayload, 
+  StorefrontProductPayload,
+  StorefrontCustomizationPayload
+} from '@gestor/types';
+import { 
+  getDefaultStorefrontThemeSettings, 
+  getDefaultStorefrontLayoutSettings,
+  sanitizeHexColor
+} from '@gestor/theme';
 import { TenantStatus } from '@gestor/core';
 import { Prisma } from '@prisma/client';
 import { AvailabilityService, SalesChannel } from '../catalog/publication/availability.service';
@@ -428,11 +439,33 @@ export class StorefrontService {
         }),
     }));
 
-    const payload = {
+    // 5. Storefront Customization
+    const customization: StorefrontCustomizationPayload = {
+      theme: {
+        ...getDefaultStorefrontThemeSettings(),
+        ...(tenant.settings?.storefrontThemeJson as any || {}),
+      },
+      layout: {
+        ...getDefaultStorefrontLayoutSettings(),
+        ...(tenant.settings?.storefrontLayoutJson as any || {}),
+      },
+    };
+
+    // Sanitize colors
+    customization.theme.primaryColor = sanitizeHexColor(customization.theme.primaryColor);
+    if (customization.theme.secondaryColor) {
+      customization.theme.secondaryColor = sanitizeHexColor(customization.theme.secondaryColor);
+    }
+    if (customization.theme.accentColor) {
+      customization.theme.accentColor = sanitizeHexColor(customization.theme.accentColor);
+    }
+
+    const payload: StorefrontPayload = {
       tenant: tenantInfo,
       categories,
       combos,
       upsells: globalUpsells,
+      customization,
     };
 
     // Cache for 60 seconds

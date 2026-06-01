@@ -357,6 +357,11 @@ model TenantSettings {
   newOrderSound                String   @default("notification.mp3") @map("new_order_sound")
   cancellationSound            String   @default("notification.mp3") @map("cancellation_sound")
   notificationVolume           Float    @default(1.0) @map("notification_volume")
+  
+  // --- Storefront Customization ---
+  storefrontThemeJson          Json?    @map("storefront_theme_json")
+  storefrontLayoutJson         Json?    @map("storefront_layout_json")
+  
   tenant                       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_settings")

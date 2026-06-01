@@ -140,11 +140,17 @@ export interface StorefrontComboPayload {
   }>;
 }
 
+export interface StorefrontCustomizationPayload {
+  theme: any; // We'll use types from @gestor/theme in the app
+  layout: any;
+}
+
 export interface StorefrontPayload {
   tenant: StorefrontTenantInfo;
   categories: StorefrontCategoryPayload[];
   combos: StorefrontComboPayload[];
   upsells: StorefrontUpsellPayload[];
+  customization?: StorefrontCustomizationPayload;
 }
 
 export interface StorefrontUpsellItemPayload {

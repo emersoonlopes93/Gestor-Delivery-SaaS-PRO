@@ -101,6 +101,27 @@ export class TenantController {
     return this.onboardingService.updateStep(tenantId, body.step, body.completed ?? true);
   }
 
+  /**
+   * Get storefront customization.
+   */
+  @Get('storefront-customization')
+  @RequirePermissions('settings.manage')
+  async getStorefrontCustomization(@CurrentTenant() tenantId: string) {
+    return this.tenantService.getStorefrontCustomization(tenantId);
+  }
+
+  /**
+   * Update storefront customization.
+   */
+  @Patch('storefront-customization')
+  @RequirePermissions('settings.manage')
+  async updateStorefrontCustomization(
+    @CurrentTenant() tenantId: string,
+    @Body() body: any,
+  ) {
+    return this.tenantService.updateStorefrontCustomization(tenantId, body);
+  }
+
   @Get('test-route')
   async testRoute() {
     return { message: 'Tenant controller is reachable' };

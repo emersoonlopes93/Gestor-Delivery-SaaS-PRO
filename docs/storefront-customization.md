@@ -6,6 +6,19 @@ O Storefront foi projetado para ser "White-Label", permitindo que cada tenant pe
 
 A personalização é baseada em **Presets** e **CSS Variables**. Não permitimos injeção de CSS livre por motivos de segurança e estabilidade.
 
+### Persistência das Configurações
+
+As configurações de personalização são salvas na tabela `tenant_settings` através de dois campos JSON:
+- `storefrontThemeJson`: Armazena tokens de cor, radius e fontes (`StorefrontThemeSettings`).
+- `storefrontLayoutJson`: Armazena preferências de layout de produtos e categorias (`StorefrontLayoutSettings`).
+
+### Fluxo de Dados
+
+1. O tenant configura a aparência no painel administrativo (`web-tenant`).
+2. O backend (`apps/api`) valida os enums e sanitiza as cores usando helpers do `@gestor/theme`.
+3. O `web-storefront` solicita o payload público da loja, que agora inclui o objeto `customization`.
+4. O `StorefrontThemeProvider` e o `ProductRenderer` aplicam as configurações em tempo real.
+
 ### Cores de Branding
 
 As cores principais são aplicadas através do `StorefrontThemeProvider`.

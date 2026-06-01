@@ -4,6 +4,11 @@ import { TenantStatus } from '@gestor/core';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import type { TenantOperatingHours } from '@gestor/types';
 import { Prisma } from '@prisma/client';
+import { 
+  getDefaultStorefrontThemeSettings, 
+  getDefaultStorefrontLayoutSettings,
+  sanitizeHexColor
+} from '@gestor/theme';
 
 @Injectable()
 export class TenantService {
@@ -131,6 +136,51 @@ export class TenantService {
           tenantId,
         })),
       });
+    });
+  }
+
+  /**
+   * Get storefront customization for a tenant.
+   */
+  async getStorefrontCustomization(tenantId: string) {
+    const settings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+      select: { storefrontThemeJson: true, storefrontLayoutJson: true },
+    });
+
+    return {
+      theme: {
+        ...getDefaultStorefrontThemeSettings(),
+        ...(settings?.storefrontThemeJson as any || {}),
+      },
+      layout: {
+        ...getDefaultStorefrontLayoutSettings(),
+        ...(settings?.storefrontLayoutJson as any || {}),
+      },
+    };
+  }
+
+  /**
+   * Update storefront customization.
+   */
+  async updateStorefrontCustomization(tenantId: string, data: any) {
+    const updateData: Prisma.TenantSettingsUpdateInput = {};
+
+    if (data.theme) {
+      // Basic sanitization
+      if (data.theme.primaryColor) {
+        data.theme.primaryColor = sanitizeHexColor(data.theme.primaryColor);
+      }
+      updateData.storefrontThemeJson = data.theme;
+    }
+
+    if (data.layout) {
+      updateData.storefrontLayoutJson = data.layout;
+    }
+
+    return this.prisma.tenantSettings.update({
+      where: { tenantId },
+      data: updateData,
     });
   }
 

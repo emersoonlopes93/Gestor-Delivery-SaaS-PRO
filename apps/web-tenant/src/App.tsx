@@ -30,6 +30,7 @@ import { TablesPage } from './features/pos/TablesPage';
 import { QrCodesPage } from './features/settings/QrCodesPage';
 import { PrinterSettings } from './features/pos/PrinterSettings';
 import { NotificationSettings } from './features/settings/NotificationSettings';
+import { StorefrontCustomizationPage } from './features/settings/StorefrontCustomizationPage';
 
 // CRM & Promotions
 import { CustomersListPage } from './features/crm/CustomersListPage';
@@ -390,6 +391,14 @@ export function App() {
           element={
             <PermissionGate permission="settings.manage">
               <SettingsPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/settings/storefront"
+          element={
+            <PermissionGate permission="settings.manage">
+              <StorefrontCustomizationPage />
             </PermissionGate>
           }
         />

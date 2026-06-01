@@ -33,7 +33,8 @@ import {
   Printer,
   MessageSquare,
   Megaphone,
-  Bot
+  Bot,
+  Palette
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
@@ -161,6 +162,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     label: 'Sistema',
     items: [
       { id: 'settings', label: 'Configurações', to: '/settings', icon: Settings, permission: 'settings.manage' },
+      { id: 'settings-storefront', label: 'Personalizar Vitrine', to: '/settings/storefront', icon: Palette, permission: 'settings.manage' },
       { id: 'notifications', label: 'Notificações', to: '/settings/notifications', icon: Bell, permission: 'settings.manage' },
     ],
   },

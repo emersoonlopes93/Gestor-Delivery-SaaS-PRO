@@ -140,15 +140,19 @@ export function StorefrontPage() {
     );
   }
 
-  const { tenant, categories, combos } = data;
+  const { tenant, categories, combos, customization } = data;
   const storefrontTheme = useStorefrontThemeStore(s => s.theme);
+
+  // Use real settings from backend, with local override for testing in DEV
+  const effectiveProductLayout = (import.meta.env.DEV && productLayout !== 'grid') 
+    ? productLayout 
+    : (customization?.layout?.productLayout || 'grid');
 
   return (
     <StorefrontThemeProvider 
       settings={{ 
-        primaryColor: tenant.primaryColor, 
-        colorMode: storefrontTheme,
-        borderRadius: 'lg'
+        ...customization?.theme,
+        colorMode: storefrontTheme === 'system' ? customization?.theme?.colorMode : storefrontTheme,
       }}
       className="px-4 py-6"
     >
@@ -216,31 +220,33 @@ export function StorefrontPage() {
         </div>
       ) : null}
 
-      {/* Demo Layout Switcher */}
-      <div className="mb-6 p-4 bg-[var(--storefront-muted)] rounded-[var(--storefront-radius)] border border-[var(--storefront-border)]">
-        <p className="text-xs font-bold text-[var(--storefront-muted-foreground)] uppercase tracking-widest mb-3">Demo: Escolha o Layout</p>
-        <div className="flex flex-wrap gap-2">
-          {(['grid', 'list', 'compact', 'square', 'premium-card'] as const).map((layout) => (
-            <button
-              key={layout}
-              onClick={() => setProductLayout(layout)}
-              className={cn(
-                'px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tight transition-all',
-                productLayout === layout 
-                  ? 'bg-[var(--storefront-primary)] text-[var(--storefront-primary-foreground)]' 
-                  : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300'
-              )}
-            >
-              {layout}
-            </button>
-          ))}
+      {/* Demo Layout Switcher (DEV ONLY) */}
+      {import.meta.env.DEV && (
+        <div className="mb-6 p-4 bg-[var(--storefront-muted)] rounded-[var(--storefront-radius)] border border-[var(--storefront-border)]">
+          <p className="text-xs font-bold text-[var(--storefront-muted-foreground)] uppercase tracking-widest mb-3">Demo (DEV): Escolha o Layout</p>
+          <div className="flex flex-wrap gap-2">
+            {(['grid', 'list', 'compact', 'square', 'premium-card'] as const).map((layout) => (
+              <button
+                key={layout}
+                onClick={() => setProductLayout(layout)}
+                className={cn(
+                  'px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tight transition-all',
+                  productLayout === layout 
+                    ? 'bg-[var(--storefront-primary)] text-[var(--storefront-primary-foreground)]' 
+                    : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300'
+                )}
+              >
+                {layout}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Categories Navigation */}
       <CategoryNavigation 
         categories={categories}
-        layout="tabs"
+        layout={customization?.layout?.categoryLayout || 'tabs'}
         onCategoryClick={(slug) => {
           const el = document.getElementById(slug);
           if (el) {
@@ -322,11 +328,11 @@ export function StorefrontPage() {
             
             <div className={cn(
               'grid gap-3 sm:gap-4',
-              productLayout === 'grid' && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
-              productLayout === 'square' && 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4',
-              productLayout === 'compact' && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
-              productLayout === 'list' && 'grid-cols-1',
-              productLayout === 'premium-card' && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+              effectiveProductLayout === 'grid' && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+              effectiveProductLayout === 'square' && 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4',
+              effectiveProductLayout === 'compact' && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+              effectiveProductLayout === 'list' && 'grid-cols-1',
+              effectiveProductLayout === 'premium-card' && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
             )}>
               {category.products.map((product) => (
                 <ProductRenderer
@@ -339,7 +345,10 @@ export function StorefrontPage() {
                     price: product.basePrice,
                     isAvailable: product.isAvailable,
                   }}
-                  layout={productLayout}
+                  layout={effectiveProductLayout}
+                  imageMode={customization?.layout?.productImageMode}
+                  showDescription={customization?.layout?.showProductDescription}
+                  showBadges={customization?.layout?.showBadges}
                   onSelectProduct={() => setSelectedProduct(product)}
                 />
               ))}
