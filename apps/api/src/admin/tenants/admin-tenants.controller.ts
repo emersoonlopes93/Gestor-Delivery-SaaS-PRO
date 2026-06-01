@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards, Patch, Put, Body } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { AdminTenantsService } from './admin-tenants.service';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
 import { AdminPermissionsGuard } from '../rbac/admin-permissions.guard';
@@ -28,6 +28,14 @@ export class AdminTenantsController {
     return this.tenantsService.findById(id);
   }
 
+  @Post()
+  @RequireAdminPermissions('saas.tenants.update')
+  async create(
+    @Body() body: { name: string; slug: string; status?: 'active' | 'inactive' | 'suspended' | 'trial'; billingPlanId?: string },
+  ) {
+    return this.tenantsService.create(body);
+  }
+
   @Patch(':id/status')
   @RequireAdminPermissions('saas.tenants.update')
   async updateStatus(
@@ -44,6 +52,15 @@ export class AdminTenantsController {
     @Body() body: { name?: string; slug?: string },
   ) {
     return this.tenantsService.update(id, body);
+  }
+
+  @Post(':id/billing-v2-subscription')
+  @RequireAdminPermissions('saas.billing.manage')
+  async createBillingV2Subscription(
+    @Param('id') id: string,
+    @Body() body: { billingPlanId?: string },
+  ) {
+    return this.tenantsService.createBillingV2Subscription(id, body.billingPlanId);
   }
   
   @Get(':id/impersonate')

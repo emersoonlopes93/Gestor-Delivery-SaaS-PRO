@@ -1,13 +1,20 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { BillingService } from '../../billing/billing.service';
+import { TenantBillingResolverService } from '../../billing/tenant-billing-resolver.service';
 import { REQUIRES_FEATURE_KEY } from '../decorators/requires-feature.decorator';
+
+type RequestWithTenant = {
+  headers: Record<string, string | string[] | undefined>;
+  user?: { tenantId?: string };
+};
 
 @Injectable()
 export class PlanGatingGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     private billingService: BillingService,
+    private tenantBillingResolver: TenantBillingResolverService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -16,21 +23,24 @@ export class PlanGatingGuard implements CanActivate {
       context.getClass(),
     ]);
 
-    const request = context.switchToHttp().getRequest();
-    const tenantId = request.headers['x-tenant-id'] || request.user?.tenantId;
+    const request = context.switchToHttp().getRequest<RequestWithTenant>();
+    const headerTenantId = request.headers['x-tenant-id'];
+    const tenantId = typeof headerTenantId === 'string' ? headerTenantId : request.user?.tenantId;
 
     if (!tenantId) {
-      return true; // Deixa passar se não houver contexto de tenant (ex: rotas públicas)
+      return true;
     }
 
-    // Verificar acesso básico (bloqueio por inadimplência, etc)
-    const access = await this.billingService.checkAccess(tenantId);
-    if (!access.canAccess) {
-      throw new ForbiddenException(access.reason || 'Acesso negado por questões de assinatura.');
-    }
+    const state = await this.tenantBillingResolver.getTenantBillingState(tenantId);
 
-    // Verificar feature específica
     if (requiredFeature) {
+      if (state.source === 'billing_v2') {
+        if (state.allowAllModules || state.includedModules.includes(requiredFeature)) {
+          return true;
+        }
+        throw new ForbiddenException(`Seu plano não inclui a funcionalidade: ${requiredFeature}`);
+      }
+
       const hasFeature = await this.billingService.hasFeature(tenantId, requiredFeature);
       if (!hasFeature) {
         throw new ForbiddenException(`Seu plano não inclui a funcionalidade: ${requiredFeature}`);

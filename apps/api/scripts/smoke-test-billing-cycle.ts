@@ -119,9 +119,9 @@ async function ensureRevenueGrowthPlan(prisma: PrismaService): Promise<BillingPl
   });
 
   const tiers = [
-    { minRevenue: 0, maxRevenue: 1500, price: 0, label: 'Ate R$ 1.500', sortOrder: 0 },
-    { minRevenue: 1500.01, maxRevenue: 4000, price: 100, label: 'R$ 1.500,01 ate R$ 4.000', sortOrder: 1 },
-    { minRevenue: 4000.01, maxRevenue: 6000, price: 200, label: 'R$ 4.000,01 ate R$ 6.000', sortOrder: 2 },
+    { minRevenue: 0, maxRevenue: 1500, price: 0, label: 'Até R$ 1.500', sortOrder: 0 },
+    { minRevenue: 1500.01, maxRevenue: 4000, price: 100, label: 'R$ 1.500,01 até R$ 4.000', sortOrder: 1 },
+    { minRevenue: 4000.01, maxRevenue: 6000, price: 200, label: 'R$ 4.000,01 até R$ 6.000', sortOrder: 2 },
     { minRevenue: 6000.01, maxRevenue: null, price: 300, label: 'Acima de R$ 6.000', sortOrder: 3 },
   ];
 

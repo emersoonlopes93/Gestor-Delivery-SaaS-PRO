@@ -1,19 +1,24 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards } from '@nestjs/common';
-import { RequirePermissions, CurrentTenant } from '../common/decorators';
+import { Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { CurrentTenant, RequirePermissions } from '../common/decorators';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { BillingService } from './billing.service';
-import type { CreatePlanDto, UpdatePlanDto, CreateSubscriptionDto, UpdateSubscriptionDto } from './dto/create-plan.dto';
+import { BillingUsageService } from './billing-usage.service';
+import type { CreatePlanDto, CreateSubscriptionDto, UpdatePlanDto, UpdateSubscriptionDto } from './dto/create-plan.dto';
+import { TenantBillingResolverService } from './tenant-billing-resolver.service';
 
 @Controller('billing')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class BillingController {
-  constructor(private readonly billingService: BillingService) {}
+  constructor(
+    private readonly billingService: BillingService,
+    private readonly tenantBillingResolver: TenantBillingResolverService,
+    private readonly billingUsageService: BillingUsageService,
+  ) {}
 
   @Get('plans')
   async listPlans() {
-    // Todos os usuários autenticados do tenant podem ver os planos (necessário para onboarding)
-    return this.billingService.listPlans(true);
+    return [await this.tenantBillingResolver.getDefaultBillingPlan()];
   }
 
   @Post('plans')
@@ -30,7 +35,30 @@ export class BillingController {
 
   @Get('subscription')
   async getCurrentSubscription(@CurrentTenant() tenantId: string) {
-    return this.billingService.getCurrentSubscription(tenantId);
+    return this.tenantBillingResolver.getTenantBillingState(tenantId);
+  }
+
+  @Get('state')
+  async getBillingState(@CurrentTenant() tenantId: string) {
+    return this.tenantBillingResolver.getTenantBillingState(tenantId);
+  }
+
+  @Get('usage-preview')
+  @RequirePermissions('billing.read')
+  async getUsagePreview(@CurrentTenant() tenantId: string) {
+    const state = await this.tenantBillingResolver.getTenantBillingState(tenantId);
+    const now = new Date();
+    const periodStart = state.subscription?.currentCycleStartedAt
+      ?? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const periodEnd = state.subscription?.currentCycleEndsAt
+      ?? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+
+    return this.billingUsageService.getBillableRevenuePreview({
+      tenantId,
+      periodStart,
+      periodEnd,
+      planId: state.plan?.id,
+    });
   }
 
   @Post('subscription')
@@ -38,7 +66,8 @@ export class BillingController {
     @Body() dto: Omit<CreateSubscriptionDto, 'tenantId'>,
     @CurrentTenant() tenantId: string,
   ) {
-    return this.billingService.createSubscription({ ...dto, tenantId });
+    const subscription = await this.tenantBillingResolver.getOrCreateTenantBillingSubscription(tenantId, dto.planId);
+    return this.tenantBillingResolver.getTenantBillingState(subscription.tenantId);
   }
 
   @Put('subscription')
@@ -52,6 +81,12 @@ export class BillingController {
   @Get('access-check')
   @RequirePermissions('billing.read')
   async checkAccess(@CurrentTenant() tenantId: string) {
-    return this.billingService.checkAccess(tenantId);
+    const state = await this.tenantBillingResolver.getTenantBillingState(tenantId);
+    return {
+      canAccess: true,
+      reason: null,
+      state,
+      enforcement: 'disabled',
+    };
   }
 }

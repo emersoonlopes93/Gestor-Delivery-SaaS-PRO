@@ -491,8 +491,10 @@ function TenantTab(props: {
   onRefreshUsage: () => void;
   onPreviewInvoice: () => void;
   onOpenCloseModal: () => void;
+  onCreateSubscription: () => void;
   creatingCycle: boolean;
   closingCycle: boolean;
+  creatingSubscription: boolean;
 }) {
   const tenantBilling = props.tenantBilling;
   const subscription = tenantBilling?.subscription ?? null;
@@ -531,7 +533,23 @@ function TenantTab(props: {
         ) : props.tenantLoading ? (
           <LoadingBlock />
         ) : !subscription ? (
-          <EmptyState icon={AlertTriangle} title="Tenant sem assinatura billing nova" text="Não há TenantBillingSubscription v2 para este tenant. A console não cria cobrança nem inventa assinatura." />
+          <Panel
+            title="Tenant sem assinatura Billing V2"
+            action={
+              <button
+                onClick={props.onCreateSubscription}
+                disabled={props.creatingSubscription}
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-black text-primary-foreground disabled:opacity-60"
+              >
+                {props.creatingSubscription ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                Criar assinatura Billing V2
+              </button>
+            }
+          >
+            <div className="p-5">
+              <EmptyState icon={AlertTriangle} title="Fallback legado ativo" text="Não há TenantBillingSubscription V2 para este tenant. A ação manual cria a assinatura sem gateway, sem cobrança automática e sem bloquear o tenant." />
+            </div>
+          </Panel>
         ) : (
           <>
             <Panel
@@ -1124,6 +1142,18 @@ export function BillingConsolePage() {
     },
   });
 
+  const createSubscriptionMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedTenantId) throw new Error('Selecione um tenant.');
+      return adminBillingApi.createTenantBillingSubscription(selectedTenantId);
+    },
+    onSuccess: async () => {
+      setUsagePreview(undefined);
+      setInvoicePreview(undefined);
+      await refreshTenantBilling();
+    },
+  });
+
   const refreshInvoiceDetails = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['admin-billing-invoice-details', selectedInvoiceId] }),
@@ -1271,8 +1301,10 @@ export function BillingConsolePage() {
           onRefreshUsage={() => usagePreviewMutation.mutate()}
           onPreviewInvoice={() => invoicePreviewMutation.mutate()}
           onOpenCloseModal={() => setCloseModalOpen(true)}
+          onCreateSubscription={() => createSubscriptionMutation.mutate()}
           creatingCycle={createCycleMutation.isPending}
           closingCycle={closeCycleMutation.isPending}
+          creatingSubscription={createSubscriptionMutation.isPending}
         />
       ) : null}
       {activeTab === 'invoices' ? (
@@ -1303,9 +1335,9 @@ export function BillingConsolePage() {
         />
       ) : null}
 
-      {(createCycleMutation.error || usagePreviewMutation.error || invoicePreviewMutation.error || closeCycleMutation.error || createPaymentAttemptMutation.error || markPaymentAttemptPaidMutation.error || markPaymentAttemptFailedMutation.error || updatePlanMutation.error || updateSettingsMutation.error) ? (
+      {(createCycleMutation.error || usagePreviewMutation.error || invoicePreviewMutation.error || closeCycleMutation.error || createSubscriptionMutation.error || createPaymentAttemptMutation.error || markPaymentAttemptPaidMutation.error || markPaymentAttemptFailedMutation.error || updatePlanMutation.error || updateSettingsMutation.error) ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 font-bold text-red-700">
-          {(createCycleMutation.error ?? usagePreviewMutation.error ?? invoicePreviewMutation.error ?? closeCycleMutation.error ?? createPaymentAttemptMutation.error ?? markPaymentAttemptPaidMutation.error ?? markPaymentAttemptFailedMutation.error ?? updatePlanMutation.error ?? updateSettingsMutation.error)?.message}
+          {(createCycleMutation.error ?? usagePreviewMutation.error ?? invoicePreviewMutation.error ?? closeCycleMutation.error ?? createSubscriptionMutation.error ?? createPaymentAttemptMutation.error ?? markPaymentAttemptPaidMutation.error ?? markPaymentAttemptFailedMutation.error ?? updatePlanMutation.error ?? updateSettingsMutation.error)?.message}
         </div>
       ) : null}
 

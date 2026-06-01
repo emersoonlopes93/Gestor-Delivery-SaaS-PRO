@@ -11,6 +11,8 @@ import { BillingSettingsService } from '../../billing/billing-settings.service';
 import { BillingPaymentAttemptService } from '../../billing/billing-payment-attempt.service';
 import { BillingPaymentGatewayService } from '../../billing/billing-payment-gateway.service';
 import { BillingGatewayMode, PaymentProvider, Prisma } from '@prisma/client';
+import { TenantBillingResolverService } from '../../billing/tenant-billing-resolver.service';
+import { normalizeSeededRevenueTierLabel } from '../../billing/revenue-tier-label';
 
 type BillingRevenueTierInput = {
   id?: string;
@@ -67,6 +69,7 @@ export class AdminBillingController {
     private readonly billingSettingsService: BillingSettingsService,
     private readonly billingPaymentAttemptService: BillingPaymentAttemptService,
     private readonly billingPaymentGatewayService: BillingPaymentGatewayService,
+    private readonly tenantBillingResolver: TenantBillingResolverService,
   ) {}
 
   @Get('plans')
@@ -90,7 +93,7 @@ export class AdminBillingController {
   @Get('plans-v2')
   @RequireAdminPermissions('saas.billing.read')
   async listBillingPlansV2() {
-    return this.prisma.billingPlan.findMany({
+    const plans = await this.prisma.billingPlan.findMany({
       include: {
         revenueTiers: {
           orderBy: [{ sortOrder: 'asc' }],
@@ -98,6 +101,13 @@ export class AdminBillingController {
       },
       orderBy: [{ createdAt: 'asc' }],
     });
+    return plans.map((plan) => ({
+      ...plan,
+      revenueTiers: plan.revenueTiers.map((tier) => ({
+        ...tier,
+        label: normalizeSeededRevenueTierLabel(tier),
+      })),
+    }));
   }
 
   @Put('plans-v2/:id')
@@ -289,6 +299,7 @@ export class AdminBillingController {
   @Get('tenants/:tenantId/subscription')
   @RequireAdminPermissions('saas.billing.read')
   async getTenantBillingSubscription(@Param('tenantId') tenantId: string) {
+    const billingState = await this.tenantBillingResolver.getTenantBillingState(tenantId);
     const subscription = await this.prisma.tenantBillingSubscription.findFirst({
       where: { tenantId },
       include: {
@@ -327,7 +338,18 @@ export class AdminBillingController {
       currentCycle,
       latestInvoice,
       calculatedStatus: this.calculateSubscriptionStatus(subscription),
+      billingState,
     };
+  }
+
+  @Post('tenants/:tenantId/subscription')
+  @RequireAdminPermissions('saas.billing.manage')
+  async createTenantBillingSubscription(
+    @Param('tenantId') tenantId: string,
+    @Body() body: { billingPlanId?: string },
+  ) {
+    await this.tenantBillingResolver.getOrCreateTenantBillingSubscription(tenantId, body.billingPlanId);
+    return this.getTenantBillingSubscription(tenantId);
   }
 
   @Get('tenants/:tenantId/cycles')
@@ -651,7 +673,11 @@ export class AdminBillingController {
         minRevenue,
         maxRevenue,
         price,
-        label: this.parseNullableString(tier.label ?? null, `tiers.${index}.label`, 100),
+        label: normalizeSeededRevenueTierLabel({
+          label: this.parseNullableString(tier.label ?? null, `tiers.${index}.label`, 100),
+          minRevenue,
+          maxRevenue,
+        }),
         sortOrder: index,
       };
     });

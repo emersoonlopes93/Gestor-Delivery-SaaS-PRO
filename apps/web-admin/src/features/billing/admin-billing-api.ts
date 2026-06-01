@@ -288,6 +288,11 @@ export type TenantBillingSubscriptionResponse = {
   currentCycle: BillingCycleRecord | null;
   latestInvoice: InvoiceSummary | null;
   calculatedStatus: string;
+  billingState?: {
+    source: 'billing_v2' | 'legacy_fallback' | 'none';
+    warning: string | null;
+    legacySubscriptionId: string | null;
+  };
 };
 
 export type BillingOverview = {
@@ -381,6 +386,10 @@ export const adminBillingApi = {
   },
   getTenantBillingSubscription: async (tenantId: string) => {
     const res = await api.get<TenantBillingSubscriptionResponse>(`/admin/billing/tenants/${tenantId}/subscription`);
+    return res.data;
+  },
+  createTenantBillingSubscription: async (tenantId: string) => {
+    const res = await api.post<TenantBillingSubscriptionResponse>(`/admin/billing/tenants/${tenantId}/subscription`, {});
     return res.data;
   },
   getTenantBillingCycles: async (tenantId: string) => {

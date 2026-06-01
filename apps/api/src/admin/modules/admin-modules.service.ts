@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { TenantBillingResolverService } from '../../billing/tenant-billing-resolver.service';
 
 interface ModuleAccess {
   id: string;
@@ -15,7 +16,10 @@ type ModuleAccessRow = {
 
 @Injectable()
 export class AdminModulesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tenantBillingResolver: TenantBillingResolverService,
+  ) {}
 
   /**
    * Lista todos os módulos disponíveis no sistema.
@@ -39,6 +43,7 @@ export class AdminModulesService {
    * Obtém configuração de módulos de um tenant.
    */
   async getTenantModules(tenantId: string) {
+    const entitlements = await this.tenantBillingResolver.resolveTenantEntitlements(tenantId);
     const access = await this.prisma.$queryRaw<ModuleAccessRow[]>`
       SELECT id, module, enabled
       FROM tenant_module_access
@@ -49,8 +54,12 @@ export class AdminModulesService {
     
     return available.map((module) => ({
       ...module,
-      enabled: access.find((a) => a.module === module.key)?.enabled ?? false,
+      enabled: entitlements.allowAllModules
+        || entitlements.includedModules.includes(module.key)
+        || access.find((a) => a.module === module.key)?.enabled
+        || false,
       accessId: access.find((a) => a.module === module.key)?.id,
+      source: entitlements.allowAllModules || entitlements.includedModules.includes(module.key) ? entitlements.source : 'legacy_access',
     }));
   }
 
@@ -82,6 +91,11 @@ export class AdminModulesService {
    * Verifica se um tenant tem acesso a um módulo.
    */
   async hasModuleAccess(tenantId: string, module: string): Promise<boolean> {
+    const entitlements = await this.tenantBillingResolver.resolveTenantEntitlements(tenantId);
+    if (entitlements.allowAllModules || entitlements.includedModules.includes(module)) {
+      return true;
+    }
+
     const rows = await this.prisma.$queryRaw<Pick<ModuleAccess, 'enabled'>[]>`
       SELECT enabled
       FROM tenant_module_access
