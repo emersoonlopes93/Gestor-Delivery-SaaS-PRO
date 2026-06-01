@@ -8,6 +8,7 @@ export interface StorefrontTenantInfo {
   isOpen: boolean; 
   statusMessage?: string | null;
   nextOpenAt?: string | null;
+  primaryColor?: string | null;
   paymentMethods?: string[];
   mercadoPagoPublicKey?: string | null;
   address?: {

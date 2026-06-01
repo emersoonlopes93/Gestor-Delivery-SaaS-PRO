@@ -4,7 +4,19 @@ import { Megaphone, Plus, Users, Send, PauseCircle, Play, Square } from 'lucide-
 import { api } from '../../../lib/api-client';
 import type { Campaign } from '@gestor/types';
 import { CreateCampaignModal } from '../components/CreateCampaignModal';
-import { PageHeader, Button, Card, StatusBadge, EmptyState } from '../../../components/ui';
+import { 
+  PageHeader, 
+  Button, 
+  Card, 
+  StatusBadge, 
+  EmptyState,
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell
+} from '@gestor/ui';
 
 
 export function CampaignsPage() {
@@ -108,23 +120,23 @@ export function CampaignsPage() {
         </div>
       ) : (
         <Card className="overflow-hidden">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-border bg-muted">
-                <th className="py-4 px-6 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Campanha</th>
-                <th className="py-4 px-6 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                <th className="py-4 px-6 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Progresso</th>
-                <th className="py-4 px-6 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Data Criação</th>
-                <th className="py-4 px-6 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">Ações</th>
-              </tr>
-            </thead>
-          <tbody className="divide-y divide-border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Campanha</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Progresso</TableHead>
+                <TableHead>Data Criação</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+          <TableBody>
             {campaigns.map(c => (
-              <tr key={c.id} className="hover:bg-muted transition-colors">
-                <td className="py-4 px-6">
+              <TableRow key={c.id}>
+                <TableCell>
                   <span className="font-medium text-foreground">{c.name}</span>
-                </td>
-                <td className="py-4 px-6">
+                </TableCell>
+                <TableCell>
                   <StatusBadge
                     status={
                       c.status === 'running' ? 'success' : 
@@ -140,8 +152,8 @@ export function CampaignsPage() {
                      c.status === 'cancelled' ? 'Cancelada' :
                      'Rascunho'}
                   </StatusBadge>
-                </td>
-                <td className="py-4 px-6">
+                </TableCell>
+                <TableCell>
                   <div className="flex items-center gap-3">
                     <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                       <div 
@@ -151,9 +163,9 @@ export function CampaignsPage() {
                     </div>
                     <span className="text-sm text-muted-foreground">{c.totalSent}/{c.totalAudience}</span>
                   </div>
-                </td>
-                <td className="py-4 px-6 text-sm text-muted-foreground">{new Date(c.createdAt).toLocaleDateString('pt-BR')}</td>
-                <td className="py-4 px-6 text-right">
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">{new Date(c.createdAt).toLocaleDateString('pt-BR')}</TableCell>
+                <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
                     {c.status === 'running' && (
                       <button 
@@ -186,11 +198,11 @@ export function CampaignsPage() {
                       </button>
                     )}
                   </div>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
         {campaigns.length === 0 && !isLoading && (
           <EmptyState
             icon={Megaphone}

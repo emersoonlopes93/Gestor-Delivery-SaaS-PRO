@@ -36,6 +36,11 @@
     --ring: #9333ea;                 /* ring de foco - purple-700 */
     
     --radius: 1rem;                  /* border-radius padrão - 16px */
+
+    /* === STATUS TOKENS (LIGHT) === */
+    --status-success: #10b981;
+    --status-warning: #f59e0b;
+    --status-info: #0c93e9;
   }
 
   .dark {
@@ -66,6 +71,11 @@
     --border: #1f2937;               /* borda padrão dark - gray-800 */
     --input: #1f2937;                /* borda de inputs dark - gray-800 */
     --ring: #a855f7;                 /* ring de foco dark - purple-500 */
+
+    /* === STATUS TOKENS (DARK) === */
+    --status-success: #10b981;
+    --status-warning: #f59e0b;
+    --status-info: #0c93e9;
   }
 
   body {

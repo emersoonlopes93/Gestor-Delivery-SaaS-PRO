@@ -1,7 +1,11 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: 'class',
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  content: [
+    './index.html',
+    './src/**/*.{js,ts,jsx,tsx}',
+    '../../packages/ui/src/**/*.{ts,tsx}'
+  ],
   theme: {
     extend: {
       colors: {
@@ -37,6 +41,9 @@ export default {
         border: 'var(--border)',
         input: 'var(--input)',
         ring: 'var(--ring)',
+        'status-success': 'var(--status-success)',
+        'status-warning': 'var(--status-warning)',
+        'status-info': 'var(--status-info)',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

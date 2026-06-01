@@ -1,5 +1,7 @@
-// @gestor/ui — Shared UI Components
-// This package will hold shared shadcn/ui components in future phases.
-// For now, it serves as a placeholder with the correct structure.
-
-export {};
+export * from './lib/cn';
+export * from './components/Button';
+export * from './components/Card';
+export * from './components/Input';
+export * from './components/Badge';
+export * from './components/Table';
+export * from './components/Layout';

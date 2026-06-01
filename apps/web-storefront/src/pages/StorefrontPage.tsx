@@ -14,6 +14,8 @@ import { useCustomerStore } from '../store/useCustomerStore';
 import { LoginModal } from '../components/LoginModal';
 import { User, LogOut, ClipboardList } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { StorefrontThemeProvider, StorefrontButton } from '@gestor/storefront-ui';
+import { useStorefrontThemeStore } from '../stores/theme.store';
 
 export function StorefrontPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -128,15 +130,23 @@ export function StorefrontPage() {
   }
 
   const { tenant, categories, combos } = data;
+  const storefrontTheme = useStorefrontThemeStore(s => s.theme);
 
   return (
-    <div className="px-4 py-6">
+    <StorefrontThemeProvider 
+      settings={{ 
+        primaryColor: tenant.primaryColor, 
+        colorMode: storefrontTheme,
+        borderRadius: 'lg'
+      }}
+      className="px-4 py-6"
+    >
       {/* Store Header */}
       <header className="mb-8 flex items-center gap-4">
         {tenant.logo ? (
           <img src={tenant.logo} alt={tenant.name} className="w-16 h-16 rounded-lg object-cover bg-white shadow-sm border" />
         ) : (
-          <div className="w-16 h-16 rounded-lg bg-primary-100 flex items-center justify-center text-primary-600 font-bold text-xl border">
+          <div className="w-16 h-16 rounded-lg bg-[var(--storefront-muted)] flex items-center justify-center text-[var(--storefront-primary)] font-bold text-xl border">
             {tenant.name.substring(0, 1)}
           </div>
         )}
@@ -173,13 +183,15 @@ export function StorefrontPage() {
               </button>
             </div>
           ) : (
-            <button 
+            <StorefrontButton 
+              variant="outline"
+              size="sm"
               onClick={() => setIsLoginOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-full text-sm font-bold text-gray-700 hover:border-primary-300 transition-all shadow-sm"
+              className="rounded-full"
             >
-              <User className="w-4 h-4 text-primary-500" />
+              <User className="w-4 h-4 mr-2" />
               Entrar
-            </button>
+            </StorefrontButton>
           )}
         </div>
       </header>
@@ -364,6 +376,6 @@ export function StorefrontPage() {
           </button>
         </div>
       )}
-    </div>
+    </StorefrontThemeProvider>
   );
 }

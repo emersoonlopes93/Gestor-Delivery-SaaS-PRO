@@ -15,6 +15,7 @@
       "@gestor/utils": ["../../packages/utils/src"],
       "@gestor/auth": ["../../packages/auth/src"],
       "@gestor/config": ["../../packages/config/src"],
+      "@gestor/theme": ["../../packages/theme/src"],
       "@gestor/ui": ["../../packages/ui/src"]
     }
   },
@@ -25,6 +26,7 @@
     "../../packages/utils/src",
     "../../packages/auth/src",
     "../../packages/config/src",
+    "../../packages/theme/src",
     "../../packages/ui/src"
   ],
   "exclude": ["node_modules", "dist"]

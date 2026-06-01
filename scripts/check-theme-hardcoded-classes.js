@@ -23,6 +23,9 @@ const WARNING_PATTERNS = [
   'bg-gray-',
   'text-gray-',
   'border-gray-',
+  'bg-white',
+  'dark:bg-gray-',
+  'dark:bg-slate-',
 ];
 
 // Allowlist pattern for justified exceptions
@@ -39,6 +42,8 @@ const DIRECTORIES_TO_SCAN = [
   'apps/web-tenant/src',
   'apps/web-admin/src',
   'apps/web-storefront/src',
+  'packages/ui/src',
+  'packages/storefront-ui/src',
 ];
 
 // File extensions to scan

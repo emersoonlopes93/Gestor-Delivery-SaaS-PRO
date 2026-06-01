@@ -6,7 +6,8 @@
       "@gestor/core": ["packages/core/src"],
       "@gestor/utils": ["packages/utils/src"],
       "@gestor/auth": ["packages/auth/src"],
-      "@gestor/config": ["packages/config/src"]
+      "@gestor/config": ["packages/config/src"],
+      "@gestor/theme": ["packages/theme/src"]
     }
   },
   "files": [],
@@ -16,6 +17,7 @@
     { "path": "packages/utils" },
     { "path": "packages/auth" },
     { "path": "packages/core" },
+    { "path": "packages/theme" },
     { "path": "packages/ui" },
     { "path": "apps/api" }
   ]
