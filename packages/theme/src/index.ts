@@ -132,12 +132,30 @@ export function getDefaultStorefrontLayoutSettings(): StorefrontLayoutSettings {
  * This avoids dynamic tailwind classes and keeps branding isolated.
  */
 export function applyStorefrontThemeVariables(settings: Partial<StorefrontThemeSettings>) {
+  const mode = settings.colorMode || 'light';
   const primary = sanitizeHexColor(settings.primaryColor, '#0c93e9');
   const radius = getStorefrontRadiusValue(settings.borderRadius || 'lg');
   
+  const isDark = mode === 'dark';
+
   return {
     '--storefront-primary': primary,
     '--storefront-primary-foreground': getAccessibleForegroundColor(primary),
     '--storefront-radius': radius,
+    
+    // Semantic backgrounds
+    '--storefront-background': isDark ? '#020617' : '#ffffff',
+    '--storefront-foreground': isDark ? '#f8fafc' : '#0f172a',
+    
+    // Cards
+    '--storefront-card': isDark ? '#0f172a' : '#ffffff',
+    '--storefront-card-foreground': isDark ? '#f8fafc' : '#0f172a',
+    
+    // Muted
+    '--storefront-muted': isDark ? '#1e293b' : '#f1f5f9',
+    '--storefront-muted-foreground': isDark ? '#94a3b8' : '#64748b',
+    
+    // Borders
+    '--storefront-border': isDark ? '#1e293b' : '#e2e8f0',
   } as React.CSSProperties;
 }

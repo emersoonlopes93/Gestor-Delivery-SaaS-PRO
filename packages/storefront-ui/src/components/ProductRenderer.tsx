@@ -1,27 +1,58 @@
-import { StorefrontProductLayout } from '@gestor/theme';
+import { StorefrontProductLayout, StorefrontImageMode } from '@gestor/theme';
+import { StorefrontProduct } from '../types';
+import { ProductGridCard } from './ProductGridCard';
+import { ProductListItem } from './ProductListItem';
+import { ProductCompactCard } from './ProductCompactCard';
+import { ProductSquareCard } from './ProductSquareCard';
+import { ProductPremiumCard } from './ProductPremiumCard';
+
+import { ProductCardProps } from './ProductGridCard';
 
 interface ProductRendererProps {
+  product: StorefrontProduct;
   layout: StorefrontProductLayout;
-  product: any; // Using any temporarily as requested to not change API/schema yet
-  onClick?: (product: any) => void;
+  imageMode?: StorefrontImageMode;
+  showDescription?: boolean;
+  showBadges?: boolean;
+  onSelectProduct?: (product: StorefrontProduct) => void;
+  currencyFormatter?: (value: number) => string;
 }
 
-export function ProductRenderer({ layout, product, onClick }: ProductRendererProps) {
-  // Placeholder components for different layouts
-  // In a real scenario, these would be separate components in the package
-  
+/**
+ * ProductRenderer - Orchestrates the rendering of products based on selected layout.
+ * Ensures visual consistency while allowing tenant customization.
+ */
+export function ProductRenderer({ 
+  product, 
+  layout, 
+  imageMode = 'cover',
+  showDescription = true,
+  showBadges = true,
+  onSelectProduct,
+  currencyFormatter
+}: ProductRendererProps) {
+  const commonProps: ProductCardProps = {
+    product,
+    onClick: onSelectProduct,
+    currencyFormatter,
+    showDescription,
+    showBadges,
+    imageMode: imageMode === 'hidden' ? 'hidden' : (imageMode as 'cover' | 'contain')
+  };
+
   switch (layout) {
     case 'list':
-      return <div onClick={() => onClick?.(product)} className="p-4 border-b">List Item: {product.name}</div>;
+      return <ProductListItem {...commonProps} />;
     case 'grid':
-      return <div onClick={() => onClick?.(product)} className="p-4 border rounded-xl">Grid Card: {product.name}</div>;
+      return <ProductGridCard {...commonProps} />;
     case 'compact':
-      return <div onClick={() => onClick?.(product)} className="p-2 border rounded-lg text-sm">Compact: {product.name}</div>;
+      return <ProductCompactCard {...commonProps} />;
     case 'square':
-      return <div onClick={() => onClick?.(product)} className="aspect-square border flex items-center justify-center">Square: {product.name}</div>;
+      return <ProductSquareCard {...commonProps} />;
     case 'premium-card':
-      return <div onClick={() => onClick?.(product)} className="p-6 shadow-xl border-primary border-2 rounded-2xl">Premium: {product.name}</div>;
+      return <ProductPremiumCard {...commonProps} />;
     default:
-      return <div onClick={() => onClick?.(product)} className="p-4 border rounded-xl">Default: {product.name}</div>;
+      return <ProductGridCard {...commonProps} />;
   }
 }
+

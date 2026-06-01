@@ -21,6 +21,16 @@ A arquitetura é dividida em três camadas principais para garantir isolamento e
 - **Uso**: `web-storefront`.
 - **Foco**: Conversão, mobile-first e personalização visual via branding do tenant.
 
+## Componentes Disponíveis (@gestor/storefront-ui)
+
+- `StorefrontShell`: Wrapper raiz que garante aplicação de tema e isolamento.
+- `StorefrontThemeProvider`: Gerenciador de variáveis CSS e modo de cor.
+- `ProductRenderer`: Orquestrador de vitrine com suporte a 5 layouts (`grid`, `list`, `compact`, `square`, `premium-card`).
+- `CategoryNavigation`: Navegação responsiva por categorias (`tabs`, `scroll`, `sections`).
+- `StorefrontButton`: Botão otimizado para conversão no storefront.
+- `StorefrontBadge`: Badges de destaque para produtos e estados.
+- `StorefrontEmptyState`: Estados vazios estilizados para a vitrine.
+
 ## Princípios de Design
 
 - **Isolamento de Tema**: O storefront utiliza o atributo `data-storefront-theme` e variáveis `--storefront-*`, garantindo que o tema dark do painel administrativo não "vaze" para a loja pública.

@@ -14,8 +14,16 @@ import { useCustomerStore } from '../store/useCustomerStore';
 import { LoginModal } from '../components/LoginModal';
 import { User, LogOut, ClipboardList } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { StorefrontThemeProvider, StorefrontButton } from '@gestor/storefront-ui';
+import { 
+  StorefrontThemeProvider, 
+  StorefrontButton, 
+  ProductRenderer, 
+  CategoryNavigation, 
+  StorefrontEmptyState,
+  cn
+} from '@gestor/storefront-ui';
 import { useStorefrontThemeStore } from '../stores/theme.store';
+import type { StorefrontProductLayout } from '@gestor/theme';
 
 export function StorefrontPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -33,6 +41,9 @@ export function StorefrontPage() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
 
   const { customer, logout, isLoggedIn } = useCustomerStore();
+
+  // Demo state for layout testing
+  const [productLayout, setProductLayout] = useState<StorefrontProductLayout>('grid');
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['storefront', tenantSlug],
@@ -144,17 +155,17 @@ export function StorefrontPage() {
       {/* Store Header */}
       <header className="mb-8 flex items-center gap-4">
         {tenant.logo ? (
-          <img src={tenant.logo} alt={tenant.name} className="w-16 h-16 rounded-lg object-cover bg-white shadow-sm border" />
+          <img src={tenant.logo} alt={tenant.name} className="w-16 h-16 rounded-[var(--storefront-radius)] object-cover bg-[var(--storefront-card)] shadow-sm border border-[var(--storefront-border)]" />
         ) : (
-          <div className="w-16 h-16 rounded-lg bg-[var(--storefront-muted)] flex items-center justify-center text-[var(--storefront-primary)] font-bold text-xl border">
+          <div className="w-16 h-16 rounded-[var(--storefront-radius)] bg-[var(--storefront-muted)] flex items-center justify-center text-[var(--storefront-primary)] font-bold text-xl border border-[var(--storefront-border)]">
             {tenant.name.substring(0, 1)}
           </div>
         )}
         <div>
-          <h1 className="text-2xl font-black text-gray-900 leading-tight">{tenant.name}</h1>
+          <h1 className="text-2xl font-black text-[var(--storefront-foreground)] leading-tight">{tenant.name}</h1>
           <div className="flex items-center gap-2 mt-1">
             <span className={`w-2 h-2 rounded-full ${data.tenant.isOpen ? 'bg-green-500' : 'bg-red-500'}`} />
-            <span className="text-sm text-gray-500 font-medium">
+            <span className="text-sm text-[var(--storefront-muted-foreground)] font-medium">
               {data.tenant.statusMessage || (data.tenant.isOpen ? 'Aberto agora' : 'Fechado no momento')}
             </span>
           </div>
@@ -165,18 +176,18 @@ export function StorefrontPage() {
             <div className="flex items-center gap-3">
                <Link 
                 to={`/${tenantSlug}/orders`}
-                className="p-2 text-gray-500 hover:text-primary-600 transition-colors"
+                className="p-2 text-[var(--storefront-muted-foreground)] hover:text-[var(--storefront-primary)] transition-colors"
                 title="Meus Pedidos"
               >
                 <ClipboardList className="w-6 h-6" />
               </Link>
               <div className="text-right hidden sm:block">
-                <p className="text-xs text-gray-400">Olá,</p>
-                <p className="text-sm font-bold text-gray-800">{customer?.name}</p>
+                <p className="text-xs text-[var(--storefront-muted-foreground)]">Olá,</p>
+                <p className="text-sm font-bold text-[var(--storefront-foreground)]">{customer?.name}</p>
               </div>
               <button 
                 onClick={logout}
-                className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                className="p-2 text-[var(--storefront-muted-foreground)] hover:text-red-500 transition-colors"
                 title="Sair"
               >
                 <LogOut className="w-5 h-5" />
@@ -205,24 +216,55 @@ export function StorefrontPage() {
         </div>
       ) : null}
 
-      {/* Categories / Anchor Links (Simple) */}
-      <nav className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide sticky top-0 bg-gray-50/80 backdrop-blur-md z-30 pt-2 -mx-4 px-4 overflow-y-hidden">
-        {combos.length > 0 && (
-          <a href="#combos" className="whitespace-nowrap px-4 py-2 bg-white border border-gray-100 rounded-full text-xs font-bold text-gray-600 hover:border-primary-200 uppercase tracking-widest">Combos</a>
-        )}
-        {categories.map(cat => (
-          <a key={cat.id} href={`#${cat.slug}`} className="whitespace-nowrap px-4 py-2 bg-white border border-gray-100 rounded-full text-xs font-bold text-gray-600 hover:border-primary-200 uppercase tracking-widest">
-            {cat.name}
-          </a>
-        ))}
-      </nav>
+      {/* Demo Layout Switcher */}
+      <div className="mb-6 p-4 bg-[var(--storefront-muted)] rounded-[var(--storefront-radius)] border border-[var(--storefront-border)]">
+        <p className="text-xs font-bold text-[var(--storefront-muted-foreground)] uppercase tracking-widest mb-3">Demo: Escolha o Layout</p>
+        <div className="flex flex-wrap gap-2">
+          {(['grid', 'list', 'compact', 'square', 'premium-card'] as const).map((layout) => (
+            <button
+              key={layout}
+              onClick={() => setProductLayout(layout)}
+              className={cn(
+                'px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tight transition-all',
+                productLayout === layout 
+                  ? 'bg-[var(--storefront-primary)] text-[var(--storefront-primary-foreground)]' 
+                  : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300'
+              )}
+            >
+              {layout}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Categories Navigation */}
+      <CategoryNavigation 
+        categories={categories}
+        layout="tabs"
+        onCategoryClick={(slug) => {
+          const el = document.getElementById(slug);
+          if (el) {
+            const offset = 80; // Adjust for sticky header
+            const bodyRect = document.body.getBoundingClientRect().top;
+            const elementRect = el.getBoundingClientRect().top;
+            const elementPosition = elementRect - bodyRect;
+            const offsetPosition = elementPosition - offset;
+
+            window.scrollTo({
+              top: offsetPosition,
+              behavior: 'smooth'
+            });
+          }
+        }}
+        className="-mx-4 mb-8"
+      />
 
       <div className="space-y-12 mt-4">
         {/* Combos Section */}
         {combos.length > 0 && (
           <section id="combos">
-            <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <span className="w-1 h-6 bg-orange-500 rounded-full" />
+            <h2 className="text-lg font-bold text-[var(--storefront-foreground)] mb-4 flex items-center gap-2">
+              <span className="w-1 h-6 bg-[var(--storefront-primary)] rounded-full" />
               COMBOS ESPECIAIS
             </h2>
             <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2 xl:grid-cols-3">
@@ -231,32 +273,35 @@ export function StorefrontPage() {
                   key={combo.id}
                   onClick={() => setSelectedCombo(combo)}
                   disabled={!combo.isAvailable}
-                  className={`flex bg-orange-50/50 rounded-xl p-3 border border-orange-100/50 transition-all text-left group ${
-                    combo.isAvailable ? 'hover:border-orange-200' : 'opacity-50 grayscale cursor-not-allowed'
-                  }`}
+                  className={cn(
+                    'flex bg-[var(--storefront-card)] rounded-[var(--storefront-radius)] p-3 border border-[var(--storefront-border)] transition-all text-left group',
+                    combo.isAvailable ? 'hover:border-[var(--storefront-primary)]' : 'opacity-50 grayscale cursor-not-allowed'
+                  )}
                 >
                   <div className="flex-1 pr-3">
                     <div className="flex items-center gap-2 mb-1">
-                      <Box className="w-3 h-3 text-orange-500" />
-                      <h3 className="font-bold text-gray-900 group-hover:text-orange-600 transition-colors uppercase text-sm tracking-wide">
+                      <Box className="w-3 h-3 text-[var(--storefront-primary)]" />
+                      <h3 className="font-bold text-[var(--storefront-foreground)] group-hover:text-[var(--storefront-primary)] transition-colors uppercase text-sm tracking-wide">
                         {combo.name}
                       </h3>
                       {!combo.isAvailable ? (
                         <span className="ml-auto text-[10px] font-black text-red-600 uppercase">Indisponível</span>
                       ) : null}
                     </div>
-                    <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed italic">
+                    <p className="text-xs text-[var(--storefront-muted-foreground)] line-clamp-2 leading-relaxed italic">
                       {combo.description || 'Combo completo para você.'}
                     </p>
-                    <div className="mt-3 font-black text-orange-600">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(combo.basePrice)}
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-sm font-black text-[var(--storefront-foreground)]">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(combo.basePrice)}
+                      </span>
                     </div>
                   </div>
                   {combo.image && (
                     <img 
                       src={combo.image} 
                       alt={combo.name} 
-                      className="w-24 h-24 rounded-lg object-cover"
+                      className="w-24 h-24 rounded-[var(--storefront-radius)] object-cover"
                       loading="lazy"
                       decoding="async"
                     />
@@ -270,56 +315,44 @@ export function StorefrontPage() {
         {/* Categories Sections */}
         {categories.map((category) => (
           <section key={category.id} id={category.slug}>
-            <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <span className="w-1 h-6 bg-primary-500 rounded-full" />
+            <h2 className="text-lg font-bold text-[var(--storefront-foreground)] mb-4 flex items-center gap-2">
+              <span className="w-1 h-6 bg-[var(--storefront-primary)] rounded-full" />
               {category.name}
             </h2>
             
-            <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            <div className={cn(
+              'grid gap-3 sm:gap-4',
+              productLayout === 'grid' && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+              productLayout === 'square' && 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4',
+              productLayout === 'compact' && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+              productLayout === 'list' && 'grid-cols-1',
+              productLayout === 'premium-card' && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+            )}>
               {category.products.map((product) => (
-                <button
+                <ProductRenderer
                   key={product.id}
-                  onClick={() => setSelectedProduct(product)}
-                  disabled={!product.isAvailable}
-                  className={`flex bg-white rounded-xl p-3 shadow-sm border border-gray-100 transition-all text-left group ${
-                    product.isAvailable ? 'hover:border-primary-200' : 'opacity-50 grayscale cursor-not-allowed'
-                  }`}
-                >
-                  <div className="flex-1 pr-3">
-                    <h3 className="font-bold text-gray-900 group-hover:text-primary-600 transition-colors uppercase text-sm tracking-wide">
-                      {product.name}
-                    </h3>
-                    {!product.isAvailable ? (
-                      <div className="mt-1 text-[10px] font-black text-red-600 uppercase">Indisponível</div>
-                    ) : null}
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-2 leading-relaxed">
-                      {product.shortDescription || 'Sem descrição.'}
-                    </p>
-                    <div className="mt-3 font-black text-primary-600">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.basePrice)}
-                    </div>
-                  </div>
-                  {product.image && (
-                    <img 
-                      src={product.image} 
-                      alt={product.name} 
-                      className="w-24 h-24 rounded-lg object-cover"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  )}
-                </button>
+                  product={{
+                    id: product.id,
+                    name: product.name,
+                    description: product.shortDescription,
+                    imageUrl: product.image,
+                    price: product.basePrice,
+                    isAvailable: product.isAvailable,
+                  }}
+                  layout={productLayout}
+                  onSelectProduct={() => setSelectedProduct(product)}
+                />
               ))}
             </div>
           </section>
         ))}
 
         {combos.length === 0 && categories.length === 0 && (
-          <section className="bg-white border border-gray-200 rounded-xl p-6 text-center">
-            <p className="text-sm text-gray-600 font-medium">
-              Nenhum item disponível para este canal no momento.
-            </p>
-          </section>
+          <StorefrontEmptyState 
+            title="Nenhum item disponível"
+            description="Nenhum item disponível para este canal no momento."
+            icon={<ShoppingBag className="w-12 h-12" />}
+          />
         )}
       </div>
 
