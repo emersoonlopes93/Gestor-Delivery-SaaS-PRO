@@ -164,22 +164,23 @@ export function StorefrontCustomizationPage() {
       <PageHeader 
         title="Personalização da Vitrine" 
         description="Configure a aparência e o comportamento da sua loja pública."
-      >
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleReset} disabled={saving}>
-            <RotateCcw className="w-4 h-4 mr-2" />
-            Restaurar Padrão
-          </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-            ) : (
-              <Save className="w-4 h-4 mr-2" />
-            )}
-            Salvar Alterações
-          </Button>
-        </div>
-      </PageHeader>
+        action={
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleReset} disabled={saving}>
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Restaurar Padrão
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
+              Salvar Alterações
+            </Button>
+          </div>
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -497,8 +498,10 @@ export function StorefrontCustomizationPage() {
             </div>
 
             <div 
-              className={`rounded-2xl border border-gray-200 overflow-hidden shadow-sm transition-all duration-500 ${
-                customization.theme.colorMode === 'dark' ? 'bg-slate-950 text-white' : 'bg-white text-slate-900'
+              className={`rounded-2xl border transition-all duration-500 overflow-hidden shadow-sm ${
+                customization.theme.colorMode === 'dark' 
+                  ? 'bg-[#0f172a] border-slate-800 text-slate-100' 
+                  : 'bg-white border-slate-200 text-slate-900'
               }`}
               style={{
                 '--preview-primary': customization.theme.primaryColor,
@@ -510,11 +513,19 @@ export function StorefrontCustomizationPage() {
               } as React.CSSProperties}
             >
               {/* Fake Store Header */}
-              <div className="p-4 border-b border-gray-100/10 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-[var(--preview-radius)] bg-gray-200/50 flex-shrink-0" />
+              <div className={`p-4 border-b flex items-center gap-3 ${
+                customization.theme.colorMode === 'dark' ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50/50'
+              }`}>
+                <div className={`w-10 h-10 rounded-[var(--preview-radius)] flex-shrink-0 ${
+                  customization.theme.colorMode === 'dark' ? 'bg-slate-800' : 'bg-slate-200'
+                }`} />
                 <div className="flex-1">
-                  <div className="h-3 w-24 bg-gray-200/50 rounded mb-2" />
-                  <div className="h-2 w-16 bg-gray-200/30 rounded" />
+                  <div className={`h-3 w-24 rounded mb-2 ${
+                    customization.theme.colorMode === 'dark' ? 'bg-slate-700' : 'bg-slate-300'
+                  }`} />
+                  <div className={`h-2 w-16 rounded ${
+                    customization.theme.colorMode === 'dark' ? 'bg-slate-800' : 'bg-slate-200'
+                  }`} />
                 </div>
               </div>
 
@@ -522,31 +533,47 @@ export function StorefrontCustomizationPage() {
               <div className="p-4 space-y-4">
                 <div className="flex gap-2 overflow-hidden">
                   <div className="px-3 py-1.5 rounded-full bg-[var(--preview-primary)] text-white text-[10px] font-black uppercase">Burgers</div>
-                  <div className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-400 text-[10px] font-black uppercase">Bebidas</div>
+                  <div className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase ${
+                    customization.theme.colorMode === 'dark' ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-400'
+                  }`}>Bebidas</div>
                 </div>
 
                 <div className="space-y-3">
-                  <div className="h-3 w-32 bg-gray-200/50 rounded" />
+                  <div className={`h-3 w-32 rounded ${
+                    customization.theme.colorMode === 'dark' ? 'bg-slate-800' : 'bg-slate-200'
+                  }`} />
                   
                   {/* Fake Product Card */}
-                  <div className={`p-3 border rounded-[var(--preview-radius)] border-gray-100 transition-all ${
+                  <div className={`p-3 border rounded-[var(--preview-radius)] transition-all ${
+                    customization.theme.colorMode === 'dark' ? 'border-slate-800 bg-slate-900/30' : 'border-slate-100 bg-white'
+                  } ${
                     customization.layout.productLayout === 'premium-card' ? 'shadow-lg border-2 border-[var(--preview-primary)]' : ''
                   }`}>
                     <div className={`flex gap-3 ${
                       ['grid', 'square', 'premium-card'].includes(customization.layout.productLayout) ? 'flex-col' : 'flex-row'
                     }`}>
                       {customization.layout.productImageMode !== 'hidden' && (
-                        <div className={`bg-gray-100 rounded-[calc(var(--preview-radius)-4px)] flex-shrink-0 ${
+                        <div className={`rounded-[calc(var(--preview-radius)-4px)] flex-shrink-0 ${
+                          customization.theme.colorMode === 'dark' ? 'bg-slate-800' : 'bg-slate-100'
+                        } ${
                           ['grid', 'square', 'premium-card'].includes(customization.layout.productLayout) ? 'aspect-video w-full' : 'w-16 h-16'
                         }`} />
                       )}
                       <div className="flex-1 space-y-2">
-                        <div className="h-3 w-full bg-gray-200/50 rounded" />
+                        <div className={`h-3 w-full rounded ${
+                          customization.theme.colorMode === 'dark' ? 'bg-slate-700' : 'bg-slate-300'
+                        }`} />
                         {customization.layout.showProductDescription && (
-                          <div className="h-2 w-full bg-gray-100/50 rounded" />
+                          <div className={`h-2 w-full rounded ${
+                            customization.theme.colorMode === 'dark' ? 'bg-slate-800' : 'bg-slate-100'
+                          }`} />
                         )}
                         <div className="flex justify-between items-center pt-2">
-                          <div className="h-4 w-12 bg-[var(--preview-primary)]/20 rounded" />
+                          <div className="flex flex-col gap-1">
+                            <div className={`h-4 w-12 rounded ${
+                              customization.theme.colorMode === 'dark' ? 'bg-slate-700/50' : 'bg-slate-200'
+                            }`} />
+                          </div>
                           <div 
                             className="h-8 w-16 rounded-[calc(var(--preview-radius)-4px)]" 
                             style={{ backgroundColor: customization.theme.primaryColor }}
@@ -568,6 +595,16 @@ export function StorefrontCustomizationPage() {
                 <Smartphone className="w-3 h-3" />
                 <span>As alterações podem levar alguns segundos para propagar.</span>
               </div>
+
+              {/* Bottom Action for easier access */}
+              <Button onClick={handleSave} className="w-full shadow-lg shadow-primary-100" size="lg" disabled={saving}>
+                {saving ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
+                Salvar Todas Alterações
+              </Button>
             </div>
           </Card>
         </div>

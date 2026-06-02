@@ -42,6 +42,8 @@ export function StorefrontPage() {
 
   const { customer, logout, isLoggedIn } = useCustomerStore();
 
+  const storefrontTheme = useStorefrontThemeStore(s => s.theme);
+
   // Demo state for layout testing
   const [productLayout, setProductLayout] = useState<StorefrontProductLayout>('grid');
 
@@ -141,7 +143,6 @@ export function StorefrontPage() {
   }
 
   const { tenant, categories, combos, customization } = data;
-  const storefrontTheme = useStorefrontThemeStore(s => s.theme);
 
   // Use real settings from backend, with local override for testing in DEV
   // Backend now guarantees normalization, but we add a safety layer here too.
