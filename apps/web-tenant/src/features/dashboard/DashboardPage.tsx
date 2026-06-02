@@ -99,7 +99,7 @@ export function DashboardPage() {
     }
 
     void loadOnboardingData();
-  }, []);
+  }, [user]);
 
   const summaryCards = [
     {

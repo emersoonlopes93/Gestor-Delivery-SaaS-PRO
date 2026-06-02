@@ -20,14 +20,8 @@ import {
   Save,
   Printer,
   Receipt,
-  Phone,
   UserPlus,
-  MapPin,
-  Home,
-  RefreshCw,
-  Edit3,
-  CheckCircle,
-  AlertCircle
+  MapPin
 } from 'lucide-react';
 
 // New Components
@@ -38,6 +32,7 @@ import { PosSalonView, type SalonTable } from './components/PosSalonView';
 import { TransferTableModal } from './components/TransferTableModal';
 import { PosItemConfiguratorModal } from './components/PosItemConfiguratorModal';
 import { SplitPaymentModal } from './components/SplitPaymentModal';
+import { PosCustomerDrawer } from './components/PosCustomerDrawer';
 import type { CreateOrderItemSelectionGroupDTO, CreateOrderItemComboSlotSelectionDTO, PizzaCompositionDTO } from '@gestor/types';
 
 interface CatalogProduct {
@@ -172,6 +167,7 @@ export default function PosPage() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
+  const [isCustomerDrawerOpen, setIsCustomerDrawerOpen] = useState(false);
   const [sourceTableForTransfer, setSourceTableForTransfer] = useState<SalonTable | null>(null);
 
   const [configProductId, setConfigProductId] = useState<string | null>(null);
@@ -730,236 +726,59 @@ export default function PosPage() {
                </>
              )}
              {currentOrderId && (
-               <span className="bg-status-warning/10 text-status-warning text-[9px] font-black uppercase px-2 py-0.5 rounded border border-status-warning/20 shadow-sm">Comanda Aberta</span>
-             )}
-           </div>
-        </div>
-
-          <div className="shrink-0 px-4 py-3 bg-card border-b border-border200 dark:border-border800 space-y-3">
-           <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase text-muted-foreground500 dark:text-muted-foreground400 tracking-widest flex items-center gap-1.5 leading-none">
-                <Phone size={12} className="text-status-success" />
-                Cliente do pedido
-              </span>
-              {selectedCustomer ? (
-                <button onClick={clearSelectedCustomer} className="text-[10px] font-black uppercase text-muted-foreground500 hover:text-destructive transition-colors">
-                  Trocar
-                </button>
-              ) : (
-                <button onClick={() => setShowCustomerSearch(!showCustomerSearch)} className="text-muted-foreground500 dark:text-muted-foreground400 hover:text-status-success transition-colors">
-                  <Search size={16} />
-                </button>
+                <span className="bg-status-warning/10 text-status-warning text-[9px] font-black uppercase px-2 py-0.5 rounded border border-status-warning/20 shadow-sm">Comanda Aberta</span>
               )}
-           </div>
-
-           {!selectedCustomer && (
-              <div className="relative animate-in fade-in slide-in-from-top-2">
-                 <div className="relative">
-                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground500" size={14} />
-                   <input
-                     autoFocus={showCustomerSearch}
-                     className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
-                     placeholder="Buscar por telefone ou nome"
-                     value={customerSearchTerm}
-                     onChange={(e) => {
-                       setCustomerSearchTerm(e.target.value);
-                       if (!customerPhone && /\d/.test(e.target.value)) setCustomerPhone(e.target.value);
-                     }}
-                   />
-                 </div>
-                 {foundCustomers && foundCustomers.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 bg-card dark:bg-muted800 border border-border200 dark:border-border700 rounded-xl mt-1 shadow-2xl z-50 overflow-hidden">
-                       {foundCustomers.map((customer) => (
-                         <button
-                           key={customer.id}
-                           onClick={() => selectCustomer(customer)}
-                           className="w-full text-left px-4 py-3 hover:bg-muted100 dark:hover:bg-muted750 transition-colors border-b border-border200 dark:border-border700 last:border-0"
-                         >
-                           <div className="flex items-center justify-between gap-3">
-                             <div className="min-w-0">
-                               <p className="font-black text-xs text-muted-foreground900 dark:text-white truncate">{customer.name}</p>
-                               <p className="text-[10px] font-bold text-muted-foreground500">{customer.phone}</p>
-                             </div>
-                             <span className="text-[9px] font-black uppercase text-status-success">{customer.orderCount} pedidos</span>
-                           </div>
-                         </button>
-                       ))}
-                    </div>
-                 )}
+            </div>
+        </div>
+        
+        {/* Compact Customer & Address Selection */}
+        <div className="shrink-0 px-4 py-3 bg-muted50 dark:bg-muted950 border-b border-border200 dark:border-border800">
+          {(!selectedCustomer && !customerName.trim()) ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase text-muted-foreground500 tracking-wider">Cliente</span>
+                {isDelivery && (
+                  <span className="text-[9px] font-bold text-destructive uppercase animate-pulse">
+                    Requer Identificação
+                  </span>
+                )}
               </div>
-           )}
-
-           <div className="grid grid-cols-[1fr_130px] gap-2">
-             <input
-               className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
-               placeholder={isDelivery ? 'Nome do cliente' : 'Cliente opcional'}
-               value={customerName}
-               disabled={!!selectedCustomer}
-               onChange={(e) => setCustomerName(e.target.value)}
-             />
-             <input
-               className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
-               placeholder={isDelivery ? 'Telefone' : 'Telefone opcional'}
-               value={customerPhone}
-               disabled={!!selectedCustomer}
-               onChange={(e) => setCustomerPhone(e.target.value)}
-             />
-           </div>
-
-           {selectedCustomer && (
-             <div className="flex items-center justify-between rounded-xl bg-status-success/10 border border-status-success/20 px-3 py-2">
-               <div className="min-w-0">
-                 <p className="text-xs font-black text-foreground truncate">{selectedCustomer.name}</p>
-                 <p className="text-[10px] font-bold text-muted-foreground">{selectedCustomer.phone}</p>
-               </div>
-               <CheckCircle size={18} className="text-status-success shrink-0" />
-             </div>
-           )}
-
-           {isDelivery && (
-             <div className="space-y-3 border-t border-border200 dark:border-border800 pt-3">
-               {selectedCustomer && addressesForSelectedCustomer.length > 0 && (
-                 <div className="space-y-2">
-                   <div className="flex items-center justify-between">
-                     <span className="text-[10px] font-black uppercase text-muted-foreground500 tracking-widest flex items-center gap-1">
-                       <Home size={12} />
-                       Enderecos salvos
-                     </span>
-                     <button
-                       onClick={() => {
-                         setEditingAddressId(null);
-                         setSelectedAddressId(null);
-                         setDeliveryAddress(emptyDeliveryAddress);
-                         resetDeliveryFee();
-                       }}
-                       className="text-[10px] font-black uppercase text-primary"
-                     >
-                       Novo
-                     </button>
-                   </div>
-                   <div className="max-h-28 overflow-y-auto space-y-2 pr-1">
-                     {addressesForSelectedCustomer.map((address) => (
-                       <button
-                         key={address.id}
-                         onClick={() => applyAddress(address)}
-                         className={`w-full text-left rounded-xl border px-3 py-2 transition-all ${selectedAddressId === address.id ? 'border-primary bg-primary/10' : 'border-border200 dark:border-border800 bg-muted50 dark:bg-muted950 hover:border-primary/40'}`}
-                       >
-                         <div className="flex items-start justify-between gap-2">
-                           <div className="min-w-0">
-                             <p className="text-xs font-black text-foreground truncate">{address.label || `${address.street}, ${address.number}`}</p>
-                             <p className="text-[10px] font-bold text-muted-foreground truncate">{address.neighborhood} · {address.city}/{address.state}</p>
-                           </div>
-                           {address.isDefault && <span className="text-[9px] font-black uppercase text-status-success">Padrao</span>}
-                         </div>
-                       </button>
-                     ))}
-                   </div>
-                 </div>
-               )}
-
-               <div className="grid grid-cols-[1fr_88px] gap-2">
-                 <input
-                   className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
-                   placeholder="Rua"
-                   value={deliveryAddress.street}
-                   onChange={(e) => updateDeliveryAddress('street', e.target.value)}
-                 />
-                 <input
-                   className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
-                   placeholder="Numero"
-                   value={deliveryAddress.number}
-                   onChange={(e) => updateDeliveryAddress('number', e.target.value)}
-                 />
-               </div>
-               <div className="grid grid-cols-2 gap-2">
-                 <input
-                   className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
-                   placeholder="Bairro"
-                   value={deliveryAddress.neighborhood}
-                   onChange={(e) => updateDeliveryAddress('neighborhood', e.target.value)}
-                 />
-                 <input
-                   className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
-                   placeholder="Cidade"
-                   value={deliveryAddress.city}
-                   onChange={(e) => updateDeliveryAddress('city', e.target.value)}
-                 />
-               </div>
-               <div className="grid grid-cols-[72px_1fr] gap-2">
-                 <input
-                   className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white uppercase outline-none focus:border-status-success"
-                   placeholder="UF"
-                   maxLength={2}
-                   value={deliveryAddress.state}
-                   onChange={(e) => updateDeliveryAddress('state', e.target.value.toUpperCase())}
-                 />
-                 <input
-                   className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
-                   placeholder="CEP"
-                   value={deliveryAddress.zipCode}
-                   onChange={(e) => updateDeliveryAddress('zipCode', e.target.value)}
-                 />
-               </div>
-               <div className="grid grid-cols-2 gap-2">
-                 <input
-                   className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
-                   placeholder="Complemento"
-                   value={deliveryAddress.complement}
-                   onChange={(e) => updateDeliveryAddress('complement', e.target.value)}
-                 />
-                 <input
-                   className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
-                   placeholder="Referencia"
-                   value={deliveryAddress.reference}
-                   onChange={(e) => updateDeliveryAddress('reference', e.target.value)}
-                 />
-               </div>
-
-               <div className="grid grid-cols-2 gap-2">
-                 <button
-                   onClick={handleSaveCustomerAndAddress}
-                   disabled={isSavingCustomerAddress || !customerName.trim() || !customerPhone.trim() || deliveryMissingRequiredData}
-                   className="bg-card dark:bg-muted800 hover:bg-muted100 dark:hover:bg-muted750 text-muted-foreground700 dark:text-muted-foreground300 border border-border200 dark:border-border700 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70"
-                 >
-                   {editingAddressId ? <Edit3 size={13} /> : <UserPlus size={13} />}
-                   {editingAddressId ? 'Salvar edicao' : selectedCustomer ? 'Salvar endereco' : 'Salvar cliente'}
-                 </button>
-                 {selectedAddressId && (
-                   <button
-                     onClick={() => setEditingAddressId(selectedAddressId)}
-                     className="bg-card dark:bg-muted800 hover:bg-muted100 dark:hover:bg-muted750 text-muted-foreground700 dark:text-muted-foreground300 border border-border200 dark:border-border700 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all"
-                   >
-                     <Edit3 size={13} />
-                     Editar
-                   </button>
-                 )}
-               </div>
-
-               <button
-                 onClick={handleCalculateDeliveryFee}
-                 disabled={deliveryRateMutation.isPending}
-                 className="w-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 flex items-center justify-center gap-2"
-               >
-                 <RefreshCw size={13} className={deliveryRateMutation.isPending ? 'animate-spin' : ''} />
-                 {deliveryRateMutation.isPending ? 'Calculando frete...' : `Frete: ${deliveryFeeCalculated ? formatCurrency(deliveryFee) : 'Calcular'}`}
-               </button>
-               {deliveryFeeCalculated && (
-                 <div className="rounded-xl bg-primary/5 border border-primary/15 px-3 py-2 text-[10px] font-bold text-muted-foreground flex items-start gap-2">
-                   <MapPin size={13} className="text-primary mt-0.5 shrink-0" />
-                   <span>{deliveryAddress.neighborhood || 'Bairro'} · {deliveryFeeRule || deliveryAddress.street || 'Endereco'} · {formatCurrency(deliveryFee)}</span>
-                 </div>
-               )}
-               {deliveryFeeError && (
-                 <p className="text-[10px] font-bold text-destructive flex items-center gap-1">
-                   <AlertCircle size={12} />
-                   {deliveryFeeError}
-                 </p>
-               )}
-             </div>
-           )}
+              <button 
+                onClick={() => setIsCustomerDrawerOpen(true)}
+                className="w-full bg-card dark:bg-muted800 hover:bg-muted100 dark:hover:bg-muted750 text-muted-foreground700 dark:text-muted-foreground300 border border-dashed border-border300 dark:border-border700 rounded-xl py-3 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
+              >
+                <UserPlus size={14} className="text-primary" />
+                Identificar Cliente
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1 bg-card dark:bg-muted900 rounded-xl border border-border200 dark:border-border800 p-3 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-foreground truncate">{selectedCustomer?.name || customerName}</p>
+                  <p className="text-[10px] font-bold text-muted-foreground">{selectedCustomer?.phone || customerPhone}</p>
+                </div>
+                <button 
+                  onClick={() => setIsCustomerDrawerOpen(true)}
+                  className="text-[9px] font-black uppercase text-primary bg-primary/10 border border-primary/20 px-2.5 py-1 rounded-lg hover:bg-primary/20 transition-all shrink-0"
+                >
+                  Editar
+                </button>
+              </div>
+              {isDelivery && (
+                <div className="border-t border-border100 dark:border-border800 mt-2 pt-2 text-[10px] font-bold text-muted-foreground flex items-start gap-1.5 min-w-0">
+                  <MapPin size={12} className="text-primary shrink-0 mt-0.5" />
+                  <span className="truncate">
+                    {deliveryAddress.street ? `${deliveryAddress.street}, ${deliveryAddress.number}` : 'Endereço não selecionado'}
+                    {deliveryAddress.neighborhood && ` · ${deliveryAddress.neighborhood}`}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3 bg-card/50 dark:bg-muted900/50 scrollbar-hide">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3 bg-card/50 dark:bg-muted900/50 scrollbar-hide">
              {cart.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
                 <ShoppingCart size={48} strokeWidth={1} />
@@ -1054,6 +873,40 @@ export default function PosPage() {
       <PaymentModal 
         isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)}
         total={total} subtotal={subtotal} discount={discountTotal} onConfirm={handleConfirmSale} isPending={createSale.isPending}
+      />
+
+      <PosCustomerDrawer
+        isOpen={isCustomerDrawerOpen}
+        onClose={() => setIsCustomerDrawerOpen(false)}
+        fulfillmentType={fulfillmentType}
+        selectedCustomer={selectedCustomer}
+        customerName={customerName}
+        setCustomerName={setCustomerName}
+        customerPhone={customerPhone}
+        setCustomerPhone={setCustomerPhone}
+        customerSearchTerm={customerSearchTerm}
+        setCustomerSearchTerm={setCustomerSearchTerm}
+        foundCustomers={foundCustomers}
+        onSelectCustomer={selectCustomer}
+        onClearCustomer={clearSelectedCustomer}
+        addressesForSelectedCustomer={addressesForSelectedCustomer}
+        selectedAddressId={selectedAddressId}
+        setSelectedAddressId={setSelectedAddressId}
+        editingAddressId={editingAddressId}
+        setEditingAddressId={setEditingAddressId}
+        deliveryAddress={deliveryAddress}
+        setDeliveryAddress={setDeliveryAddress}
+        onUpdateDeliveryAddress={updateDeliveryAddress}
+        onApplyAddress={applyAddress}
+        deliveryFee={deliveryFee}
+        deliveryFeeCalculated={deliveryFeeCalculated}
+        deliveryFeeError={deliveryFeeError}
+        deliveryFeeRule={deliveryFeeRule}
+        onCalculateDeliveryFee={handleCalculateDeliveryFee}
+        onResetDeliveryFee={resetDeliveryFee}
+        isSavingCustomerAddress={isSavingCustomerAddress}
+        onSaveCustomerAndAddress={handleSaveCustomerAndAddress}
+        deliveryMissingRequiredData={deliveryMissingRequiredData}
       />
 
       {sourceTableForTransfer && (
