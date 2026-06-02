@@ -6,6 +6,8 @@ import { ConfigService } from '@nestjs/config';
 import { WebhookDto } from './dto/create-pix-payment.dto';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { MercadoPagoPaymentSchema, MercadoPagoPayment } from './schemas/mercadopago.schema';
+import { ModuleRef } from '@nestjs/core';
+import { OrdersService } from '../orders/orders.service';
 
 interface MercadoPagoConfig {
   accessToken: string;
@@ -87,7 +89,12 @@ export class PaymentGatewayService {
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
     private readonly configService: ConfigService,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  private get ordersService(): OrdersService {
+    return this.moduleRef.get(OrdersService, { strict: false });
+  }
 
   private mergeMetadata(current: Prisma.JsonValue, update: Partial<PaymentMetadata>): Prisma.InputJsonValue {
     const base = (current && typeof current === 'object' && !Array.isArray(current)) 
@@ -308,9 +315,11 @@ export class PaymentGatewayService {
       });
 
       if (mpResponse.status === 'approved') {
-        await this.prisma.order.update({
-          where: { id: orderId },
-          data: { status: OrderStatus.confirmed },
+        await this.ordersService.updateOrderStatus(orderId, tenantId, {
+          status: 'confirmed',
+          note: 'Pagamento via cartão de crédito aprovado.',
+        }).catch(err => {
+          this.logger.error(`Error transitioning order ${orderId} to confirmed in createCardPayment: ${err.message}`);
         });
       }
 
@@ -621,9 +630,11 @@ export class PaymentGatewayService {
     });
 
     if (newStatus === PaymentTxStatus.confirmed && transaction.orderId) {
-      await this.prisma.order.update({
-        where: { id: transaction.orderId },
-        data: { status: orderStatus },
+      await this.ordersService.updateOrderStatus(transaction.orderId, transaction.tenantId, {
+        status: orderStatus as any,
+        note: `Pagamento via gateway confirmado (Transação: ${transaction.gatewayTxId}).`,
+      }).catch(err => {
+        this.logger.error(`Error transitioning order ${transaction.orderId} to ${orderStatus} in webhook update: ${err.message}`);
       });
 
       this.logger.log(`Payment confirmed for order ${transaction.orderId}`);
@@ -694,10 +705,19 @@ export class PaymentGatewayService {
       });
 
       if (transaction.orderId) {
-        await this.prisma.order.update({
-          where: { id: transaction.orderId },
-          data: { status: OrderStatus.cancelled },
-        });
+        try {
+          await this.ordersService.updateOrderStatus(
+            transaction.orderId,
+            transaction.tenantId,
+            {
+              status: 'cancelled' as any,
+              note: 'Pagamento cancelado pelo gateway.',
+            },
+            'SYSTEM'
+          );
+        } catch (error) {
+          this.logger.error(`Failed to update order status to cancelled for order ${transaction.orderId}: ${error}`);
+        }
       }
 
       this.logger.log(`Payment cancelled: ${transactionId}`);

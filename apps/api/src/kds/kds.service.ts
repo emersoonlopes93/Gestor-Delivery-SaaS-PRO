@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
 import { 
@@ -37,11 +37,64 @@ type PrintJobWithOrder = PrintJob & {
 
 @Injectable()
 export class KdsService {
+  private readonly logger = new Logger(KdsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenantContext: TenantContextService,
     private readonly printerService: PrinterService,
   ) {}
+
+  /**
+   * Obtém as estações ativas de forma dinâmica (categorias e jobs pendentes)
+   */
+  async getAvailableStations(): Promise<string[]> {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) return ['GERAL'];
+
+    const stations = new Set<string>();
+    stations.add('GERAL');
+
+    try {
+      const categories = await this.prisma.productCategory.findMany({
+        where: { tenantId },
+        select: { name: true, templateConfig: true }
+      });
+
+      for (const cat of categories) {
+        if (cat.templateConfig && typeof cat.templateConfig === 'object' && !Array.isArray(cat.templateConfig)) {
+          const config = cat.templateConfig as Record<string, unknown>;
+          if (config.station) {
+            stations.add(config.station as string);
+          } else {
+            stations.add(cat.name);
+          }
+        } else {
+          stations.add(cat.name);
+        }
+      }
+
+      const pendingJobs = await this.prisma.printJob.groupBy({
+        by: ['station'],
+        where: {
+          tenantId,
+          status: {
+            notIn: [PrismaPrintJobStatus.completed]
+          }
+        }
+      });
+
+      for (const job of pendingJobs) {
+        if (job.station) {
+          stations.add(job.station);
+        }
+      }
+    } catch (e) {
+      this.logger.error('Error fetching dynamic stations:', e);
+    }
+
+    return Array.from(stations).sort();
+  }
 
   /**
    * Busca jobs de impressão pendentes de uma estação
@@ -357,9 +410,12 @@ export class KdsService {
   /**
    * Cria os jobs de produção na cozinha baseado no pedido
    */
-  async createProductionJobs(orderId: string) {
-    const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) return [];
+  async createProductionJobs(orderId: string, explicitTenantId?: string) {
+    const tenantId = explicitTenantId || this.tenantContext.getTenantId();
+    if (!tenantId) {
+      this.logger.warn(`createProductionJobs: tenantId is undefined for orderId ${orderId}. Job not created.`);
+      return [];
+    }
 
     const existingJobs = await this.prisma.printJob.count({
       where: { tenantId, orderId },

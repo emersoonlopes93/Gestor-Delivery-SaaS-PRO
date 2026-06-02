@@ -37,6 +37,12 @@ export class KdsController {
     return this.kdsService.getPendingPrintJobs(query.station || 'GERAL', query.limit);
   }
 
+  @Get('stations')
+  @RequirePermissions('kds.use')
+  async getAvailableStations() {
+    return this.kdsService.getAvailableStations();
+  }
+
   @Post('spooler/next')
   @RequirePermissions('kds.use')
   @HttpCode(HttpStatus.OK)

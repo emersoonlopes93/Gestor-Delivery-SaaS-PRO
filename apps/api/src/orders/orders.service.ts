@@ -798,7 +798,7 @@ export class OrdersService {
       }
 
       if (nextStatus === 'confirmed' || nextStatus === 'preparing') {
-        await this.kdsService.createProductionJobs(orderId).catch((err) => {
+        await this.kdsService.createProductionJobs(orderId, tenantId).catch((err) => {
           this.logger.error(`Error creating production jobs for order ${orderId}: ${err.message}`);
         });
       }

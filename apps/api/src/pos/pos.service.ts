@@ -222,7 +222,7 @@ export class PosService {
       });
 
       // Trigger production jobs for open command
-      await this.kdsService.createProductionJobs(currentOrder.id).catch(e => {
+      await this.kdsService.createProductionJobs(currentOrder.id, tenantId).catch(e => {
         console.error('KDS print jobs failed to create for draft', e);
       });
 
@@ -355,7 +355,7 @@ export class PosService {
       }
 
       // Trigger production jobs for open command
-      await this.kdsService.createProductionJobs(currentOrder.id).catch(e => {
+      await this.kdsService.createProductionJobs(currentOrder.id, tenantId).catch(e => {
         console.error('KDS print jobs failed to create for draft', e);
       });
 

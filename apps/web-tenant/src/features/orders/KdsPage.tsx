@@ -12,6 +12,7 @@ export function KdsPage() {
   const [printJobs, setPrintJobs] = useState<KdsPrintJobDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [stations, setStations] = useState<string[]>(['GERAL']);
 
   const token = localStorage.getItem('accessToken');
 
@@ -30,6 +31,25 @@ export function KdsPage() {
       if (loading) setLoading(false);
     }
   }, [token, loading, stationId]);
+
+  useEffect(() => {
+    const fetchStations = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/kds/stations`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json && Array.isArray(json) && json.length > 0) {
+            setStations(json);
+          }
+        }
+      } catch {
+        // Ignore
+      }
+    };
+    fetchStations();
+  }, [token]);
 
   useEffect(() => {
     localStorage.setItem('kds_station', stationId);
@@ -115,10 +135,9 @@ export function KdsPage() {
             onChange={(e) => setStationId(e.target.value)}
             className="bg-card border border-input text-foreground text-sm rounded-lg focus:ring-ring focus:border-primary block w-full p-2.5 font-bold shadow-sm"
           >
-            <option value="GERAL">SETOR: GERAL</option>
-            <option value="COZINHA">SETOR: COZINHA</option>
-            <option value="BAR">SETOR: BAR</option>
-            <option value="PIZZA">SETOR: PIZZA</option>
+            {stations.map(st => (
+              <option key={st} value={st}>SETOR: {st}</option>
+            ))}
           </select>
           
           <button onClick={fetchJobs} className="p-2.5 bg-card border border-border rounded-lg hover:bg-muted transition-colors shadow-sm" title="Atualizar">
