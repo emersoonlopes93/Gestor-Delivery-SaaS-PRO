@@ -19,6 +19,8 @@ import {
   Max,
 } from 'class-validator';
 import { AiAgentConfigService, UpdateAiAgentConfigDto } from '../../ai-agent/services/ai-agent-config.service';
+import { AiProviderRegistryService } from '../../ai-agent/services/ai-provider-registry.service';
+import { AiProviderType } from '@prisma/client';
 import { AiAgentPlanPresetService, UpdateAiAgentPlanPresetDto } from './ai-agent-plan-preset.service';
 import { SystemConfigService } from '../services/system-config.service';
 import { AgentToolsService } from '../../ai-agent/services/agent-tools.service';
@@ -105,6 +107,13 @@ export class UpdateGlobalAiConfigDto {
   @IsOptional() @IsBoolean() aiRequireConfirmation?: boolean;
   @IsOptional() @IsBoolean() aiEnableUpsell?: boolean;
   @IsOptional() @IsBoolean() aiEnableHumanHandoff?: boolean;
+
+  @IsOptional() @IsString() defaultAiProvider?: string;
+  @IsOptional() @IsString() googleAiModel?: string;
+  @IsOptional() @IsString() openaiModel?: string;
+  @IsOptional() @IsString() anthropicModel?: string;
+  @IsOptional() @IsString() fallbackAiProvider?: string | null;
+  @IsOptional() @IsString() fallbackAiModel?: string | null;
 }
 
 @Controller('admin/ai-agent')
@@ -115,6 +124,7 @@ export class AdminAiAgentController {
     private readonly planPresetService: AiAgentPlanPresetService,
     private readonly systemConfigService: SystemConfigService,
     private readonly agentToolsService: AgentToolsService,
+    private readonly aiRegistry: AiProviderRegistryService,
   ) {}
 
   // ─── Config Global de IA ──────────────────────────────────────────────────
@@ -140,6 +150,42 @@ export class AdminAiAgentController {
     this.assertPromptSaveAllowed(dto);
     const { confirmEmptyPromptFallback: _confirmEmptyPromptFallback, ...updateData } = dto;
     return this.systemConfigService.updateConfig(updateData as Record<string, unknown>);
+  }
+
+  /**
+   * POST /admin/ai-agent/test-provider
+   * Executa uma requisição de teste para o provedor/modelo selecionado.
+   */
+  @Post('test-provider')
+  @HttpCode(200)
+  @Permissions('saas.ai.manage')
+  async testProvider(@Body() body: { provider: string; model?: string }) {
+    const { provider, model } = body;
+    const resolvedProvider = this.aiRegistry.getProvider(provider as AiProviderType);
+
+    const available = await resolvedProvider.isAvailable();
+    if (!available) {
+      throw new BadRequestException('Provedor não configurado ou API Key ausente no sistema.');
+    }
+
+    try {
+      const res = await resolvedProvider.complete({
+        messages: [{ role: 'user', content: 'Responder apenas com a palavra OK.' }],
+        temperature: 0.1,
+        model,
+      });
+
+      if (res.finishReason === 'error') {
+        const type = res.error?.type || 'unknown';
+        const msg = res.error?.message || 'Erro desconhecido';
+        return { success: false, error: `Falha no provedor (${type}): ${msg}`, errorType: type };
+      }
+
+      return { success: true, response: res.content };
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'Erro interno ao testar o provedor.';
+      return { success: false, error: errMsg };
+    }
   }
 
   @Get('recommended-prompt')

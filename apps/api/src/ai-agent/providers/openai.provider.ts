@@ -159,13 +159,32 @@ export class OpenAiProvider implements IAiProvider {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`OpenAI completion failed: ${message}`);
+      let errorType: 'quota_exhausted' | 'model_unavailable' | 'unknown' = 'unknown';
+
       if (axios.isAxiosError(error) && error.response?.data) {
         this.logger.error(`OpenAI error details: ${JSON.stringify(error.response.data)}`);
+        const responseStr = JSON.stringify(error.response.data);
+        if (responseStr.includes('insufficient_quota') || responseStr.includes('429') || responseStr.includes('rate_limit')) {
+          errorType = 'quota_exhausted';
+        } else if (responseStr.includes('model_not_found') || responseStr.includes('does not exist')) {
+          errorType = 'model_unavailable';
+        }
+      } else if (typeof message === 'string') {
+        if (message.includes('insufficient_quota') || message.includes('429') || message.includes('rate_limit')) {
+          errorType = 'quota_exhausted';
+        } else if (message.includes('model_not_found') || message.includes('does not exist')) {
+          errorType = 'model_unavailable';
+        }
       }
+
       return {
         content: null,
         toolCalls: [],
         finishReason: 'error',
+        error: {
+          type: errorType,
+          message,
+        },
       };
     }
   }

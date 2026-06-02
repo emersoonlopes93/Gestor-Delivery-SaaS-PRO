@@ -12,7 +12,6 @@ import type {
 
 /** Modelos com tier gratuito no Google AI Studio */
 export const GOOGLE_AI_FREE_MODELS = [
-  { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash-Lite (gratuito)' },
   { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (gratuito)' },
   { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (gratuito)' },
   { id: 'gemini-1.5-flash-8b', label: 'Gemini 1.5 Flash 8B (gratuito)' },
@@ -25,7 +24,7 @@ const DEFAULT_GOOGLE_AI_MODEL = 'gemini-2.0-flash';
  *
  * Variáveis de ambiente:
  * - GOOGLE_AI_API_KEY (ou GEMINI_API_KEY)
- * - GOOGLE_AI_MODEL (default: gemini-2.0-flash-lite)
+ * - GOOGLE_AI_MODEL (default: gemini-2.0-flash)
  * - GOOGLE_AI_BASE_URL (default: https://generativelanguage.googleapis.com/v1beta)
  */
 @Injectable()
@@ -194,19 +193,35 @@ export class GoogleAiProvider implements IAiProvider {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Google AI completion failed: ${message}`);
+      let errorType: 'quota_exhausted' | 'model_unavailable' | 'unknown' = 'unknown';
+
       if (axios.isAxiosError(error) && error.response?.data) {
-        this.logger.error(`Google AI error details: ${JSON.stringify(error.response.data)}`);
-        const responseStr = JSON.stringify(error.response.data);
-        if (responseStr.includes('no longer available')) {
+        const errorData = error.response.data;
+        this.logger.error(`Google AI error details: ${JSON.stringify(errorData)}`);
+        const responseStr = JSON.stringify(errorData);
+        if (responseStr.includes('no longer available') || responseStr.includes('not found')) {
+          errorType = 'model_unavailable';
           this.logger.error(`[AI_FLOW_ERROR] step=llm_model_unavailable model=${model}`);
+        } else if (responseStr.includes('429') || responseStr.includes('RESOURCE_EXHAUSTED') || responseStr.includes('Quota exceeded')) {
+          errorType = 'quota_exhausted';
         }
-      } else if (typeof message === 'string' && message.includes('no longer available')) {
-        this.logger.error(`[AI_FLOW_ERROR] step=llm_model_unavailable model=${model}`);
+      } else if (typeof message === 'string') {
+        if (message.includes('no longer available') || message.includes('not found')) {
+          errorType = 'model_unavailable';
+          this.logger.error(`[AI_FLOW_ERROR] step=llm_model_unavailable model=${model}`);
+        } else if (message.includes('429') || message.includes('RESOURCE_EXHAUSTED') || message.includes('Quota exceeded')) {
+          errorType = 'quota_exhausted';
+        }
       }
+
       return {
         content: null,
         toolCalls: [],
         finishReason: 'error',
+        error: {
+          type: errorType,
+          message,
+        },
       };
     }
   }

@@ -17,7 +17,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { api, ApiError } from '../../lib/api-client';
 
-type TabId = 'prompt' | 'memory' | 'session' | 'tools' | 'preview';
+type TabId = 'prompt' | 'providers' | 'memory' | 'session' | 'tools' | 'preview';
 
 type ToolStatus = 'active' | 'filtered_by_module' | 'unavailable';
 
@@ -53,6 +53,12 @@ interface GlobalAiConfig {
   aiEnableUpsell: boolean;
   aiEnableHumanHandoff: boolean;
   updatedAt?: string;
+  defaultAiProvider?: string;
+  googleAiModel?: string;
+  openaiModel?: string;
+  anthropicModel?: string;
+  fallbackAiProvider?: string | null;
+  fallbackAiModel?: string | null;
 }
 
 interface AiToolGuideItem {
@@ -103,6 +109,7 @@ interface RecommendedPromptResponse {
 
 const tabs: Array<{ id: TabId; label: string; icon: LucideIcon }> = [
   { id: 'prompt', label: 'Prompt Mestre', icon: FileText },
+  { id: 'providers', label: 'Provedores de IA', icon: Bot },
   { id: 'memory', label: 'Memória', icon: Database },
   { id: 'session', label: 'Sessão', icon: Clock },
   { id: 'tools', label: 'Tools', icon: Wrench },
@@ -114,6 +121,24 @@ const statusLabels: Record<ToolStatus, string> = {
   filtered_by_module: 'Filtrada por módulo',
   unavailable: 'Indisponível',
 };
+
+const GOOGLE_AI_MODELS = [
+  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (gratuito)' },
+  { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (gratuito)' },
+  { id: 'gemini-1.5-flash-8b', label: 'Gemini 1.5 Flash 8B (gratuito)' },
+];
+
+const OPENAI_MODELS = [
+  { id: 'gpt-4o', label: 'GPT-4o (Recomendado)' },
+  { id: 'gpt-4o-mini', label: 'GPT-4o Mini (Mais rápido/econômico)' },
+  { id: 'gpt-4', label: 'GPT-4' },
+];
+
+const ANTHROPIC_MODELS = [
+  { id: 'claude-3-5-sonnet-20240620', label: 'Claude 3.5 Sonnet' },
+  { id: 'claude-3-opus-20240229', label: 'Claude 3 Opus' },
+  { id: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku' },
+];
 
 export function GlobalAiAgentConfigPage() {
   const [activeTab, setActiveTab] = useState<TabId>('prompt');
@@ -127,6 +152,12 @@ export function GlobalAiAgentConfigPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Estados de teste do provedor
+  const [testingPrimary, setTestingPrimary] = useState(false);
+  const [testResultPrimary, setTestResultPrimary] = useState<{ success: boolean; message: string } | null>(null);
+  const [testingFallback, setTestingFallback] = useState(false);
+  const [testResultFallback, setTestResultFallback] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
     loadInitialData();
@@ -179,6 +210,46 @@ export function GlobalAiAgentConfigPage() {
     setConfig({ ...config, [field]: !config[field] });
   }
 
+  async function handleTestProvider(isFallback: boolean) {
+    const provider = isFallback ? config?.fallbackAiProvider : config?.defaultAiProvider;
+    const model = isFallback ? config?.fallbackAiModel : (
+      config?.defaultAiProvider === 'google_ai' ? config.googleAiModel :
+      config?.defaultAiProvider === 'openai' ? config.openaiModel :
+      config?.defaultAiProvider === 'anthropic' ? config.anthropicModel : undefined
+    );
+
+    if (!provider) return;
+
+    if (isFallback) {
+      setTestingFallback(true);
+      setTestResultFallback(null);
+    } else {
+      setTestingPrimary(true);
+      setTestResultPrimary(null);
+    }
+
+    try {
+      const res = await api.post<{ response?: string; error?: string }>('/admin/ai-agent/test-provider', {
+        provider,
+        model,
+      });
+
+      const outcome = res.success
+        ? { success: true, message: `Conexão bem sucedida! Retorno da IA: "${res.data.response}"` }
+        : { success: false, message: res.data.error || 'Falha desconhecida no teste.' };
+
+      if (isFallback) setTestResultFallback(outcome);
+      else setTestResultPrimary(outcome);
+    } catch (e: unknown) {
+      const outcome = { success: false, message: e instanceof ApiError ? e.message : 'Erro inesperado na chamada de teste.' };
+      if (isFallback) setTestResultFallback(outcome);
+      else setTestResultPrimary(outcome);
+    } finally {
+      if (isFallback) setTestingFallback(false);
+      else setTestingPrimary(false);
+    }
+  }
+
   async function handleSave(confirmEmptyPromptFallback = false) {
     if (!config) return;
     if (trimmedPrompt.length === 0 && !confirmEmptyPromptFallback) {
@@ -212,6 +283,12 @@ export function GlobalAiAgentConfigPage() {
         aiRequireConfirmation: config.aiRequireConfirmation,
         aiEnableUpsell: config.aiEnableUpsell,
         aiEnableHumanHandoff: config.aiEnableHumanHandoff,
+        defaultAiProvider: config.defaultAiProvider,
+        googleAiModel: config.googleAiModel,
+        openaiModel: config.openaiModel,
+        anthropicModel: config.anthropicModel,
+        fallbackAiProvider: config.fallbackAiProvider,
+        fallbackAiModel: config.fallbackAiModel,
       };
       const res = await api.patch<GlobalAiConfig>('/admin/ai-agent/global-config', updateData);
       if (res.success) {
@@ -370,6 +447,188 @@ export function GlobalAiAgentConfigPage() {
               <div className="mt-3 text-xs text-muted-foreground/60">Atualizado por: audit log indisponível nesta configuração.</div>
             </div>
           </aside>
+        </section>
+      )}
+
+      {activeTab === 'providers' && (
+        <section className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Provedor Principal */}
+            <div className="rounded-md border border-border bg-card p-6 space-y-4">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <Bot className="h-5 w-5 text-primary" />
+                Provedor Principal
+              </h3>
+              
+              <Field label="Provedor Padrão">
+                <select 
+                  value={config.defaultAiProvider || 'openai'} 
+                  onChange={(e) => updateConfig('defaultAiProvider', e.target.value)}
+                  className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                >
+                  <option value="openai">OpenAI (GPT)</option>
+                  <option value="anthropic">Anthropic (Claude)</option>
+                  <option value="google_ai">Google AI (Gemini)</option>
+                </select>
+              </Field>
+
+              {config.defaultAiProvider === 'google_ai' && (
+                <Field label="Modelo Google AI">
+                  <select 
+                    value={config.googleAiModel || 'gemini-2.0-flash'} 
+                    onChange={(e) => {
+                      if (!e.target.value) return;
+                      updateConfig('googleAiModel', e.target.value);
+                    }}
+                    className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  >
+                    {GOOGLE_AI_MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
+                </Field>
+              )}
+
+              {config.defaultAiProvider === 'openai' && (
+                <Field label="Modelo OpenAI">
+                  <select 
+                    value={config.openaiModel || 'gpt-4o'} 
+                    onChange={(e) => {
+                      if (!e.target.value) return;
+                      updateConfig('openaiModel', e.target.value);
+                    }}
+                    className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  >
+                    {OPENAI_MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
+                </Field>
+              )}
+
+              {config.defaultAiProvider === 'anthropic' && (
+                <Field label="Modelo Anthropic">
+                  <select 
+                    value={config.anthropicModel || 'claude-3-5-sonnet-20240620'} 
+                    onChange={(e) => {
+                      if (!e.target.value) return;
+                      updateConfig('anthropicModel', e.target.value);
+                    }}
+                    className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  >
+                    {ANTHROPIC_MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
+                </Field>
+              )}
+
+              <div className="pt-2 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleTestProvider(false)}
+                  disabled={testingPrimary}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 px-4 py-2 text-sm font-medium transition-colors"
+                >
+                  {testingPrimary ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                  Testar Provedor Principal
+                </button>
+                {testResultPrimary && (
+                  <div className={`p-3 rounded-md border text-sm ${testResultPrimary.success ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                    {testResultPrimary.message}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Provedor de Fallback */}
+            <div className="rounded-md border border-border bg-card p-6 space-y-4">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                Provedor de Fallback (Secundário)
+              </h3>
+              
+              <Field label="Provedor de Fallback">
+                <select 
+                  value={config.fallbackAiProvider || ''} 
+                  onChange={(e) => {
+                    const val = e.target.value || null;
+                    updateConfig('fallbackAiProvider', val);
+                    if (!val) {
+                      updateConfig('fallbackAiModel', null);
+                    } else {
+                      const defaultModel = val === 'google_ai' ? 'gemini-2.0-flash' : val === 'openai' ? 'gpt-4o' : 'claude-3-5-sonnet-20240620';
+                      updateConfig('fallbackAiModel', defaultModel);
+                    }
+                  }}
+                  className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                >
+                  <option value="">Sem Fallback (Desativado)</option>
+                  <option value="openai">OpenAI (GPT)</option>
+                  <option value="anthropic">Anthropic (Claude)</option>
+                  <option value="google_ai">Google AI (Gemini)</option>
+                </select>
+              </Field>
+
+              {config.fallbackAiProvider === 'google_ai' && (
+                <Field label="Modelo de Fallback (Gemini)">
+                  <select 
+                    value={config.fallbackAiModel || 'gemini-2.0-flash'} 
+                    onChange={(e) => {
+                      if (!e.target.value) return;
+                      updateConfig('fallbackAiModel', e.target.value);
+                    }}
+                    className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  >
+                    {GOOGLE_AI_MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
+                </Field>
+              )}
+
+              {config.fallbackAiProvider === 'openai' && (
+                <Field label="Modelo de Fallback (OpenAI)">
+                  <select 
+                    value={config.fallbackAiModel || 'gpt-4o'} 
+                    onChange={(e) => {
+                      if (!e.target.value) return;
+                      updateConfig('fallbackAiModel', e.target.value);
+                    }}
+                    className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  >
+                    {OPENAI_MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
+                </Field>
+              )}
+
+              {config.fallbackAiProvider === 'anthropic' && (
+                <Field label="Modelo de Fallback (Anthropic)">
+                  <select 
+                    value={config.fallbackAiModel || 'claude-3-5-sonnet-20240620'} 
+                    onChange={(e) => {
+                      if (!e.target.value) return;
+                      updateConfig('fallbackAiModel', e.target.value);
+                    }}
+                    className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  >
+                    {ANTHROPIC_MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
+                </Field>
+              )}
+
+              {config.fallbackAiProvider && (
+                <div className="pt-2 flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleTestProvider(true)}
+                    disabled={testingFallback}
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 px-4 py-2 text-sm font-medium transition-colors"
+                  >
+                    {testingFallback ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                    Testar Provedor de Fallback
+                  </button>
+                  {testResultFallback && (
+                    <div className={`p-3 rounded-md border text-sm ${testResultFallback.success ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                      {testResultFallback.message}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </section>
       )}
 

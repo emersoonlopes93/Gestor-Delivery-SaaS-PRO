@@ -5,7 +5,7 @@ import { AgentToolsService } from './agent-tools.service';
 import { WhatsAppSenderService } from '../../whatsapp-channel/services/whatsapp-sender.service';
 import { AiProviderRegistryService } from './ai-provider-registry.service';
 import { AdminModulesService } from '../../admin/modules/admin-modules.service';
-import type { AiMessage } from '../interfaces/ai-provider.interface';
+import type { AiMessage, IAiProvider } from '../interfaces/ai-provider.interface';
 import { AiFlowLogger, createAiTrace, type AiFlowContext } from '../../common/logging/ai-flow-logger';
 import { shouldSimulateTyping } from '../utils/simulate-typing.util';
 import { getTypingDelayMs } from '../../common/utils/whatsapp-presence.util';
@@ -23,7 +23,7 @@ import { buildOrderDraftPromptBlock } from '../utils/order-draft-validator.util'
 
 import { PrismaService } from '../../database/prisma.service';
 
-import { Prisma } from '@prisma/client';
+import { Prisma, AiProviderType } from '@prisma/client';
 import { createHash } from 'crypto';
 
 interface ProcessMessageOptions {
@@ -1040,29 +1040,32 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
         });
       }
 
-      const providerAvailable = await providerResolved.isAvailable();
+      let activeProvider = providerResolved;
+      let usingFallback = false;
+
+      let providerAvailable = await activeProvider.isAvailable();
       AiFlowLogger.flow('llm_provider_check', trace, {
-        provider: providerResolved.providerType,
+        provider: activeProvider.providerType,
         available: providerAvailable,
         messagesCount: messages.length,
         toolsCount: tools.length,
       });
 
       if (!providerAvailable) {
-        AiFlowLogger.error('llm_provider_unavailable', trace, {
-          provider: providerResolved.providerType,
-        });
-        if (config.fallbackMessage && !dryRun) {
-          await this.sendFinalResponse(
-            tenantId,
-            session.id,
-            customerPhone,
-            config.fallbackMessage,
-            trace,
-            config.simulateTyping,
-          );
+        this.logger.warn(`[AI_PROVIDER] primary_failed provider=${activeProvider.providerType} reason=unavailable`);
+        
+        if (systemConfig?.fallbackAiProvider) {
+          const fallbackType = systemConfig.fallbackAiProvider as AiProviderType;
+          const fallbackProvider = this.aiRegistry.getProvider(fallbackType);
+          
+          this.logger.log(`[AI_PROVIDER] fallback_attempt provider=${fallbackProvider.providerType}`);
+          if (await fallbackProvider.isAvailable()) {
+            activeProvider = fallbackProvider;
+            usingFallback = true;
+          } else {
+            this.logger.error(`[AI_PROVIDER] fallback_failed`);
+          }
         }
-        return;
       }
 
       await this.trySimulateTyping(
@@ -1074,34 +1077,75 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
         'composing',
       );
 
+      const runCompletion = async (provider: IAiProvider) => {
+        const currentModel = usingFallback && systemConfig?.fallbackAiModel
+          ? systemConfig.fallbackAiModel
+          : (provider.providerType === 'google_ai' ? (systemConfig?.googleAiModel ?? undefined)
+            : provider.providerType === 'openai' ? (systemConfig?.openaiModel ?? undefined)
+            : provider.providerType === 'anthropic' ? (systemConfig?.anthropicModel ?? undefined) : undefined);
+
+        return provider.complete({
+          messages,
+          tools,
+          temperature: 0.3,
+          model: currentModel,
+        });
+      };
+
       const llmStartedAt = Date.now();
       AiFlowLogger.flow('llm_request_start', trace, {
-        provider: providerResolved.providerType,
+        provider: activeProvider.providerType,
         inputMessages: messages.length,
       });
 
-      const completion = await providerResolved.complete({
-        messages,
-        tools,
-        temperature: 0.3,
-      });
+      let completion = await runCompletion(activeProvider);
+
+      if (completion.finishReason === 'error' && !usingFallback) {
+        const errType = completion.error?.type || 'unknown';
+        const isTrigger = errType === 'quota_exhausted' || errType === 'model_unavailable';
+
+        if (isTrigger && systemConfig?.fallbackAiProvider) {
+          const reasonLog = errType === 'quota_exhausted' ? 'quota_exhausted' : 'model_unavailable';
+          this.logger.warn(`[AI_PROVIDER] primary_failed provider=${activeProvider.providerType} reason=${reasonLog}`);
+          
+          const fallbackType = systemConfig.fallbackAiProvider as AiProviderType;
+          const fallbackProvider = this.aiRegistry.getProvider(fallbackType);
+          
+          this.logger.log(`[AI_PROVIDER] fallback_attempt provider=${fallbackProvider.providerType}`);
+          if (await fallbackProvider.isAvailable()) {
+            activeProvider = fallbackProvider;
+            usingFallback = true;
+            completion = await runCompletion(activeProvider);
+            
+            if (completion.finishReason !== 'error') {
+              this.logger.log(`[AI_PROVIDER] fallback_success provider=${activeProvider.providerType}`);
+            } else {
+              this.logger.error(`[AI_PROVIDER] fallback_failed`);
+            }
+          } else {
+            this.logger.error(`[AI_PROVIDER] fallback_failed`);
+          }
+        }
+      }
 
       const llmDurationMs = Date.now() - llmStartedAt;
       const outputLength = completion.content?.length ?? 0;
       const toolCallsCount = completion.toolCalls?.length ?? 0;
 
       if (completion.finishReason === 'error') {
+        this.logger.error(`[AI_FLOW_ERROR] step=all_providers_failed`);
         AiFlowLogger.error('llm_response_failed', trace, {
-          provider: providerResolved.providerType,
+          provider: activeProvider.providerType,
           finishReason: completion.finishReason,
           durationMs: llmDurationMs,
         });
-        if (config.fallbackMessage && !dryRun) {
+        if (!dryRun) {
+          await this.conversationService.activateHandoff(session.id, 'Falha geral nos provedores de IA');
           await this.sendFinalResponse(
             tenantId,
             session.id,
             customerPhone,
-            config.fallbackMessage,
+            config.fallbackMessage || 'Tivemos um problema de conexão temporário com nossa inteligência artificial. Estou transferindo você para um atendente humano para dar continuidade ao seu atendimento.',
             trace,
             config.simulateTyping,
           );

@@ -161,10 +161,32 @@ export class AnthropicProvider implements IAiProvider {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Anthropic completion failed: ${message}`);
+      let errorType: 'quota_exhausted' | 'model_unavailable' | 'unknown' = 'unknown';
+
+      if (axios.isAxiosError(error) && error.response?.data) {
+        this.logger.error(`Anthropic error details: ${JSON.stringify(error.response.data)}`);
+        const responseStr = JSON.stringify(error.response.data);
+        if (responseStr.includes('429') || responseStr.includes('rate_limit') || responseStr.includes('quota')) {
+          errorType = 'quota_exhausted';
+        } else if (responseStr.includes('not_found') || responseStr.includes('model_not_found') || responseStr.includes('does_not_exist')) {
+          errorType = 'model_unavailable';
+        }
+      } else if (typeof message === 'string') {
+        if (message.includes('429') || message.includes('rate_limit') || message.includes('quota')) {
+          errorType = 'quota_exhausted';
+        } else if (message.includes('not_found') || message.includes('model_not_found') || message.includes('does_not_exist')) {
+          errorType = 'model_unavailable';
+        }
+      }
+
       return {
         content: null,
         toolCalls: [],
         finishReason: 'error',
+        error: {
+          type: errorType,
+          message,
+        },
       };
     }
   }

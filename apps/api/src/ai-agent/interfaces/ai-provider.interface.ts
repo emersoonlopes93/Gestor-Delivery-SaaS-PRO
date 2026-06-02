@@ -42,6 +42,10 @@ export interface AiCompletionResult {
     completionTokens: number;
     totalTokens: number;
   };
+  error?: {
+    type: 'quota_exhausted' | 'model_unavailable' | 'unknown';
+    message: string;
+  };
 }
 
 export const AI_PROVIDER = 'AI_PROVIDER';
