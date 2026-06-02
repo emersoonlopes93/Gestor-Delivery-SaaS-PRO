@@ -248,12 +248,12 @@ export default function IntegrationsPage() {
                 <label className="text-sm font-medium text-foreground">Prompt Base (Global)</label>
                 <textarea
                   rows={4}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none resize-none"
+                  className="w-full px-4 py-3 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-ring transition-all outline-none resize-none"
                   placeholder="Instruções base que serão aplicadas a todos os agentes IA do sistema..."
                   value={config?.baseAiPrompt || ''}
                   onChange={(e) => setConfig(prev => prev ? {...prev, baseAiPrompt: e.target.value} : null)}
                 />
-                <p className="text-xs text-gray-400">Este prompt será combinado com as instruções específicas de cada tenant.</p>
+                <p className="text-xs text-muted-foreground">Este prompt será combinado com as instruções específicas de cada tenant.</p>
               </div>
             </div>
           </div>
@@ -262,7 +262,7 @@ export default function IntegrationsPage() {
         {/* Actions */}
         <div className="flex items-center justify-between">
           {error && (
-            <div className="flex items-center gap-2 text-red-600 bg-red-50 px-4 py-2 rounded-lg">
+            <div className="flex items-center gap-2 text-destructive bg-destructive/10 border border-destructive/20 px-4 py-2 rounded-lg">
               <AlertCircle className="h-5 w-5" />
               <span className="text-sm font-medium">{error}</span>
             </div>
@@ -271,7 +271,7 @@ export default function IntegrationsPage() {
           <button
             type="submit"
             disabled={saving}
-            className="ml-auto flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary ml-auto flex items-center gap-2 px-6 py-3 rounded-xl"
           >
             {saving ? (
               <>

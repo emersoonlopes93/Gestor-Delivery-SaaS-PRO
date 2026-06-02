@@ -252,12 +252,12 @@ export function TenantsPage() {
 function StatusPill({ status }: { status: Tenant['status'] }) {
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${
         status === 'active'
-          ? 'bg-green-100 text-green-800'
+          ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400'
           : status === 'trial'
-          ? 'bg-blue-100 text-blue-800'
-          : 'bg-gray-100 text-gray-800'
+          ? 'bg-primary/10 text-primary border-primary/20'
+          : 'bg-muted text-muted-foreground border-border'
       }`}
     >
       {status.toUpperCase()}
@@ -270,20 +270,20 @@ function BillingCell({ tenant }: { tenant: TenantListItem }) {
   if (subscription) {
     return (
       <div>
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400">
           {subscription.status}
         </span>
-        <p className="mt-1 text-xs text-gray-500">{subscription.billingPlan?.name ?? 'Billing V2'}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{subscription.billingPlan?.name ?? 'Billing V2'}</p>
       </div>
     );
   }
 
   return (
     <div>
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400">
         Fallback legado
       </span>
-      <p className="mt-1 text-xs text-gray-500">{tenant.subscription?.plan?.name ?? 'Sem assinatura V2'}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{tenant.subscription?.plan?.name ?? 'Sem assinatura V2'}</p>
     </div>
   );
 }

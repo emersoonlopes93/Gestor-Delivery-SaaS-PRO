@@ -91,11 +91,11 @@ function shortId(value: string | null | undefined): string {
 }
 
 function statusBadgeClass(status: string): string {
-  if (['active', 'paid', 'invoiced'].includes(status)) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-  if (['trialing', 'trial_expired_not_enforced'].includes(status)) return 'bg-amber-50 text-amber-800 border-amber-200';
-  if (['past_due', 'suspended', 'failed'].includes(status)) return 'bg-red-50 text-red-700 border-red-200';
-  if (['closed', 'open'].includes(status)) return 'bg-blue-50 text-blue-700 border-blue-200';
-  return 'bg-slate-100 text-slate-700 border-slate-200';
+  if (['active', 'paid', 'invoiced'].includes(status)) return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400';
+  if (['trialing', 'trial_expired_not_enforced'].includes(status)) return 'bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400';
+  if (['past_due', 'suspended', 'failed'].includes(status)) return 'bg-red-500/10 text-red-600 border-red-500/20 dark:text-red-400';
+  if (['closed', 'open'].includes(status)) return 'bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400';
+  return 'bg-muted text-muted-foreground border-border';
 }
 
 function metadataText(metadata: Record<string, unknown> | null | undefined, key: string): string {
@@ -161,7 +161,7 @@ function LoadingBlock() {
 
 function SafetyAlert() {
   return (
-    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
+    <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-amber-700 dark:text-amber-400">
       <div className="flex gap-3">
         <ShieldAlert className="mt-0.5 h-5 w-5 flex-shrink-0" />
         <div>
@@ -604,7 +604,7 @@ function TenantTab(props: {
                   <button
                     onClick={props.onOpenCloseModal}
                     disabled={!currentCycle || props.closingCycle}
-                    className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-black text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-950"
+                    className="btn-primary inline-flex items-center gap-2 px-3 py-2 text-sm font-black disabled:opacity-50 text-primary-foreground"
                   >
                     <Receipt className="h-4 w-4" />
                     Fechar e gerar draft

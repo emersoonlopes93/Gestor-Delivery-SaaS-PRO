@@ -23,9 +23,9 @@ export function PermissionGate({
     ) : (
       <div className="p-6 text-center">
         <div className="text-4xl mb-4">🔒</div>
-        <h2 className="text-xl font-semibold text-gray-700">Acesso Restrito</h2>
-        <p className="text-gray-500 mt-2">
-          Permissão necessária: <code className="text-sm bg-gray-100 px-2 py-1 rounded">{permission}</code>
+        <h2 className="text-xl font-semibold text-foreground">Acesso Restrito</h2>
+        <p className="text-muted-foreground mt-2">
+          Permissão necessária: <code className="text-sm bg-muted text-foreground px-2 py-1 rounded">{permission}</code>
         </p>
       </div>
     );

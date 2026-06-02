@@ -279,7 +279,7 @@ export function CategoriesPage() {
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-sm transition-all"
+              className="btn-primary px-6 py-2"
             >
               Salvar Categoria
             </button>
@@ -379,8 +379,8 @@ export function CategoriesPage() {
             </div>
 
             {formData.templateType === 'pizza' && (
-              <div className="mt-4 p-4 bg-primary-50 dark:bg-primary-500/10 rounded-xl border border-primary-100 dark:border-primary-500/30">
-                <p className="text-xs text-primary-700 dark:text-primary-400 leading-relaxed font-medium">
+              <div className="mt-4 p-4 bg-primary/10 rounded-xl border border-primary/20">
+                <p className="text-xs text-primary leading-relaxed font-medium">
                   <strong>💡 Template Pizza Ativado:</strong> Novos produtos nesta categoria serão configurados automaticamente como Sabores e vinculados aos grupos de Tamanhos e Montagem.
                 </p>
               </div>

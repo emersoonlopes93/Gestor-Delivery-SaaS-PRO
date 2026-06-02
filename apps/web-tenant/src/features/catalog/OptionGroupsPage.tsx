@@ -186,12 +186,12 @@ export function OptionGroupsPage() {
     <div className="p-6 max-w-7xl mx-auto text-left">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">Complementos e Adicionais</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Gerencie os grupos de opções, tamanhos e adicionais que podem ser vinculados aos produtos.</p>
+          <h1 className="text-3xl font-bold text-foreground tracking-tight">Complementos e Adicionais</h1>
+          <p className="text-muted-foreground mt-1">Gerencie os grupos de opções, tamanhos e adicionais que podem ser vinculados aos produtos.</p>
         </div>
         <button
           onClick={() => openGroupModal()}
-          className="bg-primary-600 hover:bg-primary-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-sm transition-all flex items-center gap-2"
+          className="btn-primary px-5 py-2.5 flex items-center gap-2"
           type="button"
         >
           Novo Grupo/Tamanho
@@ -200,39 +200,39 @@ export function OptionGroupsPage() {
 
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : (
         <div className="space-y-6">
           {groupsSorted.map((g) => {
             const items = [...(g.items ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
             return (
-              <section key={g.id} className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
-                <div className="px-6 py-4 bg-gray-50 dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800 flex justify-between items-start gap-4">
+              <section key={g.id} className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+                <div className="px-6 py-4 bg-muted/50 border-b border-border flex justify-between items-start gap-4">
                   <div className="min-w-0">
-                    <div className="font-black text-gray-900 dark:text-gray-100 uppercase tracking-wider text-sm truncate">{g.name}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 font-bold mt-1">
+                    <div className="font-black text-foreground uppercase tracking-wider text-sm truncate">{g.name}</div>
+                    <div className="text-xs text-muted-foreground font-bold mt-1">
                       Seleção: {g.selectionType === 'single' ? 'Única' : g.selectionType === 'multiple' ? 'Múltipla' : 'Quantidade'} | {g.isRequired ? 'Obrigatório' : 'Opcional'} | Mín {g.minSelect} / Máx {g.maxSelect}
                     </div>
                   </div>
                   <div className="flex gap-2 shrink-0">
                     <button
                       onClick={() => openItemModal(g.id)}
-                      className="text-xs font-bold text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-500/10 px-3 py-1.5 rounded-lg transition-colors"
+                      className="text-xs font-bold text-primary hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-colors"
                       type="button"
                     >
                       Novo item
                     </button>
                     <button
                       onClick={() => openGroupModal(g)}
-                      className="px-3 py-1.5 text-xs font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+                      className="px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
                       type="button"
                     >
                       Editar
                     </button>
                     <button
                       onClick={() => deleteGroup(g.id)}
-                      className="px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg"
+                      className="px-3 py-1.5 text-xs font-bold text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
                       type="button"
                     >
                       Excluir
@@ -242,25 +242,25 @@ export function OptionGroupsPage() {
 
                 <div className="overflow-auto">
                   <table className="w-full text-left border-collapse">
-                    <thead className="bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800">
+                    <thead className="bg-card border-b border-border">
                       <tr>
-                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Item</th>
-                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider">Item</th>
+                        <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider">
                           Impacto no Preço
                           <InfoTooltip text="Define como este item altera o valor base do produto." />
                         </th>
-                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider">Status</th>
-                        <th className="px-6 py-3 text-xs font-black text-gray-400 uppercase tracking-wider text-right">Ações</th>
+                        <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider text-right">Ações</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                    <tbody className="divide-y divide-border/50">
                       {items.map((it) => (
-                        <tr key={it.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/40 transition-colors group">
+                        <tr key={it.id} className="hover:bg-muted transition-colors group">
                           <td className="px-6 py-4">
-                            <div className="font-bold text-gray-800 dark:text-gray-200">{it.name}</div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">{it.description || ''}</div>
+                            <div className="font-bold text-foreground">{it.name}</div>
+                            <div className="text-xs text-muted-foreground font-medium">{it.description || ''}</div>
                           </td>
-                          <td className="px-6 py-4 text-sm font-bold text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                          <td className="px-6 py-4 text-sm font-bold text-foreground whitespace-nowrap">
                             {it.priceImpactType === 'none' ? 'Nenhum' : 
                              it.priceImpactType === 'fixed' ? 'Adicional Fixo' : 
                              it.priceImpactType === 'percentage' ? 'Porcentagem' : 'Substituir Preço'}
@@ -276,7 +276,7 @@ export function OptionGroupsPage() {
                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button
                                 onClick={() => moveItem(g, it.id, -1)}
-                                className="px-2 py-1 text-xs font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+                                className="px-2 py-1 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
                                 type="button"
                                 title="Subir"
                               >
@@ -284,7 +284,7 @@ export function OptionGroupsPage() {
                               </button>
                               <button
                                 onClick={() => moveItem(g, it.id, 1)}
-                                className="px-2 py-1 text-xs font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+                                className="px-2 py-1 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
                                 type="button"
                                 title="Descer"
                               >
@@ -292,14 +292,14 @@ export function OptionGroupsPage() {
                               </button>
                               <button
                                 onClick={() => openItemModal(g.id, it)}
-                                className="px-3 py-1 text-xs font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
+                                className="px-3 py-1 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
                                 type="button"
                               >
                                 Editar
                               </button>
                               <button
                                 onClick={() => deleteItem(it.id)}
-                                className="px-3 py-1 text-xs font-bold text-red-600 hover:bg-red-50 rounded"
+                                className="px-3 py-1 text-xs font-bold text-destructive hover:bg-destructive/10 rounded transition-colors"
                                 type="button"
                               >
                                 Excluir
@@ -310,7 +310,7 @@ export function OptionGroupsPage() {
                       ))}
                       {items.length === 0 && (
                         <tr>
-                          <td colSpan={4} className="px-6 py-10 text-center text-gray-400 text-sm italic">
+                          <td colSpan={4} className="px-6 py-10 text-center text-muted-foreground text-sm italic">
                             Nenhum item neste grupo.
                           </td>
                         </tr>
@@ -323,7 +323,7 @@ export function OptionGroupsPage() {
           })}
 
           {groupsSorted.length === 0 && (
-            <div className="py-16 text-center text-gray-400 font-bold italic">Nenhum grupo cadastrado ainda.</div>
+            <div className="py-16 text-center text-muted-foreground font-bold italic">Nenhum grupo cadastrado ainda.</div>
           )}
         </div>
       )}
@@ -336,14 +336,14 @@ export function OptionGroupsPage() {
           <>
             <button
               onClick={() => setIsGroupModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted rounded-lg transition-colors"
               type="button"
             >
               Cancelar
             </button>
             <button
               onClick={saveGroup}
-              className="px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-sm"
+              className="btn-primary px-5 py-2 text-sm"
               type="button"
             >
               Salvar
@@ -390,18 +390,18 @@ export function OptionGroupsPage() {
                   type="checkbox"
                   checked={Boolean(groupForm.isRequired)}
                   onChange={(e) => setGroupForm((p) => ({ ...p, isRequired: e.target.checked }))}
-                  className="w-4 h-4 text-primary-600"
+                  className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
                 />
-                <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Obrigatório</span>
+                <span className="text-sm font-bold text-foreground">Obrigatório</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={Boolean(groupForm.isActive)}
                   onChange={(e) => setGroupForm((p) => ({ ...p, isActive: e.target.checked }))}
-                  className="w-4 h-4 text-primary-600"
+                  className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
                 />
-                <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Ativo</span>
+                <span className="text-sm font-bold text-foreground">Ativo</span>
               </label>
             </div>
           </div>
@@ -412,7 +412,7 @@ export function OptionGroupsPage() {
                 type="number"
                 value={groupForm.minSelect ?? 0}
                 onChange={(e) => setGroupForm((p) => ({ ...p, minSelect: Number(e.target.value || 0) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                className="input-premium"
               />
             </div>
             <div>
@@ -421,7 +421,7 @@ export function OptionGroupsPage() {
                 type="number"
                 value={groupForm.maxSelect ?? 1}
                 onChange={(e) => setGroupForm((p) => ({ ...p, maxSelect: Number(e.target.value || 1) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                className="input-premium"
               />
             </div>
           </div>
@@ -436,14 +436,14 @@ export function OptionGroupsPage() {
           <>
             <button
               onClick={() => setIsItemModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted rounded-lg transition-colors"
               type="button"
             >
               Cancelar
             </button>
             <button
               onClick={saveItem}
-              className="px-4 py-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-lg shadow-sm"
+              className="btn-primary px-5 py-2 text-sm"
               type="button"
             >
               Salvar
@@ -492,7 +492,7 @@ export function OptionGroupsPage() {
                 step="0.01"
                 value={Number(itemForm.priceImpactValue ?? 0)}
                 onChange={(e) => setItemForm((p) => ({ ...p, priceImpactValue: Number(e.target.value || 0) }))}
-                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                className="input-premium"
               />
             </div>
           </div>
@@ -502,18 +502,18 @@ export function OptionGroupsPage() {
                 type="checkbox"
                 checked={Boolean(itemForm.isActive)}
                 onChange={(e) => setItemForm((p) => ({ ...p, isActive: e.target.checked }))}
-                className="w-4 h-4 text-primary-600"
+                className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
               />
-              <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Ativo</span>
+              <span className="text-sm font-bold text-foreground">Ativo</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={Boolean(itemForm.allowQuantity)}
                 onChange={(e) => setItemForm((p) => ({ ...p, allowQuantity: e.target.checked }))}
-                className="w-4 h-4 text-primary-600"
+                className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
               />
-              <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Permitir qty</span>
+              <span className="text-sm font-bold text-foreground">Permitir qty</span>
             </label>
           </div>
           {itemForm.allowQuantity ? (
@@ -524,7 +524,7 @@ export function OptionGroupsPage() {
                   type="number"
                   value={Number(itemForm.minQty ?? 1)}
                   onChange={(e) => setItemForm((p) => ({ ...p, minQty: Number(e.target.value || 1) }))}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                  className="input-premium"
                 />
               </div>
               <div>
@@ -533,7 +533,7 @@ export function OptionGroupsPage() {
                   type="number"
                   value={Number(itemForm.maxQty ?? 1)}
                   onChange={(e) => setItemForm((p) => ({ ...p, maxQty: Number(e.target.value || 1) }))}
-                  className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded-xl outline-none"
+                  className="input-premium"
                 />
               </div>
             </div>

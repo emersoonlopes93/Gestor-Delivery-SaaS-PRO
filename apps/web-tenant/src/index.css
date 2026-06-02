@@ -1030,6 +1030,10 @@
     transition: all 0.2s;
   }
 
+  .btn-primary {
+    @apply inline-flex items-center justify-center font-bold rounded-xl bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md;
+  }
+
   /* === AUTH THEME BOUNDARY - Sempre light === */
   [data-auth-theme="light"] {
     --background: #f1f5f9;

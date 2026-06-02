@@ -171,6 +171,10 @@
   .card-premium {
     @apply bg-card rounded-3xl shadow-sm border border-border overflow-hidden transition-all duration-300;
   }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center font-bold rounded-xl bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md;
+  }
 }
 
 @keyframes shake {

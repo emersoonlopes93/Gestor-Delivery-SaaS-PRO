@@ -128,9 +128,9 @@ export function AuditLogsPage() {
           </div>
         ) : !data || data.items.length === 0 ? (
           <div className="p-12 text-center">
-            <Shield className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 font-medium">Nenhum log encontrado</p>
-            <p className="text-gray-400 text-sm mt-1">
+            <Shield className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+            <p className="text-foreground font-medium">Nenhum log encontrado</p>
+            <p className="text-muted-foreground text-sm mt-1">
               Os logs de auditoria são gerados automaticamente quando ações são realizadas no sistema.
             </p>
           </div>
@@ -150,12 +150,12 @@ export function AuditLogsPage() {
               <TableBody>
                 {data.items.map((log) => (
                   <TableRow key={log.id}>
-                    <TableCell className="text-gray-500 whitespace-nowrap text-xs">
+                    <TableCell className="text-muted-foreground whitespace-nowrap text-xs">
                       {new Date(log.createdAt).toLocaleString('pt-BR')}
                     </TableCell>
                     <TableCell>
-                      <div className="font-medium text-gray-900 text-xs">{log.tenant?.name || '—'}</div>
-                      <div className="text-[10px] text-gray-400 font-mono">{log.tenant?.slug || log.tenantId}</div>
+                      <div className="font-medium text-foreground text-xs">{log.tenant?.name || '—'}</div>
+                      <div className="text-[10px] text-muted-foreground font-mono">{log.tenant?.slug || log.tenantId}</div>
                     </TableCell>
                     <TableCell>
                       <StatusBadge
@@ -170,21 +170,21 @@ export function AuditLogsPage() {
                         {log.action}
                       </StatusBadge>
                     </TableCell>
-                    <TableCell className="text-gray-500 text-xs">{log.resource || '—'}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs">{log.resource || '—'}</TableCell>
                     <TableCell>
                       <Badge variant={log.userType === 'admin' ? 'secondary' : 'outline'}>
                         {log.userType}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-gray-400 text-xs font-mono">{log.ip || '—'}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs font-mono">{log.ip || '—'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
 
             {/* Pagination */}
-            <div className="border-t border-gray-200 px-6 py-3 flex items-center justify-between bg-muted/30">
-              <div className="text-xs text-gray-500">
+            <div className="border-t border-border px-6 py-3 flex items-center justify-between bg-muted/30">
+              <div className="text-xs text-muted-foreground">
                 Página {data.page} de {data.totalPages} · Total: {data.total}
               </div>
               <div className="flex gap-2">
