@@ -184,6 +184,7 @@ export class StorefrontService {
       tenantId: tenant.id,
       productIds: productIdsArray,
       channel,
+      ignoreStoreClosed: true,
     });
 
     const availabilityMap = new Map<string, boolean>();

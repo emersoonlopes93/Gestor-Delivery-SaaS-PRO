@@ -236,13 +236,14 @@ export class AvailabilityService {
     channel: SalesChannel;
     now?: Date;
     context?: { settings?: Partial<TenantSettings> | null; operatingHours?: TenantOperatingHours[] };
+    ignoreStoreClosed?: boolean;
   }): Promise<Map<string, AvailabilityDecision>> {
     const now = input.now ?? new Date();
     const storeStatus = await this.getStoreStatus(input.tenantId, now, input.context);
     
     const results = new Map<string, AvailabilityDecision>();
 
-    if (!storeStatus.isOpen) {
+    if (!input.ignoreStoreClosed && !storeStatus.isOpen) {
       for (const id of input.productIds) {
         results.set(id, { canSell: false, reason: `STORE_${storeStatus.reason}`, effectiveStatus: storeStatus.message });
       }
