@@ -249,10 +249,10 @@ export function ProductsPage() {
       const pubLabel = pub ? pub.publicationStatus : null;
       const opLabel = pub ? pub.operationalStatus : null;
       return (
-        <tr key={product.id} className="border-b border-border last:border-b-0 bg-card text-card-foreground transition-colors duration-150 hover:bg-muted/40">
+        <tr key={product.id} className="border-b border-border last:border-b-0 bg-card text-card-foreground transition-colors duration-150 hover:bg-muted/60">
           <td className="px-6 py-4">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-12 h-12 rounded-lg bg-muted/50 dark:bg-muted/80 border border-border overflow-hidden shrink-0">
+              <div className="w-12 h-12 rounded-lg bg-muted dark:bg-muted/80 border border-border overflow-hidden shrink-0">
                 {product.image ? (
                   <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
                 ) : (
@@ -266,16 +266,16 @@ export function ProductsPage() {
                 <div className="font-bold text-foreground truncate">{product.name}</div>
                 <div className="text-xs text-muted-foreground truncate hidden sm:block">{product.shortDescription || 'Sem descrição'}</div>
                 <div className="mt-1 flex items-center gap-2 flex-wrap">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${product.type === 'combo' ? 'bg-primary/20 text-primary border-primary/30' : 'bg-card text-foreground border-border'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${product.type === 'combo' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-foreground border-border'}`}>
                     {typeLabel}
                   </span>
                   {pubLabel ? (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${pubLabel === 'published' ? 'bg-primary/20 text-primary border-primary/30' : 'bg-card text-muted-foreground border-border'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${pubLabel === 'published' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border'}`}>
                       {pubLabel}
                     </span>
                   ) : null}
                   {opLabel ? (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${opLabel === 'active' ? 'bg-status-success/20 text-status-success border-status-success/30' : opLabel === 'inactive' ? 'bg-status-danger/20 text-status-danger border-status-danger/30' : opLabel === 'hidden' ? 'bg-status-warning/20 text-status-warning border-status-warning/30' : 'bg-status-warning/20 text-status-warning border-status-warning/30'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${opLabel === 'active' ? 'bg-status-success text-white border-status-success' : opLabel === 'inactive' ? 'bg-status-danger text-white border-status-danger' : opLabel === 'hidden' ? 'bg-status-warning text-white border-status-warning' : 'bg-status-warning text-white border-status-warning'}`}>
                       {opLabel}
                     </span>
                   ) : null}
@@ -293,7 +293,7 @@ export function ProductsPage() {
           </td>
 
           <td className="px-6 py-4 text-sm whitespace-nowrap">
-            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${product.isActive ? 'bg-status-success/10 text-status-success border-status-success/20' : 'bg-status-danger/10 text-status-danger border-status-danger/20'}`}>
+            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${product.isActive ? 'bg-status-success/20 text-status-success border-status-success/30' : 'bg-status-danger/20 text-status-danger border-status-danger/30'}`}>
               {product.isActive ? 'Ativo' : 'Inativo'}
             </span>
           </td>
@@ -302,7 +302,7 @@ export function ProductsPage() {
             <div className="flex justify-end gap-1.5">
               <button
                 onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
-                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors"
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
                 title="Ficha técnica"
                 type="button"
               >
@@ -328,7 +328,7 @@ export function ProductsPage() {
               <PermissionGate permission="catalog.publish" fallback={null}>
                 <button
                   onClick={() => handleTogglePublication(product)}
-                  className={`p-2 rounded-lg transition-colors ${product.publication?.publicationStatus === 'published' ? 'text-status-success hover:text-status-success hover:bg-status-success/10' : 'text-muted-foreground hover:text-primary hover:bg-primary/10'}`}
+                  className={`p-2 rounded-lg transition-colors ${product.publication?.publicationStatus === 'published' ? 'text-status-success hover:text-status-success hover:bg-status-success/20' : 'text-muted-foreground hover:text-primary hover:bg-primary/10'}`}
                   title={product.publication?.publicationStatus === 'published' ? 'Despublicar' : 'Publicar'}
                   type="button"
                 >
@@ -338,7 +338,7 @@ export function ProductsPage() {
               <PermissionGate permission="catalog.publish" fallback={null}>
                 <button
                   onClick={() => handleToggleOperational(product)}
-                  className={`p-2 rounded-lg transition-colors ${product.publication?.operationalStatus === 'active' ? 'text-status-success hover:text-status-success hover:bg-status-success/10' : 'text-muted-foreground hover:text-status-warning hover:bg-status-warning/10'}`}
+                  className={`p-2 rounded-lg transition-colors ${product.publication?.operationalStatus === 'active' ? 'text-status-success hover:text-status-success hover:bg-status-success/20' : 'text-muted-foreground hover:text-status-warning hover:bg-status-warning/20'}`}
                   title={product.publication?.operationalStatus === 'active' ? 'Ocultar' : 'Exibir'}
                   type="button"
                 >
@@ -347,7 +347,7 @@ export function ProductsPage() {
               </PermissionGate>
               <button
                 onClick={() => handleToggleActive(product)}
-                className={`p-2 rounded-lg transition-colors ${product.isActive ? 'text-muted-foreground hover:text-status-warning hover:bg-status-warning/10' : 'text-muted-foreground hover:text-status-success hover:bg-status-success/10'}`}
+                className={`p-2 rounded-lg transition-colors ${product.isActive ? 'text-muted-foreground hover:text-status-warning hover:bg-status-warning/20' : 'text-muted-foreground hover:text-status-success hover:bg-status-success/20'}`}
                 title={product.isActive ? 'Desativar' : 'Ativar'}
                 type="button"
               >
@@ -378,7 +378,7 @@ export function ProductsPage() {
         <div key={product.id} className="card-premium p-3 md:p-4 hover:shadow-md transition-all">
           <div className="flex items-start justify-between gap-3">
             <div className="flex gap-3 min-w-0 flex-1">
-               <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-muted/50 dark:bg-muted/80 border border-border overflow-hidden shrink-0 shadow-sm">
+               <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-muted dark:bg-muted/80 border border-border overflow-hidden shrink-0 shadow-sm">
                 {product.image ? (
                   <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
                 ) : (
@@ -392,16 +392,16 @@ export function ProductsPage() {
                 <div className="font-black text-foreground truncate text-sm md:text-base leading-tight">{product.name}</div>
                 <div className="text-[10px] md:text-xs text-muted-foreground font-bold mt-0.5 truncate">{categoryName}</div>
                 <div className="mt-2 flex flex-wrap items-center gap-1">
-                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-primary/20 text-primary border-primary/30' : 'bg-secondary text-foreground border-border'}`}>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary text-foreground border-border'}`}>
                     {product.type === 'simple' ? 'Individual' : product.type === 'configurable' ? 'Personalizado' : 'Combo'}
                   </span>
                   {pubLabel && (
-                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-secondary text-muted-foreground border border-border'}`}>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-primary text-primary-foreground border border-primary' : 'bg-secondary text-muted-foreground border border-border'}`}>
                       {pubLabel}
                     </span>
                   )}
                   {opLabel && (
-                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${opLabel === 'active' ? 'bg-status-success/20 text-status-success border border-status-success/30' : opLabel === 'inactive' ? 'bg-status-danger/20 text-status-danger border border-status-danger/30' : opLabel === 'hidden' ? 'bg-status-warning/20 text-status-warning border border-status-warning/30' : 'bg-status-danger/20 text-status-danger border border-status-danger/30'}`}>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${opLabel === 'active' ? 'bg-status-success text-white border border-status-success' : opLabel === 'inactive' ? 'bg-status-danger text-white border border-status-danger' : opLabel === 'hidden' ? 'bg-status-warning text-white border border-status-warning' : 'bg-status-danger text-white border border-status-danger'}`}>
                       {opLabel}
                     </span>
                   )}
@@ -419,7 +419,7 @@ export function ProductsPage() {
             style={{ borderTop: '1px solid var(--border-subtle)' }}
           >
              <div className="flex items-center gap-2">
-               <span className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${product.isActive ? 'bg-status-success animate-pulse' : 'bg-destructive'}`} />
+               <span className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${product.isActive ? 'bg-status-success shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-destructive'}`} />
                <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 {product.isActive ? 'Ativo' : 'Inativo'}
               </span>
@@ -442,7 +442,7 @@ export function ProductsPage() {
               </button>
               <button
                 onClick={() => setRecipeTarget({ id: product.id, name: product.name })}
-                className="p-1.5 md:p-2 text-muted-foreground bg-muted/50 dark:bg-muted/80 rounded-xl hover:bg-muted/70 transition-colors"
+                className="p-1.5 md:p-2 text-muted-foreground bg-muted dark:bg-muted/80 rounded-xl hover:bg-muted/70 transition-colors"
                 title="Ficha técnica"
               >
                 <FileText size={14} />
@@ -662,7 +662,7 @@ export function ProductsPage() {
               <div className="card-premium hidden md:block overflow-hidden bg-card border border-border">
                 <div ref={tableScrollRef} className="max-h-[70vh] overflow-auto custom-scrollbar">
                   <table className="w-full min-w-full border-separate border-spacing-0">
-                    <thead className="bg-muted/50 border-b border-border">
+                    <thead className="bg-muted border-b border-border">
                       <tr>
                         <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-left">Produto</th>
                         <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest hidden lg:table-cell text-left">Categoria</th>

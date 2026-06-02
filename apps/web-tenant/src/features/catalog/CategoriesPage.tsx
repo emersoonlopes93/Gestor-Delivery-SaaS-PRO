@@ -131,7 +131,7 @@ export function CategoriesPage() {
           {/* Desktop View */}
           <div className="hidden md:block bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
             <table className="w-full text-left border-collapse">
-              <thead className="bg-muted/50 border-b border-border">
+              <thead className="bg-muted border-b border-border">
                 <tr>
                   <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Nome</th>
                   <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">Produtos</th>
@@ -142,7 +142,7 @@ export function CategoriesPage() {
               </thead>
               <tbody className="divide-y divide-border/50">
                 {categories.map((category) => (
-                  <tr key={category.id} className="hover:bg-muted/30 transition-colors group">
+                  <tr key={category.id} className="hover:bg-muted transition-colors group">
                     <td className="px-6 py-4">
                       <div className="font-bold text-foreground">{category.name}</div>
                       <div className="text-xs text-muted-foreground truncate max-w-xs">{category.description || 'Sem descrição'}</div>
@@ -155,18 +155,18 @@ export function CategoriesPage() {
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <div className="flex items-center gap-2">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${category.isActive ? 'bg-status-success/20 text-status-success border-status-success/30' : 'bg-status-danger/20 text-status-danger border-status-danger/30'}`}>
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${category.isActive ? 'bg-status-success text-white border-status-success' : 'bg-status-danger text-white border-status-danger'}`}>
                           {category.isActive ? 'Ativo' : 'Inativo'}
                         </span>
                         {category.isFeatured && (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-status-warning/20 text-status-warning border border-status-warning/30">
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-status-warning text-white border border-status-warning">
                             Destaque
                           </span>
                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-right">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => navigate(`/catalog/products?categoryId=${encodeURIComponent(category.id)}`)}
                           className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-all"
@@ -206,18 +206,18 @@ export function CategoriesPage() {
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{category.description || 'Sem descrição'}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${category.isActive ? 'bg-status-success/20 text-status-success border-status-success/30' : 'bg-status-danger/20 text-status-danger border-status-danger/30'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${category.isActive ? 'bg-status-success text-white border-status-success' : 'bg-status-danger text-white border-status-danger'}`}>
                       {category.isActive ? 'Ativo' : 'Inativo'}
                     </span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="bg-muted/50 p-2 rounded-xl border border-border">
+                  <div className="bg-muted p-2 rounded-xl border border-border">
                     <span className="block text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">Produtos</span>
                     <span className="text-sm font-bold text-foreground">{category.productCount ?? 0} itens</span>
                   </div>
-                  <div className="bg-muted/50 p-2 rounded-xl border border-border">
+                  <div className="bg-muted p-2 rounded-xl border border-border">
                     <span className="block text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">Ordem</span>
                     <span className="text-sm font-bold text-foreground">Posição {category.order}</span>
                   </div>
@@ -226,7 +226,7 @@ export function CategoriesPage() {
                 <div className="flex items-center justify-between pt-3 border-t border-border">
                   <div className="flex gap-1">
                     {category.isFeatured && (
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-status-warning/20 text-status-warning border border-status-warning/30">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-status-warning text-white border border-status-warning">
                         Destaque
                       </span>
                     )}
