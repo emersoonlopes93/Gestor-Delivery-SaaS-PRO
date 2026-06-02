@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import * as fs from 'fs';
@@ -12,8 +12,15 @@ export class StorageService {
   private readonly uploadDir: string;
 
   constructor(private readonly config: ConfigService) {
-    this.driver = this.config.get<'local' | 'r2'>('STORAGE_DRIVER') || 'local';
-    this.uploadDir = path.join(process.cwd(), this.config.get<string>('UPLOAD_DIR', 'uploads'));
+    this.driver =
+      this.config.get<'local' | 'r2'>('MEDIA_STORAGE_DRIVER') ||
+      this.config.get<'local' | 'r2'>('STORAGE_DRIVER') ||
+      'local';
+    const rawUploadDir =
+      this.config.get<string>('MEDIA_UPLOAD_DIR') ||
+      this.config.get<string>('UPLOAD_DIR') ||
+      'uploads';
+    this.uploadDir = path.resolve(process.cwd(), rawUploadDir);
 
     if (this.driver === 'r2') {
       const rawAccountId = this.config.get<string>('R2_ACCOUNT_ID') || '';
@@ -56,7 +63,11 @@ export class StorageService {
         this.logger.error(`Erro ao deletar arquivo no R2: ${key}`, err);
       }
     } else {
-      const filePath = path.join(this.uploadDir, key);
+      const filePath = path.resolve(this.uploadDir, key);
+      const baseResolved = path.resolve(this.uploadDir);
+      if (!filePath.startsWith(baseResolved)) {
+        throw new BadRequestException('Tentativa de path traversal detectada.');
+      }
       try {
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
@@ -94,7 +105,11 @@ export class StorageService {
       return { key: params.key, url };
     } else {
       // Local driver for development
-      const destinationPath = path.join(this.uploadDir, params.key);
+      const destinationPath = path.resolve(this.uploadDir, params.key);
+      const baseResolved = path.resolve(this.uploadDir);
+      if (!destinationPath.startsWith(baseResolved)) {
+        throw new BadRequestException('Tentativa de path traversal detectada.');
+      }
       const directory = path.dirname(destinationPath);
 
       fs.mkdirSync(directory, { recursive: true });

@@ -55,6 +55,10 @@ const baseEnvSchema = z.object({
 
   // Storage Driver & Cloudflare R2
   STORAGE_DRIVER: z.enum(['local', 'r2']).optional(),
+  MEDIA_STORAGE_DRIVER: z.enum(['local', 'r2']).optional(),
+  MEDIA_UPLOAD_DIR: z.string().optional(),
+  MEDIA_PUBLIC_BASE_URL: z.string().optional(),
+  MEDIA_MAX_SIZE_BYTES: z.coerce.number().int().positive().optional(),
   R2_ACCOUNT_ID: z.string().default(''),
   R2_ACCESS_KEY_ID: z.string().default(''),
   R2_SECRET_ACCESS_KEY: z.string().default(''),
@@ -66,7 +70,7 @@ const baseEnvSchema = z.object({
 const envSchema = baseEnvSchema
   .transform((data) => {
     const isProduction = data.NODE_ENV === 'production';
-    const resolvedDriver = data.STORAGE_DRIVER || (isProduction ? 'r2' : 'local');
+    const resolvedDriver = data.MEDIA_STORAGE_DRIVER || data.STORAGE_DRIVER || (isProduction ? 'r2' : 'local');
     return {
       ...data,
       STORAGE_DRIVER: resolvedDriver as 'local' | 'r2',

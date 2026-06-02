@@ -176,16 +176,47 @@ export class TenantService {
         updateData.storefrontThemeJson = preset.theme as any;
         updateData.storefrontLayoutJson = preset.layout as any;
         
-        return this.prisma.tenantSettings.update({
+        const updated = await this.prisma.tenantSettings.update({
           where: { tenantId },
           data: updateData,
+          include: { tenant: { select: { slug: true } } }
         });
+
+        // Invalidate public storefront cache for this tenant
+        const slug = updated.tenant.slug;
+        const cacheKeys = [
+          `storefront:${slug}:delivery`,
+          `storefront:${slug}:pickup`
+        ];
+        
+        for (const key of cacheKeys) {
+          await this.cacheManager.del(key);
+        }
+
+        return {
+          theme: normalizeStorefrontTheme(updated.storefrontThemeJson),
+          layout: normalizeStorefrontLayout(updated.storefrontLayoutJson),
+        };
       }
     }
 
     // 2. Handle Manual Settings with Full Normalization (Hardening)
     if (data.theme) {
-      updateData.storefrontThemeJson = normalizeStorefrontTheme(data.theme) as any;
+      const themeSettings = normalizeStorefrontTheme(data.theme);
+      if (themeSettings.backgroundImageMediaId) {
+        const asset = await this.prisma.mediaAsset.findFirst({
+          where: {
+            id: themeSettings.backgroundImageMediaId,
+            tenantId,
+          },
+        });
+        if (!asset) {
+          throw new BadRequestException('A imagem de fundo informada é inválida ou pertence a outro inquilino.');
+        }
+        // Force matching URL to prevent hijack
+        themeSettings.backgroundImageUrl = asset.publicUrl;
+      }
+      updateData.storefrontThemeJson = themeSettings as any;
     }
 
     if (data.layout) {

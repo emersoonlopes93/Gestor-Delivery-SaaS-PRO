@@ -16,7 +16,7 @@ import { memoryStorage } from 'multer';
 import { randomUUID } from 'crypto';
 import { ImageOptimizerService } from './image-optimizer.service';
 import { StorageService } from './storage.service';
-import { UploadService } from './upload.service';
+import { UploadService, validateBufferSafety } from './upload.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
@@ -119,10 +119,19 @@ export class UploadController {
       throw new BadRequestException('Arquivo não enviado');
     }
 
-    const uploaded = file as { buffer: Buffer; originalname: string };
+    const uploaded = file as { buffer: Buffer; originalname: string; mimetype: string; size: number };
     const tenantId = req.user.tenantId;
 
-    // 1. Otimiza a imagem na memória
+    // 1. Enforce size limit from environment variables
+    const maxSizeBytes = Number(process.env.MEDIA_MAX_SIZE_BYTES) || 10 * 1024 * 1024;
+    if (uploaded.size > maxSizeBytes || uploaded.buffer.length > maxSizeBytes) {
+      throw new BadRequestException('O arquivo excede o limite máximo de tamanho permitido.');
+    }
+
+    // 2. Perform magic number and script/SVG injection validations
+    validateBufferSafety(uploaded.buffer, uploaded.mimetype);
+
+    // 3. Otimiza a imagem na memória
     const { buffer: optimizedBuffer } = await this.optimizer.optimize(
       uploaded.buffer,
       uploaded.originalname,

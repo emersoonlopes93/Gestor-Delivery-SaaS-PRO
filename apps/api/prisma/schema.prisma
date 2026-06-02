@@ -384,6 +384,7 @@ model MediaAsset {
   publicUrl    String   @map("public_url") @db.Text
   altText      String?  @map("alt_text") @db.VarChar(255)
   metadataJson Json?    @map("metadata_json")
+  tagsJson     Json?    @map("tags_json")
   isSystem     Boolean  @default(false) @map("is_system")
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at")

@@ -35,11 +35,14 @@ O sistema oferece presets comerciais prontos para uso, facilitando a configuraç
 
 O Storefront suporta imagens de fundo personalizadas para o modo "Premium" e outros estilos. 
 
-- **Formatos**: JPG, PNG, WebP (SVG bloqueado por segurança).
-- **Limite**: 5MB por arquivo.
-- **Otimização**: Todas as imagens são convertidas para WebP e redimensionadas para um máximo de 1920px de largura/altura.
-- **Armazenamento**: Gerenciado via `MediaAsset` no banco de dados e salvo no driver configurado (`local` ou `r2`).
-- **Overlay**: É possível configurar a intensidade do overlay (Leve, Médio, Forte) para garantir o contraste do texto sobre imagens muito claras ou detalhadas.
+- **Formatos**: JPG, PNG, WebP (SVG, HTML e scripts são estritamente bloqueados por meio de verificação de assinaturas digitais/magic numbers e busca por tags perigosas nos primeiros 1024 bytes).
+- **Limite**: Configurável por `MEDIA_MAX_SIZE_BYTES` (padrão: 10MB; 5MB no frontend).
+- **Otimização**: Todas as imagens são convertidas para WebP e redimensionadas para um máximo de 1920px de largura/altura usando a biblioteca `sharp`.
+- **Armazenamento**: Gerenciado via `MediaAsset` no banco de dados (com suporte a `tagsJson` e `isSystem`) e salvo no driver configurado (`local` ou `r2`).
+- **Overlay**: É possível configurar a intensidade do overlay (Leve, Médio, Forte) para garantir o contraste do texto.
+- **Políticas de Consistência e Limpeza**:
+  - A associação de um background valida estritamente o tenant owner e garante que a URL utilizada corresponda à URL oficial do arquivo no banco de dados, prevenindo injeções de links externos.
+  - Ao deletar um `MediaAsset` que está atualmente em uso como background, o sistema automaticamente zera a referência no banco de dados (`backgroundImageMediaId = null`, `backgroundImageUrl = null`) e invalida o cache do storefront público para o respectivo inquilino (chaves de cache `storefront:${slug}:delivery` e `storefront:${slug}:pickup`).
 
 ### Versionamento e Segurança
 
