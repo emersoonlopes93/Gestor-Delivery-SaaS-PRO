@@ -197,7 +197,7 @@ export function FranchiseDashboard() {
                 {stats.topProducts.map((p, idx) => (
                   <div key={idx} className="flex items-center justify-between p-4 border-b border-border last:border-none">
                     <div className="flex items-center gap-3">
-                      <span className="text-xs font-black text-muted-foreground/30 w-4">#{idx + 1}</span>
+                      <span className="text-xs font-black text-muted-foreground w-4">#{idx + 1}</span>
                       <p className="font-bold text-foreground/80">{p.name}</p>
                     </div>
                     <div className="flex items-center gap-8">

@@ -128,7 +128,7 @@ export function AuditLogsPage() {
           </div>
         ) : !data || data.items.length === 0 ? (
           <div className="p-12 text-center">
-            <Shield className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+            <Shield className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-foreground font-medium">Nenhum log encontrado</p>
             <p className="text-muted-foreground text-sm mt-1">
               Os logs de auditoria são gerados automaticamente quando ações são realizadas no sistema.

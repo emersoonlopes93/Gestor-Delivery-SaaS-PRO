@@ -434,7 +434,7 @@ function IconButton(props: { label: string; icon: typeof CreditCard; disabled?: 
       title={props.label}
       disabled={props.disabled}
       onClick={props.onClick}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-foreground disabled:opacity-40"
+      className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-foreground disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed"
     >
       <Icon className="h-4 w-4" />
     </button>
