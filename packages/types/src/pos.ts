@@ -41,6 +41,10 @@ export class CreatePosOrderDTO {
 
   @IsString()
   @IsOptional()
+  customerId?: string;
+
+  @IsString()
+  @IsOptional()
   customerName?: string;
 
   @IsString()
@@ -80,6 +84,9 @@ export class CreatePosOrderDTO {
   @IsOptional()
   @Min(0)
   deliveryFee?: number;
+
+  @IsOptional()
+  selectedAddressId?: string;
 
   @IsOptional()
   deliveryAddress?: {

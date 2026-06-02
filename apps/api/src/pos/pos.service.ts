@@ -64,10 +64,10 @@ export class PosService {
     return typeof value === 'string' && value.trim().length > 0;
   }
 
-  private normalizeDeliveryAddress(dto: CreatePosOrderDTO): DeliveryAddressDTO | null {
+  private normalizeDeliveryAddress(dto: CreatePosOrderDTO, sourceAddress = dto.deliveryAddress): DeliveryAddressDTO | null {
     if (dto.fulfillmentType !== PosFulfillmentType.DELIVERY) return null;
 
-    const address = dto.deliveryAddress;
+    const address = sourceAddress;
     if (!address) {
       throw new BadRequestException('Endereco de entrega e obrigatorio para venda delivery.');
     }
@@ -92,6 +92,84 @@ export class PosService {
       lat: address.lat,
       lng: address.lng,
     };
+  }
+
+  private mapSavedAddressToDeliveryAddress(address: {
+    street: string;
+    number: string;
+    neighborhood: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    complement: string | null;
+    reference: string | null;
+    lat: number | null;
+    lng: number | null;
+  }): DeliveryAddressDTO {
+    return {
+      street: address.street,
+      number: address.number,
+      neighborhood: address.neighborhood,
+      city: address.city,
+      state: address.state,
+      zipCode: address.zipCode,
+      complement: address.complement || undefined,
+      reference: address.reference || undefined,
+      lat: address.lat || undefined,
+      lng: address.lng || undefined,
+    };
+  }
+
+  private async resolveCustomerId(tenantId: string, dto: CreatePosOrderDTO): Promise<string | null> {
+    if (dto.customerId) {
+      const customer = await this.prisma.customer.findFirst({
+        where: { id: dto.customerId, tenantId },
+        select: { id: true },
+      });
+      if (!customer) {
+        throw new BadRequestException('Cliente selecionado nao pertence a este tenant ou nao existe.');
+      }
+      return customer.id;
+    }
+
+    if (!dto.customerPhone) return null;
+
+    const cust = await this.customerService.syncCustomerOnOrderUpsert(
+      tenantId,
+      dto.customerPhone,
+      dto.customerName || 'Consumidor',
+      undefined
+    );
+    return cust?.id || null;
+  }
+
+  private async resolveDeliveryAddress(
+    tenantId: string,
+    dto: CreatePosOrderDTO,
+    customerId: string | null,
+  ): Promise<DeliveryAddressDTO | null> {
+    if (dto.fulfillmentType !== PosFulfillmentType.DELIVERY) return null;
+
+    if (dto.selectedAddressId) {
+      const savedAddress = await this.prisma.customerAddress.findFirst({
+        where: {
+          id: dto.selectedAddressId,
+          tenantId,
+          ...(customerId ? { customerId } : {}),
+        },
+      });
+
+      if (!savedAddress) {
+        throw new BadRequestException('Endereco selecionado nao pertence ao cliente ou tenant informado.');
+      }
+
+      return this.normalizeDeliveryAddress(
+        dto,
+        dto.deliveryAddress || this.mapSavedAddressToDeliveryAddress(savedAddress),
+      );
+    }
+
+    return this.normalizeDeliveryAddress(dto);
   }
 
   private async resolveDeliveryFee(
@@ -125,7 +203,8 @@ export class PosService {
       throw new BadRequestException('Forma de pagamento e obrigatoria para finalizar a venda.');
     }
 
-    const deliveryAddress = this.normalizeDeliveryAddress(dto);
+    const customerId = await this.resolveCustomerId(tenantId, dto);
+    const deliveryAddress = await this.resolveDeliveryAddress(tenantId, dto, customerId);
     const deliveryFee = await this.resolveDeliveryFee(tenantId, dto, deliveryAddress);
 
     const discountTotal = dto.discountTotal || 0;
@@ -146,17 +225,6 @@ export class PosService {
          where: { tenantId, idempotencyKey: dto.idempotencyKey },
        });
        if (existingOrder) return this.getOrderDetail(existingOrder.id, tenantId);
-    }
-
-    let customerId: string | null = null;
-    if (dto.customerPhone) {
-      const cust = await this.customerService.syncCustomerOnOrderUpsert(
-        tenantId,
-        dto.customerPhone,
-        dto.customerName || 'Consumidor',
-        undefined
-      );
-      if (cust) customerId = cust.id;
     }
 
     const validation = await this.checkoutValidator.validateByTenantId(tenantId, dto.items, {

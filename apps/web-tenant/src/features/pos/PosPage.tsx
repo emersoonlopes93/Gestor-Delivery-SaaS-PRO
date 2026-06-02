@@ -10,7 +10,6 @@ import {
   ShoppingCart, 
   Plus, 
   Minus, 
-  User,
   Users,
   Store,
   ChevronRight,
@@ -20,7 +19,15 @@ import {
   LayoutGrid,
   Save,
   Printer,
-  Receipt
+  Receipt,
+  Phone,
+  UserPlus,
+  MapPin,
+  Home,
+  RefreshCw,
+  Edit3,
+  CheckCircle,
+  AlertCircle
 } from 'lucide-react';
 
 // New Components
@@ -63,6 +70,27 @@ interface CustomerResult {
   id: string;
   name: string;
   phone: string;
+  email?: string | null;
+  notes?: string | null;
+  lastOrderAt?: string | null;
+  orderCount: number;
+  addresses: CustomerAddress[];
+}
+
+interface CustomerAddress {
+  id: string;
+  label?: string | null;
+  street: string;
+  number: string;
+  neighborhood: string;
+  complement?: string | null;
+  reference?: string | null;
+  zipCode: string;
+  city: string;
+  state: string;
+  lat?: number | null;
+  lng?: number | null;
+  isDefault: boolean;
 }
 
 interface DeliveryRateCalcResponse {
@@ -73,6 +101,19 @@ interface DeliveryRateCalcResponse {
     description: string;
   };
 }
+
+const emptyDeliveryAddress = {
+  street: '',
+  number: '',
+  neighborhood: '',
+  complement: '',
+  reference: '',
+  zipCode: '',
+  city: '',
+  state: '',
+  lat: undefined as number | undefined,
+  lng: undefined as number | undefined,
+};
 
 function formatCurrency(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -108,22 +149,17 @@ export default function PosPage() {
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [deliveryFeeCalculated, setDeliveryFeeCalculated] = useState(false);
   const [deliveryFeeError, setDeliveryFeeError] = useState<string | null>(null);
-  const [deliveryAddress, setDeliveryAddress] = useState({
-    street: '',
-    number: '',
-    neighborhood: '',
-    complement: '',
-    reference: '',
-    zipCode: '',
-    city: '',
-    state: '',
-  });
+  const [deliveryFeeRule, setDeliveryFeeRule] = useState<string | null>(null);
+  const [deliveryAddress, setDeliveryAddress] = useState(emptyDeliveryAddress);
 
   // Customer Identification
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerResult | null>(null);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
 
   // Financials
   const [discountTotal] = useState(0);
@@ -222,30 +258,89 @@ export default function PosPage() {
     queryKey: ['posCustomers', customerSearchTerm],
     queryFn: async () => {
       if (customerSearchTerm.length < 2) return [];
-      const res = await api.get<Array<Record<string, unknown>> | { data: Array<Record<string, unknown>> }>(`/crm/customers?search=${encodeURIComponent(customerSearchTerm)}&limit=5`);
-      const data = Array.isArray(res.data) ? res.data : res.data.data;
-      return (data || []).filter((c) => {
-        const name = String(c['name'] || c['fullName'] || '').toLowerCase();
-        const phone = String(c['phone'] || '').toLowerCase();
-        const term = customerSearchTerm.toLowerCase();
-        return name.includes(term) || phone.includes(term);
-      }).slice(0, 5).map(c => ({ 
-        id: c['id'] as string, 
-        name: (c['fullName'] as string) || (c['name'] as string), 
-        phone: (c['phone'] as string) || '' 
-      }));
+      const res = await api.get<CustomerResult[]>(`/crm/customers/search?q=${encodeURIComponent(customerSearchTerm)}&limit=8`);
+      return res.data || [];
     },
     enabled: customerSearchTerm.length >= 2,
   });
 
-  const deliveryRateMutation = useMutation({
+  const { data: savedAddresses } = useQuery<CustomerAddress[]>({
+    queryKey: ['posCustomerAddresses', selectedCustomer?.id],
+    queryFn: async () => {
+      if (!selectedCustomer) return [];
+      const res = await api.get<CustomerAddress[]>(`/crm/customers/${selectedCustomer.id}/addresses`);
+      return res.data || [];
+    },
+    enabled: !!selectedCustomer,
+  });
+
+  const createCustomerMutation = useMutation({
     mutationFn: async () => {
+      const res = await api.post<CustomerResult>('/crm/customers', {
+        name: customerName.trim(),
+        phone: customerPhone.trim(),
+      });
+      return { ...res.data, orderCount: 0, addresses: [] };
+    },
+    onSuccess: (customer) => {
+      setSelectedCustomer(customer);
+      setCustomerName(customer.name);
+      setCustomerPhone(customer.phone);
+      setShowCustomerSearch(false);
+      void queryClient.invalidateQueries({ queryKey: ['posCustomers'] });
+    },
+  });
+
+  const createAddressMutation = useMutation({
+    mutationFn: async (customerId: string) => {
+      const res = await api.post<CustomerAddress>(`/crm/customers/${customerId}/addresses`, {
+        ...deliveryAddress,
+        city: deliveryAddress.city || 'Nao informado',
+        state: deliveryAddress.state || 'NA',
+        zipCode: deliveryAddress.zipCode || '00000000',
+        isDefault: true,
+      });
+      return res.data;
+    },
+    onSuccess: (address) => {
+      setSelectedAddressId(address.id);
+      setEditingAddressId(null);
+      void queryClient.invalidateQueries({ queryKey: ['posCustomerAddresses'] });
+      setDeliveryFee(0);
+      setDeliveryFeeCalculated(false);
+      deliveryRateMutation.mutate(deliveryAddress);
+    },
+  });
+
+  const updateAddressMutation = useMutation({
+    mutationFn: async (args: { customerId: string; addressId: string }) => {
+      const res = await api.patch<CustomerAddress>(`/crm/customers/${args.customerId}/addresses/${args.addressId}`, {
+        ...deliveryAddress,
+        city: deliveryAddress.city || 'Nao informado',
+        state: deliveryAddress.state || 'NA',
+        zipCode: deliveryAddress.zipCode || '00000000',
+        isDefault: true,
+      });
+      return res.data;
+    },
+    onSuccess: (address) => {
+      setSelectedAddressId(address.id);
+      setEditingAddressId(null);
+      void queryClient.invalidateQueries({ queryKey: ['posCustomerAddresses'] });
+      setDeliveryFee(0);
+      setDeliveryFeeCalculated(false);
+      deliveryRateMutation.mutate(deliveryAddress);
+    },
+  });
+
+  const deliveryRateMutation = useMutation({
+    mutationFn: async (addressForRate: typeof emptyDeliveryAddress) => {
       const res = await api.post<DeliveryRateCalcResponse>('/delivery/rates/calculate-current', {
         address: {
-          ...deliveryAddress,
-          city: deliveryAddress.city || 'Nao informado',
-          state: deliveryAddress.state || 'NA',
-          zipCode: deliveryAddress.zipCode || '00000000',
+          ...addressForRate,
+          city: addressForRate.city || 'Nao informado',
+          state: addressForRate.state || 'NA',
+          zipCode: addressForRate.zipCode || '00000000',
         },
       });
       return res.data;
@@ -254,10 +349,12 @@ export default function PosPage() {
       setDeliveryFee(Math.round(data.fee * 100) / 100);
       setDeliveryFeeCalculated(true);
       setDeliveryFeeError(null);
+      setDeliveryFeeRule(data.rule.description);
     },
     onError: (error) => {
       setDeliveryFee(0);
       setDeliveryFeeCalculated(false);
+      setDeliveryFeeRule(null);
       setDeliveryFeeError(error instanceof Error ? error.message : 'Nao foi possivel calcular o frete.');
     },
   });
@@ -267,8 +364,88 @@ export default function PosPage() {
       setDeliveryFee(0);
       setDeliveryFeeCalculated(false);
       setDeliveryFeeError(null);
+      setDeliveryFeeRule(null);
     }
   }, [fulfillmentType]);
+
+  const addressesForSelectedCustomer = savedAddresses || selectedCustomer?.addresses || [];
+
+  const resetDeliveryFee = useCallback(() => {
+    setDeliveryFee(0);
+    setDeliveryFeeCalculated(false);
+    setDeliveryFeeError(null);
+    setDeliveryFeeRule(null);
+  }, []);
+
+  const selectCustomer = useCallback((customer: CustomerResult) => {
+    setSelectedCustomer(customer);
+    setCustomerName(customer.name);
+    setCustomerPhone(customer.phone);
+    setCustomerSearchTerm('');
+    setShowCustomerSearch(false);
+    setSelectedAddressId(null);
+    setDeliveryAddress(emptyDeliveryAddress);
+    resetDeliveryFee();
+  }, [resetDeliveryFee]);
+
+  const clearSelectedCustomer = useCallback(() => {
+    setSelectedCustomer(null);
+    setSelectedAddressId(null);
+    setCustomerName('');
+    setCustomerPhone('');
+    setCustomerSearchTerm('');
+    setDeliveryAddress(emptyDeliveryAddress);
+    resetDeliveryFee();
+  }, [resetDeliveryFee]);
+
+  const applyAddress = (address: CustomerAddress) => {
+    const nextAddress = {
+      street: address.street,
+      number: address.number,
+      neighborhood: address.neighborhood,
+      complement: address.complement || '',
+      reference: address.reference || '',
+      zipCode: address.zipCode || '',
+      city: address.city || '',
+      state: address.state || '',
+      lat: address.lat || undefined,
+      lng: address.lng || undefined,
+    };
+
+    setSelectedAddressId(address.id);
+    setEditingAddressId(null);
+    setDeliveryAddress(nextAddress);
+    resetDeliveryFee();
+    deliveryRateMutation.mutate(nextAddress);
+  };
+
+  const handleSaveCustomerAndAddress = async () => {
+    if (!customerName.trim() || !customerPhone.trim()) {
+      setDeliveryFeeError('Informe nome e telefone para salvar o cliente.');
+      return;
+    }
+
+    try {
+      let customer = selectedCustomer;
+      if (!customer) {
+        customer = await createCustomerMutation.mutateAsync();
+      }
+
+      if (isDelivery) {
+        if (deliveryMissingRequiredData) {
+          setDeliveryFeeError('Informe rua, numero e bairro para salvar o endereco.');
+          return;
+        }
+        if (editingAddressId) {
+          await updateAddressMutation.mutateAsync({ customerId: customer.id, addressId: editingAddressId });
+        } else {
+          await createAddressMutation.mutateAsync(customer.id);
+        }
+      }
+    } catch (error) {
+      setDeliveryFeeError(error instanceof Error ? error.message : 'Nao foi possivel salvar cliente/endereco.');
+    }
+  };
 
   useMemo(() => {
     if (!products) return [];
@@ -323,6 +500,8 @@ export default function PosPage() {
            setCurrentOrderId(order.id);
            setCustomerName(order.customerName);
            setCustomerPhone(order.customerPhone);
+           setSelectedCustomer(null);
+           setSelectedAddressId(null);
            setCart(order.items.map((it) => ({
              cartLineId: generateId(),
              lineType: it.lineType as 'product' | 'combo',
@@ -339,6 +518,8 @@ export default function PosPage() {
         setCart([]);
         setCustomerName('');
         setCustomerPhone('');
+        setSelectedCustomer(null);
+        setSelectedAddressId(null);
      }
      setViewMode('catalog');
   };
@@ -358,9 +539,14 @@ export default function PosPage() {
     cart.length > 0 &&
     !createSale.isPending &&
     (!isDelivery || (!deliveryMissingRequiredData && deliveryFeeCalculated));
+  const isSavingCustomerAddress =
+    createCustomerMutation.isPending ||
+    createAddressMutation.isPending ||
+    updateAddressMutation.isPending;
 
-  const updateDeliveryAddress = (field: keyof typeof deliveryAddress, value: string) => {
+  const updateDeliveryAddress = (field: Exclude<keyof typeof deliveryAddress, 'lat' | 'lng'>, value: string) => {
     setDeliveryAddress((prev) => ({ ...prev, [field]: value }));
+      setSelectedAddressId(null);
       setDeliveryFeeError(null);
       if (field === 'street' || field === 'number' || field === 'neighborhood' || field === 'city' || field === 'state' || field === 'zipCode') {
         setDeliveryFee(0);
@@ -373,7 +559,7 @@ export default function PosPage() {
       setDeliveryFeeError('Informe cliente, telefone, rua, numero e bairro para calcular o frete.');
       return;
     }
-    deliveryRateMutation.mutate();
+    deliveryRateMutation.mutate(deliveryAddress);
   };
 
   const getPayload = (): PosCreateSalePayload & { id?: string } => ({
@@ -395,11 +581,13 @@ export default function PosPage() {
       quantity: item.quantity,
       notes: item.notes || undefined,
     })),
+    customerId: selectedCustomer?.id,
     customerName: customerName || undefined,
     customerPhone: customerPhone || undefined,
     fulfillmentType,
     tableNumber: fulfillmentType === PosFulfillmentType.TABLE ? tableNumber : undefined,
     deliveryFee: isDelivery ? deliveryFee : undefined,
+    selectedAddressId: isDelivery ? selectedAddressId || undefined : undefined,
     deliveryAddress: isDelivery
       ? {
           ...deliveryAddress,
@@ -440,6 +628,7 @@ export default function PosPage() {
       onSuccess: (data) => {
         handlePrint(data.id, 'customer'); // Auto-print customer receipt
         setCart([]); setCurrentOrderId(null); setTableNumber(''); setViewMode('salon'); setIsPaymentModalOpen(false);
+        clearSelectedCustomer();
         setDeliveryFee(0); setDeliveryFeeCalculated(false); setDeliveryFeeError(null);
         queryClient.invalidateQueries({ queryKey: ['posSalon'] });
       },
@@ -532,43 +721,128 @@ export default function PosPage() {
            </div>
         </div>
 
-          <div className="px-4 py-3 bg-card border-b border-border200 dark:border-border800">
-           <div className="flex items-center justify-between mb-2">
+          <div className="px-4 py-3 bg-card border-b border-border200 dark:border-border800 space-y-3">
+           <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase text-muted-foreground500 dark:text-muted-foreground400 tracking-widest flex items-center gap-1.5 leading-none">
-                <User size={12} className="text-status-success" />
-                {customerName || 'Identificar Cliente'}
+                <Phone size={12} className="text-status-success" />
+                Cliente do pedido
               </span>
-              <button onClick={() => setShowCustomerSearch(!showCustomerSearch)} className="text-muted-foreground500 dark:text-muted-foreground400 hover:text-status-success transition-colors">
-                <Search size={16} />
-              </button>
+              {selectedCustomer ? (
+                <button onClick={clearSelectedCustomer} className="text-[10px] font-black uppercase text-muted-foreground500 hover:text-destructive transition-colors">
+                  Trocar
+                </button>
+              ) : (
+                <button onClick={() => setShowCustomerSearch(!showCustomerSearch)} className="text-muted-foreground500 dark:text-muted-foreground400 hover:text-status-success transition-colors">
+                  <Search size={16} />
+                </button>
+              )}
            </div>
-           
-           {showCustomerSearch && (
-              <div className="relative mb-3 animate-in fade-in slide-in-from-top-2">
-                 <input autoFocus className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white" placeholder="Nome ou Telefone..." value={customerSearchTerm} onChange={(e) => setCustomerSearchTerm(e.target.value)} />
+
+           {!selectedCustomer && (
+              <div className="relative animate-in fade-in slide-in-from-top-2">
+                 <div className="relative">
+                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground500" size={14} />
+                   <input
+                     autoFocus={showCustomerSearch}
+                     className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
+                     placeholder="Buscar por telefone ou nome"
+                     value={customerSearchTerm}
+                     onChange={(e) => {
+                       setCustomerSearchTerm(e.target.value);
+                       if (!customerPhone && /\d/.test(e.target.value)) setCustomerPhone(e.target.value);
+                     }}
+                   />
+                 </div>
                  {foundCustomers && foundCustomers.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 bg-card dark:bg-muted800 border border-border200 dark:border-border700 rounded-xl mt-1 shadow-2xl z-50">
-                       {foundCustomers.map(c => <button key={c.id} onClick={() => { setCustomerName(c.name); setCustomerPhone(c.phone); setShowCustomerSearch(false); }} className="w-full text-left px-4 py-3 hover:bg-muted100 dark:bg-muted750 transition-colors border-b border-border200 dark:border-border700 last:border-0"><p className="font-bold text-xs text-muted-foreground900 dark:text-white">{c.name}</p></button>)}
+                    <div className="absolute top-full left-0 right-0 bg-card dark:bg-muted800 border border-border200 dark:border-border700 rounded-xl mt-1 shadow-2xl z-50 overflow-hidden">
+                       {foundCustomers.map((customer) => (
+                         <button
+                           key={customer.id}
+                           onClick={() => selectCustomer(customer)}
+                           className="w-full text-left px-4 py-3 hover:bg-muted100 dark:hover:bg-muted750 transition-colors border-b border-border200 dark:border-border700 last:border-0"
+                         >
+                           <div className="flex items-center justify-between gap-3">
+                             <div className="min-w-0">
+                               <p className="font-black text-xs text-muted-foreground900 dark:text-white truncate">{customer.name}</p>
+                               <p className="text-[10px] font-bold text-muted-foreground500">{customer.phone}</p>
+                             </div>
+                             <span className="text-[9px] font-black uppercase text-status-success">{customer.orderCount} pedidos</span>
+                           </div>
+                         </button>
+                       ))}
                     </div>
                  )}
               </div>
            )}
-           <div className="grid grid-cols-2 gap-2">
+
+           <div className="grid grid-cols-[1fr_130px] gap-2">
              <input
                className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
-               placeholder={isDelivery ? 'Cliente' : 'Cliente opcional'}
+               placeholder={isDelivery ? 'Nome do cliente' : 'Cliente opcional'}
                value={customerName}
+               disabled={!!selectedCustomer}
                onChange={(e) => setCustomerName(e.target.value)}
              />
              <input
                className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
                placeholder={isDelivery ? 'Telefone' : 'Telefone opcional'}
                value={customerPhone}
+               disabled={!!selectedCustomer}
                onChange={(e) => setCustomerPhone(e.target.value)}
              />
            </div>
+
+           {selectedCustomer && (
+             <div className="flex items-center justify-between rounded-xl bg-status-success/10 border border-status-success/20 px-3 py-2">
+               <div className="min-w-0">
+                 <p className="text-xs font-black text-foreground truncate">{selectedCustomer.name}</p>
+                 <p className="text-[10px] font-bold text-muted-foreground">{selectedCustomer.phone}</p>
+               </div>
+               <CheckCircle size={18} className="text-status-success shrink-0" />
+             </div>
+           )}
+
            {isDelivery && (
-             <div className="mt-3 space-y-2 border-t border-border200 dark:border-border800 pt-3">
+             <div className="space-y-3 border-t border-border200 dark:border-border800 pt-3">
+               {selectedCustomer && addressesForSelectedCustomer.length > 0 && (
+                 <div className="space-y-2">
+                   <div className="flex items-center justify-between">
+                     <span className="text-[10px] font-black uppercase text-muted-foreground500 tracking-widest flex items-center gap-1">
+                       <Home size={12} />
+                       Enderecos salvos
+                     </span>
+                     <button
+                       onClick={() => {
+                         setEditingAddressId(null);
+                         setSelectedAddressId(null);
+                         setDeliveryAddress(emptyDeliveryAddress);
+                         resetDeliveryFee();
+                       }}
+                       className="text-[10px] font-black uppercase text-primary"
+                     >
+                       Novo
+                     </button>
+                   </div>
+                   <div className="max-h-28 overflow-y-auto space-y-2 pr-1">
+                     {addressesForSelectedCustomer.map((address) => (
+                       <button
+                         key={address.id}
+                         onClick={() => applyAddress(address)}
+                         className={`w-full text-left rounded-xl border px-3 py-2 transition-all ${selectedAddressId === address.id ? 'border-primary bg-primary/10' : 'border-border200 dark:border-border800 bg-muted50 dark:bg-muted950 hover:border-primary/40'}`}
+                       >
+                         <div className="flex items-start justify-between gap-2">
+                           <div className="min-w-0">
+                             <p className="text-xs font-black text-foreground truncate">{address.label || `${address.street}, ${address.number}`}</p>
+                             <p className="text-[10px] font-bold text-muted-foreground truncate">{address.neighborhood} · {address.city}/{address.state}</p>
+                           </div>
+                           {address.isDefault && <span className="text-[9px] font-black uppercase text-status-success">Padrao</span>}
+                         </div>
+                       </button>
+                     ))}
+                   </div>
+                 </div>
+               )}
+
                <div className="grid grid-cols-[1fr_88px] gap-2">
                  <input
                    className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
@@ -626,14 +900,47 @@ export default function PosPage() {
                    onChange={(e) => updateDeliveryAddress('reference', e.target.value)}
                  />
                </div>
+
+               <div className="grid grid-cols-2 gap-2">
+                 <button
+                   onClick={handleSaveCustomerAndAddress}
+                   disabled={isSavingCustomerAddress || !customerName.trim() || !customerPhone.trim() || deliveryMissingRequiredData}
+                   className="bg-card dark:bg-muted800 hover:bg-muted100 dark:hover:bg-muted750 text-muted-foreground700 dark:text-muted-foreground300 border border-border200 dark:border-border700 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70"
+                 >
+                   {editingAddressId ? <Edit3 size={13} /> : <UserPlus size={13} />}
+                   {editingAddressId ? 'Salvar edicao' : selectedCustomer ? 'Salvar endereco' : 'Salvar cliente'}
+                 </button>
+                 {selectedAddressId && (
+                   <button
+                     onClick={() => setEditingAddressId(selectedAddressId)}
+                     className="bg-card dark:bg-muted800 hover:bg-muted100 dark:hover:bg-muted750 text-muted-foreground700 dark:text-muted-foreground300 border border-border200 dark:border-border700 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all"
+                   >
+                     <Edit3 size={13} />
+                     Editar
+                   </button>
+                 )}
+               </div>
+
                <button
                  onClick={handleCalculateDeliveryFee}
                  disabled={deliveryRateMutation.isPending}
-                 className="w-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70"
+                 className="w-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 flex items-center justify-center gap-2"
                >
+                 <RefreshCw size={13} className={deliveryRateMutation.isPending ? 'animate-spin' : ''} />
                  {deliveryRateMutation.isPending ? 'Calculando frete...' : `Frete: ${deliveryFeeCalculated ? formatCurrency(deliveryFee) : 'Calcular'}`}
                </button>
-               {deliveryFeeError && <p className="text-[10px] font-bold text-destructive">{deliveryFeeError}</p>}
+               {deliveryFeeCalculated && (
+                 <div className="rounded-xl bg-primary/5 border border-primary/15 px-3 py-2 text-[10px] font-bold text-muted-foreground flex items-start gap-2">
+                   <MapPin size={13} className="text-primary mt-0.5 shrink-0" />
+                   <span>{deliveryAddress.neighborhood || 'Bairro'} · {deliveryFeeRule || deliveryAddress.street || 'Endereco'} · {formatCurrency(deliveryFee)}</span>
+                 </div>
+               )}
+               {deliveryFeeError && (
+                 <p className="text-[10px] font-bold text-destructive flex items-center gap-1">
+                   <AlertCircle size={12} />
+                   {deliveryFeeError}
+                 </p>
+               )}
              </div>
            )}
         </div>
@@ -703,9 +1010,14 @@ export default function PosPage() {
                   <span>{formatCurrency(subtotal)}</span>
                </div>
                {isDelivery && (
-                 <div className="flex justify-between text-[11px] font-bold text-muted-foreground500 dark:text-muted-foreground400 uppercase tracking-tighter">
-                   <span>Frete</span>
-                   <span>{deliveryFeeCalculated ? formatCurrency(deliveryFee) : 'Pendente'}</span>
+                 <div className="space-y-1">
+                   <div className="flex justify-between text-[11px] font-bold text-muted-foreground500 dark:text-muted-foreground400 uppercase tracking-tighter">
+                     <span>Frete</span>
+                     <span>{deliveryFeeCalculated ? formatCurrency(deliveryFee) : 'Pendente'}</span>
+                   </div>
+                   {deliveryFeeRule && (
+                     <p className="text-[10px] font-bold text-muted-foreground500 dark:text-muted-foreground400 truncate">{deliveryFeeRule}</p>
+                   )}
                  </div>
                )}
                <div className="flex justify-between items-end">

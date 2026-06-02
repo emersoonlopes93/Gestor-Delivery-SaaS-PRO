@@ -18,11 +18,13 @@ export interface PosCreateSalePayload {
     pizzaComposition?: PizzaCompositionDTO;
     slots?: CreateOrderItemComboSlotSelectionDTO[];
   }>;
+  customerId?: string;
   customerName?: string;
   customerPhone?: string;
   fulfillmentType: PosFulfillmentType;
   tableNumber?: string;
   deliveryFee?: number;
+  selectedAddressId?: string;
   deliveryAddress?: {
     street: string;
     number: string;
@@ -32,6 +34,8 @@ export interface PosCreateSalePayload {
     zipCode?: string;
     city?: string;
     state?: string;
+    lat?: number;
+    lng?: number;
   };
   paymentMethod: PaymentMethod;
   discountTotal?: number;
