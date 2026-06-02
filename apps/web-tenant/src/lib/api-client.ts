@@ -56,7 +56,22 @@ async function apiFetch<T>(
         headers: retryHeaders,
       });
       if (!retryResponse.ok) {
-        throw new ApiError(retryResponse.status, 'Request failed after refresh');
+        // Se o retry também falhou com 401, a sessão é irrecuperável:
+        // limpar tokens e redirecionar para o login.
+        if (retryResponse.status === 401) {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login?expired=1';
+          }
+          throw new ApiError(401, 'Session expired');
+        }
+        const retryErrorBody: ApiErrorResponse = await retryResponse.json().catch(() => ({}));
+        throw new ApiError(
+          retryResponse.status,
+          retryErrorBody?.error?.message || 'Request failed after refresh',
+          retryErrorBody?.error?.code,
+        );
       }
       return retryResponse.json();
     }

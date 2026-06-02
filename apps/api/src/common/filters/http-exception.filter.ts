@@ -76,6 +76,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const userId = request.user?.type === 'tenant' ? request.user.sub : undefined;
     const requestId = request.requestId;
 
+    // Normalizar o code baseado no status HTTP real quando o code ainda é genérico.
+    // Isso garante que respostas 401/403 sempre tenham codes semânticos corretos,
+    // mesmo quando a exceção vem de fora do NestJS (ex: Passport).
+    if (status === HttpStatus.UNAUTHORIZED && (code === 'INTERNAL_ERROR' || code === 'HTTP_ERROR')) {
+      code = 'UNAUTHORIZED';
+    } else if (status === HttpStatus.FORBIDDEN && (code === 'INTERNAL_ERROR' || code === 'HTTP_ERROR')) {
+      code = 'FORBIDDEN';
+    }
+
     const errorBody = {
       success: false,
       error: {

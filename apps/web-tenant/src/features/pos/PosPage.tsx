@@ -168,6 +168,7 @@ export default function PosPage() {
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
   const [isCustomerDrawerOpen, setIsCustomerDrawerOpen] = useState(false);
+  const [saleError, setSaleError] = useState<string | null>(null);
   const [sourceTableForTransfer, setSourceTableForTransfer] = useState<SalonTable | null>(null);
 
   const [configProductId, setConfigProductId] = useState<string | null>(null);
@@ -615,12 +616,17 @@ export default function PosPage() {
 
   const handleSaveDraft = () => {
     if (cart.length === 0) return;
+    setSaleError(null);
     upsertDraft.mutate(getPayload(), {
         onSuccess: (data) => {
             setCurrentOrderId(data.id);
             handlePrint(data.id, 'kitchen'); // Print production ticket
             setViewMode('salon');
-        }
+        },
+        onError: (error) => {
+            const msg = error instanceof Error ? error.message : 'Erro ao salvar comanda.';
+            setSaleError(msg);
+        },
     });
   };
 
@@ -634,13 +640,19 @@ export default function PosPage() {
       setDeliveryFeeError('Calcule o frete antes de finalizar a venda delivery.');
       return;
     }
+    setSaleError(null);
     createSale.mutate({ ...getPayload(), paymentMethod: method }, {
       onSuccess: (data) => {
         handlePrint(data.id, 'customer'); // Auto-print customer receipt
         setCart([]); setCurrentOrderId(null); setTableNumber(''); setViewMode('salon'); setIsPaymentModalOpen(false);
         clearSelectedCustomer();
         setDeliveryFee(0); setDeliveryFeeCalculated(false); setDeliveryFeeError(null);
+        setSaleError(null);
         queryClient.invalidateQueries({ queryKey: ['posSalon'] });
+      },
+      onError: (error) => {
+        const msg = error instanceof Error ? error.message : 'Erro ao finalizar venda.';
+        setSaleError(msg);
       },
     });
   };
@@ -858,6 +870,13 @@ export default function PosPage() {
                   <span className="text-4xl font-black text-foreground tracking-tighter italic leading-none">{formatCurrency(total)}</span>
                </div>
             </div>
+
+            {saleError && (
+              <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-3 flex items-start gap-2">
+                <X size={14} className="text-destructive shrink-0 mt-0.5 cursor-pointer" onClick={() => setSaleError(null)} />
+                <p className="text-[11px] font-bold text-destructive leading-tight">{saleError}</p>
+              </div>
+            )}
 
             <button 
               onClick={() => setIsPaymentModalOpen(true)}
