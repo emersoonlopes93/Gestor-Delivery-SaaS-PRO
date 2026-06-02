@@ -32,6 +32,100 @@ import {
 } from '@gestor/theme';
 import { ProductCategory, Product, Tenant, TenantSettings } from '@gestor/types';
 
+interface DemoProduct {
+  id: string;
+  name: string;
+  shortDescription: string;
+  image?: string;
+  basePrice: number;
+  isAvailable: boolean;
+  featured?: boolean;
+}
+
+interface DemoCategory {
+  id: string;
+  name: string;
+  slug: string;
+  products: DemoProduct[];
+}
+
+interface DemoCombo {
+  id: string;
+  name: string;
+  description: string;
+  image?: string;
+  basePrice: number;
+  isAvailable: boolean;
+}
+
+const DEMO_COMBOS: DemoCombo[] = [
+  {
+    id: 'demo-combo-1',
+    name: 'Combo Casal Smash',
+    description: '2 Burgers Smash Artesanais + 1 Batata Rústica Grande + 2 Refrigerantes gelados à sua escolha.',
+    image: 'https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?w=400&auto=format&fit=crop&q=60',
+    basePrice: 69.90,
+    isAvailable: true
+  }
+];
+
+const DEMO_CATEGORIES: DemoCategory[] = [
+  {
+    id: 'demo-cat-1',
+    name: 'Burgers Artesanais',
+    slug: 'burgers-artesanais',
+    products: [
+      {
+        id: 'demo-prod-1',
+        name: 'Classic Smash Burger',
+        shortDescription: 'Dois smash burgers de 80g blend premium, queijo cheddar derretido, alface, tomate e maionese verde artesanal no pão brioche.',
+        image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&auto=format&fit=crop&q=60',
+        basePrice: 28.90,
+        isAvailable: true,
+        featured: true
+      },
+      {
+        id: 'demo-prod-2',
+        name: 'Bacon Cheddar Monster',
+        shortDescription: 'Burger bovino de 150g grelhado na brasa, tiras crocantes de bacon, cheddar cremoso e cebola caramelizada.',
+        image: 'https://images.unsplash.com/photo-1553979459-d2229ba7433b?w=400&auto=format&fit=crop&q=60',
+        basePrice: 34.90,
+        isAvailable: true
+      }
+    ]
+  },
+  {
+    id: 'demo-cat-2',
+    name: 'Acompanhamentos',
+    slug: 'acompanhamentos',
+    products: [
+      {
+        id: 'demo-prod-3',
+        name: 'Batata Rústica da Casa',
+        shortDescription: 'Batatas fritas rústicas com casca, temperadas com páprica defumada, alecrim fresco e sal grosso.',
+        image: 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=400&auto=format&fit=crop&q=60',
+        basePrice: 16.00,
+        isAvailable: true
+      }
+    ]
+  },
+  {
+    id: 'demo-cat-3',
+    name: 'Bebidas Geladas',
+    slug: 'bebidas-geladas',
+    products: [
+      {
+        id: 'demo-prod-4',
+        name: 'Soda Italiana Cranberry',
+        shortDescription: 'Refrescante xarope artesanal de cranberry com água gaseificada, rodelas de limão siciliano e gelo.',
+        image: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=400&auto=format&fit=crop&q=60',
+        basePrice: 12.00,
+        isAvailable: true
+      }
+    ]
+  }
+];
+
 export function StorefrontCustomizationPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -166,6 +260,256 @@ export function StorefrontCustomizationPage() {
       backgroundImageUrl: null,
       backgroundImageMediaId: null
     });
+  };
+
+  // Normalização e Fallback dos Dados
+  const rawNormalized = categories.length > 0
+    ? categories.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        slug: cat.slug,
+        products: products.filter(p => p.categoryId === cat.id)
+      })).filter(cat => cat.products.length > 0)
+    : [];
+
+  const displayCategories = rawNormalized.length > 0 ? rawNormalized : DEMO_CATEGORIES;
+  const displayCombos = categories.length > 0 ? [] : DEMO_COMBOS; // Exibe combos de demonstração se banco estiver vazio
+
+  // Utilitários de Estilização Reativa em Tempo Real (Real-time updates)
+  const primaryHex = customization.theme.primaryColor.startsWith('#') 
+    ? customization.theme.primaryColor 
+    : '#e11d48';
+
+  const primary10 = `${primaryHex}1a`; // 10%
+  const primary5 = `${primaryHex}0d`; // 5%
+
+  const isDark = customization.theme.colorMode === 'dark';
+  const showBgImage = !!customization.theme.backgroundImageUrl;
+
+  const getBackgroundStyles = () => {
+    if (customization.theme.backgroundStyle === 'clean') {
+      return isDark ? 'bg-[#09090b]' : 'bg-[#ffffff]';
+    }
+    if (customization.theme.backgroundStyle === 'soft') {
+      return isDark ? 'bg-[#18181b]' : 'bg-[#f4f4f5]';
+    }
+    if (customization.theme.backgroundStyle === 'premium') {
+      return isDark 
+        ? 'bg-gradient-to-b from-[#090d16] to-[#1e1b4b]' 
+        : 'bg-gradient-to-b from-[#ffffff] to-[#eff6ff]';
+    }
+    if (customization.theme.backgroundStyle === 'brand') {
+      return isDark
+        ? `bg-gradient-to-b from-[#09090b] to-[var(--storefront-primary-10)]`
+        : `bg-gradient-to-b from-[#ffffff] to-[var(--storefront-primary-5)]`;
+    }
+    return isDark ? 'bg-[#09090b]' : 'bg-[#ffffff]';
+  };
+
+  const getFontStyle = () => {
+    if (customization.theme.fontStyle === 'rounded') return 'font-rounded';
+    if (customization.theme.fontStyle === 'modern') return 'font-sans';
+    return 'font-sans';
+  };
+
+  const getProductListClass = () => {
+    const layout = customization.layout.productLayout;
+    if (layout === 'grid' || layout === 'square') {
+      return 'grid grid-cols-2 gap-2.5';
+    }
+    return 'flex flex-col gap-2.5';
+  };
+
+  const renderProductCard = (product: any) => {
+    const layout = customization.layout.productLayout;
+    const imageMode = customization.layout.productImageMode;
+    const showDesc = customization.layout.showProductDescription;
+    const showBadges = customization.layout.showBadges;
+    const isDark = customization.theme.colorMode === 'dark';
+    
+    const showImage = imageMode !== 'hidden' && product.image;
+    
+    // Classes de Cores Reativas
+    const cardBgClass = isDark 
+      ? 'bg-slate-900/60 border-slate-800 text-slate-100' 
+      : 'bg-white/80 border-slate-150 text-slate-900';
+    
+    const cardBorderRadius = 'rounded-[calc(var(--preview-radius)-4px)]';
+    
+    if (layout === 'grid') {
+      return (
+        <div 
+          key={product.id}
+          className={`p-2 border ${cardBorderRadius} ${cardBgClass} flex flex-col shadow-sm transition-all duration-350 hover:scale-[1.01] backdrop-blur-sm`}
+        >
+          {showImage && (
+            <div className={`aspect-video w-full overflow-hidden mb-2 ${cardBorderRadius} bg-muted`}>
+              <img src={product.image} className="w-full h-full object-cover" alt={product.name} />
+            </div>
+          )}
+          <div className="flex-1 flex flex-col min-w-0">
+            <div className="flex items-center gap-1 mb-0.5">
+              <h4 className="font-bold text-[9px] truncate text-foreground leading-tight">{product.name}</h4>
+              {showBadges && product.featured && (
+                <span className="text-[6px] font-black bg-[var(--preview-primary)] text-white px-1 py-0.2 rounded-full uppercase shrink-0 scale-90">Destaque</span>
+              )}
+            </div>
+            {showDesc && product.shortDescription && (
+              <p className="text-[7px] text-muted-foreground line-clamp-2 leading-tight mb-2">{product.shortDescription}</p>
+            )}
+            <div className="mt-auto flex justify-between items-center pt-1 border-t border-border/5">
+              <span className="text-[8px] font-black">
+                R$ {Number(product.basePrice).toFixed(2)}
+              </span>
+              <div 
+                className="h-4.5 px-2 rounded-full flex items-center justify-center text-[7px] font-bold text-white uppercase select-none"
+                style={{ backgroundColor: primaryHex }}
+              >
+                Ver
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    if (layout === 'square') {
+      return (
+        <div 
+          key={product.id}
+          className={`p-2 border ${cardBorderRadius} ${cardBgClass} flex flex-col shadow-sm transition-all duration-300 backdrop-blur-sm`}
+        >
+          {showImage && (
+            <div className={`aspect-square w-full overflow-hidden mb-2 ${cardBorderRadius} bg-muted`}>
+              <img src={product.image} className="w-full h-full object-cover" alt={product.name} />
+            </div>
+          )}
+          <div className="flex-1 flex flex-col min-w-0">
+            <div className="flex items-center gap-1 mb-0.5">
+              <h4 className="font-bold text-[9px] truncate text-foreground leading-tight">{product.name}</h4>
+            </div>
+            {showDesc && product.shortDescription && (
+              <p className="text-[7px] text-muted-foreground line-clamp-1 leading-tight mb-1.5">{product.shortDescription}</p>
+            )}
+            <div className="mt-auto flex justify-between items-center pt-1">
+              <span className="text-[8px] font-black">
+                R$ {Number(product.basePrice).toFixed(2)}
+              </span>
+              <div 
+                className="h-4 w-4 rounded-full flex items-center justify-center text-[8px] font-black text-white"
+                style={{ backgroundColor: primaryHex }}
+              >
+                +
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (layout === 'list') {
+      return (
+        <div 
+          key={product.id}
+          className={`p-2 border ${cardBorderRadius} ${cardBgClass} flex justify-between items-center gap-2.5 shadow-sm transition-all duration-300 backdrop-blur-sm`}
+        >
+          <div className="flex-1 min-w-0 space-y-0.5 text-left">
+            <div className="flex items-center gap-1">
+              <h4 className="font-bold text-[9px] text-foreground truncate leading-tight">{product.name}</h4>
+              {showBadges && product.featured && (
+                <span className="text-[6px] font-black bg-[var(--preview-primary)] text-white px-1 py-0.2 rounded-full uppercase shrink-0 scale-90">Destaque</span>
+              )}
+            </div>
+            {showDesc && product.shortDescription && (
+              <p className="text-[7px] text-muted-foreground line-clamp-2 leading-relaxed">{product.shortDescription}</p>
+            )}
+            <div className="flex items-center gap-2 pt-0.5">
+              <span className="text-[9px] font-black">
+                R$ {Number(product.basePrice).toFixed(2)}
+              </span>
+            </div>
+          </div>
+          {showImage && (
+            <div className="w-12 h-12 rounded-[calc(var(--preview-radius)-4px)] overflow-hidden bg-muted shrink-0 shadow-inner">
+              <img src={product.image} className="w-full h-full object-cover" alt={product.name} />
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (layout === 'compact') {
+      return (
+        <div 
+          key={product.id}
+          className={`p-1.5 px-2 border ${cardBorderRadius} ${cardBgClass} flex justify-between items-center gap-2 shadow-sm transition-all duration-300 backdrop-blur-sm`}
+        >
+          <div className="flex-1 min-w-0 text-left">
+            <h4 className="font-bold text-[9px] text-foreground truncate">{product.name}</h4>
+            {showDesc && product.shortDescription && (
+              <p className="text-[7px] text-muted-foreground line-clamp-1 leading-tight">{product.shortDescription}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[9px] font-black">
+              R$ {Number(product.basePrice).toFixed(2)}
+            </span>
+            <div 
+              className="h-3.5 px-2 rounded-full flex items-center justify-center text-[7px] font-black text-white"
+              style={{ backgroundColor: primaryHex }}
+            >
+              +
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (layout === 'premium-card') {
+      return (
+        <div 
+          key={product.id}
+          className={`p-2.5 border-2 ${cardBgClass} flex flex-col shadow-md transition-all duration-300 relative overflow-hidden backdrop-blur-sm`}
+          style={{ 
+            borderColor: primaryHex,
+            borderRadius: customization.theme.borderRadius === 'sm' ? '6px' :
+                          customization.theme.borderRadius === 'md' ? '12px' :
+                          customization.theme.borderRadius === 'lg' ? '16px' :
+                          customization.theme.borderRadius === 'xl' ? '20px' : '28px'
+          }}
+        >
+          {showImage && (
+            <div className="aspect-video w-full overflow-hidden mb-2 bg-muted rounded shadow-sm">
+              <img src={product.image} className="w-full h-full object-cover" alt={product.name} />
+            </div>
+          )}
+          <div className="flex-1 flex flex-col min-w-0 space-y-0.5">
+            <div className="flex items-center justify-between gap-1">
+              <h4 className="font-black text-[9px] text-foreground uppercase tracking-wide truncate leading-tight">{product.name}</h4>
+              {showBadges && product.featured && (
+                <span className="text-[6px] font-black bg-[var(--preview-primary)] text-white px-1 py-0.2 rounded uppercase shrink-0 scale-90">Premium</span>
+              )}
+            </div>
+            {showDesc && product.shortDescription && (
+              <p className="text-[7.5px] text-muted-foreground leading-normal italic line-clamp-2">{product.shortDescription}</p>
+            )}
+            <div className="flex justify-between items-center pt-1.5 mt-1 border-t border-border/10">
+              <span className="text-[9px] font-black">
+                R$ {Number(product.basePrice).toFixed(2)}
+              </span>
+              <div 
+                className="h-4.5 px-2 rounded flex items-center justify-center text-[7px] font-black text-white uppercase tracking-wider"
+                style={{ backgroundColor: primaryHex, borderRadius: 'var(--preview-radius)' }}
+              >
+                + Add
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    return null;
   };
 
   if (loading) {
@@ -519,7 +863,10 @@ export function StorefrontCustomizationPage() {
               <div 
                 className="relative w-[285px] h-[570px] bg-slate-950 rounded-[40px] border-[10px] border-slate-900 shadow-2xl flex flex-col overflow-hidden ring-4 ring-slate-800/10 dark:ring-slate-700/10 ring-offset-2 dark:ring-offset-slate-950 transition-all duration-500"
                 style={{
-                  '--preview-primary': customization.theme.primaryColor,
+                  '--preview-primary': primaryHex,
+                  '--storefront-primary': primaryHex,
+                  '--storefront-primary-5': primary5,
+                  '--storefront-primary-10': primary10,
                   '--preview-radius': 
                     customization.theme.borderRadius === 'sm' ? '4px' :
                     customization.theme.borderRadius === 'md' ? '8px' :
@@ -535,7 +882,7 @@ export function StorefrontCustomizationPage() {
 
                 {/* Status Bar */}
                 <div className={`px-5 pt-4 pb-1 flex justify-between items-center text-[8px] font-bold z-20 select-none transition-all duration-500 ${
-                  customization.theme.colorMode === 'dark' ? 'text-slate-400 bg-[#0f172a]' : 'text-slate-500 bg-white'
+                  isDark ? 'text-slate-400 bg-[#0f172a]' : 'text-slate-500 bg-white'
                 }`}>
                   <span>09:41</span>
                   <div className="flex items-center gap-1 select-none">
@@ -544,147 +891,165 @@ export function StorefrontCustomizationPage() {
                   </div>
                 </div>
 
-                {/* Screen Content */}
+                {/* Screen Content Wrapper */}
                 <div 
-                  className={`flex-1 overflow-y-auto no-scrollbar transition-all duration-500 flex flex-col ${
-                    customization.theme.colorMode === 'dark' 
-                      ? 'bg-[#0f172a] text-slate-100' 
-                      : 'bg-white text-slate-900'
-                  }`}
+                  className={`flex-1 overflow-y-auto no-scrollbar transition-all duration-500 flex flex-col relative ${getFontStyle()} ${getBackgroundStyles()}`}
+                  style={{
+                    fontFamily: customization.theme.fontStyle === 'rounded'
+                      ? '"Quicksand", "Nunito", system-ui, -apple-system, sans-serif'
+                      : customization.theme.fontStyle === 'modern'
+                        ? 'system-ui, -apple-system, sans-serif'
+                        : '"Inter", system-ui, sans-serif'
+                  }}
                 >
-                  {/* Logo e Nome do Tenant Real */}
-                  <div className={`p-3.5 border-b flex items-center gap-2.5 ${
-                    customization.theme.colorMode === 'dark' ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50/50'
-                  }`}>
-                    {tenantLogo ? (
-                      <img src={tenantLogo} className="w-8 h-8 rounded-[var(--preview-radius)] flex-shrink-0 object-cover" alt="" />
-                    ) : (
-                      <div className={`w-8 h-8 rounded-[var(--preview-radius)] flex-shrink-0 flex items-center justify-center font-black text-xs text-white`} style={{ backgroundColor: customization.theme.primaryColor }}>
-                        {(tenantName || 'G').charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="font-bold text-[11px] truncate leading-tight">{tenantName || 'Sua Loja'}</div>
-                      <div className="text-[8px] text-muted-foreground uppercase font-black tracking-widest mt-0.5">Loja Aberta</div>
-                    </div>
-                  </div>
+                  {/* Background Premium Image and Overlay */}
+                  {showBgImage && (
+                    <div 
+                      className="absolute inset-0 z-0 bg-cover bg-center transition-all duration-500"
+                      style={{ backgroundImage: `url(${customization.theme.backgroundImageUrl})` }}
+                    />
+                  )}
+                  {showBgImage && (
+                    <div 
+                      className={`absolute inset-0 z-0 transition-all duration-500 ${
+                        isDark ? 'bg-black' : 'bg-white'
+                      }`}
+                      style={{ 
+                        opacity: 
+                          customization.theme.backgroundOverlay === 'none' ? 0 :
+                          customization.theme.backgroundOverlay === 'soft' ? 0.2 :
+                          customization.theme.backgroundOverlay === 'medium' ? 0.5 : 0.8
+                      }}
+                    />
+                  )}
 
-                  {/* Categorias Reais do Tenant */}
-                  <div className="p-3 space-y-3">
-                    <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-                      {categories.length > 0 ? (
-                        categories.slice(0, 4).map((cat, idx) => (
-                          <div 
-                            key={cat.id} 
-                            className={`px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase whitespace-nowrap transition-colors ${
-                              idx === 0 
-                                ? 'bg-[var(--preview-primary)] text-white' 
-                                : customization.theme.colorMode === 'dark' 
-                                  ? 'bg-slate-800 text-slate-400' 
-                                  : 'bg-slate-100 text-slate-450'
-                            }`}
-                          >
-                            {cat.name}
-                          </div>
-                        ))
+                  {/* Real Content container */}
+                  <div className="z-10 relative flex-1 flex flex-col pb-16">
+                    {/* Logo e Nome do Tenant Real */}
+                    <div className={`p-3.5 border-b flex items-center gap-2.5 transition-all duration-500 ${
+                      isDark ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50/50'
+                    }`}>
+                      {tenantLogo ? (
+                        <img src={tenantLogo} className="w-8 h-8 rounded-[var(--preview-radius)] flex-shrink-0 object-cover" alt="" />
                       ) : (
-                        <>
-                          <div className="px-2.5 py-0.5 rounded-full bg-[var(--preview-primary)] text-white text-[8px] font-black uppercase">Burgers</div>
-                          <div className={`px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase ${
-                            customization.theme.colorMode === 'dark' ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-450'
-                          }`}>Bebidas</div>
-                        </>
+                        <div className="w-8 h-8 rounded-[var(--preview-radius)] flex-shrink-0 flex items-center justify-center font-black text-xs text-white" style={{ backgroundColor: primaryHex }}>
+                          {(tenantName || 'G').charAt(0).toUpperCase()}
+                        </div>
                       )}
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="font-bold text-[11px] truncate leading-tight">{tenantName || 'Sua Loja'}</div>
+                        <div className="flex items-center gap-1 mt-0.5 select-none">
+                          <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                          <span className="text-[7.5px] text-muted-foreground uppercase font-black tracking-widest">Aberto agora</span>
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        <div className={`px-2 py-0.5 rounded-full border text-[7.5px] font-black uppercase ${
+                          isDark ? 'border-slate-800 text-slate-300 bg-slate-900/20' : 'border-slate-200 text-slate-650 bg-white/50'
+                        }`}>
+                          Entrar
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="space-y-2.5">
-                      <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
-                        {categories[0]?.name || 'Principais'}
-                      </div>
-                      
-                      {/* Produtos Reais do Tenant baseado no Layout Escolhido */}
-                      <div className={`grid gap-2.5 ${
-                        customization.layout.productLayout === 'grid' ? 'grid-cols-2' : 'grid-cols-1'
-                      }`}>
-                        {products.length > 0 ? (
-                          products
-                            .filter(p => !p.categoryId || p.categoryId === categories[0]?.id)
-                            .slice(0, customization.layout.productLayout === 'grid' ? 2 : 1)
-                            .map((product) => (
-                              <div 
-                                key={product.id}
-                                className={`p-2.5 border rounded-[var(--preview-radius)] transition-all ${
-                                  customization.theme.colorMode === 'dark' ? 'border-slate-800 bg-slate-900/30' : 'border-slate-200 bg-white'
-                                } ${
-                                  customization.layout.productLayout === 'premium-card' ? 'shadow-md border-2 border-[var(--preview-primary)]' : 'shadow-sm'
+                    {/* Categorias Navigation (Tabs horizontal layout) */}
+                    <div className={`p-3 pb-1 border-b flex gap-1.5 overflow-x-auto no-scrollbar select-none transition-all duration-500 ${
+                      isDark ? 'border-slate-800 bg-slate-900/20' : 'border-slate-100 bg-slate-50/20'
+                    }`}>
+                      {displayCategories.map((cat, idx) => (
+                        <div 
+                          key={cat.id} 
+                          className={`px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase whitespace-nowrap transition-all duration-300 ${
+                            idx === 0 
+                              ? 'bg-[var(--preview-primary)] text-white shadow-sm' 
+                              : isDark 
+                                ? 'bg-slate-800/60 text-slate-400 hover:text-slate-200' 
+                                : 'bg-slate-100 text-slate-500 hover:text-slate-700'
+                          }`}
+                        >
+                          {cat.name}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Content Section (Combos and Products) */}
+                    <div className="p-3 space-y-5">
+                      {/* Combos Especiais */}
+                      {displayCombos.length > 0 && (
+                        <div className="space-y-2">
+                          <h3 className="text-[9px] font-black text-foreground flex items-center gap-1 uppercase tracking-wider text-left">
+                            <span className="w-0.5 h-3.5 rounded bg-[var(--preview-primary)] inline-block" />
+                            Combos Especiais
+                          </h3>
+                          <div className="flex flex-col gap-2">
+                            {displayCombos.map((combo) => (
+                              <div
+                                key={combo.id}
+                                className={`p-2 border border-dashed rounded-[var(--preview-radius)] flex gap-2 transition-all duration-300 ${
+                                  isDark ? 'border-slate-800 bg-slate-900/10' : 'border-slate-250 bg-slate-50/30'
                                 }`}
                               >
-                                <div className={`flex gap-2 ${
-                                  ['grid', 'square', 'premium-card'].includes(customization.layout.productLayout) ? 'flex-col' : 'flex-row'
-                                }`}>
-                                  {customization.layout.productImageMode !== 'hidden' && (
-                                    <div className={`rounded-[calc(var(--preview-radius)-4px)] flex-shrink-0 bg-muted overflow-hidden ${
-                                      ['grid', 'square', 'premium-card'].includes(customization.layout.productLayout) ? 'aspect-video w-full' : 'w-12 h-12'
-                                    }`}>
-                                      {product.image ? (
-                                        <img src={product.image} className="w-full h-full object-cover" alt="" />
-                                      ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-[7px] font-bold text-muted-foreground uppercase bg-slate-100 dark:bg-slate-800">
-                                          Sem Img
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                  <div className="flex-1 min-w-0 space-y-0.5">
-                                    <div className="font-bold text-[10px] truncate">{product.name}</div>
-                                    {customization.layout.showProductDescription && product.shortDescription && (
-                                      <div className="text-[8px] text-muted-foreground line-clamp-1">{product.shortDescription}</div>
-                                    )}
-                                    <div className="flex justify-between items-center pt-1">
-                                      <span className="text-[10px] font-black">
-                                        R$ {Number(product.basePrice ?? 0).toFixed(2)}
-                                      </span>
-                                      <div 
-                                        className="h-5 w-10 rounded-[calc(var(--preview-radius)-4px)] flex items-center justify-center text-[8px] font-bold text-white uppercase select-none cursor-pointer" 
-                                        style={{ backgroundColor: customization.theme.primaryColor }}
-                                      >
-                                        Ver
-                                      </div>
-                                    </div>
+                                <div className="flex-1 text-left min-w-0 flex flex-col justify-between">
+                                  <div>
+                                    <h4 className="font-bold text-[9px] text-foreground truncate">{combo.name}</h4>
+                                    <p className="text-[7px] text-muted-foreground line-clamp-2 leading-snug mt-0.5 italic">{combo.description}</p>
                                   </div>
+                                  <span className="text-[9px] font-black text-foreground pt-1 block">
+                                    R$ {combo.basePrice.toFixed(2)}
+                                  </span>
                                 </div>
+                                {combo.image && (
+                                  <div className="w-14 h-14 rounded-[calc(var(--preview-radius)-4px)] overflow-hidden shrink-0 shadow-sm bg-muted">
+                                    <img src={combo.image} className="w-full h-full object-cover" alt={combo.name} />
+                                  </div>
+                                )}
                               </div>
-                            ))
-                        ) : (
-                          // Fallback Mock se o banco estiver vazio
-                          <div className={`p-2.5 border rounded-[var(--preview-radius)] transition-all ${
-                            customization.theme.colorMode === 'dark' ? 'border-slate-800 bg-slate-900/30' : 'border-slate-200 bg-white'
-                          } ${
-                            customization.layout.productLayout === 'premium-card' ? 'shadow-md border-2 border-[var(--preview-primary)]' : ''
-                          }`}>
-                            <div className={`flex gap-2 ${
-                              ['grid', 'square', 'premium-card'].includes(customization.layout.productLayout) ? 'flex-col' : 'flex-row'
-                            }`}>
-                              {customization.layout.productImageMode !== 'hidden' && (
-                                <div className={`rounded-[calc(var(--preview-radius)-4px)] flex-shrink-0 bg-slate-200 dark:bg-slate-800 ${
-                                  ['grid', 'square', 'premium-card'].includes(customization.layout.productLayout) ? 'aspect-video w-full' : 'w-12 h-12'
-                                }`} />
-                              )}
-                              <div className="flex-1 space-y-1.5">
-                                <div className="h-2 w-24 bg-slate-350 dark:bg-slate-700 rounded" />
-                                <div className="h-1.5 w-16 bg-slate-250 dark:bg-slate-800 rounded" />
-                              </div>
-                            </div>
+                            ))}
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
+
+                      {/* Categorias e Produtos */}
+                      {displayCategories.map((category) => (
+                        <div key={category.id} className="space-y-2.5">
+                          <h3 className="text-[9px] font-black text-foreground flex items-center gap-1 uppercase tracking-wider text-left">
+                            <span className="w-0.5 h-3.5 rounded bg-[var(--preview-primary)] inline-block" />
+                            {category.name}
+                          </h3>
+                          
+                          <div className={getProductListClass()}>
+                            {category.products.map((product) => renderProductCard(product))}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
 
+                {/* Sticky Floating Cart */}
+                {customization.layout.stickyCart && (
+                  <div className="absolute bottom-6 left-0 right-0 px-3.5 z-30 pointer-events-none select-none">
+                    <div 
+                      className="w-full h-11 text-white rounded-xl shadow-lg flex items-center justify-between px-4 pointer-events-auto active:scale-95 transition-transform"
+                      style={{ backgroundColor: primaryHex }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="relative text-xs">
+                          <span>🛍️</span>
+                          <span className="absolute -top-1.5 -right-2.5 bg-white text-[7px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center text-slate-900 shadow-sm">
+                            1
+                          </span>
+                        </div>
+                        <span className="font-bold text-[8.5px] uppercase tracking-wider">Ver sacola</span>
+                      </div>
+                      <span className="font-black text-[9.5px]">R$ 28,90</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Home Indicator */}
                 <div className={`h-4 w-full flex items-center justify-center z-20 transition-all duration-500 ${
-                  customization.theme.colorMode === 'dark' ? 'bg-[#0f172a]' : 'bg-white'
+                  isDark ? 'bg-[#0f172a]' : 'bg-white'
                 }`}>
                   <div className="w-20 h-0.5 bg-slate-500/35 rounded-full" />
                 </div>
