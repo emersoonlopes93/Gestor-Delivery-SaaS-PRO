@@ -23,7 +23,7 @@ import {
   cn
 } from '@gestor/storefront-ui';
 import { useStorefrontThemeStore } from '../stores/theme.store';
-import type { StorefrontProductLayout } from '@gestor/theme';
+import type { StorefrontProductLayout, StorefrontThemeSettings, StorefrontLayoutSettings } from '@gestor/theme';
 
 export function StorefrontPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -144,8 +144,8 @@ export function StorefrontPage() {
 
   const { tenant, categories, combos, customization } = data;
 
-  const themeSettings = (customization?.theme || {}) as Record<string, any>;
-  const layoutSettings = (customization?.layout || {}) as Record<string, any>;
+  const themeSettings = (customization?.theme || {}) as Partial<StorefrontThemeSettings>;
+  const layoutSettings = (customization?.layout || {}) as Partial<StorefrontLayoutSettings>;
 
   // Use real settings from backend, with local override for testing in DEV
   // Backend now guarantees normalization, but we add a safety layer here too.
