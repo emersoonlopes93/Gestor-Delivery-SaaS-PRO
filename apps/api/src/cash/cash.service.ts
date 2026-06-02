@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   InternalServerErrorException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import {
@@ -102,6 +103,30 @@ export class CashService {
       }
       throw new InternalServerErrorException('Erro ao abrir sessão de caixa: ' + (error instanceof Error ? error.message : String(error)));
     }
+  }
+
+  async closeActiveSession(
+    tenantId: string,
+    operatorId: string,
+    closingAmountDeclared: number,
+    notes?: string,
+  ): Promise<CashSessionDetailDTO> {
+    const session = await this.prisma.cashSession.findFirst({
+      where: { tenantId, operatorId, status: 'open' },
+      select: { id: true },
+    });
+
+    if (!session) {
+      throw new BadRequestException('Nenhum caixa aberto para fechar.');
+    }
+
+    return this.closeSession(
+      tenantId,
+      session.id,
+      operatorId,
+      closingAmountDeclared,
+      notes,
+    );
   }
 
   /**
@@ -263,6 +288,25 @@ export class CashService {
     return this.mapMovementToDTO(movement);
   }
 
+  async addMovementToActiveSession(
+    tenantId: string,
+    operatorId: string,
+    type: 'withdrawal' | 'supply',
+    amount: number,
+    description?: string,
+  ): Promise<CashMovementDTO> {
+    const session = await this.prisma.cashSession.findFirst({
+      where: { tenantId, operatorId, status: 'open' },
+      select: { id: true },
+    });
+
+    if (!session) {
+      throw new BadRequestException('Abra o caixa antes de registrar movimentaÃ§Ãµes.');
+    }
+
+    return this.addMovement(tenantId, session.id, operatorId, type, amount, description);
+  }
+
   /**
    * Register a sale as a cash movement.
    */
@@ -375,9 +419,19 @@ export class CashService {
       ...base,
       movements,
       totalSales: movements.filter((m) => m.type === 'sale').reduce((s, m) => s + m.amount, 0),
+      totalCash: movements.filter((m) => m.type === 'sale' && m.paymentMethod === 'cash').reduce((s, m) => s + m.amount, 0),
+      totalPix: movements.filter((m) => m.type === 'sale' && m.paymentMethod === 'pix').reduce((s, m) => s + m.amount, 0),
+      totalCreditCard: movements.filter((m) => m.type === 'sale' && m.paymentMethod === 'credit_card').reduce((s, m) => s + m.amount, 0),
+      totalDebitCard: movements.filter((m) => m.type === 'sale' && m.paymentMethod === 'debit_card').reduce((s, m) => s + m.amount, 0),
+      totalOther: movements.filter((m) => m.type === 'sale' && (!m.paymentMethod || !['cash', 'pix', 'credit_card', 'debit_card'].includes(m.paymentMethod))).reduce((s, m) => s + m.amount, 0),
       totalWithdrawals: movements.filter((m) => m.type === 'withdrawal').reduce((s, m) => s + m.amount, 0),
       totalSupplies: movements.filter((m) => m.type === 'supply').reduce((s, m) => s + m.amount, 0),
       totalRefunds: movements.filter((m) => m.type === 'refund').reduce((s, m) => s + m.amount, 0),
+      expectedAmount: Number(session.closingAmountCalculated ?? 0) || movements.reduce((sum, m) => {
+        if (m.type === 'opening' || m.type === 'sale' || m.type === 'supply') return sum + m.amount;
+        if (m.type === 'withdrawal' || m.type === 'refund') return sum - m.amount;
+        return sum;
+      }, 0),
     };
   }
 

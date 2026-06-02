@@ -121,6 +121,22 @@ export class DeliveryRateController {
   }
 
   // Endpoint público para cálculo (usado no checkout)
+  // Endpoint autenticado para uso interno do PDV/tenant app.
+  @Post('calculate-current')
+  @RequirePermissions('delivery.read')
+  @HttpCode(HttpStatus.OK)
+  async calculateCurrentTenant(
+    @Request() req: ExpressRequest & { user: TenantJwtPayload },
+    @Body() body: { address?: DeliveryAddressDTO | null; distanceKm?: number | null },
+  ) {
+    const tenantId = this.getTenantIdFromRequest(req);
+    return this.deliveryRateService.calculateRate({
+      tenantId,
+      address: body.address,
+      distanceKm: body.distanceKm ?? null,
+    });
+  }
+
   @Post('calculate')
   @Public()
   @HttpCode(HttpStatus.OK)

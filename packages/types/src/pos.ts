@@ -91,6 +91,8 @@ export class CreatePosOrderDTO {
     zipCode?: string;
     city?: string;
     state?: string;
+    lat?: number;
+    lng?: number;
   };
 
   @IsString()

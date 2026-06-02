@@ -10,11 +10,12 @@ import { CrmModule } from '../crm/crm.module';
 import { PromotionsModule } from '../promotions/promotions.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { KdsModule } from '../kds/kds.module';
+import { DeliveryModule } from '../delivery/delivery.module';
 
 import { PrinterModule } from './printer.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, RbacModule, CashModule, OrdersModule, CrmModule, PromotionsModule, InventoryModule, KdsModule, PrinterModule],
+  imports: [DatabaseModule, AuthModule, RbacModule, CashModule, OrdersModule, CrmModule, PromotionsModule, InventoryModule, KdsModule, DeliveryModule, PrinterModule],
   controllers: [PosController],
   providers: [PosService],
 })

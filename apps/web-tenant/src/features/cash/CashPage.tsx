@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   useActiveSession,
   useCashSessionDetail,
+  useCashSessions,
   useOpenCashSession,
   useCloseCashSession,
   useAddCashMovement,
@@ -31,6 +32,7 @@ export default function CashPage() {
   const openMutation = useOpenCashSession();
   const closeMutation = useCloseCashSession();
   const movementMutation = useAddCashMovement();
+  const { data: sessionsHistory } = useCashSessions(1, 10);
 
   const [openingAmount, setOpeningAmount] = useState('');
   const [closingAmount, setClosingAmount] = useState('');
@@ -216,6 +218,26 @@ export default function CashPage() {
                   <p className="text-lg font-bold text-emerald-400">{formatCurrency(sessionDetail.totalSales)}</p>
                 </div>
                 <div className="bg-white dark:bg-gray-900 rounded-lg p-3">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Dinheiro</p>
+                  <p className="text-lg font-bold text-emerald-400">{formatCurrency(sessionDetail.totalCash)}</p>
+                </div>
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-3">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">PIX</p>
+                  <p className="text-lg font-bold text-cyan-400">{formatCurrency(sessionDetail.totalPix)}</p>
+                </div>
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-3">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Credito</p>
+                  <p className="text-lg font-bold text-violet-400">{formatCurrency(sessionDetail.totalCreditCard)}</p>
+                </div>
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-3">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Debito</p>
+                  <p className="text-lg font-bold text-indigo-400">{formatCurrency(sessionDetail.totalDebitCard)}</p>
+                </div>
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-3">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Outros</p>
+                  <p className="text-lg font-bold text-gray-400">{formatCurrency(sessionDetail.totalOther)}</p>
+                </div>
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-3">
                   <p className="text-xs text-gray-600 dark:text-gray-400">Sangrias</p>
                   <p className="text-lg font-bold text-red-400">{formatCurrency(sessionDetail.totalWithdrawals)}</p>
                 </div>
@@ -226,6 +248,10 @@ export default function CashPage() {
                 <div className="bg-white dark:bg-gray-900 rounded-lg p-3">
                   <p className="text-xs text-gray-600 dark:text-gray-400">Estornos</p>
                   <p className="text-lg font-bold text-yellow-400">{formatCurrency(sessionDetail.totalRefunds)}</p>
+                </div>
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-3">
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Esperado</p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(sessionDetail.expectedAmount)}</p>
                 </div>
               </div>
             </div>
@@ -288,6 +314,40 @@ export default function CashPage() {
             )}
           </div>
         </>
+      )}
+
+      {sessionsHistory && sessionsHistory.data.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Historico de sessoes</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-gray-600 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                  <th className="text-left pb-2">Operador</th>
+                  <th className="text-left pb-2">Status</th>
+                  <th className="text-left pb-2">Abertura</th>
+                  <th className="text-left pb-2">Fechamento</th>
+                  <th className="text-right pb-2">Diferenca</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessionsHistory.data.map((session) => (
+                  <tr key={session.id} className="border-b border-gray-200 dark:border-gray-700/50 text-gray-700 dark:text-gray-300">
+                    <td className="py-2">{session.operatorName}</td>
+                    <td className="py-2">
+                      <span className={session.status === 'open' ? 'text-emerald-500 font-semibold' : 'text-gray-500 font-semibold'}>
+                        {session.status === 'open' ? 'Aberto' : 'Fechado'}
+                      </span>
+                    </td>
+                    <td className="py-2">{formatDate(session.openedAt)}</td>
+                    <td className="py-2">{session.closedAt ? formatDate(session.closedAt) : '-'}</td>
+                    <td className="py-2 text-right font-mono">{formatCurrency(session.closingDifference ?? 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
     </div>
   );

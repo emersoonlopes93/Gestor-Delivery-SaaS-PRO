@@ -28,6 +28,16 @@ export class CashController {
     );
   }
 
+  // POST /cash/open
+  @Post('open')
+  @RequirePermissions('cash.open')
+  async openCurrentSession(
+    @Request() req: TenantRequest,
+    @Body() dto: OpenCashSessionDTO,
+  ) {
+    return this.openSession(req, dto);
+  }
+
   // POST /cash/sessions/:id/close
   @Post('sessions/:id/close')
   @RequirePermissions('cash.close')
@@ -45,11 +55,33 @@ export class CashController {
     );
   }
 
+  // POST /cash/close
+  @Post('close')
+  @RequirePermissions('cash.close')
+  async closeCurrentSession(
+    @Request() req: TenantRequest,
+    @Body() dto: CloseCashSessionDTO,
+  ) {
+    return this.cashService.closeActiveSession(
+      req.user.tenantId,
+      req.user.sub,
+      dto.closingAmountDeclared,
+      dto.notes,
+    );
+  }
+
   // GET /cash/sessions/active
   @Get('sessions/active')
   @RequirePermissions('cash.read')
   async getActiveSession(@Request() req: TenantRequest) {
     return this.cashService.getActiveSession(req.user.tenantId, req.user.sub);
+  }
+
+  // GET /cash/current
+  @Get('current')
+  @RequirePermissions('cash.read')
+  async getCurrentSession(@Request() req: TenantRequest) {
+    return this.getActiveSession(req);
   }
 
   // GET /cash/sessions
@@ -90,6 +122,38 @@ export class CashController {
       sessionId,
       req.user.sub,
       dto.type as 'withdrawal' | 'supply',
+      dto.amount,
+      dto.description,
+    );
+  }
+
+  // POST /cash/supply
+  @Post('supply')
+  @RequirePermissions('cash.add_supply', 'cash.manage')
+  async addSupply(
+    @Request() req: TenantRequest,
+    @Body() dto: CreateCashMovementDTO,
+  ) {
+    return this.cashService.addMovementToActiveSession(
+      req.user.tenantId,
+      req.user.sub,
+      'supply',
+      dto.amount,
+      dto.description,
+    );
+  }
+
+  // POST /cash/withdrawal
+  @Post('withdrawal')
+  @RequirePermissions('cash.add_withdrawal', 'cash.manage')
+  async addWithdrawal(
+    @Request() req: TenantRequest,
+    @Body() dto: CreateCashMovementDTO,
+  ) {
+    return this.cashService.addMovementToActiveSession(
+      req.user.tenantId,
+      req.user.sub,
+      'withdrawal',
       dto.amount,
       dto.description,
     );

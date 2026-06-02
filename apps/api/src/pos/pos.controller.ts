@@ -17,13 +17,10 @@ import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
 import { CreatePosOrderDTO } from '@gestor/types';
 import { PrinterService } from './printer.service';
+import type { TenantJwtPayload } from '@gestor/types';
 
 interface TenantRequest {
-  user: {
-    tenantId: string;
-    id: string;
-    permissions?: string[];
-  };
+  user: TenantJwtPayload & { permissions?: string[] };
 }
 
 @Controller('pos')
@@ -56,7 +53,7 @@ export class PosController {
     @Body() dto: CreatePosOrderDTO,
   ) {
     try {
-      this.logger.log(`Creating POS sale for tenant ${req.user.tenantId}, user ${req.user.id}`);
+      this.logger.log(`Creating POS sale for tenant ${req.user.tenantId}, user ${req.user.sub}`);
       
       const permissions = req.user.permissions || [];
       const hasDiscountPermission =
@@ -64,7 +61,7 @@ export class PosController {
 
       const result = await this.posService.createSale(
         req.user.tenantId,
-        req.user.id,
+        req.user.sub,
         dto,
         hasDiscountPermission,
       );
@@ -99,7 +96,7 @@ export class PosController {
   ) {
     return this.posService.upsertDraftSale(
       req.user.tenantId,
-      req.user.id,
+      req.user.sub,
       dto,
     );
   }
@@ -121,7 +118,7 @@ export class PosController {
     return this.posService.cancelPosSale(
       req.user.tenantId,
       orderId,
-      req.user.id,
+      req.user.sub,
     );
   }
 
@@ -132,7 +129,7 @@ export class PosController {
     @Request() req: TenantRequest,
     @Param('id') tableId: string,
   ) {
-    await this.posService.requestBill(req.user.tenantId, tableId, req.user.id);
+    await this.posService.requestBill(req.user.tenantId, tableId, req.user.sub);
     return { success: true };
   }
 
@@ -143,7 +140,7 @@ export class PosController {
     @Request() req: TenantRequest,
     @Body() body: { sourceTableId: string; targetTableId: string },
   ) {
-    await this.posService.transferTable(req.user.tenantId, body.sourceTableId, body.targetTableId, req.user.id);
+    await this.posService.transferTable(req.user.tenantId, body.sourceTableId, body.targetTableId, req.user.sub);
     return { success: true };
   }
 

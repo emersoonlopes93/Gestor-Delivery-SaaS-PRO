@@ -72,7 +72,13 @@ export interface CashSessionDTO {
 export interface CashSessionDetailDTO extends CashSessionDTO {
   movements: CashMovementDTO[];
   totalSales: number;
+  totalCash: number;
+  totalPix: number;
+  totalCreditCard: number;
+  totalDebitCard: number;
+  totalOther: number;
   totalWithdrawals: number;
   totalSupplies: number;
   totalRefunds: number;
+  expectedAmount: number;
 }

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import { useActiveSession } from '../cash/hooks/useCashSession';
 import { useCreatePosSale, type PosCreateSalePayload } from './hooks/usePosSale';
@@ -65,6 +65,15 @@ interface CustomerResult {
   phone: string;
 }
 
+interface DeliveryRateCalcResponse {
+  fee: number;
+  rule: {
+    id: string;
+    type: string;
+    description: string;
+  };
+}
+
 function formatCurrency(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -96,14 +105,18 @@ export default function PosPage() {
   const [tableNumber, setTableNumber] = useState('');
   
   // Delivery Fields
-  const [deliveryFee] = useState(0);
-  const [deliveryAddress] = useState({
+  const [deliveryFee, setDeliveryFee] = useState(0);
+  const [deliveryFeeCalculated, setDeliveryFeeCalculated] = useState(false);
+  const [deliveryFeeError, setDeliveryFeeError] = useState<string | null>(null);
+  const [deliveryAddress, setDeliveryAddress] = useState({
     street: '',
     number: '',
     neighborhood: '',
     complement: '',
     reference: '',
     zipCode: '',
+    city: '',
+    state: '',
   });
 
   // Customer Identification
@@ -209,9 +222,14 @@ export default function PosPage() {
     queryKey: ['posCustomers', customerSearchTerm],
     queryFn: async () => {
       if (customerSearchTerm.length < 2) return [];
-      const res = await api.get<{ data: Array<Record<string, unknown>> }>(`/crm/customers?search=${customerSearchTerm}&limit=5`);
-      const data = res.data;
-      return (data.data || []).map(c => ({ 
+      const res = await api.get<Array<Record<string, unknown>> | { data: Array<Record<string, unknown>> }>(`/crm/customers?search=${encodeURIComponent(customerSearchTerm)}&limit=5`);
+      const data = Array.isArray(res.data) ? res.data : res.data.data;
+      return (data || []).filter((c) => {
+        const name = String(c['name'] || c['fullName'] || '').toLowerCase();
+        const phone = String(c['phone'] || '').toLowerCase();
+        const term = customerSearchTerm.toLowerCase();
+        return name.includes(term) || phone.includes(term);
+      }).slice(0, 5).map(c => ({ 
         id: c['id'] as string, 
         name: (c['fullName'] as string) || (c['name'] as string), 
         phone: (c['phone'] as string) || '' 
@@ -219,6 +237,38 @@ export default function PosPage() {
     },
     enabled: customerSearchTerm.length >= 2,
   });
+
+  const deliveryRateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.post<DeliveryRateCalcResponse>('/delivery/rates/calculate-current', {
+        address: {
+          ...deliveryAddress,
+          city: deliveryAddress.city || 'Nao informado',
+          state: deliveryAddress.state || 'NA',
+          zipCode: deliveryAddress.zipCode || '00000000',
+        },
+      });
+      return res.data;
+    },
+    onSuccess: (data) => {
+      setDeliveryFee(Math.round(data.fee * 100) / 100);
+      setDeliveryFeeCalculated(true);
+      setDeliveryFeeError(null);
+    },
+    onError: (error) => {
+      setDeliveryFee(0);
+      setDeliveryFeeCalculated(false);
+      setDeliveryFeeError(error instanceof Error ? error.message : 'Nao foi possivel calcular o frete.');
+    },
+  });
+
+  useEffect(() => {
+    if (fulfillmentType !== PosFulfillmentType.DELIVERY) {
+      setDeliveryFee(0);
+      setDeliveryFeeCalculated(false);
+      setDeliveryFeeError(null);
+    }
+  }, [fulfillmentType]);
 
   useMemo(() => {
     if (!products) return [];
@@ -295,6 +345,36 @@ export default function PosPage() {
 
   const subtotal = cart.reduce((sum, item) => sum + item.basePrice * item.quantity, 0);
   const total = Math.max(0, subtotal - discountTotal + deliveryFee);
+  const isDelivery = fulfillmentType === PosFulfillmentType.DELIVERY;
+  const deliveryMissingRequiredData =
+    isDelivery &&
+    (!customerName.trim() ||
+      !customerPhone.trim() ||
+      !deliveryAddress.street.trim() ||
+      !deliveryAddress.number.trim() ||
+      !deliveryAddress.neighborhood.trim());
+  const canFinalizeSale =
+    !!activeSession &&
+    cart.length > 0 &&
+    !createSale.isPending &&
+    (!isDelivery || (!deliveryMissingRequiredData && deliveryFeeCalculated));
+
+  const updateDeliveryAddress = (field: keyof typeof deliveryAddress, value: string) => {
+    setDeliveryAddress((prev) => ({ ...prev, [field]: value }));
+      setDeliveryFeeError(null);
+      if (field === 'street' || field === 'number' || field === 'neighborhood' || field === 'city' || field === 'state' || field === 'zipCode') {
+        setDeliveryFee(0);
+        setDeliveryFeeCalculated(false);
+      }
+  };
+
+  const handleCalculateDeliveryFee = () => {
+    if (deliveryMissingRequiredData) {
+      setDeliveryFeeError('Informe cliente, telefone, rua, numero e bairro para calcular o frete.');
+      return;
+    }
+    deliveryRateMutation.mutate();
+  };
 
   const getPayload = (): PosCreateSalePayload & { id?: string } => ({
     id: currentOrderId || undefined,
@@ -319,8 +399,15 @@ export default function PosPage() {
     customerPhone: customerPhone || undefined,
     fulfillmentType,
     tableNumber: fulfillmentType === PosFulfillmentType.TABLE ? tableNumber : undefined,
-    deliveryFee: fulfillmentType === PosFulfillmentType.DELIVERY ? deliveryFee : undefined,
-    deliveryAddress: fulfillmentType === PosFulfillmentType.DELIVERY ? deliveryAddress : undefined,
+    deliveryFee: isDelivery ? deliveryFee : undefined,
+    deliveryAddress: isDelivery
+      ? {
+          ...deliveryAddress,
+          city: deliveryAddress.city || 'Nao informado',
+          state: deliveryAddress.state || 'NA',
+          zipCode: deliveryAddress.zipCode || '00000000',
+        }
+      : undefined,
     paymentMethod: PaymentMethod.cash, 
     discountTotal: discountTotal > 0 ? discountTotal : undefined,
     notes: saleNotes || undefined,
@@ -340,10 +427,20 @@ export default function PosPage() {
   };
 
   const handleConfirmSale = (method: PaymentMethod) => {
+    if (!activeSession) return;
+    if (isDelivery && deliveryMissingRequiredData) {
+      setDeliveryFeeError('Delivery exige cliente, telefone, rua, numero e bairro.');
+      return;
+    }
+    if (isDelivery && !deliveryFeeCalculated) {
+      setDeliveryFeeError('Calcule o frete antes de finalizar a venda delivery.');
+      return;
+    }
     createSale.mutate({ ...getPayload(), paymentMethod: method }, {
       onSuccess: (data) => {
         handlePrint(data.id, 'customer'); // Auto-print customer receipt
         setCart([]); setCurrentOrderId(null); setTableNumber(''); setViewMode('salon'); setIsPaymentModalOpen(false);
+        setDeliveryFee(0); setDeliveryFeeCalculated(false); setDeliveryFeeError(null);
         queryClient.invalidateQueries({ queryKey: ['posSalon'] });
       },
     });
@@ -456,6 +553,89 @@ export default function PosPage() {
                  )}
               </div>
            )}
+           <div className="grid grid-cols-2 gap-2">
+             <input
+               className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
+               placeholder={isDelivery ? 'Cliente' : 'Cliente opcional'}
+               value={customerName}
+               onChange={(e) => setCustomerName(e.target.value)}
+             />
+             <input
+               className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
+               placeholder={isDelivery ? 'Telefone' : 'Telefone opcional'}
+               value={customerPhone}
+               onChange={(e) => setCustomerPhone(e.target.value)}
+             />
+           </div>
+           {isDelivery && (
+             <div className="mt-3 space-y-2 border-t border-border200 dark:border-border800 pt-3">
+               <div className="grid grid-cols-[1fr_88px] gap-2">
+                 <input
+                   className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
+                   placeholder="Rua"
+                   value={deliveryAddress.street}
+                   onChange={(e) => updateDeliveryAddress('street', e.target.value)}
+                 />
+                 <input
+                   className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
+                   placeholder="Numero"
+                   value={deliveryAddress.number}
+                   onChange={(e) => updateDeliveryAddress('number', e.target.value)}
+                 />
+               </div>
+               <div className="grid grid-cols-2 gap-2">
+                 <input
+                   className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
+                   placeholder="Bairro"
+                   value={deliveryAddress.neighborhood}
+                   onChange={(e) => updateDeliveryAddress('neighborhood', e.target.value)}
+                 />
+                 <input
+                   className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
+                   placeholder="Cidade"
+                   value={deliveryAddress.city}
+                   onChange={(e) => updateDeliveryAddress('city', e.target.value)}
+                 />
+               </div>
+               <div className="grid grid-cols-[72px_1fr] gap-2">
+                 <input
+                   className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white uppercase outline-none focus:border-status-success"
+                   placeholder="UF"
+                   maxLength={2}
+                   value={deliveryAddress.state}
+                   onChange={(e) => updateDeliveryAddress('state', e.target.value.toUpperCase())}
+                 />
+                 <input
+                   className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
+                   placeholder="CEP"
+                   value={deliveryAddress.zipCode}
+                   onChange={(e) => updateDeliveryAddress('zipCode', e.target.value)}
+                 />
+               </div>
+               <div className="grid grid-cols-2 gap-2">
+                 <input
+                   className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
+                   placeholder="Complemento"
+                   value={deliveryAddress.complement}
+                   onChange={(e) => updateDeliveryAddress('complement', e.target.value)}
+                 />
+                 <input
+                   className="w-full bg-muted50 dark:bg-muted950 border border-border200 dark:border-border800 rounded-xl px-3 py-2 text-xs text-muted-foreground900 dark:text-white outline-none focus:border-status-success"
+                   placeholder="Referencia"
+                   value={deliveryAddress.reference}
+                   onChange={(e) => updateDeliveryAddress('reference', e.target.value)}
+                 />
+               </div>
+               <button
+                 onClick={handleCalculateDeliveryFee}
+                 disabled={deliveryRateMutation.isPending}
+                 className="w-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-widest transition-all disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70"
+               >
+                 {deliveryRateMutation.isPending ? 'Calculando frete...' : `Frete: ${deliveryFeeCalculated ? formatCurrency(deliveryFee) : 'Calcular'}`}
+               </button>
+               {deliveryFeeError && <p className="text-[10px] font-bold text-destructive">{deliveryFeeError}</p>}
+             </div>
+           )}
         </div>
 
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-card/50 dark:bg-muted900/50 scrollbar-hide">
@@ -522,6 +702,12 @@ export default function PosPage() {
                   <span>Subtotal</span>
                   <span>{formatCurrency(subtotal)}</span>
                </div>
+               {isDelivery && (
+                 <div className="flex justify-between text-[11px] font-bold text-muted-foreground500 dark:text-muted-foreground400 uppercase tracking-tighter">
+                   <span>Frete</span>
+                   <span>{deliveryFeeCalculated ? formatCurrency(deliveryFee) : 'Pendente'}</span>
+                 </div>
+               )}
                <div className="flex justify-between items-end">
                   <span className="text-sm font-black text-muted-foreground900 dark:text-white uppercase italic">Total Líquido</span>
                   <span className="text-4xl font-black text-foreground tracking-tighter italic leading-none">{formatCurrency(total)}</span>
@@ -530,7 +716,7 @@ export default function PosPage() {
 
             <button 
               onClick={() => setIsPaymentModalOpen(true)}
-              disabled={cart.length === 0 || createSale.isPending}
+              disabled={!canFinalizeSale}
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-black py-4 rounded-2xl shadow-xl shadow-primary/20 flex items-center justify-center gap-2 text-base transition-all active:scale-95 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70"
             >
                {createSale.isPending ? 'PROCESSANDO...' : 'FECHAR CONTA (F4)'}
@@ -586,6 +772,28 @@ export default function PosPage() {
             setConfigProductId(null);
           }}
         />
+      )}
+
+      {!activeSession && (
+        <div className="fixed inset-0 z-[90] bg-background/85 dark:bg-muted950/90 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-card border border-border rounded-2xl p-6 shadow-2xl">
+            <div className="flex items-start gap-4">
+              <div className="w-11 h-11 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center shrink-0">
+                <Receipt size={22} />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-lg font-black text-foreground uppercase leading-tight">Abra o caixa para iniciar vendas no PDV</h2>
+                <p className="mt-2 text-sm text-muted-foreground">Vendas reais ficam bloqueadas ate uma sessao de caixa ser aberta para este operador.</p>
+                <button
+                  onClick={() => { window.location.href = '/cash'; }}
+                  className="mt-4 bg-primary hover:bg-primary/90 text-primary-foreground font-black px-4 py-3 rounded-xl text-xs uppercase tracking-widest"
+                >
+                  Abrir caixa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {currentOrderId && (

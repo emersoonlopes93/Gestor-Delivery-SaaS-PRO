@@ -15,9 +15,11 @@ import { generatePublicTrackingToken } from '../common/utils/tracking-token.util
 import { KdsService } from '../kds/kds.service';
 import { PrismaService } from '../database/prisma.service';
 import { OrdersService } from '../orders/orders.service';
+import { DeliveryRateService } from '../delivery/delivery-rate.service';
 
 import type {
   CreatePosOrderDTO,
+  DeliveryAddressDTO,
   OrderResponseDTO,
   PosOrderListItemDTO,
   ValidatedLine,
@@ -36,6 +38,7 @@ export class PosService {
     private readonly theoreticalStockService: TheoreticalStockService,
     private readonly kdsService: KdsService,
     private readonly ordersService: OrdersService,
+    private readonly deliveryRateService: DeliveryRateService,
   ) {}
 
   private mapPaymentMethod(p: PrismaPaymentMethod): SharedPaymentMethod {
@@ -52,7 +55,53 @@ export class PosService {
 
   private mapPosFulfillment(f: string | undefined): FulfillmentType {
     if (f === 'pickup') return FulfillmentType.pickup;
+    if (f === 'table') return FulfillmentType.table;
+    if (f === 'dine_in') return FulfillmentType.dine_in;
     return FulfillmentType.delivery;
+  }
+
+  private hasText(value: string | undefined | null): boolean {
+    return typeof value === 'string' && value.trim().length > 0;
+  }
+
+  private normalizeDeliveryAddress(dto: CreatePosOrderDTO): DeliveryAddressDTO | null {
+    if (dto.fulfillmentType !== PosFulfillmentType.DELIVERY) return null;
+
+    const address = dto.deliveryAddress;
+    if (!address) {
+      throw new BadRequestException('Endereco de entrega e obrigatorio para venda delivery.');
+    }
+
+    if (!this.hasText(dto.customerName) || !this.hasText(dto.customerPhone)) {
+      throw new BadRequestException('Cliente e telefone sao obrigatorios para venda delivery.');
+    }
+
+    if (!this.hasText(address.street) || !this.hasText(address.number) || !this.hasText(address.neighborhood)) {
+      throw new BadRequestException('Rua, numero e bairro sao obrigatorios para venda delivery.');
+    }
+
+    return {
+      street: address.street.trim(),
+      number: address.number.trim(),
+      neighborhood: address.neighborhood.trim(),
+      city: this.hasText(address.city) ? address.city.trim() : 'Nao informado',
+      state: this.hasText(address.state) ? address.state.trim().slice(0, 2).toUpperCase() : 'NA',
+      zipCode: this.hasText(address.zipCode) ? address.zipCode.trim() : '00000000',
+      complement: this.hasText(address.complement) ? address.complement.trim() : undefined,
+      reference: this.hasText(address.reference) ? address.reference.trim() : undefined,
+      lat: address.lat,
+      lng: address.lng,
+    };
+  }
+
+  private async resolveDeliveryFee(
+    tenantId: string,
+    dto: CreatePosOrderDTO,
+    address: DeliveryAddressDTO | null,
+  ): Promise<number> {
+    if (dto.fulfillmentType !== PosFulfillmentType.DELIVERY) return 0;
+    const calculation = await this.deliveryRateService.calculateDeliveryFee(tenantId, address);
+    return Math.round(calculation.fee * 100) / 100;
   }
 
   // ----------------------------------------------------------------
@@ -71,6 +120,13 @@ export class PosService {
     if (!activeSession) {
       throw new BadRequestException('É necessário ter um caixa aberto para criar vendas no PDV.');
     }
+
+    if (!dto.paymentMethod) {
+      throw new BadRequestException('Forma de pagamento e obrigatoria para finalizar a venda.');
+    }
+
+    const deliveryAddress = this.normalizeDeliveryAddress(dto);
+    const deliveryFee = await this.resolveDeliveryFee(tenantId, dto, deliveryAddress);
 
     const discountTotal = dto.discountTotal || 0;
     if (discountTotal > 0 && !hasDiscountPermission) {
@@ -121,7 +177,6 @@ export class PosService {
 
     const order = await this.prisma.$transaction(async (tx) => {
       let currentOrder;
-      const deliveryFee = dto.deliveryFee || 0;
       const orderTotal = Math.round((finalTotal + deliveryFee) * 100) / 100;
 
       if (dto.id) {
@@ -175,6 +230,42 @@ export class PosService {
         });
       }
 
+      if (deliveryAddress) {
+        await tx.orderDeliveryAddress.upsert({
+          where: { orderId: currentOrder.id },
+          create: {
+            orderId: currentOrder.id,
+            tenantId,
+            street: deliveryAddress.street,
+            number: deliveryAddress.number,
+            neighborhood: deliveryAddress.neighborhood,
+            city: deliveryAddress.city,
+            state: deliveryAddress.state,
+            zipCode: deliveryAddress.zipCode,
+            complement: deliveryAddress.complement || null,
+            reference: deliveryAddress.reference || null,
+            lat: deliveryAddress.lat,
+            lng: deliveryAddress.lng,
+          },
+          update: {
+            street: deliveryAddress.street,
+            number: deliveryAddress.number,
+            neighborhood: deliveryAddress.neighborhood,
+            city: deliveryAddress.city,
+            state: deliveryAddress.state,
+            zipCode: deliveryAddress.zipCode,
+            complement: deliveryAddress.complement || null,
+            reference: deliveryAddress.reference || null,
+            lat: deliveryAddress.lat,
+            lng: deliveryAddress.lng,
+          },
+        });
+      } else if (dto.fulfillmentType !== PosFulfillmentType.DELIVERY) {
+        await tx.orderDeliveryAddress.deleteMany({
+          where: { orderId: currentOrder.id, tenantId },
+        });
+      }
+
       // Re-create items snapshots
       for (const line of lines) {
         const productId = line.lineType === 'product' ? (line as ValidatedLine & { productId: string }).productId : null;
@@ -213,10 +304,6 @@ export class PosService {
 
       return currentOrder;
     });
-
-    if (!dto.paymentMethod) {
-      throw new BadRequestException('Forma de pagamento é obrigatória para finalizar a venda.');
-    }
 
     await this.cashService.registerSaleMovement(tenantId, activeSession.id, order.id, Number(order.total), dto.paymentMethod);
     if (cashbackUsed && customerId) {
