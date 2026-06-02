@@ -360,18 +360,31 @@ export class CashService {
       where: { cashSessionId: sessionId },
     });
 
+    return this.calculateExpectedCashAmount(movements.map((movement) => ({
+      type: movement.type as CashMovementType,
+      amount: Number(movement.amount),
+      paymentMethod: movement.paymentMethod,
+    })));
+  }
+
+  private calculateExpectedCashAmount(
+    movements: Array<{ type: CashMovementType; amount: number; paymentMethod?: PrismaPaymentMethod | null }>,
+  ): number {
     let expected = 0;
-    for (const m of movements) {
-      const amount = Number(m.amount);
-      switch (m.type) {
+    for (const movement of movements) {
+      switch (movement.type) {
         case 'opening':
-        case 'sale':
         case 'supply':
-          expected += amount;
+          expected += movement.amount;
+          break;
+        case 'sale':
+          if (movement.paymentMethod === PrismaPaymentMethod.cash) {
+            expected += movement.amount;
+          }
           break;
         case 'withdrawal':
         case 'refund':
-          expected -= amount;
+          expected -= movement.amount;
           break;
       }
     }
@@ -427,11 +440,13 @@ export class CashService {
       totalWithdrawals: movements.filter((m) => m.type === 'withdrawal').reduce((s, m) => s + m.amount, 0),
       totalSupplies: movements.filter((m) => m.type === 'supply').reduce((s, m) => s + m.amount, 0),
       totalRefunds: movements.filter((m) => m.type === 'refund').reduce((s, m) => s + m.amount, 0),
-      expectedAmount: Number(session.closingAmountCalculated ?? 0) || movements.reduce((sum, m) => {
-        if (m.type === 'opening' || m.type === 'sale' || m.type === 'supply') return sum + m.amount;
-        if (m.type === 'withdrawal' || m.type === 'refund') return sum - m.amount;
-        return sum;
-      }, 0),
+      expectedAmount: session.closingAmountCalculated !== null
+        ? Number(session.closingAmountCalculated)
+        : this.calculateExpectedCashAmount(movements.map((movement) => ({
+            type: movement.type,
+            amount: movement.amount,
+            paymentMethod: this.parsePaymentMethod(movement.paymentMethod || ''),
+          }))),
     };
   }
 
