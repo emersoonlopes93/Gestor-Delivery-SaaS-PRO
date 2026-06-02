@@ -100,6 +100,7 @@ interface DeliveryRateCalcResponse {
     type: string;
     description: string;
   };
+  resolvedCoordinates?: { lat: number; lng: number };
 }
 
 const emptyDeliveryAddress = {
@@ -350,12 +351,25 @@ export default function PosPage() {
       setDeliveryFeeCalculated(true);
       setDeliveryFeeError(null);
       setDeliveryFeeRule(data.rule.description);
+      if (data.resolvedCoordinates) {
+        setDeliveryAddress((prev) => ({
+          ...prev,
+          lat: data.resolvedCoordinates!.lat,
+          lng: data.resolvedCoordinates!.lng,
+        }));
+      }
     },
     onError: (error) => {
       setDeliveryFee(0);
       setDeliveryFeeCalculated(false);
       setDeliveryFeeRule(null);
-      setDeliveryFeeError(error instanceof Error ? error.message : 'Nao foi possivel calcular o frete.');
+      let message = error instanceof Error ? error.message : 'Não foi possível calcular o frete.';
+      if (message.includes('422')) {
+        message = 'Endereço não localizado (422). Verifique rua, número e cidade.';
+      } else if (message.includes('404')) {
+        message = 'Serviço de cálculo de frete indisponível (404).';
+      }
+      setDeliveryFeeError(message);
     },
   });
 
@@ -691,7 +705,7 @@ export default function PosPage() {
 
       {/* ========== RIGHT: CART ========== */}
       <div className={`w-full md:w-[380px] lg:w-[420px] flex flex-col bg-card dark:bg-muted900 border-l border-border200 dark:border-border800 shadow-2xl z-10 transition-transform ${viewMode === 'salon' ? 'translate-x-full md:translate-x-0' : ''}`}>
-        <div className="px-4 py-3 bg-card flex items-center justify-between border-b border-border200 dark:border-border800">
+        <div className="shrink-0 px-4 py-3 bg-card flex items-center justify-between border-b border-border200 dark:border-border800">
            <div className="flex items-center gap-2">
              <div className="w-2 h-2 rounded-full bg-status-success animate-pulse" />
              <span className="text-[10px] font-black uppercase text-status-success">OPERADOR: {activeSession?.operatorName || 'N/A'}</span>
@@ -721,7 +735,7 @@ export default function PosPage() {
            </div>
         </div>
 
-          <div className="px-4 py-3 bg-card border-b border-border200 dark:border-border800 space-y-3">
+          <div className="shrink-0 px-4 py-3 bg-card border-b border-border200 dark:border-border800 space-y-3">
            <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase text-muted-foreground500 dark:text-muted-foreground400 tracking-widest flex items-center gap-1.5 leading-none">
                 <Phone size={12} className="text-status-success" />
@@ -945,7 +959,7 @@ export default function PosPage() {
            )}
         </div>
 
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-card/50 dark:bg-muted900/50 scrollbar-hide">
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3 bg-card/50 dark:bg-muted900/50 scrollbar-hide">
              {cart.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
                 <ShoppingCart size={48} strokeWidth={1} />
@@ -976,7 +990,7 @@ export default function PosPage() {
             )}
         </div>
 
-        <div className="p-4 bg-muted50 dark:bg-muted950 space-y-4 shadow-[0_-10px_20px_rgba(0,0,0,0.2)]">
+        <div className="shrink-0 p-4 bg-muted50 dark:bg-muted950 space-y-4 shadow-[0_-10px_20px_rgba(0,0,0,0.2)]">
             {fulfillmentType === PosFulfillmentType.TABLE && (
                <div className="grid grid-cols-2 gap-3">
                   <div className="relative">

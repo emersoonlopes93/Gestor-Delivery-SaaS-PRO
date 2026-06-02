@@ -12,6 +12,7 @@ import { DeliveryCoverageService } from './delivery-coverage.service';
 import { DeliveryRateController } from './delivery-rate.controller';
 import { DeliveryRateService, DELIVERY_COVERAGE_REPO, DELIVERY_RATE_RULE_REPO } from './delivery-rate.service';
 import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
+import { GeocodingService } from './geocoding.service';
 
 @Module({
   imports: [DatabaseModule, AuthModule, RbacModule, forwardRef(() => OrdersModule)],
@@ -30,8 +31,9 @@ import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
       inject: [PrismaService],
       useFactory: (prisma: PrismaService) => prisma.deliveryCoverageConfig,
     },
+    GeocodingService,
     DeliveryRateService,
   ],
-  exports: [DeliveryRateService, DriversService],
+  exports: [DeliveryRateService, DriversService, GeocodingService],
 })
 export class DeliveryModule {}

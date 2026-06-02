@@ -13,6 +13,7 @@ export interface DeliveryFeeCalculation {
     type: string;
     description: string;
   };
+  resolvedCoordinates?: { lat: number; lng: number };
 }
 
 export type DeliveryMatchedStrategy =
@@ -33,6 +34,7 @@ export interface DeliveryDecision {
   fee: number;
   distanceKm: number | null;
   reason: string;
+  resolvedCoordinates?: { lat: number; lng: number };
   debugInfo?: Record<string, unknown>;
 }
 
@@ -40,12 +42,14 @@ export type DeliveryRateRuleType = 'POLYGON' | 'NEIGHBORHOOD' | 'DISTANCE' | 'FI
 
 export interface CalculateDeliveryRateInput {
   tenantId: string;
-  address?: Pick<DeliveryAddressDTO, 'neighborhood' | 'lat' | 'lng'> | null;
+  address?: Partial<DeliveryAddressDTO> | null;
   distanceKm?: number | null;
 }
 
 export const DELIVERY_RATE_RULE_REPO = 'DELIVERY_RATE_RULE_REPO';
 export const DELIVERY_COVERAGE_REPO = 'DELIVERY_COVERAGE_REPO';
+
+import { GeocodingService } from './geocoding.service';
 
 @Injectable()
 export class DeliveryRateService {
@@ -58,6 +62,7 @@ export class DeliveryRateService {
     @Inject(DELIVERY_RATE_RULE_REPO) deliveryRateRuleRepo: DeliveryRateRuleRepo,
     @Inject(DELIVERY_COVERAGE_REPO) deliveryCoverageRepo: DeliveryCoverageRepo,
     private readonly prisma: PrismaService,
+    private readonly geocodingService: GeocodingService,
   ) {
     this.deliveryRateRuleRepo = deliveryRateRuleRepo;
     this.deliveryCoverageRepo = deliveryCoverageRepo;
@@ -132,10 +137,25 @@ export class DeliveryRateService {
       };
     }
 
-    const lat = input.address?.lat;
-    const lng = input.address?.lng;
+    let lat = input.address?.lat;
+    let lng = input.address?.lng;
+    let resolvedCoordinates: { lat: number; lng: number } | undefined = undefined;
+
     if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-      throw new UnprocessableEntityException('Coordenadas (lat/lng) são obrigatórias para calcular entrega.');
+      const addr = input.address;
+      if (addr && addr.street && addr.number && addr.neighborhood) {
+        const fullAddress = `${addr.street}, ${addr.number} - ${addr.neighborhood}, ${addr.city || ''} ${addr.state || ''}`;
+        const coords = await this.geocodingService.geocodeAddress(fullAddress);
+        if (coords) {
+          lat = coords.lat;
+          lng = coords.lng;
+          resolvedCoordinates = coords;
+        }
+      }
+
+      if (typeof lat !== 'number' || typeof lng !== 'number') {
+        throw new UnprocessableEntityException('Não foi possível localizar o endereço. Revise rua, número, bairro e cidade ou informe as coordenadas.');
+      }
     }
 
     // Use TenantSettings coordinates as priority if available
@@ -291,6 +311,7 @@ export class DeliveryRateService {
       fee: 0,
       distanceKm,
       reason: 'Fora da área de cobertura',
+      resolvedCoordinates,
     };
   }
 
@@ -588,6 +609,7 @@ export class DeliveryRateService {
           type: decision.matchedStrategy,
           description: decision.reason,
         },
+        resolvedCoordinates: decision.resolvedCoordinates,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
