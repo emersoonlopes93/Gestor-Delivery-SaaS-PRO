@@ -718,7 +718,7 @@ export function DeliveryZonesPageV2() {
         pricePerKm: pricePerKm ?? undefined,
         fixedRate: pricingMode === 'fixed' && zoneKind !== 'blocked_zone' ? fixedFee ?? undefined : undefined,
         ratePerKm: pricingMode === 'distance' && zoneKind !== 'blocked_zone' ? pricePerKm ?? undefined : undefined,
-        rate: pricingMode === 'free' && zoneKind !== 'blocked_zone' ? 0 : undefined,
+        rate: (pricingMode === 'free' && zoneKind !== 'blocked_zone') ? 0 : undefined,
       };
 
       if (zoneForm.id) {

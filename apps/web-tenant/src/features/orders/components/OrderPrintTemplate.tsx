@@ -121,13 +121,13 @@ export const OrderPrintTemplate = memo(function OrderPrintTemplate({ order }: Or
         <p>Sistema Gestor Delivery</p>
       </div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style>{`
         @media print {
           body * { visibility: hidden; }
           .print-template, .print-template * { visibility: visible; }
           .print-template { position: absolute; left: 0; top: 0; width: 100%; }
         }
-      `}} />
+      `}</style>
     </div>
   );
 });
