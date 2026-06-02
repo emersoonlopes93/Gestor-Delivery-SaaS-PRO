@@ -52,6 +52,7 @@
     --sidebar-border: #e2e8f0;        /* borda da sidebar */
     --sidebar-hover: #f1f5f9;         /* hover na sidebar */
     --sidebar-active: #e2e8f0;        /* item ativo na sidebar */
+    --sidebar-active-foreground: var(--foreground);
     --topbar-bg: #ffffff;             /* fundo da topbar */
     --topbar-foreground: #0f172a;    /* texto da topbar */
     --topbar-border: #e2e8f0;         /* borda da topbar */
@@ -191,6 +192,7 @@
     --sidebar-border: #1e293b;       /* borda da sidebar dark */
     --sidebar-hover: #1e293b;        /* hover na sidebar dark */
     --sidebar-active: #1e293b;       /* item ativo na sidebar dark */
+    --sidebar-active-foreground: var(--foreground);
     --topbar-bg: #0a0f1a;            /* fundo da topbar dark */
     --topbar-foreground: #f8fafc;    /* texto da topbar dark */
     --topbar-border: #1e293b;        /* borda da topbar dark */

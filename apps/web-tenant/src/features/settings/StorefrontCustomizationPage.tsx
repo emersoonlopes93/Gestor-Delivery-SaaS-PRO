@@ -30,11 +30,16 @@ import {
   ThemeMode,
   StorefrontPreset
 } from '@gestor/theme';
+import { ProductCategory, Product, Tenant, TenantSettings } from '@gestor/types';
 
 export function StorefrontCustomizationPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [tenantLogo, setTenantLogo] = useState<string | null>(null);
+  const [tenantName, setTenantName] = useState<string>('');
   const [customization, setCustomization] = useState<{
     theme: StorefrontThemeSettings;
     layout: StorefrontLayoutSettings;
@@ -50,13 +55,25 @@ export function StorefrontCustomizationPage() {
   const loadCustomization = async () => {
     setLoading(true);
     try {
-      const response = await api.get<{
-        theme: StorefrontThemeSettings;
-        layout: StorefrontLayoutSettings;
-      }>('/tenant/storefront-customization');
+      const [customRes, catRes, prodRes, tenantRes] = await Promise.all([
+        api.get<{ theme: StorefrontThemeSettings; layout: StorefrontLayoutSettings }>('/tenant/storefront-customization'),
+        api.get<ProductCategory[]>('/catalog/categories'),
+        api.get<Product[]>('/catalog/products'),
+        api.get<Tenant & { settings: TenantSettings }>('/tenant/me')
+      ]);
       
-      if (response.success) {
-        setCustomization(response.data);
+      if (customRes.success) {
+        setCustomization(customRes.data);
+      }
+      if (catRes.success) {
+        setCategories(catRes.data);
+      }
+      if (prodRes.success) {
+        setProducts(prodRes.data);
+      }
+      if (tenantRes.success) {
+        setTenantLogo(tenantRes.data.settings?.logoUrl || null);
+        setTenantName(tenantRes.data.name || '');
       }
     } catch (error) {
       console.error('Erro ao carregar personalização:', error);
@@ -160,13 +177,13 @@ export function StorefrontCustomizationPage() {
   }
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-20 text-left">
       <PageHeader 
         title="Personalização da Vitrine" 
         description="Configure a aparência e o comportamento da sua loja pública."
         action={
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handleReset} disabled={saving}>
+            <Button variant="outline" className="border-border text-foreground hover:bg-muted" onClick={handleReset} disabled={saving}>
               <RotateCcw className="w-4 h-4 mr-2" />
               Restaurar Padrão
             </Button>
@@ -185,10 +202,10 @@ export function StorefrontCustomizationPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           {/* Presets Rápidos */}
-          <Card className="p-6">
+          <Card className="p-6 bg-card border-border">
             <div className="flex items-center gap-2 mb-6">
               <Zap className="w-5 h-5 text-amber-500" />
-              <h2 className="text-lg font-bold">Presets Rápidos</h2>
+              <h2 className="text-lg font-bold text-foreground">Presets Rápidos</h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -196,7 +213,7 @@ export function StorefrontCustomizationPage() {
                 <button
                   key={preset.id}
                   onClick={() => applyPreset(preset)}
-                  className="flex flex-col p-4 border border-gray-100 rounded-xl hover:border-primary-200 hover:bg-primary-50/30 transition-all text-left group"
+                  className="flex flex-col p-4 border border-border bg-card hover:border-primary/45 hover:bg-primary/5 transition-all text-left rounded-xl group"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div 
@@ -205,28 +222,28 @@ export function StorefrontCustomizationPage() {
                     />
                     <Badge variant="info" className="text-[10px] uppercase font-black">{preset.layout.productLayout}</Badge>
                   </div>
-                  <h3 className="font-bold text-sm text-gray-900 mb-1 group-hover:text-primary-700">{preset.name}</h3>
-                  <p className="text-[11px] text-gray-500 leading-tight">{preset.description}</p>
+                  <h3 className="font-bold text-sm text-foreground mb-1 group-hover:text-primary">{preset.name}</h3>
+                  <p className="text-[11px] text-muted-foreground leading-tight">{preset.description}</p>
                 </button>
               ))}
             </div>
           </Card>
 
           {/* Background Premium */}
-          <Card className="p-6">
+          <Card className="p-6 bg-card border-border">
             <div className="flex items-center gap-2 mb-6">
-              <ImageIcon className="w-5 h-5 text-primary-600" />
-              <h2 className="text-lg font-bold">Background Premium</h2>
+              <ImageIcon className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-bold text-foreground">Background Premium</h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-4">
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium">Imagem de Fundo</label>
-                  <p className="text-xs text-gray-500 mb-2">JPG, PNG ou WebP. Recomendado: 1920x1080px (Máx 5MB).</p>
+                  <label className="text-sm font-medium text-foreground">Imagem de Fundo</label>
+                  <p className="text-xs text-muted-foreground mb-2">JPG, PNG ou WebP. Recomendado: 1920x1080px (Máx 5MB).</p>
                   
                   {customization.theme.backgroundImageUrl ? (
-                    <div className="relative group rounded-xl overflow-hidden border-2 border-primary-100 aspect-video bg-gray-100">
+                    <div className="relative group rounded-xl overflow-hidden border-2 border-primary/20 aspect-video bg-muted">
                       <img 
                         src={customization.theme.backgroundImageUrl} 
                         alt="Background Preview" 
@@ -251,15 +268,15 @@ export function StorefrontCustomizationPage() {
                       />
                       <label 
                         htmlFor="bg-upload"
-                        className={`flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-200 rounded-2xl cursor-pointer hover:border-primary-400 hover:bg-primary-50 transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-2xl cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {uploading ? (
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
                         ) : (
                           <>
-                            <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                            <span className="text-sm font-bold text-gray-600">Clique para enviar</span>
-                            <span className="text-xs text-gray-400">ou arraste a imagem aqui</span>
+                            <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+                            <span className="text-sm font-bold text-muted-foreground">Clique para enviar</span>
+                            <span className="text-xs text-muted-foreground/60">ou arraste a imagem aqui</span>
                           </>
                         )}
                       </label>
@@ -270,8 +287,8 @@ export function StorefrontCustomizationPage() {
 
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Intensidade do Overlay</label>
-                  <p className="text-xs text-gray-500 mb-4">Ajuste para garantir que os textos fiquem legíveis sobre a imagem.</p>
+                  <label className="text-sm font-medium text-foreground">Intensidade do Overlay</label>
+                  <p className="text-xs text-muted-foreground mb-4">Ajuste para garantir que os textos fiquem legíveis sobre a imagem.</p>
                   <div className="grid grid-cols-4 gap-2">
                     {(['none', 'soft', 'medium', 'strong'] as const).map((o) => (
                       <button
@@ -279,8 +296,8 @@ export function StorefrontCustomizationPage() {
                         onClick={() => updateTheme({ backgroundOverlay: o })}
                         className={`px-3 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${
                           customization.theme.backgroundOverlay === o
-                            ? 'border-primary-600 bg-primary-50 text-primary-700'
-                            : 'border-gray-200 hover:border-gray-300 bg-white'
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border hover:border-muted-foreground/30 bg-card text-foreground'
                         }`}
                       >
                         {o === 'none' ? 'Nenhum' : o === 'soft' ? 'Leve' : o === 'medium' ? 'Médio' : 'Forte'}
@@ -289,8 +306,8 @@ export function StorefrontCustomizationPage() {
                   </div>
                 </div>
 
-                <div className="p-4 bg-primary-50 rounded-xl border border-primary-100">
-                  <p className="text-[11px] text-primary-700 leading-relaxed">
+                <div className="p-4 bg-primary/10 rounded-xl border border-primary/20">
+                  <p className="text-[11px] text-primary leading-relaxed font-medium">
                     <strong>Dica UX:</strong> Se sua imagem for muito colorida ou detalhada, use o overlay <strong>Médio</strong> ou <strong>Forte</strong> para manter o contraste do cardápio.
                   </p>
                 </div>
@@ -299,15 +316,15 @@ export function StorefrontCustomizationPage() {
           </Card>
 
           {/* Aparência */}
-          <Card className="p-6">
+          <Card className="p-6 bg-card border-border">
             <div className="flex items-center gap-2 mb-6">
-              <Palette className="w-5 h-5 text-primary-600" />
-              <h2 className="text-lg font-bold">Aparência</h2>
+              <Palette className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-bold text-foreground">Aparência</h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Modo de Cor</label>
+                <label className="text-sm font-medium text-foreground">Modo de Cor</label>
                 <div className="grid grid-cols-3 gap-2">
                   {(['light', 'dark', 'system'] as ThemeMode[]).map((mode) => (
                     <button
@@ -315,8 +332,8 @@ export function StorefrontCustomizationPage() {
                       onClick={() => updateTheme({ colorMode: mode })}
                       className={`px-3 py-2 text-xs font-bold rounded-lg border transition-all ${
                         customization.theme.colorMode === mode
-                          ? 'border-primary-600 bg-primary-50 text-primary-700'
-                          : 'border-gray-200 hover:border-gray-300 bg-white'
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border hover:border-muted-foreground/30 bg-card text-foreground'
                       }`}
                     >
                       {mode === 'light' ? 'Claro' : mode === 'dark' ? 'Escuro' : 'Sistema'}
@@ -326,7 +343,7 @@ export function StorefrontCustomizationPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Cor Principal</label>
+                <label className="text-sm font-medium text-foreground">Cor Principal</label>
                 <div className="flex gap-2">
                   <input 
                     type="color" 
@@ -338,17 +355,17 @@ export function StorefrontCustomizationPage() {
                     type="text" 
                     value={customization.theme.primaryColor}
                     onChange={(e) => updateTheme({ primaryColor: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm uppercase font-mono"
+                    className="flex-1 px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm uppercase font-mono"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Estilo de Fundo</label>
+                <label className="text-sm font-medium text-foreground">Estilo de Fundo</label>
                 <select 
                   value={customization.theme.backgroundStyle}
                   onChange={(e) => updateTheme({ backgroundStyle: e.target.value as any })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
                 >
                   <option value="clean">Clean (Branco/Preto)</option>
                   <option value="soft">Soft (Cores suaves)</option>
@@ -358,7 +375,7 @@ export function StorefrontCustomizationPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Arredondamento (Radius)</label>
+                <label className="text-sm font-medium text-foreground">Arredondamento (Radius)</label>
                 <div className="grid grid-cols-5 gap-2">
                   {(['sm', 'md', 'lg', 'xl', '2xl'] as StorefrontRadius[]).map((r) => (
                     <button
@@ -366,8 +383,8 @@ export function StorefrontCustomizationPage() {
                       onClick={() => updateTheme({ borderRadius: r })}
                       className={`px-2 py-2 text-xs font-bold rounded-lg border transition-all ${
                         customization.theme.borderRadius === r
-                          ? 'border-primary-600 bg-primary-50 text-primary-700'
-                          : 'border-gray-200 hover:border-gray-300 bg-white'
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border hover:border-muted-foreground/30 bg-card text-foreground'
                       }`}
                     >
                       {r.toUpperCase()}
@@ -377,11 +394,11 @@ export function StorefrontCustomizationPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Estilo de Fonte</label>
+                <label className="text-sm font-medium text-foreground">Estilo de Fonte</label>
                 <select 
                   value={customization.theme.fontStyle}
                   onChange={(e) => updateTheme({ fontStyle: e.target.value as any })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
                 >
                   <option value="default">Padrão (Inter)</option>
                   <option value="modern">Moderno (Sans)</option>
@@ -392,19 +409,19 @@ export function StorefrontCustomizationPage() {
           </Card>
 
           {/* Layout do Cardápio */}
-          <Card className="p-6">
+          <Card className="p-6 bg-card border-border">
             <div className="flex items-center gap-2 mb-6">
-              <Layout className="w-5 h-5 text-primary-600" />
-              <h2 className="text-lg font-bold">Layout do Cardápio</h2>
+              <Layout className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-bold text-foreground">Layout do Cardápio</h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Layout dos Produtos</label>
+                <label className="text-sm font-medium text-foreground">Layout dos Produtos</label>
                 <select 
                   value={customization.layout.productLayout}
                   onChange={(e) => updateLayout({ productLayout: e.target.value as StorefrontProductLayout })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
                 >
                   <option value="grid">Grade (Padrão)</option>
                   <option value="list">Lista (Econômico)</option>
@@ -415,11 +432,11 @@ export function StorefrontCustomizationPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Layout das Categorias</label>
+                <label className="text-sm font-medium text-foreground">Layout das Categorias</label>
                 <select 
                   value={customization.layout.categoryLayout}
                   onChange={(e) => updateLayout({ categoryLayout: e.target.value as StorefrontCategoryLayout })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
                 >
                   <option value="tabs">Abas superiores</option>
                   <option value="horizontal-scroll">Scroll Horizontal</option>
@@ -429,11 +446,11 @@ export function StorefrontCustomizationPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Modo de Imagem</label>
+                <label className="text-sm font-medium text-foreground">Modo de Imagem</label>
                 <select 
                   value={customization.layout.productImageMode}
                   onChange={(e) => updateLayout({ productImageMode: e.target.value as StorefrontImageMode })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                  className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
                 >
                   <option value="cover">Preencher (Cover)</option>
                   <option value="contain">Conter (Contain)</option>
@@ -447,9 +464,9 @@ export function StorefrontCustomizationPage() {
                     type="checkbox"
                     checked={customization.layout.showProductDescription}
                     onChange={(e) => updateLayout({ showProductDescription: e.target.checked })}
-                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                    className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
                   />
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Mostrar descrição dos produtos</span>
+                  <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground">Mostrar descrição dos produtos</span>
                 </label>
 
                 <label className="flex items-center gap-3 cursor-pointer group">
@@ -457,9 +474,9 @@ export function StorefrontCustomizationPage() {
                     type="checkbox"
                     checked={customization.layout.showBadges}
                     onChange={(e) => updateLayout({ showBadges: e.target.checked })}
-                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                    className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
                   />
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Mostrar badges de destaque</span>
+                  <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground">Mostrar badges de destaque</span>
                 </label>
 
                 <label className="flex items-center gap-3 cursor-pointer group">
@@ -467,9 +484,9 @@ export function StorefrontCustomizationPage() {
                     type="checkbox"
                     checked={customization.layout.stickyCart}
                     onChange={(e) => updateLayout({ stickyCart: e.target.checked })}
-                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                    className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
                   />
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Carrinho flutuante (Sticky)</span>
+                  <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground">Carrinho flutuante (Sticky)</span>
                 </label>
 
                 <label className="flex items-center gap-3 cursor-pointer group">
@@ -477,9 +494,9 @@ export function StorefrontCustomizationPage() {
                     type="checkbox"
                     checked={customization.layout.heroEnabled}
                     onChange={(e) => updateLayout({ heroEnabled: e.target.checked })}
-                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                    className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
                   />
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Habilitar Banner (Hero)</span>
+                  <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground">Habilitar Banner (Hero)</span>
                 </label>
               </div>
             </div>
@@ -488,11 +505,11 @@ export function StorefrontCustomizationPage() {
 
         {/* Preview Sidebar */}
         <div className="space-y-6">
-          <Card className="p-6 sticky top-24 border-2 border-primary-100 shadow-xl overflow-hidden">
+          <Card className="p-6 sticky top-24 border-2 border-primary/20 shadow-xl overflow-hidden bg-card text-foreground">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2">
-                <Eye className="w-5 h-5 text-primary-600" />
-                <h2 className="text-lg font-bold">Preview</h2>
+                <Eye className="w-5 h-5 text-primary" />
+                <h2 className="text-lg font-bold text-foreground">Preview</h2>
               </div>
               <Badge variant="info" className="text-[10px]">ADMIN PREVIEW</Badge>
             </div>
@@ -512,84 +529,142 @@ export function StorefrontCustomizationPage() {
                   customization.theme.borderRadius === 'xl' ? '16px' : '24px'
               } as React.CSSProperties}
             >
-              {/* Fake Store Header */}
+              {/* Logo e Nome do Tenant Real */}
               <div className={`p-4 border-b flex items-center gap-3 ${
                 customization.theme.colorMode === 'dark' ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50/50'
               }`}>
-                <div className={`w-10 h-10 rounded-[var(--preview-radius)] flex-shrink-0 ${
-                  customization.theme.colorMode === 'dark' ? 'bg-slate-800' : 'bg-slate-200'
-                }`} />
-                <div className="flex-1">
-                  <div className={`h-3 w-24 rounded mb-2 ${
-                    customization.theme.colorMode === 'dark' ? 'bg-slate-700' : 'bg-slate-300'
-                  }`} />
-                  <div className={`h-2 w-16 rounded ${
-                    customization.theme.colorMode === 'dark' ? 'bg-slate-800' : 'bg-slate-200'
-                  }`} />
+                {tenantLogo ? (
+                  <img src={tenantLogo} className="w-10 h-10 rounded-[var(--preview-radius)] flex-shrink-0 object-cover" alt="" />
+                ) : (
+                  <div className={`w-10 h-10 rounded-[var(--preview-radius)] flex-shrink-0 flex items-center justify-center font-black text-sm text-white ${
+                    customization.theme.colorMode === 'dark' ? 'bg-slate-800' : 'bg-slate-350'
+                  }`} style={{ backgroundColor: customization.theme.primaryColor }}>
+                    {(tenantName || 'G').charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-xs truncate leading-tight">{tenantName || 'Sua Loja'}</div>
+                  <div className="text-[9px] text-muted-foreground uppercase font-black tracking-widest mt-0.5">Loja Aberta</div>
                 </div>
               </div>
 
-              {/* Fake Content */}
+              {/* Categorias Reais do Tenant */}
               <div className="p-4 space-y-4">
-                <div className="flex gap-2 overflow-hidden">
-                  <div className="px-3 py-1.5 rounded-full bg-[var(--preview-primary)] text-white text-[10px] font-black uppercase">Burgers</div>
-                  <div className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase ${
-                    customization.theme.colorMode === 'dark' ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-400'
-                  }`}>Bebidas</div>
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                  {categories.length > 0 ? (
+                    categories.slice(0, 4).map((cat, idx) => (
+                      <div 
+                        key={cat.id} 
+                        className={`px-3 py-1 rounded-full text-[9px] font-black uppercase whitespace-nowrap transition-colors ${
+                          idx === 0 
+                            ? 'bg-[var(--preview-primary)] text-white' 
+                            : customization.theme.colorMode === 'dark' 
+                              ? 'bg-slate-800 text-slate-400' 
+                              : 'bg-slate-100 text-slate-450'
+                        }`}
+                      >
+                        {cat.name}
+                      </div>
+                    ))
+                  ) : (
+                    <>
+                      <div className="px-3 py-1 rounded-full bg-[var(--preview-primary)] text-white text-[9px] font-black uppercase">Burgers</div>
+                      <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${
+                        customization.theme.colorMode === 'dark' ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-450'
+                      }`}>Bebidas</div>
+                    </>
+                  )}
                 </div>
 
                 <div className="space-y-3">
-                  <div className={`h-3 w-32 rounded ${
-                    customization.theme.colorMode === 'dark' ? 'bg-slate-800' : 'bg-slate-200'
-                  }`} />
+                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                    {categories[0]?.name || 'Principais'}
+                  </div>
                   
-                  {/* Fake Product Card */}
-                  <div className={`p-3 border rounded-[var(--preview-radius)] transition-all ${
-                    customization.theme.colorMode === 'dark' ? 'border-slate-800 bg-slate-900/30' : 'border-slate-100 bg-white'
-                  } ${
-                    customization.layout.productLayout === 'premium-card' ? 'shadow-lg border-2 border-[var(--preview-primary)]' : ''
+                  {/* Produtos Reais do Tenant baseado no Layout Escolhido */}
+                  <div className={`grid gap-3 ${
+                    customization.layout.productLayout === 'grid' ? 'grid-cols-2' : 'grid-cols-1'
                   }`}>
-                    <div className={`flex gap-3 ${
-                      ['grid', 'square', 'premium-card'].includes(customization.layout.productLayout) ? 'flex-col' : 'flex-row'
-                    }`}>
-                      {customization.layout.productImageMode !== 'hidden' && (
-                        <div className={`rounded-[calc(var(--preview-radius)-4px)] flex-shrink-0 ${
-                          customization.theme.colorMode === 'dark' ? 'bg-slate-800' : 'bg-slate-100'
-                        } ${
-                          ['grid', 'square', 'premium-card'].includes(customization.layout.productLayout) ? 'aspect-video w-full' : 'w-16 h-16'
-                        }`} />
-                      )}
-                      <div className="flex-1 space-y-2">
-                        <div className={`h-3 w-full rounded ${
-                          customization.theme.colorMode === 'dark' ? 'bg-slate-700' : 'bg-slate-300'
-                        }`} />
-                        {customization.layout.showProductDescription && (
-                          <div className={`h-2 w-full rounded ${
-                            customization.theme.colorMode === 'dark' ? 'bg-slate-800' : 'bg-slate-100'
-                          }`} />
-                        )}
-                        <div className="flex justify-between items-center pt-2">
-                          <div className="flex flex-col gap-1">
-                            <div className={`h-4 w-12 rounded ${
-                              customization.theme.colorMode === 'dark' ? 'bg-slate-700/50' : 'bg-slate-200'
-                            }`} />
-                          </div>
+                    {products.length > 0 ? (
+                      products
+                        .filter(p => !p.categoryId || p.categoryId === categories[0]?.id)
+                        .slice(0, customization.layout.productLayout === 'grid' ? 2 : 1)
+                        .map((product) => (
                           <div 
-                            className="h-8 w-16 rounded-[calc(var(--preview-radius)-4px)]" 
-                            style={{ backgroundColor: customization.theme.primaryColor }}
-                          />
+                            key={product.id}
+                            className={`p-3 border rounded-[var(--preview-radius)] transition-all ${
+                              customization.theme.colorMode === 'dark' ? 'border-slate-800 bg-slate-900/30' : 'border-slate-200 bg-white'
+                            } ${
+                              customization.layout.productLayout === 'premium-card' ? 'shadow-lg border-2 border-[var(--preview-primary)]' : 'shadow-sm'
+                            }`}
+                          >
+                            <div className={`flex gap-3 ${
+                              ['grid', 'square', 'premium-card'].includes(customization.layout.productLayout) ? 'flex-col' : 'flex-row'
+                            }`}>
+                              {customization.layout.productImageMode !== 'hidden' && (
+                                <div className={`rounded-[calc(var(--preview-radius)-4px)] flex-shrink-0 bg-muted overflow-hidden ${
+                                  ['grid', 'square', 'premium-card'].includes(customization.layout.productLayout) ? 'aspect-video w-full' : 'w-16 h-16'
+                                }`}>
+                                  {product.image ? (
+                                    <img src={product.image} className="w-full h-full object-cover" alt="" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-[8px] font-bold text-muted-foreground uppercase bg-slate-100 dark:bg-slate-800">
+                                      Sem Img
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0 space-y-1">
+                                <div className="font-bold text-xs truncate">{product.name}</div>
+                                {customization.layout.showProductDescription && product.shortDescription && (
+                                  <div className="text-[10px] text-muted-foreground line-clamp-1">{product.shortDescription}</div>
+                                )}
+                                <div className="flex justify-between items-center pt-1.5">
+                                  <span className="text-xs font-black">
+                                    R$ {Number(product.basePrice ?? 0).toFixed(2)}
+                                  </span>
+                                  <div 
+                                    className="h-6 w-12 rounded-[calc(var(--preview-radius)-4px)] flex items-center justify-center text-[9px] font-bold text-white uppercase select-none cursor-pointer" 
+                                    style={{ backgroundColor: customization.theme.primaryColor }}
+                                  >
+                                    Ver
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                    ) : (
+                      // Fallback Mock se o banco estiver vazio
+                      <div className={`p-3 border rounded-[var(--preview-radius)] transition-all ${
+                        customization.theme.colorMode === 'dark' ? 'border-slate-800 bg-slate-900/30' : 'border-slate-200 bg-white'
+                      } ${
+                        customization.layout.productLayout === 'premium-card' ? 'shadow-lg border-2 border-[var(--preview-primary)]' : ''
+                      }`}>
+                        <div className={`flex gap-3 ${
+                          ['grid', 'square', 'premium-card'].includes(customization.layout.productLayout) ? 'flex-col' : 'flex-row'
+                        }`}>
+                          {customization.layout.productImageMode !== 'hidden' && (
+                            <div className={`rounded-[calc(var(--preview-radius)-4px)] flex-shrink-0 bg-slate-200 dark:bg-slate-800 ${
+                              ['grid', 'square', 'premium-card'].includes(customization.layout.productLayout) ? 'aspect-video w-full' : 'w-16 h-16'
+                            }`} />
+                          )}
+                          <div className="flex-1 space-y-2">
+                            <div className="h-3 w-32 bg-slate-350 dark:bg-slate-700 rounded" />
+                            <div className="h-2 w-20 bg-slate-250 dark:bg-slate-800 rounded" />
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="mt-6 space-y-4">
-              <div className="p-3 bg-amber-50 rounded-lg border border-amber-100 text-[11px] text-amber-700 leading-relaxed italic">
+              <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20 text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed italic">
                 <MousePointer2 className="w-3 h-3 inline mr-1 mb-0.5" />
-                Este é um preview simplificado. Para ver o resultado real, salve e acesse seu cardápio público.
+                Preview com dados reais do seu cardápio. Para ver o resultado público, salve e acesse sua loja.
               </div>
               <div className="flex items-center gap-2 text-[10px] text-gray-400">
                 <Smartphone className="w-3 h-3" />

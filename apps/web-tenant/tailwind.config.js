@@ -15,6 +15,12 @@ export default {
         'card-foreground': 'var(--card-foreground)',
         popover: 'var(--popover)',
         'popover-foreground': 'var(--popover-foreground)',
+        'sidebar-bg': 'var(--sidebar-bg)',
+        'sidebar-foreground': 'var(--sidebar-foreground)',
+        'sidebar-border': 'var(--sidebar-border)',
+        'sidebar-hover': 'var(--sidebar-hover)',
+        'sidebar-active': 'var(--sidebar-active)',
+        'sidebar-active-foreground': 'var(--sidebar-active-foreground)',
         primary: {
           DEFAULT: 'var(--primary)',
           foreground: 'var(--primary-foreground)',
