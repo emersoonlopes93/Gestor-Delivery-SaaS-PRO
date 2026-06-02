@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api-client';
+import { api, ApiError } from '@/lib/api-client';
 import { useActiveSession } from '../cash/hooks/useCashSession';
 import { useCreatePosSale, type PosCreateSalePayload } from './hooks/usePosSale';
 import { useDraftSale } from './hooks/useDraftSale';
@@ -656,7 +656,12 @@ export default function PosPage() {
         queryClient.invalidateQueries({ queryKey: ['posSalon'] });
       },
       onError: (error) => {
-        const msg = error instanceof Error ? error.message : 'Erro ao finalizar venda.';
+        setIsPaymentModalOpen(false);
+        const msg = error instanceof ApiError && error.status === 401
+          ? 'Sessao expirada ou usuario sem autenticacao valida. Faca login novamente e tente finalizar a venda.'
+          : error instanceof Error
+            ? error.message
+            : 'Erro ao finalizar venda.';
         setSaleError(msg);
       },
     });

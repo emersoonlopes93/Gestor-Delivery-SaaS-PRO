@@ -843,11 +843,15 @@ export class OrdersService {
     if (shouldCreateProductionJobs) {
       const jobs = await this.kdsService.createProductionJobs(orderId, tenantId);
       if (jobs.length === 0) {
-        const existingJobsCount = await this.prisma.printJob.count({
-          where: { tenantId, orderId },
+        const existingActiveJobsCount = await this.prisma.printJob.count({
+          where: {
+            tenantId,
+            orderId,
+            status: { in: ['pending', 'printing'] },
+          },
         });
-        if (existingJobsCount === 0) {
-          this.logger.error(`No production jobs created for order ${orderId} after status ${nextStatus}`);
+        if (existingActiveJobsCount === 0) {
+          this.logger.error(`No active production jobs found for order ${orderId} after status ${nextStatus}`);
         }
       }
     }

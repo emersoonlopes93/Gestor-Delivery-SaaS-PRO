@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, Clock, CheckCircle2, ChefHat } from 'lucide-react';
 import { 
-  KdsPrintJobDTO 
+  KdsPrintJobDTO,
+  PrintJobStatus,
 } from '@gestor/types';
 import { api } from '@/lib/api-client';
 
@@ -13,24 +14,32 @@ interface KdsPrintJobsResponse {
 }
 
 export function KdsPage() {
-  const [stationId, setStationId] = useState<string>(localStorage.getItem('kds_station') || 'GERAL');
+  const [stationId, setStationId] = useState<string>(localStorage.getItem('kds_station') || 'ALL');
   const [printJobs, setPrintJobs] = useState<KdsPrintJobDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [stations, setStations] = useState<string[]>(['GERAL']);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const activeStatuses = useMemo(
+    () => new Set<PrintJobStatus>([PrintJobStatus.pending, PrintJobStatus.printing]),
+    [],
+  );
 
   const fetchJobs = useCallback(async () => {
     try {
+      setLoadError(null);
+      const stationQuery = stationId === 'ALL' ? '' : `station=${encodeURIComponent(stationId)}&`;
       const res = await api.get<KdsPrintJobsResponse>(
-        `/kds/print-jobs?station=${encodeURIComponent(stationId)}&status=pending`,
+        `/kds/print-jobs?${stationQuery}limit=100`,
       );
-      setPrintJobs(res.data.items || []);
-    } catch {
-      // Ignore
+      setPrintJobs((res.data.items || []).filter((job) => activeStatuses.has(job.status)));
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Erro ao carregar KDS.');
     } finally {
       if (loading) setLoading(false);
     }
-  }, [loading, stationId]);
+  }, [activeStatuses, loading, stationId]);
 
   useEffect(() => {
     const fetchStations = async () => {
@@ -39,8 +48,8 @@ export function KdsPage() {
         if (Array.isArray(res.data) && res.data.length > 0) {
           setStations(res.data);
         }
-      } catch {
-        // Ignore
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : 'Erro ao carregar setores do KDS.');
       }
     };
     fetchStations();
@@ -59,8 +68,8 @@ export function KdsPage() {
     try {
       await api.put(`/kds/print-jobs/${jobId}/completed`);
       await fetchJobs();
-    } catch {
-      // Ignore
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Erro ao concluir job do KDS.');
     } finally {
       setUpdatingId(null);
     }
@@ -125,6 +134,7 @@ export function KdsPage() {
             onChange={(e) => setStationId(e.target.value)}
             className="bg-card border border-input text-foreground text-sm rounded-lg focus:ring-ring focus:border-primary block w-full p-2.5 font-bold shadow-sm"
           >
+            <option value="ALL">TODOS OS SETORES</option>
             {stations.map(st => (
               <option key={st} value={st}>SETOR: {st}</option>
             ))}
@@ -135,6 +145,12 @@ export function KdsPage() {
           </button>
         </div>
       </header>
+
+      {loadError && (
+        <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-bold text-destructive">
+          {loadError}
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-12 text-muted-foreground font-bold text-lg">Carregando painel KDS...</div>

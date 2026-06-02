@@ -418,12 +418,17 @@ export class KdsService {
       return [];
     }
 
-    // Early check: if jobs already exist, return immediately
-    const existingJobsCount = await this.prisma.printJob.count({
-      where: { tenantId, orderId },
+    // Early check: only active jobs should block new production tickets.
+    // Completed/failed jobs are historical and must not hide a new send-to-production action.
+    const existingActiveJobsCount = await this.prisma.printJob.count({
+      where: {
+        tenantId,
+        orderId,
+        status: { in: [PrismaPrintJobStatus.pending, PrismaPrintJobStatus.printing] },
+      },
     });
-    if (existingJobsCount > 0) {
-      this.logger.debug(`createProductionJobs: Jobs already exist for order ${orderId}`);
+    if (existingActiveJobsCount > 0) {
+      this.logger.debug(`createProductionJobs: Active jobs already exist for order ${orderId}`);
       return [];
     }
 
@@ -437,11 +442,15 @@ export class KdsService {
 
     try {
       // Double-check: confirm jobs still don't exist (in case another thread created them while we were acquiring the lock)
-      const finalCheckJobs = await this.prisma.printJob.count({
-        where: { tenantId, orderId },
+      const finalCheckActiveJobs = await this.prisma.printJob.count({
+        where: {
+          tenantId,
+          orderId,
+          status: { in: [PrismaPrintJobStatus.pending, PrismaPrintJobStatus.printing] },
+        },
       });
-      if (finalCheckJobs > 0) {
-        this.logger.debug(`createProductionJobs: Jobs were created by another thread for order ${orderId}`);
+      if (finalCheckActiveJobs > 0) {
+        this.logger.debug(`createProductionJobs: Active jobs were created by another thread for order ${orderId}`);
         return [];
       }
 
@@ -462,7 +471,10 @@ export class KdsService {
         },
       });
 
-      if (!order) return [];
+      if (!order) {
+        this.logger.warn(`createProductionJobs: order ${orderId} not found for tenant ${tenantId}.`);
+        return [];
+      }
 
       // Agrupar itens por estação
       const stationGroups: Record<string, OrderItem[]> = {};
@@ -480,6 +492,11 @@ export class KdsService {
         
         if (!stationGroups[station]) stationGroups[station] = [];
         stationGroups[station].push(item);
+      }
+
+      if (Object.keys(stationGroups).length === 0) {
+        this.logger.warn(`createProductionJobs: order ${orderId} has no items. No KDS jobs created.`);
+        return [];
       }
 
       // Para cada estação, criar um job
