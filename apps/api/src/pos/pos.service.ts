@@ -143,6 +143,12 @@ export class PosService {
     return cust?.id || null;
   }
 
+  private assertCustomerForFinalSale(dto: CreatePosOrderDTO): void {
+    if (!this.hasText(dto.customerName) || !this.hasText(dto.customerPhone)) {
+      throw new BadRequestException('Nome do cliente e telefone sao obrigatorios para fechar a conta.');
+    }
+  }
+
   private async resolveDeliveryAddress(
     tenantId: string,
     dto: CreatePosOrderDTO,
@@ -203,6 +209,8 @@ export class PosService {
       throw new BadRequestException('Forma de pagamento e obrigatoria para finalizar a venda.');
     }
 
+    this.assertCustomerForFinalSale(dto);
+
     const customerId = await this.resolveCustomerId(tenantId, dto);
     const deliveryAddress = await this.resolveDeliveryAddress(tenantId, dto, customerId);
     const deliveryFee = await this.resolveDeliveryFee(tenantId, dto, deliveryAddress);
@@ -259,6 +267,9 @@ export class PosService {
             total: orderTotal,
             paymentMethod: dto.paymentMethod,
             cashSessionId: activeSession.id,
+            customerName: dto.customerName!.trim(),
+            customerPhone: dto.customerPhone!.trim(),
+            customerId,
             notes: dto.notes || null,
             waiterId: draftWaiterId || dto.waiterId || null,
             tableNumber: dto.tableNumber || undefined,
@@ -277,8 +288,8 @@ export class PosService {
             orderNumber: `#${updatedTenant.orderSequence.toString().padStart(4, '0')}`,
             status: 'pending',
             fulfillmentType: dto.fulfillmentType,
-            customerName: dto.customerName || 'Consumidor',
-            customerPhone: dto.customerPhone || '',
+            customerName: dto.customerName!.trim(),
+            customerPhone: dto.customerPhone!.trim(),
             itemsSubtotal,
             discountTotal: combinedDiscountTotal,
             deliveryFee,
@@ -500,13 +511,10 @@ export class PosService {
         }
       }
 
-      // Trigger production jobs for open command
-      await this.kdsService.createProductionJobs(currentOrder.id, tenantId).catch(e => {
-        console.error('KDS print jobs failed to create for draft', e);
-      });
-
       return currentOrder;
     });
+
+    await this.kdsService.createProductionJobs(order.id, tenantId);
 
     return this.getOrderDetail(order.id, tenantId);
   }

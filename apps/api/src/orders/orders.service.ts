@@ -781,7 +781,9 @@ export class OrdersService {
       throw new BadRequestException('Não é possível despachar um pedido de entrega sem um entregador atribuído.');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const shouldCreateProductionJobs = nextStatus === 'confirmed' || nextStatus === 'preparing';
+
+    const updated = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.order.update({
         where: { id: orderId },
         data: { status: nextStatus },
@@ -795,12 +797,6 @@ export class OrdersService {
             data: { status: 'available' },
           });
         }
-      }
-
-      if (nextStatus === 'confirmed' || nextStatus === 'preparing') {
-        await this.kdsService.createProductionJobs(orderId, tenantId).catch((err) => {
-          this.logger.error(`Error creating production jobs for order ${orderId}: ${err.message}`);
-        });
       }
 
       await tx.orderTimeline.create({
@@ -843,6 +839,20 @@ export class OrdersService {
 
       return updated;
     });
+
+    if (shouldCreateProductionJobs) {
+      const jobs = await this.kdsService.createProductionJobs(orderId, tenantId);
+      if (jobs.length === 0) {
+        const existingJobsCount = await this.prisma.printJob.count({
+          where: { tenantId, orderId },
+        });
+        if (existingJobsCount === 0) {
+          this.logger.error(`No production jobs created for order ${orderId} after status ${nextStatus}`);
+        }
+      }
+    }
+
+    return updated;
   }
 
   async updateOrderNotes(orderId: string, tenantId: string, dto: UpdateOrderNotesDTO, actorId?: string) {

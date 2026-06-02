@@ -3,9 +3,14 @@ import { RefreshCw, Clock, CheckCircle2, ChefHat } from 'lucide-react';
 import { 
   KdsPrintJobDTO 
 } from '@gestor/types';
+import { api } from '@/lib/api-client';
 
-
-const API_BASE = '/api/v1';
+interface KdsPrintJobsResponse {
+  items: KdsPrintJobDTO[];
+  total: number;
+  page: number;
+  limit: number;
+}
 
 export function KdsPage() {
   const [stationId, setStationId] = useState<string>(localStorage.getItem('kds_station') || 'GERAL');
@@ -14,42 +19,32 @@ export function KdsPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [stations, setStations] = useState<string[]>(['GERAL']);
 
-  const token = localStorage.getItem('accessToken');
-
   const fetchJobs = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/kds/print-jobs?station=${stationId}&status=pending`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const json = await res.json();
-        setPrintJobs(json.items || []);
-      }
+      const res = await api.get<KdsPrintJobsResponse>(
+        `/kds/print-jobs?station=${encodeURIComponent(stationId)}&status=pending`,
+      );
+      setPrintJobs(res.data.items || []);
     } catch {
       // Ignore
     } finally {
       if (loading) setLoading(false);
     }
-  }, [token, loading, stationId]);
+  }, [loading, stationId]);
 
   useEffect(() => {
     const fetchStations = async () => {
       try {
-        const res = await fetch(`${API_BASE}/kds/stations`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const json = await res.json();
-          if (json && Array.isArray(json) && json.length > 0) {
-            setStations(json);
-          }
+        const res = await api.get<string[]>('/kds/stations');
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          setStations(res.data);
         }
       } catch {
         // Ignore
       }
     };
     fetchStations();
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('kds_station', stationId);
@@ -62,13 +57,8 @@ export function KdsPage() {
     if (updatingId) return;
     setUpdatingId(jobId);
     try {
-      const res = await fetch(`${API_BASE}/kds/print-jobs/${jobId}/completed`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        await fetchJobs();
-      }
+      await api.put(`/kds/print-jobs/${jobId}/completed`);
+      await fetchJobs();
     } catch {
       // Ignore
     } finally {

@@ -538,10 +538,10 @@ export default function PosPage() {
   const subtotal = cart.reduce((sum, item) => sum + item.basePrice * item.quantity, 0);
   const total = Math.max(0, subtotal - discountTotal + deliveryFee);
   const isDelivery = fulfillmentType === PosFulfillmentType.DELIVERY;
+  const customerMissingRequiredData = !customerName.trim() || !customerPhone.trim();
   const deliveryMissingRequiredData =
     isDelivery &&
-    (!customerName.trim() ||
-      !customerPhone.trim() ||
+    (customerMissingRequiredData ||
       !deliveryAddress.street.trim() ||
       !deliveryAddress.number.trim() ||
       !deliveryAddress.neighborhood.trim());
@@ -549,6 +549,7 @@ export default function PosPage() {
     !!activeSession &&
     cart.length > 0 &&
     !createSale.isPending &&
+    !customerMissingRequiredData &&
     (!isDelivery || (!deliveryMissingRequiredData && deliveryFeeCalculated));
   const isSavingCustomerAddress =
     createCustomerMutation.isPending ||
@@ -632,6 +633,10 @@ export default function PosPage() {
 
   const handleConfirmSale = (method: PaymentMethod) => {
     if (!activeSession) return;
+    if (customerMissingRequiredData) {
+      setSaleError('Informe nome do cliente e telefone para fechar a conta.');
+      return;
+    }
     if (isDelivery && deliveryMissingRequiredData) {
       setDeliveryFeeError('Delivery exige cliente, telefone, rua, numero e bairro.');
       return;

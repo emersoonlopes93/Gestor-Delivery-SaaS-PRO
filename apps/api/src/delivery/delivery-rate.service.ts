@@ -612,6 +612,13 @@ export class DeliveryRateService {
         resolvedCoordinates: decision.resolvedCoordinates,
       };
     } catch (error: unknown) {
+      if (error instanceof UnprocessableEntityException) {
+        try {
+          return await this.calculateRateLegacy(input);
+        } catch {
+          // Preserve the original coverage/geocoding error if legacy rules cannot resolve it either.
+        }
+      }
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Error calculating delivery rate: ${message}`);
       throw error;
