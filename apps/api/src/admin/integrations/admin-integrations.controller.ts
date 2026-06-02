@@ -5,6 +5,7 @@ import {
   Body,
   UseGuards,
   HttpCode,
+  BadRequestException,
 } from '@nestjs/common';
 import { IsOptional, IsString, IsEnum, ValidateIf } from 'class-validator';
 import { SystemConfigService } from '../services/system-config.service';
@@ -85,6 +86,10 @@ export class AdminIntegrationsController {
   @HttpCode(200)
   @Permissions('saas.settings.manage')
   async updateConfig(@Body() data: UpdateIntegrationsConfigDto) {
+    if (Object.prototype.hasOwnProperty.call(data, 'baseAiPrompt') && data.baseAiPrompt != null) {
+      throw new BadRequestException('baseAiPrompt deve ser atualizado em /admin/ai-agent/global-config');
+    }
+
     return this.configService.updateConfig(data);
   }
 }

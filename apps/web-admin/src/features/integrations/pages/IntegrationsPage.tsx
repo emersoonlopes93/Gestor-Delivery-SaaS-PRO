@@ -244,17 +244,18 @@ export default function IntegrationsPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Prompt Base (Global)</label>
-                <textarea
-                  rows={4}
-                  className="w-full px-4 py-3 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-ring transition-all outline-none resize-none"
-                  placeholder="Instruções base que serão aplicadas a todos os agentes IA do sistema..."
-                  value={config?.baseAiPrompt || ''}
-                  onChange={(e) => setConfig(prev => prev ? {...prev, baseAiPrompt: e.target.value} : null)}
-                />
-                <p className="text-xs text-muted-foreground">Este prompt será combinado com as instruções específicas de cada tenant.</p>
-              </div>
+              
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Prompt Mestre Global</label>
+                  <div className="p-4 rounded-xl border border-border bg-card">
+                    <p className="text-sm text-muted-foreground">O Prompt Mestre Global do Agente IA agora é gerenciado na tela Agente IA Global. Essa configuração define as regras centrais do agente para todos os tenants.</p>
+                    <div className="mt-4">
+                      <a href="/ai-agent/global" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground">
+                        Ir para Agente IA Global
+                      </a>
+                    </div>
+                  </div>
+                </div>
             </div>
           </div>
         </section>

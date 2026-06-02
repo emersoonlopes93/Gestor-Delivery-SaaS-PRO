@@ -562,6 +562,7 @@ export function WhatsAppConfigPage() {
                  onChange={(e) => setFormAi(prev => prev ? {...prev, customInstructions: e.target.value} : null)}
                />
                <p className="text-[10px] text-muted-foreground italic">Forneça detalhes que a IA deve saber sobre seu negócio.</p>
+               <p className="text-xs text-muted-foreground">Essas instruções complementam o Prompt Mestre Global do SaaS. Elas não substituem regras ou políticas obrigatórias definidas globalmente pelo administrador — para alterar o Prompt Mestre Global use a tela Agente IA Global.</p>
              </div>
 
              <div className="pt-4 border-t border-border space-y-4">
