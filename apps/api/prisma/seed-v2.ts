@@ -1,14 +1,16 @@
 import 'reflect-metadata';
 import { PrismaClient } from '@prisma/client';
+import * as process from 'process';
+
 const prisma = new PrismaClient();
 
 async function seedCatalogV2() {
-  console.log('   ? Seeding Catalog V2 demo data...');
+  console.log('   🌱 Seeding Catalog V2 demo data...');
 
   const TENANT_SLUG = 'pizzaria-demo';
   const tenant = await prisma.tenant.findUnique({ where: { slug: TENANT_SLUG } });
   if (!tenant) {
-    console.error('   ? Demo tenant not found. Run main seed first.');
+    console.error('   ❌ Demo tenant not found. Run main seed first.');
     return;
   }
 
@@ -16,18 +18,20 @@ async function seedCatalogV2() {
     where: { tenantId: tenant.id, slug: 'pizzas' },
   });
   if (!category) {
-    console.error('   ? Pizzas category not found. Run main seed first.');
+    console.error('   ❌ Pizzas category not found. Run main seed first.');
     return;
   }
 
+  // Clear existing OptionGroups, ComboSlots, etc. to make it idempotent
+  await prisma.optionGroup.deleteMany({ where: { tenantId: tenant.id } });
+  await prisma.comboSlot.deleteMany({ where: { tenantId: tenant.id } });
+
   // V2 Option Groups
-  const ogMassas = await prisma.optionGroup.upsert({
-    where: { tenantId_slug: { tenantId: tenant.id, slug: 'massas' } },
-    update: {},
-    create: {
+  const ogMassas = await prisma.optionGroup.create({
+    data: {
       tenantId: tenant.id,
       name: 'Massas',
-      slug: 'massas',
+      selectionType: 'single',
       isRequired: true,
       minSelect: 1,
       maxSelect: 1,
@@ -35,13 +39,11 @@ async function seedCatalogV2() {
     },
   });
 
-  const ogSabores = await prisma.optionGroup.upsert({
-    where: { tenantId_slug: { tenantId: tenant.id, slug: 'sabores-adicionais' } },
-    update: {},
-    create: {
+  const ogSabores = await prisma.optionGroup.create({
+    data: {
       tenantId: tenant.id,
       name: 'Sabores Adicionais',
-      slug: 'sabores-adicionais',
+      selectionType: 'multiple',
       isRequired: false,
       minSelect: 0,
       maxSelect: 3,
@@ -56,50 +58,45 @@ async function seedCatalogV2() {
         tenantId: tenant.id,
         optionGroupId: ogMassas.id,
         name: 'Massa Tradicional',
-        slug: 'massa-tradicional',
-        priceImpact: 'none',
-        priceDelta: 0,
-        qty: 1,
+        priceImpactType: 'none',
+        priceImpactValue: 0,
+        allowQuantity: false,
         order: 0,
       },
       {
         tenantId: tenant.id,
         optionGroupId: ogMassas.id,
         name: 'Massa Fina',
-        slug: 'massa-fina',
-        priceImpact: 'fixed',
-        priceDelta: 3.0,
-        qty: 1,
+        priceImpactType: 'fixed',
+        priceImpactValue: 3.0,
+        allowQuantity: false,
         order: 1,
       },
       {
         tenantId: tenant.id,
         optionGroupId: ogSabores.id,
         name: 'Cheddar',
-        slug: 'cheddar',
-        priceImpact: 'fixed',
-        priceDelta: 5.0,
-        qty: 1,
+        priceImpactType: 'fixed',
+        priceImpactValue: 5.0,
+        allowQuantity: false,
         order: 0,
       },
       {
         tenantId: tenant.id,
         optionGroupId: ogSabores.id,
         name: 'Catupiry',
-        slug: 'catupiry',
-        priceImpact: 'fixed',
-        priceDelta: 4.0,
-        qty: 1,
+        priceImpactType: 'fixed',
+        priceImpactValue: 4.0,
+        allowQuantity: false,
         order: 1,
       },
       {
         tenantId: tenant.id,
         optionGroupId: ogSabores.id,
         name: 'Parmesão',
-        slug: 'parmesao',
-        priceImpact: 'none',
-        priceDelta: 0,
-        qty: 1,
+        priceImpactType: 'none',
+        priceImpactValue: 0,
+        allowQuantity: false,
         order: 2,
       },
     ],
@@ -183,14 +180,11 @@ async function seedCatalogV2() {
   });
 
   // V2 Combo Slots
-  const slotPizza = await prisma.comboSlot.upsert({
-    where: { tenantId_slug: { tenantId: tenant.id, slug: 'pizza-grande' } },
-    update: {},
-    create: {
+  const slotPizza = await prisma.comboSlot.create({
+    data: {
       tenantId: tenant.id,
       comboProductId: comboProduct.id,
       name: 'Pizza Grande',
-      slug: 'pizza-grande',
       isRequired: true,
       minSelect: 1,
       maxSelect: 1,
@@ -198,14 +192,11 @@ async function seedCatalogV2() {
     },
   });
 
-  const slotBebida = await prisma.comboSlot.upsert({
-    where: { tenantId_slug: { tenantId: tenant.id, slug: 'bebidas' } },
-    update: {},
-    create: {
+  const slotBebida = await prisma.comboSlot.create({
+    data: {
       tenantId: tenant.id,
       comboProductId: comboProduct.id,
       name: 'Bebidas (2 unidades)',
-      slug: 'bebidas',
       isRequired: true,
       minSelect: 2,
       maxSelect: 2,
@@ -217,13 +208,6 @@ async function seedCatalogV2() {
   await prisma.comboSlotAllowedItem.createMany({
     data: [
       // Itens permitidos no slot de pizza
-      {
-        tenantId: tenant.id,
-        comboSlotId: slotPizza.id,
-        productId: 'pizza-de-calabresa', // Pizza de Calabresa (legado)
-        additionalPrice: 0,
-        order: 0,
-      },
       {
         tenantId: tenant.id,
         comboSlotId: slotPizza.id,
@@ -244,8 +228,8 @@ async function seedCatalogV2() {
   });
 
   // V2 Publication e Availability
-  await prisma.catalogPublication.upsert({
-    where: { tenantId_productId: { tenantId: tenant.id, productId: configurableProduct.id } },
+  const configurablePublication = await prisma.catalogPublication.upsert({
+    where: { productId: configurableProduct.id },
     update: {},
     create: {
       tenantId: tenant.id,
@@ -255,8 +239,8 @@ async function seedCatalogV2() {
     },
   });
 
-  await prisma.catalogPublication.upsert({
-    where: { tenantId_productId: { tenantId: tenant.id, productId: comboProduct.id } },
+  const comboPublication = await prisma.catalogPublication.upsert({
+    where: { productId: comboProduct.id },
     update: {},
     create: {
       tenantId: tenant.id,
@@ -271,7 +255,7 @@ async function seedCatalogV2() {
     data: [
       {
         tenantId: tenant.id,
-        productId: comboProduct.id,
+        publicationId: comboPublication.id,
         channel: 'storefront_delivery',
         daysOfWeek: [5, 6], // Sexta e Sábado
         startTime: '18:00',
@@ -280,7 +264,7 @@ async function seedCatalogV2() {
       },
       {
         tenantId: tenant.id,
-        productId: configurableProduct.id,
+        publicationId: configurablePublication.id,
         channel: 'storefront_delivery',
         daysOfWeek: [0, 1, 2, 3, 4, 5, 6], // Todos os dias
         startTime: '18:00',
@@ -291,11 +275,11 @@ async function seedCatalogV2() {
     skipDuplicates: true,
   });
 
-  console.log(`   ? Catalog V2 data seeded for ${TENANT_SLUG}`);
-  console.log(`   ? Products: simple (1), configurable (1), combo (1)`);
-  console.log(`   ? Option Groups: 2 with 5 items total`);
-  console.log(`   ? Combo Slots: 2 with 3 allowed items total`);
-  console.log(`   ? Publication & Availability rules configured`);
+  console.log(`   ✅ Catalog V2 data seeded for ${TENANT_SLUG}`);
+  console.log(`   📌 Products: simple (1), configurable (1), combo (1)`);
+  console.log(`   📌 Option Groups: 2 with 5 items total`);
+  console.log(`   📌 Combo Slots: 2 with 2 allowed items total`);
+  console.log(`   📌 Publication & Availability rules configured`);
 }
 
 async function main() {
@@ -304,7 +288,7 @@ async function main() {
 
 main()
   .catch((e) => {
-    console.error('   ? V2 Seed failed:', e);
+    console.error('   ❌ V2 Seed failed:', e);
     process.exit(1);
   })
   .finally(async () => {
