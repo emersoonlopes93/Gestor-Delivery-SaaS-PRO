@@ -3,7 +3,8 @@ import { X, Minus, Plus, AlertCircle, Box, Check } from 'lucide-react';
 import type { 
   CartSelectedComboSlot,
   StorefrontComboPayload,
-  StorefrontProductPayload
+  StorefrontProductPayload,
+  StorefrontComboBlockItemPayload
 } from '@gestor/types';
 import { useCartStore } from '../store/use-cart-store';
 import { clsx, type ClassValue } from 'clsx';
@@ -34,7 +35,7 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
       blockId: b.id,
       productId: '',
       items: []
-    } as any));
+    }));
     setSlots(initial);
     }
   }, [combo, isBundle]);
@@ -50,7 +51,7 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
       (combo.bundleItems ?? []).forEach(i => parts.push(`${i.productName} x${i.qty}`));
     } else {
       slots.forEach(slot => {
-        slot.items.forEach(item => {
+        slot.items?.forEach(item => {
           extras += item.additionalPrice * (item.qty || 1);
           parts.push(item.qty && item.qty > 1 ? `${item.name} x${item.qty}` : item.name);
         });
@@ -69,8 +70,8 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
     if (isBundle) return null;
 
     for (const block of combo.blocks || []) {
-      const state = slots.find(s => (s as any).comboSlotId === block.id || s.blockId === block.id);
-      const count = state?.items.length || 0;
+      const state = slots.find(s => s.comboSlotId === block.id || s.blockId === block.id);
+      const count = state?.items?.length || 0;
       if (count < block.minSelect) return `Selecione pelo menos ${block.minSelect} em "${block.name}"`;
       if (count > block.maxSelect) return `Selecione no máximo ${block.maxSelect} em "${block.name}"`;
     }
@@ -78,16 +79,16 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
     return null;
   }, [combo, slots, isBundle]);
 
-  const toggleSlotItem = (blockId: string, item: any, maxSelect: number) => {
+  const toggleSlotItem = (blockId: string, item: StorefrontComboBlockItemPayload, maxSelect: number) => {
     setSlots(prev => {
-      const slot = prev.find(s => (s as any).comboSlotId === blockId || s.blockId === blockId);
+      const slot = prev.find(s => s.comboSlotId === blockId || s.blockId === blockId);
       if (!slot) return prev;
 
-      const isSelected = slot.items?.some((i: any) => i.productId === item.productId);
+      const isSelected = slot.items?.some(i => i.productId === item.productId);
       let newItems = [...(slot.items || [])];
 
       if (isSelected) {
-        newItems = newItems.filter((i: any) => i.productId !== item.productId);
+        newItems = newItems.filter(i => i.productId !== item.productId);
       } else {
         if (maxSelect === 1) {
           newItems = [{ productId: item.productId, name: item.productName, additionalPrice: item.additionalPrice, qty: 1 }];
@@ -96,7 +97,7 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
         }
       }
 
-      return prev.map(s => ((s as any).comboSlotId === blockId || s.blockId === blockId) ? { ...s, items: newItems } : s);
+      return prev.map(s => (s.comboSlotId === blockId || s.blockId === blockId) ? { ...s, items: newItems } : s);
     });
   };
 
@@ -126,7 +127,7 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
       quantity,
       notes: notes.trim() || undefined,
       slots: !isBundle ? slots : undefined,
-      bundleItems: isBundle ? combo.bundleItems.map((bi: any) => ({ ...bi, name: bi.productName })) : undefined,
+      bundleItems: isBundle ? combo.bundleItems.map(bi => ({ ...bi, name: bi.productName })) : undefined,
       computedUnitPrice: computed.unitPrice,
       compositionLabel: computed.compositionLabel
     });
@@ -138,7 +139,7 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4">
       <div className="bg-storefront-card w-full max-w-lg sm:rounded-3xl flex flex-col max-h-[92vh] shadow-2xl animate-in fade-in slide-in-from-bottom-10 duration-300">
         
-        <div className="relative">
+         <div className="relative">
           {combo.image ? (
             <img src={combo.image} alt={combo.name} className="w-full h-48 sm:h-64 object-cover sm:rounded-t-3xl" />
           ) : (
@@ -188,8 +189,8 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
                 </div>
               </div>
             ) : (combo.blocks ?? []).map((block) => {
-              const state = slots.find(s => (s as any).comboSlotId === block.id || s.blockId === block.id);
-              const selectedCount = state?.items.length || 0;
+              const state = slots.find(s => s.comboSlotId === block.id || s.blockId === block.id);
+              const selectedCount = state?.items?.length || 0;
 
               return (
                 <div key={block.id} className="bg-orange-50/30 rounded-2xl p-4 border border-orange-100/50">

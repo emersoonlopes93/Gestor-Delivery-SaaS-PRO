@@ -5,7 +5,6 @@ import { AdminRbacService } from './rbac/admin-rbac.service';
 import { AdminTenantsController } from './tenants/admin-tenants.controller';
 import { AdminTenantsService } from './tenants/admin-tenants.service';
 import { AdminModulesController } from './modules/admin-modules.controller';
-import { AdminModulesService } from './modules/admin-modules.service';
 import { AdminGroupsController } from './groups/admin-groups.controller';
 import { AdminGroupsService } from './groups/admin-groups.service';
 import { AdminHealthController } from './health/admin-health.controller';

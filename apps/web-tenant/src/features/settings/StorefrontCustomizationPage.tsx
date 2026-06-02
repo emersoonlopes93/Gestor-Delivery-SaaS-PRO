@@ -39,7 +39,7 @@ interface DemoProduct {
   image?: string;
   basePrice: number;
   isAvailable: boolean;
-  featured?: boolean;
+  isFeatured?: boolean;
 }
 
 interface DemoCategory {
@@ -82,7 +82,7 @@ const DEMO_CATEGORIES: DemoCategory[] = [
         image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&auto=format&fit=crop&q=60',
         basePrice: 28.90,
         isAvailable: true,
-        featured: true
+        isFeatured: true
       },
       {
         id: 'demo-prod-2',
@@ -179,9 +179,9 @@ export function StorefrontCustomizationPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await api.patch('/tenant/storefront-customization', customization);
+      const response = await api.patch<{ theme: StorefrontThemeSettings; layout: StorefrontLayoutSettings }>('/tenant/storefront-customization', customization);
       if (response.success) {
-        setCustomization(response.data as any);
+        setCustomization(response.data);
         // Success notification
         alert('Configurações salvas com sucesso! As alterações podem levar até 1 minuto para propagar no cardápio público devido ao cache.');
       }
@@ -240,7 +240,7 @@ export function StorefrontCustomizationPage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await api.post<any>('/upload/storefront-background', formData);
+      const response = await api.post<{ publicUrl: string; id: string }>('/upload/storefront-background', formData);
       if (response.success) {
         updateTheme({ 
           backgroundImageUrl: response.data.publicUrl,
@@ -320,7 +320,7 @@ export function StorefrontCustomizationPage() {
     return 'flex flex-col gap-2.5';
   };
 
-  const renderProductCard = (product: any) => {
+  const renderProductCard = (product: Product | DemoProduct) => {
     const layout = customization.layout.productLayout;
     const imageMode = customization.layout.productImageMode;
     const showDesc = customization.layout.showProductDescription;
@@ -344,13 +344,13 @@ export function StorefrontCustomizationPage() {
         >
           {showImage && (
             <div className={`aspect-video w-full overflow-hidden mb-2 ${cardBorderRadius} bg-muted`}>
-              <img src={product.image} className="w-full h-full object-cover" alt={product.name} />
+              <img src={product.image ?? undefined} className="w-full h-full object-cover" alt={product.name} />
             </div>
           )}
           <div className="flex-1 flex flex-col min-w-0">
             <div className="flex items-center gap-1 mb-0.5">
               <h4 className="font-bold text-[9px] truncate text-foreground leading-tight">{product.name}</h4>
-              {showBadges && product.featured && (
+              {showBadges && product.isFeatured && (
                 <span className="text-[6px] font-black bg-[var(--preview-primary)] text-white px-1 py-0.2 rounded-full uppercase shrink-0 scale-90">Destaque</span>
               )}
             </div>
@@ -381,7 +381,7 @@ export function StorefrontCustomizationPage() {
         >
           {showImage && (
             <div className={`aspect-square w-full overflow-hidden mb-2 ${cardBorderRadius} bg-muted`}>
-              <img src={product.image} className="w-full h-full object-cover" alt={product.name} />
+              <img src={product.image ?? undefined} className="w-full h-full object-cover" alt={product.name} />
             </div>
           )}
           <div className="flex-1 flex flex-col min-w-0">
@@ -416,7 +416,7 @@ export function StorefrontCustomizationPage() {
           <div className="flex-1 min-w-0 space-y-0.5 text-left">
             <div className="flex items-center gap-1">
               <h4 className="font-bold text-[9px] text-foreground truncate leading-tight">{product.name}</h4>
-              {showBadges && product.featured && (
+              {showBadges && product.isFeatured && (
                 <span className="text-[6px] font-black bg-[var(--preview-primary)] text-white px-1 py-0.2 rounded-full uppercase shrink-0 scale-90">Destaque</span>
               )}
             </div>
@@ -431,7 +431,7 @@ export function StorefrontCustomizationPage() {
           </div>
           {showImage && (
             <div className="w-12 h-12 rounded-[calc(var(--preview-radius)-4px)] overflow-hidden bg-muted shrink-0 shadow-inner">
-              <img src={product.image} className="w-full h-full object-cover" alt={product.name} />
+              <img src={product.image ?? undefined} className="w-full h-full object-cover" alt={product.name} />
             </div>
           )}
         </div>
@@ -480,13 +480,13 @@ export function StorefrontCustomizationPage() {
         >
           {showImage && (
             <div className="aspect-video w-full overflow-hidden mb-2 bg-muted rounded shadow-sm">
-              <img src={product.image} className="w-full h-full object-cover" alt={product.name} />
+              <img src={product.image ?? undefined} className="w-full h-full object-cover" alt={product.name} />
             </div>
           )}
           <div className="flex-1 flex flex-col min-w-0 space-y-0.5">
             <div className="flex items-center justify-between gap-1">
               <h4 className="font-black text-[9px] text-foreground uppercase tracking-wide truncate leading-tight">{product.name}</h4>
-              {showBadges && product.featured && (
+              {showBadges && product.isFeatured && (
                 <span className="text-[6px] font-black bg-[var(--preview-primary)] text-white px-1 py-0.2 rounded uppercase shrink-0 scale-90">Premium</span>
               )}
             </div>
@@ -708,7 +708,7 @@ export function StorefrontCustomizationPage() {
                 <label className="text-sm font-medium text-foreground">Estilo de Fundo</label>
                 <select 
                   value={customization.theme.backgroundStyle}
-                  onChange={(e) => updateTheme({ backgroundStyle: e.target.value as any })}
+                  onChange={(e) => updateTheme({ backgroundStyle: e.target.value as StorefrontThemeSettings['backgroundStyle'] })}
                   className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
                 >
                   <option value="clean">Clean (Branco/Preto)</option>
@@ -741,7 +741,7 @@ export function StorefrontCustomizationPage() {
                 <label className="text-sm font-medium text-foreground">Estilo de Fonte</label>
                 <select 
                   value={customization.theme.fontStyle}
-                  onChange={(e) => updateTheme({ fontStyle: e.target.value as any })}
+                  onChange={(e) => updateTheme({ fontStyle: e.target.value as StorefrontThemeSettings['fontStyle'] })}
                   className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
                 >
                   <option value="default">Padrão (Inter)</option>

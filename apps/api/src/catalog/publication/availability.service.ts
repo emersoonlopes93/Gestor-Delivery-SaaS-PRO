@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { Prisma, TenantSettings, TenantOperatingHours } from '@prisma/client';
+import { TenantSettings, TenantOperatingHours } from '@prisma/client';
 
 export type SalesChannel = 'storefront_delivery' | 'storefront_pickup' | 'pos';
 

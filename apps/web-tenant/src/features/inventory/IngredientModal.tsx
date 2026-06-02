@@ -72,7 +72,7 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
     if (factor !== formData.conversionFactor) {
       setFormData(prev => ({ ...prev, conversionFactor: factor }));
     }
-  }, [formData.unit, formData.purchaseUnit]);
+  }, [formData.unit, formData.purchaseUnit, editingIngredient, formData.conversionFactor]);
 
   const calculatedValues = useMemo(() => {
     if (!formData.initialPurchaseActive || !formData.initialPurchase) return null;
@@ -96,7 +96,8 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const { initialPurchaseActive: _, ...payload } = formData;
+      const payload = { ...formData };
+      delete payload.initialPurchaseActive;
       if (!formData.initialPurchaseActive) {
         delete payload.initialPurchase;
       }

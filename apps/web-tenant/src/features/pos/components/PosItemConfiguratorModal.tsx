@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { X, Minus, Plus, AlertCircle, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import type {
@@ -368,13 +368,13 @@ export function PosItemConfiguratorModal(props: {
     }
 
     return { unitPrice: base, label: '' };
-  }, [detail, hasLegacyComplements, hasV2Options, isSlotCombo, selectionState, selectedComplements, slotState]);
+  }, [detail, hasLegacyComplements, hasV2Options, isSlotCombo, selectionState, selectedComplements, slotState, categoryFlavors, isPizzaTemplate, selectedPizzaFlavors]);
 
   const total = computed.unitPrice * quantity;
 
-  const validateNow = (): string | null => {
+  const validateNow = useCallback((): string | null => {
     if (!detail) return 'Produto não carregado.';
-
+ 
     if (hasV2Options) {
       try {
         computeOptionSelectionsPrice(detail, selectionState);
@@ -382,12 +382,12 @@ export function PosItemConfiguratorModal(props: {
         return e instanceof Error ? e.message : 'Seleção inválida.';
       }
     }
-
+ 
     if (hasLegacyComplements) {
       for (const link of detail.complementGroups ?? []) {
         const group = link.group;
         const selectedCount = selectedComplements.filter((s) => s.groupId === group.id).length;
-
+ 
         const effectiveMin = group.isRequired ? Math.max(1, Number(group.minSelect ?? 0)) : Number(group.minSelect ?? 0);
         if (selectedCount < effectiveMin) {
           return `Selecione pelo menos ${effectiveMin} opções em "${group.name}".`;
@@ -397,7 +397,7 @@ export function PosItemConfiguratorModal(props: {
         }
       }
     }
-
+ 
     if (isSlotCombo) {
       for (const slot of detail.comboSlots ?? []) {
         const selected = slotState.find((s) => s.comboSlotId === slot.id)?.items ?? [];
@@ -411,21 +411,21 @@ export function PosItemConfiguratorModal(props: {
         }
       }
     }
-
+ 
     if (isPizzaTemplate) {
       const sizesLink = detail.optionGroupLinks?.find(l => l.pricingAxis === 'primary');
       const sizeSelected = selectionState.find(s => s.optionGroupId === sizesLink?.optionGroup.id)?.items.length ?? 0;
       if (sizeSelected === 0) return 'Selecione um tamanho.';
       if (selectedPizzaFlavors.length === 0) return 'Selecione pelo menos 1 sabor.';
     }
-
+ 
     return null;
-  };
-
+  }, [detail, hasV2Options, hasLegacyComplements, selectedComplements, isSlotCombo, slotState, isPizzaTemplate, selectionState, selectedPizzaFlavors]);
+ 
   const currentValidationError = useMemo(() => {
     if (!isOpen) return null;
     return validateNow();
-  }, [isOpen, detail, hasV2Options, hasLegacyComplements, isSlotCombo, isPizzaTemplate, selectionState, selectedComplements, slotState]);
+  }, [isOpen, validateNow]);
 
   const toggleComplement = (groupId: string, itemId: string, maxSelect: number) => {
     setSelectedComplements((prev) => {

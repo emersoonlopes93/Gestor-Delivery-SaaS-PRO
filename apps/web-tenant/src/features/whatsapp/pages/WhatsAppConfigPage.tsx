@@ -77,23 +77,17 @@ export function WhatsAppConfigPage() {
 
   // Fetch Status/QR
   const fetchStatus = async () => {
-    try {
-      const res = await api.get<WhatsAppStatusResponse>('/whatsapp/instance/status');
-      console.log('[Frontend] Status response:', res.data);
-      
-      // Se conectou ou desconectou, limpar QR code
-      if (res.data.status === 'connected' || res.data.status === 'disconnected') {
-        setQrCode(null);
-      } else if (res.data.qrCode) {
-        setQrCode(res.data.qrCode);
-      }
-      
-      return res.data;
-    } catch (e) {
-      // Importante: não retornar `null`, senão o polling pode parar (status vira undefined).
-      // Deixar falhar preserva o último `data` conhecido do React Query.
-      throw e;
+    const res = await api.get<WhatsAppStatusResponse>('/whatsapp/instance/status');
+    console.log('[Frontend] Status response:', res.data);
+    
+    // Se conectou ou desconectou, limpar QR code
+    if (res.data.status === 'connected' || res.data.status === 'disconnected') {
+      setQrCode(null);
+    } else if (res.data.qrCode) {
+      setQrCode(res.data.qrCode);
     }
+    
+    return res.data;
   };
 
   const { data: status, refetch: refetchStatus } = useQuery({

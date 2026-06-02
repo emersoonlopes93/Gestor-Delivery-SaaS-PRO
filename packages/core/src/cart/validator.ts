@@ -33,7 +33,7 @@ export class CartValidator {
 
       // Check availability of selected items
       for (const sel of selectedForGroup) {
-        const item = group.items.find((i: any) => i.id === sel.itemId);
+        const item = group.items.find((i) => i.id === sel.itemId);
         if (!item) {
           throw new Error(`Opção inválida ou não encontrada no grupo "${group.name}".`);
         }
@@ -45,7 +45,7 @@ export class CartValidator {
 
     // 2. Extraneous options check
     for (const opt of selectedOptions) {
-      const groupExists = complements.find((g: any) => g.id === opt.groupId);
+      const groupExists = complements.find((g) => g.id === opt.groupId);
       if (!groupExists) {
         throw new Error(`Grupo adicional não reconhecido neste produto.`);
       }
@@ -86,7 +86,7 @@ export class CartValidator {
 
       // Validate allowed items within the block
       for (const sel of selectedForBlock) {
-        const item = block.items.find((i: any) => i.id === (sel as any).blockItemId || i.id === sel.productId);
+        const item = block.items.find((i) => i.id === sel.blockItemId || i.id === sel.productId);
         if (!item) {
           throw new Error(`O item selecionado não faz parte do bloco "${block.name}".`);
         }

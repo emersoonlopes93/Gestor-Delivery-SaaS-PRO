@@ -1284,13 +1284,6 @@ export class AgentToolsService {
     if (args.data) {
       // Interpretar a data no timezone do tenant para evitar off-by-one
       const [year, month, day] = args.data.split('-').map(Number);
-      // Cria a data às 00:00 no timezone do tenant
-      const formatter = new Intl.DateTimeFormat('en-CA', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      });
       // Usar a data informada diretamente
       date = new Date(year, (month ?? 1) - 1, day ?? 1, 12, 0, 0);
     } else {

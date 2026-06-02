@@ -157,7 +157,6 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
       }
     };
   // Re-subscribe apenas quando tenantId ou enabled muda — volume/som são lidos por ref
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, settings.enabled]);
 
   const requestPermission = useCallback(() => {

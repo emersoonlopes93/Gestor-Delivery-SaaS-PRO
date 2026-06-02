@@ -5,8 +5,7 @@ import {
   CreateInventoryCountDTO, 
   InventoryCountStatus, 
   StockMovementType,
-  UnitType,
-  UnitType as PrismaUnitType
+  UnitType
 } from '@gestor/types';
 import { Prisma, UnitType as PrismaClientUnitType } from '@prisma/client';
 

@@ -7,13 +7,11 @@ import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import type { TenantOperatingHours } from '@gestor/types';
 import { Prisma } from '@prisma/client';
 import { 
-  getDefaultStorefrontThemeSettings, 
-  getDefaultStorefrontLayoutSettings,
-  sanitizeHexColor,
   getStorefrontPresetById,
   normalizeStorefrontTheme,
   normalizeStorefrontLayout
 } from '@gestor/theme';
+import { StorefrontCustomizationPayload } from '@gestor/types';
 
 @Injectable()
 export class TenantService {
@@ -165,7 +163,7 @@ export class TenantService {
   /**
    * Update storefront customization.
    */
-  async updateStorefrontCustomization(tenantId: string, data: any) {
+  async updateStorefrontCustomization(tenantId: string, data: Partial<StorefrontCustomizationPayload> & { presetId?: string }) {
     const updateData: Prisma.TenantSettingsUpdateInput = {};
 
     // 1. Handle Preset (Atomically)
@@ -173,8 +171,8 @@ export class TenantService {
       const preset = getStorefrontPresetById(data.presetId);
       if (preset) {
         // Presets are already normalized by definition in theme package
-        updateData.storefrontThemeJson = preset.theme as any;
-        updateData.storefrontLayoutJson = preset.layout as any;
+        updateData.storefrontThemeJson = preset.theme as Prisma.InputJsonValue;
+        updateData.storefrontLayoutJson = preset.layout as Prisma.InputJsonValue;
         
         const updated = await this.prisma.tenantSettings.update({
           where: { tenantId },
@@ -216,11 +214,11 @@ export class TenantService {
         // Force matching URL to prevent hijack
         themeSettings.backgroundImageUrl = asset.publicUrl;
       }
-      updateData.storefrontThemeJson = themeSettings as any;
+      updateData.storefrontThemeJson = themeSettings as Prisma.InputJsonValue;
     }
 
     if (data.layout) {
-      updateData.storefrontLayoutJson = normalizeStorefrontLayout(data.layout) as any;
+      updateData.storefrontLayoutJson = normalizeStorefrontLayout(data.layout) as Prisma.InputJsonValue;
     }
 
     if (!updateData.storefrontThemeJson && !updateData.storefrontLayoutJson) {

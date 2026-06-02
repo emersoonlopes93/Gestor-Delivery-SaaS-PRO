@@ -16,7 +16,6 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions as Permissions } from '../../common/decorators';
 
-import { Request as ExpressRequest } from 'express';
 import { AuthenticatedRequest } from '../../common/interfaces/request.interface';
 
 @Controller('whatsapp/instance')
@@ -76,7 +75,7 @@ export class WhatsAppInstanceController {
     const tenantId = req.user.tenantId;
     
     // Primeiro cria a instância (para gerar o secret se for nova)
-    const result = await this.instanceService.createInstance(tenantId, dto);
+    await this.instanceService.createInstance(tenantId, dto);
     
     // Depois reconecta com a URL de webhook correta incluindo o secret
     const webhookUrl = dto?.webhookUrl?.trim() || await this.buildWebhookUrl(req, tenantId);
@@ -99,7 +98,7 @@ export class WhatsAppInstanceController {
     const tenantId = req.user.tenantId;
     
     // Auto-create instance if it doesn't exist
-    let instance = await this.instanceService.getInstance(tenantId);
+    const instance = await this.instanceService.getInstance(tenantId);
     if (!instance) {
       this.logger.log(`Auto-creating new WhatsAppInstance for tenant ${tenantId} on connect request`);
       await this.instanceService.createInstance(tenantId, {});

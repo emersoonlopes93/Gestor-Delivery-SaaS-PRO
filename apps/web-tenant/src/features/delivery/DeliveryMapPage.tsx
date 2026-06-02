@@ -266,6 +266,8 @@ const OrderMarkersLayer = memo(function OrderMarkersLayer(props: {
   );
 });
 
+const DEFAULT_CENTER: LatLngExpression = [-23.55052, -46.633308];
+
 export function DeliveryMapPage() {
   const [selected, setSelected] = useState<SelectedTarget>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
@@ -319,7 +321,7 @@ export function DeliveryMapPage() {
     );
   }, [ordersQuery.data]);
 
-  const defaultCenter: LatLngExpression = [-23.55052, -46.633308];
+
 
   const selectedPosition = useMemo<LatLngExpression | null>(() => {
     if (!selected) return null;
@@ -346,10 +348,10 @@ export function DeliveryMapPage() {
     } else if (selectedPosition) {
       mapRef.current.setView(selectedPosition, 16, { animate: true });
     } else {
-      mapRef.current.setView(defaultCenter, 13, { animate: true });
+      mapRef.current.setView(DEFAULT_CENTER, 13, { animate: true });
     }
     setFitSeq((v) => v + 1);
-  }, [bounds, defaultCenter, selectedPosition]);
+  }, [bounds, selectedPosition]);
 
   const handleSelect = useCallback((t: SelectedTarget) => {
     setSelected(t);
@@ -545,7 +547,7 @@ export function DeliveryMapPage() {
 
           <div className="min-h-[520px] bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm">
             <MapContainer
-              center={selectedPosition ?? defaultCenter}
+              center={selectedPosition ?? DEFAULT_CENTER}
               zoom={13}
               style={{ height: '100%', width: '100%' }}
             >

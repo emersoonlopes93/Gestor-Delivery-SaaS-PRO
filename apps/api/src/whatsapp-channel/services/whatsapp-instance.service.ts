@@ -354,7 +354,6 @@ export class WhatsAppInstanceService {
     });
     if (!instance) return;
 
-    const provider = this.getProvider(instance.providerType);
     const apiKeyForDelete = await this.resolveApiKeyForProvider({
       providerType: instance.providerType,
       instanceApiKey: instance.apiKey,

@@ -144,17 +144,20 @@ export function StorefrontPage() {
 
   const { tenant, categories, combos, customization } = data;
 
+  const themeSettings = (customization?.theme || {}) as Record<string, any>;
+  const layoutSettings = (customization?.layout || {}) as Record<string, any>;
+
   // Use real settings from backend, with local override for testing in DEV
   // Backend now guarantees normalization, but we add a safety layer here too.
   const effectiveProductLayout = (import.meta.env.DEV && productLayout !== 'grid') 
     ? productLayout 
-    : (customization?.layout?.productLayout || 'grid');
+    : (layoutSettings.productLayout || 'grid') as StorefrontProductLayout;
 
   const effectiveTheme = {
-    ...customization?.theme,
-    colorMode: storefrontTheme === 'system' 
-      ? (customization?.theme?.colorMode || 'light') 
-      : storefrontTheme,
+    ...themeSettings,
+    colorMode: (storefrontTheme === 'system' 
+      ? (themeSettings.colorMode || 'light') 
+      : storefrontTheme) as 'light' | 'dark',
   };
 
   return (
@@ -252,7 +255,7 @@ export function StorefrontPage() {
       {/* Categories Navigation */}
       <CategoryNavigation 
         categories={categories}
-        layout={customization?.layout?.categoryLayout || 'tabs'}
+        layout={layoutSettings.categoryLayout || 'tabs'}
         onCategoryClick={(slug) => {
           const el = document.getElementById(slug);
           if (el) {
@@ -352,9 +355,9 @@ export function StorefrontPage() {
                     isAvailable: product.isAvailable,
                   }}
                   layout={effectiveProductLayout}
-                  imageMode={customization?.layout?.productImageMode}
-                  showDescription={customization?.layout?.showProductDescription}
-                  showBadges={customization?.layout?.showBadges}
+                  imageMode={layoutSettings.productImageMode}
+                  showDescription={layoutSettings.showProductDescription}
+                  showBadges={layoutSettings.showBadges}
                   onSelectProduct={() => setSelectedProduct(product)}
                 />
               ))}

@@ -7,6 +7,8 @@ import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 
+import { Prisma } from '@prisma/client';
+
 export interface CreateMediaAssetInput {
   tenantId: string;
   scope: string;
@@ -18,7 +20,7 @@ export interface CreateMediaAssetInput {
   };
   category?: string;
   altText?: string;
-  tagsJson?: any;
+  tagsJson?: Prisma.InputJsonValue;
 }
 
 @Injectable()
@@ -81,7 +83,7 @@ export class UploadService {
         path: storageResult.key,
         publicUrl: storageResult.url,
         altText,
-        tagsJson: tagsJson as any,
+        tagsJson: tagsJson as Prisma.InputJsonValue,
         isActive: true,
       },
     });
@@ -134,7 +136,7 @@ export class UploadService {
         await this.prisma.tenantSettings.update({
           where: { tenantId },
           data: {
-            storefrontThemeJson: theme as any,
+            storefrontThemeJson: theme as Prisma.InputJsonValue,
           },
         });
 

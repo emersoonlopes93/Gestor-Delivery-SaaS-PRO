@@ -434,25 +434,6 @@ function haversineDistanceKm(a: { lat: number; lng: number }, b: { lat: number; 
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-export function strategyLabel(v: string): string {
-  if (v === 'base_radius') return 'Cobertura padrão';
-  if (v === 'custom_zone_free') return 'Zona personalizada';
-  if (v === 'custom_zone_fixed') return 'Zona personalizada';
-  if (v === 'custom_zone_distance') return 'Zona personalizada';
-  if (v === 'blocked_zone') return 'Área bloqueada';
-  if (v === 'out_of_coverage') return 'Fora da área de entrega';
-  if (v === 'delivery_disabled') return 'Entrega desativada';
-  if (v === 'legacy_rules') return 'Regras legadas';
-  return 'Regra aplicada';
-}
-
-export function zoneNameById(zones: DeliveryRateRule[], id: string | null): string | null {
-  if (!id) return null;
-  const zone = zones.find((z) => z.id === id);
-  if (!zone) return null;
-  return zone.name && zone.name.trim() !== '' ? zone.name : null;
-}
-
 export function DeliveryZonesPageV2() {
   const [coverage, setCoverage] = useState<CoverageConfig | null>(null);
   const [coverageDraft, setCoverageDraft] = useState({

@@ -3,7 +3,7 @@ import { PrismaService } from '../database/prisma.service';
 import { UpdateIngredientDTO, IngredientDTO, UnitType, CreateIngredientDTO } from '@gestor/types';
 import { UnitType as PrismaUnitType, Prisma } from '@prisma/client';
 
-type IngredientWithRelations = Prisma.IngredientGetPayload<{}>;
+type IngredientWithRelations = Prisma.IngredientGetPayload<Record<string, never>>;
 
 @Injectable()
 export class IngredientsService {

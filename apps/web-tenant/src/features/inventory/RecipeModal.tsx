@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../lib/api-client';
 import { 
   IngredientDTO, 
@@ -20,13 +20,7 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadData();
-    }
-  }, [isOpen, entityType, entityId]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       const [ingRes, recipeRes] = await Promise.all([
@@ -41,7 +35,13 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [entityType, entityId]);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadData();
+    }
+  }, [isOpen, loadData]);
 
   const handleAddItem = () => {
     if (ingredients.length === 0) return;

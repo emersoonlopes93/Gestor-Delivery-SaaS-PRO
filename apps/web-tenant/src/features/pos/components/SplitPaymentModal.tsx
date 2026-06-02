@@ -90,7 +90,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
 
   const handleSplitByItems = async () => {
     const selectedItems = Object.entries(itemSelections)
-      .filter(([_, qty]) => qty > 0)
+      .filter(([, qty]) => qty > 0)
       .map(([id, qty]) => ({ orderItemId: id, quantity: qty }));
 
     if (selectedItems.length === 0) {

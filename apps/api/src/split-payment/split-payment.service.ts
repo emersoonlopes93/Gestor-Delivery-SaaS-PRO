@@ -11,8 +11,7 @@ import {
   OrderSplitDTO, 
   SplitPaymentDTO, 
   OrderSplitStatus, 
-  PaymentMethod, 
-  PaymentTxStatus 
+  PaymentMethod 
 } from '@gestor/types';
 
 @Injectable()
@@ -42,7 +41,7 @@ export class SplitPaymentService {
     };
   }
 
-  private mapPaymentToDTO(p: Prisma.SplitPaymentGetPayload<{}>): SplitPaymentDTO {
+  private mapPaymentToDTO(p: Prisma.SplitPaymentGetPayload<Record<string, never>>): SplitPaymentDTO {
     return {
       ...p,
       paymentMethod: p.paymentMethod as PaymentMethod,

@@ -5,7 +5,7 @@ import * as sharp from 'sharp';
 export class ImageOptimizerService {
   async optimize(
     buffer: Buffer,
-    originalFilename: string,
+    _originalFilename: string,
   ): Promise<{ buffer: Buffer; filename: string; info: sharp.OutputInfo }> {
     const timestamp = Date.now();
     const random = Math.round(Math.random() * 1e9);
@@ -25,7 +25,7 @@ export class ImageOptimizerService {
         filename: outputFilename,
         info,
       };
-    } catch (err) {
+    } catch {
       throw new BadRequestException('Imagem inválida ou corrompida.');
     }
   }

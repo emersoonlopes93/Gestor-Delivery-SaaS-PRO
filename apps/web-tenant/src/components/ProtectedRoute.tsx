@@ -37,7 +37,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         clearUser();
         navigate('/login');
       });
-  }, []);
+  }, [clearUser, navigate, setUser]);
 
   if (isLoading) {
     return (

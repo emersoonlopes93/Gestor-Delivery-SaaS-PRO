@@ -50,15 +50,6 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     onStateChange?.(state);
   }, [state, minHeight, peekHeight, getMaxHeight, onStateChange]);
 
-  const getStateFromHeight = (height: number): BottomSheetState => {
-    const mh = getMaxHeight();
-    const midPeekExpanded = (peekHeight + mh) / 2;
-    const midCollapsedPeek = (minHeight + peekHeight) / 2;
-    if (height > midPeekExpanded) return 'expanded';
-    if (height > midCollapsedPeek) return 'peeking';
-    return 'collapsed';
-  };
-
   const handleTouchStart = (e: React.TouchEvent) => {
     setStartY(e.touches[0].clientY);
     setStartHeight(currentHeight);
@@ -74,9 +65,18 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   }, [startY, startHeight, minHeight, getMaxHeight]);
 
   const handleTouchEnd = useCallback(() => {
+    const getStateFromHeight = (height: number): BottomSheetState => {
+      const mh = getMaxHeight();
+      const midPeekExpanded = (peekHeight + mh) / 2;
+      const midCollapsedPeek = (minHeight + peekHeight) / 2;
+      if (height > midPeekExpanded) return 'expanded';
+      if (height > midCollapsedPeek) return 'peeking';
+      return 'collapsed';
+    };
+
     const newState = getStateFromHeight(currentHeight);
     setState(newState);
-  }, [currentHeight, getStateFromHeight]);
+  }, [currentHeight, getMaxHeight, minHeight, peekHeight]);
 
   useEffect(() => {
     if (sheetRef.current) {

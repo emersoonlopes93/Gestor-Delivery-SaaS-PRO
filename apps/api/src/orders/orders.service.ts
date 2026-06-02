@@ -7,7 +7,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { PaymentTxStatus, OrderStatus, Prisma, DineInTable, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
+import { OrderStatus, Prisma, DineInTable, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
 import { PaymentMethod as SharedPaymentMethod } from '@gestor/types';
 import { CheckoutValidatorService } from './checkout-validator.service';
 import { CustomerService } from '../crm/customer.service';

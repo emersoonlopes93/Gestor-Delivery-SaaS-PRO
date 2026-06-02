@@ -81,7 +81,7 @@ export class SuppliersService {
     return this.mapToDTO(updated);
   }
 
-  private mapToDTO(s: Prisma.SupplierGetPayload<{}>): SupplierDTO {
+  private mapToDTO(s: Prisma.SupplierGetPayload<Record<string, never>>): SupplierDTO {
     return {
       id: s.id,
       tenantId: s.tenantId,

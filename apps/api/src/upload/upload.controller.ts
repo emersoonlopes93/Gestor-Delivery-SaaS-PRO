@@ -22,8 +22,6 @@ import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
 import type { TenantJwtPayload } from '@gestor/types';
 
-type DestinationCallback = (error: Error | null, destination: string) => void;
-type FileNameCallback = (error: Error | null, filename: string) => void;
 type FileFilterCallback = (error: Error | null, acceptFile: boolean) => void;
 
 type MulterFileLike = {
@@ -65,20 +63,22 @@ export class UploadController {
   )
   async uploadStorefrontBackground(
     @Request() req: ExpressRequest & { user: TenantJwtPayload },
-    @UploadedFile() file: any,
+    @UploadedFile() file: unknown,
   ) {
     if (!file) {
       throw new BadRequestException('Arquivo não enviado');
     }
 
+    const uploaded = file as { buffer: Buffer; originalname: string; mimetype: string; size: number };
+
     return this.uploadService.createMediaAsset({
       tenantId: req.user.tenantId,
       scope: 'storefront_background',
       file: {
-        buffer: file.buffer,
-        originalname: file.originalname,
-        mimetype: file.mimetype,
-        size: file.size,
+        buffer: uploaded.buffer,
+        originalname: uploaded.originalname,
+        mimetype: uploaded.mimetype,
+        size: uploaded.size,
       },
     });
   }

@@ -5,7 +5,6 @@ import {
   IsString,
   IsOptional,
   IsNumber,
-  IsEnum,
   Min,
   Max,
 } from 'class-validator';
@@ -237,7 +236,7 @@ export class AiAgentConfigService {
       select: { plan: true },
     });
 
-    let planOverrides: Partial<typeof globalDefaults> = {};
+    const planOverrides: Partial<typeof globalDefaults> = {};
 
     if (subscription?.plan) {
       const preset = await this.prisma.aiAgentPlanPreset.findUnique({

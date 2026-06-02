@@ -5,7 +5,7 @@ import { CurrentTenant, RequirePermissions } from '../common/decorators';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { OnboardingService } from './onboarding.service';
-import { UpdateOperatingHoursRequest, UpdateStorePauseRequest } from '@gestor/types';
+import { UpdateOperatingHoursRequest, UpdateStorePauseRequest, StorefrontCustomizationPayload } from '@gestor/types';
 
 @Controller('tenant')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -117,7 +117,7 @@ export class TenantController {
   @RequirePermissions('settings.manage')
   async updateStorefrontCustomization(
     @CurrentTenant() tenantId: string,
-    @Body() body: any,
+    @Body() body: StorefrontCustomizationPayload,
   ) {
     return this.tenantService.updateStorefrontCustomization(tenantId, body);
   }

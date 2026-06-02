@@ -1019,7 +1019,7 @@ export class ConversationService {
     this.chatGateway.emitSessionUpdated(session.tenantId, session);
 
     // Registra o comando do cliente como mensagem
-    const customerMessage = await this.addMessage({
+    await this.addMessage({
       sessionId,
       direction: 'inbound',
       senderType: 'customer',

@@ -125,7 +125,9 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
     if (session?.id) {
       try {
         window.__CHAT_SOCKET?.emit('joinSession', { sessionId: session.id });
-      } catch (e) {}
+      } catch (e) {
+        // Ignora erros se a instância global do socket não estiver disponível
+      }
       setIsAtBottom(true);
     }
   }, [session?.id]);

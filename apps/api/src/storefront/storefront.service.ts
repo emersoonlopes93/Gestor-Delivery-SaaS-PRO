@@ -13,7 +13,6 @@ import {
   normalizeStorefrontTheme,
   normalizeStorefrontLayout
 } from '@gestor/theme';
-import { TenantStatus } from '@gestor/core';
 import { Prisma } from '@prisma/client';
 import { AvailabilityService, SalesChannel } from '../catalog/publication/availability.service';
 import { UpsellsService } from '../catalog/upsells.service';
@@ -197,7 +196,7 @@ export class StorefrontService {
         id: cat.id,
         name: cat.name,
         slug: cat.slug,
-        order: (cat as any).order ?? 0,
+        order: cat.order ?? 0,
         templateType: cat.templateType,
         products: cat.products
           .map((p) => {
@@ -209,7 +208,7 @@ export class StorefrontService {
               slug: p.slug,
               type: p.type as 'simple' | 'combo',
               shortDescription: p.shortDescription,
-              description: (p as any).description,
+              description: p.longDescription,
               longDescription: p.longDescription,
               basePrice: Number(p.basePrice),
               image: p.image,

@@ -159,8 +159,8 @@ export interface StorefrontComboPayload {
 }
 
 export interface StorefrontCustomizationPayload {
-  theme: any;
-  layout: any;
+  theme: Record<string, unknown>;
+  layout: Record<string, unknown>;
 }
 
 export interface StorefrontPayload {
@@ -220,11 +220,18 @@ export interface CartSelectedComboItem {
   price?: number;
 }
 
+export interface CartSelectedComboSlotItem {
+  productId: string;
+  name: string;
+  additionalPrice: number;
+  qty: number;
+}
+
 export interface CartSelectedComboSlot {
   blockId: string;
   productId: string;
   comboSlotId?: string; // Compatibility
-  items?: any[];
+  items?: CartSelectedComboSlotItem[];
 }
 
 export interface CartLineItem {
@@ -238,16 +245,16 @@ export interface CartLineItem {
   qty?: number;
   quantity: number;
   notes?: string;
-  options?: any[];
+  options?: unknown[];
   complements?: CartSelectedComplement[];
   comboItems?: CartSelectedComboItem[];
   type?: 'simple' | 'combo';
   selections?: CartSelectedOptionGroup[];
   slots?: CartSelectedComboSlot[];
   selectedOptions?: CartSelectedComplement[]; // Legacy
-  selectedComboItems?: any[]; // Legacy
+  selectedComboItems?: CartSelectedComboItem[]; // Legacy
   snapshot: CartSnapshot;
-  bundleItems?: any[]; // Compatibility
+  bundleItems?: unknown[]; // Compatibility
   sourceUpsellId?: string; // Compatibility
 }
 

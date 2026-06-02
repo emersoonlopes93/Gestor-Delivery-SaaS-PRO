@@ -101,10 +101,10 @@ export const useCartStore = create<CartState>()(
           comboId: product.type === 'combo' ? product.id : undefined,
           quantity,
           notes,
-          selectedOptions: selectedOptions as any,
-          selections: selections as any,
-          slots: slots as any,
-          bundleItems: bundleItems as any,
+          selectedOptions,
+          selections,
+          slots,
+          bundleItems,
           sourceUpsellId,
           snapshot,
         };
@@ -140,7 +140,7 @@ export const useCartStore = create<CartState>()(
               if (i.priceImpactType === 'percentage') return ss + (item.snapshot.basePrice * (i.priceImpactValue / 100) * (i.qty || 1));
               return ss;
             }, 0), 0) || 0) + 
-            (item.slots?.reduce((s, slot) => s + slot.items.reduce((ss, i) => ss + (i.additionalPrice * (i.qty || 1)), 0), 0) || 0);
+            (item.slots?.reduce((s, slot) => s + (slot.items?.reduce((ss, i) => ss + (i.additionalPrice * (i.qty || 1)), 0) || 0), 0) || 0);
 
             const unitPrice = item.snapshot.basePrice + legacyExtras + v2Extras;
 

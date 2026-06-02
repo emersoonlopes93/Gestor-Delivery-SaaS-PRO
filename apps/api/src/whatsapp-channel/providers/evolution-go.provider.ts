@@ -4,7 +4,6 @@ import { AiFlowLogger } from '../../common/logging/ai-flow-logger';
 import { normalizeWhatsAppSendNumber } from '../../common/utils/whatsapp-number.util';
 import {
   isNonActionableWebhookEvent,
-  resolveWhatsAppPresenceTarget,
   summarizeHttpBody,
 } from '../../common/utils/whatsapp-presence.util';
 import type {
@@ -251,7 +250,6 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       return { pairingCode: String(pairingCode) };
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`[WHATSAPP_ERROR] step=pair instanceId=${instanceId} status=${isAxiosError(error) ? error.response?.status : 'unknown'} body=${isAxiosError(error) ? JSON.stringify(error.response?.data) : 'unknown'}`);
       throw error;
     }

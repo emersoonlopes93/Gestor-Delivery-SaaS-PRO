@@ -44,12 +44,12 @@ export class HealthController {
 
         if (store && typeof store === 'object') {
           const s = store as { client?: unknown; getClient?: unknown };
-          const client = s.client ?? (typeof s.getClient === 'function' ? (s.getClient as Function)() : undefined);
-          if (client && typeof client.ping === 'function') {
+          const client = s.client ?? (typeof s.getClient === 'function' ? (s.getClient as () => unknown)() : undefined);
+          if (client && typeof (client as { ping?: unknown }).ping === 'function') {
             cacheDriver = 'redis';
             const pingStart = Date.now();
             const pingResult = await Promise.race([
-              client.ping(),
+              (client as { ping: () => Promise<unknown> }).ping(),
               new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500)),
             ]);
             if (typeof pingResult === 'string') {
@@ -63,7 +63,7 @@ export class HealthController {
           cacheDriver = 'memory';
         }
       }
-    } catch (err) {
+    } catch {
       cacheDriver = 'memory';
       redisConnected = false;
     }

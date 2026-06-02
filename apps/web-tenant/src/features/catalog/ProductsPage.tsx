@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { api } from '../../lib/api-client';
 import { CatalogPublication, Product, ProductCategory, CreateProductDto } from '@gestor/types';
 import { RecipeModal } from '../inventory/RecipeModal';
@@ -42,9 +42,26 @@ export function ProductsPage() {
   const [savingMap, setSavingMap] = useState<Record<string, boolean>>({});
   
 
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [prodRes, catRes] = await Promise.all([
+        api.get<ProductWithPublication[]>('/catalog/products'),
+        api.get<ProductCategory[]>('/catalog/categories')
+      ]);
+      
+      if (prodRes.success) setProducts(prodRes.data);
+      if (catRes.success) setCategories(catRes.data);
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const selectedCategoryId = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -145,22 +162,7 @@ export function ProductsPage() {
     navigate({ pathname: location.pathname, search: query ? `?${query}` : '' }, { replace: true });
   };
 
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const [prodRes, catRes] = await Promise.all([
-        api.get<ProductWithPublication[]>('/catalog/products'),
-        api.get<ProductCategory[]>('/catalog/categories')
-      ]);
-      
-      if (prodRes.success) setProducts(prodRes.data);
-      if (catRes.success) setCategories(catRes.data);
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+
 
   // CRUD operations now occur in ProductV2EditorPage
   /*

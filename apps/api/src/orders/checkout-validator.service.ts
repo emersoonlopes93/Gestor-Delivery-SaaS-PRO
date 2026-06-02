@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { Prisma, Product, ProductCategory, ProductOptionGroupLink, ProductComplementGroupLink, ProductComplementGroup, ProductComplementItem, ProductComboBlock, ProductComboBlockItem } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import type {
   CreateOrderItemDTO,
   CreateOrderItemComplementDTO,
@@ -323,7 +323,7 @@ export class CheckoutValidatorService {
     item: CreateOrderItemDTO,
     checkSellableOnline: boolean = true,
     channel: 'storefront_delivery' | 'storefront_pickup' | 'pos' = 'storefront_delivery',
-    context?: { settings?: Prisma.TenantSettingsGetPayload<{ select: { isStorePaused: true, storePauseReason: true, timezone: true } }> | null; operatingHours?: Prisma.TenantOperatingHoursGetPayload<{}>[] },
+    context?: { settings?: Prisma.TenantSettingsGetPayload<{ select: { isStorePaused: true, storePauseReason: true, timezone: true } }> | null; operatingHours?: Prisma.TenantOperatingHoursGetPayload<Record<string, never>>[] },
   ): Promise<ValidatedProductLine> {
     if (!item.productId) {
       throw new BadRequestException('productId é obrigatório para linhas do tipo product.');
@@ -782,7 +782,7 @@ export class CheckoutValidatorService {
     tenantId: string,
     item: CreateOrderItemDTO,
     channel: 'storefront_delivery' | 'storefront_pickup' | 'pos' = 'storefront_delivery',
-    context?: { settings?: Prisma.TenantSettingsGetPayload<{ select: { isStorePaused: true, storePauseReason: true, timezone: true } }> | null; operatingHours?: Prisma.TenantOperatingHoursGetPayload<{}>[] },
+    context?: { settings?: Prisma.TenantSettingsGetPayload<{ select: { isStorePaused: true, storePauseReason: true, timezone: true } }> | null; operatingHours?: Prisma.TenantOperatingHoursGetPayload<Record<string, never>>[] },
   ): Promise<ValidatedComboLine> {
     const hasNewSlots = Array.isArray(item.slots) && item.slots.length > 0;
     const comboProductId = item.productId || item.comboId;

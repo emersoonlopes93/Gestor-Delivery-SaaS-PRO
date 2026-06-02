@@ -63,7 +63,7 @@ export class FinancialAccountsService {
     return this.mapToDTO(account);
   }
 
-  private mapToDTO(acc: Prisma.FinancialAccountGetPayload<{}>): FinancialAccountDTO {
+  private mapToDTO(acc: Prisma.FinancialAccountGetPayload<Record<string, never>>): FinancialAccountDTO {
     return {
       ...acc,
       type: this.toDtoType(acc.type),
