@@ -8,10 +8,10 @@ export interface BadgeProps extends HTMLAttributes<HTMLDivElement> {
 const baseClasses = 'inline-flex items-center font-medium rounded-full';
 
 const variantClasses = {
-  default: 'bg-primary/10 text-primary border border-primary/20',
-  success: 'bg-status-success/10 text-status-success border border-status-success/20',
-  warning: 'bg-status-warning/10 text-status-warning border border-status-warning/20',
-  destructive: 'bg-destructive/10 text-destructive border border-destructive/20',
+  default: 'bg-primary/20 text-primary border border-primary/30',
+  success: 'bg-status-success/20 text-status-success border border-status-success/30',
+  warning: 'bg-status-warning/20 text-status-warning border border-status-warning/30',
+  destructive: 'bg-destructive/20 text-destructive border border-destructive/30',
   info: 'bg-muted text-muted-foreground border border-border',
 };
 

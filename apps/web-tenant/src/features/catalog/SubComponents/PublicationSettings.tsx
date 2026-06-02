@@ -73,7 +73,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
               type="button"
               onClick={() => patchPublication({ operationalStatus: 'hidden' })}
               disabled={savingStates.patchPublication}
-              className="px-3 py-2 text-sm font-bold bg-status-warning/10 text-status-warning hover:bg-status-warning/20 border border-status-warning/20 rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+              className="px-3 py-2 text-sm font-bold bg-status-warning/20 text-status-warning hover:bg-status-warning/30 border border-status-warning/30 rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center gap-2"
             >
               {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-status-warning border-t-transparent rounded-full animate-spin" />}
               Oculto
@@ -82,7 +82,7 @@ export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
               type="button"
               onClick={() => patchPublication({ operationalStatus: 'sold_out_manual' })}
               disabled={savingStates.patchPublication}
-              className="px-3 py-2 text-sm font-bold bg-destructive/10 text-destructive hover:bg-destructive/20 border border-destructive/20 rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+              className="px-3 py-2 text-sm font-bold bg-destructive/20 text-destructive hover:bg-destructive/30 border border-destructive/30 rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center gap-2"
             >
               {savingStates.patchPublication && <div className="w-4 h-4 border-2 border-destructive border-t-transparent rounded-full animate-spin" />}
               Esgotado

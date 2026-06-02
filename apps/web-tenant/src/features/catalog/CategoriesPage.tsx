@@ -111,8 +111,8 @@ export function CategoriesPage() {
     <div className="p-4 md:p-6 max-w-7xl mx-auto text-left transition-colors">
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-gray-100 tracking-tight uppercase">Categorias</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">Organize seus produtos por grupos lógicos.</p>
+          <h1 className="text-2xl md:text-3xl font-black text-foreground tracking-tight uppercase">Categorias</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Organize seus produtos por grupos lógicos.</p>
         </div>
         <button
           onClick={() => handleOpenModal()}
@@ -124,42 +124,42 @@ export function CategoriesPage() {
 
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : (
         <div className="space-y-4">
           {/* Desktop View */}
-          <div className="hidden md:block bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+          <div className="hidden md:block bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
             <table className="w-full text-left border-collapse">
-              <thead className="bg-gray-50 dark:bg-gray-950 border-b border-gray-100 dark:border-gray-800">
+              <thead className="bg-muted/50 border-b border-border">
                 <tr>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Nome</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Produtos</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Ordem</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Nome</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">Produtos</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center">Ordem</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Status</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+              <tbody className="divide-y divide-border/50">
                 {categories.map((category) => (
-                  <tr key={category.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/40 transition-colors group">
+                  <tr key={category.id} className="hover:bg-muted/30 transition-colors group">
                     <td className="px-6 py-4">
-                      <div className="font-bold text-gray-900 dark:text-gray-100">{category.name}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-xs">{category.description || 'Sem descrição'}</div>
+                      <div className="font-bold text-foreground">{category.name}</div>
+                      <div className="text-xs text-muted-foreground truncate max-w-xs">{category.description || 'Sem descrição'}</div>
                     </td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-600 dark:text-gray-400 font-bold">
+                    <td className="px-6 py-4 text-center text-sm text-foreground font-bold">
                       {category.productCount ?? 0}
                     </td>
-                    <td className="px-6 py-4 text-center text-sm text-gray-600 dark:text-gray-400 font-medium">
+                    <td className="px-6 py-4 text-center text-sm text-foreground font-medium">
                       {category.order}
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <div className="flex items-center gap-2">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${category.isActive ? 'status-badge-success' : 'status-badge-danger'}`}>
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${category.isActive ? 'bg-status-success/20 text-status-success border-status-success/30' : 'bg-status-danger/20 text-status-danger border-status-danger/30'}`}>
                           {category.isActive ? 'Ativo' : 'Inativo'}
                         </span>
                         {category.isFeatured && (
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider status-badge-warning">
+                          <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-status-warning/20 text-status-warning border border-status-warning/30">
                             Destaque
                           </span>
                         )}
@@ -169,21 +169,21 @@ export function CategoriesPage() {
                       <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => navigate(`/catalog/products?categoryId=${encodeURIComponent(category.id)}`)}
-                          className="p-2 text-gray-400 hover:text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all"
+                          className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-all"
                           title="Ver produtos"
                         >
                           👁️
                         </button>
                         <button
                           onClick={() => handleOpenModal(category)}
-                          className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-500/10 rounded-lg transition-all"
+                          className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
                           title="Editar"
                         >
                           ✏️
                         </button>
                         <button
                           onClick={() => handleDelete(category.id)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
+                          className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
                           title="Excluir"
                         >
                           🗑️
@@ -199,34 +199,34 @@ export function CategoriesPage() {
           {/* Mobile View */}
           <div className="md:hidden space-y-3">
             {categories.map((category) => (
-              <div key={category.id} className="card-premium p-4 border-none shadow-sm active:scale-[0.98] transition-all">
+              <div key={category.id} className="bg-card rounded-2xl p-4 border border-border shadow-sm active:scale-[0.98] transition-all">
                 <div className="flex justify-between items-start mb-3">
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-gray-900 dark:text-gray-100 text-lg truncate">{category.name}</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">{category.description || 'Sem descrição'}</p>
+                    <h3 className="font-bold text-foreground text-lg truncate">{category.name}</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{category.description || 'Sem descrição'}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${category.isActive ? 'status-badge-success' : 'status-badge-danger'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${category.isActive ? 'bg-status-success/20 text-status-success border-status-success/30' : 'bg-status-danger/20 text-status-danger border-status-danger/30'}`}>
                       {category.isActive ? 'Ativo' : 'Inativo'}
                     </span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div className="bg-gray-50 dark:bg-gray-950/50 p-2 rounded-xl border border-gray-100 dark:border-gray-800">
-                    <span className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Produtos</span>
-                    <span className="text-sm font-bold text-gray-700 dark:text-gray-300">{category.productCount ?? 0} itens</span>
+                  <div className="bg-muted/50 p-2 rounded-xl border border-border">
+                    <span className="block text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">Produtos</span>
+                    <span className="text-sm font-bold text-foreground">{category.productCount ?? 0} itens</span>
                   </div>
-                  <div className="bg-gray-50 dark:bg-gray-950/50 p-2 rounded-xl border border-gray-100 dark:border-gray-800">
-                    <span className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Ordem</span>
-                    <span className="text-sm font-bold text-gray-700 dark:text-gray-300">Posição {category.order}</span>
+                  <div className="bg-muted/50 p-2 rounded-xl border border-border">
+                    <span className="block text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">Ordem</span>
+                    <span className="text-sm font-bold text-foreground">Posição {category.order}</span>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800">
+                <div className="flex items-center justify-between pt-3 border-t border-border">
                   <div className="flex gap-1">
                     {category.isFeatured && (
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider status-badge-warning">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-status-warning/20 text-status-warning border border-status-warning/30">
                         Destaque
                       </span>
                     )}
@@ -234,19 +234,19 @@ export function CategoriesPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => navigate(`/catalog/products?categoryId=${encodeURIComponent(category.id)}`)}
-                      className="w-9 h-9 flex items-center justify-center text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-xl"
+                      className="w-9 h-9 flex items-center justify-center text-muted-foreground bg-muted rounded-xl"
                     >
                       👁️
                     </button>
                     <button
                       onClick={() => handleOpenModal(category)}
-                      className="w-9 h-9 flex items-center justify-center text-primary-600 bg-primary-50 dark:bg-primary-500/10 rounded-xl"
+                      className="w-9 h-9 flex items-center justify-center text-primary bg-primary/10 rounded-xl"
                     >
                       ✏️
                     </button>
                     <button
                       onClick={() => handleDelete(category.id)}
-                      className="w-9 h-9 flex items-center justify-center text-red-600 bg-red-50 dark:bg-red-500/10 rounded-xl"
+                      className="w-9 h-9 flex items-center justify-center text-destructive bg-destructive/10 rounded-xl"
                     >
                       🗑️
                     </button>

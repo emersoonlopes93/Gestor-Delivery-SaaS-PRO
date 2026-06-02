@@ -102,68 +102,68 @@ export default function IntegrationsPage() {
     <div className="p-6 max-w-5xl mx-auto space-y-8">
       <header className="flex flex-col gap-2">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary-100 rounded-lg">
-            <Puzzle className="h-6 w-6 text-primary-600" />
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Puzzle className="h-6 w-6 text-primary" />
           </div>
-          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
+          <h1 className="text-3xl font-extrabold text-foreground tracking-tight">
             Integrações Globais
           </h1>
         </div>
-        <p className="text-gray-500 text-lg">
+        <p className="text-muted-foreground text-lg">
           Configure os provedores padrão e credenciais para todo o ecossistema do SaaS.
         </p>
       </header>
 
       <form onSubmit={handleSave} className="space-y-8">
         {/* WhatsApp Providers */}
-        <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-50 bg-gray-50/30">
+        <section className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+          <div className="p-6 border-b border-border bg-muted/30">
             <div className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-green-600" />
-              <h2 className="text-xl font-bold text-gray-800">Canal WhatsApp</h2>
+              <h2 className="text-xl font-bold text-foreground">Canal WhatsApp</h2>
             </div>
           </div>
           
           <div className="p-8 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700">Provedor Padrão</label>
+                <label className="text-sm font-semibold text-foreground">Provedor Padrão</label>
                 <select 
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                  className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
                   value={config?.defaultWhatsAppProvider}
                   onChange={(e) => setConfig(prev => prev ? {...prev, defaultWhatsAppProvider: e.target.value as SystemConfig['defaultWhatsAppProvider']} : null)}
                 >
                   <option value="evolution_go">Evolution Go (Recomendado)</option>
                   <option value="meta_cloud">WhatsApp Business API (Meta)</option>
                 </select>
-                <p className="text-xs text-gray-400">Define qual provedor será sugerido para novos tenants.</p>
+                <p className="text-xs text-muted-foreground">Define qual provedor será sugerido para novos tenants.</p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700">URL Global Evolution Go</label>
+                <label className="text-sm font-semibold text-foreground">URL Global Evolution Go</label>
                 <input 
                   placeholder="https://api.meuserver.com"
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                  className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
                   value={config?.evolutionUrl || ''}
                   onChange={(e) => setConfig(prev => prev ? {...prev, evolutionUrl: e.target.value} : null)}
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-gray-700">Global Token Evolution Go</label>
+                <label className="text-sm font-semibold text-foreground">Global Token Evolution Go</label>
                 <input 
                   type="password"
                   placeholder="Token Global do Servidor"
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                  className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
                   value={config?.evolutionGlobalToken || ''}
                   onChange={(e) => setConfig(prev => prev ? {...prev, evolutionGlobalToken: e.target.value} : null)}
                 />
               </div>
             </div>
 
-            <div className="p-4 bg-yellow-50 rounded-xl border border-yellow-100 flex gap-3">
-              <Zap className="h-5 w-5 text-yellow-600 shrink-0" />
-              <p className="text-sm text-yellow-800">
+            <div className="p-4 bg-amber-500/10 rounded-xl border border-amber-500/20 flex gap-3">
+              <Zap className="h-5 w-5 text-amber-600 shrink-0" />
+              <p className="text-sm text-amber-600/90">
                 <strong>Dica:</strong> O Evolution Go permite conexões via QR Code e tem menor custo operacional para pequenas e médias empresas.
               </p>
             </div>
@@ -171,20 +171,20 @@ export default function IntegrationsPage() {
         </section>
 
         {/* AI Providers */}
-        <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-50 bg-gray-50/30">
+        <section className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+          <div className="p-6 border-b border-border bg-muted/30">
             <div className="flex items-center gap-2">
               <Bot className="h-5 w-5 text-indigo-600" />
-              <h2 className="text-xl font-bold text-gray-800">Inteligência Artificial (LLM)</h2>
+              <h2 className="text-xl font-bold text-foreground">Inteligência Artificial (LLM)</h2>
             </div>
           </div>
           
           <div className="p-8 space-y-6">
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Provedor de IA Padrão</label>
+                <label className="text-sm font-medium text-foreground">Provedor de IA Padrão</label>
                 <select 
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                  className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
                   value={config?.defaultAiProvider || 'openai'}
                   onChange={(e) => setConfig(prev => prev ? {...prev, defaultAiProvider: e.target.value as SystemConfig['defaultAiProvider']} : null)}
                 >
@@ -196,9 +196,9 @@ export default function IntegrationsPage() {
 
               {config?.defaultAiProvider === 'google_ai' && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Modelo Google AI</label>
+                  <label className="text-sm font-medium text-foreground">Modelo Google AI</label>
                   <select
-                    className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                    className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
                     value={config?.googleAiModel || ''}
                     onChange={(e) => setConfig(prev => prev ? {...prev, googleAiModel: e.target.value} : null)}
                   >
@@ -211,33 +211,33 @@ export default function IntegrationsPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">API Key OpenAI</label>
+                  <label className="text-sm font-medium text-foreground">API Key OpenAI</label>
                   <input
                     type="password"
                     placeholder="sk-..."
-                    className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                    className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
                     value={config?.openaiApiKey || ''}
                     onChange={(e) => setConfig(prev => prev ? {...prev, openaiApiKey: e.target.value} : null)}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">API Key Anthropic</label>
+                  <label className="text-sm font-medium text-foreground">API Key Anthropic</label>
                   <input
                     type="password"
                     placeholder="sk-ant-..."
-                    className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                    className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
                     value={config?.anthropicApiKey || ''}
                     onChange={(e) => setConfig(prev => prev ? {...prev, anthropicApiKey: e.target.value} : null)}
                   />
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-medium text-gray-700">API Key Google AI</label>
+                  <label className="text-sm font-medium text-foreground">API Key Google AI</label>
                   <input
                     type="password"
                     placeholder="AIza..."
-                    className="w-full h-12 px-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none"
+                    className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
                     value={config?.googleAiApiKey || ''}
                     onChange={(e) => setConfig(prev => prev ? {...prev, googleAiApiKey: e.target.value} : null)}
                   />
@@ -245,7 +245,7 @@ export default function IntegrationsPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Prompt Base (Global)</label>
+                <label className="text-sm font-medium text-foreground">Prompt Base (Global)</label>
                 <textarea
                   rows={4}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all outline-none resize-none"

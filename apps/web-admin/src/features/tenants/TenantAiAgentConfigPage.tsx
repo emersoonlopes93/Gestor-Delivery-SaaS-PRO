@@ -142,7 +142,7 @@ export function TenantAiAgentConfigPage() {
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -153,12 +153,12 @@ export function TenantAiAgentConfigPage() {
         <div className="mb-6">
           <button
             onClick={() => navigate('/tenants')}
-            className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
+            className="text-primary hover:opacity-80 text-sm font-medium"
           >
             ← Voltar para Tenants
           </button>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
+        <div className="bg-card rounded-xl border border-border p-8 text-center text-muted-foreground">
           Configuração não encontrada
         </div>
       </div>
@@ -170,12 +170,12 @@ export function TenantAiAgentConfigPage() {
       <div className="mb-6">
         <button
           onClick={() => navigate('/tenants')}
-          className="text-indigo-600 hover:text-indigo-900 text-sm font-medium mb-2 inline-block"
+          className="text-primary hover:opacity-80 text-sm font-medium mb-2 inline-block"
         >
           ← Voltar para Tenants
         </button>
-        <h1 className="text-2xl font-bold text-gray-900">Memória do Agente IA</h1>
-        <p className="text-gray-500 mt-1">
+        <h1 className="text-2xl font-bold text-foreground">Memória do Agente IA</h1>
+        <p className="text-muted-foreground mt-1">
           Configure a política de memória do agente IA para este tenant
         </p>
       </div>
@@ -194,18 +194,18 @@ export function TenantAiAgentConfigPage() {
 
       <div className="space-y-6">
         {/* Geral */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Geral</h2>
-            <p className="text-sm text-gray-500 mt-1">
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <div className="p-6 border-b border-border">
+            <h2 className="text-lg font-semibold text-foreground">Geral</h2>
+            <p className="text-sm text-muted-foreground mt-1">
               Quando ativada, a memória permite que o agente lembre nome, endereço e último pedido do cliente para agilizar atendimentos futuros.
             </p>
           </div>
           <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-medium text-gray-900">Ativar memória do agente</h3>
-                <p className="text-sm text-gray-500 mt-1">
+                <h3 className="text-base font-medium text-foreground">Ativar memória do agente</h3>
+                <p className="text-sm text-muted-foreground mt-1">
                   Permite que o agente use dados salvos da conversa, cliente e pedidos anteriores
                 </p>
               </div>
@@ -216,14 +216,14 @@ export function TenantAiAgentConfigPage() {
                   onChange={() => handleToggle('memoryEnabled')}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
               </label>
             </div>
 
             <div className="flex items-center justify-between gap-4">
               <div>
-                <h3 className="text-base font-medium text-gray-900">Tempo de sessão</h3>
-                <p className="text-sm text-gray-500 mt-1">
+                <h3 className="text-base font-medium text-foreground">Tempo de sessão</h3>
+                <p className="text-sm text-muted-foreground mt-1">
                   Tempo em minutos para expirar a sessão por inatividade do cliente.
                 </p>
               </div>
@@ -232,21 +232,21 @@ export function TenantAiAgentConfigPage() {
                 min={1}
                 value={config.sessionTimeoutMin}
                 onChange={(e) => handleSessionTimeoutChange(e.target.value)}
-                className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                className="w-24 px-3 py-2 border border-border bg-card text-foreground rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-sm"
               />
             </div>
           </div>
         </div>
 
         {/* Dados do Cliente */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Dados do Cliente</h2>
-            <p className="text-sm text-gray-500 mt-1">
+        <div className="bg-card rounded-xl border border-border overflow-hidden">
+          <div className="p-6 border-b border-border">
+            <h2 className="text-lg font-semibold text-foreground">Dados do Cliente</h2>
+            <p className="text-sm text-muted-foreground mt-1">
               Configure quais informações do cliente o agente deve lembrar
             </p>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-border/50">
             <div className="p-6 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-medium text-gray-900">Lembrar nome do cliente</h3>

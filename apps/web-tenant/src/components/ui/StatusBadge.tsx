@@ -8,10 +8,10 @@ export interface StatusBadgeProps extends HTMLAttributes<HTMLSpanElement> {
 const baseClasses = 'inline-flex items-center font-medium rounded-full';
 
 const statusClasses = {
-  success: 'bg-status-success/10 text-status-success border border-status-success/20',
-  warning: 'bg-status-warning/10 text-status-warning border border-status-warning/20',
-  error: 'bg-destructive/10 text-destructive border border-destructive/20',
-  info: 'bg-primary/10 text-primary border border-primary/20',
+  success: 'bg-status-success/20 text-status-success border border-status-success/30',
+  warning: 'bg-status-warning/20 text-status-warning border border-status-warning/30',
+  error: 'bg-destructive/20 text-destructive border border-destructive/30',
+  info: 'bg-primary/20 text-primary border border-primary/30',
   neutral: 'bg-muted text-muted-foreground border border-border',
 };
 

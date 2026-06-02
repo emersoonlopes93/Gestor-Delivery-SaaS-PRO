@@ -266,16 +266,16 @@ export function ProductsPage() {
                 <div className="font-bold text-foreground truncate">{product.name}</div>
                 <div className="text-xs text-muted-foreground truncate hidden sm:block">{product.shortDescription || 'Sem descrição'}</div>
                 <div className="mt-1 flex items-center gap-2 flex-wrap">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${product.type === 'combo' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-card text-foreground border-border'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${product.type === 'combo' ? 'bg-primary/20 text-primary border-primary/30' : 'bg-card text-foreground border-border'}`}>
                     {typeLabel}
                   </span>
                   {pubLabel ? (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${pubLabel === 'published' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-card text-muted-foreground border-border'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${pubLabel === 'published' ? 'bg-primary/20 text-primary border-primary/30' : 'bg-card text-muted-foreground border-border'}`}>
                       {pubLabel}
                     </span>
                   ) : null}
                   {opLabel ? (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${opLabel === 'active' ? 'bg-status-success/10 text-status-success border-status-success/20' : opLabel === 'inactive' ? 'bg-status-danger/10 text-status-danger border-status-danger/20' : opLabel === 'hidden' ? 'bg-status-warning/10 text-status-warning border-status-warning/20' : 'bg-status-warning/10 text-status-warning border-status-warning/20'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${opLabel === 'active' ? 'bg-status-success/20 text-status-success border-status-success/30' : opLabel === 'inactive' ? 'bg-status-danger/20 text-status-danger border-status-danger/30' : opLabel === 'hidden' ? 'bg-status-warning/20 text-status-warning border-status-warning/30' : 'bg-status-warning/20 text-status-warning border-status-warning/30'}`}>
                       {opLabel}
                     </span>
                   ) : null}
@@ -392,16 +392,16 @@ export function ProductsPage() {
                 <div className="font-black text-foreground truncate text-sm md:text-base leading-tight">{product.name}</div>
                 <div className="text-[10px] md:text-xs text-muted-foreground font-bold mt-0.5 truncate">{categoryName}</div>
                 <div className="mt-2 flex flex-wrap items-center gap-1">
-                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-secondary text-foreground border-border'}`}>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest border transition-colors ${product.type === 'combo' ? 'bg-primary/20 text-primary border-primary/30' : 'bg-secondary text-foreground border-border'}`}>
                     {product.type === 'simple' ? 'Individual' : product.type === 'configurable' ? 'Personalizado' : 'Combo'}
                   </span>
                   {pubLabel && (
-                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-secondary text-muted-foreground border border-border'}`}>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${pubLabel === 'published' ? 'bg-primary/20 text-primary border border-primary/30' : 'bg-secondary text-muted-foreground border border-border'}`}>
                       {pubLabel}
                     </span>
                   )}
                   {opLabel && (
-                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${opLabel === 'active' ? 'status-badge-success' : opLabel === 'inactive' ? 'status-badge-neutral' : opLabel === 'hidden' ? 'status-badge-warning' : 'status-badge-danger'}`}>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest ${opLabel === 'active' ? 'bg-status-success/20 text-status-success border border-status-success/30' : opLabel === 'inactive' ? 'bg-status-danger/20 text-status-danger border border-status-danger/30' : opLabel === 'hidden' ? 'bg-status-warning/20 text-status-warning border border-status-warning/30' : 'bg-status-danger/20 text-status-danger border border-status-danger/30'}`}>
                       {opLabel}
                     </span>
                   )}
