@@ -5,7 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { OrderStatus, FulfillmentType, PaymentMethod as PrismaPaymentMethod } from '@prisma/client';
-import { PaymentMethod as SharedPaymentMethod } from '@gestor/types';
+import { PaymentMethod as SharedPaymentMethod, OrderStatus as SharedOrderStatus } from '@gestor/types';
 import { CashService } from '../cash/cash.service';
 import { CustomerService } from '../crm/customer.service';
 import { CashbackService } from '../promotions/cashback.service';
@@ -14,6 +14,7 @@ import { CheckoutValidatorService } from '../orders/checkout-validator.service';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
 import { KdsService } from '../kds/kds.service';
 import { PrismaService } from '../database/prisma.service';
+import { OrdersService } from '../orders/orders.service';
 
 import type {
   CreatePosOrderDTO,
@@ -34,6 +35,7 @@ export class PosService {
     private readonly cashbackService: CashbackService,
     private readonly theoreticalStockService: TheoreticalStockService,
     private readonly kdsService: KdsService,
+    private readonly ordersService: OrdersService,
   ) {}
 
   private mapPaymentMethod(p: PrismaPaymentMethod): SharedPaymentMethod {
@@ -123,12 +125,11 @@ export class PosService {
       const orderTotal = Math.round((finalTotal + deliveryFee) * 100) / 100;
 
       if (dto.id) {
-        // Updating existing draft to confirmed
+        // Updating existing draft (keep status as-is for now, will transition via updateOrderStatus)
         await tx.orderItem.deleteMany({ where: { orderId: dto.id, tenantId } });
         currentOrder = await tx.order.update({
           where: { id: dto.id },
           data: {
-            status: 'confirmed',
             itemsSubtotal,
             discountTotal: combinedDiscountTotal,
             deliveryFee,
@@ -151,7 +152,7 @@ export class PosService {
           data: {
             tenantId,
             orderNumber: `#${updatedTenant.orderSequence.toString().padStart(4, '0')}`,
-            status: 'confirmed',
+            status: 'pending',
             fulfillmentType: dto.fulfillmentType,
             customerName: dto.customerName || 'Consumidor',
             customerPhone: dto.customerPhone || '',
@@ -210,22 +211,6 @@ export class PosService {
         }
       }
 
-      await tx.orderTimeline.create({
-        data: {
-          orderId: currentOrder.id,
-          tenantId,
-          status: 'confirmed',
-          note: 'Venda finalizada via PDV.',
-          actorId: operatorId,
-          actorType: 'tenant_user',
-        },
-      });
-
-      // Trigger production jobs for open command
-      await this.kdsService.createProductionJobs(currentOrder.id, tenantId).catch(e => {
-        console.error('KDS print jobs failed to create for draft', e);
-      });
-
       return currentOrder;
     });
 
@@ -244,6 +229,12 @@ export class PosService {
       await this.prisma.coupon.update({ where: { id: couponId }, data: { usedCount: { increment: 1 } } });
     }
     await this.theoreticalStockService.processOrderDepletion(tenantId, order.id);
+
+    // Transition order to confirmed via centralized OrdersService to ensure timeline, KDS, and WebSocket are properly triggered
+    await this.ordersService.updateOrderStatus(order.id, tenantId, {
+      status: 'confirmed' as SharedOrderStatus,
+      note: 'Venda finalizada via PDV.',
+    }, operatorId);
 
     return this.getOrderDetail(order.id, tenantId);
   }
@@ -510,33 +501,28 @@ export class PosService {
       throw new ConflictException('Esta venda já está cancelada ou foi finalizada.');
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.order.update({ where: { id: orderId }, data: { status: 'cancelled' } });
-      
-      // If it's a table order, free it
-      if (order.fulfillmentType === 'table') {
-        await tx.dineInTable.updateMany({
-           where: { tenantId, activeOrderId: orderId },
-           data: { status: 'free', activeOrderId: null }
-        });
-      }
+    // Utiliza centralizadamente OrdersService.updateOrderStatus para gerenciar a transição de status operacional
+    await this.ordersService.updateOrderStatus(
+      orderId,
+      tenantId,
+      {
+        status: 'cancelled' as SharedOrderStatus,
+        note: 'Venda cancelada via PDV.',
+      },
+      operatorId,
+    );
 
-      await tx.orderTimeline.create({
-        data: {
-          orderId,
-          tenantId,
-          status: 'cancelled',
-          note: 'Venda cancelada via PDV.',
-          actorId: operatorId,
-          actorType: 'tenant_user',
-        },
+    // Se for pedido de mesa, liberar a mesa correspondente
+    if (order.fulfillmentType === 'table') {
+      await this.prisma.dineInTable.updateMany({
+         where: { tenantId, activeOrderId: orderId },
+         data: { status: 'free', activeOrderId: null }
       });
-    });
+    }
 
     if (order.cashSessionId && order.status !== 'draft') {
       await this.cashService.registerRefundMovement(tenantId, order.cashSessionId, orderId, Number(order.total));
     }
-    await this.theoreticalStockService.reverseOrderDepletion(tenantId, orderId);
 
     return this.getOrderDetail(orderId, tenantId);
   }

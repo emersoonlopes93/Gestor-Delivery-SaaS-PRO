@@ -8,6 +8,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { MercadoPagoPaymentSchema, MercadoPagoPayment } from './schemas/mercadopago.schema';
 import { ModuleRef } from '@nestjs/core';
 import { OrdersService } from '../orders/orders.service';
+import { OrderStatus as SharedOrderStatus } from '@gestor/types';
 
 interface MercadoPagoConfig {
   accessToken: string;
@@ -92,8 +93,14 @@ export class PaymentGatewayService {
     private readonly moduleRef: ModuleRef,
   ) {}
 
-  private get ordersService(): OrdersService {
-    return this.moduleRef.get(OrdersService, { strict: false });
+  private async getOrdersService(): Promise<OrdersService> {
+    const service = this.moduleRef.get(OrdersService, { strict: false });
+    if (!service) {
+      const message = 'OrdersService is not available in the module context. This may indicate a circular dependency or module initialization issue.';
+      this.logger.error(message);
+      throw new Error(message);
+    }
+    return service;
   }
 
   private mergeMetadata(current: Prisma.JsonValue, update: Partial<PaymentMetadata>): Prisma.InputJsonValue {
@@ -315,12 +322,15 @@ export class PaymentGatewayService {
       });
 
       if (mpResponse.status === 'approved') {
-        await this.ordersService.updateOrderStatus(orderId, tenantId, {
-          status: 'confirmed',
-          note: 'Pagamento via cartão de crédito aprovado.',
-        }).catch(err => {
-          this.logger.error(`Error transitioning order ${orderId} to confirmed in createCardPayment: ${err.message}`);
-        });
+        try {
+          const ordersService = await this.getOrdersService();
+          await ordersService.updateOrderStatus(orderId, tenantId, {
+            status: 'confirmed',
+            note: 'Pagamento via cartão de crédito aprovado.',
+          });
+        } catch (err) {
+          this.logger.error(`Error transitioning order ${orderId} to confirmed in createCardPayment: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
 
       return mpResponse;
@@ -630,14 +640,16 @@ export class PaymentGatewayService {
     });
 
     if (newStatus === PaymentTxStatus.confirmed && transaction.orderId) {
-      await this.ordersService.updateOrderStatus(transaction.orderId, transaction.tenantId, {
-        status: orderStatus as any,
-        note: `Pagamento via gateway confirmado (Transação: ${transaction.gatewayTxId}).`,
-      }).catch(err => {
-        this.logger.error(`Error transitioning order ${transaction.orderId} to ${orderStatus} in webhook update: ${err.message}`);
-      });
-
-      this.logger.log(`Payment confirmed for order ${transaction.orderId}`);
+      try {
+        const ordersService = await this.getOrdersService();
+        await ordersService.updateOrderStatus(transaction.orderId, transaction.tenantId, {
+          status: orderStatus as SharedOrderStatus,
+          note: `Pagamento via gateway confirmado (Transação: ${transaction.gatewayTxId}).`,
+        });
+        this.logger.log(`Payment confirmed for order ${transaction.orderId}`);
+      } catch (err) {
+        this.logger.error(`Error transitioning order ${transaction.orderId} to ${orderStatus} in webhook update: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
   }
 
@@ -706,17 +718,18 @@ export class PaymentGatewayService {
 
       if (transaction.orderId) {
         try {
-          await this.ordersService.updateOrderStatus(
+          const ordersService = await this.getOrdersService();
+          await ordersService.updateOrderStatus(
             transaction.orderId,
             transaction.tenantId,
             {
-              status: 'cancelled' as any,
+              status: 'cancelled' as SharedOrderStatus,
               note: 'Pagamento cancelado pelo gateway.',
             },
             'SYSTEM'
           );
         } catch (error) {
-          this.logger.error(`Failed to update order status to cancelled for order ${transaction.orderId}: ${error}`);
+          this.logger.error(`Failed to update order status to cancelled for order ${transaction.orderId}: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
 

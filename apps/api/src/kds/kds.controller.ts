@@ -137,12 +137,6 @@ export class KdsController {
     await this.kdsService.cancelPrintJobs({ orderId: id }); // Or handle by ID if needed, but cancelPrintJobs handles by filters
   }
 
-  @Post('spooler/next')
-  @RequirePermissions('kds.use')
-  @HttpCode(HttpStatus.OK)
-  async getNextPrintJobForSpooler(@Body('station') station: string) {
-    return this.kdsService.getNextPrintJobForSpooler(station);
-  }
 
   @Post('print-jobs/cleanup')
   @RequirePermissions('kds.manage')

@@ -38,6 +38,7 @@ type PrintJobWithOrder = PrintJob & {
 @Injectable()
 export class KdsService {
   private readonly logger = new Logger(KdsService.name);
+  private readonly activeJobsCreations = new Set<string>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -417,122 +418,145 @@ export class KdsService {
       return [];
     }
 
-    const existingJobs = await this.prisma.printJob.count({
+    // Early check: if jobs already exist, return immediately
+    const existingJobsCount = await this.prisma.printJob.count({
       where: { tenantId, orderId },
     });
-    if (existingJobs > 0) {
+    if (existingJobsCount > 0) {
+      this.logger.debug(`createProductionJobs: Jobs already exist for order ${orderId}`);
       return [];
     }
 
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId, tenantId },
-      include: {
-        items: {
-          include: {
-            product: {
-              include: {
-                category: true,
+    const lockKey = `${tenantId}:${orderId}`;
+    if (this.activeJobsCreations.has(lockKey)) {
+      this.logger.log(`createProductionJobs: Job creation already in progress for order ${orderId}`);
+      return [];
+    }
+
+    this.activeJobsCreations.add(lockKey);
+
+    try {
+      // Double-check: confirm jobs still don't exist (in case another thread created them while we were acquiring the lock)
+      const finalCheckJobs = await this.prisma.printJob.count({
+        where: { tenantId, orderId },
+      });
+      if (finalCheckJobs > 0) {
+        this.logger.debug(`createProductionJobs: Jobs were created by another thread for order ${orderId}`);
+        return [];
+      }
+
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId, tenantId },
+        include: {
+          items: {
+            include: {
+              product: {
+                include: {
+                  category: true,
+                },
               },
+              complements: true,
+              comboSelections: true,
             },
-            complements: true,
-            comboSelections: true,
           },
         },
-      },
-    });
-
-    if (!order) return;
-
-    // Agrupar itens por estação
-    const stationGroups: Record<string, OrderItem[]> = {};
-    
-    for (const item of (order as OrderWithItems).items) {
-      const category = item.product?.category;
-      let station = 'GERAL';
-      
-      if (category && category.templateConfig && typeof category.templateConfig === 'object' && !Array.isArray(category.templateConfig)) {
-        const config = category.templateConfig as Record<string, unknown>;
-        station = (config.station as string) || category.name;
-      } else if (category) {
-        station = category.name;
-      }
-      
-      if (!stationGroups[station]) stationGroups[station] = [];
-      stationGroups[station].push(item);
-    }
-
-    // Para cada estação, criar um job
-    const jobs = [];
-    for (const [station, items] of Object.entries(stationGroups)) {
-      // Map OrderItem and its relations to OrderItemResponseDTO
-      const mappedItems = items.map(item => {
-        const orderItem = item as OrderWithItems['items'][number];
- 
-        return {
-          id: orderItem.id,
-          lineType: orderItem.lineType as 'product' | 'combo',
-          productId: orderItem.productId,
-          comboId: orderItem.comboId,
-          quantity: orderItem.quantity,
-          unitPrice: Number(orderItem.unitPrice),
-          lineTotal: Number(orderItem.lineTotal),
-          notes: orderItem.notes,
-          snapshotName: orderItem.snapshotName,
-          snapshotImage: orderItem.snapshotImage,
-          snapshotBasePrice: Number(orderItem.snapshotBasePrice),
-          snapshotExtrasTotal: Number(orderItem.snapshotExtrasTotal),
-          snapshotComposition: orderItem.snapshotComposition,
-          complements: (orderItem.complements || []).map(c => ({
-            id: c.id,
-            complementItemId: c.complementItemId,
-            snapshotName: c.snapshotName,
-            snapshotPrice: Number(c.snapshotPrice),
-          })),
-          comboSelections: (orderItem.comboSelections || []).map(s => ({
-            id: s.id,
-            comboBlockItemId: s.comboBlockItemId,
-            snapshotBlockName: s.snapshotBlockName,
-            snapshotProductName: s.snapshotProductName,
-            snapshotAdditionalPrice: Number(s.snapshotAdditionalPrice),
-          })),
-        };
       });
 
-      const pseudoOrder: OrderResponseDTO = {
-        id: order.id,
-        orderNumber: order.orderNumber,
-        status: order.status as OrderStatus,
-        fulfillmentType: order.fulfillmentType as FulfillmentType,
-        customerName: order.customerName,
-        customerPhone: order.customerPhone,
-        items: mappedItems,
-        total: Number(order.total),
-        itemsSubtotal: Number(order.itemsSubtotal),
-        discountTotal: Number(order.discountTotal),
-        deliveryFee: Number(order.deliveryFee),
-        serviceFee: Number(order.serviceFee),
-        sourceChannel: order.sourceChannel,
-        paymentMethod: order.paymentMethod as PaymentMethod,
-        timeline: [],
-        createdAt: order.createdAt.toISOString(),
-        updatedAt: order.updatedAt.toISOString(),
-      };
+      if (!order) return [];
 
-      const content = await this.printerService.formatTicket(pseudoOrder, PrintType.kitchen, station);
+      // Agrupar itens por estação
+      const stationGroups: Record<string, OrderItem[]> = {};
+      
+      for (const item of (order as OrderWithItems).items) {
+        const category = item.product?.category;
+        let station = 'GERAL';
+        
+        if (category && category.templateConfig && typeof category.templateConfig === 'object' && !Array.isArray(category.templateConfig)) {
+          const config = category.templateConfig as Record<string, unknown>;
+          station = (config.station as string) || category.name;
+        } else if (category) {
+          station = category.name;
+        }
+        
+        if (!stationGroups[station]) stationGroups[station] = [];
+        stationGroups[station].push(item);
+      }
 
-      jobs.push(this.prisma.printJob.create({
-        data: {
-          tenantId,
-          orderId,
-          station,
-          type: PrismaPrintType.kitchen,
-          content,
-          status: PrismaPrintJobStatus.pending,
-        },
-      }));
+      // Para cada estação, criar um job
+      const jobs = [];
+      for (const [station, items] of Object.entries(stationGroups)) {
+        // Map OrderItem and its relations to OrderItemResponseDTO
+        const mappedItems = items.map(item => {
+          const orderItem = item as OrderWithItems['items'][number];
+    
+          return {
+            id: orderItem.id,
+            lineType: orderItem.lineType as 'product' | 'combo',
+            productId: orderItem.productId,
+            comboId: orderItem.comboId,
+            quantity: orderItem.quantity,
+            unitPrice: Number(orderItem.unitPrice),
+            lineTotal: Number(orderItem.lineTotal),
+            notes: orderItem.notes,
+            snapshotName: orderItem.snapshotName,
+            snapshotImage: orderItem.snapshotImage,
+            snapshotBasePrice: Number(orderItem.snapshotBasePrice),
+            snapshotExtrasTotal: Number(orderItem.snapshotExtrasTotal),
+            snapshotComposition: orderItem.snapshotComposition,
+            complements: (orderItem.complements || []).map(c => ({
+              id: c.id,
+              complementItemId: c.complementItemId,
+              snapshotName: c.snapshotName,
+              snapshotPrice: Number(c.snapshotPrice),
+            })),
+            comboSelections: (orderItem.comboSelections || []).map(s => ({
+              id: s.id,
+              comboBlockItemId: s.comboBlockItemId,
+              snapshotBlockName: s.snapshotBlockName,
+              snapshotProductName: s.snapshotProductName,
+              snapshotAdditionalPrice: Number(s.snapshotAdditionalPrice),
+            })),
+          };
+        });
+
+        const pseudoOrder: OrderResponseDTO = {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          status: order.status as OrderStatus,
+          fulfillmentType: order.fulfillmentType as FulfillmentType,
+          customerName: order.customerName,
+          customerPhone: order.customerPhone,
+          items: mappedItems,
+          total: Number(order.total),
+          itemsSubtotal: Number(order.itemsSubtotal),
+          discountTotal: Number(order.discountTotal),
+          deliveryFee: Number(order.deliveryFee),
+          serviceFee: Number(order.serviceFee),
+          sourceChannel: order.sourceChannel,
+          paymentMethod: order.paymentMethod as PaymentMethod,
+          timeline: [],
+          createdAt: order.createdAt.toISOString(),
+          updatedAt: order.updatedAt.toISOString(),
+        };
+
+        const content = await this.printerService.formatTicket(pseudoOrder, PrintType.kitchen, station);
+
+        jobs.push(this.prisma.printJob.create({
+          data: {
+            tenantId,
+            orderId,
+            station,
+            type: PrismaPrintType.kitchen,
+            content,
+            status: PrismaPrintJobStatus.pending,
+          },
+        }));
+      }
+
+      return await Promise.all(jobs);
+    } finally {
+      this.activeJobsCreations.delete(lockKey);
     }
-
-    return Promise.all(jobs);
   }
 
   /**
