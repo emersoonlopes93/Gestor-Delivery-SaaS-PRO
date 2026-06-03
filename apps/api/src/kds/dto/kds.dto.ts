@@ -86,8 +86,8 @@ export class CleanupPrintJobsDTO {
 }
 
 export class GetPrintJobsQueryDTO {
-  @IsString() @IsNotEmpty()
-  station!: string;
+  @IsString() @IsOptional()
+  station?: string;
 
   @IsEnum(PrintJobStatus)
   @IsOptional()

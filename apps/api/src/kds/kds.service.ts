@@ -65,13 +65,9 @@ export class KdsService {
       for (const cat of categories) {
         if (cat.templateConfig && typeof cat.templateConfig === 'object' && !Array.isArray(cat.templateConfig)) {
           const config = cat.templateConfig as Record<string, unknown>;
-          if (config.station) {
+          if (typeof config.station === 'string' && config.station.trim()) {
             stations.add(config.station as string);
-          } else {
-            stations.add(cat.name);
           }
-        } else {
-          stations.add(cat.name);
         }
       }
 
@@ -180,7 +176,7 @@ export class KdsService {
 
     const where: Prisma.PrintJobWhereInput = {
       tenantId,
-      station: station || undefined,
+      station: station && station !== 'ALL' ? station : undefined,
     };
 
     if (status) {
@@ -485,9 +481,9 @@ export class KdsService {
         
         if (category && category.templateConfig && typeof category.templateConfig === 'object' && !Array.isArray(category.templateConfig)) {
           const config = category.templateConfig as Record<string, unknown>;
-          station = (config.station as string) || category.name;
-        } else if (category) {
-          station = category.name;
+          station = typeof config.station === 'string' && config.station.trim()
+            ? config.station
+            : 'GERAL';
         }
         
         if (!stationGroups[station]) stationGroups[station] = [];

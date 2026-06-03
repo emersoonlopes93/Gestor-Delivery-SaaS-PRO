@@ -53,8 +53,9 @@ export class KdsController {
   @Get('print-jobs')
   @RequirePermissions('kds.use')
   async getAllPrintJobs(@Query() query: GetPrintJobsQueryDTO) {
+    const station = query.station === 'ALL' ? '' : query.station || '';
     return this.kdsService.getAllPrintJobs(
-      query.station || '',
+      station,
       query.status as PrintJobStatus, // Cast simples de enum Prisma para DTO @gestor/types (são compatíveis por string)
       query.page,
       query.limit,

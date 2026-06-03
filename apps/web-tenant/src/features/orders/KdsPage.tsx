@@ -29,9 +29,8 @@ export function KdsPage() {
   const fetchJobs = useCallback(async () => {
     try {
       setLoadError(null);
-      const stationQuery = stationId === 'ALL' ? '' : `station=${encodeURIComponent(stationId)}&`;
       const res = await api.get<KdsPrintJobsResponse>(
-        `/kds/print-jobs?${stationQuery}limit=100`,
+        `/kds/print-jobs?station=${encodeURIComponent(stationId)}&limit=100`,
       );
       setPrintJobs((res.data.items || []).filter((job) => activeStatuses.has(job.status)));
     } catch (error) {
