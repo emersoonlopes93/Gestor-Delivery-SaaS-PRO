@@ -1,16 +1,15 @@
-import { Injectable, BadRequestException, Inject } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { StorageService } from './storage.service';
 import { ImageOptimizerService } from './image-optimizer.service';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
-
 import { Prisma } from '@prisma/client';
 
 export interface CreateMediaAssetInput {
-  tenantId: string;
+  tenantId: string | null;
   scope: string;
   file: {
     buffer: Buffer;
@@ -18,13 +17,20 @@ export interface CreateMediaAssetInput {
     mimetype: string;
     size: number;
   };
+  title?: string;
+  description?: string;
   category?: string;
+  categoryId?: string | null;
   altText?: string;
+  createdByUserId?: string | null;
+  publicationStatus?: 'draft' | 'published' | 'unpublished';
   tagsJson?: Prisma.InputJsonValue;
 }
 
 @Injectable()
 export class UploadService {
+  private readonly logger = new Logger(UploadService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
@@ -33,95 +39,102 @@ export class UploadService {
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
-  /**
-   * Processes an upload and creates a MediaAsset record.
-   * Centralized logic for the new media library.
-   */
   async createMediaAsset(input: CreateMediaAssetInput) {
-    const { tenantId, scope, file, category, altText, tagsJson } = input;
+    const { tenantId, scope, file, category, categoryId, altText, tagsJson } = input;
 
-    // 1. Enforce size limit from environment variables
-    const maxSizeBytes = this.config.get<number>('MEDIA_MAX_SIZE_BYTES') || 10 * 1024 * 1024; // fallback to 10MB
-    if (file.size > maxSizeBytes || file.buffer.length > maxSizeBytes) {
-      throw new BadRequestException('O arquivo excede o limite máximo de tamanho permitido.');
+    if (scope !== 'system_gallery' && !tenantId) {
+      throw new BadRequestException('Upload tenant exige tenantId.');
     }
 
-    // 2. Perform magic number and script/SVG injection validations
+    const maxSizeBytes =
+      this.config.get<number>('MEDIA_MAX_SIZE_BYTES') ||
+      (this.config.get<number>('MEDIA_MAX_FILE_SIZE_MB')
+        ? this.config.get<number>('MEDIA_MAX_FILE_SIZE_MB', 10) * 1024 * 1024
+        : 10 * 1024 * 1024);
+    if (file.size > maxSizeBytes || file.buffer.length > maxSizeBytes) {
+      throw new BadRequestException('O arquivo excede o limite maximo de tamanho permitido.');
+    }
+
+    validateOriginalFilename(file.originalname);
+    validateFileExtension(file.originalname, file.mimetype);
     validateBufferSafety(file.buffer, file.mimetype);
 
-    // 3. Optimize image
+    this.logger.log(`media_upload_started scope=${scope} tenantId=${tenantId ?? 'system'} provider=${this.storage.getDriver()}`);
+
     const { buffer: optimizedBuffer, info } = await this.optimizer.optimize(
       file.buffer,
       file.originalname,
     );
 
-    // 4. Prepare storage path
     const uuid = randomUUID();
-    const folder = scope.replace(/_/g, '-'); // e.g. storefront-background
-    const key = `tenants/${tenantId}/${folder}/${uuid}.webp`;
+    const folder = scope.replace(/_/g, '-');
+    const key =
+      scope === 'system_gallery'
+        ? `system/gallery/${uuid}.webp`
+        : `tenants/${tenantId}/${folder}/${uuid}.webp`;
+    const checksum = createHash('sha256').update(optimizedBuffer).digest('hex');
 
-    // 5. Upload to storage
     const storageResult = await this.storage.uploadBuffer({
       buffer: optimizedBuffer,
       key,
       contentType: 'image/webp',
     });
 
-    // 6. Create database record
-    const asset = await this.prisma.mediaAsset.create({
-      data: {
-        tenantId,
-        scope,
-        source: 'upload',
-        category,
-        filename: `${uuid}.webp`,
-        originalName: file.originalname,
-        mimeType: 'image/webp',
-        sizeBytes: optimizedBuffer.length,
-        width: info.width,
-        height: info.height,
-        path: storageResult.key,
-        publicUrl: storageResult.url,
-        altText,
-        tagsJson: tagsJson as Prisma.InputJsonValue,
-        isActive: true,
-      },
-    });
-
-    // 7. Invalidate public storefront cache
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { slug: true },
-    });
-    if (tenant) {
-      const cacheKeys = [
-        `storefront:${tenant.slug}:delivery`,
-        `storefront:${tenant.slug}:pickup`,
-      ];
-      for (const key of cacheKeys) {
-        await this.cacheManager.del(key);
-      }
+    let asset;
+    try {
+      asset = await this.prisma.mediaAsset.create({
+        data: {
+          tenantId,
+          scope,
+          source: 'upload',
+          title: input.title ?? sanitizedTitle(file.originalname),
+          description: input.description ?? null,
+          category,
+          categoryId: categoryId ?? null,
+          filename: `${uuid}.webp`,
+          originalName: file.originalname,
+          mimeType: 'image/webp',
+          sizeBytes: optimizedBuffer.length,
+          width: info.width,
+          height: info.height,
+          path: storageResult.key,
+          storageProvider: this.storage.getDriver(),
+          storageKey: storageResult.key,
+          publicUrl: storageResult.url,
+          checksum,
+          altText,
+          tagsJson: tagsJson as Prisma.InputJsonValue,
+          isSystem: scope === 'system_gallery',
+          status: 'active',
+          publicationStatus: input.publicationStatus ?? 'published',
+          createdByUserId: input.createdByUserId ?? null,
+          isActive: true,
+        },
+      });
+    } catch (error) {
+      await this.storage.delete(storageResult.key);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`media_upload_persist_failed scope=${scope} tenantId=${tenantId ?? 'system'} error=${message}`);
+      throw error;
     }
+
+    await this.invalidateStorefrontCache(tenantId);
+    this.logger.log(`media_upload_completed assetId=${asset.id} scope=${scope} tenantId=${tenantId ?? 'system'} provider=${this.storage.getDriver()}`);
 
     return asset;
   }
 
-  /**
-   * Deletes a media asset and its physical file.
-   */
   async deleteMediaAsset(tenantId: string, assetId: string) {
     const asset = await this.prisma.mediaAsset.findFirst({
-      where: { id: assetId, tenantId },
+      where: { id: assetId, tenantId, deletedAt: null },
     });
 
     if (!asset) {
-      throw new BadRequestException('Mídia não encontrada ou sem permissão.');
+      throw new BadRequestException('Midia nao encontrada ou sem permissao.');
     }
 
-    // 1. Delete physical file
-    await this.storage.delete(asset.path);
+    await this.storage.delete(asset.storageKey ?? asset.path);
 
-    // 2. Clean references in storefront background config
     const settings = await this.prisma.tenantSettings.findUnique({
       where: { tenantId },
       include: { tenant: { select: { slug: true } } },
@@ -139,23 +152,22 @@ export class UploadService {
             storefrontThemeJson: theme as Prisma.InputJsonValue,
           },
         });
-
-        // Invalidate public storefront cache
-        const slug = settings.tenant.slug;
-        const cacheKeys = [
-          `storefront:${slug}:delivery`,
-          `storefront:${slug}:pickup`,
-        ];
-        for (const key of cacheKeys) {
-          await this.cacheManager.del(key);
-        }
       }
     }
 
-    // 3. Delete database record
-    return this.prisma.mediaAsset.delete({
+    const updated = await this.prisma.mediaAsset.update({
       where: { id: assetId },
+      data: {
+        status: 'deleted',
+        isActive: false,
+        publicationStatus: 'unpublished',
+        deletedAt: new Date(),
+      },
     });
+
+    await this.invalidateStorefrontCache(tenantId);
+    this.logger.log(`media_asset_soft_deleted assetId=${assetId} tenantId=${tenantId}`);
+    return updated;
   }
 
   async resolveTenantIdFromRequestUser(user: unknown): Promise<string> {
@@ -164,43 +176,94 @@ export class UploadService {
       return tenantId;
     }
 
-    throw new Error('TenantId não encontrado no usuário autenticado');
+    throw new Error('TenantId nao encontrado no usuario autenticado');
+  }
+
+  private async invalidateStorefrontCache(tenantId: string | null): Promise<void> {
+    if (!tenantId) return;
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { slug: true },
+    });
+    if (!tenant) return;
+
+    const cacheKeys = [
+      `storefront:${tenant.slug}:delivery`,
+      `storefront:${tenant.slug}:pickup`,
+    ];
+    for (const key of cacheKeys) {
+      await this.cacheManager.del(key);
+    }
   }
 }
 
-/**
- * Safely validates a file buffer against magic numbers and checks for malicious scripts/HTML/SVG.
- */
+function sanitizedTitle(originalName: string): string {
+  return originalName
+    .replace(/\.[^.]+$/, '')
+    .replace(/[^\w\s.-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120) || 'Imagem';
+}
+
+function validateOriginalFilename(originalName: string): void {
+  const normalized = originalName.replace(/\\/g, '/');
+  const lower = normalized.toLowerCase();
+  if (
+    normalized.includes('../') ||
+    normalized.includes('..\\') ||
+    normalized.includes('/') ||
+    lower.includes('%2f') ||
+    lower.includes('%5c') ||
+    lower.includes('..%')
+  ) {
+    throw new BadRequestException('Nome de arquivo invalido.');
+  }
+  const dangerousExtensions = ['.svg', '.html', '.htm', '.js', '.pdf', '.zip', '.exe', '.bat', '.cmd', '.ps1'];
+  if (dangerousExtensions.some((ext) => lower.endsWith(ext) || lower.includes(`${ext}.`))) {
+    throw new BadRequestException('Extensao de arquivo nao permitida.');
+  }
+}
+
+function validateFileExtension(originalName: string, mimetype: string): void {
+  const lower = originalName.toLowerCase();
+  const extension = lower.includes('.') ? lower.slice(lower.lastIndexOf('.')) : '';
+  const allowedByMime: Record<string, string[]> = {
+    'image/jpeg': ['.jpg', '.jpeg'],
+    'image/png': ['.png'],
+    'image/webp': ['.webp'],
+  };
+  const allowed = allowedByMime[mimetype];
+  if (!allowed || !allowed.includes(extension)) {
+    throw new BadRequestException('Extensao incompativel com o tipo de imagem.');
+  }
+}
+
 export function validateBufferSafety(buffer: Buffer, mimetype: string) {
   if (!buffer || buffer.length === 0) {
-    throw new BadRequestException('Arquivo vazio ou inválido.');
+    throw new BadRequestException('Arquivo vazio ou invalido.');
   }
 
-  // 1. Check magic numbers/signatures
   const hex = buffer.toString('hex', 0, 8).toUpperCase();
 
   if (mimetype === 'image/jpeg') {
-    // JPEG starts with FF D8 FF
     if (!hex.startsWith('FFD8FF')) {
-      throw new BadRequestException('Assinatura do arquivo JPEG inválida.');
+      throw new BadRequestException('Assinatura do arquivo JPEG invalida.');
     }
   } else if (mimetype === 'image/png') {
-    // PNG starts with 89 50 4E 47 0D 0A 1A 0A
     if (!hex.startsWith('89504E470D0A1A0A')) {
-      throw new BadRequestException('Assinatura do arquivo PNG inválida.');
+      throw new BadRequestException('Assinatura do arquivo PNG invalida.');
     }
   } else if (mimetype === 'image/webp') {
-    // WebP starts with RIFF and has WEBP at offset 8
     const riff = buffer.toString('ascii', 0, 4);
     const webp = buffer.toString('ascii', 8, 12);
     if (riff !== 'RIFF' || webp !== 'WEBP') {
-      throw new BadRequestException('Assinatura do arquivo WebP inválida.');
+      throw new BadRequestException('Assinatura do arquivo WebP invalida.');
     }
   } else {
-    throw new BadRequestException('MIME type não suportado.');
+    throw new BadRequestException('MIME type nao suportado.');
   }
 
-  // 2. Scan the first 1024 bytes for malicious scripts, HTML elements or SVGs (polyglot file prevention)
   const checkLength = Math.min(buffer.length, 1024);
   const headerContent = buffer.toString('utf-8', 0, checkLength).toLowerCase();
 
@@ -218,7 +281,7 @@ export function validateBufferSafety(buffer: Buffer, mimetype: string) {
 
   for (const pattern of dangerousPatterns) {
     if (headerContent.includes(pattern)) {
-      throw new BadRequestException('Conteúdo de arquivo inválido ou potencialmente perigoso detectado.');
+      throw new BadRequestException('Conteudo de arquivo invalido ou potencialmente perigoso detectado.');
     }
   }
 }

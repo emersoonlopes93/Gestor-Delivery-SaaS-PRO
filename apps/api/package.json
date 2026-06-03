@@ -22,6 +22,7 @@
 
     "smoke:auth": "ts-node scripts/smoke-test-auth.ts",
     "smoke:p1": "ts-node -r tsconfig-paths/register scripts/smoke-test-p1.ts",
+    "smoke:media": "ts-node -r tsconfig-paths/register scripts/smoke-test-media.ts",
 
     "smoke:combos": "ts-node scripts/smoke-test-combos.ts",
 

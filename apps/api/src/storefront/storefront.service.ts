@@ -16,6 +16,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { AvailabilityService, SalesChannel } from '../catalog/publication/availability.service';
 import { UpsellsService } from '../catalog/upsells.service';
+import { MediaLibraryService } from '../upload/media-library.service';
 
 import { SchedulingService } from '../scheduling/scheduling.service';
 
@@ -25,6 +26,7 @@ export class StorefrontService {
     private readonly prisma: PrismaService,
     private readonly availabilityService: AvailabilityService,
     private readonly upsellsService: UpsellsService,
+    private readonly mediaLibrary: MediaLibraryService,
     private readonly schedulingService: SchedulingService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
@@ -107,6 +109,7 @@ export class StorefrontService {
                 },
               },
             },
+            mediaAsset: true,
           },
         },
       },
@@ -131,6 +134,7 @@ export class StorefrontService {
             };
             comboBundleItems: { include: { product: true } };
             comboSlots: { include: { allowedItems: { include: { product: true } } } };
+            mediaAsset: true;
           };
         };
       };
@@ -159,6 +163,7 @@ export class StorefrontService {
             },
           },
         },
+        mediaAsset: true,
       },
     });
 
@@ -166,6 +171,7 @@ export class StorefrontService {
       include: {
         comboBundleItems: { include: { product: true } };
         comboSlots: { include: { allowedItems: { include: { product: true } } } };
+        mediaAsset: true;
       };
     }>;
 
@@ -202,6 +208,7 @@ export class StorefrontService {
           .map((p) => {
             const canSell = availabilityMap.get(p.id) ?? true;
             const isAvailable = Boolean(p.isAvailable) && canSell;
+            const image = this.mediaLibrary.resolveFinalImage(p);
             return {
               id: p.id,
               name: p.name,
@@ -211,7 +218,10 @@ export class StorefrontService {
               description: p.longDescription,
               longDescription: p.longDescription,
               basePrice: Number(p.basePrice),
-              image: p.image,
+              image: image.imageUrl,
+              imageUrl: image.imageUrl,
+              imageAltText: image.imageAltText,
+              imageSource: image.imageSource,
               isAvailable,
               complementGroups: (p.complementGroups || []).map((cg) => ({
                 id: cg.id,
@@ -301,6 +311,7 @@ export class StorefrontService {
       .map((combo) => {
         const canSell = availabilityMap.get(combo.id) ?? true;
         const isAvailable = Boolean(combo.isAvailable) && canSell;
+        const image = this.mediaLibrary.resolveFinalImage(combo);
 
         const basePrice = Number(combo.basePrice);
         const pricingValue = Number(combo.comboPricingValue || 0);
@@ -328,7 +339,10 @@ export class StorefrontService {
           slug: combo.slug,
           description: combo.shortDescription,
           basePrice,
-          image: combo.image,
+          image: image.imageUrl,
+          imageUrl: image.imageUrl,
+          imageAltText: image.imageAltText,
+          imageSource: image.imageSource,
           isAvailable,
           comboMode: (combo.comboMode === 'bundle' ? 'bundle' : 'slot') as 'bundle' | 'slot',
           pricingType: combo.comboPricingType as 'fixed_price' | 'discount_percent' | 'discount_amount' | null,

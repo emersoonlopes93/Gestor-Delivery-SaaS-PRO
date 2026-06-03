@@ -55,6 +55,8 @@ export class PrismaService
         'BillingModuleAddon',
         'BillingSettings',
         'InvoiceItem',
+        'MediaAsset',
+        'MediaCategory',
       ];
 
       const model = params.model ?? '';

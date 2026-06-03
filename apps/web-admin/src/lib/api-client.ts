@@ -114,6 +114,27 @@ export const api = {
       method: 'POST',
       body: body ? JSON.stringify(body) : undefined,
     }),
+  upload: async <T>(endpoint: string, formData: FormData): Promise<ApiResponse<T>> => {
+    const token = localStorage.getItem('admin_accessToken');
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorBody: ApiErrorResponse = await response.json().catch(() => ({}));
+      throw new ApiError(
+        response.status,
+        errorBody?.error?.message || 'Upload failed',
+        errorBody?.error?.code,
+      );
+    }
+
+    return response.json();
+  },
   put: <T>(endpoint: string, body?: unknown) =>
     apiFetch<T>(endpoint, {
       method: 'PUT',

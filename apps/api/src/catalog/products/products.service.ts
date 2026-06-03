@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Cache } from 'cache-manager';
 import { PrismaService } from '../../database/prisma.service';
 import { TenantContextService } from '../../common/context/tenant-context.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -7,6 +9,7 @@ import { slugify } from '@gestor/utils';
 import { CatalogTemplatesService } from '../catalog-templates.service';
 import { AvailabilityService, SalesChannel } from '../publication/availability.service';
 import type { Upsell } from '@gestor/types';
+import { MediaLibraryService } from '../../upload/media-library.service';
 
 @Injectable()
 export class ProductsService {
@@ -15,6 +18,8 @@ export class ProductsService {
     private readonly tenantContext: TenantContextService,
     private readonly catalogTemplates: CatalogTemplatesService,
     private readonly availabilityService: AvailabilityService,
+    private readonly mediaLibrary: MediaLibraryService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   private getRequiredTenantId(): string {
@@ -27,6 +32,19 @@ export class ProductsService {
 
   private roundMoney(value: number): number {
     return Number((Math.round(value * 100) / 100).toFixed(2));
+  }
+
+  private async invalidateStorefrontCache(tenantId: string): Promise<void> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { slug: true },
+    });
+    if (!tenant?.slug) return;
+
+    await Promise.all([
+      this.cacheManager.del(`storefront:${tenant.slug}:delivery`),
+      this.cacheManager.del(`storefront:${tenant.slug}:pickup`),
+    ]);
   }
 
   calculateComboBundleFinalPrice(
@@ -118,6 +136,14 @@ export class ProductsService {
       typeof createProductDto.categoryId === 'string' && createProductDto.categoryId.trim() === ''
         ? null
         : (createProductDto.categoryId ?? null);
+    const normalizedMediaAssetId =
+      typeof createProductDto.mediaAssetId === 'string' && createProductDto.mediaAssetId.trim() !== ''
+        ? createProductDto.mediaAssetId
+        : null;
+
+    const mediaAsset = normalizedMediaAssetId
+      ? await this.mediaLibrary.assertProductCanUseAsset(tenantId, normalizedMediaAssetId)
+      : null;
 
     const productExists = await this.prisma.tenantClient.product.findFirst({
       where: {
@@ -162,7 +188,8 @@ export class ProductsService {
         shortDescription: createProductDto.shortDescription ?? null,
         longDescription: createProductDto.longDescription ?? null,
         basePrice: safeInitialBasePrice,
-        image: createProductDto.image ?? null,
+        image: mediaAsset ? mediaAsset.publicUrl : (createProductDto.image ?? null),
+        mediaAssetId: normalizedMediaAssetId,
         isActive: createProductDto.isActive ?? true,
         isFeatured: createProductDto.isFeatured ?? false,
         isAvailable: createProductDto.isAvailable ?? true,
@@ -171,7 +198,7 @@ export class ProductsService {
         sku: createProductDto.sku && createProductDto.sku.trim() !== '' ? createProductDto.sku : null,
         costPrice: createProductDto.costPrice ?? null,
       },
-      include: { category: true }
+      include: { category: true, mediaAsset: true }
     });
 
     if (isCombo && comboMode === 'bundle') {
@@ -201,6 +228,8 @@ export class ProductsService {
       });
     }
 
+    await this.invalidateStorefrontCache(tenantId);
+
     return product;
   }
 
@@ -218,7 +247,7 @@ export class ProductsService {
         })
       },
       orderBy: { order: 'asc' },
-      include: { category: true, publication: { include: { rules: true } } }
+      include: { category: true, mediaAsset: true, publication: { include: { rules: true } } }
     });
 
     // If channel is provided, filter using AvailabilityService
@@ -250,6 +279,7 @@ export class ProductsService {
       where: { id, tenantId, deletedAt: null },
       include: {
         category: true,
+        mediaAsset: true,
         complementGroups: { include: { group: true } },
         optionGroupLinks: { include: { optionGroup: { include: { items: { orderBy: { order: 'asc' } } } } }, orderBy: { order: 'asc' } },
         comboSlots: { include: { allowedItems: { include: { product: true }, orderBy: { order: 'asc' } } }, orderBy: { order: 'asc' } },
@@ -311,6 +341,16 @@ export class ProductsService {
         : (typeof updateProductDto.categoryId === 'string' && updateProductDto.categoryId.trim() === ''
             ? null
             : updateProductDto.categoryId);
+    const normalizedMediaAssetId =
+      updateProductDto.mediaAssetId === undefined
+        ? undefined
+        : (typeof updateProductDto.mediaAssetId === 'string' && updateProductDto.mediaAssetId.trim() !== ''
+            ? updateProductDto.mediaAssetId
+            : null);
+    const mediaAsset =
+      typeof normalizedMediaAssetId === 'string'
+        ? await this.mediaLibrary.assertProductCanUseAsset(this.getRequiredTenantId(), normalizedMediaAssetId)
+        : null;
 
     let nextBasePrice = updateProductDto.basePrice;
     if (nextType === 'combo' && nextComboMode === 'bundle') {
@@ -332,7 +372,10 @@ export class ProductsService {
         shortDescription: updateProductDto.shortDescription ?? undefined,
         longDescription: updateProductDto.longDescription ?? undefined,
         basePrice: nextBasePrice,
-        image: updateProductDto.image ?? undefined,
+        image: mediaAsset ? mediaAsset.publicUrl : updateProductDto.image ?? undefined,
+        mediaAsset: normalizedMediaAssetId === undefined
+          ? undefined
+          : (normalizedMediaAssetId === null ? { disconnect: true } : { connect: { id: normalizedMediaAssetId } }),
         isActive: updateProductDto.isActive,
         isFeatured: updateProductDto.isFeatured,
         isAvailable: updateProductDto.isAvailable,
@@ -375,6 +418,8 @@ export class ProductsService {
       );
     }
 
+    await this.invalidateStorefrontCache(this.getRequiredTenantId());
+
     return product;
   }
 
@@ -383,13 +428,15 @@ export class ProductsService {
 
     // Soft delete - we also rename the slug to free it up for new products with the same name
     const timestamp = Date.now();
-    return this.prisma.tenantClient.product.update({
+    const removed = await this.prisma.tenantClient.product.update({
       where: { id },
       data: {
         deletedAt: new Date(),
         slug: `${product.slug}-deleted-${timestamp}`,
       },
     });
+    await this.invalidateStorefrontCache(this.getRequiredTenantId());
+    return removed;
   }
 
   async listUpsellsForProduct(productId: string): Promise<Upsell[]> {
@@ -448,6 +495,7 @@ export class ProductsService {
           basePrice: source.basePrice,
           costPrice: source.costPrice,
           image: source.image,
+          mediaAssetId: source.mediaAssetId,
           isActive: false, // Start inactive for safety
           isFeatured: source.isFeatured,
           isAvailable: source.isAvailable,

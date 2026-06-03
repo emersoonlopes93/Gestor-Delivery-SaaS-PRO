@@ -26,9 +26,10 @@ import { PizzaController } from './pizza.controller';
 import { UpsellsController } from './upsells.controller';
 import { UpsellsService } from './upsells.service';
 import { AvailabilityService } from './publication/availability.service';
+import { UploadModule } from '../upload/upload.module';
 
 @Module({
-  imports: [DatabaseModule, RbacModule],
+  imports: [DatabaseModule, RbacModule, UploadModule],
   controllers: [CategoriesController, ProductsController, ComplementsController, CombosController, OptionGroupsController, ProductOptionGroupsController, ComboSlotsController, ComboBundleItemsController, PublicationController, PizzaController, UpsellsController],
   providers: [
     CategoriesService,

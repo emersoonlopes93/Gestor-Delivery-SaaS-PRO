@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Images, RefreshCw } from 'lucide-react';
 import { ProductCategory, ProductDetails, CreateProductDto, CatalogProductType } from '@gestor/types';
+import { api } from '../../../lib/api-client';
 
 
 
@@ -10,6 +12,17 @@ type BundleSummary = {
   finalPrice: number;
   pricingType: 'fixed_price' | 'discount_percent' | 'discount_amount';
   pricingValue: number;
+};
+
+type MediaOrigin = 'tenant' | 'system';
+
+type MediaAsset = {
+  id: string;
+  title: string | null;
+  originalName: string | null;
+  publicUrl: string;
+  altText: string | null;
+  scope: string;
 };
 
 interface ProductBasicInfoProps {
@@ -53,6 +66,28 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
   isNew,
   onOpenRecipe,
 }) => {
+  const [mediaOrigin, setMediaOrigin] = useState<MediaOrigin>('tenant');
+  const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([]);
+  const [isLoadingMedia, setIsLoadingMedia] = useState(false);
+
+  const selectedMediaAsset = useMemo(() => {
+    return mediaAssets.find((asset) => asset.id === productForm.mediaAssetId) ?? null;
+  }, [mediaAssets, productForm.mediaAssetId]);
+
+  async function loadMediaAssets(origin = mediaOrigin) {
+    setIsLoadingMedia(true);
+    try {
+      const response = await api.get<MediaAsset[]>(`/media/assets?origin=${origin}`);
+      setMediaAssets(response.data);
+    } finally {
+      setIsLoadingMedia(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadMediaAssets();
+  }, []);
+
   return (
     <section className="space-y-6">
       <div className="bg-card border border-border rounded-2xl p-6 shadow-sm text-left">
@@ -186,13 +221,74 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                   <p className="text-xs text-muted-foreground font-medium mb-2">Clique na imagem para enviar um novo arquivo.</p>
                   <button
                     type="button"
-                    onClick={() => { setImageFile(null); setImagePreviewUrl(null); setProductForm({ ...productForm, image: '' }); }}
+                    onClick={() => { setImageFile(null); setImagePreviewUrl(null); setProductForm({ ...productForm, image: '', mediaAssetId: '' }); }}
                     className="text-[10px] font-black uppercase text-destructive hover:text-destructive/80"
                   >
                     Remover imagem
                   </button>
                 </div>
               </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-muted/30 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Images className="h-4 w-4 text-primary" />
+                  <span className="text-xs font-black uppercase tracking-wider text-foreground">Biblioteca</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => loadMediaAssets()}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:bg-card hover:text-foreground"
+                  title="Atualizar biblioteca"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isLoadingMedia ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+              <div className="flex rounded-xl bg-background p-1">
+                {(['tenant', 'system'] as const).map((origin) => (
+                  <button
+                    key={origin}
+                    type="button"
+                    onClick={() => {
+                      setMediaOrigin(origin);
+                      void loadMediaAssets(origin);
+                    }}
+                    className={`flex-1 rounded-lg px-3 py-2 text-[10px] font-black uppercase ${
+                      mediaOrigin === origin ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
+                    }`}
+                  >
+                    {origin === 'tenant' ? 'Proprias' : 'Globais'}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-1">
+                {mediaAssets.map((asset) => {
+                  const selected = productForm.mediaAssetId === asset.id;
+                  return (
+                    <button
+                      key={asset.id}
+                      type="button"
+                      onClick={() => {
+                        setImageFile(null);
+                        setImagePreviewUrl(null);
+                        setProductForm({ ...productForm, mediaAssetId: asset.id, image: asset.publicUrl });
+                      }}
+                      className={`aspect-square rounded-xl overflow-hidden border-2 bg-card ${
+                        selected ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/40'
+                      }`}
+                      title={asset.title ?? asset.originalName ?? 'Imagem'}
+                    >
+                      <img src={asset.publicUrl} alt={asset.altText ?? asset.title ?? 'Media'} className="h-full w-full object-cover" />
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedMediaAsset ? (
+                <p className="text-[10px] font-bold text-muted-foreground truncate">
+                  Selecionada: {selectedMediaAsset.title ?? selectedMediaAsset.originalName ?? selectedMediaAsset.id}
+                </p>
+              ) : null}
             </div>
 
             <div>

@@ -13,10 +13,12 @@ export class StorageService {
 
   constructor(private readonly config: ConfigService) {
     this.driver =
+      this.config.get<'local' | 'r2'>('MEDIA_STORAGE_PROVIDER') ||
       this.config.get<'local' | 'r2'>('MEDIA_STORAGE_DRIVER') ||
       this.config.get<'local' | 'r2'>('STORAGE_DRIVER') ||
       'local';
     const rawUploadDir =
+      this.config.get<string>('MEDIA_LOCAL_ROOT') ||
       this.config.get<string>('MEDIA_UPLOAD_DIR') ||
       this.config.get<string>('UPLOAD_DIR') ||
       'uploads';
@@ -48,6 +50,10 @@ export class StorageService {
     } else {
       this.logger.log('StorageService inicializado com driver Local.');
     }
+  }
+
+  getDriver(): 'local' | 'r2' {
+    return this.driver;
   }
 
   async delete(key: string): Promise<void> {
@@ -86,7 +92,7 @@ export class StorageService {
   }): Promise<{ key: string; url: string }> {
     if (this.driver === 'r2') {
       const bucket = this.config.get<string>('R2_BUCKET') || '';
-      const publicBaseUrl = this.config.get<string>('R2_PUBLIC_BASE_URL') || '';
+      const publicBaseUrl = this.config.get<string>('MEDIA_CDN_BASE_URL') || this.config.get<string>('R2_PUBLIC_BASE_URL') || '';
 
       await this.s3Client!.send(
         new PutObjectCommand({

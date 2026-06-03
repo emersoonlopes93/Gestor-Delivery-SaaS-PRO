@@ -9,6 +9,7 @@ import { GlobalAiAgentConfigPage } from './features/ai-agent/GlobalAiAgentConfig
 import { AuditLogsPage } from './features/audit/AuditLogsPage';
 import { FranchiseDashboard } from './features/franchise/FranchiseDashboard';
 import IntegrationsPage from './features/integrations/pages/IntegrationsPage';
+import { GlobalMediaLibraryPage } from './features/media/GlobalMediaLibraryPage';
 import { AuthLayout } from './layouts/AuthLayout';
 import { AppLayout } from './layouts/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -104,6 +105,14 @@ export function App() {
             element={
               <PermissionGate permission="saas.settings.read">
                 <IntegrationsPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="/media"
+            element={
+              <PermissionGate permission="saas.settings.read">
+                <GlobalMediaLibraryPage />
               </PermissionGate>
             }
           />

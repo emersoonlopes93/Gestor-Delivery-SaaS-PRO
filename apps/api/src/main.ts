@@ -11,7 +11,7 @@ import { requestIdMiddleware } from './common/middlewares/request-id.middleware'
 import helmet from 'helmet';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as express from 'express';
-import { join } from 'path';
+import { resolve } from 'path';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -34,9 +34,14 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix(prefix);
 
-  // Static files (uploads)
-  // Exposed under the global prefix, e.g. /api/v1/static/<tenantId>/<file>
-  app.use(`${prefix}/static`, express.static(join(process.cwd(), 'uploads')));
+  // Static files (local media storage)
+  // Exposed under the global prefix, e.g. /api/v1/static/tenants/<tenantId>/<file>
+  const mediaLocalRoot =
+    configService.get<string>('MEDIA_LOCAL_ROOT') ||
+    configService.get<string>('MEDIA_UPLOAD_DIR') ||
+    configService.get<string>('UPLOAD_DIR') ||
+    'uploads';
+  app.use(`${prefix}/static`, express.static(resolve(process.cwd(), mediaLocalRoot)));
 
   // Basic hardening
   app.getHttpAdapter().getInstance().disable('x-powered-by');

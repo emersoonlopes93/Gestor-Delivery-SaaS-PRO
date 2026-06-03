@@ -98,6 +98,9 @@ export interface StorefrontProductPayload {
   longDescription?: string | null; // Added for AI agent
   basePrice: number;
   image?: string | null;
+  imageUrl?: string | null;
+  imageAltText?: string | null;
+  imageSource?: 'TENANT_MEDIA' | 'SYSTEM_GALLERY' | 'EXTERNAL_URL' | 'PLACEHOLDER';
   isAvailable: boolean;
   categoryName?: string;
   categoryId?: string;

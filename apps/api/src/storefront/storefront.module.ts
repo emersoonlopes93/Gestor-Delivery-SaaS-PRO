@@ -7,9 +7,10 @@ import { DatabaseModule } from '../database/database.module';
 import { CatalogModule } from '../catalog/catalog.module';
 
 import { SchedulingModule } from '../scheduling/scheduling.module';
+import { UploadModule } from '../upload/upload.module';
 
 @Module({
-  imports: [DatabaseModule, CatalogModule, SchedulingModule],
+  imports: [DatabaseModule, CatalogModule, SchedulingModule, UploadModule],
   controllers: [StorefrontController],
   providers: [StorefrontService],
   exports: [StorefrontService],

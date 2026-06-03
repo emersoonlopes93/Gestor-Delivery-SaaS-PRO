@@ -156,6 +156,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     sellableOnline: true,
     costPrice: 0,
     image: '',
+    mediaAssetId: '',
     order: 0,
   });
 
@@ -301,6 +302,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           sellableOnline: prodRes.data.sellableOnline,
           costPrice: Number(prodRes.data.costPrice ?? 0),
           image: prodRes.data.image || '',
+          mediaAssetId: prodRes.data.mediaAssetId || '',
           order: prodRes.data.order,
         });
       }
@@ -392,6 +394,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     }
     if (file) {
       setImagePreviewUrl(URL.createObjectURL(file));
+      setProductForm((prev) => ({ ...prev, mediaAssetId: '' }));
     } else {
       setImagePreviewUrl(productForm.image || null);
     }

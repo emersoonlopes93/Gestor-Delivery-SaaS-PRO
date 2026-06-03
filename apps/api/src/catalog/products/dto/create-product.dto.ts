@@ -40,6 +40,10 @@ export class CreateProductDto implements ICreateProductDto {
   @IsOptional()
   image?: string;
 
+  @IsString()
+  @IsOptional()
+  mediaAssetId?: string;
+
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;

@@ -33,6 +33,7 @@ export interface Product {
   longDescription?: string | null;
   basePrice: number | string; // usually strings when decimal serialized
   image?: string | null;
+  mediaAssetId?: string | null;
   isActive: boolean;
   isFeatured: boolean;
   isAvailable: boolean;
@@ -139,6 +140,7 @@ export interface CreateProductDto {
   longDescription?: string;
   basePrice: number;
   image?: string;
+  mediaAssetId?: string;
   isActive?: boolean;
   isFeatured?: boolean;
   isAvailable?: boolean;

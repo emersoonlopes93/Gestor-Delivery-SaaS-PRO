@@ -3,13 +3,16 @@ import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
 import { ImageOptimizerService } from './image-optimizer.service';
 import { StorageService } from './storage.service';
+import { MediaLibraryService } from './media-library.service';
+import { AdminMediaController, TenantMediaController } from './media.controllers';
 import { DatabaseModule } from '../database/database.module';
 import { RbacModule } from '../rbac/rbac.module';
+import { AdminRbacService } from '../admin/rbac/admin-rbac.service';
 
 @Module({
   imports: [DatabaseModule, RbacModule],
-  controllers: [UploadController],
-  providers: [UploadService, ImageOptimizerService, StorageService],
-  exports: [StorageService],
+  controllers: [UploadController, AdminMediaController, TenantMediaController],
+  providers: [UploadService, ImageOptimizerService, StorageService, MediaLibraryService, AdminRbacService],
+  exports: [StorageService, UploadService, MediaLibraryService],
 })
 export class UploadModule {}

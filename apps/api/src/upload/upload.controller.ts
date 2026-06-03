@@ -123,7 +123,9 @@ export class UploadController {
     const tenantId = req.user.tenantId;
 
     // 1. Enforce size limit from environment variables
-    const maxSizeBytes = Number(process.env.MEDIA_MAX_SIZE_BYTES) || 10 * 1024 * 1024;
+    const maxSizeBytes =
+      Number(process.env.MEDIA_MAX_SIZE_BYTES) ||
+      (Number(process.env.MEDIA_MAX_FILE_SIZE_MB) ? Number(process.env.MEDIA_MAX_FILE_SIZE_MB) * 1024 * 1024 : 10 * 1024 * 1024);
     if (uploaded.size > maxSizeBytes || uploaded.buffer.length > maxSizeBytes) {
       throw new BadRequestException('O arquivo excede o limite máximo de tamanho permitido.');
     }

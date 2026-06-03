@@ -16,7 +16,8 @@ import {
   Sun,
   LogOut,
   Globe,
-  Bot
+  Bot,
+  Images
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
@@ -54,6 +55,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
       { id: 'franchise', label: 'Franquias', to: '/franchise', icon: Globe, permission: 'saas.franchise.read' },
       { id: 'billing', label: 'Billing Console', to: '/billing', icon: CreditCard, permission: 'saas.billing.read' },
       { id: 'integrations', label: 'Marketplace & IA', to: '/integrations', icon: Puzzle, permission: 'saas.settings.read' },
+      { id: 'media', label: 'Biblioteca Global', to: '/media', icon: Images, permission: 'saas.settings.read' },
       { id: 'ai-global', label: 'Agente IA Global', to: '/ai-agent/global', icon: Bot, permission: 'saas.ai.read' },
       { id: 'audit-logs', label: 'Auditoria', to: '/audit-logs', icon: Shield, permission: 'saas.audit.read' },
     ],

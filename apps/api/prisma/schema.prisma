@@ -102,6 +102,7 @@ model Tenant {
   roles                       TenantRole[]
   settings                    TenantSettings?
   mediaAssets                 MediaAsset[]
+  mediaCategories             MediaCategory[]
   users                       TenantUser[]
   businessGroup               BusinessGroup?               @relation(fields: [businessGroupId], references: [id])
   timeSlots                   TimeSlot[]
@@ -370,34 +371,71 @@ model TenantSettings {
 }
 
 model MediaAsset {
-  id           String   @id @default(cuid())
-  tenantId     String?  @map("tenant_id")
-  scope        String   @db.VarChar(50) // e.g., "storefront_background", "product_image"
-  source       String   @db.VarChar(20) // "upload", "url"
-  category     String?  @db.VarChar(50)
-  filename     String   @db.VarChar(255)
-  originalName String?  @map("original_name") @db.VarChar(255)
-  mimeType     String   @map("mime_type") @db.VarChar(100)
-  sizeBytes    Int      @map("size_bytes")
-  width        Int?
-  height       Int?
-  path         String   @db.Text // internal path or key
-  publicUrl    String   @map("public_url") @db.Text
-  altText      String?  @map("alt_text") @db.VarChar(255)
-  metadataJson Json?    @map("metadata_json")
-  tagsJson     Json?    @map("tags_json")
-  isSystem     Boolean  @default(false) @map("is_system")
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id                String    @id @default(cuid())
+  tenantId          String?   @map("tenant_id")
+  scope             String    @db.VarChar(50) // tenant_library, system_gallery, storefront_background, product_image
+  source            String    @db.VarChar(20) // upload, url
+  title             String?   @db.VarChar(150)
+  description       String?
+  category          String?   @db.VarChar(50)
+  categoryId        String?   @map("category_id")
+  filename          String    @db.VarChar(255)
+  originalName      String?   @map("original_name") @db.VarChar(255)
+  mimeType          String    @map("mime_type") @db.VarChar(100)
+  sizeBytes         Int       @map("size_bytes")
+  width             Int?
+  height            Int?
+  path              String    @db.Text // internal path or key
+  storageProvider   String    @default("local") @map("storage_provider") @db.VarChar(30)
+  storageKey        String?   @map("storage_key") @db.Text
+  publicUrl         String    @map("public_url") @db.Text
+  checksum          String?   @db.VarChar(128)
+  altText           String?   @map("alt_text") @db.VarChar(255)
+  metadataJson      Json?     @map("metadata_json")
+  tagsJson          Json?     @map("tags_json")
+  status            String    @default("active") @db.VarChar(30)
+  publicationStatus String    @default("published") @map("publication_status") @db.VarChar(30)
+  isSystem          Boolean   @default(false) @map("is_system")
+  isActive          Boolean   @default(true) @map("is_active")
+  createdByUserId   String?   @map("created_by_user_id")
+  deletedAt         DateTime? @map("deleted_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
-  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  categoryRel MediaCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  products Product[]
 
   @@index([tenantId])
   @@index([scope])
   @@index([isSystem])
   @@index([category])
+  @@index([categoryId])
+  @@index([status])
+  @@index([publicationStatus])
+  @@index([deletedAt])
   @@map("media_assets")
+}
+
+model MediaCategory {
+  id          String       @id @default(cuid())
+  tenantId    String?      @map("tenant_id")
+  scope       String       @db.VarChar(50)
+  name        String       @db.VarChar(100)
+  slug        String       @db.VarChar(100)
+  description String?
+  isActive    Boolean      @default(true) @map("is_active")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  deletedAt   DateTime?    @map("deleted_at")
+  tenant      Tenant?      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assets      MediaAsset[]
+
+  @@unique([tenantId, scope, slug])
+  @@index([tenantId])
+  @@index([scope])
+  @@index([isActive])
+  @@map("media_categories")
 }
 
 model TenantOperatingHours {
@@ -580,6 +618,7 @@ model Product {
   longDescription     String?                      @map("long_description")
   basePrice           Decimal                      @map("base_price") @db.Decimal(10, 2)
   image               String?
+  mediaAssetId        String?                      @map("media_asset_id")
   isActive            Boolean                      @default(true) @map("is_active")
   isFeatured          Boolean                      @default(false) @map("is_featured")
   isAvailable         Boolean                      @default(true) @map("is_available")
@@ -607,12 +646,14 @@ model Product {
   recipeIngredients   ProductRecipeIngredient[]
   upsellLinks         ProductUpsell[]
   category            ProductCategory?             @relation(fields: [categoryId], references: [id])
+  mediaAsset          MediaAsset?                  @relation(fields: [mediaAssetId], references: [id], onDelete: SetNull)
   tenant              Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   upsellItemEntries   UpsellItem[]
 
   @@unique([tenantId, slug])
   @@index([tenantId])
   @@index([categoryId])
+  @@index([mediaAssetId])
   @@map("products")
 }
 
