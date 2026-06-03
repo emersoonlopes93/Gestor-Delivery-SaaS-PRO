@@ -18,7 +18,7 @@ export interface AiProviderRuntimeConfig {
 const DEFAULT_MODELS: Record<AiProviderType, string> = {
   openai: 'gpt-4o',
   anthropic: 'claude-3-5-sonnet-20240620',
-  google_ai: 'gemini-1.5-flash',
+  google_ai: 'gemini-2.0-flash',
 };
 
 @Injectable()

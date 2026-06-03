@@ -514,6 +514,10 @@ export class PaymentGatewayService {
 
       const mpRawPayment = await response.json();
       const payment = MercadoPagoPaymentSchema.parse(mpRawPayment);
+      if (payment.id.toString() !== transaction.gatewayTxId || payment.external_reference !== transaction.id) {
+        this.logger.warn(`Webhook payment reference mismatch for tenant ${transaction.tenantId} payment ${payload.data.id}`);
+        throw new BadRequestException('Payment reference mismatch');
+      }
       await this.processPaymentUpdate(payment);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -532,7 +536,7 @@ export class PaymentGatewayService {
       return false;
     }
 
-    if (headers?.webhookSecret && headers.webhookSecret === configuredSecret) {
+    if (headers?.webhookSecret && this.timingSafeStringEqual(headers.webhookSecret, configuredSecret)) {
       return true;
     }
 
@@ -541,7 +545,7 @@ export class PaymentGatewayService {
       return false;
     }
 
-    if (signature === configuredSecret) {
+    if (this.timingSafeStringEqual(signature, configuredSecret)) {
       return true;
     }
 
@@ -564,6 +568,12 @@ export class PaymentGatewayService {
     }
 
     return timingSafeEqual(providedBuffer, expectedBuffer);
+  }
+
+  private timingSafeStringEqual(value: string, expected: string): boolean {
+    const valueBuffer = Buffer.from(value);
+    const expectedBuffer = Buffer.from(expected);
+    return valueBuffer.length === expectedBuffer.length && timingSafeEqual(valueBuffer, expectedBuffer);
   }
 
   private async getWebhookSecret(tenantId: string): Promise<string | undefined> {
@@ -627,6 +637,19 @@ export class PaymentGatewayService {
       default:
         this.logger.warn(`Unknown payment status: ${payment.status}`);
         return;
+    }
+
+    if (transaction.status === newStatus) {
+      await this.prisma.paymentTransaction.update({
+        where: { id: transaction.id },
+        data: {
+          metadata: this.mergeMetadata(transaction.metadata, {
+            mercadoPagoPayment: payment,
+          }),
+        },
+      });
+      this.logger.log(`Payment webhook idempotent update ignored for transaction ${transaction.id}`);
+      return;
     }
 
     await this.prisma.paymentTransaction.update({

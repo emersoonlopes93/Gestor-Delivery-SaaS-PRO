@@ -10,6 +10,7 @@ import {
   HttpCode,
   BadRequestException,
 } from '@nestjs/common';
+import axios from 'axios';
 import {
   IsOptional,
   IsBoolean,
@@ -241,6 +242,89 @@ export class AdminAiAgentController {
       };
     }
   }
+
+  /**
+   * GET /admin/ai-agent/providers/google/models
+   * Lista os modelos disponíveis na API do Google AI para a key configurada.
+   * Filtra apenas modelos que suportam generateContent.
+   */
+  @Get('providers/google/models')
+  @Permissions('saas.ai.read')
+  async listGoogleModels() {
+    const runtimeConfig = await this.providerConfig.resolveRuntimeConfig(
+      'google_ai' as import('@prisma/client').AiProviderType,
+      undefined,
+      { log: false },
+    );
+
+    if (!runtimeConfig.apiKeyPresent) {
+      return {
+        success: false,
+        error: 'API Key do Google AI não está configurada no sistema.',
+        models: [],
+      };
+    }
+
+    const baseUrl =
+      process.env.GOOGLE_AI_BASE_URL ||
+      'https://generativelanguage.googleapis.com/v1beta';
+
+    try {
+      const { data } = await axios.get(`${baseUrl}/models`, {
+        params: { key: runtimeConfig.apiKey },
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 15_000,
+      });
+
+      interface GoogleModelEntry {
+        name: string;
+        displayName?: string;
+        description?: string;
+        supportedGenerationMethods?: string[];
+        inputTokenLimit?: number;
+        outputTokenLimit?: number;
+      }
+
+      const allModels: GoogleModelEntry[] = data?.models ?? [];
+
+      const generateContentModels = allModels
+        .filter((m) =>
+          Array.isArray(m.supportedGenerationMethods) &&
+          m.supportedGenerationMethods.includes('generateContent'),
+        )
+        .map((m) => {
+          const modelId = m.name?.replace('models/', '') ?? m.name;
+          const supportsFunctionCalling =
+            Array.isArray(m.supportedGenerationMethods) &&
+            m.supportedGenerationMethods.includes('generateContent');
+
+          return {
+            id: modelId,
+            displayName: m.displayName ?? modelId,
+            description: m.description ?? '',
+            supportsFunctionCalling,
+            inputTokenLimit: m.inputTokenLimit,
+            outputTokenLimit: m.outputTokenLimit,
+          };
+        });
+
+      return {
+        success: true,
+        models: generateContentModels,
+        total: generateContentModels.length,
+        apiKeySource: runtimeConfig.apiKeySource,
+      };
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'Erro ao listar modelos do Google AI.';
+      const statusCode = axios.isAxiosError(err) ? err.response?.status : undefined;
+      return {
+        success: false,
+        error: errMsg,
+        statusCode,
+        models: [],
+      };
+    }
+  }
   @Get('recommended-prompt')
   @Permissions('saas.ai.read')
   getRecommendedPrompt() {
@@ -401,7 +485,7 @@ export class AdminAiAgentController {
       return 'Quota ou limite do provedor esgotado. Troque a key, aguarde a quota renovar ou configure fallback.';
     }
     if (type === 'model_unavailable') {
-      return 'Modelo indisponivel para esta key/provedor. Selecione outro modelo no SaaS Admin.';
+      return 'Esse modelo não está disponível para esta chave/projeto. Clique em "Listar modelos disponíveis" para ver os modelos válidos.';
     }
     return 'Falha ao chamar o provedor de IA.';
   }

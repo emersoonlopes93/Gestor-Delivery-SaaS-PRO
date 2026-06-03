@@ -346,7 +346,7 @@ export function App() {
         <Route
           path="/management/inventory-count"
           element={
-            <PermissionGate permission="inventory.manage">
+            <PermissionGate permission="inventory.adjust">
               <InventoryCountPage />
             </PermissionGate>
           }
@@ -354,7 +354,7 @@ export function App() {
         <Route
           path="/management/losses"
           element={
-            <PermissionGate permission="inventory.manage">
+            <PermissionGate permission="inventory.adjust">
               <LossesPage />
             </PermissionGate>
           }

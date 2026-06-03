@@ -136,8 +136,8 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
       { id: 'management-employees', label: 'Funcionários', to: '/management/employees', icon: Users, permission: 'users.read' },
       { id: 'management-suppliers', label: 'Fornecedores', to: '/management/suppliers', icon: Truck, permission: 'purchasing.read' },
       { id: 'management-purchases', label: 'Compras / Entradas', to: '/management/purchases', icon: ShoppingCart, permission: 'purchasing.read' },
-      { id: 'management-inventory-count', label: 'Inventário Físico', to: '/management/inventory-count', icon: ClipboardList, permission: 'inventory.manage' },
-      { id: 'management-losses', label: 'Perdas e Desperdícios', to: '/management/losses', icon: SlidersHorizontal, permission: 'inventory.manage' },
+      { id: 'management-inventory-count', label: 'Inventário Físico', to: '/management/inventory-count', icon: ClipboardList, permission: 'inventory.adjust' },
+      { id: 'management-losses', label: 'Perdas e Desperdícios', to: '/management/losses', icon: SlidersHorizontal, permission: 'inventory.adjust' },
       { id: 'management-finance', label: 'Financeiro / Fluxo', to: '/management/finance', icon: Wallet, permission: 'finance.read' },
     ],
   },
@@ -388,6 +388,9 @@ export function AppLayout() {
 
     let rules = operatingHours;
     if (rules.length === 0) {
+      if (!import.meta.env.DEV) {
+        return 'closed';
+      }
       rules = Array.from({ length: 7 }, (_, i) => ({
         id: `mock-${i}`,
         tenantId: tenantData.id,
@@ -455,9 +458,9 @@ export function AppLayout() {
       return;
     }
 
-    const { protocol, hostname, origin, port } = window.location;
+    const { protocol, hostname, origin } = window.location;
 
-    // Production fallback: same origin. Dev fallback: probe common storefront ports.
+    // Production fallback: same origin. Dev fallback: common storefront port.
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
       if (hostname.startsWith('app-')) {
         setStorefrontBaseUrl(origin.replace('app-', ''));
@@ -469,34 +472,7 @@ export function AppLayout() {
       return;
     }
 
-    const candidatePorts = ['3000', '3001', '3002'].filter((p) => p !== port);
-    const candidateBases = candidatePorts.map((p) => `${protocol}//${hostname}:${p}`);
-    let cancelled = false;
-
-    const probe = async () => {
-      for (const base of candidateBases) {
-        try {
-          const controller = new AbortController();
-          const timeout = window.setTimeout(() => controller.abort(), 1600);
-          await fetch(`${base}/pizzaria-demo`, {
-            method: 'GET',
-            mode: 'cors',
-            signal: controller.signal,
-          });
-          window.clearTimeout(timeout);
-          if (!cancelled) setStorefrontBaseUrl(base);
-          return;
-        } catch {
-          // Keep probing next candidate
-        }
-      }
-      if (!cancelled) setStorefrontBaseUrl(`${protocol}//${hostname}:3000`);
-    };
-
-    void probe();
-    return () => {
-      cancelled = true;
-    };
+    setStorefrontBaseUrl(`${protocol}//${hostname}:3000`);
   }, []);
 
   const groups = useMemo(() => {

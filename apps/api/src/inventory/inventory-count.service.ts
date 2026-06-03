@@ -49,6 +49,15 @@ export class InventoryCountService {
   }
 
   async create(tenantId: string, dto: CreateInventoryCountDTO): Promise<InventoryCountDTO> {
+    const ingredientIds = Array.from(new Set(dto.items.map((item) => item.ingredientId)));
+    const tenantIngredients = await this.prisma.ingredient.findMany({
+      where: { id: { in: ingredientIds }, tenantId },
+      select: { id: true },
+    });
+    if (tenantIngredients.length !== ingredientIds.length) {
+      throw new NotFoundException('Um ou mais insumos nÃ£o foram encontrados para este tenant');
+    }
+
     return this.prisma.$transaction(async (tx) => {
       // 1. Create Inventory Session
       const inventoryCount = await tx.inventoryCount.create({
@@ -78,8 +87,8 @@ export class InventoryCountService {
 
         if (adjustment !== 0) {
           // Update ingredient stock
-          await tx.ingredient.update({
-            where: { id: item.ingredientId },
+          await tx.ingredient.updateMany({
+            where: { id: item.ingredientId, tenantId },
             data: {
               currentStock: item.physicalStock // Overwrite with physical count
             }

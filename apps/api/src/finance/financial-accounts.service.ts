@@ -74,14 +74,14 @@ export class FinancialAccountsService {
   async update(tenantId: string, id: string, dto: UpdateFinancialAccountDTO): Promise<FinancialAccountDTO> {
     await this.findOne(tenantId, id);
 
-    const updated = await this.prisma.financialAccount.update({
-      where: { id },
+    await this.prisma.financialAccount.updateMany({
+      where: { id, tenantId },
       data: {
         ...(dto.name && { name: dto.name }),
         ...(dto.active !== undefined && { active: dto.active }),
       },
     });
 
-    return this.mapToDTO(updated);
+    return this.findOne(tenantId, id);
   }
 }

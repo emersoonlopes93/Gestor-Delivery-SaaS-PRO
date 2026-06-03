@@ -13,6 +13,9 @@ import {
   Search,
   ShieldAlert,
   Wrench,
+  List,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { api, ApiError } from '../../lib/api-client';
@@ -143,10 +146,27 @@ const statusLabels: Record<ToolStatus, string> = {
 };
 
 const GOOGLE_AI_MODELS = [
+  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (gratuito)' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (gratuito)' },
   { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (gratuito)' },
-  { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (gratuito)' },
-  { id: 'gemini-1.5-flash-8b', label: 'Gemini 1.5 Flash 8B (gratuito)' },
 ];
+
+interface GoogleModelEntry {
+  id: string;
+  displayName: string;
+  description: string;
+  supportsFunctionCalling: boolean;
+  inputTokenLimit?: number;
+  outputTokenLimit?: number;
+}
+
+interface ListGoogleModelsResponse {
+  success: boolean;
+  models: GoogleModelEntry[];
+  total?: number;
+  error?: string;
+  apiKeySource?: string;
+}
 
 const OPENAI_MODELS = [
   { id: 'gpt-4o', label: 'GPT-4o (Recomendado)' },
@@ -178,6 +198,12 @@ export function GlobalAiAgentConfigPage() {
   const [testResultPrimary, setTestResultPrimary] = useState<TestProviderResult | null>(null);
   const [testingFallback, setTestingFallback] = useState(false);
   const [testResultFallback, setTestResultFallback] = useState<TestProviderResult | null>(null);
+
+  // Estados de listagem dinâmica de modelos Google
+  const [fetchedGoogleModels, setFetchedGoogleModels] = useState<GoogleModelEntry[]>([]);
+  const [googleModelsLoading, setGoogleModelsLoading] = useState(false);
+  const [googleModelsError, setGoogleModelsError] = useState<string | null>(null);
+  const [googleModelsFetched, setGoogleModelsFetched] = useState(false);
 
   useEffect(() => {
     loadInitialData();
@@ -281,8 +307,38 @@ export function GlobalAiAgentConfigPage() {
       else setTestingPrimary(false);
     }
   }
+
+  async function fetchGoogleModels() {
+    setGoogleModelsLoading(true);
+    setGoogleModelsError(null);
+    try {
+      const res = await api.get<ListGoogleModelsResponse>('/admin/ai-agent/providers/google/models');
+      const result = res.data;
+      if (result.success && result.models.length > 0) {
+        setFetchedGoogleModels(result.models);
+        setGoogleModelsFetched(true);
+      } else {
+        setGoogleModelsError(result.error || 'Nenhum modelo encontrado para esta chave.');
+        setFetchedGoogleModels([]);
+        setGoogleModelsFetched(true);
+      }
+    } catch (e: unknown) {
+      setGoogleModelsError(e instanceof ApiError ? e.message : 'Erro ao listar modelos.');
+      setFetchedGoogleModels([]);
+    } finally {
+      setGoogleModelsLoading(false);
+    }
+  }
+
   async function handleSave(confirmEmptyPromptFallback = false) {
     if (!config) return;
+
+    // Impedir salvar modelo vazio quando Google AI é o provedor principal
+    if (config.defaultAiProvider === 'google_ai' && !(config.googleAiModel ?? '').trim()) {
+      setError('Selecione um modelo do Google AI antes de salvar.');
+      return;
+    }
+
     if (trimmedPrompt.length === 0 && !confirmEmptyPromptFallback) {
       const confirmed = window.confirm(
         'O Prompt Mestre está vazio. Em produção isso mantém o fallback do código ativo. Deseja salvar mesmo assim?',
@@ -504,18 +560,57 @@ export function GlobalAiAgentConfigPage() {
               </Field>
 
               {config.defaultAiProvider === 'google_ai' && (
-                <Field label="Modelo Google AI">
-                  <select 
-                    value={config.googleAiModel || 'gemini-1.5-flash'} 
-                    onChange={(e) => {
-                      if (!e.target.value) return;
-                      updateConfig('googleAiModel', e.target.value);
-                    }}
-                    className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                  >
-                    {GOOGLE_AI_MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-                  </select>
-                </Field>
+                <div className="space-y-3">
+                  <Field label="Modelo Google AI">
+                    <div className="flex gap-2">
+                      <select 
+                        value={config.googleAiModel || 'gemini-2.0-flash'} 
+                        onChange={(e) => {
+                          if (!e.target.value) return;
+                          updateConfig('googleAiModel', e.target.value);
+                        }}
+                        className="flex-1 rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                      >
+                        {(fetchedGoogleModels.length > 0 ? fetchedGoogleModels : GOOGLE_AI_MODELS.map<GoogleModelEntry>((m) => ({ ...m, displayName: m.label, description: '', supportsFunctionCalling: true }))).map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.displayName}
+                            {('supportsFunctionCalling' in m && m.supportsFunctionCalling) ? ' ✅' : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={fetchGoogleModels}
+                        disabled={googleModelsLoading}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors whitespace-nowrap"
+                      >
+                        {googleModelsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <List className="h-4 w-4" />}
+                        Listar modelos
+                      </button>
+                    </div>
+                  </Field>
+
+                  {googleModelsError && (
+                    <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 flex items-start gap-2">
+                      <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                      <span>{googleModelsError}</span>
+                    </div>
+                  )}
+
+                  {googleModelsFetched && fetchedGoogleModels.length > 0 && !googleModelsError && (
+                    <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+                      <span>{fetchedGoogleModels.length} modelos disponíveis carregados da API do Google.</span>
+                    </div>
+                  )}
+
+                  {googleModelsFetched && fetchedGoogleModels.length > 0 && config.googleAiModel && !fetchedGoogleModels.find(m => m.id === config.googleAiModel) && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                      <span>O modelo <strong>"{config.googleAiModel}"</strong> não aparece na lista de modelos disponíveis para esta chave. Selecione um modelo válido da lista.</span>
+                    </div>
+                  )}
+                </div>
               )}
 
               {config.defaultAiProvider === 'openai' && (
@@ -583,7 +678,7 @@ export function GlobalAiAgentConfigPage() {
                     if (!val) {
                       updateConfig('fallbackAiModel', null);
                     } else {
-                      const defaultModel = val === 'google_ai' ? 'gemini-1.5-flash' : val === 'openai' ? 'gpt-4o' : 'claude-3-5-sonnet-20240620';
+                      const defaultModel = val === 'google_ai' ? 'gemini-2.0-flash' : val === 'openai' ? 'gpt-4o' : 'claude-3-5-sonnet-20240620';
                       updateConfig('fallbackAiModel', defaultModel);
                     }
                   }}
@@ -599,7 +694,7 @@ export function GlobalAiAgentConfigPage() {
               {config.fallbackAiProvider === 'google_ai' && (
                 <Field label="Modelo de Fallback (Gemini)">
                   <select 
-                    value={config.fallbackAiModel || 'gemini-1.5-flash'} 
+                    value={config.fallbackAiModel || 'gemini-2.0-flash'} 
                     onChange={(e) => {
                       if (!e.target.value) return;
                       updateConfig('fallbackAiModel', e.target.value);

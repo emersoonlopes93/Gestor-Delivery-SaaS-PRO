@@ -3,7 +3,13 @@ import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '../store/authStore';
 import { api } from '../lib/api';
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:3000/delivery';
+const configuredWsUrl = import.meta.env.VITE_WS_URL?.trim();
+
+if (import.meta.env.PROD && !configuredWsUrl) {
+  throw new Error('VITE_WS_URL precisa estar configurado para o app entregador em produÃ§Ã£o.');
+}
+
+const WS_URL = configuredWsUrl || 'http://localhost:3333/delivery';
 
 // How often to send location via HTTP REST (to ensure DB persistence)
 const HTTP_LOCATION_INTERVAL_MS = 15_000;

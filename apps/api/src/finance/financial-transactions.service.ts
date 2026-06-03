@@ -78,6 +78,14 @@ export class FinancialTransactionsService {
   }
 
   async create(tenantId: string, dto: CreateFinancialTransactionDTO): Promise<FinancialTransactionDTO> {
+    if (dto.accountId) {
+      const account = await this.prisma.financialAccount.findFirst({
+        where: { id: dto.accountId, tenantId },
+        select: { id: true },
+      });
+      if (!account) throw new NotFoundException('Conta financeira nÃ£o encontrada');
+    }
+
     return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const transaction = await tx.financialTransaction.create({
         data: {
@@ -101,8 +109,8 @@ export class FinancialTransactionsService {
       // If transition is created as PAID and has an account, update account balance
       if (transaction.status === PrismaFinancialStatus.paid && transaction.accountId) {
         const multiplier = transaction.type === PrismaFinancialTransactionType.income ? 1 : -1;
-        await tx.financialAccount.update({
-          where: { id: transaction.accountId },
+        await tx.financialAccount.updateMany({
+          where: { id: transaction.accountId, tenantId },
           data: {
             balance: {
               increment: Number(transaction.amount) * multiplier
@@ -123,24 +131,27 @@ export class FinancialTransactionsService {
     if (!existing) throw new NotFoundException('Transação não encontrada');
 
     return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const updated = await tx.financialTransaction.update({
-        where: { id },
+      await tx.financialTransaction.updateMany({
+        where: { id, tenantId },
         data: {
           ...(dto.status && { status: this.toPrismaStatus(dto.status) }),
           ...(dto.paymentDate && { paymentDate: dto.paymentDate }),
           ...(dto.description && { description: dto.description }),
           ...(dto.amount !== undefined && { amount: dto.amount }),
         },
-        include: {
-          account: true
-        }
       });
+
+      const updated = await tx.financialTransaction.findFirst({
+        where: { id, tenantId },
+        include: { account: true },
+      });
+      if (!updated) throw new NotFoundException('TransaÃ§Ã£o nÃ£o encontrada');
 
       // If status changed to PAID, update balance
       if (existing.status !== PrismaFinancialStatus.paid && updated.status === PrismaFinancialStatus.paid && updated.accountId) {
         const multiplier = updated.type === PrismaFinancialTransactionType.income ? 1 : -1;
-        await tx.financialAccount.update({
-          where: { id: updated.accountId },
+        await tx.financialAccount.updateMany({
+          where: { id: updated.accountId, tenantId },
           data: {
             balance: {
               increment: Number(updated.amount) * multiplier

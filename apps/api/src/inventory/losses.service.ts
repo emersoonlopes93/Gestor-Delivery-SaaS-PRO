@@ -7,8 +7,8 @@ export class LossesService {
   constructor(private prisma: PrismaService) {}
 
   async create(tenantId: string, ingredientId: string, quantity: number, reason: string) {
-    const ingredient = await this.prisma.ingredient.findUnique({
-      where: { id: ingredientId }
+    const ingredient = await this.prisma.ingredient.findFirst({
+      where: { id: ingredientId, tenantId }
     });
 
     if (!ingredient) throw new NotFoundException('Insumo não encontrado');
@@ -17,8 +17,8 @@ export class LossesService {
 
     return this.prisma.$transaction(async (tx) => {
       // 1. Update stock
-      await tx.ingredient.update({
-        where: { id: ingredientId },
+      await tx.ingredient.updateMany({
+        where: { id: ingredientId, tenantId },
         data: {
           currentStock: { decrement: quantity }
         }

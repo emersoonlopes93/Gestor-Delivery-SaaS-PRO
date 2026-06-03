@@ -12,10 +12,11 @@ import {
   FinancialTransactionType,
 } from '@gestor/types';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
-import { CurrentTenant } from '../common/decorators';
+import { CurrentTenant, RequirePermissions } from '../common/decorators';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 
 @Controller('finance')
-@UseGuards(TenantAuthGuard)
+@UseGuards(TenantAuthGuard, PermissionsGuard)
 export class FinanceController {
   constructor(
     private readonly accountsService: FinancialAccountsService,
@@ -24,11 +25,13 @@ export class FinanceController {
 
   // Accounts
   @Get('accounts')
+  @RequirePermissions('finance.read')
   async findAllAccounts(@CurrentTenant() tenantId: string): Promise<FinancialAccountDTO[]> {
     return this.accountsService.findAll(tenantId);
   }
 
   @Post('accounts')
+  @RequirePermissions('finance.manage')
   async createAccount(
     @CurrentTenant() tenantId: string,
     @Body() dto: CreateFinancialAccountDTO,
@@ -37,6 +40,7 @@ export class FinanceController {
   }
 
   @Put('accounts/:id')
+  @RequirePermissions('finance.manage')
   async updateAccount(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,
@@ -47,6 +51,7 @@ export class FinanceController {
 
   // Transactions
   @Get('transactions')
+  @RequirePermissions('finance.read')
   async findAllTransactions(
     @CurrentTenant() tenantId: string,
     @Query('accountId') accountId?: string,
@@ -57,6 +62,7 @@ export class FinanceController {
   }
 
   @Post('transactions')
+  @RequirePermissions('finance.manage')
   async createTransaction(
     @CurrentTenant() tenantId: string,
     @Body() dto: CreateFinancialTransactionDTO,
@@ -65,6 +71,7 @@ export class FinanceController {
   }
 
   @Put('transactions/:id')
+  @RequirePermissions('finance.manage')
   async updateTransaction(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,

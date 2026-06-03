@@ -10,11 +10,11 @@ import type {
   AiToolCall,
 } from '../interfaces/ai-provider.interface';
 
-/** Modelos com tier gratuito no Google AI Studio */
+/** Modelos conhecidos com tier gratuito no Google AI Studio (lista estática de referência) */
 export const GOOGLE_AI_FREE_MODELS = [
+  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (gratuito)' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (gratuito)' },
   { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (gratuito)' },
-  { id: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (gratuito)' },
-  { id: 'gemini-1.5-flash-8b', label: 'Gemini 1.5 Flash 8B (gratuito)' },
 ] as const;
 
 /**
@@ -22,7 +22,7 @@ export const GOOGLE_AI_FREE_MODELS = [
  *
  * Variáveis de ambiente:
  * - GOOGLE_AI_API_KEY (ou GEMINI_API_KEY)
- * - GOOGLE_AI_MODEL (fallback; default seguro: gemini-1.5-flash)
+ * - GOOGLE_AI_MODEL (fallback; default seguro: gemini-2.0-flash)
  * - GOOGLE_AI_BASE_URL (default: https://generativelanguage.googleapis.com/v1beta)
  */
 @Injectable()
@@ -170,10 +170,12 @@ export class GoogleAiProvider implements IAiProvider {
         if (
           normalizedResponse.includes('no longer available') ||
           normalizedResponse.includes('not found') ||
-          normalizedResponse.includes('model unavailable')
+          normalizedResponse.includes('model unavailable') ||
+          normalizedResponse.includes('not supported for generatecontent')
         ) {
           errorType = 'model_unavailable';
-          this.logger.error(`[AI_FLOW_ERROR] step=llm_model_unavailable model=${model}`);
+          this.logger.error(`[AI_PROVIDER] model_unavailable provider=google_ai model=${model}`);
+          this.logger.warn(`[AI_PROVIDER] list_models_recommended=true`);
         } else if (
           normalizedResponse.includes('429') ||
           normalizedResponse.includes('resource_exhausted') ||
@@ -186,10 +188,12 @@ export class GoogleAiProvider implements IAiProvider {
         if (
           normalizedMessage.includes('no longer available') ||
           normalizedMessage.includes('not found') ||
-          normalizedMessage.includes('model unavailable')
+          normalizedMessage.includes('model unavailable') ||
+          normalizedMessage.includes('not supported for generatecontent')
         ) {
           errorType = 'model_unavailable';
-          this.logger.error(`[AI_FLOW_ERROR] step=llm_model_unavailable model=${model}`);
+          this.logger.error(`[AI_PROVIDER] model_unavailable provider=google_ai model=${model}`);
+          this.logger.warn(`[AI_PROVIDER] list_models_recommended=true`);
         } else if (
           normalizedMessage.includes('429') ||
           normalizedMessage.includes('resource_exhausted') ||

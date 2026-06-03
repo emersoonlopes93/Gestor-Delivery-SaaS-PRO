@@ -1040,7 +1040,7 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
       let activeProviderSource = providerResolved.source;
       let usingFallback = false;
 
-      let providerAvailable = await activeProvider.isAvailable();
+      const providerAvailable = await activeProvider.isAvailable();
       AiFlowLogger.flow('llm_provider_check', trace, {
         provider: activeProvider.providerType,
         available: providerAvailable,
