@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
-import { PrismaService } from '../../database/prisma.service';
+import { AiProviderConfigService } from '../services/ai-provider-config.service';
 import { normalizeToolResponse } from '../utils/normalize-tool-response';
 import type {
   IAiProvider,
@@ -17,14 +17,12 @@ export const GOOGLE_AI_FREE_MODELS = [
   { id: 'gemini-1.5-flash-8b', label: 'Gemini 1.5 Flash 8B (gratuito)' },
 ] as const;
 
-const DEFAULT_GOOGLE_AI_MODEL = 'gemini-2.0-flash';
-
 /**
  * Provider de IA via Google AI Studio (Gemini API).
  *
  * Variáveis de ambiente:
  * - GOOGLE_AI_API_KEY (ou GEMINI_API_KEY)
- * - GOOGLE_AI_MODEL (default: gemini-2.0-flash)
+ * - GOOGLE_AI_MODEL (fallback; default seguro: gemini-1.5-flash)
  * - GOOGLE_AI_BASE_URL (default: https://generativelanguage.googleapis.com/v1beta)
  */
 @Injectable()
@@ -32,48 +30,7 @@ export class GoogleAiProvider implements IAiProvider {
   private readonly logger = new Logger('GoogleAiProvider');
   readonly providerType = 'google_ai' as const;
 
-  private cachedConfig: {
-    apiKey: string;
-    model: string;
-    fetchedAt: number;
-  } | null = null;
-
-  constructor(private readonly prisma: PrismaService) {}
-
-  private async getConfig(): Promise<{ apiKey: string; model: string }> {
-    const envKey =
-      process.env.GOOGLE_AI_API_KEY?.trim() ||
-      process.env.GEMINI_API_KEY?.trim() ||
-      '';
-    const envModel = process.env.GOOGLE_AI_MODEL?.trim();
-
-    if (envKey) {
-      return {
-        apiKey: envKey,
-        model: envModel || DEFAULT_GOOGLE_AI_MODEL,
-      };
-    }
-
-    const now = Date.now();
-    if (this.cachedConfig && now - this.cachedConfig.fetchedAt < 60_000) {
-      return {
-        apiKey: this.cachedConfig.apiKey,
-        model: this.cachedConfig.model,
-      };
-    }
-
-    const systemConfig = await this.prisma.systemConfig.findUnique({
-      where: { id: 'global' },
-      select: { googleAiApiKey: true, googleAiModel: true },
-    });
-
-    const apiKey = systemConfig?.googleAiApiKey?.trim() || '';
-    const model =
-      systemConfig?.googleAiModel?.trim() || envModel || DEFAULT_GOOGLE_AI_MODEL;
-
-    this.cachedConfig = { apiKey, model, fetchedAt: now };
-    return { apiKey, model };
-  }
+  constructor(private readonly providerConfig: AiProviderConfigService) {}
 
   private get baseUrl(): string {
     return (
@@ -83,19 +40,28 @@ export class GoogleAiProvider implements IAiProvider {
   }
 
   async isAvailable(): Promise<boolean> {
-    const { apiKey } = await this.getConfig();
-    return apiKey !== '';
+    const config = await this.providerConfig.resolveRuntimeConfig(this.providerType);
+    return config.apiKeyPresent;
   }
 
   async complete(input: AiCompletionInput): Promise<AiCompletionResult> {
-    const { apiKey, model: configModel } = await this.getConfig();
-    const model = input.model || configModel;
+    const config = await this.providerConfig.resolveRuntimeConfig(
+      this.providerType,
+      input.model,
+      { log: true, providerSource: input.providerSource, modelOverrideSource: input.modelSource },
+    );
+    const { apiKey, model } = config;
 
     if (!apiKey) {
+      this.logger.error('Google AI provider is not configured: API key missing.');
       return {
         content: null,
         toolCalls: [],
         finishReason: 'error',
+        error: {
+          type: 'unknown',
+          message: 'Google AI API key ausente. Configure no SaaS Admin ou ENV.',
+        },
       };
     }
 
@@ -194,22 +160,41 @@ export class GoogleAiProvider implements IAiProvider {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Google AI completion failed: ${message}`);
       let errorType: 'quota_exhausted' | 'model_unavailable' | 'unknown' = 'unknown';
+      const statusCode = axios.isAxiosError(error) ? error.response?.status : undefined;
 
       if (axios.isAxiosError(error) && error.response?.data) {
         const errorData = error.response.data;
         this.logger.error(`Google AI error details: ${JSON.stringify(errorData)}`);
         const responseStr = JSON.stringify(errorData);
-        if (responseStr.includes('no longer available') || responseStr.includes('not found')) {
+        const normalizedResponse = responseStr.toLowerCase();
+        if (
+          normalizedResponse.includes('no longer available') ||
+          normalizedResponse.includes('not found') ||
+          normalizedResponse.includes('model unavailable')
+        ) {
           errorType = 'model_unavailable';
           this.logger.error(`[AI_FLOW_ERROR] step=llm_model_unavailable model=${model}`);
-        } else if (responseStr.includes('429') || responseStr.includes('RESOURCE_EXHAUSTED') || responseStr.includes('Quota exceeded')) {
+        } else if (
+          normalizedResponse.includes('429') ||
+          normalizedResponse.includes('resource_exhausted') ||
+          normalizedResponse.includes('quota exceeded')
+        ) {
           errorType = 'quota_exhausted';
         }
       } else if (typeof message === 'string') {
-        if (message.includes('no longer available') || message.includes('not found')) {
+        const normalizedMessage = message.toLowerCase();
+        if (
+          normalizedMessage.includes('no longer available') ||
+          normalizedMessage.includes('not found') ||
+          normalizedMessage.includes('model unavailable')
+        ) {
           errorType = 'model_unavailable';
           this.logger.error(`[AI_FLOW_ERROR] step=llm_model_unavailable model=${model}`);
-        } else if (message.includes('429') || message.includes('RESOURCE_EXHAUSTED') || message.includes('Quota exceeded')) {
+        } else if (
+          normalizedMessage.includes('429') ||
+          normalizedMessage.includes('resource_exhausted') ||
+          normalizedMessage.includes('quota exceeded')
+        ) {
           errorType = 'quota_exhausted';
         }
       }
@@ -221,6 +206,7 @@ export class GoogleAiProvider implements IAiProvider {
         error: {
           type: errorType,
           message,
+          statusCode,
         },
       };
     }

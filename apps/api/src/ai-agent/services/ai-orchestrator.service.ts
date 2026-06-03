@@ -4,6 +4,7 @@ import { ConversationService } from './conversation.service';
 import { AgentToolsService } from './agent-tools.service';
 import { WhatsAppSenderService } from '../../whatsapp-channel/services/whatsapp-sender.service';
 import { AiProviderRegistryService } from './ai-provider-registry.service';
+import { AiProviderConfigService } from './ai-provider-config.service';
 import { AdminModulesService } from '../../admin/modules/admin-modules.service';
 import type { AiMessage, IAiProvider } from '../interfaces/ai-provider.interface';
 import { AiFlowLogger, createAiTrace, type AiFlowContext } from '../../common/logging/ai-flow-logger';
@@ -58,6 +59,7 @@ export class AiOrchestratorService {
     @Inject(forwardRef(() => WhatsAppSenderService))
     private readonly whatsappSender: WhatsAppSenderService,
     private readonly aiRegistry: AiProviderRegistryService,
+    private readonly providerConfig: AiProviderConfigService,
     private readonly prisma: PrismaService,
     private readonly adminModulesService: AdminModulesService,
     private readonly availabilityService: AvailabilityService,
@@ -305,40 +307,24 @@ export class AiOrchestratorService {
 
     const config = await this.configService.getEffectiveAiAgentConfig(tenantId);
     this.logger.log(`[AI_MEMORY] config_loaded tenantId=${tenantId} memoryEnabled=${config.memoryEnabled}`);
-    const systemConfig = await this.prisma.systemConfig.findUnique({
-      where: { id: 'global' },
-      select: { defaultAiProvider: true, googleAiModel: true },
-    });
-    const providerType = systemConfig?.defaultAiProvider ?? 'openai';
-
-    const resolvedModel =
-      providerType === 'google_ai'
-        ? systemConfig?.googleAiModel ?? 'gemini-2.0-flash-lite'
-        : providerType === 'anthropic'
-          ? process.env.ANTHROPIC_MODEL ?? 'claude-3-5-sonnet-20240620'
-          : process.env.OPENAI_MODEL ?? 'gpt-4o';
-
-    const modelSource =
-      providerType === 'google_ai'
-        ? systemConfig?.googleAiModel
-          ? 'system_config'
-          : 'default'
-        : providerType === 'anthropic'
-          ? process.env.ANTHROPIC_MODEL
-            ? 'env'
-            : 'default'
-          : process.env.OPENAI_MODEL
-            ? 'env'
-            : 'default';
+    const providerResolution = await this.providerConfig.resolveDefaultProvider();
+    const runtimeConfig = await this.providerConfig.resolveRuntimeConfig(
+      providerResolution.provider,
+      undefined,
+      { providerSource: providerResolution.source },
+    );
 
     AiFlowLogger.flow('ai_config_loaded', flowTrace, {
       tenantId,
       agentName: config.agentName,
       isEnabled: config.isEnabled,
-      provider: providerType,
-      providerSource: 'system_config',
-      model: resolvedModel,
-      modelSource,
+      provider: runtimeConfig.provider,
+      providerSource: runtimeConfig.providerSource,
+      model: runtimeConfig.model,
+      modelSource: runtimeConfig.modelSource,
+      apiKeyPresent: runtimeConfig.apiKeyPresent,
+      apiKeySource: runtimeConfig.apiKeySource,
+      apiKeyFingerprint: runtimeConfig.apiKeyFingerprint,
       debounceMs: config.debounceMs ?? 1000,
       operatingMode: config.operatingMode,
       handoffActive: false,
@@ -896,10 +882,20 @@ export class AiOrchestratorService {
       const systemConfig = await this.prisma.systemConfig.findUnique({
         where: { id: 'global' },
       });
-      const providerResolved = await this.aiRegistry.resolveProvider(tenantId);
+      const providerResolved = await this.aiRegistry.resolveProviderWithSource(tenantId);
+      const providerResolvedConfig = await this.providerConfig.resolveRuntimeConfig(
+        providerResolved.provider.providerType,
+        undefined,
+        { log: true, providerSource: providerResolved.source },
+      );
       AiFlowLogger.flow('provider_resolved', trace, {
-        provider: providerResolved.providerType,
-        providerSource: 'ai_provider_registry',
+        provider: providerResolved.provider.providerType,
+        providerSource: providerResolved.source,
+        model: providerResolvedConfig.model,
+        modelSource: providerResolvedConfig.modelSource,
+        apiKeyPresent: providerResolvedConfig.apiKeyPresent,
+        apiKeySource: providerResolvedConfig.apiKeySource,
+        apiKeyFingerprint: providerResolvedConfig.apiKeyFingerprint,
       });
 
       let tools = await this.toolsService.getAvailableToolsForTenant(tenantId);
@@ -1040,7 +1036,8 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
         });
       }
 
-      let activeProvider = providerResolved;
+      let activeProvider = providerResolved.provider;
+      let activeProviderSource = providerResolved.source;
       let usingFallback = false;
 
       let providerAvailable = await activeProvider.isAvailable();
@@ -1061,6 +1058,7 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
           this.logger.log(`[AI_PROVIDER] fallback_attempt provider=${fallbackProvider.providerType}`);
           if (await fallbackProvider.isAvailable()) {
             activeProvider = fallbackProvider;
+            activeProviderSource = 'database';
             usingFallback = true;
           } else {
             this.logger.error(`[AI_PROVIDER] fallback_failed`);
@@ -1080,15 +1078,15 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
       const runCompletion = async (provider: IAiProvider) => {
         const currentModel = usingFallback && systemConfig?.fallbackAiModel
           ? systemConfig.fallbackAiModel
-          : (provider.providerType === 'google_ai' ? (systemConfig?.googleAiModel ?? undefined)
-            : provider.providerType === 'openai' ? (systemConfig?.openaiModel ?? undefined)
-            : provider.providerType === 'anthropic' ? (systemConfig?.anthropicModel ?? undefined) : undefined);
+          : undefined;
 
         return provider.complete({
           messages,
           tools,
           temperature: 0.3,
           model: currentModel,
+          providerSource: activeProviderSource,
+          modelSource: currentModel ? 'database' : undefined,
         });
       };
 
@@ -1114,6 +1112,7 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
           this.logger.log(`[AI_PROVIDER] fallback_attempt provider=${fallbackProvider.providerType}`);
           if (await fallbackProvider.isAvailable()) {
             activeProvider = fallbackProvider;
+            activeProviderSource = 'database';
             usingFallback = true;
             completion = await runCompletion(activeProvider);
             
@@ -1154,7 +1153,7 @@ ${config.customInstructions || 'Atenda com cordialidade e foco em conversão.'}
       }
 
       AiFlowLogger.flow('llm_response_success', trace, {
-        provider: providerResolved.providerType,
+        provider: activeProvider.providerType,
         finishReason: completion.finishReason,
         length: outputLength,
         toolCallsCount,

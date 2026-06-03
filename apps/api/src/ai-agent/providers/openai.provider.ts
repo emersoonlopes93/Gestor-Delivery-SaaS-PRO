@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
-import { PrismaService } from '../../database/prisma.service';
+import { AiProviderConfigService } from '../services/ai-provider-config.service';
 import type {
   IAiProvider,
   AiCompletionInput,
@@ -21,50 +21,34 @@ export class OpenAiProvider implements IAiProvider {
   private readonly logger = new Logger('OpenAiProvider');
   readonly providerType = 'openai' as const;
 
-  private cachedApiKey: { value: string; fetchedAt: number } | null = null;
-
-  constructor(private readonly prisma: PrismaService) {}
-
-  private async getApiKey(): Promise<string> {
-    const envKey = process.env.OPENAI_API_KEY;
-    if (envKey && envKey.trim() !== '') return envKey.trim();
-
-    const now = Date.now();
-    if (this.cachedApiKey && now - this.cachedApiKey.fetchedAt < 60_000) {
-      return this.cachedApiKey.value;
-    }
-
-    const systemConfig = await this.prisma.systemConfig.findUnique({
-      where: { id: 'global' },
-      select: { openaiApiKey: true },
-    });
-
-    const dbKey = systemConfig?.openaiApiKey?.trim() || '';
-    this.cachedApiKey = { value: dbKey, fetchedAt: now };
-    return dbKey;
-  }
-
-  private get model(): string {
-    return process.env.OPENAI_MODEL || 'gpt-4o';
-  }
+  constructor(private readonly providerConfig: AiProviderConfigService) {}
 
   private get baseUrl(): string {
     return process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
   }
 
   async isAvailable(): Promise<boolean> {
-    const apiKey = await this.getApiKey();
-    return apiKey.trim() !== '';
+    const config = await this.providerConfig.resolveRuntimeConfig(this.providerType);
+    return config.apiKeyPresent;
   }
 
   async complete(input: AiCompletionInput): Promise<AiCompletionResult> {
-    const model = input.model || this.model;
-    const apiKey = await this.getApiKey();
+    const config = await this.providerConfig.resolveRuntimeConfig(
+      this.providerType,
+      input.model,
+      { log: true, providerSource: input.providerSource, modelOverrideSource: input.modelSource },
+    );
+    const { apiKey, model } = config;
     if (!apiKey) {
+      this.logger.error('OpenAI provider is not configured: API key missing.');
       return {
         content: null,
         toolCalls: [],
         finishReason: 'error',
+        error: {
+          type: 'unknown',
+          message: 'OpenAI API key ausente. Configure no SaaS Admin ou ENV.',
+        },
       };
     }
 
@@ -160,19 +144,22 @@ export class OpenAiProvider implements IAiProvider {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`OpenAI completion failed: ${message}`);
       let errorType: 'quota_exhausted' | 'model_unavailable' | 'unknown' = 'unknown';
+      const statusCode = axios.isAxiosError(error) ? error.response?.status : undefined;
 
       if (axios.isAxiosError(error) && error.response?.data) {
         this.logger.error(`OpenAI error details: ${JSON.stringify(error.response.data)}`);
         const responseStr = JSON.stringify(error.response.data);
-        if (responseStr.includes('insufficient_quota') || responseStr.includes('429') || responseStr.includes('rate_limit')) {
+        const normalizedResponse = responseStr.toLowerCase();
+        if (normalizedResponse.includes('insufficient_quota') || normalizedResponse.includes('429') || normalizedResponse.includes('rate_limit') || normalizedResponse.includes('quota exceeded')) {
           errorType = 'quota_exhausted';
-        } else if (responseStr.includes('model_not_found') || responseStr.includes('does not exist')) {
+        } else if (normalizedResponse.includes('model_not_found') || normalizedResponse.includes('does not exist') || normalizedResponse.includes('model unavailable')) {
           errorType = 'model_unavailable';
         }
       } else if (typeof message === 'string') {
-        if (message.includes('insufficient_quota') || message.includes('429') || message.includes('rate_limit')) {
+        const normalizedMessage = message.toLowerCase();
+        if (normalizedMessage.includes('insufficient_quota') || normalizedMessage.includes('429') || normalizedMessage.includes('rate_limit') || normalizedMessage.includes('quota exceeded')) {
           errorType = 'quota_exhausted';
-        } else if (message.includes('model_not_found') || message.includes('does not exist')) {
+        } else if (normalizedMessage.includes('model_not_found') || normalizedMessage.includes('does not exist') || normalizedMessage.includes('model unavailable')) {
           errorType = 'model_unavailable';
         }
       }
@@ -184,6 +171,7 @@ export class OpenAiProvider implements IAiProvider {
         error: {
           type: errorType,
           message,
+          statusCode,
         },
       };
     }

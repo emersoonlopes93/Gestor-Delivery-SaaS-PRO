@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
-import { PrismaService } from '../../database/prisma.service';
+import { AiProviderConfigService } from '../services/ai-provider-config.service';
 import type {
   IAiProvider,
   AiCompletionInput,
@@ -21,50 +21,34 @@ export class AnthropicProvider implements IAiProvider {
   private readonly logger = new Logger('AnthropicProvider');
   readonly providerType = 'anthropic' as const;
 
-  private cachedApiKey: { value: string; fetchedAt: number } | null = null;
-
-  constructor(private readonly prisma: PrismaService) {}
-
-  private async getApiKey(): Promise<string> {
-    const envKey = process.env.ANTHROPIC_API_KEY;
-    if (envKey && envKey.trim() !== '') return envKey.trim();
-
-    const now = Date.now();
-    if (this.cachedApiKey && now - this.cachedApiKey.fetchedAt < 60_000) {
-      return this.cachedApiKey.value;
-    }
-
-    const systemConfig = await this.prisma.systemConfig.findUnique({
-      where: { id: 'global' },
-      select: { anthropicApiKey: true },
-    });
-
-    const dbKey = systemConfig?.anthropicApiKey?.trim() || '';
-    this.cachedApiKey = { value: dbKey, fetchedAt: now };
-    return dbKey;
-  }
-
-  private get model(): string {
-    return process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20240620';
-  }
-
   private get anthropicVersion(): string {
     return process.env.ANTHROPIC_VERSION || '2023-06-01';
   }
 
+  constructor(private readonly providerConfig: AiProviderConfigService) {}
+
   async isAvailable(): Promise<boolean> {
-    const apiKey = await this.getApiKey();
-    return apiKey.trim() !== '';
+    const config = await this.providerConfig.resolveRuntimeConfig(this.providerType);
+    return config.apiKeyPresent;
   }
 
   async complete(input: AiCompletionInput): Promise<AiCompletionResult> {
-    const model = input.model || this.model;
-    const apiKey = await this.getApiKey();
+    const config = await this.providerConfig.resolveRuntimeConfig(
+      this.providerType,
+      input.model,
+      { log: true, providerSource: input.providerSource, modelOverrideSource: input.modelSource },
+    );
+    const { apiKey, model } = config;
     if (!apiKey) {
+      this.logger.error('Anthropic provider is not configured: API key missing.');
       return {
         content: null,
         toolCalls: [],
         finishReason: 'error',
+        error: {
+          type: 'unknown',
+          message: 'Anthropic API key ausente. Configure no SaaS Admin ou ENV.',
+        },
       };
     }
 
@@ -162,19 +146,22 @@ export class AnthropicProvider implements IAiProvider {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Anthropic completion failed: ${message}`);
       let errorType: 'quota_exhausted' | 'model_unavailable' | 'unknown' = 'unknown';
+      const statusCode = axios.isAxiosError(error) ? error.response?.status : undefined;
 
       if (axios.isAxiosError(error) && error.response?.data) {
         this.logger.error(`Anthropic error details: ${JSON.stringify(error.response.data)}`);
         const responseStr = JSON.stringify(error.response.data);
-        if (responseStr.includes('429') || responseStr.includes('rate_limit') || responseStr.includes('quota')) {
+        const normalizedResponse = responseStr.toLowerCase();
+        if (normalizedResponse.includes('429') || normalizedResponse.includes('rate_limit') || normalizedResponse.includes('quota') || normalizedResponse.includes('quota exceeded')) {
           errorType = 'quota_exhausted';
-        } else if (responseStr.includes('not_found') || responseStr.includes('model_not_found') || responseStr.includes('does_not_exist')) {
+        } else if (normalizedResponse.includes('not_found') || normalizedResponse.includes('model_not_found') || normalizedResponse.includes('does_not_exist') || normalizedResponse.includes('model unavailable')) {
           errorType = 'model_unavailable';
         }
       } else if (typeof message === 'string') {
-        if (message.includes('429') || message.includes('rate_limit') || message.includes('quota')) {
+        const normalizedMessage = message.toLowerCase();
+        if (normalizedMessage.includes('429') || normalizedMessage.includes('rate_limit') || normalizedMessage.includes('quota') || normalizedMessage.includes('quota exceeded')) {
           errorType = 'quota_exhausted';
-        } else if (message.includes('not_found') || message.includes('model_not_found') || message.includes('does_not_exist')) {
+        } else if (normalizedMessage.includes('not_found') || normalizedMessage.includes('model_not_found') || normalizedMessage.includes('does_not_exist') || normalizedMessage.includes('model unavailable')) {
           errorType = 'model_unavailable';
         }
       }
@@ -186,6 +173,7 @@ export class AnthropicProvider implements IAiProvider {
         error: {
           type: errorType,
           message,
+          statusCode,
         },
       };
     }

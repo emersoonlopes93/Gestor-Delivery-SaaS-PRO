@@ -35,6 +35,17 @@ const baseEnvSchema = z.object({
   // Mercado Pago
   MERCADO_PAGO_WEBHOOK_SECRET: z.string().default(''),
 
+  // AI Providers. SaaS Admin database config has runtime priority; ENV is fallback.
+  OPENAI_API_KEY: z.string().default(''),
+  OPENAI_MODEL: z.string().default(''),
+  ANTHROPIC_API_KEY: z.string().default(''),
+  ANTHROPIC_MODEL: z.string().default(''),
+  ANTHROPIC_VERSION: z.string().default('2023-06-01'),
+  GOOGLE_AI_API_KEY: z.string().default(''),
+  GEMINI_API_KEY: z.string().default(''),
+  GOOGLE_AI_MODEL: z.string().default(''),
+  GOOGLE_AI_BASE_URL: z.string().default('https://generativelanguage.googleapis.com/v1beta'),
+
   // Redis
   REDIS_ENABLED: z.enum(['true', 'false']).default('true'),
   REDIS_HOST: z.string().default('localhost'),

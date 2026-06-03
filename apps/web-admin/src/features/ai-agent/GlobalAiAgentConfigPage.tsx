@@ -107,6 +107,26 @@ interface RecommendedPromptResponse {
   characterCount: number;
 }
 
+interface TestProviderResponse {
+  success: boolean;
+  statusCode: number;
+  response?: string | null;
+  error?: string;
+  friendlyError?: string;
+  errorType?: string;
+  keySource: string;
+  apiKeySource: string;
+  apiKeyFingerprint: string | null;
+  model: string;
+  modelSource: string;
+}
+
+interface TestProviderResult {
+  success: boolean;
+  message: string;
+  details: string;
+}
+
 const tabs: Array<{ id: TabId; label: string; icon: LucideIcon }> = [
   { id: 'prompt', label: 'Prompt Mestre', icon: FileText },
   { id: 'providers', label: 'Provedores de IA', icon: Bot },
@@ -155,9 +175,9 @@ export function GlobalAiAgentConfigPage() {
 
   // Estados de teste do provedor
   const [testingPrimary, setTestingPrimary] = useState(false);
-  const [testResultPrimary, setTestResultPrimary] = useState<{ success: boolean; message: string } | null>(null);
+  const [testResultPrimary, setTestResultPrimary] = useState<TestProviderResult | null>(null);
   const [testingFallback, setTestingFallback] = useState(false);
-  const [testResultFallback, setTestResultFallback] = useState<{ success: boolean; message: string } | null>(null);
+  const [testResultFallback, setTestResultFallback] = useState<TestProviderResult | null>(null);
 
   useEffect(() => {
     loadInitialData();
@@ -229,19 +249,31 @@ export function GlobalAiAgentConfigPage() {
     }
 
     try {
-      const res = await api.post<{ response?: string; error?: string }>('/admin/ai-agent/test-provider', {
+      const res = await api.post<TestProviderResponse>('/admin/ai-agent/test-provider', {
         provider,
         model,
       });
+      const result = res.data;
+      const details = [
+        `status=${result.statusCode}`,
+        `key=${result.apiKeySource}`,
+        `fingerprint=${result.apiKeyFingerprint ?? 'none'}`,
+        `model=${result.model}`,
+        `modelSource=${result.modelSource}`,
+      ].join(' | ');
 
-      const outcome = res.success
-        ? { success: true, message: `Conexão bem sucedida! Retorno da IA: "${res.data.response}"` }
-        : { success: false, message: res.data.error || 'Falha desconhecida no teste.' };
+      const outcome = result.success
+        ? { success: true, message: `Conexao bem sucedida! Retorno da IA: "${result.response}"`, details }
+        : { success: false, message: result.friendlyError || result.error || 'Falha desconhecida no teste.', details };
 
       if (isFallback) setTestResultFallback(outcome);
       else setTestResultPrimary(outcome);
     } catch (e: unknown) {
-      const outcome = { success: false, message: e instanceof ApiError ? e.message : 'Erro inesperado na chamada de teste.' };
+      const outcome = {
+        success: false,
+        message: e instanceof ApiError ? e.message : 'Erro inesperado na chamada de teste.',
+        details: 'A chamada nao retornou diagnostico do provider.',
+      };
       if (isFallback) setTestResultFallback(outcome);
       else setTestResultPrimary(outcome);
     } finally {
@@ -249,7 +281,6 @@ export function GlobalAiAgentConfigPage() {
       else setTestingPrimary(false);
     }
   }
-
   async function handleSave(confirmEmptyPromptFallback = false) {
     if (!config) return;
     if (trimmedPrompt.length === 0 && !confirmEmptyPromptFallback) {
@@ -475,7 +506,7 @@ export function GlobalAiAgentConfigPage() {
               {config.defaultAiProvider === 'google_ai' && (
                 <Field label="Modelo Google AI">
                   <select 
-                    value={config.googleAiModel || 'gemini-2.0-flash'} 
+                    value={config.googleAiModel || 'gemini-1.5-flash'} 
                     onChange={(e) => {
                       if (!e.target.value) return;
                       updateConfig('googleAiModel', e.target.value);
@@ -529,7 +560,8 @@ export function GlobalAiAgentConfigPage() {
                 </button>
                 {testResultPrimary && (
                   <div className={`p-3 rounded-md border text-sm ${testResultPrimary.success ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-                    {testResultPrimary.message}
+                    <div>{testResultPrimary.message}</div>
+                    <div className="mt-1 font-mono text-xs opacity-80">{testResultPrimary.details}</div>
                   </div>
                 )}
               </div>
@@ -551,7 +583,7 @@ export function GlobalAiAgentConfigPage() {
                     if (!val) {
                       updateConfig('fallbackAiModel', null);
                     } else {
-                      const defaultModel = val === 'google_ai' ? 'gemini-2.0-flash' : val === 'openai' ? 'gpt-4o' : 'claude-3-5-sonnet-20240620';
+                      const defaultModel = val === 'google_ai' ? 'gemini-1.5-flash' : val === 'openai' ? 'gpt-4o' : 'claude-3-5-sonnet-20240620';
                       updateConfig('fallbackAiModel', defaultModel);
                     }
                   }}
@@ -567,7 +599,7 @@ export function GlobalAiAgentConfigPage() {
               {config.fallbackAiProvider === 'google_ai' && (
                 <Field label="Modelo de Fallback (Gemini)">
                   <select 
-                    value={config.fallbackAiModel || 'gemini-2.0-flash'} 
+                    value={config.fallbackAiModel || 'gemini-1.5-flash'} 
                     onChange={(e) => {
                       if (!e.target.value) return;
                       updateConfig('fallbackAiModel', e.target.value);
@@ -622,7 +654,8 @@ export function GlobalAiAgentConfigPage() {
                   </button>
                   {testResultFallback && (
                     <div className={`p-3 rounded-md border text-sm ${testResultFallback.success ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-                      {testResultFallback.message}
+                      <div>{testResultFallback.message}</div>
+                      <div className="mt-1 font-mono text-xs opacity-80">{testResultFallback.details}</div>
                     </div>
                   )}
                 </div>

@@ -20,6 +20,7 @@ import {
 } from 'class-validator';
 import { AiAgentConfigService, UpdateAiAgentConfigDto } from '../../ai-agent/services/ai-agent-config.service';
 import { AiProviderRegistryService } from '../../ai-agent/services/ai-provider-registry.service';
+import { AiProviderConfigService } from '../../ai-agent/services/ai-provider-config.service';
 import { AiProviderType } from '@prisma/client';
 import { AiAgentPlanPresetService, UpdateAiAgentPlanPresetDto } from './ai-agent-plan-preset.service';
 import { SystemConfigService } from '../services/system-config.service';
@@ -116,6 +117,11 @@ export class UpdateGlobalAiConfigDto {
   @IsOptional() @IsString() fallbackAiModel?: string | null;
 }
 
+export class TestAiProviderDto {
+  @IsString() provider!: string;
+  @IsOptional() @IsString() model?: string;
+}
+
 @Controller('admin/ai-agent')
 @UseGuards(AdminAuthGuard, AdminPermissionsGuard)
 export class AdminAiAgentController {
@@ -125,6 +131,7 @@ export class AdminAiAgentController {
     private readonly systemConfigService: SystemConfigService,
     private readonly agentToolsService: AgentToolsService,
     private readonly aiRegistry: AiProviderRegistryService,
+    private readonly providerConfig: AiProviderConfigService,
   ) {}
 
   // ─── Config Global de IA ──────────────────────────────────────────────────
@@ -159,13 +166,28 @@ export class AdminAiAgentController {
   @Post('test-provider')
   @HttpCode(200)
   @Permissions('saas.ai.manage')
-  async testProvider(@Body() body: { provider: string; model?: string }) {
+  async testProvider(@Body() body: TestAiProviderDto) {
     const { provider, model } = body;
-    const resolvedProvider = this.aiRegistry.getProvider(provider as AiProviderType);
+    const providerType = provider as AiProviderType;
+    const resolvedProvider = this.aiRegistry.getProvider(providerType);
+    const runtimeConfig = await this.providerConfig.resolveRuntimeConfig(
+      providerType,
+      model,
+      { log: true, providerSource: 'request', modelOverrideSource: model ? 'request' : undefined },
+    );
 
-    const available = await resolvedProvider.isAvailable();
-    if (!available) {
-      throw new BadRequestException('Provedor não configurado ou API Key ausente no sistema.');
+    if (!runtimeConfig.apiKeyPresent) {
+      return {
+        success: false,
+        statusCode: 400,
+        error: 'Provedor nao configurado ou API Key ausente no sistema.',
+        friendlyError: 'Configure a API key no SaaS Admin ou ENV.',
+        keySource: runtimeConfig.apiKeySource,
+        apiKeySource: runtimeConfig.apiKeySource,
+        apiKeyFingerprint: runtimeConfig.apiKeyFingerprint,
+        model: runtimeConfig.model,
+        modelSource: runtimeConfig.modelSource,
+      };
     }
 
     try {
@@ -173,21 +195,52 @@ export class AdminAiAgentController {
         messages: [{ role: 'user', content: 'Responder apenas com a palavra OK.' }],
         temperature: 0.1,
         model,
+        providerSource: 'request',
+        modelSource: model ? 'request' : undefined,
       });
 
       if (res.finishReason === 'error') {
         const type = res.error?.type || 'unknown';
         const msg = res.error?.message || 'Erro desconhecido';
-        return { success: false, error: `Falha no provedor (${type}): ${msg}`, errorType: type };
+        return {
+          success: false,
+          statusCode: res.error?.statusCode ?? 500,
+          error: `Falha no provedor (${type}): ${msg}`,
+          friendlyError: this.toFriendlyProviderError(type),
+          errorType: type,
+          keySource: runtimeConfig.apiKeySource,
+          apiKeySource: runtimeConfig.apiKeySource,
+          apiKeyFingerprint: runtimeConfig.apiKeyFingerprint,
+          model: runtimeConfig.model,
+          modelSource: runtimeConfig.modelSource,
+        };
       }
 
-      return { success: true, response: res.content };
+      return {
+        success: true,
+        statusCode: 200,
+        response: res.content,
+        keySource: runtimeConfig.apiKeySource,
+        apiKeySource: runtimeConfig.apiKeySource,
+        apiKeyFingerprint: runtimeConfig.apiKeyFingerprint,
+        model: runtimeConfig.model,
+        modelSource: runtimeConfig.modelSource,
+      };
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : 'Erro interno ao testar o provedor.';
-      return { success: false, error: errMsg };
+      return {
+        success: false,
+        statusCode: 500,
+        error: errMsg,
+        friendlyError: 'Nao foi possivel testar o provedor agora.',
+        keySource: runtimeConfig.apiKeySource,
+        apiKeySource: runtimeConfig.apiKeySource,
+        apiKeyFingerprint: runtimeConfig.apiKeyFingerprint,
+        model: runtimeConfig.model,
+        modelSource: runtimeConfig.modelSource,
+      };
     }
   }
-
   @Get('recommended-prompt')
   @Permissions('saas.ai.read')
   getRecommendedPrompt() {
@@ -341,6 +394,16 @@ export class AdminAiAgentController {
         'Prompt Mestre vazio em produção exige confirmação explícita de uso do fallback.',
       );
     }
+  }
+
+  private toFriendlyProviderError(type: string): string {
+    if (type === 'quota_exhausted') {
+      return 'Quota ou limite do provedor esgotado. Troque a key, aguarde a quota renovar ou configure fallback.';
+    }
+    if (type === 'model_unavailable') {
+      return 'Modelo indisponivel para esta key/provedor. Selecione outro modelo no SaaS Admin.';
+    }
+    return 'Falha ao chamar o provedor de IA.';
   }
 
   private async buildToolsGuide(tenantId?: string): Promise<AdminAiToolGuideItem[]> {

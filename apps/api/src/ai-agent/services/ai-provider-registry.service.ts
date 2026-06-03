@@ -5,6 +5,7 @@ import { OpenAiProvider } from '../providers/openai.provider';
 import { AnthropicProvider } from '../providers/anthropic.provider';
 import { GoogleAiProvider } from '../providers/google-ai.provider';
 import { IAiProvider } from '../interfaces/ai-provider.interface';
+import { AiConfigSource, AiProviderConfigService } from './ai-provider-config.service';
 
 @Injectable()
 export class AiProviderRegistryService {
@@ -15,11 +16,9 @@ export class AiProviderRegistryService {
     private readonly openai: OpenAiProvider,
     private readonly anthropic: AnthropicProvider,
     private readonly googleAi: GoogleAiProvider,
+    private readonly providerConfig: AiProviderConfigService,
   ) {}
 
-  /**
-   * Retorna o provider solicitado
-   */
   getProvider(type: AiProviderType): IAiProvider {
     switch (type) {
       case 'openai':
@@ -33,25 +32,29 @@ export class AiProviderRegistryService {
     }
   }
 
-  /**
-   * Resolve qual provider usar baseado no tenant e nas configs globais
-   */
   async resolveProvider(tenantId: string): Promise<IAiProvider> {
-    // 1. Verificar se o tenant tem um override específico na config de agente
+    const resolved = await this.resolveProviderWithSource(tenantId);
+    return resolved.provider;
+  }
+
+  async resolveProviderWithSource(
+    tenantId: string,
+  ): Promise<{ provider: IAiProvider; source: AiConfigSource }> {
     await this.prisma.aiAgentConfig.findUnique({
       where: { tenantId },
-      select: { tenantId: true } // temporário até adicionar campo aiProvider no modelo
+      select: { tenantId: true },
     });
 
-    // TODO: quando o campo aiProvider for adicionado ao AiAgentConfig, usar:
-    // if (agentConfig?.aiProvider) { return this.getProvider(agentConfig.aiProvider as AiProviderType); }
+    // Tenant provider/model override ainda nao existe em AiAgentConfig.
+    // Quando existir, ele deve entrar aqui antes da config global.
+    const resolved = await this.providerConfig.resolveDefaultProvider();
+    this.logger.log(
+      `[AI_PROVIDER_CONFIG] provider=${resolved.provider} providerSource=${resolved.source}`,
+    );
 
-    // 2. Senão, buscar o default global do SystemConfig
-    const systemConfig = await this.prisma.systemConfig.findUnique({
-      where: { id: 'global' },
-      select: { defaultAiProvider: true }
-    });
-
-    return this.getProvider(systemConfig?.defaultAiProvider || 'openai');
+    return {
+      provider: this.getProvider(resolved.provider),
+      source: resolved.source,
+    };
   }
 }

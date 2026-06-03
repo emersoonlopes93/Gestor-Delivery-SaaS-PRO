@@ -31,6 +31,8 @@ export interface AiCompletionInput {
   temperature?: number;
   maxTokens?: number;
   model?: string;
+  providerSource?: 'database' | 'env' | 'tenant_config' | 'default' | 'request';
+  modelSource?: 'database' | 'env' | 'tenant_config' | 'default' | 'request';
 }
 
 export interface AiCompletionResult {
@@ -45,6 +47,7 @@ export interface AiCompletionResult {
   error?: {
     type: 'quota_exhausted' | 'model_unavailable' | 'unknown';
     message: string;
+    statusCode?: number;
   };
 }
 
