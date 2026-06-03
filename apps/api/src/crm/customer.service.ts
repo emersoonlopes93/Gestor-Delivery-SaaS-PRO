@@ -379,20 +379,8 @@ export class CustomerService {
       });
     }
 
-    return this.db.customer.upsert({
-      where: {
-        tenantId_phone: {
-          tenantId,
-          phone: normalizedPhone,
-        },
-      },
-      update: {
-        // If customer exists, we might want to update the name/email if it's new
-        // We'll trust the latest order name, or just keep it as is. Let's update it.
-        name,
-        ...(email && { email }),
-      },
-      create: {
+    return this.db.customer.create({
+      data: {
         tenantId,
         phone: normalizedPhone,
         name,

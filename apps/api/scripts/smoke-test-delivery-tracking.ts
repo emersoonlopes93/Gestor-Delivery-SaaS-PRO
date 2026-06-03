@@ -7,8 +7,8 @@ declare const process: {
 
 const API = process.env.SMOKE_API_BASE_URL ?? 'http://localhost:3333/api/v1';
 const TENANT_SLUG = process.env.SMOKE_TENANT_SLUG ?? 'pizzaria-demo';
-const TENANT_EMAIL = process.env.SMOKE_TENANT_EMAIL ?? 'owner@pizzariademo.com';
-const TENANT_PASSWORD = process.env.SMOKE_TENANT_PASSWORD ?? 'Owner@123';
+const TENANT_EMAIL = process.env.SMOKE_TENANT_EMAIL ?? 'demo@demo.com';
+const TENANT_PASSWORD = process.env.SMOKE_TENANT_PASSWORD ?? 'demo123';
 
 interface TestResult {
   name: string;
@@ -138,7 +138,10 @@ async function main() {
       city: 'São Paulo',
       state: 'SP',
       zipCode: '01001000',
+      lat: -23.5614,
+      lng: -46.6559,
     },
+    payment: { method: 'pix' },
   });
 
   assert('Delivery checkout creates order', checkoutStatus === 201 || checkoutStatus === 200, `Status: ${checkoutStatus}`, orderData);
@@ -150,14 +153,34 @@ async function main() {
   const { status: listDriversStatus, data: driversData } = await api('GET', '/delivery/drivers', undefined, token);
   assert('List drivers', listDriversStatus === 200, `Status: ${listDriversStatus}`, driversData);
 
-  const driversArr = asArray(driversData);
-  const firstDriver = driversArr.length > 0 ? asRecord(driversArr[0]) : null;
-  const driverId = firstDriver ? pickString(firstDriver, 'id') : null;
+  let driversArr = asArray(driversData);
+  let firstDriver: Record<string, unknown> | null = null;
+  let driverId = firstDriver ? pickString(firstDriver, 'id') : null;
+  const { status: createDriverStatus, data: createDriverData } = await api('POST', '/delivery/drivers', {
+    name: 'Smoke Entregador',
+    phone: `1198888${Date.now().toString().slice(-8)}`,
+    vehicleType: 'motorcycle',
+  }, token);
+  assert('Create smoke driver', createDriverStatus === 200 || createDriverStatus === 201, `Status: ${createDriverStatus}`, createDriverData);
+  driversArr = [createDriverData, ...driversArr];
+  firstDriver = asRecord(driversArr[0]);
+  driverId = firstDriver ? pickString(firstDriver, 'id') : null;
   assert('Has at least one driver', typeof driverId === 'string' && !!driverId, 'No driver in seed');
   if (!driverId) process.exit(1);
 
-  const { status: assignStatus } = await api('POST', `/orders/${orderId}/assign-driver`, { driverId }, token);
-  assert('Assign driver', assignStatus === 200, `Status: ${assignStatus}`);
+  const { status: activateDriverStatus, data: activateDriverData } = await api('PATCH', `/delivery/drivers/${driverId}`, {
+    isActive: true,
+    status: 'available',
+  }, token);
+  assert('Activate smoke driver', activateDriverStatus === 200, `Status: ${activateDriverStatus}`, activateDriverData);
+
+  const { status: assignStatus, data: assignData } = await api('POST', `/orders/${orderId}/assign-driver`, { driverId }, token);
+  assert('Assign driver', assignStatus === 200 || assignStatus === 201, `Status: ${assignStatus}`, assignData);
+
+  for (const status of ['confirmed', 'preparing', 'ready_for_delivery']) {
+    const { status: transitionStatus } = await api('PATCH', `/orders/${orderId}/status`, { status }, token);
+    assert(`Update status to ${status}`, transitionStatus === 200, `Status: ${transitionStatus}`);
+  }
 
   const { status: updateStatusStatus } = await api('PATCH', `/orders/${orderId}/status`, { status: 'out_for_delivery' }, token);
   assert('Update status to out_for_delivery', updateStatusStatus === 200, `Status: ${updateStatusStatus}`);

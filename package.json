@@ -31,7 +31,8 @@
     "check:theme:baseline": "node scripts/check-theme-hardcoded-classes.js --baseline",
     "check:boundaries": "node scripts/check-package-boundaries.js",
     "check:theme:write-baseline": "node scripts/check-theme-hardcoded-classes.js --report --write-baseline",
-    "check:theme": "pnpm check:theme:critical"
+    "check:theme": "pnpm check:theme:critical",
+    "smoke:p1": "pnpm -C apps/api smoke:p1"
   },
   "engines": {
     "node": ">=20.0.0",
