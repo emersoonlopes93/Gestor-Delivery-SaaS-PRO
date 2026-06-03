@@ -15,15 +15,13 @@ import { LoginModal } from '../components/LoginModal';
 import { User, LogOut, ClipboardList } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { 
-  StorefrontThemeProvider, 
   StorefrontButton, 
   ProductRenderer, 
   CategoryNavigation, 
   StorefrontEmptyState,
   cn
 } from '@gestor/storefront-ui';
-import { useStorefrontThemeStore } from '../stores/theme.store';
-import type { StorefrontProductLayout, StorefrontThemeSettings, StorefrontLayoutSettings } from '@gestor/theme';
+import type { StorefrontProductLayout, StorefrontLayoutSettings } from '@gestor/theme';
 
 export function StorefrontPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -41,8 +39,6 @@ export function StorefrontPage() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
 
   const { customer, logout, isLoggedIn } = useCustomerStore();
-
-  const storefrontTheme = useStorefrontThemeStore(s => s.theme);
 
   // Demo state for layout testing
   const [productLayout, setProductLayout] = useState<StorefrontProductLayout>('grid');
@@ -144,7 +140,6 @@ export function StorefrontPage() {
 
   const { tenant, categories, combos, customization } = data;
 
-  const themeSettings = (customization?.theme || {}) as Partial<StorefrontThemeSettings>;
   const layoutSettings = (customization?.layout || {}) as Partial<StorefrontLayoutSettings>;
 
   // Use real settings from backend, with local override for testing in DEV
@@ -153,16 +148,8 @@ export function StorefrontPage() {
     ? productLayout 
     : (layoutSettings.productLayout || 'grid') as StorefrontProductLayout;
 
-  const effectiveTheme = {
-    ...themeSettings,
-    colorMode: (storefrontTheme === 'system' 
-      ? (themeSettings.colorMode || 'light') 
-      : storefrontTheme) as 'light' | 'dark',
-  };
-
   return (
-    <StorefrontThemeProvider 
-      settings={effectiveTheme}
+    <div 
       className="px-4 py-6"
     >
       {/* Store Header */}
@@ -427,6 +414,6 @@ export function StorefrontPage() {
           </button>
         </div>
       )}
-    </StorefrontThemeProvider>
+    </div>
   );
 }

@@ -130,6 +130,7 @@ export function StorefrontCustomizationPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'presets' | 'background' | 'appearance' | 'layout'>('presets');
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [tenantLogo, setTenantLogo] = useState<string | null>(null);
@@ -542,309 +543,361 @@ export function StorefrontCustomizationPage() {
           </div>
         }
       />
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          {/* Presets Rápidos */}
-          <Card className="p-6 bg-card border-border">
-            <div className="flex items-center gap-2 mb-6">
-              <Zap className="w-5 h-5 text-amber-500" />
-              <h2 className="text-lg font-bold text-foreground">Presets Rápidos</h2>
-            </div>
+          {/* Navegação por Abas */}
+          <div className="flex flex-wrap gap-1 p-1 bg-muted/60 dark:bg-slate-900/40 rounded-xl border border-border/80">
+            <button
+              onClick={() => setActiveTab('presets')}
+              className={`flex items-center justify-center gap-2 flex-1 min-w-[130px] px-4 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                activeTab === 'presets'
+                  ? 'bg-card text-foreground shadow-sm border border-border/50'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+              }`}
+            >
+              <Zap className={`w-3.5 h-3.5 ${activeTab === 'presets' ? 'text-amber-500 fill-amber-500/20' : ''}`} />
+              Presets Rápidos
+            </button>
+            <button
+              onClick={() => setActiveTab('background')}
+              className={`flex items-center justify-center gap-2 flex-1 min-w-[130px] px-4 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                activeTab === 'background'
+                  ? 'bg-card text-foreground shadow-sm border border-border/50'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+              }`}
+            >
+              <ImageIcon className={`w-3.5 h-3.5 ${activeTab === 'background' ? 'text-primary' : ''}`} />
+              Background Premium
+            </button>
+            <button
+              onClick={() => setActiveTab('appearance')}
+              className={`flex items-center justify-center gap-2 flex-1 min-w-[130px] px-4 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                activeTab === 'appearance'
+                  ? 'bg-card text-foreground shadow-sm border border-border/50'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+              }`}
+            >
+              <Palette className={`w-3.5 h-3.5 ${activeTab === 'appearance' ? 'text-primary' : ''}`} />
+              Aparência
+            </button>
+            <button
+              onClick={() => setActiveTab('layout')}
+              className={`flex items-center justify-center gap-2 flex-1 min-w-[130px] px-4 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                activeTab === 'layout'
+                  ? 'bg-card text-foreground shadow-sm border border-border/50'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+              }`}
+            >
+              <Layout className={`w-3.5 h-3.5 ${activeTab === 'layout' ? 'text-primary' : ''}`} />
+              Layout do Cardápio
+            </button>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {getStorefrontPresets().map((preset) => (
-                <button
-                  key={preset.id}
-                  onClick={() => applyPreset(preset)}
-                  className="flex flex-col p-4 border border-border bg-card hover:border-primary/45 hover:bg-primary/5 transition-all text-left rounded-xl group"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div 
-                      className="w-8 h-8 rounded-lg shadow-inner" 
-                      style={{ backgroundColor: preset.theme.primaryColor }}
-                    />
-                    <Badge variant="info" className="text-[10px] uppercase font-black">{preset.layout.productLayout}</Badge>
-                  </div>
-                  <h3 className="font-bold text-sm text-foreground mb-1 group-hover:text-primary">{preset.name}</h3>
-                  <p className="text-[11px] text-muted-foreground leading-tight">{preset.description}</p>
-                </button>
-              ))}
-            </div>
-          </Card>
-
-          {/* Background Premium */}
-          <Card className="p-6 bg-card border-border">
-            <div className="flex items-center gap-2 mb-6">
-              <ImageIcon className="w-5 h-5 text-primary" />
-              <h2 className="text-lg font-bold text-foreground">Background Premium</h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-4">
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium text-foreground">Imagem de Fundo</label>
-                  <p className="text-xs text-muted-foreground mb-2">JPG, PNG ou WebP. Recomendado: 1920x1080px (Máx 5MB).</p>
-                  
-                  {customization.theme.backgroundImageUrl ? (
-                    <div className="relative group rounded-xl overflow-hidden border-2 border-primary/20 aspect-video bg-muted">
-                      <img 
-                        src={customization.theme.backgroundImageUrl} 
-                        alt="Background Preview" 
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                        <Button size="sm" variant="destructive" onClick={removeBackground}>
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Remover
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <input
-                        type="file"
-                        id="bg-upload"
-                        className="hidden"
-                        accept="image/jpeg,image/png,image/webp"
-                        onChange={handleFileUpload}
-                        disabled={uploading}
-                      />
-                      <label 
-                        htmlFor="bg-upload"
-                        className={`flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-2xl cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        {uploading ? (
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-                        ) : (
-                          <>
-                            <Upload className="w-8 h-8 text-muted-foreground mb-2" />
-                            <span className="text-sm font-bold text-muted-foreground">Clique para enviar</span>
-                            <span className="text-xs text-muted-foreground/60">ou arraste a imagem aqui</span>
-                          </>
-                        )}
-                      </label>
-                    </div>
-                  )}
-                </div>
+          {/* Conteúdo das Abas */}
+          {activeTab === 'presets' && (
+            <Card className="p-6 bg-card border-border shadow-sm">
+              <div className="flex items-center gap-2 mb-6">
+                <Zap className="w-5 h-5 text-amber-500" />
+                <h2 className="text-lg font-bold text-foreground">Presets Rápidos</h2>
               </div>
 
-              <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {getStorefrontPresets().map((preset) => (
+                  <button
+                    key={preset.id}
+                    onClick={() => applyPreset(preset)}
+                    className="flex flex-col p-4 border border-border bg-card hover:border-primary/45 hover:bg-primary/5 transition-all text-left rounded-xl group"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div 
+                        className="w-8 h-8 rounded-lg shadow-inner" 
+                        style={{ backgroundColor: preset.theme.primaryColor }}
+                      />
+                      <Badge variant="info" className="text-[10px] uppercase font-black">{preset.layout.productLayout}</Badge>
+                    </div>
+                    <h3 className="font-bold text-sm text-foreground mb-1 group-hover:text-primary">{preset.name}</h3>
+                    <p className="text-[11px] text-muted-foreground leading-tight">{preset.description}</p>
+                  </button>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {activeTab === 'background' && (
+            <Card className="p-6 bg-card border-border shadow-sm">
+              <div className="flex items-center gap-2 mb-6">
+                <ImageIcon className="w-5 h-5 text-primary" />
+                <h2 className="text-lg font-bold text-foreground">Background Premium</h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-foreground">Imagem de Fundo</label>
+                    <p className="text-xs text-muted-foreground mb-2">JPG, PNG ou WebP. Recomendado: 1920x1080px (Máx 5MB).</p>
+                    
+                    {customization.theme.backgroundImageUrl ? (
+                      <div className="relative group rounded-xl overflow-hidden border-2 border-primary/20 aspect-video bg-muted">
+                        <img 
+                          src={customization.theme.backgroundImageUrl} 
+                          alt="Background Preview" 
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <Button size="sm" variant="destructive" onClick={removeBackground}>
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Remover
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <input
+                          type="file"
+                          id="bg-upload"
+                          className="hidden"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={handleFileUpload}
+                          disabled={uploading}
+                        />
+                        <label 
+                          htmlFor="bg-upload"
+                          className={`flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-2xl cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {uploading ? (
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                          ) : (
+                            <>
+                              <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+                              <span className="text-sm font-bold text-muted-foreground">Clique para enviar</span>
+                              <span className="text-xs text-muted-foreground/60">ou arraste a imagem aqui</span>
+                            </>
+                          )}
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Intensidade do Overlay</label>
+                    <p className="text-xs text-muted-foreground mb-4">Ajuste para garantir que os textos fiquem legíveis sobre a imagem.</p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {(['none', 'soft', 'medium', 'strong'] as const).map((o) => (
+                        <button
+                          key={o}
+                          onClick={() => updateTheme({ backgroundOverlay: o })}
+                          className={`px-3 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${
+                            customization.theme.backgroundOverlay === o
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-border hover:border-muted-foreground/30 bg-card text-foreground'
+                          }`}
+                        >
+                          {o === 'none' ? 'Nenhum' : o === 'soft' ? 'Leve' : o === 'medium' ? 'Médio' : 'Forte'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-primary/10 rounded-xl border border-primary/20">
+                    <p className="text-[11px] text-primary leading-relaxed font-medium">
+                      <strong>Dica UX:</strong> Se sua imagem for muito colorida ou detalhada, use o overlay <strong>Médio</strong> ou <strong>Forte</strong> para manter o contraste do cardápio.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {activeTab === 'appearance' && (
+            <Card className="p-6 bg-card border-border shadow-sm">
+              <div className="flex items-center gap-2 mb-6">
+                <Palette className="w-5 h-5 text-primary" />
+                <h2 className="text-lg font-bold text-foreground">Aparência</h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Intensidade do Overlay</label>
-                  <p className="text-xs text-muted-foreground mb-4">Ajuste para garantir que os textos fiquem legíveis sobre a imagem.</p>
-                  <div className="grid grid-cols-4 gap-2">
-                    {(['none', 'soft', 'medium', 'strong'] as const).map((o) => (
+                  <label className="text-sm font-medium text-foreground">Modo de Cor</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['light', 'dark', 'system'] as ThemeMode[]).map((mode) => (
                       <button
-                        key={o}
-                        onClick={() => updateTheme({ backgroundOverlay: o })}
-                        className={`px-3 py-2 text-[10px] font-black uppercase rounded-lg border transition-all ${
-                          customization.theme.backgroundOverlay === o
+                        key={mode}
+                        onClick={() => updateTheme({ colorMode: mode })}
+                        className={`px-3 py-2 text-xs font-bold rounded-lg border transition-all ${
+                          customization.theme.colorMode === mode
                             ? 'border-primary bg-primary/10 text-primary'
                             : 'border-border hover:border-muted-foreground/30 bg-card text-foreground'
                         }`}
                       >
-                        {o === 'none' ? 'Nenhum' : o === 'soft' ? 'Leve' : o === 'medium' ? 'Médio' : 'Forte'}
+                        {mode === 'light' ? 'Claro' : mode === 'dark' ? 'Escuro' : 'Sistema'}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="p-4 bg-primary/10 rounded-xl border border-primary/20">
-                  <p className="text-[11px] text-primary leading-relaxed font-medium">
-                    <strong>Dica UX:</strong> Se sua imagem for muito colorida ou detalhada, use o overlay <strong>Médio</strong> ou <strong>Forte</strong> para manter o contraste do cardápio.
-                  </p>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Cor Principal</label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="color" 
+                      value={customization.theme.primaryColor}
+                      onChange={(e) => updateTheme({ primaryColor: e.target.value })}
+                      className="w-10 h-10 rounded-lg cursor-pointer border-none p-0 overflow-hidden"
+                    />
+                    <input 
+                      type="text" 
+                      value={customization.theme.primaryColor}
+                      onChange={(e) => updateTheme({ primaryColor: e.target.value })}
+                      className="flex-1 px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm uppercase font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Estilo de Fundo</label>
+                  <select 
+                    value={customization.theme.backgroundStyle}
+                    onChange={(e) => updateTheme({ backgroundStyle: e.target.value as StorefrontThemeSettings['backgroundStyle'] })}
+                    className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
+                  >
+                    <option value="clean">Clean (Branco/Preto)</option>
+                    <option value="soft">Soft (Cores suaves)</option>
+                    <option value="premium">Premium (Gradientes)</option>
+                    <option value="brand">Brand (Focado na marca)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Arredondamento (Radius)</label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {(['sm', 'md', 'lg', 'xl', '2xl'] as StorefrontRadius[]).map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => updateTheme({ borderRadius: r })}
+                        className={`px-2 py-2 text-xs font-bold rounded-lg border transition-all ${
+                          customization.theme.borderRadius === r
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-border hover:border-muted-foreground/30 bg-card text-foreground'
+                        }`}
+                      >
+                        {r.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Estilo de Fonte</label>
+                  <select 
+                    value={customization.theme.fontStyle}
+                    onChange={(e) => updateTheme({ fontStyle: e.target.value as StorefrontThemeSettings['fontStyle'] })}
+                    className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
+                  >
+                    <option value="default">Padrão (Inter)</option>
+                    <option value="modern">Moderno (Sans)</option>
+                    <option value="rounded">Arredondado (Quicksand)</option>
+                  </select>
                 </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+          )}
 
-          {/* Aparência */}
-          <Card className="p-6 bg-card border-border">
-            <div className="flex items-center gap-2 mb-6">
-              <Palette className="w-5 h-5 text-primary" />
-              <h2 className="text-lg font-bold text-foreground">Aparência</h2>
-            </div>
+          {activeTab === 'layout' && (
+            <Card className="p-6 bg-card border-border shadow-sm">
+              <div className="flex items-center gap-2 mb-6">
+                <Layout className="w-5 h-5 text-primary" />
+                <h2 className="text-lg font-bold text-foreground">Layout do Cardápio</h2>
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Modo de Cor</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['light', 'dark', 'system'] as ThemeMode[]).map((mode) => (
-                    <button
-                      key={mode}
-                      onClick={() => updateTheme({ colorMode: mode })}
-                      className={`px-3 py-2 text-xs font-bold rounded-lg border transition-all ${
-                        customization.theme.colorMode === mode
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-border hover:border-muted-foreground/30 bg-card text-foreground'
-                      }`}
-                    >
-                      {mode === 'light' ? 'Claro' : mode === 'dark' ? 'Escuro' : 'Sistema'}
-                    </button>
-                  ))}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Layout dos Produtos</label>
+                  <select 
+                    value={customization.layout.productLayout}
+                    onChange={(e) => updateLayout({ productLayout: e.target.value as StorefrontProductLayout })}
+                    className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
+                  >
+                    <option value="grid">Grade (Padrão)</option>
+                    <option value="list">Lista (Econômico)</option>
+                    <option value="compact">Compacto (Denso)</option>
+                    <option value="square">Quadrado (Visual)</option>
+                    <option value="premium-card">Premium (Sofisticado)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Layout das Categorias</label>
+                  <select 
+                    value={customization.layout.categoryLayout}
+                    onChange={(e) => updateLayout({ categoryLayout: e.target.value as StorefrontCategoryLayout })}
+                    className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
+                  >
+                    <option value="tabs">Abas superiores</option>
+                    <option value="horizontal-scroll">Scroll Horizontal</option>
+                    <option value="sections">Seções (Anchor)</option>
+                    <option value="sidebar">Barra Lateral (Desktop)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Modo de Imagem</label>
+                  <select 
+                    value={customization.layout.productImageMode}
+                    onChange={(e) => updateLayout({ productImageMode: e.target.value as StorefrontImageMode })}
+                    className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
+                  >
+                    <option value="cover">Preencher (Cover)</option>
+                    <option value="contain">Conter (Contain)</option>
+                    <option value="hidden">Ocultar imagens</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-4 pt-2">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input 
+                      type="checkbox"
+                      checked={customization.layout.showProductDescription}
+                      onChange={(e) => updateLayout({ showProductDescription: e.target.checked })}
+                      className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
+                    />
+                    <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground">Mostrar descrição dos produtos</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input 
+                      type="checkbox"
+                      checked={customization.layout.showBadges}
+                      onChange={(e) => updateLayout({ showBadges: e.target.checked })}
+                      className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
+                    />
+                    <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground">Mostrar badges de destaque</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input 
+                      type="checkbox"
+                      checked={customization.layout.stickyCart}
+                      onChange={(e) => updateLayout({ stickyCart: e.target.checked })}
+                      className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
+                    />
+                    <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground">Carrinho flutuante (Sticky)</span>
+                  </label>
+
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input 
+                      type="checkbox"
+                      checked={customization.layout.heroEnabled}
+                      onChange={(e) => updateLayout({ heroEnabled: e.target.checked })}
+                      className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
+                    />
+                    <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground">Habilitar Banner (Hero)</span>
+                  </label>
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Cor Principal</label>
-                <div className="flex gap-2">
-                  <input 
-                    type="color" 
-                    value={customization.theme.primaryColor}
-                    onChange={(e) => updateTheme({ primaryColor: e.target.value })}
-                    className="w-10 h-10 rounded-lg cursor-pointer border-none p-0 overflow-hidden"
-                  />
-                  <input 
-                    type="text" 
-                    value={customization.theme.primaryColor}
-                    onChange={(e) => updateTheme({ primaryColor: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm uppercase font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Estilo de Fundo</label>
-                <select 
-                  value={customization.theme.backgroundStyle}
-                  onChange={(e) => updateTheme({ backgroundStyle: e.target.value as StorefrontThemeSettings['backgroundStyle'] })}
-                  className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
-                >
-                  <option value="clean">Clean (Branco/Preto)</option>
-                  <option value="soft">Soft (Cores suaves)</option>
-                  <option value="premium">Premium (Gradientes)</option>
-                  <option value="brand">Brand (Focado na marca)</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Arredondamento (Radius)</label>
-                <div className="grid grid-cols-5 gap-2">
-                  {(['sm', 'md', 'lg', 'xl', '2xl'] as StorefrontRadius[]).map((r) => (
-                    <button
-                      key={r}
-                      onClick={() => updateTheme({ borderRadius: r })}
-                      className={`px-2 py-2 text-xs font-bold rounded-lg border transition-all ${
-                        customization.theme.borderRadius === r
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-border hover:border-muted-foreground/30 bg-card text-foreground'
-                      }`}
-                    >
-                      {r.toUpperCase()}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Estilo de Fonte</label>
-                <select 
-                  value={customization.theme.fontStyle}
-                  onChange={(e) => updateTheme({ fontStyle: e.target.value as StorefrontThemeSettings['fontStyle'] })}
-                  className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
-                >
-                  <option value="default">Padrão (Inter)</option>
-                  <option value="modern">Moderno (Sans)</option>
-                  <option value="rounded">Arredondado (Quicksand)</option>
-                </select>
-              </div>
-            </div>
-          </Card>
-
-          {/* Layout do Cardápio */}
-          <Card className="p-6 bg-card border-border">
-            <div className="flex items-center gap-2 mb-6">
-              <Layout className="w-5 h-5 text-primary" />
-              <h2 className="text-lg font-bold text-foreground">Layout do Cardápio</h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Layout dos Produtos</label>
-                <select 
-                  value={customization.layout.productLayout}
-                  onChange={(e) => updateLayout({ productLayout: e.target.value as StorefrontProductLayout })}
-                  className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
-                >
-                  <option value="grid">Grade (Padrão)</option>
-                  <option value="list">Lista (Econômico)</option>
-                  <option value="compact">Compacto (Denso)</option>
-                  <option value="square">Quadrado (Visual)</option>
-                  <option value="premium-card">Premium (Sofisticado)</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Layout das Categorias</label>
-                <select 
-                  value={customization.layout.categoryLayout}
-                  onChange={(e) => updateLayout({ categoryLayout: e.target.value as StorefrontCategoryLayout })}
-                  className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
-                >
-                  <option value="tabs">Abas superiores</option>
-                  <option value="horizontal-scroll">Scroll Horizontal</option>
-                  <option value="sections">Seções (Anchor)</option>
-                  <option value="sidebar">Barra Lateral (Desktop)</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Modo de Imagem</label>
-                <select 
-                  value={customization.layout.productImageMode}
-                  onChange={(e) => updateLayout({ productImageMode: e.target.value as StorefrontImageMode })}
-                  className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-lg text-sm"
-                >
-                  <option value="cover">Preencher (Cover)</option>
-                  <option value="contain">Conter (Contain)</option>
-                  <option value="hidden">Ocultar imagens</option>
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-4 pt-2">
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <input 
-                    type="checkbox"
-                    checked={customization.layout.showProductDescription}
-                    onChange={(e) => updateLayout({ showProductDescription: e.target.checked })}
-                    className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
-                  />
-                  <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground">Mostrar descrição dos produtos</span>
-                </label>
-
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <input 
-                    type="checkbox"
-                    checked={customization.layout.showBadges}
-                    onChange={(e) => updateLayout({ showBadges: e.target.checked })}
-                    className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
-                  />
-                  <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground">Mostrar badges de destaque</span>
-                </label>
-
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <input 
-                    type="checkbox"
-                    checked={customization.layout.stickyCart}
-                    onChange={(e) => updateLayout({ stickyCart: e.target.checked })}
-                    className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
-                  />
-                  <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground">Carrinho flutuante (Sticky)</span>
-                </label>
-
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <input 
-                    type="checkbox"
-                    checked={customization.layout.heroEnabled}
-                    onChange={(e) => updateLayout({ heroEnabled: e.target.checked })}
-                    className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
-                  />
-                  <span className="text-sm font-medium text-foreground/80 group-hover:text-foreground">Habilitar Banner (Hero)</span>
-                </label>
-              </div>
-            </div>
-          </Card>
+            </Card>
+          )}
         </div>
 
         {/* Preview Sidebar */}
