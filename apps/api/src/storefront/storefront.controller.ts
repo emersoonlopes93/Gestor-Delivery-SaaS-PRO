@@ -23,8 +23,8 @@ export class StorefrontController {
   @Public()
   async getSlots(
     @Param('slug') slug: string,
-    @Query('date') date: string,
+    @Query('date') date?: string,
   ) {
-    return this.storefrontService.getAvailableSlots(slug, new Date(date));
+    return this.storefrontService.getAvailableSlots(slug, date);
   }
 }

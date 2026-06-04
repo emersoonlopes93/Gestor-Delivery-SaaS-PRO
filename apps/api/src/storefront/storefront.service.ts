@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import { DateTime } from 'luxon';
 import { PrismaService } from '../database/prisma.service';
 import { 
   StorefrontPayload, 
@@ -466,13 +467,31 @@ export class StorefrontService {
     return payload;
   }
 
-  async getAvailableSlots(slug: string, date: Date) {
+  async getAvailableSlots(slug: string, date?: Date | string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { slug },
-      select: { id: true },
+      select: { id: true, settings: { select: { timezone: true } } },
     });
     if (!tenant) throw new NotFoundException('Store not found');
 
-    return this.schedulingService.getAvailableTimeSlots(date, tenant.id);
+    const timezone = tenant.settings?.timezone || 'America/Sao_Paulo';
+    let targetDate: Date;
+
+    if (typeof date === 'string') {
+      const parsed = DateTime.fromISO(date, { zone: timezone });
+      if (!parsed.isValid) {
+        throw new NotFoundException('Invalid date format');
+      }
+      targetDate = parsed.set({ hour: 12, minute: 0, second: 0, millisecond: 0 }).toJSDate();
+    } else if (date instanceof Date && !isNaN(date.getTime())) {
+      targetDate = date;
+    } else {
+      targetDate = DateTime.now()
+        .setZone(timezone)
+        .set({ hour: 12, minute: 0, second: 0, millisecond: 0 })
+        .toJSDate();
+    }
+
+    return this.schedulingService.getAvailableTimeSlots(targetDate, tenant.id);
   }
 }

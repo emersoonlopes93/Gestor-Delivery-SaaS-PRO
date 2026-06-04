@@ -82,4 +82,40 @@ describe('SchedulingGeneratorService', () => {
     expect(endDate.toISOString()).toBe('2026-06-15T22:00:00.000Z');
     expect(result).toHaveLength(1);
   });
+
+  it.each([
+    ['America/Sao_Paulo', '2026-06-15T21:00:00.000Z', '2026-06-16T02:00:00.000Z'],
+    ['America/Manaus', '2026-06-15T22:00:00.000Z', '2026-06-16T03:00:00.000Z'],
+    ['America/Rio_Branco', '2026-06-15T23:00:00.000Z', '2026-06-16T04:00:00.000Z'],
+  ])('converts local window times to UTC correctly for %s', async (timezone, expectedStart, expectedEnd) => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-15T12:00:00Z'));
+
+    (prisma as any).schedulingSettings.findUnique.mockResolvedValue({
+      enabled: true,
+      acceptScheduledOrders: true,
+      maximumAdvanceDays: 0,
+      slotIntervalMinutes: 30,
+      maxOrdersPerSlot: 1,
+      timezone,
+    });
+
+    (prisma as any).schedulingWindow.findMany.mockResolvedValue([
+      {
+        id: 'window-1',
+        dayOfWeek: 1,
+        startTime: '18:00',
+        endTime: '23:00',
+        active: true,
+      },
+    ]);
+
+    const result = await service.generateSlotsForNextDays();
+
+    expect(result).toHaveLength(1);
+    expect((schedulingService as any).generateTimeSlots).toHaveBeenCalledTimes(1);
+
+    const [startDate, endDate] = (schedulingService as any).generateTimeSlots.mock.calls[0];
+    expect(startDate.toISOString()).toBe(expectedStart);
+    expect(endDate.toISOString()).toBe(expectedEnd);
+  });
 });

@@ -1,4 +1,5 @@
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
+import { DateTime } from 'luxon';
 import axios from 'axios';
 import { OrdersService } from '../../orders/orders.service';
 import { DeliveryRateService } from '../../delivery/delivery-rate.service';
@@ -1283,19 +1284,17 @@ export class AgentToolsService {
     let date: Date;
     if (args.data) {
       // Interpretar a data no timezone do tenant para evitar off-by-one
-      const [year, month, day] = args.data.split('-').map(Number);
-      // Usar a data informada diretamente
-      date = new Date(year, (month ?? 1) - 1, day ?? 1, 12, 0, 0);
+      date = DateTime.fromObject(
+        { year: Number(args.data.slice(0, 4)), month: Number(args.data.slice(5, 7)), day: Number(args.data.slice(8, 10)) },
+        { zone: timezone },
+      )
+        .set({ hour: 12, minute: 0, second: 0, millisecond: 0 })
+        .toJSDate();
     } else {
-      // Data atual no timezone do tenant
-      const nowInTz = new Intl.DateTimeFormat('en-CA', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(new Date());
-      const [y, m, d] = nowInTz.split('-').map(Number);
-      date = new Date(y, (m ?? 1) - 1, d ?? 1, 12, 0, 0);
+      date = DateTime.now()
+        .setZone(timezone)
+        .set({ hour: 12, minute: 0, second: 0, millisecond: 0 })
+        .toJSDate();
     }
 
     const slots = await this.schedulingService.getAvailableTimeSlots(date, tenantId);
