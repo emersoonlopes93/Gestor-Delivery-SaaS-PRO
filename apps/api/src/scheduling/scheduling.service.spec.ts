@@ -5,33 +5,41 @@ import { TenantContextService } from '../common/context/tenant-context.service';
 
 describe('SchedulingService', () => {
   let service: SchedulingService;
-  let prisma: PrismaService;
-  let tenantContext: TenantContextService;
+  let prismaMock: {
+    timeSlot: { findMany: jest.Mock };
+    schedulingSettings: { upsert: jest.Mock };
+  };
 
   beforeEach(async () => {
+    const timeSlotMocks = {
+      timeSlot: {
+        findMany: jest.fn(),
+      },
+      schedulingSettings: {
+        upsert: jest.fn(),
+      },
+    };
+
+    const tenantContextMocks = {
+      getTenantId: jest.fn().mockReturnValue('tenant-123'),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SchedulingService,
         {
           provide: PrismaService,
-          useValue: {
-            timeSlot: {
-              findMany: jest.fn(),
-            },
-          },
+          useValue: timeSlotMocks,
         },
         {
           provide: TenantContextService,
-          useValue: {
-            getTenantId: jest.fn().mockReturnValue('tenant-123'),
-          },
+          useValue: tenantContextMocks,
         },
       ],
     }).compile();
 
     service = module.get<SchedulingService>(SchedulingService);
-    prisma = module.get<PrismaService>(PrismaService);
-    tenantContext = module.get<TenantContextService>(TenantContextService);
+    prismaMock = timeSlotMocks;
   });
 
   afterEach(() => {
@@ -42,7 +50,7 @@ describe('SchedulingService', () => {
   it('returns available slots with explicit availability flag and filters full slots', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-06-15T10:00:00Z'));
 
-    jest.spyOn(service as any, 'getOrCreateSchedulingSettings').mockResolvedValue({
+    prismaMock.schedulingSettings.upsert.mockResolvedValue({
       enabled: true,
       acceptScheduledOrders: true,
       minimumAdvanceMinutes: 0,
@@ -50,7 +58,7 @@ describe('SchedulingService', () => {
       timezone: 'America/Sao_Paulo',
     });
 
-    (prisma as any).timeSlot.findMany.mockResolvedValue([
+    prismaMock.timeSlot.findMany.mockResolvedValue([
       {
         id: 'slot-1',
         startTime: new Date('2026-06-15T21:00:00Z'),

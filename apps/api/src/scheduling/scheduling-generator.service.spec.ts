@@ -6,23 +6,30 @@ import { SchedulingService } from './scheduling.service';
 
 describe('SchedulingGeneratorService', () => {
   let service: SchedulingGeneratorService;
-  let prisma: PrismaService;
-  let schedulingService: SchedulingService;
+  let prismaMock: {
+    schedulingSettings: { findUnique: jest.Mock };
+    schedulingWindow: { findMany: jest.Mock };
+  };
+  let schedulingServiceMock: { generateTimeSlots: jest.Mock };
 
   beforeEach(async () => {
+    const schedulingSettingsMocks = {
+      schedulingSettings: {
+        findUnique: jest.fn(),
+      },
+      schedulingWindow: {
+        findMany: jest.fn(),
+      },
+    };
+
+    const generateTimeSlotsMock = jest.fn().mockResolvedValue([{ count: 1 }]);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SchedulingGeneratorService,
         {
           provide: PrismaService,
-          useValue: {
-            schedulingSettings: {
-              findUnique: jest.fn(),
-            },
-            schedulingWindow: {
-              findMany: jest.fn(),
-            },
-          },
+          useValue: schedulingSettingsMocks,
         },
         {
           provide: TenantContextService,
@@ -33,15 +40,15 @@ describe('SchedulingGeneratorService', () => {
         {
           provide: SchedulingService,
           useValue: {
-            generateTimeSlots: jest.fn().mockResolvedValue([{ count: 1 }]),
+            generateTimeSlots: generateTimeSlotsMock,
           },
         },
       ],
     }).compile();
 
     service = module.get<SchedulingGeneratorService>(SchedulingGeneratorService);
-    prisma = module.get<PrismaService>(PrismaService);
-    schedulingService = module.get<SchedulingService>(SchedulingService);
+    prismaMock = schedulingSettingsMocks;
+    schedulingServiceMock = { generateTimeSlots: generateTimeSlotsMock };
   });
 
   afterEach(() => {
@@ -52,7 +59,7 @@ describe('SchedulingGeneratorService', () => {
   it('generates slots for tenant windows using timezone-aware local dates', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-06-15T12:00:00Z'));
 
-    (prisma as any).schedulingSettings.findUnique.mockResolvedValue({
+    prismaMock.schedulingSettings.findUnique.mockResolvedValue({
       enabled: true,
       acceptScheduledOrders: true,
       maximumAdvanceDays: 0,
@@ -61,7 +68,7 @@ describe('SchedulingGeneratorService', () => {
       timezone: 'America/Sao_Paulo',
     });
 
-    (prisma as any).schedulingWindow.findMany.mockResolvedValue([
+    prismaMock.schedulingWindow.findMany.mockResolvedValue([
       {
         id: 'window-1',
         dayOfWeek: 1,
@@ -73,11 +80,11 @@ describe('SchedulingGeneratorService', () => {
 
     const result = await service.generateSlotsForNextDays();
 
-    expect((prisma as any).schedulingSettings.findUnique).toHaveBeenCalledWith({ where: { tenantId: 'tenant-123' } });
-    expect((prisma as any).schedulingWindow.findMany).toHaveBeenCalledWith({ where: { tenantId: 'tenant-123', active: true } });
-    expect((schedulingService as any).generateTimeSlots).toHaveBeenCalledTimes(1);
+    expect(prismaMock.schedulingSettings.findUnique).toHaveBeenCalledWith({ where: { tenantId: 'tenant-123' } });
+    expect(prismaMock.schedulingWindow.findMany).toHaveBeenCalledWith({ where: { tenantId: 'tenant-123', active: true } });
+    expect(schedulingServiceMock.generateTimeSlots).toHaveBeenCalledTimes(1);
 
-    const [startDate, endDate] = (schedulingService as any).generateTimeSlots.mock.calls[0];
+    const [startDate, endDate] = schedulingServiceMock.generateTimeSlots.mock.calls[0];
     expect(startDate.toISOString()).toBe('2026-06-15T13:00:00.000Z');
     expect(endDate.toISOString()).toBe('2026-06-15T22:00:00.000Z');
     expect(result).toHaveLength(1);
@@ -90,7 +97,7 @@ describe('SchedulingGeneratorService', () => {
   ])('converts local window times to UTC correctly for %s', async (timezone, expectedStart, expectedEnd) => {
     jest.useFakeTimers().setSystemTime(new Date('2026-06-15T12:00:00Z'));
 
-    (prisma as any).schedulingSettings.findUnique.mockResolvedValue({
+    prismaMock.schedulingSettings.findUnique.mockResolvedValue({
       enabled: true,
       acceptScheduledOrders: true,
       maximumAdvanceDays: 0,
@@ -99,7 +106,7 @@ describe('SchedulingGeneratorService', () => {
       timezone,
     });
 
-    (prisma as any).schedulingWindow.findMany.mockResolvedValue([
+    prismaMock.schedulingWindow.findMany.mockResolvedValue([
       {
         id: 'window-1',
         dayOfWeek: 1,
@@ -112,9 +119,9 @@ describe('SchedulingGeneratorService', () => {
     const result = await service.generateSlotsForNextDays();
 
     expect(result).toHaveLength(1);
-    expect((schedulingService as any).generateTimeSlots).toHaveBeenCalledTimes(1);
+    expect(schedulingServiceMock.generateTimeSlots).toHaveBeenCalledTimes(1);
 
-    const [startDate, endDate] = (schedulingService as any).generateTimeSlots.mock.calls[0];
+    const [startDate, endDate] = schedulingServiceMock.generateTimeSlots.mock.calls[0];
     expect(startDate.toISOString()).toBe(expectedStart);
     expect(endDate.toISOString()).toBe(expectedEnd);
   });

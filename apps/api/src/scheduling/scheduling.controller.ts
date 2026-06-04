@@ -80,7 +80,7 @@ export class SchedulingController {
   @Put('settings')
   @RequirePermissions('scheduling.manage')
   async updateSchedulingSettings(@Body() dto: UpdateSchedulingSettingsDto) {
-    return this.schedulingService.updateSchedulingSettings(dto as any);
+    return this.schedulingService.updateSchedulingSettings(dto);
   }
 
   @Get('windows')
@@ -102,7 +102,7 @@ export class SchedulingController {
     @Param('id') id: string,
     @Body() dto: UpdateSchedulingWindowDTO,
   ) {
-    return this.schedulingService.updateSchedulingWindow(id, dto as any);
+    return this.schedulingService.updateSchedulingWindow(id, dto);
   }
 
   @Delete('windows/:id')

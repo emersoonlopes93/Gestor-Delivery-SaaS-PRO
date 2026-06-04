@@ -10,20 +10,26 @@ import { DateTime } from 'luxon';
 
 describe('StorefrontService', () => {
   let service: StorefrontService;
-  let prisma: PrismaService;
-  let schedulingService: SchedulingService;
+  let prismaMock: { tenant: { findUnique: jest.Mock } };
+  let schedulingServiceMock: { getAvailableTimeSlots: jest.Mock };
 
   beforeEach(async () => {
+    const tenantMocks = {
+      tenant: {
+        findUnique: jest.fn(),
+      },
+    };
+
+    const schedulingServiceMocks = {
+      getAvailableTimeSlots: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StorefrontService,
         {
           provide: PrismaService,
-          useValue: {
-            tenant: {
-              findUnique: jest.fn(),
-            },
-          },
+          useValue: tenantMocks,
         },
         {
           provide: AvailabilityService,
@@ -45,9 +51,7 @@ describe('StorefrontService', () => {
         },
         {
           provide: SchedulingService,
-          useValue: {
-            getAvailableTimeSlots: jest.fn(),
-          },
+          useValue: schedulingServiceMocks,
         },
         {
           provide: CACHE_MANAGER,
@@ -60,8 +64,8 @@ describe('StorefrontService', () => {
     }).compile();
 
     service = module.get<StorefrontService>(StorefrontService);
-    prisma = module.get<PrismaService>(PrismaService);
-    schedulingService = module.get<SchedulingService>(SchedulingService);
+    prismaMock = tenantMocks;
+    schedulingServiceMock = schedulingServiceMocks;
   });
 
   afterEach(() => {
@@ -75,8 +79,8 @@ describe('StorefrontService', () => {
         timezone: 'America/Sao_Paulo',
       },
     };
-    (prisma as any).tenant.findUnique.mockResolvedValue(tenant);
-    (schedulingService as any).getAvailableTimeSlots.mockResolvedValue([
+    prismaMock.tenant.findUnique.mockResolvedValue(tenant);
+    schedulingServiceMock.getAvailableTimeSlots.mockResolvedValue([
       {
         id: 'slot-1',
         startTime: new Date('2026-06-15T21:00:00Z'),
@@ -93,6 +97,6 @@ describe('StorefrontService', () => {
       .set({ hour: 12, minute: 0, second: 0, millisecond: 0 })
       .toJSDate();
 
-    expect((schedulingService as any).getAvailableTimeSlots).toHaveBeenCalledWith(expectedDate, 'tenant-1');
+    expect(schedulingServiceMock.getAvailableTimeSlots).toHaveBeenCalledWith(expectedDate, 'tenant-1');
   });
 });
