@@ -3,6 +3,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
 import { ScheduledOrderStatus, TimeSlotStatus, Prisma } from '@prisma/client';
+import { FulfillmentType } from '@gestor/types';
 
 @Injectable()
 export class SchedulingService {
@@ -354,7 +355,9 @@ export class SchedulingService {
    * Cria um agendamento de pedido
    */
   async createScheduledOrder(data: {
+    orderId?: string;
     customerId: string;
+    fulfillmentType?: FulfillmentType;
     scheduledFor: Date;
     timeSlotId: string;
     estimatedDuration: number;
@@ -381,6 +384,7 @@ export class SchedulingService {
     const scheduledOrder = await this.prisma.scheduledOrder.create({
       data: {
         tenantId,
+        orderId: data.orderId || null,
         customerId: data.customerId,
         scheduledFor: data.scheduledFor,
         timeSlotId: data.timeSlotId,
@@ -390,7 +394,7 @@ export class SchedulingService {
         // Campos legados para compatibilidade
         customerName: customer.name,
         customerPhone: customer.phone,
-        fulfillmentType: 'pickup', // default para agendamentos
+        fulfillmentType: data.fulfillmentType || 'pickup',
       },
       include: {
         customer: true,

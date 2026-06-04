@@ -179,6 +179,8 @@ export class OrdersService {
             cashbackUsed,
             paymentMethod: dto.payment.method as PrismaPaymentMethod,
             changeFor: dto.payment.changeFor || null,
+            scheduledFor: dto.scheduledFor ? new Date(dto.scheduledFor) : undefined,
+            isScheduled: dto.scheduledFor && dto.timeSlotId ? true : false,
             publicTrackingToken: generatePublicTrackingToken(),
             tableNumber: dineInTable?.name || null,
           },
@@ -322,7 +324,9 @@ export class OrdersService {
     if (dto.scheduledFor && dto.timeSlotId && customerId) {
       try {
         await this.schedulingService.createScheduledOrder({
+          orderId: order.id,
           customerId,
+          fulfillmentType: dto.fulfillmentType,
           scheduledFor: new Date(dto.scheduledFor),
           timeSlotId: dto.timeSlotId,
           estimatedDuration: dto.estimatedDuration || 30, // 30 min padrão
@@ -458,6 +462,8 @@ export class OrdersService {
           total: Number(o.total),
           itemCount: o._count.items,
           paymentMethod: this.mapPaymentMethod(o.paymentMethod),
+          scheduledFor: o.scheduledFor ? o.scheduledFor.toISOString() : null,
+          isScheduled: o.isScheduled ?? false,
           sourceChannel: o.sourceChannel,
           createdAt: o.createdAt.toISOString(),
         })),
@@ -521,6 +527,8 @@ export class OrdersService {
           total: Number(o.total),
           itemCount: o._count.items,
           paymentMethod: this.mapPaymentMethod(o.paymentMethod),
+          scheduledFor: o.scheduledFor ? o.scheduledFor.toISOString() : null,
+          isScheduled: o.isScheduled ?? false,
           sourceChannel: o.sourceChannel,
           createdAt: o.createdAt.toISOString(),
         })),
@@ -570,6 +578,8 @@ export class OrdersService {
         total: Number(o.total),
         itemCount: o._count.items,
         paymentMethod: this.mapPaymentMethod(o.paymentMethod),
+        scheduledFor: o.scheduledFor ? o.scheduledFor.toISOString() : null,
+        isScheduled: o.isScheduled ?? false,
         sourceChannel: o.sourceChannel,
         createdAt: o.createdAt.toISOString(),
       })),
@@ -610,6 +620,8 @@ export class OrdersService {
       itemCount: o.items.reduce((sum, i) => sum + i.quantity, 0),
       itemsSummary: o.items.map((i) => `${i.quantity}x ${i.snapshotName}`).join(', '),
       sourceChannel: o.sourceChannel,
+      scheduledFor: o.scheduledFor ? o.scheduledFor.toISOString() : null,
+      isScheduled: o.isScheduled ?? false,
       createdAt: o.createdAt.toISOString(),
       deliveryDriverId: o.deliveryDriverId || undefined,
       deliveryDriverName: o.deliveryDriver?.name || undefined,
@@ -659,6 +671,8 @@ export class OrdersService {
         })),
       })),
       createdAt: o.createdAt.toISOString(),
+      scheduledFor: o.scheduledFor ? o.scheduledFor.toISOString() : null,
+      isScheduled: o.isScheduled ?? false,
     }));
   }
 
@@ -698,6 +712,8 @@ export class OrdersService {
         publicTrackingToken: order.publicTrackingToken,
         paymentMethod: this.mapPaymentMethod(order.paymentMethod),
         changeFor: order.changeFor ? Number(order.changeFor) : null,
+        scheduledFor: order.scheduledFor ? order.scheduledFor.toISOString() : null,
+        isScheduled: order.isScheduled ?? false,
       customerId: order.customerId,
       couponId: order.couponId,
       cashbackUsed: order.cashbackUsed ? Number(order.cashbackUsed) : null,
