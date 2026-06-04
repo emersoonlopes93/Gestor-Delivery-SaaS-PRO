@@ -73,11 +73,21 @@ export class SchedulingService {
       throw new Error('Tenant context not found');
     }
 
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    // Load tenant scheduling settings (fallbacks applied)
+    const settings = await this.prisma.schedulingSettings.findUnique({ where: { tenantId } }).catch(() => null);
+    const timezone = (settings && settings.timezone) || 'America/Sao_Paulo';
+    const minimumAdvanceMinutes = (settings && settings.minimumAdvanceMinutes) || 60;
+    const maximumAdvanceDays = (settings && settings.maximumAdvanceDays) || 7;
+
+    // Compute tenant-local start/end of day for the requested date to avoid off-by-one
+    const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
+    const dateLabel = fmt.format(date);
+    const [y, m, d] = dateLabel.split('-').map(Number);
+    const startOfDay = new Date(y, (m ?? 1) - 1, d, 0, 0, 0);
+    const endOfDay = new Date(y, (m ?? 1) - 1, d, 23, 59, 59, 999);
+
+    const now = new Date();
+    const maxAllowed = new Date(now.getTime() + maximumAdvanceDays * 24 * 60 * 60 * 1000);
 
     const slots = await this.prisma.timeSlot.findMany({
       where: {
@@ -89,12 +99,27 @@ export class SchedulingService {
         status: TimeSlotStatus.available,
         isActive: true,
       },
-      orderBy: {
-        startTime: 'asc',
-      },
+      orderBy: { startTime: 'asc' },
     });
 
-    return slots.map(slot => ({
+    const filtered = slots.filter((slot) => {
+      // Exclude past slots
+      if (slot.startTime.getTime() <= now.getTime()) return false;
+
+      // Minimum advance
+      if (slot.startTime.getTime() - now.getTime() < minimumAdvanceMinutes * 60 * 1000) return false;
+
+      // Maximum future allowed
+      if (slot.startTime.getTime() > maxAllowed.getTime()) return false;
+
+      // Capacity
+      if (slot.currentOccupancy >= slot.capacity) return false;
+
+      // Active and available already enforced in query
+      return true;
+    });
+
+    return filtered.map(slot => ({
       id: slot.id,
       startTime: slot.startTime,
       endTime: slot.endTime,

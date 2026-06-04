@@ -338,6 +338,9 @@ export interface OrderResponseDTO {
 
   createdAt: string;
   updatedAt: string;
+  // Scheduling
+  scheduledFor?: string | null;
+  isScheduled?: boolean | null;
 }
 
 export interface OrderListItemDTO {
@@ -353,6 +356,9 @@ export interface OrderListItemDTO {
   sourceChannel: string;
   waiterId?: string | null;
   createdAt: string;
+  // Scheduling
+  scheduledFor?: string | null;
+  isScheduled?: boolean | null;
 }
 
 export class UpdateOrderStatusDTO {
@@ -376,6 +382,9 @@ export interface OrderBoardItemDTO {
   deliveryDriverId?: string;
   deliveryDriverName?: string;
   deliveryDriverStatus?: string;
+  // Scheduling
+  scheduledFor?: string | null;
+  isScheduled?: boolean | null;
 }
 
 export interface OrderKdsItemDTO {

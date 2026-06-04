@@ -879,6 +879,9 @@ model Order {
   publicTrackingToken String                @unique @map("public_tracking_token")
   changeFor           Decimal?              @map("change_for") @db.Decimal(10, 2)
   tableNumber         String?               @map("table_number") @db.VarChar(20)
+  // Scheduling fields
+  scheduledFor        DateTime?             @map("scheduled_for")
+  isScheduled         Boolean               @default(false) @map("is_scheduled")
   waiterId            String?               @map("waiter_id")
   orderCoupons        OrderCoupon[]
   paymentTransactions PaymentTransaction[]
@@ -1817,6 +1820,41 @@ model ScheduledOrder {
 
   @@index([tenantId, scheduledFor])
   @@map("scheduled_orders")
+}
+
+model SchedulingSettings {
+  id                    String    @id @default(uuid())
+  tenantId              String    @map("tenant_id")
+  enabled               Boolean   @default(true)
+  acceptScheduledOrders Boolean   @default(true) @map("accept_scheduled_orders")
+  minimumAdvanceMinutes Int       @default(60) @map("minimum_advance_minutes")
+  maximumAdvanceDays    Int       @default(7)  @map("maximum_advance_days")
+  slotIntervalMinutes   Int       @default(30) @map("slot_interval_minutes")
+  maxOrdersPerSlot      Int       @default(4)  @map("max_orders_per_slot")
+  timezone              String    @default("America/Sao_Paulo")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  tenant                Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId])
+  @@map("scheduling_settings")
+}
+
+model SchedulingWindow {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  dayOfWeek  Int      @map("day_of_week") // 0=Sunday..6=Saturday
+  startTime  String   @map("start_time")  // HH:MM
+  endTime    String   @map("end_time")    // HH:MM
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, dayOfWeek])
+  @@map("scheduling_windows")
 }
 
 model Supplier {

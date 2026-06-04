@@ -17,6 +17,7 @@ import { RequirePermissions } from '../common/decorators';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { SchedulingService } from './scheduling.service';
+import { SchedulingGeneratorService } from './scheduling-generator.service';
 import {
   CreateScheduledOrderDTO,
   CancelScheduledOrderDTO,
@@ -26,7 +27,10 @@ import { ScheduledOrderStatus } from '@prisma/client';
 @Controller('scheduling')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class SchedulingController {
-  constructor(private readonly schedulingService: SchedulingService) {}
+  constructor(
+    private readonly schedulingService: SchedulingService,
+    private readonly schedulingGenerator: SchedulingGeneratorService,
+  ) {}
 
   @Post('time-slots/generate')
   @RequirePermissions('scheduling.manage')
@@ -43,6 +47,14 @@ export class SchedulingController {
       data.slotDurationMinutes,
       data.capacity,
     );
+  }
+
+  @Post('time-slots/auto-generate')
+  @RequirePermissions('scheduling.manage')
+  @HttpCode(HttpStatus.OK)
+  async autoGenerateTimeSlots() {
+    const result = await this.schedulingGenerator.generateSlotsForNextDays();
+    return { success: true, resultCount: result.length };
   }
 
   @Get('time-slots/available')
