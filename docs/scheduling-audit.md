@@ -41,6 +41,29 @@ The repository contains a partially implemented scheduling module. Key existing 
 - Enhanced `SchedulingService.getAvailableTimeSlots` to apply scheduling settings constraints (minimum advance, maximum days, capacity filtering).
 - Updated types (`packages/types/src/order.ts`) to include scheduling fields in DTOs.
 
+## Live Database Validation
+
+- Verified live database tables with `pnpm exec node scripts/scheduling-db-audit.js`.
+- Confirmed `time_slots`, `scheduled_orders`, and `orders` exist in the deployed `public` schema.
+- Confirmed `scheduling_settings` and `scheduling_windows` do not exist in the deployed `public` schema.
+- `prisma migrate status --schema prisma/schema.prisma` reports 13 migrations and the database schema is up to date.
+- This indicates a deployment gap: the current Prisma models are defined, but the live DB is missing the scheduling configuration tables required to operate the feature.
+
+## Critical Findings
+
+- `SchedulingService.getAvailableTimeSlots()` relies on `getOrCreateSchedulingSettings()`, which performs `prisma.schedulingSettings.upsert(...)`.
+- `SchedulingGeneratorService.generateSlotsForNextDays()` relies on `prisma.schedulingSettings.findUnique(...)` and `prisma.schedulingWindow.findMany(...)`.
+- Both paths will fail at runtime if `scheduling_settings` and `scheduling_windows` are absent.
+- Existing `time_slots`/`scheduled_orders` data is available, but the scheduling workflow is not fully homologated without the missing tables.
+
+## Recommended immediate remediation
+
+1. Add and deploy the missing migration(s) for `scheduling_settings` and `scheduling_windows`.
+2. Seed default scheduling settings for existing tenants.
+3. Create at least one active scheduling window for a tenant to enable slot generation.
+4. Run the slot generation path and validate generated rows in `time_slots`.
+5. Revalidate storefront public slot retrieval and AI slot consultation using the live DB.
+
 ## Next Recommended Steps
 
 1. Implement API endpoints to manage `SchedulingSettings` and `SchedulingWindow` (CRUD) for tenant admin.
