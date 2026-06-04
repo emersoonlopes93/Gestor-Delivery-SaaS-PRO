@@ -51,6 +51,7 @@ export class GoogleAiProvider implements IAiProvider {
       { log: true, providerSource: input.providerSource, modelOverrideSource: input.modelSource },
     );
     const { apiKey, model } = config;
+    this.logger.log(`[MODEL_DEBUG] runtime model=${model}`);
 
     if (!apiKey) {
       this.logger.error('Google AI provider is not configured: API key missing.');
