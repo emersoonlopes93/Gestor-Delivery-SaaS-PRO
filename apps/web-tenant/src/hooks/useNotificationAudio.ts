@@ -6,6 +6,13 @@ import toast from 'react-hot-toast';
 export const AVAILABLE_SOUNDS = [
   { value: 'notification.mp3', label: 'Notificação (Padrão)' },
   { value: 'Microsoft-Teams.mp3', label: 'Microsoft Teams' },
+  { value: 'Novo Pedido (H).mp3', label: 'Novo Pedido (Voz Masculina)' },
+  { value: 'Novo Pedido (M).mp3', label: 'Novo Pedido (Voz Feminina)' },
+  { value: 'Pedido Pronto (H).mp3', label: 'Pedido Pronto (Voz Masculina)' },
+  { value: 'Pedido Pronto (M).mp3', label: 'Pedido Pronto (Voz Feminina)' },
+  { value: 'pedido de cancelamento(H).mp3', label: 'Pedido de Cancelamento (Voz Masculina)' },
+  { value: 'pedido de cancelamento(M).mp3', label: 'Pedido de Cancelamento (Voz Feminina)' },
+  { value: 'transferindo para atendente (H).mp3', label: 'Transferindo para Atendente (Voz Masculina)' },
 ] as const;
 
 export type SoundFile = typeof AVAILABLE_SOUNDS[number]['value'];
