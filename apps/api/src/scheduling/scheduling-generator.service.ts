@@ -42,6 +42,69 @@ export class SchedulingGeneratorService {
 
     const results = [];
     const nowLocal = DateTime.now().setZone(settings.timezone).startOf('day');
+    const rangeStartUtc = nowLocal.toUTC().toJSDate();
+    const rangeEndUtc = nowLocal.plus({ days: maxDays }).endOf('day').toUTC().toJSDate();
+
+    const newSlotStartTimes = new Set<number>();
+
+    for (let day = 0; day <= maxDays; day++) {
+      const currentLocal = nowLocal.plus({ days: day });
+      const weekday = currentLocal.weekday % 7; // Luxon weekday 1-7; convert to 0-6
+      const dayWindows = windows.filter((w) => w.dayOfWeek === weekday && w.active);
+
+      for (const w of dayWindows) {
+        const [sh, sm] = (w.startTime || '00:00').split(':').map(Number);
+        const [eh, em] = (w.endTime || '23:59').split(':').map(Number);
+
+        const windowStartLocal = currentLocal.set({ hour: sh, minute: sm, second: 0, millisecond: 0 });
+        const windowEndLocal = currentLocal.set({ hour: eh, minute: em, second: 0, millisecond: 0 });
+
+        const windowStartUtc = windowStartLocal.toUTC().toJSDate();
+        const windowEndUtc = windowEndLocal.toUTC().toJSDate();
+
+        if (windowEndUtc <= windowStartUtc) {
+          this.logger.warn(`Skipping invalid scheduling window ${w.id} for tenant ${tenantId}`);
+          continue;
+        }
+
+        let current = windowStartUtc;
+        while (current < windowEndUtc) {
+          newSlotStartTimes.add(current.getTime());
+          current = new Date(current.getTime() + interval * 60 * 1000);
+        }
+      }
+    }
+
+    if (newSlotStartTimes.size > 0) {
+      await this.prisma.timeSlot.updateMany({
+        where: {
+          tenantId,
+          isActive: true,
+          startTime: {
+            gte: rangeStartUtc,
+            lte: rangeEndUtc,
+            notIn: Array.from(newSlotStartTimes).map((timestamp) => new Date(timestamp)),
+          },
+        },
+        data: {
+          isActive: false,
+        },
+      });
+    } else {
+      await this.prisma.timeSlot.updateMany({
+        where: {
+          tenantId,
+          isActive: true,
+          startTime: {
+            gte: rangeStartUtc,
+            lte: rangeEndUtc,
+          },
+        },
+        data: {
+          isActive: false,
+        },
+      });
+    }
 
     for (let day = 0; day <= maxDays; day++) {
       const currentLocal = nowLocal.plus({ days: day });

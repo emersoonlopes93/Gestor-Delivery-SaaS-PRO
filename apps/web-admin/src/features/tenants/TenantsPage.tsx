@@ -131,6 +131,13 @@ export function TenantsPage() {
                       </button>
                       <button
                         type="button"
+                        onClick={() => navigate(`/tenants/${tenant.id}/scheduling`)}
+                        className="text-cyan-600 hover:text-cyan-700 dark:text-cyan-400 dark:hover:text-cyan-300 text-sm font-medium"
+                      >
+                        Agendamento
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => navigate(`/tenants/${tenant.id}/ai-agent`)}
                         className="text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 text-sm font-medium flex items-center gap-1"
                         title="Configurar Agente IA"
@@ -206,6 +213,13 @@ export function TenantsPage() {
                   className="flex-1 py-2.5 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 rounded-lg text-xs font-bold"
                 >
                   Módulos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/tenants/${tenant.id}/scheduling`)}
+                  className="flex-1 py-2.5 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 rounded-lg text-xs font-bold"
+                >
+                  Agendamento
                 </button>
                 <button
                   type="button"

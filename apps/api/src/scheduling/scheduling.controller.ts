@@ -12,6 +12,7 @@ import {
   HttpStatus,
   BadRequestException,
   NotImplementedException,
+  Logger,
 } from '@nestjs/common';
 import { RequirePermissions } from '../common/decorators';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
@@ -32,10 +33,22 @@ import { ScheduledOrderStatus } from '@prisma/client';
 @Controller('scheduling')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class SchedulingController {
+  private readonly logger = new Logger(SchedulingController.name);
+
   constructor(
     private readonly schedulingService: SchedulingService,
     private readonly schedulingGenerator: SchedulingGeneratorService,
   ) {}
+
+  private async autoGenerateSlots() {
+    try {
+      await this.schedulingGenerator.generateSlotsForNextDays();
+    } catch (error) {
+      this.logger.error(
+        `Auto-generate slots failed after scheduling update: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
 
   @Post('time-slots/generate')
   @RequirePermissions('scheduling.manage')
@@ -80,7 +93,9 @@ export class SchedulingController {
   @Put('settings')
   @RequirePermissions('scheduling.manage')
   async updateSchedulingSettings(@Body() dto: UpdateSchedulingSettingsDto) {
-    return this.schedulingService.updateSchedulingSettings(dto);
+    const updated = await this.schedulingService.updateSchedulingSettings(dto);
+    await this.autoGenerateSlots();
+    return updated;
   }
 
   @Get('windows')
@@ -93,7 +108,9 @@ export class SchedulingController {
   @RequirePermissions('scheduling.manage')
   @HttpCode(HttpStatus.CREATED)
   async createSchedulingWindow(@Body() dto: CreateSchedulingWindowDTO) {
-    return this.schedulingService.createSchedulingWindow(dto);
+    const created = await this.schedulingService.createSchedulingWindow(dto);
+    await this.autoGenerateSlots();
+    return created;
   }
 
   @Put('windows/:id')
@@ -102,7 +119,9 @@ export class SchedulingController {
     @Param('id') id: string,
     @Body() dto: UpdateSchedulingWindowDTO,
   ) {
-    return this.schedulingService.updateSchedulingWindow(id, dto);
+    const updated = await this.schedulingService.updateSchedulingWindow(id, dto);
+    await this.autoGenerateSlots();
+    return updated;
   }
 
   @Delete('windows/:id')
