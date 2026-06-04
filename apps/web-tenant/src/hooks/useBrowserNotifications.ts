@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 
 /**
  * Hook para gerenciar permissões e registro de notificações do navegador.
@@ -9,7 +8,6 @@ export function useBrowserNotifications(
   enabled: boolean = true,
   tenantId: string | undefined,
 ) {
-  const queryClient = useQueryClient();
   const swRegistrationRef = useRef<ServiceWorkerRegistration | null>(null);
   const permissionCheckedRef = useRef(false);
 

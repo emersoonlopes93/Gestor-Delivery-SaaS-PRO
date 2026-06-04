@@ -166,7 +166,7 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
           console.warn('[Audio] Falha ao reproduzir som de transferência:', err);
         });
       }
-      toast.info(`👤 Transferência: Chat #${data.sessionId}\n${data.customerName || 'Cliente'} aguardando atendimento humano`, {
+      toast(`👤 Transferência: Chat #${data.sessionId}\n${data.customerName || 'Cliente'} aguardando atendimento humano`, {
         duration: 7000,
         style: { fontWeight: 'bold' },
       });

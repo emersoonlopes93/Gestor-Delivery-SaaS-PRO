@@ -8,8 +8,7 @@ import {
   Volume2,
   VolumeX,
   Play,
-  Smartphone,
-  Wind
+  Smartphone
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '../../lib/api-client';

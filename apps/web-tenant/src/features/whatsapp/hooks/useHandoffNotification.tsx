@@ -64,7 +64,7 @@ export function useHandoffNotification(enabled: boolean = true) {
         }
 
         // Show toast
-        toast(`👤 ${session.visitorName || 'Cliente'} aguardando atendimento humano`, {
+        toast(`👤 ${session.displayName || 'Cliente'} aguardando atendimento humano`, {
           duration: 6000,
           style: { fontWeight: 'bold' },
         });
@@ -72,7 +72,7 @@ export function useHandoffNotification(enabled: boolean = true) {
         // Show browser notification if permitted
         if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
           new Notification('Transferência para Atendimento Humano', {
-            body: `${session.visitorName || 'Cliente'} foi transferido para um agente humano.`,
+            body: `${session.displayName || 'Cliente'} foi transferido para um agente humano.`,
             icon: '/favicon.ico',
             tag: `handoff-${session.id}`,
           });
