@@ -25,6 +25,9 @@ export interface TenantSettingsDTO {
   notificationVolume: number;
   newOrderSound: string;
   cancellationSound: string;
+  handoffSound: string;
+  readySound: string;
+  browserNotificationsEnabled: boolean;
   isStorePaused: boolean;
   storePauseReason?: string;
   createdAt: Date | string;

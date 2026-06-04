@@ -68,7 +68,10 @@ export interface TenantSettings {
   audioNotificationEnabled?: boolean;
   newOrderSound?: string;
   cancellationSound?: string;
+  handoffSound?: string;
+  readySound?: string;
   notificationVolume?: number;
+  browserNotificationsEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
 }

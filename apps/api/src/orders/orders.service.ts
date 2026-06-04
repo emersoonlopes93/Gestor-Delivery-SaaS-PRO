@@ -829,6 +829,16 @@ export class OrdersService {
         });
       }
 
+      // Se pedido foi marcado como pronto, emitir notificação especial
+      if (nextStatus === 'ready_for_pickup' || nextStatus === 'ready_for_delivery') {
+        this.ordersGateway.emitOrderReady(
+          tenantId,
+          order.orderNumber,
+          order.customerName || undefined,
+          order.fulfillmentType || undefined,
+        );
+      }
+
       // Disparar notificação WhatsApp (fire-and-forget, não bloqueia a transação)
       const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
       if (order.customerPhone && tenant) {

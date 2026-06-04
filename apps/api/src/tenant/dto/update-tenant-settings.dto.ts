@@ -154,6 +154,18 @@ export class UpdateTenantSettingsDto {
   cancellationSound?: string;
 
   @IsOptional()
+  @IsString()
+  handoffSound?: string;
+
+  @IsOptional()
+  @IsString()
+  readySound?: string;
+
+  @IsOptional()
   @IsNumber()
   notificationVolume?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  browserNotificationsEnabled?: boolean;
 }

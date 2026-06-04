@@ -44,6 +44,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api-client';
 import type { Tenant, TenantSettings, TenantOperatingHours } from '@gestor/types';
 import { useNotificationAudio } from '../hooks/useNotificationAudio';
+import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
 import { useLogisticsSocket } from '../features/delivery/hooks/useLogisticsSocket';
 import { Toaster } from 'react-hot-toast';
 
@@ -427,7 +428,15 @@ export function AppLayout() {
     volume: tenantData?.settings?.notificationVolume ?? 1.0,
     newOrderSound: tenantData?.settings?.newOrderSound,
     cancellationSound: tenantData?.settings?.cancellationSound,
+    handoffSound: tenantData?.settings?.handoffSound,
+    readySound: tenantData?.settings?.readySound,
   });
+
+  // Browser Notifications Integration
+  useBrowserNotifications(
+    tenantData?.settings?.browserNotificationsEnabled ?? true,
+    tenantData?.id,
+  );
 
   useLogisticsSocket(tenantData?.id);
 

@@ -357,9 +357,14 @@ model TenantSettings {
   whatsappNotificationsEnabled Boolean  @default(false) @map("whatsapp_notifications_enabled")
   notificationTemplates        Json?    @map("notification_templates")
   audioNotificationEnabled     Boolean  @default(true) @map("audio_notification_enabled")
+  notificationVolume           Float    @default(1.0) @map("notification_volume")
+  
+  // --- Notification Sounds Configuration ---
   newOrderSound                String   @default("notification.mp3") @map("new_order_sound")
   cancellationSound            String   @default("notification.mp3") @map("cancellation_sound")
-  notificationVolume           Float    @default(1.0) @map("notification_volume")
+  handoffSound                 String   @default("notification.mp3") @map("handoff_sound") // IA transfer to human agent
+  readySound                   String   @default("notification.mp3") @map("ready_sound") // Order ready notification
+  browserNotificationsEnabled  Boolean  @default(true) @map("browser_notifications_enabled")
   
   // --- Storefront Customization ---
   storefrontThemeJson          Json?    @map("storefront_theme_json")

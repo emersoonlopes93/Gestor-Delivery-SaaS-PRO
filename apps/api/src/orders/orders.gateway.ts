@@ -76,4 +76,43 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
       timestamp: new Date().toISOString(),
     });
   }
+
+  /**
+   * Emite evento de transferência de IA para agente humano
+   */
+  emitAiHandoff(tenantId: string, sessionId: string, sessionName?: string, customerName?: string) {
+    if (!this.server) {
+      this.logger.warn('WebSocket server not initialized. Skipping emitAiHandoff.');
+      return;
+    }
+    this.logger.log(`[Handoff] AI transferring session ${sessionId} to human agent for tenant ${tenantId}`);
+    this.server.to(`tenant:${tenantId}`).emit('aiHandoff', {
+      sessionId,
+      sessionName,
+      customerName,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Emite evento de pedido marcado como pronto
+   */
+  emitOrderReady(
+    tenantId: string,
+    orderNumber: string,
+    customerName?: string,
+    fulfillmentType?: string,
+  ) {
+    if (!this.server) {
+      this.logger.warn('WebSocket server not initialized. Skipping emitOrderReady.');
+      return;
+    }
+    this.logger.log(`[Ready] Order ${orderNumber} marked as ready for tenant ${tenantId}`);
+    this.server.to(`tenant:${tenantId}`).emit('orderReady', {
+      orderNumber,
+      customerName,
+      fulfillmentType,
+      timestamp: new Date().toISOString(),
+    });
+  }
 }
