@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Images, RefreshCw } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Images } from 'lucide-react';
 import { ProductCategory, ProductDetails, CreateProductDto, CatalogProductType } from '@gestor/types';
-import { api } from '../../../lib/api-client';
+import { ImagePickerModal } from '../../../components/ImagePickerModal';
 
 
 
@@ -12,17 +12,6 @@ type BundleSummary = {
   finalPrice: number;
   pricingType: 'fixed_price' | 'discount_percent' | 'discount_amount';
   pricingValue: number;
-};
-
-type MediaOrigin = 'tenant' | 'system';
-
-type MediaAsset = {
-  id: string;
-  title: string | null;
-  originalName: string | null;
-  publicUrl: string;
-  altText: string | null;
-  scope: string;
 };
 
 interface ProductBasicInfoProps {
@@ -54,7 +43,6 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
   isComboMode,
   bundleSummary,
   imagePreviewUrl,
-  handleSelectImageFile,
   setImageFile,
   setImagePreviewUrl,
   pizzaPrices,
@@ -66,27 +54,12 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
   isNew,
   onOpenRecipe,
 }) => {
-  const [mediaOrigin, setMediaOrigin] = useState<MediaOrigin>('tenant');
-  const [mediaAssets, setMediaAssets] = useState<MediaAsset[]>([]);
-  const [isLoadingMedia, setIsLoadingMedia] = useState(false);
+  const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
 
   const selectedMediaAsset = useMemo(() => {
-    return mediaAssets.find((asset) => asset.id === productForm.mediaAssetId) ?? null;
-  }, [mediaAssets, productForm.mediaAssetId]);
-
-  async function loadMediaAssets(origin = mediaOrigin) {
-    setIsLoadingMedia(true);
-    try {
-      const response = await api.get<MediaAsset[]>(`/media/assets?origin=${origin}`);
-      setMediaAssets(response.data);
-    } finally {
-      setIsLoadingMedia(false);
-    }
-  }
-
-  useEffect(() => {
-    void loadMediaAssets();
-  }, []);
+    if (!productForm.mediaAssetId) return null;
+    return { id: productForm.mediaAssetId };
+  }, [productForm.mediaAssetId]);
 
   return (
     <section className="space-y-6">
@@ -204,21 +177,23 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
             <div>
               <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Imagem do Produto</label>
               <div className="flex items-center gap-4">
-                <div className="w-24 h-24 rounded-2xl bg-muted border border-border overflow-hidden flex items-center justify-center relative group">
+                <button
+                  type="button"
+                  onClick={() => setIsImagePickerOpen(true)}
+                  className="w-24 h-24 rounded-2xl bg-muted border border-border overflow-hidden flex items-center justify-center relative group"
+                  aria-label="Abrir seletor de imagem"
+                >
                   {(imagePreviewUrl || productForm.image) ? (
                     <img src={imagePreviewUrl || productForm.image} alt="Preview" className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-muted-foreground font-black">IMG</span>
                   )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleSelectImageFile(e.target.files?.[0] || null)}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                </div>
+                  <div className="absolute inset-x-0 bottom-0 bg-black/40 text-[10px] text-white uppercase tracking-[0.14em] text-center py-1">
+                    Selecionar
+                  </div>
+                </button>
                 <div className="flex-1">
-                  <p className="text-xs text-muted-foreground font-medium mb-2">Clique na imagem para enviar um novo arquivo.</p>
+                  <p className="text-xs text-muted-foreground font-medium mb-2">Clique no quadro para escolher uma imagem do banco ou fazer upload.</p>
                   <button
                     type="button"
                     onClick={() => { setImageFile(null); setImagePreviewUrl(null); setProductForm({ ...productForm, image: '', mediaAssetId: '' }); }}
@@ -231,62 +206,35 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
             </div>
 
             <div className="rounded-2xl border border-border bg-muted/30 p-4 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Images className="h-4 w-4 text-primary" />
-                  <span className="text-xs font-black uppercase tracking-wider text-foreground">Biblioteca</span>
-                </div>
+              <div className="flex items-center gap-2">
+                <Images className="h-4 w-4 text-primary" />
+                <span className="text-xs font-black uppercase tracking-wider text-foreground">Banco de Imagens</span>
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <button
                   type="button"
-                  onClick={() => loadMediaAssets()}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground hover:bg-card hover:text-foreground"
-                  title="Atualizar biblioteca"
+                  onClick={() => setIsImagePickerOpen(true)}
+                  className="px-4 py-2.5 rounded-lg bg-primary text-primary-foreground font-black uppercase text-[10px] hover:bg-primary/90 transition-colors"
                 >
-                  <RefreshCw className={`h-4 w-4 ${isLoadingMedia ? 'animate-spin' : ''}`} />
+                  Selecionar Imagem
                 </button>
-              </div>
-              <div className="flex rounded-xl bg-background p-1">
-                {(['tenant', 'system'] as const).map((origin) => (
+                {selectedMediaAsset && productForm.mediaAssetId ? (
                   <button
-                    key={origin}
                     type="button"
                     onClick={() => {
-                      setMediaOrigin(origin);
-                      void loadMediaAssets(origin);
+                      setImageFile(null);
+                      setImagePreviewUrl(null);
+                      setProductForm({ ...productForm, image: '', mediaAssetId: '' });
                     }}
-                    className={`flex-1 rounded-lg px-3 py-2 text-[10px] font-black uppercase ${
-                      mediaOrigin === origin ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
-                    }`}
+                    className="px-4 py-2.5 rounded-lg bg-destructive/10 text-destructive font-black uppercase text-[10px] hover:bg-destructive/20 transition-colors"
                   >
-                    {origin === 'tenant' ? 'Proprias' : 'Globais'}
+                    Remover da Biblioteca
                   </button>
-                ))}
+                ) : null}
               </div>
-              <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto pr-1">
-                {mediaAssets.map((asset) => {
-                  const selected = productForm.mediaAssetId === asset.id;
-                  return (
-                    <button
-                      key={asset.id}
-                      type="button"
-                      onClick={() => {
-                        setImageFile(null);
-                        setImagePreviewUrl(null);
-                        setProductForm({ ...productForm, mediaAssetId: asset.id, image: asset.publicUrl });
-                      }}
-                      className={`aspect-square rounded-xl overflow-hidden border-2 bg-card ${
-                        selected ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/40'
-                      }`}
-                      title={asset.title ?? asset.originalName ?? 'Imagem'}
-                    >
-                      <img src={asset.publicUrl} alt={asset.altText ?? asset.title ?? 'Media'} className="h-full w-full object-cover" />
-                    </button>
-                  );
-                })}
-              </div>
-              {selectedMediaAsset ? (
-                <p className="text-[10px] font-bold text-muted-foreground truncate">
-                  Selecionada: {selectedMediaAsset.title ?? selectedMediaAsset.originalName ?? selectedMediaAsset.id}
+              {selectedMediaAsset && productForm.mediaAssetId ? (
+                <p className="text-[10px] font-bold text-muted-foreground">
+                  Imagem da biblioteca selecionada: {productForm.mediaAssetId}
                 </p>
               ) : null}
             </div>
@@ -435,6 +383,17 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
           )}
         </div>
       </div>
+
+      <ImagePickerModal
+        isOpen={isImagePickerOpen}
+        onClose={() => setIsImagePickerOpen(false)}
+        onSelect={(asset) => {
+          setImageFile(null);
+          setImagePreviewUrl(null);
+          setProductForm({ ...productForm, mediaAssetId: asset.id, image: asset.publicUrl });
+        }}
+        selectedAssetId={productForm.mediaAssetId}
+      />
     </section>
   );
 };

@@ -1,0 +1,805 @@
+{
+  "generatedAt": "2026-06-03T20:15:44.235Z",
+  "appUrls": {
+    "web-admin": "http://localhost:5174",
+    "web-tenant": "http://localhost:5173",
+    "web-storefront": "http://localhost:3000",
+    "web-delivery": "http://127.0.0.1:5175"
+  },
+  "results": [
+    {
+      "app": "web-admin",
+      "route": "/login",
+      "label": "saas-admin-login",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-login__desktop__light.png",
+      "status": "failed",
+      "observations": [
+        "console-error: Failed to load resource: the server responded with a status of 404 ()"
+      ]
+    },
+    {
+      "app": "web-admin",
+      "route": "/login",
+      "label": "saas-admin-login",
+      "viewport": "desktop",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-login__desktop__dark.png",
+      "status": "failed",
+      "observations": [
+        "console-error: Failed to load resource: the server responded with a status of 404 ()"
+      ]
+    },
+    {
+      "app": "web-admin",
+      "route": "/login",
+      "label": "saas-admin-login",
+      "viewport": "mobile",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-login__mobile__light.png",
+      "status": "failed",
+      "observations": [
+        "console-error: Failed to load resource: the server responded with a status of 404 ()"
+      ]
+    },
+    {
+      "app": "web-admin",
+      "route": "/login",
+      "label": "saas-admin-login",
+      "viewport": "mobile",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-login__mobile__dark.png",
+      "status": "failed",
+      "observations": [
+        "console-error: Failed to load resource: the server responded with a status of 404 ()"
+      ]
+    },
+    {
+      "app": "web-admin",
+      "route": "/dashboard",
+      "label": "saas-admin-dashboard",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-dashboard__desktop__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-admin",
+      "route": "/dashboard",
+      "label": "saas-admin-dashboard",
+      "viewport": "desktop",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-dashboard__desktop__dark.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-admin",
+      "route": "/dashboard",
+      "label": "saas-admin-dashboard",
+      "viewport": "notebook",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-dashboard__notebook__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-admin",
+      "route": "/dashboard",
+      "label": "saas-admin-dashboard",
+      "viewport": "notebook",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-dashboard__notebook__dark.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-admin",
+      "route": "/dashboard",
+      "label": "saas-admin-dashboard",
+      "viewport": "mobile",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-dashboard__mobile__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-admin",
+      "route": "/dashboard",
+      "label": "saas-admin-dashboard",
+      "viewport": "mobile",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-dashboard__mobile__dark.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-admin",
+      "route": "/tenants",
+      "label": "saas-admin-tenants",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-tenants__desktop__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-admin",
+      "route": "/tenants",
+      "label": "saas-admin-tenants",
+      "viewport": "notebook",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-tenants__notebook__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-admin",
+      "route": "/tenants",
+      "label": "saas-admin-tenants",
+      "viewport": "mobile",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-tenants__mobile__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-admin",
+      "route": "/billing",
+      "label": "saas-admin-billing",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-billing__desktop__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-admin",
+      "route": "/billing",
+      "label": "saas-admin-billing",
+      "viewport": "notebook",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-billing__notebook__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-admin",
+      "route": "/media",
+      "label": "saas-admin-media-global",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-media-global__desktop__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-admin",
+      "route": "/media",
+      "label": "saas-admin-media-global",
+      "viewport": "desktop",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-media-global__desktop__dark.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-admin",
+      "route": "/media",
+      "label": "saas-admin-media-global",
+      "viewport": "notebook",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-media-global__notebook__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-admin",
+      "route": "/media",
+      "label": "saas-admin-media-global",
+      "viewport": "notebook",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-media-global__notebook__dark.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-admin",
+      "route": "/media",
+      "label": "saas-admin-media-global",
+      "viewport": "mobile",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-media-global__mobile__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-admin",
+      "route": "/media",
+      "label": "saas-admin-media-global",
+      "viewport": "mobile",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-media-global__mobile__dark.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-admin",
+      "route": "/audit-logs",
+      "label": "saas-admin-audit-logs",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-admin__saas-admin-audit-logs__desktop__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/login",
+      "label": "tenant-login",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-login__desktop__light.png",
+      "status": "failed",
+      "observations": [
+        "console-error: Failed to load resource: the server responded with a status of 404 ()"
+      ]
+    },
+    {
+      "app": "web-tenant",
+      "route": "/login",
+      "label": "tenant-login",
+      "viewport": "desktop",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-login__desktop__dark.png",
+      "status": "failed",
+      "observations": [
+        "console-error: Failed to load resource: the server responded with a status of 404 ()"
+      ]
+    },
+    {
+      "app": "web-tenant",
+      "route": "/login",
+      "label": "tenant-login",
+      "viewport": "mobile",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-login__mobile__light.png",
+      "status": "failed",
+      "observations": [
+        "console-error: Failed to load resource: the server responded with a status of 404 ()"
+      ]
+    },
+    {
+      "app": "web-tenant",
+      "route": "/login",
+      "label": "tenant-login",
+      "viewport": "mobile",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-login__mobile__dark.png",
+      "status": "failed",
+      "observations": [
+        "console-error: Failed to load resource: the server responded with a status of 404 ()"
+      ]
+    },
+    {
+      "app": "web-tenant",
+      "route": "/dashboard",
+      "label": "tenant-dashboard",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-dashboard__desktop__light.png",
+      "status": "failed",
+      "observations": [
+        "console-error: Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+        "request-failure: HTTP 500 http://localhost:5173/api/v1/analytics/dashboard?startDate=2026-06-03T03%3A00%3A00.000Z&endDate=2026-06-03T20%3A12%3A29.216Z"
+      ]
+    },
+    {
+      "app": "web-tenant",
+      "route": "/dashboard",
+      "label": "tenant-dashboard",
+      "viewport": "desktop",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-dashboard__desktop__dark.png",
+      "status": "failed",
+      "observations": [
+        "console-error: Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+        "request-failure: HTTP 500 http://localhost:5173/api/v1/analytics/dashboard?startDate=2026-06-03T03%3A00%3A00.000Z&endDate=2026-06-03T20%3A12%3A34.728Z"
+      ]
+    },
+    {
+      "app": "web-tenant",
+      "route": "/dashboard",
+      "label": "tenant-dashboard",
+      "viewport": "notebook",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-dashboard__notebook__light.png",
+      "status": "failed",
+      "observations": [
+        "console-error: Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+        "request-failure: HTTP 500 http://localhost:5173/api/v1/analytics/dashboard?startDate=2026-06-03T03%3A00%3A00.000Z&endDate=2026-06-03T20%3A12%3A39.108Z"
+      ]
+    },
+    {
+      "app": "web-tenant",
+      "route": "/dashboard",
+      "label": "tenant-dashboard",
+      "viewport": "notebook",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-dashboard__notebook__dark.png",
+      "status": "failed",
+      "observations": [
+        "console-error: Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+        "request-failure: HTTP 500 http://localhost:5173/api/v1/analytics/dashboard?startDate=2026-06-03T03%3A00%3A00.000Z&endDate=2026-06-03T20%3A12%3A43.448Z"
+      ]
+    },
+    {
+      "app": "web-tenant",
+      "route": "/dashboard",
+      "label": "tenant-dashboard",
+      "viewport": "mobile",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-dashboard__mobile__light.png",
+      "status": "failed",
+      "observations": [
+        "console-error: Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+        "request-failure: HTTP 500 http://localhost:5173/api/v1/analytics/dashboard?startDate=2026-06-03T03%3A00%3A00.000Z&endDate=2026-06-03T20%3A12%3A48.525Z"
+      ]
+    },
+    {
+      "app": "web-tenant",
+      "route": "/dashboard",
+      "label": "tenant-dashboard",
+      "viewport": "mobile",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-dashboard__mobile__dark.png",
+      "status": "failed",
+      "observations": [
+        "console-error: Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+        "request-failure: HTTP 500 http://localhost:5173/api/v1/analytics/dashboard?startDate=2026-06-03T03%3A00%3A00.000Z&endDate=2026-06-03T20%3A12%3A52.940Z"
+      ]
+    },
+    {
+      "app": "web-tenant",
+      "route": "/catalog/products",
+      "label": "tenant-products",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-products__desktop__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/catalog/products",
+      "label": "tenant-products",
+      "viewport": "notebook",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-products__notebook__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/catalog/products",
+      "label": "tenant-products",
+      "viewport": "mobile",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-products__mobile__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/catalog/products/b3a69d6f-49ee-447c-9190-6f5dd4fecd28/v2",
+      "label": "tenant-product-editor",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-product-editor__desktop__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/catalog/products/b3a69d6f-49ee-447c-9190-6f5dd4fecd28/v2",
+      "label": "tenant-product-editor",
+      "viewport": "desktop",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-product-editor__desktop__dark.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/catalog/products/b3a69d6f-49ee-447c-9190-6f5dd4fecd28/v2",
+      "label": "tenant-product-editor",
+      "viewport": "notebook",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-product-editor__notebook__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/catalog/products/b3a69d6f-49ee-447c-9190-6f5dd4fecd28/v2",
+      "label": "tenant-product-editor",
+      "viewport": "notebook",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-product-editor__notebook__dark.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/catalog/products/b3a69d6f-49ee-447c-9190-6f5dd4fecd28/v2",
+      "label": "tenant-product-editor",
+      "viewport": "mobile",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-product-editor__mobile__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/catalog/products/b3a69d6f-49ee-447c-9190-6f5dd4fecd28/v2",
+      "label": "tenant-product-editor",
+      "viewport": "mobile",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-product-editor__mobile__dark.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/catalog/media",
+      "label": "tenant-media-library",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-media-library__desktop__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/catalog/media",
+      "label": "tenant-media-library",
+      "viewport": "desktop",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-media-library__desktop__dark.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/catalog/media",
+      "label": "tenant-media-library",
+      "viewport": "notebook",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-media-library__notebook__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/catalog/media",
+      "label": "tenant-media-library",
+      "viewport": "notebook",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-media-library__notebook__dark.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/catalog/media",
+      "label": "tenant-media-library",
+      "viewport": "mobile",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-media-library__mobile__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/catalog/media",
+      "label": "tenant-media-library",
+      "viewport": "mobile",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-media-library__mobile__dark.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/pos",
+      "label": "tenant-pos",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-pos__desktop__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/pos",
+      "label": "tenant-pos",
+      "viewport": "notebook",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-pos__notebook__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/pos",
+      "label": "tenant-pos",
+      "viewport": "tablet",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-pos__tablet__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/orders",
+      "label": "tenant-orders-list",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-orders-list__desktop__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/orders",
+      "label": "tenant-orders-list",
+      "viewport": "notebook",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-orders-list__notebook__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/orders",
+      "label": "tenant-orders-list",
+      "viewport": "mobile",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-orders-list__mobile__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/orders/board",
+      "label": "tenant-orders-kanban",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-orders-kanban__desktop__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/orders/board",
+      "label": "tenant-orders-kanban",
+      "viewport": "notebook",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-orders-kanban__notebook__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/orders/board",
+      "label": "tenant-orders-kanban",
+      "viewport": "tablet",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-orders-kanban__tablet__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/billing",
+      "label": "tenant-billing",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-billing__desktop__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/billing",
+      "label": "tenant-billing",
+      "viewport": "notebook",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-billing__notebook__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/settings",
+      "label": "tenant-settings",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-settings__desktop__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/settings",
+      "label": "tenant-settings",
+      "viewport": "mobile",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-settings__mobile__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/cash",
+      "label": "tenant-cash",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-cash__desktop__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/cash",
+      "label": "tenant-cash",
+      "viewport": "notebook",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-cash__notebook__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/delivery/rates",
+      "label": "tenant-delivery-rates",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-delivery-rates__desktop__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-tenant",
+      "route": "/delivery/rates",
+      "label": "tenant-delivery-rates",
+      "viewport": "notebook",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-tenant__tenant-delivery-rates__notebook__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-storefront",
+      "route": "/pizzaria-demo",
+      "label": "storefront-menu",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-storefront__storefront-menu__desktop__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-storefront",
+      "route": "/pizzaria-demo",
+      "label": "storefront-menu",
+      "viewport": "desktop",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-storefront__storefront-menu__desktop__dark.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-storefront",
+      "route": "/pizzaria-demo",
+      "label": "storefront-menu",
+      "viewport": "notebook",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-storefront__storefront-menu__notebook__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-storefront",
+      "route": "/pizzaria-demo",
+      "label": "storefront-menu",
+      "viewport": "notebook",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-storefront__storefront-menu__notebook__dark.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-storefront",
+      "route": "/pizzaria-demo",
+      "label": "storefront-menu",
+      "viewport": "mobile",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-storefront__storefront-menu__mobile__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-storefront",
+      "route": "/pizzaria-demo",
+      "label": "storefront-menu",
+      "viewport": "mobile",
+      "theme": "dark",
+      "file": "qa-artifacts/visual/screenshots/web-storefront__storefront-menu__mobile__dark.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-storefront",
+      "route": "/pizzaria-demo/checkout",
+      "label": "storefront-checkout",
+      "viewport": "desktop",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-storefront__storefront-checkout__desktop__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-storefront",
+      "route": "/pizzaria-demo/checkout",
+      "label": "storefront-checkout",
+      "viewport": "mobile",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-storefront__storefront-checkout__mobile__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-delivery",
+      "route": "/login",
+      "label": "delivery-login",
+      "viewport": "mobile",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-delivery__delivery-login__mobile__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-delivery",
+      "route": "/login",
+      "label": "delivery-login",
+      "viewport": "tablet",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-delivery__delivery-login__tablet__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-delivery",
+      "route": "/",
+      "label": "delivery-active-runs",
+      "viewport": "mobile",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-delivery__delivery-active-runs__mobile__light.png",
+      "status": "passed",
+      "observations": []
+    },
+    {
+      "app": "web-delivery",
+      "route": "/",
+      "label": "delivery-active-runs",
+      "viewport": "tablet",
+      "theme": "light",
+      "file": "qa-artifacts/visual/screenshots/web-delivery__delivery-active-runs__tablet__light.png",
+      "status": "passed",
+      "observations": []
+    }
+  ]
+}

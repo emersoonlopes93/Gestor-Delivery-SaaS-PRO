@@ -33,7 +33,9 @@
     "check:theme:write-baseline": "node scripts/check-theme-hardcoded-classes.js --report --write-baseline",
     "check:theme": "pnpm check:theme:critical",
     "smoke:p1": "pnpm -C apps/api smoke:p1",
-    "smoke:media": "pnpm -C apps/api smoke:media"
+    "smoke:media": "pnpm -C apps/api smoke:media",
+    "qa:visual": "ts-node --project apps/api/tsconfig.json -r tsconfig-paths/register scripts/qa-visual.ts",
+    "qa:visual:update": "ts-node --project apps/api/tsconfig.json -r tsconfig-paths/register scripts/qa-visual.ts"
   },
   "engines": {
     "node": ">=20.0.0",
@@ -41,7 +43,9 @@
   },
   "packageManager": "pnpm@9.0.0",
   "devDependencies": {
-    "typescript": "~5.5.4",
-    "tsconfig-paths": "~4.2.0"
+    "@playwright/test": "^1.60.0",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "~4.2.0",
+    "typescript": "~5.5.4"
   }
 }
