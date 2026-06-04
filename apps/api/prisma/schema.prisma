@@ -106,6 +106,8 @@ model Tenant {
   users                       TenantUser[]
   businessGroup               BusinessGroup?               @relation(fields: [businessGroupId], references: [id])
   timeSlots                   TimeSlot[]
+  schedulingSettings          SchedulingSettings?
+  schedulingWindows           SchedulingWindow[]
   upsellItems                 UpsellItem[]
   upsells                     Upsell[]
   whatsappInstance            WhatsAppInstance?
@@ -1793,7 +1795,7 @@ model TimeSlot {
   scheduledOrders  ScheduledOrder[]
   tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@index([tenantId, startTime])
+  @@unique([tenantId, startTime])
   @@map("time_slots")
 }
 

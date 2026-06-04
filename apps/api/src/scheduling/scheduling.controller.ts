@@ -22,6 +22,11 @@ import {
   CreateScheduledOrderDTO,
   CancelScheduledOrderDTO,
 } from './dto/create-scheduled-order.dto';
+import { UpdateSchedulingSettingsDto } from './dto/scheduling-settings.dto';
+import {
+  CreateSchedulingWindowDTO,
+  UpdateSchedulingWindowDTO,
+} from './dto/scheduling-window.dto';
 import { ScheduledOrderStatus } from '@prisma/client';
 
 @Controller('scheduling')
@@ -64,6 +69,47 @@ export class SchedulingController {
       throw new BadRequestException('Date parameter is required');
     }
     return this.schedulingService.getAvailableTimeSlots(new Date(date));
+  }
+
+  @Get('settings')
+  @RequirePermissions('scheduling.view')
+  async getSchedulingSettings() {
+    return this.schedulingService.getSchedulingSettings();
+  }
+
+  @Put('settings')
+  @RequirePermissions('scheduling.manage')
+  async updateSchedulingSettings(@Body() dto: UpdateSchedulingSettingsDto) {
+    return this.schedulingService.updateSchedulingSettings(dto as any);
+  }
+
+  @Get('windows')
+  @RequirePermissions('scheduling.view')
+  async getSchedulingWindows() {
+    return this.schedulingService.getSchedulingWindows();
+  }
+
+  @Post('windows')
+  @RequirePermissions('scheduling.manage')
+  @HttpCode(HttpStatus.CREATED)
+  async createSchedulingWindow(@Body() dto: CreateSchedulingWindowDTO) {
+    return this.schedulingService.createSchedulingWindow(dto);
+  }
+
+  @Put('windows/:id')
+  @RequirePermissions('scheduling.manage')
+  async updateSchedulingWindow(
+    @Param('id') id: string,
+    @Body() dto: UpdateSchedulingWindowDTO,
+  ) {
+    return this.schedulingService.updateSchedulingWindow(id, dto as any);
+  }
+
+  @Delete('windows/:id')
+  @RequirePermissions('scheduling.manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteSchedulingWindow(@Param('id') id: string) {
+    await this.schedulingService.deleteSchedulingWindow(id);
   }
 
   @Post('time-slots')

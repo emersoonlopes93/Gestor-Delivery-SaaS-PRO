@@ -89,6 +89,12 @@ export class AdminTenantsService {
       },
     });
 
+    await this.prisma.schedulingSettings.create({
+      data: {
+        tenantId: tenant.id,
+      },
+    });
+
     const subscription = await this.tenantBillingResolver.getOrCreateTenantBillingSubscription(tenant.id, data.billingPlanId);
     this.logger.log(`Tenant ${tenant.id} criado com Billing V2 subscription ${subscription.id}`);
     return this.findById(tenant.id);

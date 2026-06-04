@@ -1,3 +1,4 @@
+import { DateTime } from 'luxon';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
@@ -24,7 +25,7 @@ export class SchedulingGeneratorService {
     if (!tenantId) throw new Error('Tenant context not found');
 
     const settings = await this.prisma.schedulingSettings.findUnique({ where: { tenantId } });
-    if (!settings || !settings.enabled) {
+    if (!settings || !settings.enabled || !settings.acceptScheduledOrders) {
       this.logger.log(`Scheduling disabled for tenant ${tenantId}`);
       return [];
     }
@@ -35,40 +36,35 @@ export class SchedulingGeneratorService {
       return [];
     }
 
-    const maxDays = settings.maximumAdvanceDays || 7;
-    const interval = settings.slotIntervalMinutes || 30;
-    const capacity = settings.maxOrdersPerSlot || 1;
+    const maxDays = settings.maximumAdvanceDays ?? 7;
+    const interval = settings.slotIntervalMinutes ?? 30;
+    const capacity = settings.maxOrdersPerSlot ?? 1;
 
     const results = [];
-
-    // Determine date range in tenant local date terms using Intl (approximation)
-    const nowInTz = new Intl.DateTimeFormat('en-CA', { timeZone: settings.timezone }).format(new Date());
-    const [y, m, d] = nowInTz.split('-').map(Number);
-    const startDate = new Date(y, (m ?? 1) - 1, d, 0, 0, 0);
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + maxDays);
+    const nowLocal = DateTime.now().setZone(settings.timezone).startOf('day');
 
     for (let day = 0; day <= maxDays; day++) {
-      const current = new Date(startDate);
-      current.setDate(startDate.getDate() + day);
-
-      const weekday = current.getDay(); // 0-6
+      const currentLocal = nowLocal.plus({ days: day });
+      const weekday = currentLocal.weekday % 7; // Luxon weekday 1-7; convert to 0-6
       const dayWindows = windows.filter((w) => w.dayOfWeek === weekday && w.active);
 
       for (const w of dayWindows) {
-        // Parse startTime/endTime stored as HH:MM
         const [sh, sm] = (w.startTime || '00:00').split(':').map(Number);
         const [eh, em] = (w.endTime || '23:59').split(':').map(Number);
 
-        const windowStart = new Date(current);
-        windowStart.setHours(sh, sm, 0, 0);
+        const windowStartLocal = currentLocal.set({ hour: sh, minute: sm, second: 0, millisecond: 0 });
+        const windowEndLocal = currentLocal.set({ hour: eh, minute: em, second: 0, millisecond: 0 });
 
-        const windowEnd = new Date(current);
-        windowEnd.setHours(eh, em, 0, 0);
+        const windowStartUtc = windowStartLocal.toUTC().toJSDate();
+        const windowEndUtc = windowEndLocal.toUTC().toJSDate();
 
-        // Use existing schedulingService to create slots in DB
+        if (windowEndUtc <= windowStartUtc) {
+          this.logger.warn(`Skipping invalid scheduling window ${w.id} for tenant ${tenantId}`);
+          continue;
+        }
+
         try {
-          const created = await this.schedulingService.generateTimeSlots(windowStart, windowEnd, interval, capacity);
+          const created = await this.schedulingService.generateTimeSlots(windowStartUtc, windowEndUtc, interval, capacity);
           results.push({ windowId: w.id, created });
         } catch (err) {
           this.logger.error(`Error generating slots for tenant=${tenantId} window=${w.id}: ${err instanceof Error ? err.message : String(err)}`);

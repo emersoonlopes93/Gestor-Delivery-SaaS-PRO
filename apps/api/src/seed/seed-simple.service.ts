@@ -33,6 +33,34 @@ async function runSeed() {
     },
   });
 
+  await prisma.schedulingSettings.upsert({
+    where: { tenantId: tenant.id },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      enabled: true,
+      acceptScheduledOrders: true,
+      minimumAdvanceMinutes: 60,
+      maximumAdvanceDays: 7,
+      slotIntervalMinutes: 30,
+      maxOrdersPerSlot: 4,
+      timezone: 'America/Sao_Paulo',
+    },
+  });
+
+  await prisma.schedulingWindow.createMany({
+    data: [
+      { tenantId: tenant.id, dayOfWeek: 0, startTime: '10:00', endTime: '18:00', active: true },
+      { tenantId: tenant.id, dayOfWeek: 1, startTime: '10:00', endTime: '22:00', active: true },
+      { tenantId: tenant.id, dayOfWeek: 2, startTime: '10:00', endTime: '22:00', active: true },
+      { tenantId: tenant.id, dayOfWeek: 3, startTime: '10:00', endTime: '22:00', active: true },
+      { tenantId: tenant.id, dayOfWeek: 4, startTime: '10:00', endTime: '22:00', active: true },
+      { tenantId: tenant.id, dayOfWeek: 5, startTime: '10:00', endTime: '22:00', active: true },
+      { tenantId: tenant.id, dayOfWeek: 6, startTime: '10:00', endTime: '18:00', active: true },
+    ],
+    skipDuplicates: true,
+  });
+
   // Create demo category
   const category = await prisma.productCategory.upsert({
     where: { tenantId_slug: { tenantId: tenant.id, slug: 'pizzas' } },

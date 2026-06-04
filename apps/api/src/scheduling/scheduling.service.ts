@@ -1,3 +1,4 @@
+import { DateTime } from 'luxon';
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
@@ -73,28 +74,32 @@ export class SchedulingService {
       throw new Error('Tenant context not found');
     }
 
-    // Load tenant scheduling settings (fallbacks applied)
-    const settings = await this.prisma.schedulingSettings.findUnique({ where: { tenantId } }).catch(() => null);
-    const timezone = (settings && settings.timezone) || 'America/Sao_Paulo';
-    const minimumAdvanceMinutes = (settings && settings.minimumAdvanceMinutes) || 60;
-    const maximumAdvanceDays = (settings && settings.maximumAdvanceDays) || 7;
+    // Load tenant scheduling settings (create defaults if missing)
+    const settings = await this.getOrCreateSchedulingSettings(tenantId);
+    const timezone = settings.timezone || 'America/Sao_Paulo';
+    const minimumAdvanceMinutes = settings.minimumAdvanceMinutes ?? 60;
+    const maximumAdvanceDays = settings.maximumAdvanceDays ?? 7;
 
     // Compute tenant-local start/end of day for the requested date to avoid off-by-one
-    const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
-    const dateLabel = fmt.format(date);
-    const [y, m, d] = dateLabel.split('-').map(Number);
-    const startOfDay = new Date(y, (m ?? 1) - 1, d, 0, 0, 0);
-    const endOfDay = new Date(y, (m ?? 1) - 1, d, 23, 59, 59, 999);
+    const requestedDateInTz = DateTime.fromJSDate(date, { zone: timezone });
+    const startOfRequestedDay = requestedDateInTz.startOf('day');
+    const endOfRequestedDay = requestedDateInTz.endOf('day');
 
-    const now = new Date();
-    const maxAllowed = new Date(now.getTime() + maximumAdvanceDays * 24 * 60 * 60 * 1000);
+    const startUtc = startOfRequestedDay.toUTC().toJSDate();
+    const endUtc = endOfRequestedDay.toUTC().toJSDate();
+
+    const maxAllowed = DateTime.now().toUTC().plus({ days: maximumAdvanceDays }).toJSDate();
+
+    if (!settings.enabled || !settings.acceptScheduledOrders) {
+      return [];
+    }
 
     const slots = await this.prisma.timeSlot.findMany({
       where: {
         tenantId,
         startTime: {
-          gte: startOfDay,
-          lte: endOfDay,
+          gte: startUtc,
+          lte: endUtc,
         },
         status: TimeSlotStatus.available,
         isActive: true,
@@ -102,6 +107,7 @@ export class SchedulingService {
       orderBy: { startTime: 'asc' },
     });
 
+    const now = new Date();
     const filtered = slots.filter((slot) => {
       // Exclude past slots
       if (slot.startTime.getTime() <= now.getTime()) return false;
@@ -131,9 +137,166 @@ export class SchedulingService {
     }));
   }
 
-  /**
-   * Valida se um slot de tempo está disponível para agendamento
-   */
+  async getSchedulingSettings() {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) throw new Error('Tenant context not found');
+
+    return this.getOrCreateSchedulingSettings(tenantId);
+  }
+
+  async updateSchedulingSettings(data: Prisma.SchedulingSettingsUpdateInput) {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) throw new Error('Tenant context not found');
+
+    if (data.timezone) {
+      this.validateTimezone(data.timezone as string);
+    }
+
+    return this.prisma.schedulingSettings.upsert({
+      where: { tenantId },
+      create: {
+        tenantId,
+        enabled: data.enabled ?? true,
+        acceptScheduledOrders: data.acceptScheduledOrders ?? true,
+        minimumAdvanceMinutes: data.minimumAdvanceMinutes ?? 60,
+        maximumAdvanceDays: data.maximumAdvanceDays ?? 7,
+        slotIntervalMinutes: data.slotIntervalMinutes ?? 30,
+        maxOrdersPerSlot: data.maxOrdersPerSlot ?? 4,
+        timezone: data.timezone ?? 'America/Sao_Paulo',
+      } as Prisma.SchedulingSettingsUncheckedCreateInput,
+      update: data,
+    });
+  }
+
+  async getSchedulingWindows() {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) throw new Error('Tenant context not found');
+
+    return this.prisma.schedulingWindow.findMany({
+      where: { tenantId },
+      orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
+    });
+  }
+
+  async createSchedulingWindow(data: {
+    dayOfWeek: number;
+    startTime: string;
+    endTime: string;
+    active?: boolean;
+  }) {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) throw new Error('Tenant context not found');
+
+    this.validateSchedulingWindow(data);
+
+    return this.prisma.schedulingWindow.create({
+      data: {
+        tenantId,
+        dayOfWeek: data.dayOfWeek,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        active: data.active ?? true,
+      },
+    });
+  }
+
+  async updateSchedulingWindow(id: string, data: {
+    dayOfWeek?: number;
+    startTime?: string;
+    endTime?: string;
+    active?: boolean;
+  }) {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) throw new Error('Tenant context not found');
+
+    const existing = await this.prisma.schedulingWindow.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Scheduling window not found');
+    }
+
+    const updatedData = {
+      ...data,
+      dayOfWeek: data.dayOfWeek ?? existing.dayOfWeek,
+      startTime: data.startTime ?? existing.startTime,
+      endTime: data.endTime ?? existing.endTime,
+    };
+
+    this.validateSchedulingWindow(updatedData);
+
+    return this.prisma.schedulingWindow.update({
+      where: { id },
+      data: {
+        dayOfWeek: data.dayOfWeek,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        active: data.active,
+      },
+    });
+  }
+
+  async deleteSchedulingWindow(id: string) {
+    const tenantId = this.tenantContext.getTenantId();
+    if (!tenantId) throw new Error('Tenant context not found');
+
+    const existing = await this.prisma.schedulingWindow.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Scheduling window not found');
+    }
+
+    await this.prisma.schedulingWindow.delete({ where: { id } });
+
+    return { success: true };
+  }
+
+  private validateSchedulingWindow(data: { dayOfWeek: number; startTime: string; endTime: string }) {
+    if (typeof data.dayOfWeek !== 'number' || data.dayOfWeek < 0 || data.dayOfWeek > 6) {
+      throw new BadRequestException('dayOfWeek must be an integer between 0 and 6');
+    }
+
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(data.startTime) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(data.endTime)) {
+      throw new BadRequestException('startTime and endTime must be in HH:MM format');
+    }
+
+    const [startHour, startMinute] = data.startTime.split(':').map(Number);
+    const [endHour, endMinute] = data.endTime.split(':').map(Number);
+    const startMinutes = startHour * 60 + startMinute;
+    const endMinutes = endHour * 60 + endMinute;
+
+    if (endMinutes <= startMinutes) {
+      throw new BadRequestException('endTime must be after startTime');
+    }
+  }
+
+  private validateTimezone(timezone: string) {
+    try {
+      Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date());
+    } catch (err) {
+      throw new BadRequestException('Invalid timezone');
+    }
+  }
+
+  private async getOrCreateSchedulingSettings(tenantId: string) {
+    return this.prisma.schedulingSettings.upsert({
+      where: { tenantId },
+      create: {
+        tenantId,
+        enabled: true,
+        acceptScheduledOrders: true,
+        minimumAdvanceMinutes: 60,
+        maximumAdvanceDays: 7,
+        slotIntervalMinutes: 30,
+        maxOrdersPerSlot: 4,
+        timezone: 'America/Sao_Paulo',
+      } as Prisma.SchedulingSettingsUncheckedCreateInput,
+      update: {},
+    });
+  }
   async validateTimeSlotAvailability(
     timeSlotId: string,
     orderValue?: number,
@@ -387,15 +550,14 @@ export class SchedulingService {
     const where: Prisma.ScheduledOrderWhereInput = { tenantId };
     
     if (date) {
-      const startOfDay = new Date(date);
-      startOfDay.setHours(0, 0, 0, 0);
-      
-      const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
-      
+      const settings = await this.getOrCreateSchedulingSettings(tenantId);
+      const dateInTz = DateTime.fromJSDate(date, { zone: settings.timezone });
+      const start = dateInTz.startOf('day');
+      const end = dateInTz.endOf('day');
+
       where.scheduledFor = {
-        gte: startOfDay,
-        lte: endOfDay,
+        gte: start.toUTC().toJSDate(),
+        lte: end.toUTC().toJSDate(),
       };
     }
 
