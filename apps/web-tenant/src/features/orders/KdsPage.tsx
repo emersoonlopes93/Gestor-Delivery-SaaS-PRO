@@ -160,7 +160,52 @@ export function KdsPage() {
         </div>
       ) : (
         <div className="flex gap-4 overflow-x-auto overflow-y-hidden pb-4 grow items-start snap-x">
-          {printJobs.map(job => {
+          {printJobs.filter(j => j.order?.fulfillmentType === 'scheduled').map(job => {
+            const order = job.order;
+            const scheduledForStr = order?.scheduledFor ? new Date(order.scheduledFor).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+            return (
+              <div 
+                key={job.id} 
+                className="min-w-[340px] w-[340px] rounded-2xl flex flex-col max-h-full border-2 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.2)] snap-start bg-amber-50/50 dark:bg-amber-950/10"
+              >
+                <header className="p-4 rounded-t-xl flex flex-col items-start shrink-0 bg-amber-500 text-amber-950">
+                  <div className="w-full flex justify-between items-center mb-2">
+                    <h2 className="text-3xl font-black">{order?.orderNumber || '---'}</h2>
+                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg font-black text-sm bg-amber-950 text-amber-500 border border-amber-900/50">
+                      <Clock className="w-4 h-4" /> AGENDADO
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-wider bg-amber-600/20 px-2 py-1 rounded-md w-full">
+                    {job.station} - Para: {scheduledForStr}
+                  </span>
+                </header>
+
+                <div className="p-5 overflow-y-auto grow bg-transparent">
+                   <pre className="whitespace-pre-wrap font-mono text-xs text-amber-950 dark:text-amber-50 leading-tight bg-white/50 dark:bg-black/50 p-3 rounded-lg border border-amber-500/20">
+                     {job.content}
+                   </pre>
+                </div>
+
+                <footer className="p-4 rounded-b-2xl border-t border-amber-500/20 shrink-0 flex flex-col gap-2">
+                  <button
+                    onClick={() => handlePrint(job.content)}
+                    className="w-full bg-card border border-amber-500 text-amber-600 font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition-colors hover:bg-amber-500 hover:text-amber-950"
+                  >
+                    <RefreshCw className="w-4 h-4" /> Imprimir Ticket
+                  </button>
+                  <button
+                    onClick={() => handleComplete(job.id)}
+                    disabled={updatingId === job.id}
+                    className="w-full bg-amber-500 hover:bg-amber-600 shadow-md text-amber-950 border-t border-amber-400 text-lg font-black py-4 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-70 uppercase tracking-widest"
+                  >
+                    <CheckCircle2 className="w-6 h-6" /> Concluir Agendamento
+                  </button>
+                </footer>
+              </div>
+            );
+          })}
+
+          {printJobs.filter(j => j.order?.fulfillmentType !== 'scheduled').map(job => {
             const order = job.order;
             const elapsed = getElapsedMin(job.createdAt.toString());
             const isUrgent = elapsed > 15;

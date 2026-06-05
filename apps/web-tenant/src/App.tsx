@@ -32,6 +32,7 @@ import { QrCodesPage } from './features/settings/QrCodesPage';
 import { PrinterSettings } from './features/pos/PrinterSettings';
 import { NotificationSettings } from './features/settings/NotificationSettings';
 import { StorefrontCustomizationPage } from './features/settings/StorefrontCustomizationPage';
+import { SchedulingSettingsPage } from './features/settings/SchedulingSettingsPage';
 
 // CRM & Promotions
 import { CustomersListPage } from './features/crm/CustomersListPage';
@@ -424,6 +425,14 @@ export function App() {
           element={
             <PermissionGate permission="settings.manage">
               <NotificationSettings />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/settings/scheduling"
+          element={
+            <PermissionGate permission="settings.manage">
+              <SchedulingSettingsPage />
             </PermissionGate>
           }
         />

@@ -204,6 +204,21 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
             </div>
           ) : order ? (
             <>
+              {/* Alerta de Agendamento */}
+              {order.fulfillmentType === 'scheduled' && order.scheduledFor && (
+                <div className="bg-amber-500/10 border-2 border-amber-500/30 rounded-2xl p-4 flex items-center justify-center gap-3 animate-pulse">
+                  <div className="p-2 bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-calendar-clock"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/></svg>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-400">Entrega/Retirada Programada</p>
+                    <p className="text-lg font-black text-foreground">
+                      {new Date(order.scheduledFor).toLocaleString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).replace('-feira', '')}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Cliente */}
               <OrderCustomerSection 
                 customerName={order.customerName}

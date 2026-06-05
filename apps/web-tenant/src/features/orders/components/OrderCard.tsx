@@ -134,13 +134,19 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
             {order.customerName}
           </h3>
           <p className={`text-muted-foreground mt-1 line-clamp-1 font-bold text-[10px]`}>
-            {order.fulfillmentType === 'delivery' ? '📦 Entrega' : '🏪 Retirada'}
+            {order.fulfillmentType === 'delivery' ? '📦 Entrega' : order.fulfillmentType === 'scheduled' ? '📅 Agendado' : '🏪 Retirada'}
             {' · '}
             {CHANNEL_LABELS[order.sourceChannel || ''] || order.sourceChannel || 'Online'}
           </p>
         </div>
 
         {/* 3. Status e Valor */}
+        {order.fulfillmentType === 'scheduled' && order.scheduledFor && (
+          <div className="mb-3 px-2 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5">
+            <Clock className="w-3.5 h-3.5" />
+            <span>AGENDADO: {new Date(order.scheduledFor).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-3 pt-2.5 pb-2.5 border-t border-b border-border/40">
           <StatusBadge status={order.status as OrderStatus} />
           <span className={`font-black text-foreground ${compact ? 'text-xs' : 'text-sm'}`}>
