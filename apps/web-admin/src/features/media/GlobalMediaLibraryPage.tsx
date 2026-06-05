@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Image, RefreshCw, Search, Trash2, UploadCloud } from 'lucide-react';
+import { Folder, Image, RefreshCw, Search, Trash2, UploadCloud } from 'lucide-react';
 import { api } from '../../lib/api-client';
 
 type MediaAsset = {
@@ -34,12 +34,48 @@ export function GlobalMediaLibraryPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Estados de Gerenciamento de Categorias
+  const [showCategoriesModal, setShowCategoriesModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryDesc, setNewCategoryDesc] = useState('');
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
+
   async function loadCategories() {
     try {
       const response = await api.get<MediaCategory[]>('/admin/media/categories');
       setCategories(response.data);
     } catch (error) {
       console.error('Failed to load categories:', error);
+    }
+  }
+
+  async function handleCreateCategory() {
+    if (!newCategoryName.trim()) return;
+    setIsSavingCategory(true);
+    try {
+      await api.post('/admin/media/categories', {
+        name: newCategoryName.trim(),
+        description: newCategoryDesc.trim() || undefined,
+      });
+      setNewCategoryName('');
+      setNewCategoryDesc('');
+      await loadCategories();
+    } catch (error) {
+      console.error('Failed to create category:', error);
+      alert('Erro ao criar categoria.');
+    } finally {
+      setIsSavingCategory(false);
+    }
+  }
+
+  async function handleDeleteCategory(id: string) {
+    if (!window.confirm('Tem certeza que deseja excluir esta categoria? As imagens vinculadas a ela não serão excluídas, mas ficarão sem categoria.')) return;
+    try {
+      await api.delete(`/admin/media/categories/${id}`);
+      await loadCategories();
+    } catch (error) {
+      console.error('Failed to delete category:', error);
+      alert('Erro ao excluir categoria.');
     }
   }
 
@@ -116,14 +152,24 @@ export function GlobalMediaLibraryPage() {
           <h1 className="text-2xl font-black text-foreground">Biblioteca Global</h1>
           <p className="text-sm font-bold text-muted-foreground mt-1">Imagens publicadas aqui ficam disponíveis para todos os tenants.</p>
         </div>
-        <button
-          type="button"
-          onClick={loadAssets}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-card border border-border px-4 py-2 text-sm font-black text-foreground hover:bg-muted"
-        >
-          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          Atualizar
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowCategoriesModal(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-card border border-border px-4 py-2 text-sm font-black text-foreground hover:bg-muted transition-colors"
+          >
+            <Folder className="h-4 w-4 text-primary" />
+            Categorias
+          </button>
+          <button
+            type="button"
+            onClick={loadAssets}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-card border border-border px-4 py-2 text-sm font-black text-foreground hover:bg-muted"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Atualizar
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6">
@@ -263,6 +309,88 @@ export function GlobalMediaLibraryPage() {
           </div>
         </section>
       </div>
+
+      {showCategoriesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-4 border-b border-border">
+              <h2 className="text-lg font-black text-foreground flex items-center gap-2">
+                <Folder className="h-5 w-5 text-primary" />
+                Gerenciar Categorias
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowCategoriesModal(false)}
+                className="text-muted-foreground hover:text-foreground font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+              <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
+                <p className="text-xs font-black uppercase text-muted-foreground">Nova Categoria</p>
+                <input
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-ring text-foreground"
+                  placeholder="Nome da categoria *"
+                />
+                <input
+                  value={newCategoryDesc}
+                  onChange={(e) => setNewCategoryDesc(e.target.value)}
+                  className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-ring text-foreground"
+                  placeholder="Descrição (opcional)"
+                />
+                <button
+                  type="button"
+                  onClick={handleCreateCategory}
+                  disabled={!newCategoryName.trim() || isSavingCategory}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary h-10 text-sm font-black text-primary-foreground disabled:opacity-60"
+                >
+                  Adicionar
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-black uppercase text-muted-foreground">Categorias Existentes</p>
+                {categories.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">Nenhuma categoria cadastrada.</p>
+                ) : (
+                  <div className="divide-y divide-border/50 border border-border rounded-xl overflow-hidden bg-background max-h-[30vh] overflow-y-auto">
+                    {categories.map((cat) => (
+                      <div key={cat.id} className="flex items-center justify-between p-3 hover:bg-muted/10 transition-colors">
+                        <div>
+                          <p className="text-sm font-bold text-foreground">{cat.name}</p>
+                          <p className="text-[10px] text-muted-foreground font-mono">{cat.slug}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCategory(cat.id)}
+                          className="text-destructive hover:bg-destructive/10 p-2 rounded-lg transition-colors"
+                          title="Excluir"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-border flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowCategoriesModal(false)}
+                className="rounded-xl border border-border px-4 py-2 text-sm font-black text-foreground hover:bg-muted"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

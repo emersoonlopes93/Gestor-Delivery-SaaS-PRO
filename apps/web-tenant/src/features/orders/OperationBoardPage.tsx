@@ -80,11 +80,10 @@ const SegmentedControl = memo(function SegmentedControl(props: {
             key={item.id}
             type="button"
             onClick={() => onChange(item.id)}
-            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 focus:outline-none ${
-              active
+            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 focus:outline-none ${active
                 ? 'bg-primary text-primary-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
-            }`}
+              }`}
           >
             {item.label}
           </button>
@@ -108,7 +107,7 @@ export function OperationBoardPage() {
   const [drivers, setDrivers] = useState<DriverDTO[]>([]);
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
   const [orderToDispatch, setOrderToDispatch] = useState<string | null>(null);
-  
+
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [activeDragOrder, setActiveDragOrder] = useState<OrderBoardItemDTO | null>(null);
 
@@ -202,7 +201,7 @@ export function OperationBoardPage() {
 
   const handleStatusUpdate = async (orderId: string, newStatus: OrderStatus, driverId?: string) => {
     if (updatingId) return;
-    
+
     // If delivery and going to out_for_delivery, check if driver is assigned
     if (newStatus === 'out_for_delivery') {
       const order = orders.find(o => o.id === orderId);
@@ -333,61 +332,54 @@ export function OperationBoardPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 h-screen md:h-[calc(100vh-64px)] flex flex-col overflow-hidden bg-background max-w-[1600px] mx-auto w-full space-y-4">
+    <div className="p-3 md:p-4 h-screen md:h-[calc(100vh-64px)] flex flex-col overflow-hidden bg-background w-full space-y-2">
       {/* ── Toolbar / Header Premium ── */}
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between shrink-0 gap-4 bg-card border border-border p-5 rounded-[24px] shadow-sm">
-        <div className="flex items-center justify-between sm:block">
-          <div>
-            <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight flex items-center gap-2">
-              <span className="w-2.5 h-6 rounded-md bg-primary block" />
-              <span>Painel de Operações</span>
-            </h1>
-            <p className="text-[11px] md:text-xs text-muted-foreground font-bold uppercase tracking-wider mt-1">
-              Sincronização Ativa (15s)
-            </p>
-          </div>
+      <header className="flex flex-row items-center justify-between shrink-0 gap-3 bg-card border border-border px-4 py-2.5 rounded-2xl shadow-sm">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="w-2 h-5 rounded-md bg-primary block shrink-0" />
+          <h1 className="text-base md:text-lg font-black text-foreground tracking-tight truncate">Painel de Operações</h1>
+          <span className="hidden md:inline text-[9px] text-muted-foreground font-bold uppercase tracking-wider bg-muted px-2 py-0.5 rounded-md shrink-0">15s</span>
           <button
             onClick={fetchBoard}
             disabled={loading}
-            className="sm:hidden btn-icon w-9 h-9 bg-muted border border-border rounded-xl flex items-center justify-center active:scale-95 transition-all"
+            className="sm:hidden btn-icon w-8 h-8 bg-muted border border-border rounded-lg flex items-center justify-center active:scale-95 transition-all shrink-0"
             title="Atualizar agora"
             type="button"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
 
-        <div className="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
           <div className="shrink-0">
             <SegmentedControl value={viewMode} onChange={setViewMode} />
           </div>
-          
+
           <button
             onClick={enableAudio}
-            className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all duration-200 active:scale-95 shadow-sm ${
-              isAudioEnabled 
-                ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20' 
+            className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all duration-200 active:scale-95 shadow-sm ${isAudioEnabled
+                ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20'
                 : 'bg-card text-muted-foreground border-border hover:bg-muted'
-            }`}
+              }`}
             title={isAudioEnabled ? 'Sons Ativados' : 'Ativar Sons (Clique aqui)'}
           >
-            {isAudioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            {isAudioEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
           </button>
 
           <button
             onClick={fetchBoard}
             disabled={loading}
-            className="hidden sm:flex w-10 h-10 rounded-xl bg-card border border-border text-foreground hover:bg-muted items-center justify-center transition-all active:scale-95 shadow-sm shrink-0"
+            className="hidden sm:flex w-8 h-8 rounded-lg bg-card border border-border text-foreground hover:bg-muted items-center justify-center transition-all active:scale-95 shadow-sm shrink-0"
             title="Atualizar agora"
             type="button"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </header>
 
       {/* ── Mobile Tabs Selector ── */}
-      <div className="md:hidden flex items-center gap-1.5 p-1 bg-muted rounded-xl mb-4 shrink-0">
+      <div className="md:hidden flex items-center gap-1.5 p-1 bg-muted rounded-xl shrink-0">
         {KANBAN_COLUMNS.map((col) => {
           const isActive = activeColumn === col.id;
           const count = ordersByColumnId[col.id]?.length || 0;
@@ -395,11 +387,10 @@ export function OperationBoardPage() {
             <button
               key={col.id}
               onClick={() => setActiveColumn(col.id)}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg transition-all duration-200 ${
-                isActive
+              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg transition-all duration-200 ${isActive
                   ? 'bg-background shadow-sm text-foreground'
                   : 'text-muted-foreground'
-              }`}
+                }`}
             >
               <span className={`text-[10px] font-black uppercase tracking-wider ${isActive ? 'opacity-100' : 'opacity-60'}`}>
                 {col.title}
@@ -444,58 +435,56 @@ export function OperationBoardPage() {
       )}
 
       {/* ── Board ── */}
-      <DndContext 
+      <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
         {!error && (
-          <div className="grow min-h-0">
-          <div
-            className={`h-full grid gap-3 md:gap-4 items-start ${
-              viewMode === 'focus_production'
-                ? 'lg:grid-cols-[minmax(280px,1fr)_minmax(380px,1.4fr)_minmax(280px,1fr)]'
-                : 'grid-cols-1 md:grid-cols-3'
-            }`}
-          >
-            {KANBAN_COLUMNS.map((column) => {
-              const colOrders = ordersByColumnId[column.id] ?? [];
-              const isEmpty = colOrders.length === 0;
+          <div className="grow min-h-0 overflow-hidden">
+            <div
+              className={`h-full grid gap-2 md:gap-3 items-stretch ${viewMode === 'focus_production'
+                  ? 'lg:grid-cols-[minmax(280px,1fr)_minmax(380px,1.4fr)_minmax(280px,1fr)]'
+                  : 'grid-cols-1 md:grid-cols-3'
+                }`}
+            >
+              {KANBAN_COLUMNS.map((column) => {
+                const colOrders = ordersByColumnId[column.id] ?? [];
+                const isEmpty = colOrders.length === 0;
 
-              // No mobile, só renderiza a coluna ativa
-              const isVisibleOnMobile = activeColumn === column.id;
+                // No mobile, só renderiza a coluna ativa
+                const isVisibleOnMobile = activeColumn === column.id;
 
-              if (viewMode === 'compact' && isEmpty) return null;
-              if (viewMode === 'focus_production' && column.id !== 'production' && isEmpty)
-                return null;
+                if (viewMode === 'compact' && isEmpty) return null;
+                if (viewMode === 'focus_production' && column.id !== 'production' && isEmpty)
+                  return null;
 
-              return (
-                <div
-                  key={column.id}
-                  className={`h-full min-h-0 flex-col ${
-                    isVisibleOnMobile ? 'flex' : 'hidden md:flex'
-                  }`}
-                >
-                  <KanbanColumn
-                    column={column}
-                    orders={colOrders}
-                    compact={compact}
-                    updatingId={updatingId}
-                    elapsedMinById={elapsedMinById}
-                    onAdvance={handleStatusUpdate}
-                    onClickCard={setActiveOrderId}
-                    getNextAction={getNextAction}
-                    fmt={fmt}
-                    getElapsedMin={getElapsedMin}
-                    viewMode={viewMode}
-                  />
-                </div>
-              );
-            })}
+                return (
+                  <div
+                    key={column.id}
+                    className={`h-full min-h-0 flex-col ${isVisibleOnMobile ? 'flex' : 'hidden md:flex'
+                      }`}
+                  >
+                    <KanbanColumn
+                      column={column}
+                      orders={colOrders}
+                      compact={compact}
+                      updatingId={updatingId}
+                      elapsedMinById={elapsedMinById}
+                      onAdvance={handleStatusUpdate}
+                      onClickCard={setActiveOrderId}
+                      getNextAction={getNextAction}
+                      fmt={fmt}
+                      getElapsedMin={getElapsedMin}
+                      viewMode={viewMode}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
         <DragOverlay>
           {activeDragOrder ? (
             <OrderCard
@@ -503,7 +492,7 @@ export function OperationBoardPage() {
               compact={compact}
               updating={false}
               onAdvance={handleStatusUpdate}
-              onClick={() => {}}
+              onClick={() => { }}
               nextStatus={getNextAction(activeDragOrder.status as OrderStatus, activeDragOrder.fulfillmentType)}
               elapsedMin={elapsedMinById.get(activeDragOrder.id) ?? 0}
               totalLabel={fmt(activeDragOrder.total)}
@@ -522,10 +511,10 @@ export function OperationBoardPage() {
         drivers={drivers}
         isSubmitting={!!updatingId}
       />
-      
-      <OrderDrawer 
-        orderId={activeOrderId} 
-        onClose={() => setActiveOrderId(null)} 
+
+      <OrderDrawer
+        orderId={activeOrderId}
+        onClose={() => setActiveOrderId(null)}
         onUpdated={fetchBoard}
       />
     </div>

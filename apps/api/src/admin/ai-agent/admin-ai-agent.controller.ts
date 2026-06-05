@@ -110,6 +110,14 @@ export class UpdateGlobalAiConfigDto {
   @IsOptional() @IsBoolean() aiEnableUpsell?: boolean;
   @IsOptional() @IsBoolean() aiEnableHumanHandoff?: boolean;
 
+  @IsOptional() @IsNumber() aiSessionTimeoutMin?: number;
+  @IsOptional() @IsBoolean() aiCloseOnExitCommand?: boolean;
+  @IsOptional() @IsString({ each: true }) aiExitCommands?: string[];
+  @IsOptional() @IsBoolean() aiResetDraftOnSessionClose?: boolean;
+  @IsOptional() @IsNumber() aiMaxRetries?: number;
+  @IsOptional() @IsNumber() aiDailyMessageLimit?: number;
+  @IsOptional() @IsNumber() aiCustomerCooldownMin?: number;
+
   @IsOptional() @IsString() defaultAiProvider?: string;
   @IsOptional() @IsString() googleAiModel?: string;
   @IsOptional() @IsString() openaiModel?: string;

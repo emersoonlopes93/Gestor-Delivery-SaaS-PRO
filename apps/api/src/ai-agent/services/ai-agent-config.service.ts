@@ -98,6 +98,18 @@ export class UpdateAiAgentConfigDto {
   @Max(365)
   memoryRetentionDays?: number;
 
+  @IsOptional()
+  @IsBoolean()
+  closeOnExitCommand?: boolean;
+
+  @IsOptional()
+  @IsString({ each: true })
+  exitCommands?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  resetDraftOnSessionClose?: boolean;
+
   /** Quando true o tenant herda config global; quando false usa override próprio */
   @IsOptional()
   @IsBoolean()
@@ -129,6 +141,9 @@ export interface EffectiveAiAgentConfig {
   rememberPreferences: boolean;
   allowRepeatLastOrder: boolean;
   memoryRetentionDays: number;
+  closeOnExitCommand: boolean;
+  exitCommands: string[];
+  resetDraftOnSessionClose: boolean;
   tenant: { name: string };
   /** Metadados de resolução para diagnóstico */
   _resolution: {
@@ -183,6 +198,9 @@ export class AiAgentConfigService {
           rememberPreferences: false,
           allowRepeatLastOrder: false,
           memoryRetentionDays: 180,
+          closeOnExitCommand: true,
+          exitCommands: ['#sair', 'sair', 'encerrar', 'encerrar atendimento', 'cancelar atendimento', '#exit', 'exit'],
+          resetDraftOnSessionClose: true,
         },
         include: {
           tenant: {
@@ -227,6 +245,13 @@ export class AiAgentConfigService {
       memoryRetentionDays: globalCfg?.aiMemoryRetentionDays ?? 180,
       debounceMs: globalCfg?.aiDebounceMs ?? 10000,
       simulateTyping: globalCfg?.aiSimulateTyping ?? true,
+      sessionTimeoutMin: globalCfg?.aiSessionTimeoutMin ?? 120,
+      closeOnExitCommand: globalCfg?.aiCloseOnExitCommand ?? true,
+      exitCommands: globalCfg?.aiExitCommands ?? ['#sair', 'sair', 'encerrar', 'encerrar atendimento', 'cancelar atendimento', '#exit', 'exit'],
+      resetDraftOnSessionClose: globalCfg?.aiResetDraftOnSessionClose ?? true,
+      maxRetries: globalCfg?.aiMaxRetries ?? 3,
+      dailyMessageLimit: globalCfg?.aiDailyMessageLimit ?? 1000,
+      customerCooldownMin: globalCfg?.aiCustomerCooldownMin ?? 5,
     };
 
     // --- 2. Preset do Plano ---
@@ -293,7 +318,7 @@ export class AiAgentConfigService {
         handoffPolicy: tenantCfg.handoffPolicy,
         fallbackMessage: tenantCfg.fallbackMessage,
         maxRetries: tenantCfg.maxRetries,
-        sessionTimeoutMin: tenantCfg.sessionTimeoutMin,
+        sessionTimeoutMin: merged.sessionTimeoutMin,
         dailyMessageLimit: tenantCfg.dailyMessageLimit,
         customerCooldownMin: tenantCfg.customerCooldownMin,
         simulateTyping: merged.simulateTyping,
@@ -305,6 +330,9 @@ export class AiAgentConfigService {
         rememberPreferences: merged.rememberPreferences,
         allowRepeatLastOrder: merged.allowRepeatLastOrder,
         memoryRetentionDays: merged.memoryRetentionDays,
+        closeOnExitCommand: merged.closeOnExitCommand,
+        exitCommands: merged.exitCommands,
+        resetDraftOnSessionClose: merged.resetDraftOnSessionClose,
         tenant: tenantCfg.tenant,
         _resolution: {
           source: planPresetName ? 'plan_override' : 'global_only',
@@ -341,6 +369,9 @@ export class AiAgentConfigService {
         customerCooldownMin: tenantCfg.customerCooldownMin,
         simulateTyping: tenantCfg.simulateTyping,
         debounceMs: tenantCfg.debounceMs,
+        closeOnExitCommand: tenantCfg.closeOnExitCommand,
+        exitCommands: tenantCfg.exitCommands,
+        resetDraftOnSessionClose: tenantCfg.resetDraftOnSessionClose,
         ...withPlanRestrictions,
         tenant: tenantCfg.tenant,
         _resolution: {
@@ -388,6 +419,9 @@ export class AiAgentConfigService {
       allowRepeatLastOrder: dto.allowRepeatLastOrder,
       memoryRetentionDays: dto.memoryRetentionDays,
       useGlobalDefaults: dto.useGlobalDefaults,
+      closeOnExitCommand: dto.closeOnExitCommand,
+      exitCommands: dto.exitCommands,
+      resetDraftOnSessionClose: dto.resetDraftOnSessionClose,
     };
 
     // Remove campos apenas se forem undefined (PATCH semântico)

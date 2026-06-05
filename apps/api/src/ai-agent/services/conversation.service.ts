@@ -747,9 +747,34 @@ export class ConversationService {
   }
 
   /**
+   * Obtém a configuração de se deve limpar o rascunho de pedido ao expirar/fechar a sessão
+   */
+  async getResetDraftSetting(sessionId: string): Promise<boolean> {
+    const session = await this.prisma.chatSession.findUnique({
+      where: { id: sessionId },
+      select: { tenantId: true },
+    });
+
+    if (!session) {
+      return true;
+    }
+
+    const config = await this.prisma.aiAgentConfig.findUnique({
+      where: { tenantId: session.tenantId },
+    });
+
+    if (!config || config.useGlobalDefaults) {
+      const globalConfig = await this.prisma.systemConfig.findFirst();
+      return globalConfig?.aiResetDraftOnSessionClose ?? true;
+    }
+
+    return config.resetDraftOnSessionClose;
+  }
+
+  /**
    * Remove o contexto temporário de IA que não deve ser preservado entre sessões.
    */
-  async clearSessionTemporaryAiMemory(sessionId: string): Promise<void> {
+  async clearSessionTemporaryAiMemory(sessionId: string, resetDraftOnSessionClose: boolean = true): Promise<void> {
     const session = await this.prisma.chatSession.findUnique({
       where: { id: sessionId },
       select: { metadata: true },
@@ -763,7 +788,9 @@ export class ConversationService {
     delete nextAi.lastProcessedMessageId;
     delete nextAi.pendingCustomerMessageIds;
     delete nextAi.currentIntent;
-    delete nextAi.orderDraft;
+    if (resetDraftOnSessionClose) {
+      delete nextAi.orderDraft;
+    }
     delete nextAi.toolFailures;
 
     metadata.ai = nextAi;
@@ -775,7 +802,8 @@ export class ConversationService {
   }
 
   async expireSession(sessionId: string, reason: string = 'timeout') {
-    await this.clearSessionTemporaryAiMemory(sessionId);
+    const resetDraft = await this.getResetDraftSetting(sessionId);
+    await this.clearSessionTemporaryAiMemory(sessionId, resetDraft);
 
     const session = await this.prisma.chatSession.update({
       where: { id: sessionId },
@@ -811,7 +839,8 @@ export class ConversationService {
    * Encerra a sessão totalmente.
    */
   async closeSession(sessionId: string, reason?: string) {
-    await this.clearSessionTemporaryAiMemory(sessionId);
+    const resetDraft = await this.getResetDraftSetting(sessionId);
+    await this.clearSessionTemporaryAiMemory(sessionId, resetDraft);
 
     const session = await this.prisma.chatSession.update({
       where: { id: sessionId },
@@ -999,8 +1028,9 @@ export class ConversationService {
   async closeSessionByCustomerExit(sessionId: string, exitCommand: string): Promise<{ session: ChatSession; message: ChatMessage }> {
     const now = new Date();
 
+    const resetDraft = await this.getResetDraftSetting(sessionId);
     // Limpa contexto temporário
-    await this.clearSessionTemporaryAiMemory(sessionId);
+    await this.clearSessionTemporaryAiMemory(sessionId, resetDraft);
 
     // Marca sessão como fechada
     const session = await this.prisma.chatSession.update({

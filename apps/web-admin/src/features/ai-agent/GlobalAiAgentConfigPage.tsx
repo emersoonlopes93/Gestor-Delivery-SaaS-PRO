@@ -35,7 +35,9 @@ type BooleanConfigKey =
   | 'aiRequireCustomerName'
   | 'aiRequireConfirmation'
   | 'aiEnableUpsell'
-  | 'aiEnableHumanHandoff';
+  | 'aiEnableHumanHandoff'
+  | 'aiCloseOnExitCommand'
+  | 'aiResetDraftOnSessionClose';
 
 interface GlobalAiConfig {
   id: string;
@@ -55,6 +57,13 @@ interface GlobalAiConfig {
   aiRequireConfirmation: boolean;
   aiEnableUpsell: boolean;
   aiEnableHumanHandoff: boolean;
+  aiSessionTimeoutMin: number;
+  aiCloseOnExitCommand: boolean;
+  aiExitCommands: string[];
+  aiResetDraftOnSessionClose: boolean;
+  aiMaxRetries: number;
+  aiDailyMessageLimit: number;
+  aiCustomerCooldownMin: number;
   updatedAt?: string;
   defaultAiProvider?: string;
   googleAiModel?: string;
@@ -376,6 +385,13 @@ export function GlobalAiAgentConfigPage() {
         anthropicModel: config.anthropicModel,
         fallbackAiProvider: config.fallbackAiProvider,
         fallbackAiModel: config.fallbackAiModel,
+        aiSessionTimeoutMin: config.aiSessionTimeoutMin,
+        aiCloseOnExitCommand: config.aiCloseOnExitCommand,
+        aiExitCommands: config.aiExitCommands,
+        aiResetDraftOnSessionClose: config.aiResetDraftOnSessionClose,
+        aiMaxRetries: config.aiMaxRetries,
+        aiDailyMessageLimit: config.aiDailyMessageLimit,
+        aiCustomerCooldownMin: config.aiCustomerCooldownMin,
       };
       const res = await api.patch<GlobalAiConfig>('/admin/ai-agent/global-config', updateData);
       if (res.success) {
@@ -784,14 +800,45 @@ export function GlobalAiAgentConfigPage() {
           <Field label="Tom padrão">
             <input value={config.aiDefaultTone} onChange={(e) => updateConfig('aiDefaultTone', e.target.value)} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm" />
           </Field>
-          <Field label="Debounce de mensagens">
+          <Field label="Debounce de mensagens (ms)">
             <input type="number" min={1000} max={30000} value={config.aiDebounceMs} onChange={(e) => updateConfig('aiDebounceMs', Number(e.target.value))} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm" />
           </Field>
-          <ToggleRow label="Simular digitação" checked={config.aiSimulateTyping} onChange={() => toggleConfig('aiSimulateTyping')} />
-          <ToggleRow label="Exigir nome do cliente" checked={config.aiRequireCustomerName} onChange={() => toggleConfig('aiRequireCustomerName')} />
-          <ToggleRow label="Exigir confirmação explícita" checked={config.aiRequireConfirmation} onChange={() => toggleConfig('aiRequireConfirmation')} />
-          <ToggleRow label="Habilitar upsell" checked={config.aiEnableUpsell} onChange={() => toggleConfig('aiEnableUpsell')} />
-          <ToggleRow label="Habilitar handoff humano" checked={config.aiEnableHumanHandoff} onChange={() => toggleConfig('aiEnableHumanHandoff')} />
+          <Field label="Expiração de sessão (minutos)">
+            <input type="number" min={1} max={10080} value={config.aiSessionTimeoutMin ?? 120} onChange={(e) => updateConfig('aiSessionTimeoutMin', Number(e.target.value))} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm" />
+          </Field>
+          <Field label="Máximo de retentativas">
+            <input type="number" min={1} max={10} value={config.aiMaxRetries ?? 3} onChange={(e) => updateConfig('aiMaxRetries', Number(e.target.value))} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm" />
+          </Field>
+          <Field label="Limite de mensagens diárias">
+            <input type="number" min={1} max={100000} value={config.aiDailyMessageLimit ?? 1000} onChange={(e) => updateConfig('aiDailyMessageLimit', Number(e.target.value))} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm" />
+          </Field>
+          <Field label="Cooldown do cliente (minutos)">
+            <input type="number" min={1} max={1440} value={config.aiCustomerCooldownMin ?? 5} onChange={(e) => updateConfig('aiCustomerCooldownMin', Number(e.target.value))} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm" />
+          </Field>
+
+          <div className="space-y-3 col-span-full grid gap-3 lg:grid-cols-2">
+            <ToggleRow label="Simular digitação" checked={config.aiSimulateTyping} onChange={() => toggleConfig('aiSimulateTyping')} />
+            <ToggleRow label="Exigir nome do cliente" checked={config.aiRequireCustomerName} onChange={() => toggleConfig('aiRequireCustomerName')} />
+            <ToggleRow label="Exigir confirmação explícita" checked={config.aiRequireConfirmation} onChange={() => toggleConfig('aiRequireConfirmation')} />
+            <ToggleRow label="Habilitar upsell" checked={config.aiEnableUpsell} onChange={() => toggleConfig('aiEnableUpsell')} />
+            <ToggleRow label="Habilitar handoff humano" checked={config.aiEnableHumanHandoff} onChange={() => toggleConfig('aiEnableHumanHandoff')} />
+            <ToggleRow label="Ativar comando #Sair" checked={config.aiCloseOnExitCommand ?? true} onChange={() => toggleConfig('aiCloseOnExitCommand')} />
+            <ToggleRow label="Limpar pedido ao expirar/encerrar" checked={config.aiResetDraftOnSessionClose ?? true} onChange={() => toggleConfig('aiResetDraftOnSessionClose')} />
+          </div>
+
+          {(config.aiCloseOnExitCommand ?? true) && (
+            <div className="col-span-full">
+              <Field label="Comandos de saída customizados (separados por vírgula)">
+                <textarea
+                  value={(config.aiExitCommands ?? []).join(', ')}
+                  onChange={(e) => updateConfig('aiExitCommands', e.target.value.split(',').map(cmd => cmd.trim()).filter(cmd => cmd.length > 0))}
+                  placeholder="#sair, sair, encerrar, cancelar"
+                  className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-md outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                  rows={2}
+                />
+              </Field>
+            </div>
+          )}
         </section>
       )}
 

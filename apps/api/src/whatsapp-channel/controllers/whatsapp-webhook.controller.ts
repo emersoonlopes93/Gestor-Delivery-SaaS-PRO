@@ -385,7 +385,7 @@ export class WhatsAppWebhookController {
       }
 
       // Detecta comando de saída do cliente (ex: #Sair, sair, encerrar)
-      if (isExitCommand(content)) {
+      if (config.closeOnExitCommand && isExitCommand(content, config.exitCommands)) {
         AiFlowLogger.flow('exit_command_detected', trace, {
           sessionId: session.id,
           command: content.trim(),

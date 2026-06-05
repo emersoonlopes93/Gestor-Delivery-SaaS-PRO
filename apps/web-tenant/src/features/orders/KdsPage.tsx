@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, Clock, CheckCircle2, ChefHat } from 'lucide-react';
-import { 
+import {
   KdsPrintJobDTO,
   PrintJobStatus,
 } from '@gestor/types';
@@ -82,7 +82,7 @@ export function KdsPage() {
   const handlePrint = (content: string) => {
     const printWindow = window.open('', '_blank', 'width=300,height=600');
     if (!printWindow) return;
-    
+
     printWindow.document.write(`
       <html>
         <head>
@@ -126,9 +126,9 @@ export function KdsPage() {
           </h1>
           <p className="text-sm text-muted-foreground mt-1">Gestão de Produção Individualizada</p>
         </div>
-        
+
         <div className="flex items-center gap-3">
-          <select 
+          <select
             value={stationId}
             onChange={(e) => setStationId(e.target.value)}
             className="bg-card border border-input text-foreground text-sm rounded-lg focus:ring-ring focus:border-primary block w-full p-2.5 font-bold shadow-sm"
@@ -138,7 +138,7 @@ export function KdsPage() {
               <option key={st} value={st}>SETOR: {st}</option>
             ))}
           </select>
-          
+
           <button onClick={fetchJobs} className="p-2.5 bg-card border border-border rounded-lg hover:bg-muted transition-colors shadow-sm" title="Atualizar">
             <RefreshCw className={`w-5 h-5 text-foreground ${updatingId ? 'animate-spin' : ''}`} />
           </button>
@@ -164,8 +164,8 @@ export function KdsPage() {
             const order = job.order;
             const scheduledForStr = order?.scheduledFor ? new Date(order.scheduledFor).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
             return (
-              <div 
-                key={job.id} 
+              <div
+                key={job.id}
                 className="min-w-[340px] w-[340px] rounded-2xl flex flex-col max-h-full border-2 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.2)] snap-start bg-amber-50/50 dark:bg-amber-950/10"
               >
                 <header className="p-4 rounded-t-xl flex flex-col items-start shrink-0 bg-amber-500 text-amber-950">
@@ -181,9 +181,9 @@ export function KdsPage() {
                 </header>
 
                 <div className="p-5 overflow-y-auto grow bg-transparent">
-                   <pre className="whitespace-pre-wrap font-mono text-xs text-amber-950 dark:text-amber-50 leading-tight bg-white/50 dark:bg-black/50 p-3 rounded-lg border border-amber-500/20">
-                     {job.content}
-                   </pre>
+                  <pre className="whitespace-pre-wrap font-mono text-xs text-amber-950 dark:text-amber-50 leading-tight bg-white/50 dark:bg-black/50 p-3 rounded-lg border border-amber-500/20">
+                    {job.content}
+                  </pre>
                 </div>
 
                 <footer className="p-4 rounded-b-2xl border-t border-amber-500/20 shrink-0 flex flex-col gap-2">
@@ -211,8 +211,8 @@ export function KdsPage() {
             const isUrgent = elapsed > 15;
 
             return (
-              <div 
-                key={job.id} 
+              <div
+                key={job.id}
                 className={`min-w-[340px] w-[340px] rounded-2xl flex flex-col max-h-full border border-border shadow-sm snap-start bg-card`}
               >
                 <header className={`p-4 rounded-t-2xl flex justify-between items-start shrink-0 ${isUrgent ? 'bg-destructive' : 'bg-secondary'}`}>
@@ -228,9 +228,9 @@ export function KdsPage() {
                 </header>
 
                 <div className="p-5 overflow-y-auto grow bg-card">
-                   <pre className="whitespace-pre-wrap font-mono text-xs text-foreground leading-tight bg-muted p-3 rounded-lg border border-border">
-                     {job.content}
-                   </pre>
+                  <pre className="whitespace-pre-wrap font-mono text-xs text-foreground leading-tight bg-muted p-3 rounded-lg border border-border">
+                    {job.content}
+                  </pre>
                 </div>
 
                 <footer className="p-4 bg-card rounded-b-2xl border-t border-border shrink-0 flex flex-col gap-2">

@@ -2162,6 +2162,13 @@ model SystemConfig {
   aiRequireConfirmation  Boolean @default(true) @map("ai_require_confirmation")
   aiEnableUpsell         Boolean @default(false) @map("ai_enable_upsell")
   aiEnableHumanHandoff   Boolean @default(true) @map("ai_enable_human_handoff")
+  aiSessionTimeoutMin    Int     @default(120) @map("ai_session_timeout_min")
+  aiCloseOnExitCommand   Boolean @default(true) @map("ai_close_on_exit_command")
+  aiExitCommands         String[] @map("ai_exit_commands")
+  aiResetDraftOnSessionClose Boolean @default(true) @map("ai_reset_draft_on_session_close")
+  aiMaxRetries           Int     @default(3) @map("ai_max_retries")
+  aiDailyMessageLimit    Int     @default(1000) @map("ai_daily_message_limit")
+  aiCustomerCooldownMin  Int     @default(5) @map("ai_customer_cooldown_min")
 
   @@map("system_configs")
 }
@@ -2195,6 +2202,9 @@ model AiAgentConfig {
   rememberPreferences  Boolean  @default(false) @map("remember_preferences")
   allowRepeatLastOrder Boolean  @default(false) @map("allow_repeat_last_order")
   memoryRetentionDays  Int      @default(180) @map("memory_retention_days")
+  closeOnExitCommand   Boolean  @default(true) @map("close_on_exit_command")
+  exitCommands         String[] @map("exit_commands")
+  resetDraftOnSessionClose Boolean @default(true) @map("reset_draft_on_session_close")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
   tenant               Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)

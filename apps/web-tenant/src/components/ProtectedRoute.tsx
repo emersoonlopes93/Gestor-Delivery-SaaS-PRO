@@ -20,6 +20,17 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Intercepta impersonate_token se fornecido na URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const impersonateToken = urlParams.get('impersonate_token');
+    if (impersonateToken) {
+      localStorage.setItem('accessToken', impersonateToken);
+      // Remove o query param da URL sem causar reload
+      const url = new URL(window.location.href);
+      url.searchParams.delete('impersonate_token');
+      window.history.replaceState({}, '', url.pathname + url.search);
+    }
+
     const token = localStorage.getItem('accessToken');
     if (!token) {
       clearUser();

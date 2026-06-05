@@ -774,7 +774,8 @@ export class AiOrchestratorService {
       });
 
       const normalizedContent = _content.trim().toLowerCase();
-      if (normalizedContent === '#sair') {
+      const isExit = config.closeOnExitCommand && (config.exitCommands || []).some(cmd => normalizedContent === cmd.toLowerCase() || normalizedContent.startsWith(cmd.toLowerCase() + ' '));
+      if (isExit) {
         AiFlowLogger.flow('customer_exit_command', trace, {
           sessionId: session.id,
           customerPhone,
