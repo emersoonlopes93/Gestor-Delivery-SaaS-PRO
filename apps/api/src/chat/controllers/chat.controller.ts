@@ -259,6 +259,7 @@ export class ChatController {
           lastMessageAt: s.lastMessageAt,
           lastMessage: visibleMessages[0]?.content || null,
           handoffActive: s.handoffActive,
+          handoffUntil: s.handoffUntil,
           unreadCount: s.unreadCount,
           aiAttentionRequired: aiSummary.attentionRequired,
           aiBlockedTools: aiSummary.blockedTools,
@@ -396,9 +397,26 @@ export class ChatController {
       },
     });
 
+    const config = await this.prisma.aiAgentConfig.findUnique({
+      where: { tenantId: session.tenantId },
+      select: { humanInterventionEnabled: true, humanInterventionMinutes: true },
+    });
+
+    const updateData: Prisma.ChatSessionUpdateInput = { lastMessageAt: new Date() };
+
+    if (config?.humanInterventionEnabled) {
+      updateData.handoffActive = true;
+      updateData.handoffOperator = 'human';
+      updateData.handoffReason = 'Intervenção humana (mensagem enviada pelo atendente)';
+      updateData.handoffAt = new Date();
+      const until = new Date();
+      until.setMinutes(until.getMinutes() + (config.humanInterventionMinutes || 15));
+      updateData.handoffUntil = until;
+    }
+
     await this.prisma.chatSession.update({
       where: { id: sessionId },
-      data: { lastMessageAt: new Date() },
+      data: updateData,
     });
 
     return message;

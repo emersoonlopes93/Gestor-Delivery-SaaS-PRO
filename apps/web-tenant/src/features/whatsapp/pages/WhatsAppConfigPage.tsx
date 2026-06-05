@@ -30,6 +30,9 @@ interface AiAgentConfig {
   customInstructions: string;
   simulateTyping: boolean;
   debounceMs: number;
+  humanInterventionEnabled: boolean;
+  humanInterventionMinutes: number;
+  resumeAutomatically: boolean;
 }
 
 interface WhatsAppStatusResponse {
@@ -132,6 +135,9 @@ export function WhatsAppConfigPage() {
         customInstructions: data.customInstructions,
         simulateTyping: data.simulateTyping,
         debounceMs: data.debounceMs,
+        humanInterventionEnabled: data.humanInterventionEnabled,
+        humanInterventionMinutes: data.humanInterventionMinutes,
+        resumeAutomatically: data.resumeAutomatically,
       };
       await api.patch('/ai-agent/config', cleanData);
     },
@@ -591,6 +597,45 @@ export function WhatsAppConfigPage() {
                    onChange={(e) => setFormAi(prev => prev ? {...prev, debounceMs: parseInt(e.target.value)} : null)}
                  />
                  <p className="text-[10px] text-muted-foreground italic">Tempo de espera após a última mensagem do cliente antes da IA começar a processar.</p>
+               </div>
+               
+               <div className="pt-4 border-t border-border space-y-4">
+                 <div className="flex items-center justify-between">
+                   <div className="space-y-0.5">
+                     <label className="text-sm font-medium text-foreground">Pausa por Intervenção Humana</label>
+                     <p className="text-xs text-muted-foreground">Pausar IA automaticamente quando um atendente responder</p>
+                   </div>
+                   <label className="relative inline-flex items-center cursor-pointer">
+                     <input 
+                       type="checkbox" 
+                       className="sr-only peer" 
+                       checked={formAi?.humanInterventionEnabled ?? true} 
+                       onChange={(e) => setFormAi(prev => prev ? {...prev, humanInterventionEnabled: e.target.checked} : null)}
+                     />
+                     <div className="w-9 h-5 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                   </label>
+                 </div>
+
+                 {(formAi?.humanInterventionEnabled ?? true) && (
+                   <div className="space-y-2">
+                     <label className="text-sm font-medium text-foreground">Tempo de Pausa</label>
+                     <select 
+                       className="w-full px-3 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring bg-card text-foreground"
+                       value={formAi?.humanInterventionMinutes ?? 15}
+                       onChange={(e) => setFormAi(prev => prev ? {...prev, humanInterventionMinutes: parseInt(e.target.value)} : null)}
+                     >
+                       <option value={5}>5 minutos</option>
+                       <option value={10}>10 minutos</option>
+                       <option value={15}>15 minutos</option>
+                       <option value={30}>30 minutos</option>
+                       <option value={60}>1 hora</option>
+                       <option value={120}>2 horas</option>
+                     </select>
+                     <p className="text-[10px] text-muted-foreground italic">
+                       Se o cliente responder durante este período, a IA não irá interferir.
+                     </p>
+                   </div>
+                 )}
                </div>
              </div>
 

@@ -37,6 +37,7 @@ export interface ChatSession {
   handoffReason?: string;
   handoffOperator?: string;
   handoffAt?: string;
+  handoffUntil?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -88,6 +89,7 @@ export interface ChatSessionListItem {
   lastMessageAt: string;
   lastMessage: string | null;
   handoffActive: boolean;
+  handoffUntil?: string | null;
   unreadCount?: number;
   aiAttentionRequired?: boolean;
   aiBlockedTools?: string[];

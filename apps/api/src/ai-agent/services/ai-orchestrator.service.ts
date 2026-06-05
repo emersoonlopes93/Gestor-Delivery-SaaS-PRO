@@ -804,8 +804,14 @@ export class AiOrchestratorService {
       }
 
       if (session.handoffActive) {
-        AiFlowLogger.ignored('human_handoff', trace, { sessionId: session.id });
-        return;
+        if (session.handoffUntil && new Date() > session.handoffUntil) {
+          AiFlowLogger.flow('human_handoff_expired', trace, { sessionId: session.id });
+          await this.conversationService.deactivateHandoff(session.id);
+          session.handoffActive = false;
+        } else {
+          AiFlowLogger.ignored('human_handoff', trace, { sessionId: session.id });
+          return;
+        }
       }
 
       const aiMemory = await this.conversationService.getSessionAiMemory(session.id);

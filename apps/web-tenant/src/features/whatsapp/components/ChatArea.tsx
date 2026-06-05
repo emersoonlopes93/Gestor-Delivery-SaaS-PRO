@@ -369,6 +369,15 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
               })}
             </p>
           )}
+          {session.handoffUntil && (
+            <p>
+              <span className="font-semibold text-muted-foreground">IA retoma em:</span>{' '}
+              {new Date(session.handoffUntil).toLocaleString('pt-BR', {
+                dateStyle: 'short',
+                timeStyle: 'short',
+              })}
+            </p>
+          )}
         </div>
       )}
 

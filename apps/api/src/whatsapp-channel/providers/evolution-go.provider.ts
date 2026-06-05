@@ -562,11 +562,8 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         return null;
       }
 
-      // Ignorar mensagens enviadas pelo próprio bot
-      if (info?.IsFromMe === true || info?.fromMe === true) {
-        AiFlowLogger.ignored('from_me', ctx);
-        return null;
-      }
+      // Vamos capturar mensagens fromMe para disparar o Handoff Automático
+      const isFromMe = info?.IsFromMe === true || info?.fromMe === true;
 
       let content = '';
       if (typeof message.conversation === 'string') content = message.conversation;
@@ -604,6 +601,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         messageType: 'text',
         externalId: messageId,
         pushName: pushName || undefined,
+        isFromMe,
         raw: payload,
       };
     }
@@ -623,7 +621,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
       }
 
       if (!remoteJid || remoteJid.includes('@g.us')) return null;
-      if (key?.fromMe) return null;
+      const isFromMe = key?.fromMe === true;
 
       const content = this.extractMessageContent(data);
       if (!content) return null;
@@ -637,6 +635,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         content,
         messageType: this.detectMessageType(data),
         externalId: String(key?.id || data?.messageId || data?.id),
+        isFromMe,
         raw: payload
       };
     }

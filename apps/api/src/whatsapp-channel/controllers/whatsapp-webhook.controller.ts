@@ -220,7 +220,7 @@ export class WhatsAppWebhookController {
     event: WhatsAppWebhookEvent,
     trace: ReturnType<typeof createAiTrace>,
   ) {
-    const { tenantId, from: phone, content, messageType, externalId, chatJid, pushName } = event;
+    const { tenantId, from: phone, content, messageType, externalId, chatJid, pushName, isFromMe } = event;
     trace.tenantId = tenantId;
     trace.phone = phone;
     trace.chatJid = chatJid;
@@ -317,27 +317,48 @@ export class WhatsAppWebhookController {
         sessionTimeoutMin: config.sessionTimeoutMin,
       });
 
+      let updateSessionData: any = {
+        customerId: customerId || undefined,
+        displayName: displayName || undefined,
+        remoteJid: chatJid,
+        closedAt: null,
+      };
+
+      if (isFromMe) {
+        updateSessionData.lastMessageAt = new Date();
+        const dbConfig = await this.prisma.aiAgentConfig.findUnique({
+          where: { tenantId },
+          select: { humanInterventionEnabled: true, humanInterventionMinutes: true },
+        });
+
+        if (dbConfig?.humanInterventionEnabled) {
+          updateSessionData.handoffActive = true;
+          updateSessionData.handoffOperator = 'human';
+          updateSessionData.handoffReason = 'Intervenção humana via WhatsApp (aparelho)';
+          updateSessionData.handoffAt = new Date();
+          const until = new Date();
+          until.setMinutes(until.getMinutes() + (dbConfig.humanInterventionMinutes || 15));
+          updateSessionData.handoffUntil = until;
+        }
+      } else {
+        updateSessionData.unreadCount = { increment: 1 };
+      }
+
       await this.prisma.chatSession.update({
         where: { id: session.id },
-        data: {
-          customerId: customerId || undefined,
-          displayName: displayName || undefined,
-          remoteJid: chatJid,
-          closedAt: null,
-          unreadCount: { increment: 1 },
-        },
+        data: updateSessionData,
       });
 
       try {
         await this.prisma.chatMessage.create({
           data: {
             sessionId: session.id,
-            direction: 'inbound',
-            senderType: 'customer',
+            direction: isFromMe ? 'outbound' : 'inbound',
+            senderType: isFromMe ? 'human' : 'customer',
             content,
             messageType: messageType || 'text',
             externalId: externalId || undefined,
-            externalStatus: 'delivered',
+            externalStatus: isFromMe ? 'sent' : 'delivered',
             timestamp: new Date(),
           },
         });
@@ -358,8 +379,8 @@ export class WhatsAppWebhookController {
         senderType: 'customer',
       });
 
-      if (session.handoffActive) {
-        AiFlowLogger.ignored('human_handoff', trace, { sessionId: session.id });
+      if (session.handoffActive || isFromMe) {
+        AiFlowLogger.ignored('human_handoff', trace, { sessionId: session.id, isFromMe });
         return;
       }
 
