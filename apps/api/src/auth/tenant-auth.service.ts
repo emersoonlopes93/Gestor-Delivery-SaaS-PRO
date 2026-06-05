@@ -11,6 +11,16 @@ import { PrismaService } from '../database/prisma.service';
 import { TenantStatus } from '@gestor/core';
 import type { TenantJwtPayload } from '@gestor/types';
 
+// Slug generator
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '');
+}
+
 @Injectable()
 export class TenantAuthService {
   private readonly logger = new Logger('TenantAuthService');
@@ -126,6 +136,178 @@ export class TenantAuthService {
 
     this.logger.log(
       `Tenant user logged in: ${normalizedEmail} (tenant: ${user.tenant.slug})`,
+    );
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        tenantId: user.tenantId,
+        roles,
+        permissions,
+        tenant: {
+          id: user.tenant.id,
+          name: user.tenant.name,
+          slug: user.tenant.slug,
+          status: user.tenant.status,
+        },
+        onboardingCompletedAt: user.tenant.onboarding?.completedAt?.toISOString() || null,
+      },
+    };
+  }
+
+  /**
+   * Register a new Tenant (SaaS Provisioning)
+   */
+  async register(
+    ownerName: string,
+    shopName: string,
+    phone: string,
+    email: string,
+    passwordRaw: string,
+  ) {
+    const normalizedEmail = email.toLowerCase();
+    
+    // Validate if user email already exists across the system
+    const existingUser = await this.prisma.tenantUser.findFirst({
+      where: { email: normalizedEmail },
+    });
+    if (existingUser) {
+      throw new UnauthorizedException('E-mail já está em uso.');
+    }
+
+    let slug = generateSlug(shopName);
+    const existingTenant = await this.prisma.tenant.findUnique({ where: { slug } });
+    if (existingTenant) {
+      slug = `${slug}-${Math.floor(Math.random() * 1000)}`;
+    }
+
+    const passwordHash = await bcrypt.hash(passwordRaw, 10);
+
+    // Run provisioning inside a transaction
+    const user = await this.prisma.$transaction(async (tx) => {
+      // Create Tenant
+      const tenant = await tx.tenant.create({
+        data: {
+          name: shopName,
+          slug,
+          status: TenantStatus.ACTIVE,
+          
+          // Default modules
+          onboarding: {
+            create: {
+              stepBasicInfo: false,
+              stepOperatingHours: false,
+              stepLogo: false,
+              stepAddress: false,
+              stepDelivery: false,
+              stepPayments: false,
+              stepWhatsapp: false,
+              stepMenu: false,
+              stepCatalog: false,
+              stepFirstOrder: false,
+            }
+          },
+          settings: {
+            create: {}
+          },
+          aiAgentConfig: {
+            create: {
+              isEnabled: false,
+              useGlobalDefaults: true,
+              humanInterventionEnabled: true,
+              humanInterventionMinutes: 15,
+              resumeAutomatically: true,
+            }
+          },
+          schedulingSettings: {
+            create: {
+              enabled: false,
+              maximumAdvanceDays: 7,
+              timezone: 'America/Sao_Paulo',
+            }
+          },
+          users: {
+            create: {
+              name: ownerName,
+              email: normalizedEmail,
+              passwordHash,
+              isActive: true,
+            }
+          }
+        },
+        include: {
+          users: true,
+        }
+      });
+
+      const createdUser = tenant.users[0];
+
+      // Assign Owner Role
+      let ownerRole = await tx.tenantRole.findFirst({ where: { slug: 'owner', tenantId: tenant.id } });
+      if (!ownerRole) {
+         // Create default role if it doesn't exist
+         ownerRole = await tx.tenantRole.create({
+           data: { name: 'Owner', slug: 'owner', tenantId: tenant.id, isSystem: true }
+         });
+      }
+
+      await tx.tenantUserRole.create({
+        data: {
+          userId: createdUser.id,
+          roleId: ownerRole.id,
+        }
+      });
+
+      // Load full user details to generate token
+      return tx.tenantUser.findUniqueOrThrow({
+        where: { id: createdUser.id },
+        include: {
+          tenant: { include: { onboarding: true } },
+          userRoles: {
+            include: {
+              role: {
+                include: {
+                  rolePermissions: {
+                    include: { permission: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    // Build permissions from roles
+    const roles = user.userRoles.map((ur) => ur.role?.slug).filter(Boolean);
+    const permissions = [
+      ...new Set(
+        user.userRoles.flatMap((ur) =>
+          ur.role?.rolePermissions.map((rp) => rp.permission?.slug) || [],
+        ).filter(Boolean),
+      ),
+    ];
+
+    // Generate tokens
+    const payload: TenantJwtPayload = {
+      sub: user.id,
+      tenantId: user.tenantId,
+      type: 'tenant',
+      email: user.email,
+    };
+
+    const accessToken = this.jwtService.sign(payload);
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: this.config.get('JWT_REFRESH_SECRET', 'dev-refresh-secret'),
+      expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN', '7d'),
+    });
+
+    this.logger.log(
+      `New Tenant provisioned: ${slug} by ${normalizedEmail}`,
     );
 
     return {

@@ -11,6 +11,12 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
 import { useStorefrontThemeStore } from './stores/theme.store';
 
+import { SaasLayout } from './layouts/SaasLayout';
+import { SaasLandingPage } from './pages/SaasLandingPage';
+import { SaasPricingPage } from './pages/SaasPricingPage';
+import { SaasRegisterPage } from './pages/SaasRegisterPage';
+import { SaasRedirectLogin } from './pages/SaasRedirectLogin';
+
 export function App() {
   const initTheme = useStorefrontThemeStore((s) => s.initializeTheme);
   useEffect(() => {
@@ -21,30 +27,25 @@ export function App() {
     <ToastProvider>
       <ErrorBoundary>
         <Routes>
-        <Route element={<StorefrontLayout />}>
-          {/* The main storefront route with dynamic slug */}
-          <Route path="/:tenantSlug" element={<StorefrontPage />} />
+          {/* Public SaaS Routes */}
+          <Route element={<SaasLayout />}>
+            <Route path="/" element={<SaasLandingPage />} />
+            <Route path="/precos" element={<SaasPricingPage />} />
+          </Route>
           
-          {/* Checkout */}
-          <Route path="/:tenantSlug/checkout" element={<CheckoutPage />} />
+          <Route path="/cadastro" element={<SaasRegisterPage />} />
+          <Route path="/login" element={<SaasRedirectLogin />} />
 
-          {/* Order confirmation */}
-          <Route path="/:tenantSlug/order/:orderId" element={<OrderConfirmationPage />} />
+          {/* Tenant Storefront Routes */}
+          <Route element={<StorefrontLayout />}>
+            <Route path="/:tenantSlug" element={<StorefrontPage />} />
+            <Route path="/:tenantSlug/checkout" element={<CheckoutPage />} />
+            <Route path="/:tenantSlug/order/:orderId" element={<OrderConfirmationPage />} />
+            <Route path="/:tenantSlug/order/:orderId/tracking" element={<OrderTrackingPage />} />
+            <Route path="/:tenantSlug/orders" element={<OrdersHistoryPage />} />
+            <Route path="/:tenantSlug/tracking/:token" element={<PublicTrackingPage />} />
+          </Route>
 
-          {/* Tracking by order id (UX premium) */}
-          <Route path="/:tenantSlug/order/:orderId/tracking" element={<OrderTrackingPage />} />
-
-          {/* Orders history */}
-          <Route path="/:tenantSlug/orders" element={<OrdersHistoryPage />} />
-
-          {/* Public tracking */}
-          <Route path="/:tenantSlug/tracking/:token" element={<PublicTrackingPage />} />
-        </Route>
-
-        {/* Root redirect */}
-        <Route path="/" element={<div className="p-10 text-center">Gestor Delivery - Digite o slug da sua loja.</div>} />
-        
-        {/* Catch-all */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </ErrorBoundary>

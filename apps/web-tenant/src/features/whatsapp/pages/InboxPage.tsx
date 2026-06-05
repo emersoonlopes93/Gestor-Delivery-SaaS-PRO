@@ -218,7 +218,7 @@ export function InboxPage() {
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
             <select 
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
+              onChange={(e) => setStatusFilter(e.target.value as "closed" | "human" | "waiting" | "all" | "ai_active")}
               className="bg-background border border-border rounded-lg text-xs py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
             >
               <option value="all">Todos Status</option>
@@ -229,7 +229,7 @@ export function InboxPage() {
             
             <select 
               value={periodFilter}
-              onChange={(e) => setPeriodFilter(e.target.value as any)}
+              onChange={(e) => setPeriodFilter(e.target.value as "all" | "today" | "yesterday" | "7days")}
               className="bg-background border border-border rounded-lg text-xs py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
             >
               <option value="all">Todo Período</option>

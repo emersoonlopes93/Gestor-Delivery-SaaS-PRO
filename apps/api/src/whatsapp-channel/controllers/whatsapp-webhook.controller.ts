@@ -317,7 +317,7 @@ export class WhatsAppWebhookController {
         sessionTimeoutMin: config.sessionTimeoutMin,
       });
 
-      let updateSessionData: any = {
+      let updateSessionData: Record<string, unknown> = {
         customerId: customerId || undefined,
         displayName: displayName || undefined,
         remoteJid: chatJid,
