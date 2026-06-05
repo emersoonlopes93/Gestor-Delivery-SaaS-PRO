@@ -5,7 +5,7 @@ export function SaasRedirectLogin() {
   useEffect(() => {
     // Em um ambiente de produção real, redirecionamos para o subdomínio 'app.seudominio.com'
     // Como estamos local/homologação, redirecionamos para a porta ou path do web-tenant
-    const tenantUrl = import.meta.env.VITE_TENANT_URL || 'http://localhost:3000';
+    const tenantUrl = import.meta.env.VITE_TENANT_URL || 'http://localhost:5173';
     
     const timeout = setTimeout(() => {
       window.location.href = `${tenantUrl}/login`;
