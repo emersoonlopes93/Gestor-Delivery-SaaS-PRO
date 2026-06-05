@@ -148,20 +148,22 @@ async function main() {
        // Buscar ou forçar criar pedido
        let order = await prisma.order.findFirst({ where: { tenantId: tenant.id } });
        if (!order) {
-         order = await prisma.order.create({
-           data: {
-             tenantId: tenant.id,
-             orderNumber: 'CHECKOUT-001',
-             status: 'pending',
-             fulfillmentType: 'pickup',
-             customerName: 'Cliente do Agendamento',
-             customerPhone: '11999999999',
-             itemsSubtotal: 50,
-             total: 50,
-             isScheduled: true,
-             scheduledFor: available.startTime
-           }
-         });
+          order = await prisma.order.create({
+            data: {
+              tenant: { connect: { id: tenant.id } },
+              orderNumber: 'CHECKOUT-001',
+              status: 'pending',
+              fulfillmentType: 'pickup',
+              customerName: 'Cliente do Agendamento',
+              customerPhone: '11999999999',
+              itemsSubtotal: 50,
+              total: 50,
+              isScheduled: true,
+              scheduledFor: available.startTime,
+              idempotencyKey: `e2e-key-1-${Date.now()}`,
+              publicTrackingToken: `token-1-${Date.now()}`
+            }
+          });
        } else {
          order = await prisma.order.update({
            where: { id: order.id },
@@ -185,20 +187,22 @@ async function main() {
        // Teste de Limite de Capacidade (Criando segundo pedido, limite é 2)
        let order2 = await prisma.order.findFirst({ where: { tenantId: tenant.id, id: { not: order.id } } });
        if (!order2) {
-         order2 = await prisma.order.create({
-           data: {
-             tenantId: tenant.id,
-             orderNumber: 'CHECKOUT-002',
-             status: 'pending',
-             fulfillmentType: 'pickup',
-             customerName: 'Cliente 2',
-             customerPhone: '11888888888',
-             itemsSubtotal: 50,
-             total: 50,
-             isScheduled: true,
-             scheduledFor: available.startTime
-           }
-         });
+          order2 = await prisma.order.create({
+            data: {
+              tenant: { connect: { id: tenant.id } },
+              orderNumber: 'CHECKOUT-002',
+              status: 'pending',
+              fulfillmentType: 'pickup',
+              customerName: 'Cliente 2',
+              customerPhone: '11888888888',
+              itemsSubtotal: 50,
+              total: 50,
+              isScheduled: true,
+              scheduledFor: available.startTime,
+              idempotencyKey: `e2e-key-2-${Date.now()}`,
+              publicTrackingToken: `token-2-${Date.now()}`
+            }
+          });
        } else {
          order2 = await prisma.order.update({
            where: { id: order2.id },
@@ -237,8 +241,8 @@ async function main() {
     // Vamos chamar o executor da tool simulando a IA!
     if (schedulingTool) {
       await cls.run(tenant.id, async () => {
-         const toolResponse = await agentToolsService.executeTool('consultar_slots_agendamento', { data: new Date().toISOString().split('T')[0] }, tenant.id);
-         assert('IA consome diretamente as mesmas informações que a Storefront', typeof toolResponse === 'string' && toolResponse.includes('horários disponíveis'), 'Payload da IA respeita Ocupação Excedida sem inventar dados');
+          const toolResponse = await agentToolsService.executeTool(tenant.id, 'consultar_slots_agendamento', { data: new Date().toISOString().split('T')[0] });
+          assert('IA consome diretamente as mesmas informações que a Storefront', typeof toolResponse === 'object' && toolResponse !== null && 'mensagem' in toolResponse && (toolResponse as any).mensagem.includes('horários disponíveis'), 'Payload da IA respeita Ocupação Excedida sem inventar dados');
          // O output de console dessa function gera [AI_SCHEDULING] nos logs, nós comprovamos isso checando os fontes mais cedo.
       });
     }
@@ -276,7 +280,7 @@ async function main() {
     // ==========================================
     console.log('\n--- ETAPA 11: REGRESSÃO E SLOTS ÓRFÃOS ---');
     await cls.run(tenant.id, async () => {
-       const initialCount = await prisma.timeSlot.count({ where: { tenantId: tenant.id, status: 'available' } });
+       const initialCount = await prisma.timeSlot.count({ where: { tenantId: tenant.id, status: 'available', isActive: true } });
        // Desativar janela para hoje
        await prisma.schedulingWindow.updateMany({
          where: { tenantId: tenant.id, dayOfWeek: new Date().getDay() },
@@ -284,7 +288,7 @@ async function main() {
        });
        
        await generatorService.generateSlotsForNextDays();
-       const newCount = await prisma.timeSlot.count({ where: { tenantId: tenant.id, status: 'available' } });
+       const newCount = await prisma.timeSlot.count({ where: { tenantId: tenant.id, status: 'available', isActive: true } });
        
        assert('Remoção de Slots Órfãos na Regeneração', newCount < initialCount, `Antigos: ${initialCount}, Atuais (após close): ${newCount}. O sistema limpa automaticamente a disponibilidade da IA e Storefront.`);
     });

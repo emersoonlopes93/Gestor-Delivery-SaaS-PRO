@@ -30,22 +30,34 @@ export class SchedulingGeneratorService {
       return [];
     }
 
-    const windows = await this.prisma.schedulingWindow.findMany({ where: { tenantId, active: true } });
-    if (!windows || windows.length === 0) {
-      this.logger.log(`No scheduling windows found for tenant ${tenantId}`);
-      return [];
-    }
-
     const maxDays = settings.maximumAdvanceDays ?? 7;
-    const interval = settings.slotIntervalMinutes ?? 30;
-    const capacity = settings.maxOrdersPerSlot ?? 1;
-
-    const results = [];
     const nowLocal = DateTime.now().setZone(settings.timezone).startOf('day');
     const rangeStartUtc = nowLocal.toUTC().toJSDate();
     const rangeEndUtc = nowLocal.plus({ days: maxDays }).endOf('day').toUTC().toJSDate();
 
+    const windows = await this.prisma.schedulingWindow.findMany({ where: { tenantId, active: true } });
+    if (!windows || windows.length === 0) {
+      this.logger.log(`No scheduling windows found for tenant ${tenantId}. Deactivating all upcoming slots.`);
+      await this.prisma.timeSlot.updateMany({
+        where: {
+          tenantId,
+          isActive: true,
+          startTime: {
+            gte: rangeStartUtc,
+            lte: rangeEndUtc,
+          },
+        },
+        data: {
+          isActive: false,
+        },
+      });
+      return [];
+    }
+
     const newSlotStartTimes = new Set<number>();
+    const interval = settings.slotIntervalMinutes ?? 30;
+    const capacity = settings.maxOrdersPerSlot ?? 1;
+    const results = [];
 
     for (let day = 0; day <= maxDays; day++) {
       const currentLocal = nowLocal.plus({ days: day });
