@@ -40,8 +40,12 @@ export function InboxPage() {
   const { data: stats } = useQuery({
     queryKey: ['chat-stats'],
     queryFn: async () => {
-      const res = await api.get<ChatInboxStats>('/chat/stats');
-      return res.success ? res.data : null;
+      try {
+        const res = await api.get<ChatInboxStats>('/chat/stats');
+        return res.success ? res.data : null;
+      } catch (error) {
+        return null; // Fallback se a rota não existir no backend ainda (404)
+      }
     },
     refetchInterval: socketConnected ? false : 15000,
   });
@@ -64,11 +68,18 @@ export function InboxPage() {
       if (periodFilter !== 'all') params.append('period', periodFilter);
       if (searchQuery) params.append('search', searchQuery);
 
-      const res = await api.get<PaginatedChatSessions>(`/chat/sessions?${params.toString()}`);
+      const res = await api.get<PaginatedChatSessions | ChatSessionListItem[]>(`/chat/sessions?${params.toString()}`);
       if (!res.success) throw new Error('Failed to fetch');
+      
+      // Fallback para caso o backend retorne o formato antigo (array)
+      if (Array.isArray(res.data)) {
+        return { data: res.data, meta: { page: 1, limit: 50, total: res.data.length, totalPages: 1 } };
+      }
+      
       return res.data;
     },
     getNextPageParam: (lastPage) => {
+      if (!lastPage || !lastPage.meta) return undefined;
       if (lastPage.meta.page < lastPage.meta.totalPages) {
         return lastPage.meta.page + 1;
       }
