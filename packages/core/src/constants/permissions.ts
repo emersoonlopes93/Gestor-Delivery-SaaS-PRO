@@ -106,6 +106,12 @@ export const TENANT_PERMISSIONS = {
   'chat.manage_handoff': 'Manage chat handoff to human',
   'chat.close': 'Close chat sessions',
   'chat.manage_quick_replies': 'Manage quick replies',
+
+  // Scheduling module
+  'scheduling.view': 'View scheduling settings and slots',
+  'scheduling.manage': 'Manage scheduling settings and windows',
+  'scheduling.create': 'Create scheduled orders',
+  'scheduling.update': 'Update or cancel scheduled orders',
 } as const;
 
 export type TenantPermission = keyof typeof TENANT_PERMISSIONS;
@@ -166,6 +172,7 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
     'dashboard.view',
     'billing.read',
     'chat.read', 'chat.send', 'chat.manage_handoff', 'chat.close', 'chat.manage_quick_replies',
+    'scheduling.view', 'scheduling.manage', 'scheduling.create', 'scheduling.update',
   ],
   attendant: [
     'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.view_timeline', 'orders.use_kanban',
@@ -174,6 +181,7 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
     'cash.read',
     'crm.read', 'crm.apply_benefits',
     'dashboard.view',
+    'scheduling.view', 'scheduling.create', 'scheduling.update',
   ],
   cashier: [
     'orders.read', 'orders.create',
@@ -182,16 +190,19 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
     'crm.read', 'crm.apply_benefits',
     'catalog.read',
     'dashboard.view',
+    'scheduling.view', 'scheduling.create', 'scheduling.update',
   ],
   kitchen: [
     'orders.read',
     'kds.use',
     'orders.use_kds',
+    'scheduling.view',
   ],
   dispatcher: [
     'orders.read',
     'delivery.read', 'delivery.dispatch',
     'dashboard.view',
+    'scheduling.view',
   ],
   delivery_operator: [
     'orders.read',
@@ -216,6 +227,7 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
     'pos.read', 'pos.create_sale', 'pos.waiter_mode', 'pos.transfer_table',
     'catalog.read',
     'dashboard.view',
+    'scheduling.view',
   ],
 };
 

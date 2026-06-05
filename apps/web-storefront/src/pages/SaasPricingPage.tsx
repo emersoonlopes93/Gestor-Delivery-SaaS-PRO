@@ -27,9 +27,9 @@ export function SaasPricingPage() {
   useEffect(() => {
     async function fetchPricing() {
       try {
-        const response = await api.get<RevenueTier[]>('/saas/pricing');
+        const response = await api.get<PricingData>('/saas/pricing');
         if (response && 'data' in response) {
-          setData({ tiers: response.data } as PricingData);
+          setData(response.data as PricingData);
         }
       } catch (error) {
         console.error('Error fetching pricing:', error);

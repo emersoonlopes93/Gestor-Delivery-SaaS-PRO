@@ -280,7 +280,7 @@ export class TenantAuthService {
           },
         },
       });
-    });
+    }, { timeout: 15000 });
 
     // Build permissions from roles
     const roles = user.userRoles.map((ur) => ur.role?.slug).filter(Boolean);
