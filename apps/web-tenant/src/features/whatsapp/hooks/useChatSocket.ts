@@ -55,18 +55,23 @@ export function useChatSocket(tenantId: string | undefined) {
     socket.on('messageCreated', (event: MessageCreatedEvent) => {
       // Invalidate messages query for the specific session
       queryClient.invalidateQueries({ queryKey: ['chat-messages', event.sessionId] });
-      // Invalidate sessions list to update last message
+      // Para as sessões (lista paginada), apenas revalidamos silenciosamente para evitar perder paginação
       queryClient.invalidateQueries({ queryKey: ['chat-sessions'] });
+      // Invalida status gerais (counters)
+      queryClient.invalidateQueries({ queryKey: ['chat-stats'] });
+
       try {
         window.dispatchEvent(new CustomEvent('chat:messageCreated', { detail: event }));
       } catch { /* ignore */ }
     });
 
     socket.on('sessionUpdated', (event: SessionUpdatedEvent) => {
-      // Invalidate sessions list to update session state
-      queryClient.invalidateQueries({ queryKey: ['chat-sessions'] });
-      // Invalidate specific session if it's currently loaded
+      // Invalidate specific session se estiver aberta
       queryClient.invalidateQueries({ queryKey: ['chat-session', event.session.id] });
+      // Invalidate list e counters
+      queryClient.invalidateQueries({ queryKey: ['chat-sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['chat-stats'] });
+
       try {
         window.dispatchEvent(new CustomEvent('chat:sessionUpdated', { detail: event }));
       } catch { /* ignore */ }

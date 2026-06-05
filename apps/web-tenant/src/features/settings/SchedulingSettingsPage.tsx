@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
 import { CalendarClock, Plus, Trash2, Save, Loader2, Play } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';

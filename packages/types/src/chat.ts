@@ -98,3 +98,20 @@ export interface ChatSessionListItem {
   status?: 'handoff' | 'bot';
   time?: string;
 }
+
+export interface ChatInboxStats {
+  unread: number;
+  human: number;
+  ai: number;
+  closedToday: number;
+}
+
+export interface PaginatedChatSessions {
+  data: ChatSessionListItem[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}

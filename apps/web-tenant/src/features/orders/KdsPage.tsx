@@ -160,7 +160,7 @@ export function KdsPage() {
         </div>
       ) : (
         <div className="flex gap-4 overflow-x-auto overflow-y-hidden pb-4 grow items-start snap-x">
-          {printJobs.filter(j => j.order?.fulfillmentType === 'scheduled').map(job => {
+          {printJobs.filter(j => j.order?.isScheduled).map(job => {
             const order = job.order;
             const scheduledForStr = order?.scheduledFor ? new Date(order.scheduledFor).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
             return (
@@ -205,7 +205,7 @@ export function KdsPage() {
             );
           })}
 
-          {printJobs.filter(j => j.order?.fulfillmentType !== 'scheduled').map(job => {
+          {printJobs.filter(j => !j.order?.isScheduled).map(job => {
             const order = job.order;
             const elapsed = getElapsedMin(job.createdAt.toString());
             const isUrgent = elapsed > 15;

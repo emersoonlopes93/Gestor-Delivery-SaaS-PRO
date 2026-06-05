@@ -10,9 +10,10 @@ import {
   UseGuards,
   Request,
   Logger,
+  Query,
 } from '@nestjs/common';
 import type { Request as ExpressRequest } from 'express';
-import type { ChatSession } from '@prisma/client';
+import type { ChatSession, Prisma } from '@prisma/client';
 import type { TenantJwtPayload } from '@gestor/types';
 import { ConversationService, CreateMessageDto } from '../../ai-agent/services/conversation.service';
 import { PrismaService } from '../../database/prisma.service';
@@ -125,13 +126,111 @@ export class ChatController {
     };
   }
 
+  @Get('stats')
+  @Permissions('chat.read')
+  async getStats(@Request() req: TenantRequest) {
+    const tenantId = req.user.tenantId;
+
+    const latestSessions = await this.prisma.chatSession.findMany({
+      where: { tenantId },
+      orderBy: { lastMessageAt: 'desc' },
+      distinct: ['customerPhone'],
+      select: {
+        state: true,
+        handoffActive: true,
+        unreadCount: true,
+        lastMessageAt: true,
+      }
+    });
+
+    let unreadCount = 0;
+    let humanCount = 0;
+    let aiCount = 0;
+    let closedTodayCount = 0;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (const s of latestSessions) {
+      if (s.unreadCount > 0) unreadCount++;
+      if (s.handoffActive) humanCount++;
+      else if (!['closed', 'expired'].includes(s.state)) aiCount++;
+      
+      if (['closed', 'expired'].includes(s.state) && s.lastMessageAt >= today) {
+        closedTodayCount++;
+      }
+    }
+
+    return {
+      unread: unreadCount,
+      human: humanCount,
+      ai: aiCount,
+      closedToday: closedTodayCount,
+    };
+  }
+
   @Get('sessions')
   @Permissions('chat.read')
-  async listSessions(@Request() req: TenantRequest) {
+  async listSessions(
+    @Request() req: TenantRequest,
+    @Query('page') pageStr?: string,
+    @Query('limit') limitStr?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('period') period?: string,
+  ) {
+    const page = parseInt(pageStr || '1', 10);
+    const limit = parseInt(limitStr || '50', 10);
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ChatSessionWhereInput = { tenantId: req.user.tenantId };
+
+    if (search) {
+      where.OR = [
+        { customerPhone: { contains: search, mode: 'insensitive' } },
+        { displayName: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (status) {
+      if (status === 'ai_active') {
+        where.state = { notIn: ['handoff_human', 'closed', 'expired'] };
+        where.handoffActive = false;
+      } else if (status === 'human') {
+        where.handoffActive = true;
+      } else if (status === 'closed') {
+        where.state = { in: ['closed', 'expired'] };
+      } else if (status === 'waiting') {
+        where.handoffActive = true; // Aguardando Humano = Handoff
+      }
+    }
+
+    if (period) {
+      const now = new Date();
+      if (period === 'today') {
+        now.setHours(0, 0, 0, 0);
+        where.lastMessageAt = { gte: now };
+      } else if (period === 'yesterday') {
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        yesterday.setHours(0, 0, 0, 0);
+        now.setHours(0, 0, 0, 0);
+        where.lastMessageAt = { gte: yesterday, lt: now };
+      } else if (period === '7days') {
+        now.setDate(now.getDate() - 7);
+        where.lastMessageAt = { gte: now };
+      } else if (period === '30days') {
+        now.setDate(now.getDate() - 30);
+        where.lastMessageAt = { gte: now };
+      }
+    }
+
     const sessions = await this.prisma.chatSession.findMany({
-      where: { tenantId: req.user.tenantId },
+      where,
       orderBy: { lastMessageAt: 'desc' },
-      take: 50,
+      distinct: ['customerPhone'],
+      skip,
+      take: limit,
       include: {
         messages: {
           orderBy: { createdAt: 'desc' },
@@ -140,26 +239,40 @@ export class ChatController {
       },
     });
 
-    return sessions.map((s) => {
-      const visibleMessages = Array.isArray(s.messages)
-        ? s.messages.filter((msg) => this.isInboxMessage(msg))
-        : [];
-      const aiSummary = this.buildAiSummary(s.metadata);
-      return {
-        id: s.id,
-        customerPhone: s.customerPhone,
-        displayName: s.displayName,
-        state: s.state,
-        lastMessageAt: s.lastMessageAt,
-        lastMessage: visibleMessages[0]?.content || null,
-        handoffActive: s.handoffActive,
-        unreadCount: s.unreadCount,
-        aiAttentionRequired: aiSummary.attentionRequired,
-        aiBlockedTools: aiSummary.blockedTools,
-        aiLastFailureAt: aiSummary.lastFailureAt,
-        aiToolFailures: aiSummary.failures,
-      };
+    const totalDistinct = await this.prisma.chatSession.groupBy({
+      by: ['customerPhone'],
+      where,
     });
+    const total = totalDistinct.length;
+
+    return {
+      data: sessions.map((s) => {
+        const visibleMessages = Array.isArray(s.messages)
+          ? s.messages.filter((msg) => this.isInboxMessage(msg))
+          : [];
+        const aiSummary = this.buildAiSummary(s.metadata);
+        return {
+          id: s.id,
+          customerPhone: s.customerPhone,
+          displayName: s.displayName,
+          state: s.state,
+          lastMessageAt: s.lastMessageAt,
+          lastMessage: visibleMessages[0]?.content || null,
+          handoffActive: s.handoffActive,
+          unreadCount: s.unreadCount,
+          aiAttentionRequired: aiSummary.attentionRequired,
+          aiBlockedTools: aiSummary.blockedTools,
+          aiLastFailureAt: aiSummary.lastFailureAt,
+          aiToolFailures: aiSummary.failures,
+        };
+      }),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      }
+    };
   }
 
   @Get('sessions/:id')
@@ -174,13 +287,17 @@ export class ChatController {
   @Get('sessions/:id/messages')
   @Permissions('chat.read')
   async getMessages(@Request() req: TenantRequest, @Param('id') sessionId: string) {
+    const session = await this.prisma.chatSession.findFirst({
+      where: { id: sessionId, tenantId: req.user.tenantId },
+    });
+    if (!session) return [];
+
     const messages = await this.prisma.chatMessage.findMany({
       where: {
-        sessionId,
-        session: { tenantId: req.user.tenantId },
+        session: { tenantId: req.user.tenantId, customerPhone: session.customerPhone },
       },
       orderBy: { createdAt: 'asc' },
-      take: 50,
+      take: 200,
     });
     return messages.filter((msg) => this.isInboxMessage(msg));
   }

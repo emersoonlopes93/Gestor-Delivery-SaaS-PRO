@@ -410,6 +410,8 @@ export interface OrderKdsItemDTO {
     }[];
   }[]
   createdAt: string;
+  scheduledFor?: string | null;
+  isScheduled?: boolean | null;
 }
 
 export interface OrderDispatchItemDTO {
