@@ -245,16 +245,19 @@ export class AnalyticsService {
   private async getProductPerformance(tenantId: string, filter: MetricFilterDTO) {
     const createdAt = this.buildDateRange(filter);
     
+    const validOrders = await this.prisma.tenantClient.order.findMany({
+      where: { tenantId, status: 'completed', createdAt },
+      select: { id: true },
+    });
+    const orderIds = validOrders.map(o => o.id);
+
     // Get top 10 products by quantity sold
     const topItems = await this.prisma.tenantClient.orderItem.groupBy({
       by: ['productId', 'snapshotName'],
       where: {
         tenantId,
         lineType: 'product',
-        order: {
-          status: 'completed',
-          createdAt,
-        },
+        orderId: { in: orderIds.length > 0 ? orderIds : ['__empty__'] },
       },
       _sum: { quantity: true, lineTotal: true },
       orderBy: { _sum: { quantity: 'desc' } },
@@ -594,9 +597,15 @@ export class AnalyticsService {
   }
 
   private async getTopProducts(tenantId: string, where: Prisma.OrderWhereInput) {
+    const validOrders = await this.prisma.tenantClient.order.findMany({
+      where,
+      select: { id: true },
+    });
+    const orderIds = validOrders.map(o => o.id);
+
     const items = await this.prisma.tenantClient.orderItem.groupBy({
       by: ['productId', 'snapshotName'],
-      where: { order: where, lineType: 'product' },
+      where: { orderId: { in: orderIds.length > 0 ? orderIds : ['__empty__'] }, lineType: 'product' },
       _sum: { quantity: true, lineTotal: true },
       orderBy: { _sum: { quantity: 'desc' } },
       take: 5,
@@ -617,9 +626,15 @@ export class AnalyticsService {
   }
 
   private async getTopCombos(tenantId: string, where: Prisma.OrderWhereInput) {
+    const validOrders = await this.prisma.tenantClient.order.findMany({
+      where,
+      select: { id: true },
+    });
+    const orderIds = validOrders.map(o => o.id);
+
     const items = await this.prisma.tenantClient.orderItem.groupBy({
       by: ['comboId', 'snapshotName'],
-      where: { order: where, lineType: 'combo' },
+      where: { orderId: { in: orderIds.length > 0 ? orderIds : ['__empty__'] }, lineType: 'combo' },
       _sum: { quantity: true, lineTotal: true },
       orderBy: { _sum: { quantity: 'desc' } },
       take: 5,

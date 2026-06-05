@@ -46,7 +46,15 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('Authentication required');
     }
 
-    const userPermissions = await this.rbacService.getUserPermissions(user.sub);
+    const [userPermissions, userRoles] = await Promise.all([
+      this.rbacService.getUserPermissions(user.sub),
+      this.rbacService.getUserRoles(user.sub),
+    ]);
+
+    // Implicitly allow owners and admins to access everything
+    if (userRoles.includes('owner') || userRoles.includes('admin')) {
+      return true;
+    }
 
     const hasAll = requiredPermissions.every((p) =>
       userPermissions.includes(p),
