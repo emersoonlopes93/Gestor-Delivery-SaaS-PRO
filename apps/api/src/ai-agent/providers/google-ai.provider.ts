@@ -67,7 +67,8 @@ export class GoogleAiProvider implements IAiProvider {
     }
 
     const systemMessage = input.messages.find((m) => m.role === 'system');
-    const contents = this.buildContents(input.messages);
+    const sanitized = this.sanitizeGeminiHistory(input.messages);
+    const contents = this.buildContents(sanitized);
     const body: Record<string, unknown> = {
       contents,
       generationConfig: {
@@ -293,5 +294,60 @@ export class GoogleAiProvider implements IAiProvider {
     }
 
     return contents;
+  }
+
+  private sanitizeGeminiHistory(messages: AiMessage[]): AiMessage[] {
+    const sanitized: AiMessage[] = [];
+    const systemMessages = messages.filter((m) => m.role === 'system');
+    const activeMessages = messages.filter((m) => m.role !== 'system');
+
+    // Indexa as mensagens de retorno de ferramenta por ID de chamada
+    const toolMessagesById = new Map<string, AiMessage>();
+    for (const m of activeMessages) {
+      if (m.role === 'tool' && m.toolCallId) {
+        toolMessagesById.set(m.toolCallId, m);
+      }
+    }
+
+    const placedToolMessageIds = new Set<string>();
+
+    for (const msg of activeMessages) {
+      if (msg.role === 'assistant' && msg.toolCalls?.length) {
+        sanitized.push(msg);
+
+        // Associa imediatamente as respostas para as ferramentas chamadas neste turno
+        const responses: AiMessage[] = [];
+        for (const tc of msg.toolCalls) {
+          const toolMsg = toolMessagesById.get(tc.id);
+          if (toolMsg) {
+            responses.push(toolMsg);
+            placedToolMessageIds.add(tc.id);
+          } else {
+            // Se faltar a resposta da ferramenta (por exemplo, interrupção ou crash intermediário),
+            // injeta um retorno padrão de erro para manter a integridade dos turnos no Gemini.
+            responses.push({
+              role: 'tool',
+              toolCallId: tc.id,
+              content: JSON.stringify({ error: 'Function execution was interrupted or failed.' }),
+            });
+          }
+        }
+
+        sanitized.push(...responses);
+        continue;
+      }
+
+      if (msg.role === 'tool') {
+        // Ignora respostas de ferramentas soltas ou que já foram reposicionadas
+        if (msg.toolCallId && placedToolMessageIds.has(msg.toolCallId)) {
+          continue;
+        }
+        continue;
+      }
+
+      sanitized.push(msg);
+    }
+
+    return [...systemMessages, ...sanitized];
   }
 }
