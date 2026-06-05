@@ -456,7 +456,8 @@ model TenantOperatingHours {
   updatedAt DateTime @updatedAt @map("updated_at")
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, dayOfWeek])
+  @@index([tenantId])
+  @@index([tenantId, dayOfWeek])
   @@map("tenant_operating_hours")
 }
 

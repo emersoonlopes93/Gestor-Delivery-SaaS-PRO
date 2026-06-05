@@ -7,11 +7,20 @@ ADD COLUMN     "fallback_ai_model" VARCHAR(100),
 ADD COLUMN     "fallback_ai_provider" VARCHAR(50),
 ADD COLUMN     "openai_model" VARCHAR(100) DEFAULT 'gpt-4o';
 
+
 -- AlterTable
 ALTER TABLE "tenant_settings" ADD COLUMN     "storefront_layout_json" JSONB,
-ADD COLUMN     "storefront_theme_json" JSONB,
-ALTER COLUMN "handoff_sound" SET DATA TYPE TEXT,
-ALTER COLUMN "ready_sound" SET DATA TYPE TEXT;
+ADD COLUMN     "storefront_theme_json" JSONB;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tenant_settings' AND column_name='handoff_sound') THEN
+        ALTER TABLE "tenant_settings" ALTER COLUMN "handoff_sound" SET DATA TYPE TEXT;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tenant_settings' AND column_name='ready_sound') THEN
+        ALTER TABLE "tenant_settings" ALTER COLUMN "ready_sound" SET DATA TYPE TEXT;
+    END IF;
+END $$;
 
 -- CreateTable
 CREATE TABLE "media_assets" (

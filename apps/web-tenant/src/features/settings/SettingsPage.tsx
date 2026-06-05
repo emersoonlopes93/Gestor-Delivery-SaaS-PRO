@@ -278,23 +278,83 @@ export function SettingsPage() {
     }
   };
 
-  const updateDay = (index: number, field: keyof OperatingHourForm, value: string | boolean) => {
+  const updateShift = (index: number, field: keyof OperatingHourForm, value: string | boolean) => {
     const newHours = [...hours];
     newHours[index] = { ...newHours[index], [field]: value } as OperatingHourForm;
     setHours(newHours);
   };
 
+  const toggleDayOpen = (dayOfWeek: number, isOpen: boolean) => {
+    const dayShifts = hours.filter(h => h.dayOfWeek === dayOfWeek);
+    if (dayShifts.length === 0) {
+      setHours(prev => [...prev, { dayOfWeek, isOpen, openTime: '08:00', closeTime: '22:00' }]);
+    } else {
+      setHours(prev => prev.map(h => h.dayOfWeek === dayOfWeek ? { ...h, isOpen } : h));
+    }
+  };
+
+  const addShift = (dayOfWeek: number) => {
+    const dayShifts = hours.filter(h => h.dayOfWeek === dayOfWeek);
+    if (dayShifts.length >= 3) {
+      alert('Máximo de 3 turnos permitidos por dia.');
+      return;
+    }
+    const newHours = [...hours];
+    newHours.push({
+      dayOfWeek,
+      isOpen: true,
+      openTime: '18:00',
+      closeTime: '22:00'
+    });
+    setHours(newHours);
+  };
+
+  const removeShift = (index: number) => {
+    const shiftToRemove = hours[index];
+    const dayShifts = hours.filter(h => h.dayOfWeek === shiftToRemove.dayOfWeek);
+    if (dayShifts.length <= 1) {
+      const newHours = [...hours];
+      newHours[index] = { ...newHours[index], isOpen: false };
+      setHours(newHours);
+    } else {
+      const newHours = hours.filter((_, i) => i !== index);
+      setHours(newHours);
+    }
+  };
+
   const copyFirstDayToAll = () => {
-    if (hours.length === 0) return;
-    const first = hours[0];
-    const newHours = hours.map((h, i) => i === 0 ? h : { ...h, openTime: first.openTime, closeTime: first.closeTime, isOpen: first.isOpen });
+    const sundayShifts = hours.filter(h => h.dayOfWeek === 0);
+    if (sundayShifts.length === 0) return;
+    
+    let newHours = hours.filter(h => h.dayOfWeek === 0);
+    for (let day = 1; day <= 6; day++) {
+      sundayShifts.forEach(shift => {
+        newHours.push({
+          dayOfWeek: day,
+          isOpen: shift.isOpen,
+          openTime: shift.openTime,
+          closeTime: shift.closeTime
+        });
+      });
+    }
     setHours(newHours);
   };
 
   const applyMonToFri = () => {
-    if (hours.length < 6) return;
-    const mon = hours[1];
-    const newHours = hours.map((h, i) => (i >= 1 && i <= 5) ? { ...h, openTime: mon.openTime, closeTime: mon.closeTime, isOpen: mon.isOpen } : h);
+    const mondayShifts = hours.filter(h => h.dayOfWeek === 1);
+    if (mondayShifts.length === 0) return;
+
+    let newHours = hours.filter(h => h.dayOfWeek < 2 || h.dayOfWeek > 5);
+    for (let day = 2; day <= 5; day++) {
+      mondayShifts.forEach(shift => {
+        newHours.push({
+          dayOfWeek: day,
+          isOpen: shift.isOpen,
+          openTime: shift.openTime,
+          closeTime: shift.closeTime
+        });
+      });
+    }
     setHours(newHours);
   };
 
@@ -744,7 +804,8 @@ export function SettingsPage() {
 
             <div className="space-y-4">
               {DAY_NAMES.map((name, i) => {
-                const day = hours.find(h => h.dayOfWeek === i) || { dayOfWeek: i, isOpen: false, openTime: '08:00', closeTime: '22:00' };
+                const dayShifts = hours.filter(h => h.dayOfWeek === i);
+                const isAnyOpen = dayShifts.some(h => h.isOpen);
                 return (
                   <div key={i} className="flex flex-col gap-2 p-3 rounded-xl border border-border hover:border-border/70 transition-colors">
                     <div className="flex items-center justify-between">
@@ -753,27 +814,51 @@ export function SettingsPage() {
                         <input 
                           type="checkbox" 
                           className="sr-only peer"
-                          checked={day.isOpen}
-                          onChange={(e) => updateDay(i, 'isOpen', e.target.checked)}
+                          checked={isAnyOpen}
+                          onChange={(e) => toggleDayOpen(i, e.target.checked)}
                         />
                         <div className="w-9 h-5 bg-input peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-card after:border-border after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
                       </label>
                     </div>
-                    {day.isOpen && (
-                      <div className="flex items-center gap-2 mt-1">
-                        <input 
-                          type="time" 
-                          value={day.openTime || '08:00'}
-                          onChange={(e) => updateDay(i, 'openTime', e.target.value)}
-                          className="flex-1 px-2 py-1.5 bg-card text-foreground border border-input rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary focus:border-primary"
-                        />
-                        <span className="text-muted-foreground text-xs">até</span>
-                        <input 
-                          type="time" 
-                          value={day.closeTime || '22:00'}
-                          onChange={(e) => updateDay(i, 'closeTime', e.target.value)}
-                          className="flex-1 px-2 py-1.5 bg-card text-foreground border border-input rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary focus:border-primary"
-                        />
+                    {isAnyOpen && (
+                      <div className="space-y-2 mt-1">
+                        {hours.map((day, index) => {
+                          if (day.dayOfWeek !== i || !day.isOpen) return null;
+                          return (
+                            <div key={index} className="flex items-center gap-2">
+                              <input 
+                                type="time" 
+                                value={day.openTime || '08:00'}
+                                onChange={(e) => updateShift(index, 'openTime', e.target.value)}
+                                className="flex-1 px-2 py-1.5 bg-card text-foreground border border-input rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                              />
+                              <span className="text-muted-foreground text-xs">até</span>
+                              <input 
+                                type="time" 
+                                value={day.closeTime || '22:00'}
+                                onChange={(e) => updateShift(index, 'closeTime', e.target.value)}
+                                className="flex-1 px-2 py-1.5 bg-card text-foreground border border-input rounded-lg text-sm outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeShift(index)}
+                                className="p-1.5 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                                title="Remover turno"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          );
+                        })}
+                        {dayShifts.filter(h => h.isOpen).length < 3 && (
+                          <button
+                            type="button"
+                            onClick={() => addShift(i)}
+                            className="text-xs font-bold text-primary hover:text-primary/80 flex items-center gap-1 mt-1 pl-1"
+                          >
+                            ➕ Adicionar Turno
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

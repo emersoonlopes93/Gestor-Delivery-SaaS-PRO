@@ -97,40 +97,51 @@ export class AvailabilityService {
 
     // Sort to make searching for next open easy (0=sun to 6=sat)
     const sortedRules = [...operatingHours].sort((a, b) => a.dayOfWeek - b.dayOfWeek);
-    const todayRule = sortedRules.find((h) => h.dayOfWeek === dayOfWeek);
+    const todayRules = sortedRules.filter((h) => h.dayOfWeek === dayOfWeek);
 
     // 1. Is it open right now?
-    if (todayRule?.isOpen && todayRule.openTime && todayRule.closeTime) {
-      const openMinutes = this.timeToMinutes(todayRule.openTime);
-      const closeMinutes = this.timeToMinutes(todayRule.closeTime);
+    const openRule = todayRules.find((rule) => {
+      if (!rule.isOpen || !rule.openTime || !rule.closeTime) return false;
+      const openMinutes = this.timeToMinutes(rule.openTime);
+      const closeMinutes = this.timeToMinutes(rule.closeTime);
+      return currentMinutes >= openMinutes && currentMinutes <= closeMinutes;
+    });
 
-      if (currentMinutes >= openMinutes && currentMinutes <= closeMinutes) {
-        return { isOpen: true, message: 'Aberto agora', reason: 'OPEN' };
-      }
+    if (openRule) {
+      return { isOpen: true, message: 'Aberto agora', reason: 'OPEN' };
+    }
 
-      // If it's today but haven't reached openTime yet
-      if (currentMinutes < openMinutes) {
-        return {
-          isOpen: false,
-          message: `Fechado. Abrimos hoje às ${todayRule.openTime}`,
-          reason: 'CLOSED',
-          nextOpenAt: todayRule.openTime,
-        };
-      }
+    // Check if there is another shift later today
+    const laterRuleToday = todayRules
+      .filter((rule) => rule.isOpen && rule.openTime)
+      .sort((a, b) => this.timeToMinutes(a.openTime!) - this.timeToMinutes(b.openTime!))
+      .find((rule) => this.timeToMinutes(rule.openTime!) > currentMinutes);
+
+    if (laterRuleToday && laterRuleToday.openTime) {
+      return {
+        isOpen: false,
+        message: `Fechado. Abrimos hoje às ${laterRuleToday.openTime}`,
+        reason: 'CLOSED',
+        nextOpenAt: laterRuleToday.openTime,
+      };
     }
 
     // 2. Find next opening time (searching up to 7 days ahead)
     for (let i = 1; i <= 7; i++) {
         const nextDay = (dayOfWeek + i) % 7;
-        const nextRule = sortedRules.find(r => r.dayOfWeek === nextDay);
+        const nextRules = sortedRules.filter(r => r.dayOfWeek === nextDay);
         
-        if (nextRule?.isOpen && nextRule.openTime) {
+        const nextOpenShift = nextRules
+          .filter(r => r.isOpen && r.openTime)
+          .sort((a, b) => this.timeToMinutes(a.openTime!) - this.timeToMinutes(b.openTime!))[0];
+
+        if (nextOpenShift && nextOpenShift.openTime) {
             const dayLabel = i === 1 ? 'amanhã' : this.dayOfWeekToName(nextDay);
             return {
                 isOpen: false,
-                message: `Fechado. Abrimos ${dayLabel} às ${nextRule.openTime}`,
+                message: `Fechado. Abrimos ${dayLabel} às ${nextOpenShift.openTime}`,
                 reason: 'CLOSED',
-                nextOpenAt: nextRule.openTime,
+                nextOpenAt: nextOpenShift.openTime,
             };
         }
     }
