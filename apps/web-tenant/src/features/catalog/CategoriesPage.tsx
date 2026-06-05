@@ -340,17 +340,43 @@ export function CategoriesPage() {
           </div>
 
           <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+            <label className="block text-[10px] font-black text-primary-600 uppercase tracking-widest mb-3">Integração KDS / Produção</label>
+            <div>
+              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Setor de Preparo (KDS)</label>
+              <input
+                type="text"
+                value={(formData.templateConfig?.station as string) || ''}
+                onChange={(e) => setFormData({ 
+                  ...formData, 
+                  templateConfig: { ...formData.templateConfig, station: e.target.value }
+                })}
+                className="input-premium"
+                placeholder="Ex: Cozinha, Bar, Churrasqueira (Padrão: GERAL)"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Os itens desta categoria serão enviados para a tela do KDS filtrada por este setor.
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
             <label className="block text-[10px] font-black text-primary-600 uppercase tracking-widest mb-3">Template da Categoria</label>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Tipo de Template</label>
                 <select
                   value={formData.templateType}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
-                    templateType: e.target.value as 'none' | 'pizza' | 'combo',
-                    templateConfig: e.target.value === 'pizza' ? { pricingStrategy: 'highest', allowHalfHalf: true } : {}
-                  })}
+                  onChange={(e) => {
+                    const newType = e.target.value as 'none' | 'pizza' | 'combo';
+                    const currentStation = (formData.templateConfig?.station as string) || '';
+                    setFormData({ 
+                      ...formData, 
+                      templateType: newType,
+                      templateConfig: newType === 'pizza' 
+                        ? { station: currentStation, pricingStrategy: 'highest', allowHalfHalf: true } 
+                        : { station: currentStation }
+                    });
+                  }}
                   className="input-premium text-sm font-bold"
                 >
                   <option value="none">Nenhum (Padrão)</option>
