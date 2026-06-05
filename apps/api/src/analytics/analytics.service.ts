@@ -573,11 +573,15 @@ export class AnalyticsService {
     };
   }
 
-  private async getRevenueByCategory(tenantId: string, where: Prisma.OrderWhereInput): Promise<Record<string, number>> {
+  private async getRevenueByCategory(tenantId: string, orderWhere: Prisma.OrderWhereInput): Promise<Record<string, number>> {
     const items = await this.prisma.tenantClient.orderItem.findMany({
       where: {
         tenantId,
-        order: where,
+        order: {
+          status: orderWhere.status,
+          createdAt: orderWhere.createdAt,
+          sourceChannel: orderWhere.sourceChannel,
+        },
       },
       include: {
         product: {
