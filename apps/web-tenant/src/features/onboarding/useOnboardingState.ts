@@ -64,9 +64,12 @@ export function useOnboardingState() {
     saveToStorage({ currentStep, visitedSteps, validation });
   }, [currentStep, visitedSteps, validation]);
 
-  // Check validation on mount from real data
+  // Check validation on mount from real data if token exists
   useEffect(() => {
-    checkValidationFromApi();
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      checkValidationFromApi().catch(() => {});
+    }
   }, []);
 
   const checkValidationFromApi = async () => {

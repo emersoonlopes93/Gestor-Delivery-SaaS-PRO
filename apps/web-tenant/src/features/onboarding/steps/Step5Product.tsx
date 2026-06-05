@@ -61,13 +61,25 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
     setLoading(true);
     try {
       const [catRes, prodRes] = await Promise.all([
-        api.get<ProductCategory[]>('/catalog/categories'),
-        api.get<MinProduct[]>('/catalog/products'),
+        api.get<ProductCategory[]>('/catalog/categories').catch(() => ({ success: false, data: [] })),
+        api.get<MinProduct[]>('/catalog/products').catch(() => ({ success: false, data: [] })),
       ]);
-      if (catRes.success) setCategories(catRes.data);
-      if (prodRes.success) setProducts(prodRes.data.filter(p => p.isActive).slice(0, 10));
-      if (prodRes.success && prodRes.data.length === 0) setShowForm(true);
-    } catch { /* silent */ } finally { setLoading(false); }
+      if (catRes && catRes.success) {
+        setCategories(catRes.data || []);
+      } else {
+        setCategories([]);
+      }
+      if (prodRes && prodRes.success) {
+        setProducts(prodRes.data ? prodRes.data.filter(p => p.isActive).slice(0, 10) : []);
+      }
+      if (prodRes && prodRes.success && (!prodRes.data || prodRes.data.length === 0)) {
+        setShowForm(true);
+      }
+    } catch { 
+      setCategories([]);
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const handleCreateProduct = async () => {
