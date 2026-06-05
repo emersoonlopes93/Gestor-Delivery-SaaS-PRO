@@ -2048,7 +2048,7 @@ model WhatsAppInstance {
   instanceName        String                 @unique @map("instance_name") @db.VarChar(100)
   apiUrl              String                 @map("api_url") @db.VarChar(500)
   apiKey              String                 @map("api_key") @db.VarChar(500)
-  phoneNumber         String?                @map("phone_number") @db.VarChar(30)
+  phoneNumber         String?                @map("phone_number") @db.VarChar(100)
   status              WhatsAppInstanceStatus @default(disconnected)
   qrCode              String?                @map("qr_code")
   webhookSecret       String?                @map("webhook_secret") @db.VarChar(255)
