@@ -777,69 +777,182 @@ export function GlobalAiAgentConfigPage() {
       )}
 
       {activeTab === 'memory' && (
-        <section className="grid gap-3 lg:grid-cols-2">
-          <ToggleRow label="Ativar memória do agente" checked={config.aiMemoryEnabled} onChange={() => toggleConfig('aiMemoryEnabled')} />
-          <ToggleRow label="Lembrar nome do cliente" checked={config.aiRememberCustomerName} onChange={() => toggleConfig('aiRememberCustomerName')} />
-          <ToggleRow label="Lembrar endereços" checked={config.aiRememberAddresses} onChange={() => toggleConfig('aiRememberAddresses')} />
-          <ToggleRow label="Lembrar último pedido" checked={config.aiRememberLastOrder} onChange={() => toggleConfig('aiRememberLastOrder')} />
-          <ToggleRow label="Lembrar preferências" checked={config.aiRememberPreferences} onChange={() => toggleConfig('aiRememberPreferences')} />
-          <ToggleRow label="Permitir repetir último pedido" checked={config.aiAllowRepeatLastOrder} onChange={() => toggleConfig('aiAllowRepeatLastOrder')} />
-          <Field label="Retenção da memória">
-            <select value={config.aiMemoryRetentionDays} onChange={(e) => updateConfig('aiMemoryRetentionDays', Number(e.target.value))} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm">
-              {[30, 60, 90, 180, 365].map((days) => <option key={days} value={days}>{days} dias</option>)}
-            </select>
-          </Field>
-        </section>
+        <div className="space-y-6">
+          <div className="rounded-md border border-border bg-card p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-1">Geral</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Quando ativada, a memória permite que o agente lembre nome, endereço e último pedido do cliente para agilizar atendimentos futuros.
+            </p>
+            <ToggleRow 
+              label="Ativar memória do agente" 
+              description="Permite que o agente use dados salvos da conversa, cliente e pedidos anteriores"
+              checked={config.aiMemoryEnabled} 
+              onChange={() => toggleConfig('aiMemoryEnabled')} 
+            />
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="rounded-md border border-border bg-card p-6 space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Dados do Cliente</h3>
+                <p className="text-xs text-muted-foreground mb-2">Configure quais informações do cliente o agente deve lembrar</p>
+              </div>
+              <ToggleRow 
+                label="Lembrar nome do cliente" 
+                description="O agente usará o nome do cliente em conversas futuras"
+                checked={config.aiRememberCustomerName} 
+                onChange={() => toggleConfig('aiRememberCustomerName')} 
+              />
+              <ToggleRow 
+                label="Lembrar endereços usados" 
+                description="O agente sugerirá endereços previamente usados pelo cliente"
+                checked={config.aiRememberAddresses} 
+                onChange={() => toggleConfig('aiRememberAddresses')} 
+              />
+            </div>
+
+            <div className="rounded-md border border-border bg-card p-6 space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Pedidos</h3>
+                <p className="text-xs text-muted-foreground mb-2">Configure como o agente deve lidar com pedidos anteriores</p>
+              </div>
+              <ToggleRow 
+                label="Lembrar último pedido" 
+                description="O agente terá acesso ao último pedido do cliente"
+                checked={config.aiRememberLastOrder} 
+                onChange={() => toggleConfig('aiRememberLastOrder')} 
+              />
+              <ToggleRow 
+                label="Permitir repetir último pedido" 
+                description="O agente pode oferecer a opção de repetir o último pedido (sempre com confirmação)"
+                checked={config.aiAllowRepeatLastOrder} 
+                onChange={() => toggleConfig('aiAllowRepeatLastOrder')} 
+              />
+            </div>
+
+            <div className="rounded-md border border-border bg-card p-6 space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Preferências</h3>
+                <p className="text-xs text-muted-foreground mb-2">Configure o aprendizado de preferências do cliente</p>
+              </div>
+              <ToggleRow 
+                label="Lembrar preferências de compra" 
+                description="O agente aprenderá e usará preferências como forma de pagamento, observações, etc."
+                checked={config.aiRememberPreferences} 
+                onChange={() => toggleConfig('aiRememberPreferences')} 
+              />
+            </div>
+
+            <div className="rounded-md border border-border bg-card p-6 space-y-4 flex flex-col justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Retenção</h3>
+                <p className="text-xs text-muted-foreground mb-2">Configure por quanto tempo os dados de memória são mantidos</p>
+              </div>
+              <Field 
+                label="Retenção da memória" 
+                description="Período em dias que os dados de memória são mantidos antes de serem descartados"
+              >
+                <select 
+                  value={config.aiMemoryRetentionDays} 
+                  onChange={(e) => updateConfig('aiMemoryRetentionDays', Number(e.target.value))} 
+                  className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                >
+                  {[30, 60, 90, 180, 365].map((days) => <option key={days} value={days}>{days} dias</option>)}
+                </select>
+              </Field>
+            </div>
+          </div>
+        </div>
       )}
 
       {activeTab === 'session' && (
-        <section className="grid gap-3 lg:grid-cols-2">
-          <Field label="Nome padrão do agente">
-            <input value={config.aiDefaultAgentName} onChange={(e) => updateConfig('aiDefaultAgentName', e.target.value)} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm" />
-          </Field>
-          <Field label="Tom padrão">
-            <input value={config.aiDefaultTone} onChange={(e) => updateConfig('aiDefaultTone', e.target.value)} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm" />
-          </Field>
-          <Field label="Debounce de mensagens (ms)">
-            <input type="number" min={1000} max={30000} value={config.aiDebounceMs} onChange={(e) => updateConfig('aiDebounceMs', Number(e.target.value))} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm" />
-          </Field>
-          <Field label="Expiração de sessão (minutos)">
-            <input type="number" min={1} max={10080} value={config.aiSessionTimeoutMin ?? 120} onChange={(e) => updateConfig('aiSessionTimeoutMin', Number(e.target.value))} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm" />
-          </Field>
-          <Field label="Máximo de retentativas">
-            <input type="number" min={1} max={10} value={config.aiMaxRetries ?? 3} onChange={(e) => updateConfig('aiMaxRetries', Number(e.target.value))} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm" />
-          </Field>
-          <Field label="Limite de mensagens diárias">
-            <input type="number" min={1} max={100000} value={config.aiDailyMessageLimit ?? 1000} onChange={(e) => updateConfig('aiDailyMessageLimit', Number(e.target.value))} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm" />
-          </Field>
-          <Field label="Cooldown do cliente (minutos)">
-            <input type="number" min={1} max={1440} value={config.aiCustomerCooldownMin ?? 5} onChange={(e) => updateConfig('aiCustomerCooldownMin', Number(e.target.value))} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm" />
-          </Field>
-
-          <div className="space-y-3 col-span-full grid gap-3 lg:grid-cols-2">
-            <ToggleRow label="Simular digitação" checked={config.aiSimulateTyping} onChange={() => toggleConfig('aiSimulateTyping')} />
-            <ToggleRow label="Exigir nome do cliente" checked={config.aiRequireCustomerName} onChange={() => toggleConfig('aiRequireCustomerName')} />
-            <ToggleRow label="Exigir confirmação explícita" checked={config.aiRequireConfirmation} onChange={() => toggleConfig('aiRequireConfirmation')} />
-            <ToggleRow label="Habilitar upsell" checked={config.aiEnableUpsell} onChange={() => toggleConfig('aiEnableUpsell')} />
-            <ToggleRow label="Habilitar handoff humano" checked={config.aiEnableHumanHandoff} onChange={() => toggleConfig('aiEnableHumanHandoff')} />
-            <ToggleRow label="Ativar comando #Sair" checked={config.aiCloseOnExitCommand ?? true} onChange={() => toggleConfig('aiCloseOnExitCommand')} />
-            <ToggleRow label="Limpar pedido ao expirar/encerrar" checked={config.aiResetDraftOnSessionClose ?? true} onChange={() => toggleConfig('aiResetDraftOnSessionClose')} />
-          </div>
-
-          {(config.aiCloseOnExitCommand ?? true) && (
-            <div className="col-span-full">
-              <Field label="Comandos de saída customizados (separados por vírgula)">
-                <textarea
-                  value={(config.aiExitCommands ?? []).join(', ')}
-                  onChange={(e) => updateConfig('aiExitCommands', e.target.value.split(',').map(cmd => cmd.trim()).filter(cmd => cmd.length > 0))}
-                  placeholder="#sair, sair, encerrar, cancelar"
-                  className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-md outline-none focus:ring-2 focus:ring-primary/20 text-sm"
-                  rows={2}
+        <div className="space-y-6">
+          <div className="rounded-md border border-border bg-card p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-1">Sessão e Encerramento</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Configure como as sessões de conversa são gerenciadas e encerradas
+            </p>
+            
+            <div className="grid gap-6 md:grid-cols-2">
+              <Field 
+                label="Expiração de sessão" 
+                description="Tempo em minutos para expirar a sessão por inatividade do cliente"
+              >
+                <input 
+                  type="number" 
+                  min={1} 
+                  max={10080} 
+                  value={config.aiSessionTimeoutMin ?? 120} 
+                  onChange={(e) => updateConfig('aiSessionTimeoutMin', Number(e.target.value))} 
+                  className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" 
                 />
               </Field>
+
+              <ToggleRow 
+                label="Limpar pedido em andamento" 
+                description="Remove o rascunho de pedido ao encerrar ou expirar a sessão (memória persistente é preservada)"
+                checked={config.aiResetDraftOnSessionClose ?? true} 
+                onChange={() => toggleConfig('aiResetDraftOnSessionClose')} 
+              />
+
+              <ToggleRow 
+                label="Ativar comando #Sair" 
+                description="Permite que o cliente encerre a conversa com comandos como #sair, sair, encerrar"
+                checked={config.aiCloseOnExitCommand ?? true} 
+                onChange={() => toggleConfig('aiCloseOnExitCommand')} 
+              />
+
+              {(config.aiCloseOnExitCommand ?? true) && (
+                <div className="col-span-full">
+                  <Field 
+                    label="Comandos customizados (opcional)" 
+                    description="Separe comandos por vírgula. Deixe vazio para usar padrões: #sair, sair, encerrar, etc."
+                  >
+                    <textarea
+                      value={(config.aiExitCommands ?? []).join(', ')}
+                      onChange={(e) => updateConfig('aiExitCommands', e.target.value.split(',').map(cmd => cmd.trim()).filter(cmd => cmd.length > 0))}
+                      placeholder="#sair, sair, encerrar, cancelar"
+                      className="w-full px-3 py-2 border border-border bg-card text-foreground rounded-md outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                      rows={2}
+                    />
+                  </Field>
+                </div>
+              )}
             </div>
-          )}
-        </section>
+          </div>
+
+          <div className="rounded-md border border-border bg-card p-6">
+            <h3 className="text-lg font-semibold text-foreground mb-4">Outros Parâmetros de Sessão</h3>
+            <div className="grid gap-6 md:grid-cols-2">
+              <Field label="Nome padrão do agente">
+                <input value={config.aiDefaultAgentName} onChange={(e) => updateConfig('aiDefaultAgentName', e.target.value)} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
+              </Field>
+              <Field label="Tom padrão">
+                <input value={config.aiDefaultTone} onChange={(e) => updateConfig('aiDefaultTone', e.target.value)} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
+              </Field>
+              <Field label="Debounce de mensagens (ms)">
+                <input type="number" min={1000} max={30000} value={config.aiDebounceMs} onChange={(e) => updateConfig('aiDebounceMs', Number(e.target.value))} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
+              </Field>
+              <Field label="Máximo de retentativas">
+                <input type="number" min={1} max={10} value={config.aiMaxRetries ?? 3} onChange={(e) => updateConfig('aiMaxRetries', Number(e.target.value))} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
+              </Field>
+              <Field label="Limite de mensagens diárias">
+                <input type="number" min={1} max={100000} value={config.aiDailyMessageLimit ?? 1000} onChange={(e) => updateConfig('aiDailyMessageLimit', Number(e.target.value))} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
+              </Field>
+              <Field label="Cooldown do cliente (minutos)">
+                <input type="number" min={1} max={1440} value={config.aiCustomerCooldownMin ?? 5} onChange={(e) => updateConfig('aiCustomerCooldownMin', Number(e.target.value))} className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
+              </Field>
+
+              <div className="space-y-3 col-span-full grid gap-3 lg:grid-cols-2">
+                <ToggleRow label="Simular digitação" checked={config.aiSimulateTyping} onChange={() => toggleConfig('aiSimulateTyping')} />
+                <ToggleRow label="Exigir nome do cliente" checked={config.aiRequireCustomerName} onChange={() => toggleConfig('aiRequireCustomerName')} />
+                <ToggleRow label="Exigir confirmação explícita" checked={config.aiRequireConfirmation} onChange={() => toggleConfig('aiRequireConfirmation')} />
+                <ToggleRow label="Habilitar upsell" checked={config.aiEnableUpsell} onChange={() => toggleConfig('aiEnableUpsell')} />
+                <ToggleRow label="Habilitar handoff humano" checked={config.aiEnableHumanHandoff} onChange={() => toggleConfig('aiEnableHumanHandoff')} />
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {activeTab === 'tools' && (
@@ -921,23 +1034,27 @@ export function GlobalAiAgentConfigPage() {
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, description, children }: { label: string; description?: string; children: ReactNode }) {
   return (
     <label className="block rounded-md border border-border bg-card p-4">
-      <span className="mb-2 block text-sm font-medium text-muted-foreground">{label}</span>
+      <span className="mb-1 block text-sm font-medium text-muted-foreground">{label}</span>
+      {description && <p className="text-xs text-muted-foreground mb-3">{description}</p>}
       {children}
     </label>
   );
 }
 
-function ToggleRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
+function ToggleRow({ label, description, checked, onChange }: { label: string; description?: string; checked: boolean; onChange: () => void }) {
   return (
     <div className="flex items-center justify-between gap-4 rounded-md border border-border bg-card p-4">
-      <span className="text-sm font-medium text-foreground">{label}</span>
+      <div className="space-y-0.5">
+        <span className="text-sm font-medium text-foreground block">{label}</span>
+        {description && <p className="text-xs text-muted-foreground">{description}</p>}
+      </div>
       <button
         type="button"
         onClick={onChange}
-        className={`relative h-6 w-11 rounded-full transition-colors ${checked ? 'bg-primary' : 'bg-muted'}`}
+        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${checked ? 'bg-primary' : 'bg-muted'}`}
         aria-pressed={checked}
       >
         <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
