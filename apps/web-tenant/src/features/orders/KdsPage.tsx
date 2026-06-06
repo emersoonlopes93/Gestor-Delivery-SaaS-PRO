@@ -47,9 +47,9 @@ function KdsCard({ job, onPrint, onComplete, updatingId, onViewTicket }: KdsCard
   let slaBadge = null;
   if (isScheduled) {
     slaBadge = (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20 whitespace-nowrap shrink-0 max-w-[140px] truncate" title={`Agendado ${scheduledForStr}`}>
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20 whitespace-nowrap shrink-0" title={`Agendado ${scheduledForStr}`}>
         <Clock className="w-3.5 h-3.5 shrink-0" />
-        <span className="truncate">Agendado {scheduledForStr}</span>
+        <span>Agendado {scheduledForStr}</span>
       </span>
     );
   } else {
@@ -67,7 +67,7 @@ function KdsCard({ job, onPrint, onComplete, updatingId, onViewTicket }: KdsCard
       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black tracking-wider whitespace-nowrap shrink-0 ${slaColorClass}`}>
         <span>{indicator}</span>
         <Clock className="w-3.5 h-3.5 shrink-0" />
-        <span className="truncate">{elapsed} min</span>
+        <span>{elapsed} min</span>
       </span>
     );
   }
@@ -91,7 +91,7 @@ function KdsCard({ job, onPrint, onComplete, updatingId, onViewTicket }: KdsCard
       {/* Header do Card (Alinhamento de elementos e prevenção de quebra) */}
       <header className="p-4 border-b border-border/40 flex items-center justify-between gap-3 bg-muted/20 rounded-t-[24px] min-w-0">
         <div className="min-w-0 flex-1">
-          <h2 className="text-xl font-black text-foreground truncate">#{order?.orderNumber || '---'}</h2>
+          <h2 className="text-xl font-black text-foreground">{order?.orderNumber || '---'}</h2>
           <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block mt-0.5 truncate">
             Setor: {job.station}
           </span>
