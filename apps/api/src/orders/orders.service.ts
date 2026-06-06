@@ -623,6 +623,7 @@ export class OrdersService {
       scheduledFor: o.scheduledFor ? o.scheduledFor.toISOString() : null,
       isScheduled: o.isScheduled ?? false,
       createdAt: o.createdAt.toISOString(),
+      notes: o.notes,
       deliveryDriverId: o.deliveryDriverId || undefined,
       deliveryDriverName: o.deliveryDriver?.name || undefined,
       deliveryDriverStatus: o.deliveryDriver?.status || undefined,

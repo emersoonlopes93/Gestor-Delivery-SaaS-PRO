@@ -28,6 +28,8 @@ interface KanbanColumnProps {
   elapsedMinById: Map<string, number>;
   onAdvance: (orderId: string, nextStatus: OrderStatus) => void;
   onClickCard: (orderId: string) => void;
+  onPrint: (orderId: string) => void;
+  onEdit: (orderId: string) => void;
   getNextAction: (status: OrderStatus, fulfillmentType: string) => OrderStatus | null;
   fmt: (v: number) => string;
   getElapsedMin: (createdAt: string) => number;
@@ -37,7 +39,7 @@ interface KanbanColumnProps {
 export const KanbanColumn = memo(function KanbanColumn(props: KanbanColumnProps) {
   const {
     column, orders, compact, updatingId, elapsedMinById,
-    onAdvance, onClickCard, getNextAction, fmt, getElapsedMin, viewMode,
+    onAdvance, onClickCard, onPrint, onEdit, getNextAction, fmt, getElapsedMin, viewMode,
   } = props;
 
   const Icon = column.icon;
@@ -95,6 +97,8 @@ export const KanbanColumn = memo(function KanbanColumn(props: KanbanColumnProps)
                   updating={updatingId === order.id}
                   onAdvance={onAdvance}
                   onClick={onClickCard}
+                  onPrint={onPrint}
+                  onEdit={onEdit}
                   nextStatus={nextActionStatus as OrderStatus | null}
                   elapsedMin={elapsed}
                   totalLabel={fmt(order.total)}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { RefreshCw, Clock, CheckCircle2, ChefHat } from 'lucide-react';
+import { RefreshCw, Clock, CheckCircle2, ChefHat, Printer, Eye, User, DollarSign, MessageSquare, X } from 'lucide-react';
 import {
   KdsPrintJobDTO,
   PrintJobStatus,
@@ -13,6 +13,203 @@ interface KdsPrintJobsResponse {
   limit: number;
 }
 
+interface KdsCardProps {
+  job: KdsPrintJobDTO;
+  onPrint: (content: string) => void;
+  onComplete: (jobId: string) => void;
+  updatingId: string | null;
+  onViewTicket: (content: string) => void;
+}
+
+function KdsCard({ job, onPrint, onComplete, updatingId, onViewTicket }: KdsCardProps) {
+  const order = job.order;
+  const isScheduled = order?.isScheduled;
+  const scheduledForStr = order?.scheduledFor 
+    ? new Date(order.scheduledFor).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) 
+    : '';
+
+  const getElapsedMin = () => {
+    const min = Math.floor((new Date().getTime() - new Date(job.createdAt).getTime()) / 60000);
+    return min >= 0 ? min : 0;
+  };
+
+  const [elapsed, setElapsed] = useState(getElapsedMin());
+
+  useEffect(() => {
+    setElapsed(getElapsedMin());
+    const timer = setInterval(() => {
+      setElapsed(getElapsedMin());
+    }, 30000); // atualiza a cada 30 segundos
+    return () => clearInterval(timer);
+  }, [job.createdAt]);
+
+  // SLA Indicator por cores
+  let slaBadge = null;
+  if (isScheduled) {
+    slaBadge = (
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20">
+        <Clock className="w-3.5 h-3.5" />
+        <span>Agendado {scheduledForStr}</span>
+      </span>
+    );
+  } else {
+    let indicator = '🟢';
+    let slaColorClass = 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20';
+    if (elapsed > 20) {
+      indicator = '🔴';
+      slaColorClass = 'bg-rose-500/10 text-rose-500 border border-rose-500/20 animate-pulse';
+    } else if (elapsed >= 10) {
+      indicator = '🟡';
+      slaColorClass = 'bg-amber-500/10 text-amber-500 border border-amber-500/20';
+    }
+    
+    slaBadge = (
+      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black tracking-wider ${slaColorClass}`}>
+        <span>{indicator}</span>
+        <Clock className="w-3.5 h-3.5" />
+        <span>{elapsed} min</span>
+      </span>
+    );
+  }
+
+  const fmt = (v: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+
+  const fulfillmentLabels: Record<string, string> = {
+    delivery: '📦 Entrega',
+    pickup: '🏪 Retirada',
+    dine_in: '🍽 Salão',
+    table: '🍽 Mesa',
+  };
+
+  return (
+    <div
+      className={`w-full rounded-[24px] flex flex-col border border-border bg-card shadow-sm hover:shadow-md transition-all duration-200 ${
+        isScheduled ? 'border-amber-500/30 ring-1 ring-amber-500/10' : ''
+      }`}
+    >
+      {/* Header do Card */}
+      <header className="p-5 border-b border-border/40 flex justify-between items-center bg-muted/20 rounded-t-[24px]">
+        <div>
+          <h2 className="text-2xl font-black text-foreground">#{order?.orderNumber || '---'}</h2>
+          <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mt-0.5">
+            Setor: {job.station}
+          </span>
+        </div>
+        <div>
+          {slaBadge}
+        </div>
+      </header>
+
+      {/* Corpo do Card */}
+      <div className="p-5 flex-1 flex flex-col space-y-4">
+        {/* Lista de itens estruturada */}
+        <div className="space-y-3.5">
+          {order?.items?.map((item) => (
+            <div key={item.id} className="pb-3 border-b border-border/30 last:border-b-0">
+              <div className="flex items-start justify-between font-bold text-foreground text-sm">
+                <span>🍕 {item.quantity}x {item.snapshotName}</span>
+              </div>
+              
+              {/* Complementos */}
+              {item.complements && item.complements.length > 0 && (
+                <div className="pl-6 mt-1.5 text-xs text-muted-foreground font-medium space-y-0.5">
+                  {item.complements.map(c => (
+                    <div key={c.id} className="flex justify-between">
+                      <span>+ {c.snapshotName}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Combo Selections */}
+              {item.comboSelections && item.comboSelections.length > 0 && (
+                <div className="pl-6 mt-1.5 text-xs text-muted-foreground font-medium space-y-0.5">
+                  {item.comboSelections.map(s => (
+                    <div key={s.id} className="flex justify-between">
+                      <span>- {s.snapshotProductName}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Observação do Item */}
+              {item.notes && (
+                <div className="pl-6 mt-1.5 flex items-start gap-1 text-[11px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/5 p-1.5 rounded-lg border border-amber-500/10">
+                  <MessageSquare className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>Obs: {item.notes}</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Observações Gerais do Pedido */}
+        {order?.notes && (
+          <div className="p-3 bg-amber-500/5 rounded-xl border border-amber-500/15 flex items-start gap-2">
+            <MessageSquare className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <div className="text-xs">
+              <p className="font-bold text-amber-600 dark:text-amber-400">Obs do Pedido:</p>
+              <p className="text-amber-700 dark:text-amber-300 font-medium mt-0.5 leading-relaxed">{order.notes}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Info do Cliente e Tipo de Pedido */}
+      <div className="px-5 py-4 border-t border-b border-border/40 bg-muted/10 flex justify-between items-center text-xs font-bold text-foreground">
+        <span className="flex items-center gap-1.5 truncate max-w-[150px]">
+          <User className="w-4 h-4 text-muted-foreground" />
+          <span>{order?.customerName}</span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <DollarSign className="w-4 h-4 text-muted-foreground" />
+          <span>{order ? fmt(order.total) : '---'}</span>
+        </span>
+        <span className="px-2 py-1 rounded-lg bg-secondary text-secondary-foreground text-[10px] font-black uppercase tracking-wider">
+          {fulfillmentLabels[order?.fulfillmentType || ''] || order?.fulfillmentType || 'Outro'}
+        </span>
+      </div>
+
+      {/* Ações do Card */}
+      <footer className="p-4 flex flex-col gap-2 bg-card rounded-b-[24px]">
+        <div className="flex gap-2">
+          <button
+            onClick={() => onPrint(job.content)}
+            className="flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground font-black text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all border border-border/50 hover:border-border active:scale-95"
+            title="Imprimir Ticket"
+          >
+            <Printer className="w-4 h-4" />
+            <span>Imprimir</span>
+          </button>
+          
+          <button
+            onClick={() => onViewTicket(job.content)}
+            className="flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground font-black text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all border border-border/50 hover:border-border active:scale-95"
+            title="Visualizar Ticket Original"
+          >
+            <Eye className="w-4 h-4" />
+            <span>Ver Ticket</span>
+          </button>
+        </div>
+
+        <button
+          onClick={() => onComplete(job.id)}
+          disabled={updatingId === job.id}
+          className={`w-full text-lg font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70 uppercase tracking-wider ${
+            isScheduled 
+              ? 'bg-amber-500 hover:bg-amber-600 text-amber-950 shadow-md shadow-amber-500/10' 
+              : 'bg-status-open hover:bg-status-open/90 text-destructive-foreground shadow-md shadow-emerald-500/10'
+          }`}
+        >
+          <CheckCircle2 className="w-5 h-5" />
+          <span>{isScheduled ? 'Concluir Agendamento' : 'Concluir Setor'}</span>
+        </button>
+      </footer>
+    </div>
+  );
+}
+
 export function KdsPage() {
   const [stationId, setStationId] = useState<string>(localStorage.getItem('kds_station') || 'ALL');
   const [printJobs, setPrintJobs] = useState<KdsPrintJobDTO[]>([]);
@@ -20,6 +217,7 @@ export function KdsPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [stations, setStations] = useState<string[]>(['GERAL']);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [viewingTicketContent, setViewingTicketContent] = useState<string | null>(null);
 
   const activeStatuses = useMemo(
     () => new Set<PrintJobStatus>([PrintJobStatus.pending, PrintJobStatus.printing]),
@@ -74,11 +272,6 @@ export function KdsPage() {
     }
   };
 
-  const getElapsedMin = (createdAt: string) => {
-    const min = Math.floor((new Date().getTime() - new Date(createdAt).getTime()) / 60000);
-    return min >= 0 ? min : 0;
-  };
-
   const handlePrint = (content: string) => {
     const printWindow = window.open('', '_blank', 'width=300,height=600');
     if (!printWindow) return;
@@ -118,20 +311,20 @@ export function KdsPage() {
   };
 
   return (
-    <div className="p-6 h-[calc(100vh-64px)] flex flex-col bg-background">
-      <header className="flex flex-col md:flex-row md:items-center justify-between mb-6 shrink-0 gap-4">
+    <div className="p-6 h-screen md:h-[calc(100vh-64px)] flex flex-col bg-background overflow-y-auto">
+      <header className="flex flex-col md:flex-row md:items-center justify-between mb-6 shrink-0 gap-4 bg-card border border-border p-5 rounded-[24px] shadow-sm">
         <div>
           <h1 className="text-2xl font-black text-foreground tracking-tight flex items-center gap-2">
             <ChefHat className="w-8 h-8 text-primary" /> KDS PRO
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">Gestão de Produção Individualizada</p>
+          <p className="text-sm text-muted-foreground mt-1 font-bold uppercase tracking-wider text-[11px]">Gestão de Produção Individualizada</p>
         </div>
 
         <div className="flex items-center gap-3">
           <select
             value={stationId}
             onChange={(e) => setStationId(e.target.value)}
-            className="bg-card border border-input text-foreground text-sm rounded-lg focus:ring-ring focus:border-primary block w-full p-2.5 font-bold shadow-sm"
+            className="bg-card border border-input text-foreground text-sm rounded-xl focus:ring-ring focus:border-primary block w-full p-2.5 font-bold shadow-sm"
           >
             <option value="ALL">TODOS OS SETORES</option>
             {stations.map(st => (
@@ -139,7 +332,7 @@ export function KdsPage() {
             ))}
           </select>
 
-          <button onClick={fetchJobs} className="p-2.5 bg-card border border-border rounded-lg hover:bg-muted transition-colors shadow-sm" title="Atualizar">
+          <button onClick={fetchJobs} className="p-2.5 bg-card border border-border rounded-xl hover:bg-muted transition-colors shadow-sm" title="Atualizar">
             <RefreshCw className={`w-5 h-5 text-foreground ${updatingId ? 'animate-spin' : ''}`} />
           </button>
         </div>
@@ -159,98 +352,60 @@ export function KdsPage() {
           <h2 className="text-2xl font-black text-foreground">Nenhum pedido para este setor!</h2>
         </div>
       ) : (
-        <div className="flex gap-4 overflow-x-auto overflow-y-hidden pb-4 grow items-start snap-x">
-          {printJobs.filter(j => j.order?.isScheduled).map(job => {
-            const order = job.order;
-            const scheduledForStr = order?.scheduledFor ? new Date(order.scheduledFor).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
-            return (
-              <div
-                key={job.id}
-                className="min-w-[340px] w-[340px] rounded-2xl flex flex-col max-h-full border-2 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.2)] snap-start bg-amber-50/50 dark:bg-amber-950/10"
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 w-full grow pb-8 items-start">
+          {printJobs.map(job => (
+            <KdsCard
+              key={job.id}
+              job={job}
+              onPrint={handlePrint}
+              onComplete={handleComplete}
+              updatingId={updatingId}
+              onViewTicket={setViewingTicketContent}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Modal de Visualização de Ticket */}
+      {viewingTicketContent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setViewingTicketContent(null)} />
+          <div className="relative z-10 w-full max-w-lg bg-card border border-border rounded-[28px] shadow-2xl flex flex-col max-h-[90vh]">
+            <header className="px-6 py-5 border-b border-border/40 flex justify-between items-center bg-muted/20 rounded-t-[28px]">
+              <h3 className="text-lg font-black text-foreground flex items-center gap-2">
+                <ChefHat className="w-5 h-5 text-primary" /> Visualização do Ticket
+              </h3>
+              <button 
+                onClick={() => setViewingTicketContent(null)} 
+                className="p-2 hover:bg-muted rounded-2xl transition-all active:scale-90"
               >
-                <header className="p-4 rounded-t-xl flex flex-col items-start shrink-0 bg-amber-500 text-amber-950">
-                  <div className="w-full flex justify-between items-center mb-2">
-                    <h2 className="text-3xl font-black">{order?.orderNumber || '---'}</h2>
-                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg font-black text-sm bg-amber-950 text-amber-500 border border-amber-900/50">
-                      <Clock className="w-4 h-4" /> AGENDADO
-                    </div>
-                  </div>
-                  <span className="text-xs font-bold uppercase tracking-wider bg-amber-600/20 px-2 py-1 rounded-md w-full">
-                    {job.station} - Para: {scheduledForStr}
-                  </span>
-                </header>
-
-                <div className="p-5 overflow-y-auto grow bg-transparent">
-                  <pre className="whitespace-pre-wrap font-mono text-xs text-amber-950 dark:text-amber-50 leading-tight bg-white/50 dark:bg-black/50 p-3 rounded-lg border border-amber-500/20">
-                    {job.content}
-                  </pre>
-                </div>
-
-                <footer className="p-4 rounded-b-2xl border-t border-amber-500/20 shrink-0 flex flex-col gap-2">
-                  <button
-                    onClick={() => handlePrint(job.content)}
-                    className="w-full bg-card border border-amber-500 text-amber-600 font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition-colors hover:bg-amber-500 hover:text-amber-950"
-                  >
-                    <RefreshCw className="w-4 h-4" /> Imprimir Ticket
-                  </button>
-                  <button
-                    onClick={() => handleComplete(job.id)}
-                    disabled={updatingId === job.id}
-                    className="w-full bg-amber-500 hover:bg-amber-600 shadow-md text-amber-950 border-t border-amber-400 text-lg font-black py-4 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-70 uppercase tracking-widest"
-                  >
-                    <CheckCircle2 className="w-6 h-6" /> Concluir Agendamento
-                  </button>
-                </footer>
-              </div>
-            );
-          })}
-
-          {printJobs.filter(j => !j.order?.isScheduled).map(job => {
-            const order = job.order;
-            const elapsed = getElapsedMin(job.createdAt.toString());
-            const isUrgent = elapsed > 15;
-
-            return (
-              <div
-                key={job.id}
-                className={`min-w-[340px] w-[340px] rounded-2xl flex flex-col max-h-full border border-border shadow-sm snap-start bg-card`}
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </header>
+            <div className="p-6 overflow-y-auto grow custom-scrollbar bg-card/60">
+              <pre className="whitespace-pre-wrap font-mono text-xs text-foreground bg-muted p-4 rounded-2xl border border-border leading-relaxed">
+                {viewingTicketContent}
+              </pre>
+            </div>
+            <footer className="p-4 border-t border-border/40 flex justify-end gap-3 bg-muted/10 rounded-b-[28px]">
+              <button
+                onClick={() => {
+                  handlePrint(viewingTicketContent);
+                  setViewingTicketContent(null);
+                }}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest flex items-center gap-1.5 active:scale-95 transition-all shadow-md"
               >
-                <header className={`p-4 rounded-t-2xl flex justify-between items-start shrink-0 ${isUrgent ? 'bg-destructive' : 'bg-secondary'}`}>
-                  <div>
-                    <h2 className="text-3xl font-black text-destructive-foreground">{order?.orderNumber || '---'}</h2>
-                    <span className="text-destructive-foreground text-xs font-medium uppercase tracking-wider">
-                      {job.station} - {order?.fulfillmentType === 'delivery' ? 'Entrega' : 'Salão'}
-                    </span>
-                  </div>
-                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg font-black text-sm bg-muted text-destructive-foreground border border-border`}>
-                    <Clock className="w-4 h-4" /> {elapsed}m
-                  </div>
-                </header>
-
-                <div className="p-5 overflow-y-auto grow bg-card">
-                  <pre className="whitespace-pre-wrap font-mono text-xs text-foreground leading-tight bg-muted p-3 rounded-lg border border-border">
-                    {job.content}
-                  </pre>
-                </div>
-
-                <footer className="p-4 bg-card rounded-b-2xl border-t border-border shrink-0 flex flex-col gap-2">
-                  <button
-                    onClick={() => handlePrint(job.content)}
-                    className="w-full bg-card border border-border text-primary font-bold py-2 rounded-xl flex items-center justify-center gap-2 transition-colors hover:bg-muted hover:text-foreground"
-                  >
-                    <RefreshCw className="w-4 h-4" /> Imprimir Ticket
-                  </button>
-                  <button
-                    onClick={() => handleComplete(job.id)}
-                    disabled={updatingId === job.id}
-                    className="w-full bg-status-open hover:bg-status-open/90 shadow-md text-destructive-foreground border-t border-status-open/50 text-lg font-black py-4 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-70 uppercase tracking-widest"
-                  >
-                    <CheckCircle2 className="w-6 h-6" /> Concluir Setor
-                  </button>
-                </footer>
-              </div>
-            );
-          })}
+                <Printer className="w-4 h-4" />
+                <span>Imprimir Ticket</span>
+              </button>
+              <button
+                onClick={() => setViewingTicketContent(null)}
+                className="bg-secondary text-secondary-foreground hover:bg-secondary/80 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest active:scale-95 transition-all"
+              >
+                Fechar
+              </button>
+            </footer>
+          </div>
         </div>
       )}
     </div>

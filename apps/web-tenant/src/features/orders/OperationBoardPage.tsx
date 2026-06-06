@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, LayoutGrid, Package, Truck, Volume2, VolumeX } from 'lucide-react';
-import type { OrderBoardItemDTO, OrderStatus, UpdateOrderStatusDTO, DriverDTO } from '@gestor/types';
+import type { OrderBoardItemDTO, OrderStatus, UpdateOrderStatusDTO, DriverDTO, OrderResponseDTO } from '@gestor/types';
 import { api, ApiError } from '../../lib/api-client';
 import { invalidateLogisticsQueries } from '../delivery/lib/invalidate-logistics';
 import { DndContext, DragOverlay, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, DragStartEvent, DragEndEvent } from '@dnd-kit/core';
@@ -10,6 +10,8 @@ import { OrderCard } from './components/OrderCard';
 import { KanbanColumn, KanbanColumnSpec, BoardViewMode } from './components/KanbanColumn';
 import { OrderDrawer } from './components/OrderDrawer';
 import { DriverSelectionModal } from './components/DriverSelectionModal';
+import { EditOrderModal } from './components/EditOrderModal';
+import { OrderPrintTemplate } from './components/OrderPrintTemplate';
 import { useOrderNotifications } from './hooks/useOrderNotifications';
 import toast from 'react-hot-toast';
 
@@ -110,6 +112,53 @@ export function OperationBoardPage() {
 
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [activeDragOrder, setActiveDragOrder] = useState<OrderBoardItemDTO | null>(null);
+  const [orderToPrint, setOrderToPrint] = useState<OrderResponseDTO | null>(null);
+  const [orderToEdit, setOrderToEdit] = useState<OrderResponseDTO | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
+
+  const handlePrintOrder = async (orderId: string) => {
+    setIsPrinting(true);
+    try {
+      const loadToastId = toast.loading('Carregando dados para impressão...');
+      const res = await api.get<OrderResponseDTO>(`/orders/${orderId}`);
+      toast.dismiss(loadToastId);
+      
+      if (res.data) {
+        setOrderToPrint(res.data);
+        await api.post(`/orders/${orderId}/print-log`);
+        setTimeout(() => {
+          window.print();
+          setIsPrinting(false);
+          setOrderToPrint(null);
+          toast.success('Imprimindo ticket...');
+        }, 300);
+      } else {
+        throw new Error('Pedido não encontrado');
+      }
+    } catch (err) {
+      setIsPrinting(false);
+      setOrderToPrint(null);
+      console.error('[OperationBoardPage] Erro ao imprimir:', err);
+      toast.error('Não foi possível imprimir o pedido.');
+    }
+  };
+
+  const handleEditOrder = async (orderId: string) => {
+    try {
+      const loadToastId = toast.loading('Carregando pedido para edição...');
+      const res = await api.get<OrderResponseDTO>(`/orders/${orderId}`);
+      toast.dismiss(loadToastId);
+      
+      if (res.data) {
+        setOrderToEdit(res.data);
+      } else {
+        throw new Error('Pedido não encontrado');
+      }
+    } catch (err) {
+      console.error('[OperationBoardPage] Erro ao editar:', err);
+      toast.error('Não foi possível carregar os detalhes do pedido para edição.');
+    }
+  };
 
   // Notifications
   const { isAudioEnabled, enableAudio } = useOrderNotifications(orders);
@@ -448,11 +497,11 @@ export function OperationBoardPage() {
         onDragEnd={handleDragEnd}
       >
         {!error && (
-          <div className="grow min-h-0">
+          <div className="grow min-h-0 flex flex-col h-full">
             <div
-              className={`h-full grid gap-3 md:gap-4 items-start ${viewMode === 'focus_production'
-                ? 'lg:grid-cols-[minmax(280px,1fr)_minmax(380px,1.4fr)_minmax(280px,1fr)]'
-                : 'grid-cols-1 md:grid-cols-3'
+              className={`flex-1 grid gap-4 items-stretch min-h-0 h-full overflow-x-auto no-scrollbar ${viewMode === 'focus_production'
+                ? 'grid-cols-1 lg:grid-cols-[minmax(300px,1.2fr)_minmax(400px,1.6fr)_minmax(300px,1.2fr)]'
+                : 'grid-cols-1 md:grid-cols-[repeat(3,minmax(380px,1fr))]'
                 }`}
             >
               {KANBAN_COLUMNS.map((column) => {
@@ -480,6 +529,8 @@ export function OperationBoardPage() {
                       elapsedMinById={elapsedMinById}
                       onAdvance={handleStatusUpdate}
                       onClickCard={setActiveOrderId}
+                      onPrint={handlePrintOrder}
+                      onEdit={handleEditOrder}
                       getNextAction={getNextAction}
                       fmt={fmt}
                       getElapsedMin={getElapsedMin}
@@ -499,6 +550,8 @@ export function OperationBoardPage() {
               updating={false}
               onAdvance={handleStatusUpdate}
               onClick={() => { }}
+              onPrint={() => { }}
+              onEdit={() => { }}
               nextStatus={getNextAction(activeDragOrder.status as OrderStatus, activeDragOrder.fulfillmentType)}
               elapsedMin={elapsedMinById.get(activeDragOrder.id) ?? 0}
               totalLabel={fmt(activeDragOrder.total)}
@@ -523,6 +576,23 @@ export function OperationBoardPage() {
         onClose={() => setActiveOrderId(null)}
         onUpdated={fetchBoard}
       />
+
+      {orderToEdit && (
+        <EditOrderModal
+          order={orderToEdit}
+          onClose={() => setOrderToEdit(null)}
+          onSaved={() => {
+            setOrderToEdit(null);
+            fetchBoard();
+          }}
+        />
+      )}
+
+      {isPrinting && orderToPrint && (
+        <div className="hidden print:block">
+          <OrderPrintTemplate order={orderToPrint} />
+        </div>
+      )}
     </div>
   );
 }
