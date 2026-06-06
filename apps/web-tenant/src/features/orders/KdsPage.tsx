@@ -43,13 +43,13 @@ function KdsCard({ job, onPrint, onComplete, updatingId, onViewTicket }: KdsCard
     return () => clearInterval(timer);
   }, [job.createdAt]);
 
-  // SLA Indicator por cores
+  // SLA Indicator por cores (sem quebra de linha nas tags)
   let slaBadge = null;
   if (isScheduled) {
     slaBadge = (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20">
-        <Clock className="w-3.5 h-3.5" />
-        <span>Agendado {scheduledForStr}</span>
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20 whitespace-nowrap shrink-0 max-w-[140px] truncate" title={`Agendado ${scheduledForStr}`}>
+        <Clock className="w-3.5 h-3.5 shrink-0" />
+        <span className="truncate">Agendado {scheduledForStr}</span>
       </span>
     );
   } else {
@@ -64,10 +64,10 @@ function KdsCard({ job, onPrint, onComplete, updatingId, onViewTicket }: KdsCard
     }
     
     slaBadge = (
-      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black tracking-wider ${slaColorClass}`}>
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black tracking-wider whitespace-nowrap shrink-0 ${slaColorClass}`}>
         <span>{indicator}</span>
-        <Clock className="w-3.5 h-3.5" />
-        <span>{elapsed} min</span>
+        <Clock className="w-3.5 h-3.5 shrink-0" />
+        <span className="truncate">{elapsed} min</span>
       </span>
     );
   }
@@ -88,15 +88,15 @@ function KdsCard({ job, onPrint, onComplete, updatingId, onViewTicket }: KdsCard
         isScheduled ? 'border-amber-500/30 ring-1 ring-amber-500/10' : ''
       }`}
     >
-      {/* Header do Card */}
-      <header className="p-5 border-b border-border/40 flex justify-between items-center bg-muted/20 rounded-t-[24px]">
-        <div>
-          <h2 className="text-2xl font-black text-foreground">#{order?.orderNumber || '---'}</h2>
-          <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mt-0.5">
+      {/* Header do Card (Alinhamento de elementos e prevenção de quebra) */}
+      <header className="p-4 border-b border-border/40 flex items-center justify-between gap-3 bg-muted/20 rounded-t-[24px] min-w-0">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-xl font-black text-foreground truncate">#{order?.orderNumber || '---'}</h2>
+          <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block mt-0.5 truncate">
             Setor: {job.station}
           </span>
         </div>
-        <div>
+        <div className="shrink-0">
           {slaBadge}
         </div>
       </header>
@@ -156,39 +156,39 @@ function KdsCard({ job, onPrint, onComplete, updatingId, onViewTicket }: KdsCard
         )}
       </div>
 
-      {/* Info do Cliente e Tipo de Pedido */}
-      <div className="px-5 py-4 border-t border-b border-border/40 bg-muted/10 flex justify-between items-center text-xs font-bold text-foreground">
-        <span className="flex items-center gap-1.5 truncate max-w-[150px]">
-          <User className="w-4 h-4 text-muted-foreground" />
-          <span>{order?.customerName}</span>
+      {/* Info do Cliente e Tipo de Pedido (Prevenção de quebra de tags no rodapé) */}
+      <div className="px-4 py-3 border-t border-b border-border/40 bg-muted/10 flex justify-between items-center gap-2 text-xs font-bold text-foreground min-w-0">
+        <span className="flex items-center gap-1.5 min-w-0 flex-1">
+          <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+          <span className="truncate">{order?.customerName}</span>
         </span>
-        <span className="flex items-center gap-1.5">
-          <DollarSign className="w-4 h-4 text-muted-foreground" />
-          <span>{order ? fmt(order.total) : '---'}</span>
+        <span className="flex items-center gap-1 shrink-0">
+          <DollarSign className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+          <span className="truncate">{order ? fmt(order.total) : '---'}</span>
         </span>
-        <span className="px-2 py-1 rounded-lg bg-secondary text-secondary-foreground text-[10px] font-black uppercase tracking-wider">
+        <span className="px-2 py-0.5 rounded-lg bg-secondary text-secondary-foreground text-[9px] font-black uppercase tracking-wider whitespace-nowrap shrink-0 max-w-[100px] truncate" title={fulfillmentLabels[order?.fulfillmentType || ''] || order?.fulfillmentType || 'Outro'}>
           {fulfillmentLabels[order?.fulfillmentType || ''] || order?.fulfillmentType || 'Outro'}
         </span>
       </div>
 
-      {/* Ações do Card */}
+      {/* Ações do Card (Botões harmonizados com proporções padronizadas) */}
       <footer className="p-4 flex flex-col gap-2 bg-card rounded-b-[24px]">
         <div className="flex gap-2">
           <button
             onClick={() => onPrint(job.content)}
-            className="flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground font-black text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all border border-border/50 hover:border-border active:scale-95"
+            className="flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground font-black text-[10px] py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all border border-border/50 hover:border-border active:scale-95 whitespace-nowrap"
             title="Imprimir Ticket"
           >
-            <Printer className="w-4 h-4" />
+            <Printer className="w-3.5 h-3.5 shrink-0" />
             <span>Imprimir</span>
           </button>
           
           <button
             onClick={() => onViewTicket(job.content)}
-            className="flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground font-black text-xs py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all border border-border/50 hover:border-border active:scale-95"
+            className="flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground font-black text-[10px] py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all border border-border/50 hover:border-border active:scale-95 whitespace-nowrap"
             title="Visualizar Ticket Original"
           >
-            <Eye className="w-4 h-4" />
+            <Eye className="w-3.5 h-3.5 shrink-0" />
             <span>Ver Ticket</span>
           </button>
         </div>
@@ -196,13 +196,13 @@ function KdsCard({ job, onPrint, onComplete, updatingId, onViewTicket }: KdsCard
         <button
           onClick={() => onComplete(job.id)}
           disabled={updatingId === job.id}
-          className={`w-full text-lg font-black py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70 uppercase tracking-wider ${
+          className={`w-full text-xs font-black py-2.5 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70 uppercase tracking-wider ${
             isScheduled 
               ? 'bg-amber-500 hover:bg-amber-600 text-amber-950 shadow-md shadow-amber-500/10' 
               : 'bg-status-open hover:bg-status-open/90 text-destructive-foreground shadow-md shadow-emerald-500/10'
           }`}
         >
-          <CheckCircle2 className="w-5 h-5" />
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>{isScheduled ? 'Concluir Agendamento' : 'Concluir Setor'}</span>
         </button>
       </footer>

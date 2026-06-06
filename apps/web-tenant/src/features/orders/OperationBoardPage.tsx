@@ -499,10 +499,7 @@ export function OperationBoardPage() {
         {!error && (
           <div className="grow min-h-0 flex flex-col h-full">
             <div
-              className={`flex-1 grid gap-4 items-stretch min-h-0 h-full overflow-x-auto no-scrollbar ${viewMode === 'focus_production'
-                ? 'grid-cols-1 lg:grid-cols-[minmax(300px,1.2fr)_minmax(400px,1.6fr)_minmax(300px,1.2fr)]'
-                : 'grid-cols-1 md:grid-cols-[repeat(3,minmax(380px,1fr))]'
-                }`}
+              className={`flex-1 flex flex-row gap-4 items-stretch min-h-0 h-full overflow-x-auto no-scrollbar`}
             >
               {KANBAN_COLUMNS.map((column) => {
                 const colOrders = ordersByColumnId[column.id] ?? [];
@@ -518,8 +515,8 @@ export function OperationBoardPage() {
                 return (
                   <div
                     key={column.id}
-                    className={`h-full min-h-0 flex-col ${isVisibleOnMobile ? 'flex' : 'hidden md:flex'
-                      }`}
+                    className={`h-full min-h-0 flex-col shrink-0 ${isVisibleOnMobile ? 'flex' : 'hidden md:flex'
+                      } w-full md:w-[calc(50%-8px)] xl:w-[calc(33.333%-11px)]`}
                   >
                     <KanbanColumn
                       column={column}
