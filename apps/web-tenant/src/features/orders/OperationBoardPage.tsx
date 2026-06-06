@@ -381,7 +381,7 @@ export function OperationBoardPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 min-h-screen md:min-h-[calc(100vh-64px)] flex flex-col bg-background max-w-[1600px] mx-auto w-full space-y-4">
+    <div className="p-4 md:p-6 h-screen md:h-[calc(100vh-64px)] flex flex-col overflow-hidden bg-background max-w-[1600px] mx-auto w-full space-y-4">
       {/* ── Toolbar / Header Premium ── */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between shrink-0 gap-4 bg-card border border-border p-5 rounded-[24px] shadow-sm">
         <div className="flex items-center justify-between sm:block">
@@ -497,9 +497,9 @@ export function OperationBoardPage() {
         onDragEnd={handleDragEnd}
       >
         {!error && (
-          <div className="grow flex flex-col">
+          <div className="grow min-h-0 flex flex-col">
             <div
-              className={`flex-1 flex flex-row gap-4 items-stretch overflow-x-auto no-scrollbar pb-4`}
+              className={`flex-1 flex flex-row gap-4 items-stretch min-h-0 overflow-x-auto no-scrollbar`}
             >
               {KANBAN_COLUMNS.map((column) => {
                 const colOrders = ordersByColumnId[column.id] ?? [];
@@ -515,7 +515,7 @@ export function OperationBoardPage() {
                 return (
                   <div
                     key={column.id}
-                    className={`h-full flex-col shrink-0 ${isVisibleOnMobile ? 'flex' : 'hidden md:flex'
+                    className={`h-full min-h-0 flex-col shrink-0 ${isVisibleOnMobile ? 'flex' : 'hidden md:flex'
                       } w-full md:w-[calc(50%-8px)] xl:w-[calc(33.333%-11px)]`}
                   >
                     <KanbanColumn
