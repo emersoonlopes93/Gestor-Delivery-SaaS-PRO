@@ -497,9 +497,9 @@ export function OperationBoardPage() {
         onDragEnd={handleDragEnd}
       >
         {!error && (
-          <div className="grow min-h-0 flex flex-col h-full">
+          <div className="grow min-h-0 flex flex-col">
             <div
-              className={`flex-1 flex flex-row gap-4 items-stretch min-h-0 h-full overflow-x-auto no-scrollbar`}
+              className={`flex-1 flex flex-row gap-4 items-stretch min-h-0 overflow-x-auto no-scrollbar`}
             >
               {KANBAN_COLUMNS.map((column) => {
                 const colOrders = ordersByColumnId[column.id] ?? [];
