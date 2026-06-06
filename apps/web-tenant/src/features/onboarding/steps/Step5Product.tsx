@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ShoppingBag, Plus, CheckCircle2, Package } from 'lucide-react';
 import { api } from '../../../lib/api-client';
 import { ImagePickerModal } from '../../../components/ImagePickerModal';
+import { Step5ImportMenu } from './Step5ImportMenu';
 
 interface ProductCategory {
   id: string;
@@ -42,6 +43,8 @@ const EMPTY_DRAFT: ProductDraft = {
   mediaAssetId: '',
 };
 
+type ImportMode = 'choose' | 'manual';
+
 export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
   const [products, setProducts] = useState<MinProduct[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
@@ -50,6 +53,8 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
   const [imagePicker, setImagePicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  // 'choose' = tela de importação | 'manual' = form manual
+  const [importMode, setImportMode] = useState<ImportMode>('choose');
 
   useEffect(() => { loadData(); }, []);
 
@@ -70,10 +75,15 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
         setCategories([]);
       }
       if (prodRes && prodRes.success) {
-        setProducts(prodRes.data ? prodRes.data.filter(p => p.isActive).slice(0, 10) : []);
+        const activeProducts = prodRes.data ? prodRes.data.filter(p => p.isActive).slice(0, 10) : [];
+        setProducts(activeProducts);
+        // Se já tem produtos, vai direto para o modo manual
+        if (activeProducts.length > 0) {
+          setImportMode('manual');
+        }
       }
       if (prodRes && prodRes.success && (!prodRes.data || prodRes.data.length === 0)) {
-        setShowForm(true);
+        setShowForm(false); // não mostrar form até o tenant escolher
       }
     } catch { 
       setCategories([]);
@@ -151,6 +161,23 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
       </div>
+    );
+  }
+
+  // ── Modo: Importação ──────────────────────────────────────────────────────
+  if (importMode === 'choose') {
+    return (
+      <Step5ImportMenu
+        onImportComplete={async () => {
+          // Recarregar dados após importação e ir para modo manual
+          await loadData();
+          setImportMode('manual');
+        }}
+        onSkip={() => {
+          setImportMode('manual');
+          setShowForm(true);
+        }}
+      />
     );
   }
 

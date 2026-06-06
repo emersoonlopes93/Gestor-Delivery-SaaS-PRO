@@ -27,10 +27,25 @@ import { UpsellsController } from './upsells.controller';
 import { UpsellsService } from './upsells.service';
 import { AvailabilityService } from './publication/availability.service';
 import { UploadModule } from '../upload/upload.module';
+import { MenuImportService } from './menu-import/menu-import.service';
+import { MenuImportController } from './menu-import/menu-import.controller';
 
 @Module({
   imports: [DatabaseModule, RbacModule, UploadModule],
-  controllers: [CategoriesController, ProductsController, ComplementsController, CombosController, OptionGroupsController, ProductOptionGroupsController, ComboSlotsController, ComboBundleItemsController, PublicationController, PizzaController, UpsellsController],
+  controllers: [
+    CategoriesController,
+    ProductsController,
+    ComplementsController,
+    CombosController,
+    OptionGroupsController,
+    ProductOptionGroupsController,
+    ComboSlotsController,
+    ComboBundleItemsController,
+    PublicationController,
+    PizzaController,
+    UpsellsController,
+    MenuImportController,
+  ],
   providers: [
     CategoriesService,
     ProductsService,
@@ -46,8 +61,8 @@ import { UploadModule } from '../upload/upload.module';
     CatalogTemplatesService,
     UpsellsService,
     AvailabilityService,
+    MenuImportService,
   ],
   exports: [PizzaEngineService, CatalogTemplatesService, UpsellsService, AvailabilityService],
 })
 export class CatalogModule {}
-

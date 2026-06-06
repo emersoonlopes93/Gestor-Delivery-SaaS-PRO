@@ -33,6 +33,7 @@ import { PrinterSettings } from './features/pos/PrinterSettings';
 import { NotificationSettings } from './features/settings/NotificationSettings';
 import { StorefrontCustomizationPage } from './features/settings/StorefrontCustomizationPage';
 import { SchedulingSettingsPage } from './features/settings/SchedulingSettingsPage';
+import { MenuImportPage } from './features/settings/MenuImportPage';
 
 // CRM & Promotions
 import { CustomersListPage } from './features/crm/CustomersListPage';
@@ -433,6 +434,14 @@ export function App() {
           element={
             <PermissionGate permission="settings.manage">
               <SchedulingSettingsPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/settings/menu-import"
+          element={
+            <PermissionGate permission="catalog.create">
+              <MenuImportPage />
             </PermissionGate>
           }
         />

@@ -15,8 +15,9 @@ interface OperatingHourForm {
   closeTime?: string;
 }
 
-import { Clock, Pause, Save, Copy, Calendar, MapPin, Building2 } from 'lucide-react';
+import { Clock, Pause, Save, Copy, Calendar, MapPin, Building2, ChefHat } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { useNavigate } from 'react-router-dom';
 
 async function geocodeNominatim(address: string): Promise<{ lat: number; lng: number } | null> {
   try {
@@ -366,12 +367,37 @@ export function SettingsPage() {
     );
   }
 
+  const navigate = useNavigate();
+
   return (
     <div className="p-6 max-w-5xl mx-auto text-left space-y-8">
       <PageHeader
         title="Configurações da Loja"
         description="Gerencie o funcionamento e informações do seu estabelecimento."
       />
+
+      {/* Card rápido: Importar Cardápio Base */}
+      <div className="bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
+              <ChefHat className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="font-black text-slate-900 dark:text-white text-sm">Importar Cardápio Base</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Adicione categorias e produtos pré-definidos para o seu segmento em segundos
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate('/settings/menu-import')}
+            className="shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl transition-all shadow-md shadow-indigo-500/20 text-sm"
+          >
+            Importar →
+          </button>
+        </div>
+      </div>
 
       {settings.businessGroupId && (
         <div className="bg-indigo-600 rounded-2xl shadow-lg p-5 text-white flex items-center justify-between">
