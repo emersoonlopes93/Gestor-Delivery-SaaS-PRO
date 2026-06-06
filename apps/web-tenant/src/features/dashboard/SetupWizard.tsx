@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   CheckCircle2, 
@@ -12,6 +12,9 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { TenantSettings, TenantOperatingHours } from '@gestor/types';
+import { useReadinessScore } from '../../hooks/useReadinessScore';
+import { OnboardingReadinessCard, OnboardingReadinessCardSkeleton } from '../../components/ui/OnboardingReadinessCard';
+import { api } from '../../lib/api-client';
 
 interface SetupStep {
   id: string;
@@ -32,6 +35,14 @@ interface SetupWizardProps {
 
 export function SetupWizard({ settings, operatingHours, hasCategories, hasProducts }: SetupWizardProps) {
   const navigate = useNavigate();
+  const { data: readinessData, loading: readinessLoading } = useReadinessScore();
+
+  const handleViewed = useCallback(() => {
+    void api.post('/tenant/onboarding-step', {
+      step: 'dashboard',
+      event: 'onboarding_readiness_viewed',
+    }).catch(() => {/* silencia — telemetria não bloqueia UX */});
+  }, []);
 
   const steps: SetupStep[] = [
     {
@@ -108,6 +119,19 @@ export function SetupWizard({ settings, operatingHours, hasCategories, hasProduc
         </div>
 
         <div className="p-4 sm:p-6 lg:p-8">
+          {/* Readiness Score compacto */}
+          <div className="mb-6">
+            {readinessLoading ? (
+              <OnboardingReadinessCardSkeleton />
+            ) : readinessData ? (
+              <OnboardingReadinessCard
+                data={readinessData}
+                compact={true}
+                onViewed={handleViewed}
+              />
+            ) : null}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {steps.map((step) => (
               <div 

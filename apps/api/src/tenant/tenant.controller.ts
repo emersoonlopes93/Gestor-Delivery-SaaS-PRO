@@ -5,6 +5,7 @@ import { CurrentTenant, RequirePermissions } from '../common/decorators';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { OnboardingService } from './onboarding.service';
+import { ReadinessScoreService } from './readiness-score.service';
 import { UpdateOperatingHoursRequest, UpdateStorePauseRequest, StorefrontCustomizationPayload } from '@gestor/types';
 
 @Controller('tenant')
@@ -13,6 +14,7 @@ export class TenantController {
   constructor(
     private readonly tenantService: TenantService,
     private readonly onboardingService: OnboardingService,
+    private readonly readinessScoreService: ReadinessScoreService,
   ) {}
 
   /**
@@ -133,6 +135,16 @@ export class TenantController {
   @Post('onboarding-complete')
   async completeOnboarding(@CurrentTenant() tenantId: string) {
     return this.onboardingService.completeOnboarding(tenantId);
+  }
+
+  /**
+   * Get Onboarding Readiness Score.
+   * Agrega dados existentes e calcula o nível de preparação operacional da loja.
+   */
+  @Get('readiness-score')
+  @RequirePermissions('dashboard.view')
+  async getReadinessScore(@CurrentTenant() tenantId: string) {
+    return this.readinessScoreService.calculate(tenantId);
   }
 }
 

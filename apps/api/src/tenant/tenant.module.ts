@@ -7,6 +7,7 @@ import { RbacModule } from '../rbac/rbac.module';
 import { BusinessGroupService } from './business-group.service';
 import { BusinessGroupController } from './business-group.controller';
 import { OnboardingService } from './onboarding.service';
+import { ReadinessScoreService } from './readiness-score.service';
 
 @Module({
   imports: [RbacModule],
@@ -16,7 +17,8 @@ import { OnboardingService } from './onboarding.service';
     TenantUserService,
     BusinessGroupService,
     OnboardingService,
+    ReadinessScoreService,
   ],
-  exports: [TenantService, TenantUserService, BusinessGroupService, OnboardingService],
+  exports: [TenantService, TenantUserService, BusinessGroupService, OnboardingService, ReadinessScoreService],
 })
 export class TenantModule {}
