@@ -74,7 +74,7 @@ export const KanbanColumn = memo(function KanbanColumn(props: KanbanColumnProps)
         </span>
       </header>
 
-      <div ref={setNodeRef} className={`${compact ? 'p-3' : 'p-4'} overflow-y-auto space-y-3 grow min-h-0 custom-scrollbar bg-card/40`}>
+      <div ref={setNodeRef} className={`${compact ? 'p-3' : 'p-4'} space-y-3 grow bg-card/40 flex flex-col`}>
         {isEmpty ? (
           viewMode === 'standard' ? (
             <div className="h-28 flex flex-col items-center justify-center border border-dashed border-border rounded-2xl bg-muted/20 gap-2 p-4 text-center">
