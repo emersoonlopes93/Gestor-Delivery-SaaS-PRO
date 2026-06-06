@@ -123,9 +123,9 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
       {...attributes}
       {...listeners}
     >
-      <div className={compact ? 'p-3.5' : 'p-5'}>
+      <div className={compact ? 'p-2.5 md:p-3' : 'p-3.5 md:p-4 xl:p-5'}>
         {/* 1. Header (Código e Timer/SLA) */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-2 md:mb-3 xl:mb-4">
           <span className={`font-black text-foreground ${compact ? 'text-xs md:text-sm' : 'text-base'} bg-muted px-2.5 py-1 rounded-lg border border-border`}>
             #{order.orderNumber}
           </span>
@@ -133,7 +133,7 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
         </div>
 
         {/* 2. Cliente e Canal/Fulfillment */}
-        <div className="min-w-0 mb-4 space-y-2">
+        <div className="min-w-0 mb-2.5 md:mb-3 xl:mb-4 space-y-1 md:space-y-1.5 xl:space-y-2">
           <h3
             className={`font-black text-foreground leading-snug flex items-center gap-1.5 ${compact ? 'text-xs' : 'text-sm'}`}
           >
@@ -154,14 +154,14 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
 
         {/* 3. Agendamento se houver */}
         {order.isScheduled && order.scheduledFor && (
-          <div className="mb-4 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2">
+          <div className="mb-2.5 md:mb-3 xl:mb-4 px-2 py-1.5 md:px-3 md:py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-2">
             <Clock className="w-4 h-4" />
             <span>AGENDADO: {new Date(order.scheduledFor).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
           </div>
         )}
 
         {/* 4. Resumo de Itens e Status + Valor */}
-        <div className="space-y-3 pt-3 border-t border-border/40">
+        <div className="space-y-2 md:space-y-2.5 xl:space-y-3 pt-2 md:pt-2.5 xl:pt-3 border-t border-border/40">
           <div className="flex items-center justify-between gap-3">
             <StatusBadge status={order.status as OrderStatus} />
             <span className={`font-black text-foreground flex items-center gap-1 ${compact ? 'text-xs' : 'text-sm'}`}>
@@ -186,7 +186,7 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
           )}
 
           {/* Resumo de itens */}
-          <div className="rounded-xl px-3 py-2 bg-muted/40 border border-border/45 flex items-start gap-2">
+          <div className="rounded-xl px-2 py-1.5 md:px-3 md:py-2 bg-muted/40 border border-border/45 flex items-start gap-2">
             <ShoppingBag className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
             <p className="text-[10px] md:text-[11px] text-foreground font-medium leading-relaxed">
               <strong className="text-primary mr-1">{order.itemCount} {order.itemCount === 1 ? 'item' : 'itens'}:</strong>
@@ -196,7 +196,7 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
 
           {/* Observações gerais */}
           {!compact && order.notes && (
-            <div className="rounded-xl px-3 py-2 bg-amber-500/5 border border-amber-500/15 flex items-start gap-2">
+            <div className="rounded-xl px-2 py-1.5 md:px-3 md:py-2 bg-amber-500/5 border border-amber-500/15 flex items-start gap-2">
               <FileText className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
               <p className="text-[10px] md:text-[11px] text-amber-600 dark:text-amber-400 font-semibold leading-relaxed">
                 Obs: {order.notes}
@@ -206,7 +206,7 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
         </div>
 
         {/* 5. Toolbar de Ações Rápidas */}
-        <div className="mt-4 pt-3 border-t border-border/40 flex items-center justify-end gap-2">
+        <div className="mt-2.5 md:mt-3 xl:mt-4 pt-2.5 md:pt-3 border-t border-border/40 flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={(e) => {
@@ -250,7 +250,7 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
 
       {nextStatus && (
         <div
-          className="px-3 pb-3.5 pt-1 border-t border-border/40"
+          className="px-2.5 pb-2.5 pt-1 md:px-3 md:pb-3 xl:pb-3.5 border-t border-border/40"
         >
           <button
             type="button"
@@ -260,7 +260,7 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
             }}
             disabled={updating}
             onPointerDown={(e) => e.stopPropagation()}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-black uppercase tracking-widest text-[9px] bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-[0.97] disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
+            className="w-full flex items-center justify-center gap-2 py-2 md:py-2.5 rounded-xl font-black uppercase tracking-widest text-[9px] bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-[0.97] disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed shadow-sm"
           >
             <ArrowRight className="w-3.5 h-3.5 md:w-3 md:h-3" />
             <span>

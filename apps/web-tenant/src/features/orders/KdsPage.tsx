@@ -47,9 +47,12 @@ function KdsCard({ job, onPrint, onComplete, updatingId, onViewTicket }: KdsCard
   let slaBadge = null;
   if (isScheduled) {
     slaBadge = (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20">
-        <Clock className="w-3.5 h-3.5" />
-        <span>Agendado {scheduledForStr}</span>
+      <span className="inline-flex flex-col items-end gap-0.5 px-2.5 py-1 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 text-right">
+        <div className="flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase tracking-wider">
+          <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+          <span>Agendado</span>
+        </div>
+        <span className="text-[9px] sm:text-[10px] font-bold opacity-90">{scheduledForStr}</span>
       </span>
     );
   } else {
@@ -64,10 +67,10 @@ function KdsCard({ job, onPrint, onComplete, updatingId, onViewTicket }: KdsCard
     }
 
     slaBadge = (
-      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black tracking-wider ${slaColorClass}`}>
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] sm:text-xs font-black tracking-wider ${slaColorClass}`}>
         <span>{indicator}</span>
-        <Clock className="w-3.5 h-3.5" />
-        <span>{elapsed} min</span>
+        <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+        <span className="whitespace-nowrap">{elapsed} min</span>
       </span>
     );
   }
@@ -88,14 +91,14 @@ function KdsCard({ job, onPrint, onComplete, updatingId, onViewTicket }: KdsCard
         }`}
     >
       {/* Header do Card */}
-      <header className="p-5 border-b border-border/40 flex justify-between items-center bg-muted/20 rounded-t-[24px]">
-        <div>
-          <h2 className="text-2xl font-black text-foreground">#{order?.orderNumber || '---'}</h2>
-          <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block mt-0.5">
+      <header className="p-4 border-b border-border/40 flex justify-between items-start gap-2 bg-muted/20 rounded-t-[24px]">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg sm:text-xl font-black text-foreground truncate">#{order?.orderNumber || '---'}</h2>
+          <span className="text-[9px] sm:text-[10px] font-black text-muted-foreground uppercase tracking-widest block mt-0.5 truncate">
             Setor: {job.station}
           </span>
         </div>
-        <div>
+        <div className="shrink-0 max-w-[60%] flex justify-end">
           {slaBadge}
         </div>
       </header>
