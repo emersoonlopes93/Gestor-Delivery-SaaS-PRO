@@ -99,28 +99,40 @@ async function apiFetch<T>(
   return response.json();
 }
 
+let isRefreshing = false;
+let refreshPromise: Promise<boolean> | null = null;
+
 async function tryRefreshToken(): Promise<boolean> {
   const refreshToken = localStorage.getItem('refreshToken');
   if (!refreshToken) return false;
 
-  try {
-    const res = await fetch(`${API_BASE}/auth/tenant/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
+  // Se já houver um refresh em andamento, retorna a promise dele
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+
+  isRefreshing = true;
+  refreshPromise = fetch(`${API_BASE}/auth/tenant/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refreshToken }),
+  })
+    .then(async (res) => {
+      if (!res.ok) return false;
+      const data: ApiResponse<{ accessToken: string }> = await res.json();
+      if (data?.success && data?.data?.accessToken) {
+        localStorage.setItem('accessToken', data.data.accessToken);
+        return true;
+      }
+      return false;
+    })
+    .catch(() => false)
+    .finally(() => {
+      isRefreshing = false;
+      refreshPromise = null;
     });
 
-    if (!res.ok) return false;
-
-    const data: ApiResponse<{ accessToken: string }> = await res.json();
-    if (data?.success && data?.data?.accessToken) {
-      localStorage.setItem('accessToken', data.data.accessToken);
-      return true;
-    }
-    return false;
-  } catch {
-    return false;
-  }
+  return refreshPromise;
 }
 
 export class ApiError extends Error {
