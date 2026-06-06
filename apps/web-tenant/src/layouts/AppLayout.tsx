@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { hasPermission } from '@gestor/auth';
 import {
@@ -221,7 +221,7 @@ function firstActiveGroupId(groups: readonly SidebarGroup[], pathname: string): 
   return null;
 }
 
-const SidebarGroupView = memo(function SidebarGroupView(props: {
+function SidebarGroupView(props: {
   group: SidebarGroup;
   collapsed: boolean;
   isOpen: boolean;
@@ -315,7 +315,7 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
       </div>
     </div>
   );
-});
+}
 
 /**
  * Main app layout with sidebar navigation for authenticated pages.
