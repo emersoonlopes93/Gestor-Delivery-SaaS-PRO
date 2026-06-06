@@ -122,7 +122,7 @@ export function OperationBoardPage() {
       const loadToastId = toast.loading('Carregando dados para impressão...');
       const res = await api.get<OrderResponseDTO>(`/orders/${orderId}`);
       toast.dismiss(loadToastId);
-      
+
       if (res.data) {
         setOrderToPrint(res.data);
         await api.post(`/orders/${orderId}/print-log`);
@@ -148,7 +148,7 @@ export function OperationBoardPage() {
       const loadToastId = toast.loading('Carregando pedido para edição...');
       const res = await api.get<OrderResponseDTO>(`/orders/${orderId}`);
       toast.dismiss(loadToastId);
-      
+
       if (res.data) {
         setOrderToEdit(res.data);
       } else {
