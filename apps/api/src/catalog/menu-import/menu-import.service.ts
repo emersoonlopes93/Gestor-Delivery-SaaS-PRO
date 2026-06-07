@@ -363,23 +363,27 @@ export class MenuImportService {
 
     for (const name of categoriesToCreate) {
       const slug = slugify(name);
-      await this.prisma.mediaCategory.upsert({
+      
+      const existing = await this.prisma.mediaCategory.findFirst({
         where: {
-          tenantId_scope_slug: {
-            tenantId: null,
-            scope: 'system_gallery',
-            slug,
-          },
-        },
-        update: {},
-        create: {
           tenantId: null,
           scope: 'system_gallery',
-          name,
           slug,
-          isActive: true,
+          deletedAt: null,
         },
       });
+
+      if (!existing) {
+        await this.prisma.mediaCategory.create({
+          data: {
+            tenantId: null,
+            scope: 'system_gallery',
+            name,
+            slug,
+            isActive: true,
+          },
+        });
+      }
     }
   }
 
