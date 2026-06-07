@@ -104,9 +104,8 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
       if (!categoryId && draft.newCategoryName.trim()) {
         const catRes = await api.post<{ id: string }>('/catalog/categories', {
           name: draft.newCategoryName.trim(),
-          slug: draft.newCategoryName.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
           isActive: true,
-          sortOrder: 0,
+          order: 0,
         });
         if (catRes.success) {
           categoryId = catRes.data.id;
@@ -125,9 +124,6 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
         isAvailable: true,
         sellableOnline: true,
         type: 'simple',
-        sku: '',
-        longDescription: '',
-        costPrice: 0,
       });
 
       if (res.success) {
@@ -156,6 +152,10 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
     onNext(async () => { /* products already saved individually */ });
   };
 
+  const handleSkip = () => {
+    onNext(async () => { /* skip without creating */ });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -176,6 +176,9 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
         onSkip={() => {
           setImportMode('manual');
           setShowForm(true);
+        }}
+        onSkipCompletely={() => {
+          onNext(async () => {});
         }}
       />
     );
@@ -344,6 +347,14 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
         <button onClick={onPrev} className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-black rounded-2xl transition-all text-sm">
           ← Voltar
         </button>
+        {products.length === 0 && (
+          <button
+            onClick={handleSkip}
+            className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 font-black rounded-2xl transition-all text-sm"
+          >
+            Pular etapa
+          </button>
+        )}
         <button
           onClick={handleNext}
           disabled={products.length === 0}

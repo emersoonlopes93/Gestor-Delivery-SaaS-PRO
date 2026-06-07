@@ -42,11 +42,12 @@ type ImportPhase = 'choosing' | 'segment-select' | 'importing' | 'success' | 'er
 interface Step5ImportMenuProps {
   onImportComplete: () => void;
   onSkip: () => void;
+  onSkipCompletely?: () => void;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
-export function Step5ImportMenu({ onImportComplete, onSkip }: Step5ImportMenuProps) {
+export function Step5ImportMenu({ onImportComplete, onSkip, onSkipCompletely }: Step5ImportMenuProps) {
   const [phase, setPhase] = useState<ImportPhase>('choosing');
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [recommended, setRecommended] = useState<TemplateSummary | null>(null);
@@ -198,6 +199,15 @@ export function Step5ImportMenu({ onImportComplete, onSkip }: Step5ImportMenuPro
               <ArrowRight className="w-5 h-5 text-slate-300 dark:text-slate-600 group-hover:translate-x-1 transition-transform shrink-0 mt-1" />
             </div>
           </button>
+          {/* Option 3: Skip */}
+          {onSkipCompletely && (
+            <button
+              onClick={onSkipCompletely}
+              className="group w-full text-center p-4 rounded-2xl text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 font-bold transition-all text-sm"
+            >
+              Pular esta etapa e adicionar depois
+            </button>
+          )}
         </div>
 
         <p className="text-center text-xs text-slate-400 dark:text-slate-500">
