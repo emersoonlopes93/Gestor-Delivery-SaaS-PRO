@@ -164,7 +164,7 @@ export function ProductsPage() {
 
 
 
-  // CRUD operations now occur in ProductV2EditorPage
+  // CRUD operations now occur in CatalogEditorPage
   /*
   const handleOpenModal = (product?: Product) => { ... }
   const handleSave = async () => { ... }

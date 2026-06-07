@@ -11,7 +11,7 @@ import { PermissionGate } from './components/PermissionGate';
 import { OnboardingWizard } from './features/onboarding/OnboardingWizard';
 import { CategoriesPage } from './features/catalog/CategoriesPage';
 import { ProductsPage } from './features/catalog/ProductsPage';
-import { ProductV2EditorPage } from './features/catalog/ProductV2EditorPage';
+import { CatalogEditorPage } from './features/catalog/CatalogEditorPage';
 import { OptionGroupsPage } from './features/catalog/OptionGroupsPage';
 import { CombosV2Page } from './features/catalog/CombosV2Page';
 import { OrderSimulationPage } from './features/catalog/OrderSimulationPage';
@@ -105,7 +105,7 @@ export function App() {
           path="/catalog/products/:id/v2"
           element={
             <PermissionGate permission="catalog.manage_products">
-              <ProductV2EditorPage mode="product" />
+              <CatalogEditorPage mode="product" />
             </PermissionGate>
           }
         />
@@ -113,7 +113,7 @@ export function App() {
           path="/catalog/products/new/v2"
           element={
             <PermissionGate permission="catalog.manage_products">
-              <ProductV2EditorPage mode="product" />
+              <CatalogEditorPage mode="product" />
             </PermissionGate>
           }
         />
@@ -145,7 +145,7 @@ export function App() {
           path="/catalog/combos/:id/v2"
           element={
             <PermissionGate permission="catalog.manage_combos">
-              <ProductV2EditorPage mode="combo" />
+              <CatalogEditorPage mode="combo" />
             </PermissionGate>
           }
         />
@@ -153,7 +153,7 @@ export function App() {
           path="/catalog/combos/new/v2"
           element={
             <PermissionGate permission="catalog.manage_combos">
-              <ProductV2EditorPage mode="combo" />
+              <CatalogEditorPage mode="combo" />
             </PermissionGate>
           }
         />

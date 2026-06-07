@@ -1,39 +1,22 @@
 import React from 'react';
-import { ProductOptionGroupLink, OptionGroup } from '@gestor/types';
 
+import { useCatalogEditor } from '../CatalogEditorContext';
 
+export const ProductPersonalization: React.FC = () => {
+  const {
+    isComboMode,
+    links,
+    moveLink,
+    openAddGroupModal,
+    setIsCreateComplementModalOpen,
+    openEditLinkModal,
+    removeGroupLink,
+    savingStates,
+    isProductWizard,
+    goPrevWizardStep,
+    goNextWizardStep,
+  } = useCatalogEditor();
 
-type LinkWithGroup = ProductOptionGroupLink & {
-  optionGroup: OptionGroup;
-};
-
-interface ProductPersonalizationProps {
-  isComboMode: boolean;
-  links: LinkWithGroup[];
-  moveLink: (id: string, direction: -1 | 1) => void;
-  openAddGroupModal: () => void;
-  setIsCreateComplementModalOpen: (open: boolean) => void;
-  openEditLinkModal: (link: LinkWithGroup) => void;
-  removeGroupLink: (id: string) => void;
-  savingStates: Record<string, boolean>;
-  isProductWizard?: boolean;
-  goPrevWizardStep?: () => void;
-  goNextWizardStep?: () => void;
-}
-
-export const ProductPersonalization: React.FC<ProductPersonalizationProps> = ({
-  isComboMode,
-  links,
-  moveLink,
-  openAddGroupModal,
-  setIsCreateComplementModalOpen,
-  openEditLinkModal,
-  removeGroupLink,
-  savingStates,
-  isProductWizard = false,
-  goPrevWizardStep,
-  goNextWizardStep,
-}) => {
   if (isComboMode) return null;
 
   return (

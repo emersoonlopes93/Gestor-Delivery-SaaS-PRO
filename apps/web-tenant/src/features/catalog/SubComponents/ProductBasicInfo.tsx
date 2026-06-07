@@ -1,61 +1,28 @@
 import React, { useMemo, useState } from 'react';
 import { Images } from 'lucide-react';
-import { ProductCategory, ProductDetails, CreateProductDto, CatalogProductType } from '@gestor/types';
+import { ProductCategory, CatalogProductType, CreateProductDto } from '@gestor/types';
 import { ImagePickerModal } from '../../../components/ImagePickerModal';
 import CreatableSelect from 'react-select/creatable';
 import { api } from '../../../lib/api-client';
+import { useFormContext } from 'react-hook-form';
+import { useCatalogEditor } from '../CatalogEditorContext';
+import { CatalogProductFormState } from '../CatalogEditorTypes';
 
+export const ProductBasicInfo: React.FC = () => {
+  const { isComboMode, isNew, handleSaveProduct, savingStates, onOpenRecipe, product, goNextWizardStep, isComboWizard } = useCatalogEditor();
+  const { watch, setValue } = useFormContext<CatalogProductFormState>();
+  
+  const productForm = watch('productForm');
+  const categories = watch('categories');
+  const bundleSummary = watch('bundleSummary');
+  const imagePreviewUrl = watch('imagePreviewUrl');
+  const pizzaPrices = watch('pizzaPrices');
 
-type BundleSummary = {
-  subtotal: number;
-  discountTotal: number;
-  finalPrice: number;
-  pricingType: 'fixed_price' | 'discount_percent' | 'discount_amount';
-  pricingValue: number;
-};
+  const setProductForm = (form: CreateProductDto) => setValue('productForm', form);
+  const setImageFile = (file: File | null) => setValue('imageFile', file);
+  const setImagePreviewUrl = (url: string | null) => setValue('imagePreviewUrl', url);
+  const setPizzaPrices = (prices: Record<string, number>) => setValue('pizzaPrices', prices);
 
-interface ProductBasicInfoProps {
-  product: ProductDetails | null;
-  productForm: CreateProductDto;
-  setProductForm: (form: CreateProductDto) => void;
-  categories: ProductCategory[];
-  isComboMode: boolean;
-  bundleSummary: BundleSummary | null;
-  imagePreviewUrl: string | null;
-  handleSelectImageFile: (file: File | null) => void;
-  setImageFile: (file: File | null) => void;
-  setImagePreviewUrl: (url: string | null) => void;
-  pizzaPrices: Record<string, number>;
-  setPizzaPrices: (prices: Record<string, number>) => void;
-  isComboWizard: boolean;
-  goNextWizardStep: () => void;
-  handleSaveProduct: () => void;
-  savingStates: Record<string, boolean>;
-  isNew: boolean;
-  onOpenRecipe: () => void;
-  onCategoryCreated?: (category: ProductCategory) => void;
-}
-
-export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
-  product,
-  productForm,
-  setProductForm,
-  categories,
-  isComboMode,
-  bundleSummary,
-  imagePreviewUrl,
-  setImageFile,
-  setImagePreviewUrl,
-  pizzaPrices,
-  setPizzaPrices,
-  isComboWizard,
-  goNextWizardStep,
-  handleSaveProduct,
-  savingStates,
-  isNew,
-  onOpenRecipe,
-  onCategoryCreated,
-}) => {
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
 
   const selectedMediaAsset = useMemo(() => {
@@ -154,8 +121,9 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                 onCreateOption={async (inputValue) => {
                   try {
                     const res = await api.post<ProductCategory>('/catalog/categories', { name: inputValue, isActive: true });
-                    if (res.success && onCategoryCreated) {
-                      onCategoryCreated(res.data);
+                    if (res.success) {
+                      const newCategories = [...categories, res.data];
+                      setValue('categories', newCategories);
                       setProductForm({ ...productForm, categoryId: res.data.id });
                     }
                   } catch (e) {
@@ -335,9 +303,9 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
 
         {/* Configuração Especial para Template Pizza */}
         {(() => {
-          const selectedCategory = categories.find(c => c.id === productForm.categoryId);
+          const selectedCategory = categories.find((c: any) => c.id === productForm.categoryId);
           const isPizzaTemplate = selectedCategory?.templateType === 'pizza';
-          const pizzaSizesGroup = product?.optionGroupLinks?.find(l => 
+          const pizzaSizesGroup = product?.optionGroupLinks?.find((l: any) => 
             l.optionGroup?.name.includes('Tamanhos [Pizza]')
           )?.optionGroup;
           const pizzaSizes = pizzaSizesGroup?.items || [];
@@ -359,7 +327,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
                   </p>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {pizzaSizes.map(size => (
+                    {pizzaSizes.map((size: any) => (
                       <div key={size.id} className="bg-card p-6 rounded-2xl border border-border shadow-sm hover:shadow-md hover:scale-[1.02] transition-all group">
                         <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 group-hover:text-primary transition-colors">
                           {size.name}

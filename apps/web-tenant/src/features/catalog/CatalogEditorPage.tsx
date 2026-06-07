@@ -10,8 +10,10 @@ import { ComboBuilder } from './SubComponents/ComboBuilder';
 import { PublicationSettings } from './SubComponents/PublicationSettings';
 import { InfoTooltip } from '../../components/InfoTooltip';
 import { VirtualMultiSelect } from '../../components/ui/VirtualMultiSelect';
+import { useForm, FormProvider } from 'react-hook-form';
+import { CatalogEditorProvider } from './CatalogEditorContext';
+import { CatalogProductFormState } from './CatalogEditorTypes';
 import { OptionGroupEditorModal } from './SubComponents/OptionGroupEditorModal';
-
 
 import {
   CatalogAvailabilityRule,
@@ -34,7 +36,6 @@ import {
   UpsertPublicationDto,
   Upsell,
   ProductCategory,
-  CreateProductDto,
   ProductDetails,
   OptionItem,
   ComboPricingType,
@@ -70,7 +71,7 @@ type BundleItemWithProduct = {
 
 type ProductV2EditorMode = 'product' | 'combo';
 
-type ProductV2EditorPageProps = {
+type CatalogEditorPageProps = {
   mode?: ProductV2EditorMode;
 };
 
@@ -100,7 +101,7 @@ const formatDaysLabel = (days: number[] = []) => {
   return DAY_OPTIONS.filter((d) => set.has(d.value)).map((d) => d.label).join(', ');
 };
 
-export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPageProps) {
+export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -110,9 +111,8 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   const [tab, setTab] = useState<TabKey>(initialTab);
   const [isLoading, setIsLoading] = useState(true);
   const [product, setProduct] = useState<ProductDetails | null>(null);
-  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [savingStates, setSavingStates] = useState<Record<string, boolean>>({});
-  const [pizzaPrices, setPizzaPrices] = useState<Record<string, number>>({});
+  // Removed old pizzaPrices useState
 
   const isNew = id === 'new' || !id;
   const productId = isNew ? '' : id;
@@ -141,22 +141,40 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     }
   };
 
-  const [productForm, setProductForm] = useState<CreateProductDto>({
-    name: '',
-    categoryId: '',
-    type: isComboMode ? 'combo' : 'simple',
-    basePrice: 0,
-    shortDescription: '',
-    longDescription: '',
-    sku: '',
-    isActive: true,
-    isAvailable: true,
-    sellableOnline: true,
-    costPrice: 0,
-    image: '',
-    mediaAssetId: '',
-    order: 0,
+  const methods = useForm<CatalogProductFormState>({
+    defaultValues: {
+      wizardStep: 0,
+      productForm: {
+        name: '',
+        categoryId: '',
+        type: isComboMode ? 'combo' : 'simple',
+        basePrice: 0,
+        shortDescription: '',
+        longDescription: '',
+        sku: '',
+        isActive: true,
+        isAvailable: true,
+        sellableOnline: true,
+        costPrice: 0,
+        image: '',
+        mediaAssetId: '',
+        order: 0,
+      },
+      imageFile: null,
+      imagePreviewUrl: null,
+      pizzaPrices: {},
+      categories: [],
+      publication: { publicationStatus: undefined, operationalStatus: undefined },
+      rules: [],
+      slots: [],
+      bundleItems: [],
+    }
   });
+
+  const { watch, setValue } = methods;
+  const productForm = watch('productForm');
+  const imageFile = watch('imageFile');
+  const pizzaPrices = watch('pizzaPrices');
 
   // Personalização
   const [links, setLinks] = useState<LinkWithGroup[]>([]);
@@ -249,7 +267,9 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     try {
       // Carregar categorias sempre
       const catRes = await api.get<ProductCategory[]>('/catalog/categories');
-      if (catRes.success) setCategories(catRes.data);
+      if (catRes.success) {
+        setValue('categories', catRes.data);
+      }
 
       if (isNew) {
         setIsLoading(false);
@@ -276,9 +296,9 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               Reflect.set(pricesMap, p.optionItemId, Number(p.price));
             }
           });
-          setPizzaPrices(pricesMap);
+          setValue('pizzaPrices', pricesMap);
         }
-        setProductForm({
+        setValue('productForm', {
           name: prodRes.data.name,
           categoryId: prodRes.data.categoryId || '',
           type: isComboMode ? 'combo' : (prodRes.data.type || 'simple'),
@@ -321,13 +341,15 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             ]);
             if (bundleRes.success) setBundleItems(bundleRes.data);
             if (summaryRes.success) {
-              setBundleSummary({
+              const bSum = {
                 subtotal: Number(summaryRes.data.subtotal ?? 0),
                 discountTotal: Number(summaryRes.data.discountTotal ?? 0),
                 finalPrice: Number(summaryRes.data.finalPrice ?? 0),
                 pricingType: summaryRes.data.pricingType ?? 'fixed_price',
                 pricingValue: Number(summaryRes.data.pricingValue ?? 0),
-              });
+              };
+              setBundleSummary(bSum);
+              setValue('bundleSummary', bSum);
               setComboPricingType(summaryRes.data.pricingType ?? 'fixed_price');
               setComboPricingValue(Number(summaryRes.data.pricingValue ?? 0));
             }
@@ -373,21 +395,9 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productId, isNew]);
 
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  // Using watch for images already handled in react-hook-form setup
 
-  const handleSelectImageFile = (file: File | null) => {
-    setImageFile(file);
-    if (imagePreviewUrl && imagePreviewUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(imagePreviewUrl);
-    }
-    if (file) {
-      setImagePreviewUrl(URL.createObjectURL(file));
-      setProductForm((prev) => ({ ...prev, mediaAssetId: '' }));
-    } else {
-      setImagePreviewUrl(productForm.image || null);
-    }
-  };
+  // Using watch for images already handled in react-hook-form setup
 
   const handleSaveProduct = async () => {
     if (!productForm.name || (!isComboMode && !productForm.basePrice)) {
@@ -1003,7 +1013,15 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   }
 
   return (
-    <div className="p-3 sm:p-6 max-w-7xl mx-auto text-left">
+    <FormProvider {...methods}>
+    <CatalogEditorProvider value={{ 
+      productId, isNew, isComboMode, product, savingStates, setSavingStates, loadAll, handleSaveProduct, 
+      goNextWizardStep, goPrevWizardStep, isComboWizard, isProductWizard, onOpenRecipe: () => setIsRecipeModalOpen(true),
+      links, moveLink, openAddGroupModal, setIsCreateComplementModalOpen, openEditLinkModal, removeGroupLink,
+      bundleItems, bundleSummary, comboModeState, comboPricingType, setComboPricingType, comboPricingValue, setComboPricingValue, updateComboPricing, openBundleItemModal, deleteBundleItem, convertComboToBundle, slots, moveSlot, openAllowedModal, openSlotModal, deleteSlot, moveAllowed, deleteAllowed,
+      publication, patchPublication, rules, openRuleModal, deleteRule, formatChannelLabel, formatDaysLabel
+    }}>
+    <div className="flex-1 p-8 overflow-y-auto bg-background/50 custom-scrollbar">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
         <div className="min-w-0">
           <h1 className="text-2xl font-black text-foreground truncate">
@@ -1084,70 +1102,15 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
       ) : (
         <>
           {tab === 'geral' && (
-            <ProductBasicInfo
-              product={product}
-              productForm={productForm}
-              setProductForm={setProductForm}
-              categories={categories}
-              isComboMode={isComboMode}
-              bundleSummary={bundleSummary}
-              imagePreviewUrl={imagePreviewUrl}
-              handleSelectImageFile={handleSelectImageFile}
-              setImageFile={setImageFile}
-              setImagePreviewUrl={setImagePreviewUrl}
-              pizzaPrices={pizzaPrices}
-              setPizzaPrices={setPizzaPrices}
-              isComboWizard={isComboWizard}
-              goNextWizardStep={goNextWizardStep}
-              handleSaveProduct={handleSaveProduct}
-              savingStates={savingStates}
-              isNew={isNew}
-              onOpenRecipe={() => setIsRecipeModalOpen(true)}
-              onCategoryCreated={(cat) => setCategories((prev) => [...prev, cat])}
-            />
+            <ProductBasicInfo />
           )}
 
           {tab === 'personalizacao' && (
-            <ProductPersonalization
-              isComboMode={isComboMode}
-              links={links}
-              moveLink={moveLink}
-              openAddGroupModal={openAddGroupModal}
-              setIsCreateComplementModalOpen={setIsCreateComplementModalOpen}
-              openEditLinkModal={openEditLinkModal}
-              removeGroupLink={removeGroupLink}
-              savingStates={savingStates}
-              isProductWizard={isProductWizard}
-              goPrevWizardStep={goPrevWizardStep}
-              goNextWizardStep={goNextWizardStep}
-            />
+            <ProductPersonalization />
           )}
 
           {tab === 'combo' && (
-            <ComboBuilder
-              productForm={productForm}
-              bundleItems={bundleItems}
-              bundleSummary={bundleSummary}
-              comboModeState={comboModeState}
-              comboPricingType={comboPricingType}
-              setComboPricingType={setComboPricingType}
-              comboPricingValue={comboPricingValue}
-              setComboPricingValue={setComboPricingValue}
-              updateComboPricing={updateComboPricing}
-              openBundleItemModal={openBundleItemModal}
-              deleteBundleItem={deleteBundleItem}
-              convertComboToBundle={convertComboToBundle}
-              isComboWizard={isComboWizard}
-              goNextWizardStep={goNextWizardStep}
-              slots={slots}
-              moveSlot={moveSlot}
-              openAllowedModal={openAllowedModal}
-              openSlotModal={openSlotModal}
-              deleteSlot={deleteSlot}
-              moveAllowed={moveAllowed}
-              deleteAllowed={deleteAllowed}
-              savingStates={savingStates}
-            />
+            <ComboBuilder />
           )}
 
           {tab === 'vendas' && (
@@ -1208,20 +1171,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
           )}
 
           {tab === 'publicacao' && (
-            <PublicationSettings
-              publication={publication}
-              patchPublication={patchPublication}
-              rules={rules}
-              openRuleModal={openRuleModal}
-              deleteRule={deleteRule}
-              formatChannelLabel={formatChannelLabel}
-              formatDaysLabel={formatDaysLabel}
-              isComboWizard={isComboWizard}
-              isProductWizard={isProductWizard}
-              goPrevWizardStep={goPrevWizardStep}
-              handleSaveProduct={handleSaveProduct}
-              savingStates={savingStates}
-            />
+            <PublicationSettings />
           )}
         </>
       )}
@@ -1299,54 +1249,40 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <button
               type="button"
               onClick={saveBundleItem}
-              disabled={savingStates.saveBundleItem || !bundleItemForm.productId || selectableBundleProducts.length === 0 || comboModeState !== 'bundle'}
+              disabled={savingStates.saveBundleItem || !bundleItemForm.productId}
               className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {savingStates.saveBundleItem && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
-              Salvar item
+              Salvar
             </button>
           </>
         }
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Produto do cardápio</label>
+            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Produto *</label>
             <select
               value={bundleItemForm.productId}
-              onChange={(e) => setBundleItemForm((p) => ({ ...p, productId: e.target.value }))}
+              onChange={(e) => setBundleItemForm({ ...bundleItemForm, productId: e.target.value })}
               className="w-full px-4 py-2.5 bg-card text-foreground border border-input rounded-xl outline-none focus:ring-2 focus:ring-primary"
             >
+              <option value="">Selecione um produto</option>
               {selectableBundleProducts.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
               ))}
             </select>
-            {selectableBundleProducts.length === 0 ? (
-              <p className="text-xs text-status-warning mt-2 font-bold uppercase tracking-wider">Não há produtos ativos disponíveis para vínculo.</p>
-            ) : null}
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Quantidade</label>
-              <input
-                type="number"
-                min={1}
-                value={Number(bundleItemForm.qty ?? 1)}
-                onChange={(e) => setBundleItemForm((p) => ({ ...p, qty: Math.max(1, Number(e.target.value || 1)) }))}
-                className="w-full px-4 py-2.5 bg-card text-foreground border border-input rounded-xl outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Ordem</label>
-              <input
-                type="number"
-                min={0}
-                value={Number(bundleItemForm.sortOrder ?? 0)}
-                onChange={(e) => setBundleItemForm((p) => ({ ...p, sortOrder: Math.max(0, Number(e.target.value || 0)) }))}
-                className="w-full px-4 py-2.5 bg-card text-foreground border border-input rounded-xl outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Quantidade *</label>
+            <input
+              type="number"
+              min="1"
+              value={bundleItemForm.qty}
+              onChange={(e) => setBundleItemForm({ ...bundleItemForm, qty: Number(e.target.value || 1) })}
+              className="w-full px-4 py-2.5 bg-card text-foreground border border-input rounded-xl outline-none focus:ring-2 focus:ring-primary"
+            />
           </div>
         </div>
       </Modal>
@@ -1552,11 +1488,10 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
         </div>
       </Modal>
 
-      {/* Rule Modal */}
       <Modal
         isOpen={isRuleModalOpen}
         onClose={() => setIsRuleModalOpen(false)}
-        title={editingRule ? 'Editar regra' : 'Nova regra'}
+        title={editingRule ? 'Editar regra' : 'Nova regra de horário'}
         footer={
           <>
             <button
@@ -1569,114 +1504,91 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <button
               type="button"
               onClick={saveRule}
-              disabled={savingStates.saveRule}
-              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+              disabled={savingStates.saveRule || ruleChannels.length === 0}
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {savingStates.saveRule && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
-              Salvar
+              Salvar regra
             </button>
           </>
         }
       >
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div>
-            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Canal</label>
-            {editingRule ? (
-              <select
-                value={ruleForm.channel}
-                onChange={(e) => setRuleForm((p) => ({ ...p, channel: e.target.value as CreateAvailabilityRuleDto['channel'] }))}
-                className="input-premium"
-              >
-                <option value="storefront_delivery">Delivery</option>
-                <option value="storefront_pickup">Retirada</option>
-                <option value="pos">Balcao / PDV</option>
-              </select>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {(Object.entries(CHANNEL_LABELS) as Array<[string, string]>).map(([value, label]) => {
-                  const checked = ruleChannels.includes(value as 'storefront_delivery' | 'storefront_pickup' | 'pos');
-                  return (
-                    <label key={value} className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 dark:bg-muted/80 px-3 py-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => {
-                          const current = new Set(ruleChannels);
-                          if (e.target.checked) current.add(value as 'storefront_delivery' | 'storefront_pickup' | 'pos');
-                          else current.delete(value as 'storefront_delivery' | 'storefront_pickup' | 'pos');
-                          setRuleChannels(Array.from(current));
-                        }}
-                        className="w-4 h-4 text-primary-600"
-                      />
-                      <span className="text-xs font-bold text-foreground">{label}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
+            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-2">Canais de venda afetados *</label>
+            <div className="flex flex-col gap-2">
+              {(['storefront_delivery', 'storefront_pickup', 'pos'] as const).map((ch) => (
+                <label key={ch} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={ruleChannels.includes(ch)}
+                    onChange={(e) => {
+                      if (e.target.checked) setRuleChannels((p) => [...p, ch]);
+                      else setRuleChannels((p) => p.filter((c) => c !== ch));
+                    }}
+                    className="w-4 h-4 text-primary bg-muted border-input rounded focus:ring-primary/50"
+                  />
+                  <span className="text-sm font-bold text-foreground">{formatChannelLabel(ch)}</span>
+                </label>
+              ))}
+            </div>
+            {ruleChannels.length === 0 && <span className="text-xs text-red-500 font-bold mt-1">Selecione ao menos 1 canal.</span>}
           </div>
 
           <div>
             <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-2">Dias da semana</label>
             <div className="grid grid-cols-2 gap-2">
-              {DAY_OPTIONS.map((day) => {
-                const isChecked = (ruleForm.daysOfWeek ?? []).includes(day.value);
-                return (
-                  <label key={day.value} className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 dark:bg-muted/80 px-3 py-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={(e) => {
-                        const current = new Set(ruleForm.daysOfWeek ?? []);
-                        if (e.target.checked) {
-                          current.add(day.value);
-                        } else {
-                          current.delete(day.value);
-                        }
-                        setRuleForm((p) => ({ ...p, daysOfWeek: Array.from(current) }));
-                      }}
-                      className="w-4 h-4 text-primary-600"
-                    />
-                    <span className="text-xs font-bold text-foreground">{day.label}</span>
-                  </label>
-                );
-              })}
+              {DAY_OPTIONS.map((d) => (
+                <label key={d.value} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={ruleForm.daysOfWeek.includes(d.value)}
+                    onChange={(e) => {
+                      if (e.target.checked) setRuleForm({ ...ruleForm, daysOfWeek: [...ruleForm.daysOfWeek, d.value] });
+                      else setRuleForm({ ...ruleForm, daysOfWeek: ruleForm.daysOfWeek.filter((x) => x !== d.value) });
+                    }}
+                    className="w-4 h-4 text-primary bg-muted border-input rounded focus:ring-primary/50"
+                  />
+                  <span className="text-sm font-bold text-foreground">{d.label}</span>
+                </label>
+              ))}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Início</label>
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Hora de Início</label>
               <input
+                type="time"
                 value={ruleForm.startTime}
-                onChange={(e) => setRuleForm((p) => ({ ...p, startTime: e.target.value }))}
-                className="input-premium"
-                placeholder="HH:MM"
+                onChange={(e) => setRuleForm({ ...ruleForm, startTime: e.target.value })}
+                className="w-full px-4 py-2.5 bg-card text-foreground border border-input rounded-xl outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
             <div>
-              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Fim</label>
+              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Hora de Fim</label>
               <input
+                type="time"
                 value={ruleForm.endTime}
-                onChange={(e) => setRuleForm((p) => ({ ...p, endTime: e.target.value }))}
-                className="input-premium"
-                placeholder="HH:MM"
+                onChange={(e) => setRuleForm({ ...ruleForm, endTime: e.target.value })}
+                className="w-full px-4 py-2.5 bg-card text-foreground border border-input rounded-xl outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 cursor-pointer pt-2">
             <input
               type="checkbox"
-              checked={Boolean(ruleForm.isActive)}
-              onChange={(e) => setRuleForm((p) => ({ ...p, isActive: e.target.checked }))}
-              className="w-4 h-4 text-primary-600"
+              checked={ruleForm.isActive}
+              onChange={(e) => setRuleForm({ ...ruleForm, isActive: e.target.checked })}
+              className="w-4 h-4 text-primary bg-muted border-input rounded focus:ring-primary/50"
             />
-            <span className="text-sm font-bold text-foreground">Ativa</span>
-          </div>
+            <span className="text-sm font-bold text-foreground">Regra ativa</span>
+          </label>
         </div>
       </Modal>
 
+      {/* Confirm Modal */}
       {confirmModal && (
         <Modal
           isOpen={confirmModal.isOpen}
@@ -1686,52 +1598,54 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
             <>
               <button
                 onClick={() => setConfirmModal(null)}
-                className="px-4 py-2 text-muted-foreground hover:text-foreground font-bold"
+                className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted rounded-lg"
               >
                 Cancelar
               </button>
               <button
                 onClick={confirmModal.onConfirm}
-                className="px-6 py-2 bg-destructive text-destructive-foreground rounded-xl font-bold hover:bg-destructive/90"
+                className="px-4 py-2 text-sm font-bold text-destructive-foreground bg-destructive hover:bg-destructive/90 rounded-lg"
               >
                 Confirmar
               </button>
             </>
           }
         >
-          <p className="text-muted-foreground">{confirmModal.message}</p>
+          <p className="text-sm text-muted-foreground">{confirmModal.message}</p>
         </Modal>
       )}
 
+      {/* Alert Modal */}
       {alertModal && (
         <Modal
-          isOpen={true}
+          isOpen={alertModal.isOpen}
           onClose={() => setAlertModal(null)}
           title={alertModal.title}
           footer={
             <button
               onClick={() => setAlertModal(null)}
-              className="px-6 py-2 bg-primary text-primary-foreground rounded-xl font-bold"
+              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg"
             >
               OK
             </button>
           }
         >
-          <p className="text-muted-foreground">{alertModal.message}</p>
+          <p className="text-sm text-muted-foreground">{alertModal.message}</p>
         </Modal>
       )}
-      {product && (
+
+      {/* Recipe Modal */}
+      {isRecipeModalOpen && productId && (
         <RecipeModal
           isOpen={isRecipeModalOpen}
-          onClose={() => {
-            setIsRecipeModalOpen(false);
-            loadAll();
-          }}
+          onClose={() => setIsRecipeModalOpen(false)}
+          entityId={productId}
           entityType={isComboMode ? 'combo' : 'product'}
-          entityId={product.id}
-          entityName={product.name}
+          entityName={productForm.name || 'Produto'}
         />
       )}
     </div>
+    </CatalogEditorProvider>
+    </FormProvider>
   );
 }

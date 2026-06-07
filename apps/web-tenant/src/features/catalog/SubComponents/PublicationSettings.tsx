@@ -1,38 +1,22 @@
 import React from 'react';
-import { CatalogPublication, CatalogAvailabilityRule, UpsertPublicationDto } from '@gestor/types';
 
+import { useCatalogEditor } from '../CatalogEditorContext';
 
-
-
-interface PublicationSettingsProps {
-  publication: CatalogPublication | null;
-  patchPublication: (payload: UpsertPublicationDto) => void;
-  rules: CatalogAvailabilityRule[];
-  openRuleModal: (rule?: CatalogAvailabilityRule) => void;
-  deleteRule: (id: string) => void;
-  formatChannelLabel: (channel: string) => string;
-  formatDaysLabel: (days: number[]) => string;
-  isComboWizard: boolean;
-  isProductWizard?: boolean;
-  goPrevWizardStep: () => void;
-  handleSaveProduct: () => void;
-  savingStates: Record<string, boolean>;
-}
-
-export const PublicationSettings: React.FC<PublicationSettingsProps> = ({
-  publication,
-  patchPublication,
-  rules,
-  openRuleModal,
-  deleteRule,
-  formatChannelLabel,
-  formatDaysLabel,
-  isComboWizard,
-  isProductWizard = false,
-  goPrevWizardStep,
-  handleSaveProduct,
-  savingStates,
-}) => {
+export const PublicationSettings: React.FC = () => {
+  const {
+    publication,
+    patchPublication,
+    rules,
+    openRuleModal,
+    deleteRule,
+    formatChannelLabel,
+    formatDaysLabel,
+    isComboWizard,
+    isProductWizard,
+    goPrevWizardStep,
+    handleSaveProduct,
+    savingStates,
+  } = useCatalogEditor();
   return (
     <section className="space-y-6 text-left">
       <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
