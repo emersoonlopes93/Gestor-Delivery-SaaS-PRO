@@ -21,6 +21,7 @@ export {
   FinancialStatus,
   OrderSplitStatus,
   PaymentTxStatus,
+  FractionalPricingRule,
 } from './enums';
 
 export type * from './auth';

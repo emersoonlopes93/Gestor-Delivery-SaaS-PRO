@@ -21,15 +21,65 @@ export class CombosService {
     return tenantId;
   }
 
+  // --- COMPATIBILITY MAPPER ---
+  private mapProductToLegacyCombo(product: any) {
+    return {
+      id: product.id,
+      tenantId: product.tenantId,
+      name: product.name,
+      slug: product.slug,
+      description: product.shortDescription,
+      basePrice: product.basePrice,
+      image: product.image,
+      isActive: product.publication?.publicationStatus === 'published',
+      isFeatured: product.isFeatured,
+      order: product.order,
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
+      deletedAt: product.deletedAt,
+      blocks: product.comboSlots ? product.comboSlots.map((slot: any) => this.mapSlotToLegacyBlock(slot)) : [],
+    };
+  }
+
+  private mapSlotToLegacyBlock(slot: any) {
+    return {
+      id: slot.id,
+      tenantId: slot.tenantId,
+      comboId: slot.comboProductId,
+      name: slot.name,
+      description: slot.description,
+      minSelect: slot.minSelect,
+      maxSelect: slot.maxSelect,
+      order: slot.order,
+      createdAt: slot.createdAt,
+      updatedAt: slot.updatedAt,
+      items: slot.allowedItems ? slot.allowedItems.map((item: any) => this.mapAllowedItemToLegacyBlockItem(item)) : [],
+    };
+  }
+
+  private mapAllowedItemToLegacyBlockItem(item: any) {
+    return {
+      id: item.id,
+      tenantId: item.tenantId,
+      blockId: item.comboSlotId,
+      productId: item.productId,
+      additionalPrice: item.additionalPrice,
+      order: item.order,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      product: item.product,
+    };
+  }
+
   async create(createComboDto: CreateComboDto) {
     const tenantId = this.getRequiredTenantId();
     const slug = slugify(createComboDto.name);
 
-    // Check if there is an active combo with the same slug.
-    const comboExists = await this.prisma.tenantClient.productCombo.findFirst({
+    const comboExists = await this.prisma.tenantClient.product.findFirst({
       where: {
         tenantId,
         slug,
+        type: 'combo',
         deletedAt: null,
       },
     });
@@ -38,98 +88,143 @@ export class CombosService {
       throw new ConflictException(`Já existe um combo com o nome "${createComboDto.name}".`);
     }
 
-    // Check if there is a soft-deleted combo with the same slug.
-    const deletedComboConflict = await this.prisma.tenantClient.productCombo.findFirst({
+    const deletedComboConflict = await this.prisma.tenantClient.product.findFirst({
       where: {
         tenantId,
         slug,
+        type: 'combo',
         NOT: { deletedAt: null },
       },
     });
 
     if (deletedComboConflict) {
-      // Free up the slug
-      await this.prisma.tenantClient.productCombo.update({
+      await this.prisma.tenantClient.product.update({
         where: { id: deletedComboConflict.id },
         data: { slug: `${slug}-deleted-${Date.now()}` },
       });
     }
 
-    return this.prisma.tenantClient.productCombo.create({
+    const product = await this.prisma.tenantClient.product.create({
       data: {
         tenantId,
         slug,
         name: createComboDto.name,
-        description: createComboDto.description ?? null,
+        shortDescription: createComboDto.description ?? null,
         basePrice: createComboDto.basePrice,
         image: createComboDto.image ?? null,
-        isActive: createComboDto.isActive ?? true,
         isFeatured: createComboDto.isFeatured ?? false,
         order: createComboDto.order ?? 0,
+        type: 'combo',
+        comboMode: 'bundle',
+        comboPricingType: 'fixed_price',
+        comboPricingValue: createComboDto.basePrice,
+        isAvailable: true,
+        sellableOnline: true,
+        publication: {
+          create: {
+            tenantId,
+            publicationStatus: createComboDto.isActive ? 'published' : 'draft',
+            operationalStatus: 'active',
+          }
+        }
       },
+      include: { publication: true }
     });
+
+    return this.mapProductToLegacyCombo(product);
   }
 
   async findAll() {
     const tenantId = this.getRequiredTenantId();
-    return this.prisma.tenantClient.productCombo.findMany({
-      where: { tenantId, deletedAt: null },
+    const products = await this.prisma.tenantClient.product.findMany({
+      where: { tenantId, type: 'combo', deletedAt: null },
       orderBy: { order: 'asc' },
-      include: { blocks: { include: { items: true } } },
+      include: { 
+        publication: true,
+        comboSlots: { include: { allowedItems: { include: { product: true } } } } 
+      },
     });
+    return products.map(p => this.mapProductToLegacyCombo(p));
   }
 
   async findOne(id: string) {
     const tenantId = this.getRequiredTenantId();
-    const combo = await this.prisma.tenantClient.productCombo.findFirst({
-      where: { id, tenantId, deletedAt: null },
-      include: { blocks: { include: { items: { include: { product: true } } } } },
+    const combo = await this.prisma.tenantClient.product.findFirst({
+      where: { id, tenantId, type: 'combo', deletedAt: null },
+      include: { 
+        publication: true,
+        comboSlots: { include: { allowedItems: { include: { product: true } } } } 
+      },
     });
 
     if (!combo) {
       throw new NotFoundException(`Combo não encontrado.`);
     }
 
-    return combo;
+    return this.mapProductToLegacyCombo(combo);
   }
 
   async update(id: string, updateComboDto: UpdateComboDto) {
-    await this.findOne(id);
+    const tenantId = this.getRequiredTenantId();
+    const existing = await this.prisma.tenantClient.product.findFirst({
+      where: { id, tenantId, type: 'combo', deletedAt: null }
+    });
+    
+    if (!existing) {
+      throw new NotFoundException(`Combo não encontrado.`);
+    }
 
     const slug = updateComboDto.name ? slugify(updateComboDto.name) : undefined;
 
-    return this.prisma.tenantClient.productCombo.update({
+    const updated = await this.prisma.tenantClient.product.update({
       where: { id },
       data: {
         name: updateComboDto.name,
-        description: updateComboDto.description ?? undefined,
+        shortDescription: updateComboDto.description ?? undefined,
         basePrice: updateComboDto.basePrice,
         image: updateComboDto.image ?? undefined,
-        isActive: updateComboDto.isActive,
         isFeatured: updateComboDto.isFeatured,
         order: updateComboDto.order,
         ...(slug ? { slug } : {}),
+        ...(updateComboDto.basePrice !== undefined ? { comboPricingValue: updateComboDto.basePrice } : {}),
+        publication: updateComboDto.isActive !== undefined ? {
+          update: {
+            publicationStatus: updateComboDto.isActive ? 'published' : 'draft'
+          }
+        } : undefined
       },
+      include: { publication: true, comboSlots: { include: { allowedItems: { include: { product: true } } } } }
     });
+    
+    return this.mapProductToLegacyCombo(updated);
   }
 
   async remove(id: string) {
-    const combo = await this.findOne(id);
+    const tenantId = this.getRequiredTenantId();
+    const combo = await this.prisma.tenantClient.product.findFirst({
+      where: { id, tenantId, type: 'combo', deletedAt: null }
+    });
 
-    // Soft delete
+    if (!combo) {
+      throw new NotFoundException(`Combo não encontrado.`);
+    }
+
     const timestamp = Date.now();
-    return this.prisma.tenantClient.productCombo.update({
+    const deleted = await this.prisma.tenantClient.product.update({
       where: { id },
       data: {
         deletedAt: new Date(),
         slug: `${combo.slug}-deleted-${timestamp}`,
       },
+      include: { publication: true, comboSlots: { include: { allowedItems: { include: { product: true } } } } }
     });
+    
+    return this.mapProductToLegacyCombo(deleted);
   }
 
   private async ensureComboExists(comboId: string) {
-    const combo = await this.prisma.tenantClient.productCombo.findFirst({
-      where: { id: comboId, deletedAt: null },
+    const combo = await this.prisma.tenantClient.product.findFirst({
+      where: { id: comboId, type: 'combo', deletedAt: null },
       select: { id: true },
     });
 
@@ -141,9 +236,9 @@ export class CombosService {
   }
 
   private async ensureBlockBelongsToCombo(comboId: string, blockId: string) {
-    const block = await this.prisma.tenantClient.productComboBlock.findFirst({
-      where: { id: blockId, comboId },
-      select: { id: true, comboId: true },
+    const block = await this.prisma.tenantClient.comboSlot.findFirst({
+      where: { id: blockId, comboProductId: comboId },
+      select: { id: true, comboProductId: true },
     });
 
     if (!block) {
@@ -154,9 +249,9 @@ export class CombosService {
   }
 
   private async ensureItemBelongsToBlock(blockId: string, itemId: string) {
-    const item = await this.prisma.tenantClient.productComboBlockItem.findFirst({
-      where: { id: itemId, blockId },
-      select: { id: true, blockId: true },
+    const item = await this.prisma.tenantClient.comboSlotAllowedItem.findFirst({
+      where: { id: itemId, comboSlotId: blockId },
+      select: { id: true, comboSlotId: true },
     });
 
     if (!item) {
@@ -168,83 +263,91 @@ export class CombosService {
 
   async createBlock(dto: CreateComboBlockDto) {
     await this.ensureComboExists(dto.comboId);
-
     const tenantId = this.getRequiredTenantId();
 
-    return this.prisma.tenantClient.productComboBlock.create({
+    const slot = await this.prisma.tenantClient.comboSlot.create({
       data: {
         tenantId,
-        comboId: dto.comboId,
+        comboProductId: dto.comboId,
         name: dto.name,
         description: dto.description ?? null,
+        isRequired: (dto.minSelect ?? 1) > 0,
         minSelect: dto.minSelect ?? 1,
         maxSelect: dto.maxSelect ?? 1,
         order: dto.order ?? 0,
       },
-      include: { items: { include: { product: true } } },
+      include: { allowedItems: { include: { product: true } } },
     });
+    
+    return this.mapSlotToLegacyBlock(slot);
   }
 
   async listBlocks(comboId: string) {
     await this.ensureComboExists(comboId);
 
-    return this.prisma.tenantClient.productComboBlock.findMany({
-      where: { comboId },
+    const slots = await this.prisma.tenantClient.comboSlot.findMany({
+      where: { comboProductId: comboId },
       orderBy: { order: 'asc' },
-      include: { items: { include: { product: true } } },
+      include: { allowedItems: { include: { product: true } } },
     });
+    
+    return slots.map(s => this.mapSlotToLegacyBlock(s));
   }
 
   async updateBlock(comboId: string, blockId: string, dto: UpdateComboBlockDto) {
     await this.ensureComboExists(comboId);
     await this.ensureBlockBelongsToCombo(comboId, blockId);
 
-    return this.prisma.tenantClient.productComboBlock.update({
+    const slot = await this.prisma.tenantClient.comboSlot.update({
       where: { id: blockId },
       data: {
         name: dto.name,
         description: dto.description ?? undefined,
         minSelect: dto.minSelect,
         maxSelect: dto.maxSelect,
+        isRequired: dto.minSelect !== undefined ? dto.minSelect > 0 : undefined,
         order: dto.order,
       },
-      include: { items: { include: { product: true } } },
+      include: { allowedItems: { include: { product: true } } },
     });
+    
+    return this.mapSlotToLegacyBlock(slot);
   }
 
   async removeBlock(comboId: string, blockId: string) {
     await this.ensureComboExists(comboId);
     await this.ensureBlockBelongsToCombo(comboId, blockId);
 
-    return this.prisma.tenantClient.productComboBlock.delete({
+    const deleted = await this.prisma.tenantClient.comboSlot.delete({
       where: { id: blockId },
     });
+    
+    return this.mapSlotToLegacyBlock(deleted);
   }
 
   async createBlockItem(comboId: string, dto: CreateComboBlockItemDto) {
     await this.ensureComboExists(comboId);
     await this.ensureBlockBelongsToCombo(comboId, dto.blockId);
-
     const tenantId = this.getRequiredTenantId();
 
     try {
-      return await this.prisma.tenantClient.productComboBlockItem.create({
+      const item = await this.prisma.tenantClient.comboSlotAllowedItem.create({
         data: {
           tenantId,
-          blockId: dto.blockId,
+          comboSlotId: dto.blockId,
           productId: dto.productId,
           additionalPrice: dto.additionalPrice ?? 0,
           order: dto.order ?? 0,
         },
         include: { product: true },
       });
+      return this.mapAllowedItemToLegacyBlockItem(item);
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         if (err.code === 'P2002') {
           throw new ConflictException('Este produto já existe neste bloco.');
         }
       }
-
       throw err;
     }
   }
@@ -253,11 +356,13 @@ export class CombosService {
     await this.ensureComboExists(comboId);
     await this.ensureBlockBelongsToCombo(comboId, blockId);
 
-    return this.prisma.tenantClient.productComboBlockItem.findMany({
-      where: { blockId },
+    const items = await this.prisma.tenantClient.comboSlotAllowedItem.findMany({
+      where: { comboSlotId: blockId },
       orderBy: { order: 'asc' },
       include: { product: true },
     });
+    
+    return items.map(i => this.mapAllowedItemToLegacyBlockItem(i));
   }
 
   async updateBlockItem(
@@ -275,7 +380,7 @@ export class CombosService {
     }
 
     try {
-      return await this.prisma.tenantClient.productComboBlockItem.update({
+      const item = await this.prisma.tenantClient.comboSlotAllowedItem.update({
         where: { id: itemId },
         data: {
           productId: dto.productId,
@@ -284,13 +389,13 @@ export class CombosService {
         },
         include: { product: true },
       });
+      return this.mapAllowedItemToLegacyBlockItem(item);
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError) {
         if (err.code === 'P2002') {
           throw new ConflictException('Este produto já existe neste bloco.');
         }
       }
-
       throw err;
     }
   }
@@ -300,8 +405,9 @@ export class CombosService {
     await this.ensureBlockBelongsToCombo(comboId, blockId);
     await this.ensureItemBelongsToBlock(blockId, itemId);
 
-    return this.prisma.tenantClient.productComboBlockItem.delete({
+    const deleted = await this.prisma.tenantClient.comboSlotAllowedItem.delete({
       where: { id: itemId },
     });
+    return this.mapAllowedItemToLegacyBlockItem(deleted);
   }
 }
