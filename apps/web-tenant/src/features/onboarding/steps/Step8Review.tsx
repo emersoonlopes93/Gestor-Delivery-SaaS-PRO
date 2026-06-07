@@ -9,6 +9,7 @@ interface Step8Props {
   validation: OnboardingValidation;
   onActivate: () => Promise<void>;
   onPrev: () => void;
+  goToStep: (index: number) => void;
 }
 
 interface CheckItem {
@@ -33,7 +34,7 @@ const OPTIONAL_ITEMS = [
 
 import React from 'react';
 
-export function Step8Review({ validation, onActivate, onPrev }: Step8Props) {
+export function Step8Review({ validation, onActivate, onPrev, goToStep }: Step8Props) {
   const [activating, setActivating] = useState(false);
   const [error, setError] = useState('');
 
@@ -48,9 +49,9 @@ export function Step8Review({ validation, onActivate, onPrev }: Step8Props) {
 
   // Telemetria via frontend — emitida somente quando o card é exibido
   const handleViewed = useCallback(() => {
-    void api.post('/tenant/onboarding-step', {
-      step: 'review',
+    void api.post('/tenant/telemetry', {
       event: 'onboarding_readiness_viewed',
+      payload: { step: 'review' }
     }).catch(() => {/* silencia — telemetria não bloqueia UX */});
   }, []);
 
@@ -85,6 +86,26 @@ export function Step8Review({ validation, onActivate, onPrev }: Step8Props) {
           data={readinessData}
           compact={false}
           onViewed={handleViewed}
+          onAction={(dim) => {
+            // Mapeamento das dimensões do Readiness para os passos do OnboardingWizard
+            const stepMap: Record<string, number> = {
+              profile: 0,    // Step1Identity
+              location: 1,   // Step2Location
+              hours: 2,      // Step3Hours
+              payments: 3,   // Step4Payments
+              catalog: 4,    // Step5Product
+              delivery: 1,   // Step2Location (Location handles delivery enable and radius)
+              storefront: 6, // Step7Storefront
+            };
+            const targetStep = stepMap[dim.key];
+            if (targetStep !== undefined) {
+              goToStep(targetStep);
+            } else {
+              // Fallback para caso alguma dimensão não mapeie para um passo (ex: rotas diretas)
+              // Importante: navegar pode ser bloqueado pelo OnboardingGuard dependendo da rota
+              window.location.href = dim.actionPath;
+            }
+          }}
         />
       ) : (
         /* Fallback: checklist manual quando score não carregou */

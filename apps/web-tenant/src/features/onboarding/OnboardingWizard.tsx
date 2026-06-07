@@ -253,6 +253,7 @@ export function OnboardingWizard() {
             validation={validation}
             onActivate={completeOnboarding}
             onPrev={goPrev}
+            goToStep={goToStep}
           />
         );
       default:

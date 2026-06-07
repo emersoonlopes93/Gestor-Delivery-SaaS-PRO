@@ -77,6 +77,8 @@ interface OnboardingReadinessCardProps {
   compact?: boolean;
   /** Emitir evento de telemetria quando montado */
   onViewed?: () => void;
+  /** Custom action handler (defaults to navigate(dim.actionPath)) */
+  onAction?: (dim: ReadinessDimension) => void;
 }
 
 // ─── Componente ──────────────────────────────────────────────────────────────
@@ -85,6 +87,7 @@ export function OnboardingReadinessCard({
   data,
   compact = false,
   onViewed,
+  onAction,
 }: OnboardingReadinessCardProps) {
   const navigate = useNavigate();
   const statusCfg = STATUS_CONFIG[data.status];
@@ -120,7 +123,12 @@ export function OnboardingReadinessCard({
     } catch (e) {
       // ignore
     }
-    navigate(dim.actionPath);
+    
+    if (onAction) {
+      onAction(dim);
+    } else {
+      navigate(dim.actionPath);
+    }
   };
 
   return (
