@@ -10,8 +10,7 @@ import { ComboBuilder } from './SubComponents/ComboBuilder';
 import { PublicationSettings } from './SubComponents/PublicationSettings';
 import { InfoTooltip } from '../../components/InfoTooltip';
 import { VirtualMultiSelect } from '../../components/ui/VirtualMultiSelect';
-
-
+import { OptionGroupEditorModal } from './SubComponents/OptionGroupEditorModal';
 
 
 import {
@@ -165,16 +164,6 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
   const [isAddGroupModalOpen, setIsAddGroupModalOpen] = useState(false);
   const [selectedGroupIdToAdd, setSelectedGroupIdToAdd] = useState<string>('');
   const [isCreateComplementModalOpen, setIsCreateComplementModalOpen] = useState(false);
-  const [newComplementForm, setNewComplementForm] = useState({
-    name: '',
-    description: '',
-    selectionType: 'multiple' as 'single' | 'multiple' | 'quantity',
-    isRequired: false,
-    minSelect: 0,
-    maxSelect: 1,
-    isActive: true,
-    order: 0,
-  });
 
   const [isEditLinkModalOpen, setIsEditLinkModalOpen] = useState(false);
   const [editingLink, setEditingLink] = useState<LinkWithGroup | null>(null);
@@ -506,35 +495,16 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
       setSavingStates((p) => ({ ...p, addGroupLink: false }));
     }
   };
-
-  const createComplementAndLink = async () => {
-    if (!newComplementForm.name.trim()) return;
+  const handleComplementCreated = async (created: OptionGroup) => {
     setSavingStates((p) => ({ ...p, createComplementAndLink: true }));
     try {
-      const created = await api.post<OptionGroup>('/catalog/option-groups', {
-        ...newComplementForm,
-        name: newComplementForm.name.trim(),
-      });
-      if (!created.success) return;
-
       if (!productId) throw new Error('productId não disponível');
       await api.post(`/catalog/products/${productId}/option-groups`, {
-        optionGroupId: created.data.id,
+        optionGroupId: created.id,
         order: links.length,
         pricingAxis: 'secondary',
       });
-
       setIsCreateComplementModalOpen(false);
-      setNewComplementForm({
-        name: '',
-        description: '',
-        selectionType: 'multiple',
-        isRequired: false,
-        minSelect: 0,
-        maxSelect: 1,
-        isActive: true,
-        order: 0,
-      });
       await loadAll();
     } finally {
       setSavingStates((p) => ({ ...p, createComplementAndLink: false }));
@@ -1306,84 +1276,12 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
         </div>
       </Modal>
 
-      <Modal
+      <OptionGroupEditorModal
         isOpen={isCreateComplementModalOpen}
         onClose={() => setIsCreateComplementModalOpen(false)}
-        title="Criar novo complemento"
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() => setIsCreateComplementModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted rounded-lg"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={createComplementAndLink}
-              disabled={savingStates.createComplementAndLink || !newComplementForm.name.trim()}
-              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {savingStates.createComplementAndLink && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
-              Criar e vincular
-            </button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Nome</label>
-            <input
-              value={newComplementForm.name}
-              onChange={(e) => setNewComplementForm((p) => ({ ...p, name: e.target.value }))}
-              className="w-full px-4 py-2.5 bg-card text-foreground border border-input rounded-xl outline-none focus:ring-2 focus:ring-primary placeholder:text-muted-foreground"
-              placeholder="Ex: Molhos e adicionais"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Tipo de seleção</label>
-            <select
-              value={newComplementForm.selectionType}
-              onChange={(e) => setNewComplementForm((p) => ({ ...p, selectionType: e.target.value as 'single' | 'multiple' | 'quantity' }))}
-              className="w-full px-4 py-2.5 bg-card text-foreground border border-input rounded-xl outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="single">Escolha única</option>
-              <option value="multiple">Múltipla escolha</option>
-              <option value="quantity">Por quantidade</option>
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Mínimo</label>
-              <input
-                type="number"
-                value={newComplementForm.minSelect}
-                onChange={(e) => setNewComplementForm((p) => ({ ...p, minSelect: Number(e.target.value || 0) }))}
-                className="w-full px-4 py-2.5 bg-card text-foreground border border-input rounded-xl outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Máximo</label>
-              <input
-                type="number"
-                value={newComplementForm.maxSelect}
-                onChange={(e) => setNewComplementForm((p) => ({ ...p, maxSelect: Number(e.target.value || 1) }))}
-                className="w-full px-4 py-2.5 bg-card text-foreground border border-input rounded-xl outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-          </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={newComplementForm.isRequired}
-              onChange={(e) => setNewComplementForm((p) => ({ ...p, isRequired: e.target.checked }))}
-              className="w-4 h-4 rounded text-primary border-input focus:ring-primary"
-            />
-            <span className="text-sm font-bold text-foreground">Obrigatório</span>
-          </label>
-        </div>
-      </Modal>
+        groupId={null}
+        onSaved={handleComplementCreated}
+      />
 
       <Modal
         isOpen={isBundleItemModalOpen}

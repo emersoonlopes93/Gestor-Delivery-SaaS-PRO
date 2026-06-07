@@ -1,15 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api-client';
 import {
-  CreateOptionGroupDto,
-  CreateOptionItemDto,
   OptionGroup,
   OptionItem,
-  UpdateOptionGroupDto,
-  UpdateOptionItemDto,
 } from '@gestor/types';
-import { Modal } from '../../components/Modal';
 import { InfoTooltip } from '../../components/InfoTooltip';
+import { OptionGroupEditorModal } from './SubComponents/OptionGroupEditorModal';
 
 type GroupWithItems = OptionGroup & { items?: OptionItem[] };
 
@@ -18,34 +14,8 @@ export function OptionGroupsPage() {
   const [groups, setGroups] = useState<GroupWithItems[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<GroupWithItems | null>(null);
-  const [groupForm, setGroupForm] = useState<CreateOptionGroupDto>({
-    name: '',
-    description: '',
-    selectionType: 'multiple',
-    isRequired: false,
-    minSelect: 0,
-    maxSelect: 1,
-    isActive: true,
-    order: 0,
-  });
-
-  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<OptionItem | null>(null);
-  const [itemForm, setItemForm] = useState<CreateOptionItemDto>({
-    optionGroupId: '',
-    name: '',
-    description: '',
-    sku: '',
-    isActive: true,
-    order: 0,
-    priceImpactType: 'none',
-    priceImpactValue: 0,
-    allowQuantity: false,
-    minQty: 1,
-    maxQty: 1,
-  });
 
   useEffect(() => {
     loadGroups();
@@ -66,94 +36,18 @@ export function OptionGroupsPage() {
   }, [groups]);
 
   const openGroupModal = (group?: GroupWithItems) => {
-    if (group) {
-      setEditingGroup(group);
-      setGroupForm({
-        name: group.name,
-        description: group.description ?? '',
-        selectionType: group.selectionType,
-        isRequired: group.isRequired,
-        minSelect: group.minSelect,
-        maxSelect: group.maxSelect,
-        isActive: group.isActive,
-        order: group.order,
-      });
-    } else {
-      setEditingGroup(null);
-      setGroupForm({
-        name: '',
-        description: '',
-        selectionType: 'multiple',
-        isRequired: false,
-        minSelect: 0,
-        maxSelect: 1,
-        isActive: true,
-        order: 0,
-      });
-    }
-    setIsGroupModalOpen(true);
+    setEditingGroup(group || null);
+    setIsEditorOpen(true);
   };
 
-  const saveGroup = async () => {
-    const payload: CreateOptionGroupDto | UpdateOptionGroupDto = groupForm;
-    if (editingGroup) {
-      await api.patch(`/catalog/option-groups/${editingGroup.id}`, payload);
-    } else {
-      await api.post('/catalog/option-groups', payload);
-    }
-    setIsGroupModalOpen(false);
+  const handleSaved = async () => {
+    setIsEditorOpen(false);
     await loadGroups();
   };
 
   const deleteGroup = async (id: string) => {
     if (!window.confirm('Excluir este grupo e seus itens?')) return;
     await api.delete(`/catalog/option-groups/${id}`);
-    await loadGroups();
-  };
-
-  const openItemModal = (groupId: string, item?: OptionItem) => {
-    if (item) {
-      setEditingItem(item);
-      setItemForm({
-        optionGroupId: groupId,
-        name: item.name,
-        description: item.description ?? '',
-        sku: item.sku ?? '',
-        isActive: item.isActive,
-        order: item.order,
-        priceImpactType: item.priceImpactType,
-        priceImpactValue: Number(item.priceImpactValue ?? 0),
-        allowQuantity: item.allowQuantity,
-        minQty: item.minQty ?? 1,
-        maxQty: item.maxQty ?? 1,
-      });
-    } else {
-      setEditingItem(null);
-      setItemForm({
-        optionGroupId: groupId,
-        name: '',
-        description: '',
-        sku: '',
-        isActive: true,
-        order: 0,
-        priceImpactType: 'none',
-        priceImpactValue: 0,
-        allowQuantity: false,
-        minQty: 1,
-        maxQty: 1,
-      });
-    }
-    setIsItemModalOpen(true);
-  };
-
-  const saveItem = async () => {
-    const payload: CreateOptionItemDto | UpdateOptionItemDto = itemForm;
-    if (editingItem) {
-      await api.patch(`/catalog/option-groups/items/${editingItem.id}`, payload);
-    } else {
-      await api.post('/catalog/option-groups/items', payload);
-    }
-    setIsItemModalOpen(false);
     await loadGroups();
   };
 
@@ -217,18 +111,11 @@ export function OptionGroupsPage() {
                   </div>
                   <div className="flex gap-2 shrink-0">
                     <button
-                      onClick={() => openItemModal(g.id)}
-                      className="text-xs font-bold text-primary hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-colors"
-                      type="button"
-                    >
-                      Novo item
-                    </button>
-                    <button
                       onClick={() => openGroupModal(g)}
                       className="px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
                       type="button"
                     >
-                      Editar
+                      Editar Opções
                     </button>
                     <button
                       onClick={() => deleteGroup(g.id)}
@@ -291,11 +178,11 @@ export function OptionGroupsPage() {
                                 ↓
                               </button>
                               <button
-                                onClick={() => openItemModal(g.id, it)}
+                                onClick={() => openGroupModal(g)}
                                 className="px-3 py-1 text-xs font-bold text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
                                 type="button"
                               >
-                                Editar
+                                Editar na tabela
                               </button>
                               <button
                                 onClick={() => deleteItem(it.id)}
@@ -328,218 +215,12 @@ export function OptionGroupsPage() {
         </div>
       )}
 
-      <Modal
-        isOpen={isGroupModalOpen}
-        onClose={() => setIsGroupModalOpen(false)}
-        title={editingGroup ? 'Editar grupo/tamanho' : 'Novo grupo/tamanho'}
-        footer={
-          <>
-            <button
-              onClick={() => setIsGroupModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted rounded-lg transition-colors"
-              type="button"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={saveGroup}
-              className="btn-primary px-5 py-2 text-sm"
-              type="button"
-            >
-              Salvar
-            </button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Nome</label>
-            <input
-              value={groupForm.name}
-              onChange={(e) => setGroupForm((p) => ({ ...p, name: e.target.value }))}
-              className="input-premium"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Descrição</label>
-            <input
-              value={groupForm.description ?? ''}
-              onChange={(e) => setGroupForm((p) => ({ ...p, description: e.target.value }))}
-              className="input-premium"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Tipo</label>
-                <select
-                  value={groupForm.selectionType}
-                  onChange={(e) => setGroupForm((p) => ({ ...p, selectionType: e.target.value as 'single' | 'multiple' | 'quantity' }))}
-                  className="input-premium"
-                >
-                  <option value="single">Seleção Única</option>
-                  <option value="multiple">Seleção Múltipla</option>
-                  <option value="quantity">Seleção com Quantidade</option>
-                </select>
-                <div className="mt-1">
-                  <InfoTooltip text="Única: Escolhe apenas 1. Múltipla: Escolhe vários (check). Quantidade: O usuário define a quantidade de cada item." />
-                </div>
-            </div>
-            <div className="flex items-center gap-4 pt-6">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={Boolean(groupForm.isRequired)}
-                  onChange={(e) => setGroupForm((p) => ({ ...p, isRequired: e.target.checked }))}
-                  className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
-                />
-                <span className="text-sm font-bold text-foreground">Obrigatório</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={Boolean(groupForm.isActive)}
-                  onChange={(e) => setGroupForm((p) => ({ ...p, isActive: e.target.checked }))}
-                  className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
-                />
-                <span className="text-sm font-bold text-foreground">Ativo</span>
-              </label>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Min</label>
-              <input
-                type="number"
-                value={groupForm.minSelect ?? 0}
-                onChange={(e) => setGroupForm((p) => ({ ...p, minSelect: Number(e.target.value || 0) }))}
-                className="input-premium"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Max</label>
-              <input
-                type="number"
-                value={groupForm.maxSelect ?? 1}
-                onChange={(e) => setGroupForm((p) => ({ ...p, maxSelect: Number(e.target.value || 1) }))}
-                className="input-premium"
-              />
-            </div>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={isItemModalOpen}
-        onClose={() => setIsItemModalOpen(false)}
-        title={editingItem ? 'Editar item do grupo' : 'Novo item do grupo'}
-        footer={
-          <>
-            <button
-              onClick={() => setIsItemModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted rounded-lg transition-colors"
-              type="button"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={saveItem}
-              className="btn-primary px-5 py-2 text-sm"
-              type="button"
-            >
-              Salvar
-            </button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Nome</label>
-            <input
-              value={itemForm.name}
-              onChange={(e) => setItemForm((p) => ({ ...p, name: e.target.value }))}
-              className="input-premium"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Descrição</label>
-            <input
-              value={itemForm.description ?? ''}
-              onChange={(e) => setItemForm((p) => ({ ...p, description: e.target.value }))}
-              className="input-premium"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Impacto</label>
-                <select
-                  value={itemForm.priceImpactType ?? 'none'}
-                  onChange={(e) => setItemForm((p) => ({ ...p, priceImpactType: e.target.value as 'none' | 'fixed' | 'replace' | 'percentage' }))}
-                  className="input-premium"
-                >
-                  <option value="none">Nenhum impacto</option>
-                  <option value="fixed">Adicional Fixo (Soma)</option>
-                  <option value="replace">Substituir Preço Base</option>
-                  <option value="percentage">Adicional por %</option>
-                </select>
-                <div className="mt-1">
-                  <InfoTooltip text="Fixo: Soma o valor ao produto. Substituir: Ignora o preço do produto e usa este. %: Calcula sobre o preço base." />
-                </div>
-            </div>
-            <div>
-              <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Valor</label>
-              <input
-                type="number"
-                step="0.01"
-                value={Number(itemForm.priceImpactValue ?? 0)}
-                onChange={(e) => setItemForm((p) => ({ ...p, priceImpactValue: Number(e.target.value || 0) }))}
-                className="input-premium"
-              />
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={Boolean(itemForm.isActive)}
-                onChange={(e) => setItemForm((p) => ({ ...p, isActive: e.target.checked }))}
-                className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
-              />
-              <span className="text-sm font-bold text-foreground">Ativo</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={Boolean(itemForm.allowQuantity)}
-                onChange={(e) => setItemForm((p) => ({ ...p, allowQuantity: e.target.checked }))}
-                className="w-4 h-4 text-primary bg-muted border-border rounded focus:ring-primary/50"
-              />
-              <span className="text-sm font-bold text-foreground">Permitir qty</span>
-            </label>
-          </div>
-          {itemForm.allowQuantity ? (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Min qty</label>
-                <input
-                  type="number"
-                  value={Number(itemForm.minQty ?? 1)}
-                  onChange={(e) => setItemForm((p) => ({ ...p, minQty: Number(e.target.value || 1) }))}
-                  className="input-premium"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-black text-gray-400 uppercase tracking-wider mb-1.5">Max qty</label>
-                <input
-                  type="number"
-                  value={Number(itemForm.maxQty ?? 1)}
-                  onChange={(e) => setItemForm((p) => ({ ...p, maxQty: Number(e.target.value || 1) }))}
-                  className="input-premium"
-                />
-              </div>
-            </div>
-          ) : null}
-        </div>
-      </Modal>
+      <OptionGroupEditorModal
+        isOpen={isEditorOpen}
+        onClose={() => setIsEditorOpen(false)}
+        groupId={editingGroup?.id || null}
+        onSaved={handleSaved}
+      />
     </div>
   );
 }
