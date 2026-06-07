@@ -125,6 +125,55 @@ export class MenuImportService {
 
     this.logger.log(`menu_import_start tenantId=${tenantId} templateId=${templateId}`);
 
+    // Garantir que as categorias de mídia globais existam
+    await this.ensureGlobalCategoriesExist();
+
+    // Carregar todas as imagens publicadas do sistema e imagens do próprio tenant uma única vez
+    const systemAssets = await this.prisma.mediaAsset.findMany({
+      where: {
+        scope: 'system_gallery',
+        isSystem: true,
+        isActive: true,
+        status: 'active',
+        publicationStatus: 'published',
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        title: true,
+        altText: true,
+        originalName: true,
+        tagsJson: true,
+        category: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const tenantAssets = await this.prisma.mediaAsset.findMany({
+      where: {
+        tenantId,
+        scope: 'tenant_library',
+        isActive: true,
+        status: 'active',
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        title: true,
+        altText: true,
+        originalName: true,
+        tagsJson: true,
+        category: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Contar total de produtos no template para a telemetria
+    const totalProducts = template.categories.reduce(
+      (sum, cat) => sum + cat.products.length,
+      0,
+    );
+
     for (const categoryTemplate of template.categories) {
       try {
         const catResult = await this.importCategory(tenantId, categoryTemplate, skipExisting, result);
@@ -135,8 +184,11 @@ export class MenuImportService {
               tenantId,
               productTemplate,
               catResult.categoryId,
+              categoryTemplate.name,
               skipExisting,
               result,
+              systemAssets,
+              tenantAssets,
             );
           } catch (err) {
             const msg = `Produto "${productTemplate.name}": ${String(err instanceof Error ? err.message : err)}`;
@@ -153,6 +205,25 @@ export class MenuImportService {
 
     result.durationMs = Date.now() - startTime;
     result.success = result.errors.length === 0 || result.productsCreated > 0;
+
+    // Telemetria exigida pela especificação
+    const imagesMissing = totalProducts - result.imagesLinked;
+    this.logger.log(
+      `menu_import_images_found tenantId=${tenantId} templateId=${templateId} count=${result.imagesLinked}`,
+    );
+    this.logger.log(
+      `menu_import_images_missing tenantId=${tenantId} templateId=${templateId} count=${imagesMissing}`,
+    );
+    this.logger.log(
+      `menu_import_telemetry ` +
+        JSON.stringify({
+          tenantId,
+          template: templateId,
+          products: totalProducts,
+          imagesMatched: result.imagesLinked,
+          imagesMissing,
+        }),
+    );
 
     this.logger.log(
       `menu_import_completed tenantId=${tenantId} templateId=${templateId} ` +
@@ -205,8 +276,25 @@ export class MenuImportService {
     tenantId: string,
     productTemplate: ProductTemplate,
     categoryId: string,
+    categoryName: string,
     skipExisting: boolean,
     result: MenuImportResult,
+    systemAssets: Array<{
+      id: string;
+      title: string | null;
+      altText: string | null;
+      originalName: string | null;
+      tagsJson: unknown;
+      category: string | null;
+    }>,
+    tenantAssets: Array<{
+      id: string;
+      title: string | null;
+      altText: string | null;
+      originalName: string | null;
+      tagsJson: unknown;
+      category: string | null;
+    }>,
   ): Promise<void> {
     const { slugify } = await import('@gestor/utils');
     const slug = slugify(productTemplate.name);
@@ -225,8 +313,15 @@ export class MenuImportService {
       return;
     }
 
-    // Buscar imagem na media library (prioridade: system_gallery → tenant_library)
-    const mediaAssetId = await this.findBestMatchingImage(tenantId, productTemplate.searchTags);
+    // Buscar imagem na biblioteca global ou do tenant indexados em memória
+    const mediaAssetId = this.findBestMatchingImageInMemory(
+      productTemplate.mediaLookupKey,
+      productTemplate.searchTags,
+      categoryName,
+      systemAssets,
+      tenantAssets,
+    );
+
     if (mediaAssetId) {
       result.imagesLinked++;
     }
@@ -248,57 +343,168 @@ export class MenuImportService {
   }
 
   /**
-   * Busca a melhor imagem correspondente ao produto.
-   * Prioridade 1: system_gallery publicada
-   * Prioridade 2: tenant_library
-   * Prioridade 3: null (sem imagem — nenhum URL hardcoded)
+   * Garante a existência das categorias globais de mídia.
    */
-  private async findBestMatchingImage(
-    tenantId: string,
+  private async ensureGlobalCategoriesExist(): Promise<void> {
+    const categoriesToCreate = [
+      'Pizzas',
+      'Hambúrgueres',
+      'Bebidas',
+      'Sobremesas',
+      'Massas',
+      'Porções',
+      'Mercado',
+      'Açaí',
+      'Japonesa',
+      'Lanches',
+    ];
+
+    const { slugify } = await import('@gestor/utils');
+
+    for (const name of categoriesToCreate) {
+      const slug = slugify(name);
+      await this.prisma.mediaCategory.upsert({
+        where: {
+          tenantId_scope_slug: {
+            tenantId: null,
+            scope: 'system_gallery',
+            slug,
+          },
+        },
+        update: {},
+        create: {
+          tenantId: null,
+          scope: 'system_gallery',
+          name,
+          slug,
+          isActive: true,
+        },
+      });
+    }
+  }
+
+  /**
+   * Realiza a busca em memória da melhor imagem correspondente usando a precedência:
+   * 1. mediaLookupKey
+   * 2. searchTags (todas devem corresponder)
+   * 3. categoria (nome da categoria da mídia ou correspondência de termo no asset)
+   */
+  private findBestMatchingImageInMemory(
+    mediaLookupKey: string | undefined,
     searchTags: string[],
-  ): Promise<string | null> {
-    if (!searchTags.length) return null;
-
-    // Construir condições de busca por título ou altText
-    const searchConditions = searchTags.map((tag) => ({
-      OR: [
-        { title: { contains: tag, mode: 'insensitive' as const } },
-        { altText: { contains: tag, mode: 'insensitive' as const } },
-        { originalName: { contains: tag, mode: 'insensitive' as const } },
-      ],
-    }));
-
-    // Prioridade 1: system_gallery
-    const systemAsset = await this.prisma.mediaAsset.findFirst({
-      where: {
-        scope: 'system_gallery',
-        isSystem: true,
-        isActive: true,
-        status: 'active',
-        publicationStatus: 'published',
-        deletedAt: null,
-        AND: searchConditions,
+    categoryName: string,
+    systemAssets: Array<{
+      id: string;
+      title: string | null;
+      altText: string | null;
+      originalName: string | null;
+      tagsJson: unknown;
+      category: string | null;
+    }>,
+    tenantAssets: Array<{
+      id: string;
+      title: string | null;
+      altText: string | null;
+      originalName: string | null;
+      tagsJson: unknown;
+      category: string | null;
+    }>,
+  ): string | null {
+    // Helper para verificar correspondência com uma chave/tag individual
+    const matchesKey = (
+      asset: {
+        title: string | null;
+        altText: string | null;
+        originalName: string | null;
+        tagsJson: unknown;
       },
-      select: { id: true },
-      orderBy: { createdAt: 'desc' },
-    });
+      key: string,
+    ) => {
+      const normalizedKey = key.toLowerCase().trim();
+      const title = asset.title?.toLowerCase() || '';
+      const altText = asset.altText?.toLowerCase() || '';
+      const originalName = asset.originalName?.toLowerCase() || '';
+      const tags = Array.isArray(asset.tagsJson)
+        ? (asset.tagsJson as string[]).map((t) => String(t).toLowerCase())
+        : [];
 
-    if (systemAsset) return systemAsset.id;
+      return (
+        title.includes(normalizedKey) ||
+        altText.includes(normalizedKey) ||
+        originalName.includes(normalizedKey) ||
+        tags.includes(normalizedKey)
+      );
+    };
 
-    // Prioridade 2: tenant_library
-    const tenantAsset = await this.prisma.mediaAsset.findFirst({
-      where: {
-        tenantId,
-        scope: 'tenant_library',
-        isActive: true,
-        status: 'active',
-        deletedAt: null,
-        AND: searchConditions,
+    // Helper para verificar se o asset tem todas as tags requisitadas
+    const matchesAllTags = (
+      asset: {
+        title: string | null;
+        altText: string | null;
+        originalName: string | null;
+        tagsJson: unknown;
       },
-      select: { id: true },
-      orderBy: { createdAt: 'desc' },
-    });
+      tags: string[],
+    ) => {
+      if (!tags.length) return false;
+      return tags.every((tag) => matchesKey(asset, tag));
+    };
 
-    return tenantAsset?.id ?? null;
+    // Helper para correspondência por categoria
+    const matchesCategory = (
+      asset: {
+        title: string | null;
+        altText: string | null;
+        originalName: string | null;
+        tagsJson: unknown;
+        category: string | null;
+      },
+      catName: string,
+    ) => {
+      const normalizedCat = catName.toLowerCase().trim();
+      const assetCategory = asset.category?.toLowerCase() || '';
+      if (assetCategory === normalizedCat) return true;
+      return matchesKey(asset, catName);
+    };
+
+    // ── 1. BUSCA NA BIBLIOTECA GLOBAL (SYSTEM GALLERY) ──
+    // Prioridade 1.1: mediaLookupKey
+    if (mediaLookupKey) {
+      const match = systemAssets.find((asset) => matchesKey(asset, mediaLookupKey));
+      if (match) return match.id;
+    }
+
+    // Prioridade 1.2: searchTags
+    if (searchTags && searchTags.length > 0) {
+      const match = systemAssets.find((asset) => matchesAllTags(asset, searchTags));
+      if (match) return match.id;
+    }
+
+    // Prioridade 1.3: Categoria
+    if (categoryName) {
+      const match = systemAssets.find((asset) => matchesCategory(asset, categoryName));
+      if (match) return match.id;
+    }
+
+    // ── 2. FALLBACK NA BIBLIOTECA DO TENANT (TENANT LIBRARY) ──
+    // Prioridade 2.1: mediaLookupKey
+    if (mediaLookupKey) {
+      const match = tenantAssets.find((asset) => matchesKey(asset, mediaLookupKey));
+      if (match) return match.id;
+    }
+
+    // Prioridade 2.2: searchTags
+    if (searchTags && searchTags.length > 0) {
+      const match = tenantAssets.find((asset) => matchesAllTags(asset, searchTags));
+      if (match) return match.id;
+    }
+
+    // Prioridade 2.3: Categoria
+    if (categoryName) {
+      const match = tenantAssets.find((asset) => matchesCategory(asset, categoryName));
+      if (match) return match.id;
+    }
+
+    return null;
   }
 }

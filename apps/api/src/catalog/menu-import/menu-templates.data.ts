@@ -10,6 +10,8 @@ export interface ProductTemplate {
   basePrice: number;
   /** Tags para busca de imagem na system_gallery / tenant_library */
   searchTags: string[];
+  /** Chave específica para busca de imagem na Biblioteca Global */
+  mediaLookupKey?: string;
 }
 
 export interface CategoryTemplate {
@@ -49,18 +51,21 @@ export const MENU_TEMPLATES: MenuTemplate[] = [
             shortDescription: 'Molho de tomate, mussarela e manjericão fresco',
             basePrice: 42.9,
             searchTags: ['pizza', 'margherita', 'tradicional'],
+            mediaLookupKey: 'pizza-margherita',
           },
           {
             name: 'Pizza Calabresa',
             shortDescription: 'Molho de tomate, calabresa fatiada e cebola',
             basePrice: 44.9,
             searchTags: ['pizza', 'calabresa', 'tradicional'],
+            mediaLookupKey: 'pizza-calabresa',
           },
           {
             name: 'Pizza Portuguesa',
             shortDescription: 'Presunto, ovos, azeitona, cebola e mussarela',
             basePrice: 47.9,
             searchTags: ['pizza', 'portuguesa', 'tradicional'],
+            mediaLookupKey: 'pizza-portuguesa',
           },
         ],
       },
@@ -91,6 +96,7 @@ export const MENU_TEMPLATES: MenuTemplate[] = [
             shortDescription: 'Coca-Cola, Guaraná ou Sprite 350ml',
             basePrice: 6.0,
             searchTags: ['refrigerante', 'lata', 'bebida'],
+            mediaLookupKey: 'refrigerante-lata',
           },
           {
             name: 'Refrigerante 2L',
@@ -144,6 +150,7 @@ export const MENU_TEMPLATES: MenuTemplate[] = [
             shortDescription: 'Hambúrguer artesanal 180g, queijo, alface e tomate',
             basePrice: 28.9,
             searchTags: ['hamburguer', 'xburger', 'burger'],
+            mediaLookupKey: 'x-burger',
           },
           {
             name: 'X-Salada',
@@ -156,6 +163,7 @@ export const MENU_TEMPLATES: MenuTemplate[] = [
             shortDescription: 'Hambúrguer 180g, bacon crocante, queijo e barbecue',
             basePrice: 34.9,
             searchTags: ['hamburguer', 'xbacon', 'bacon', 'burger'],
+            mediaLookupKey: 'x-bacon',
           },
           {
             name: 'X-Tudo',
