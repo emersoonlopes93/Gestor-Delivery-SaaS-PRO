@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Body, UseGuards, Logger } from '@nestjs/common';
 import { TenantService } from './tenant.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { CurrentTenant, RequirePermissions } from '../common/decorators';
@@ -145,6 +145,25 @@ export class TenantController {
   @RequirePermissions('dashboard.view')
   async getReadinessScore(@CurrentTenant() tenantId: string) {
     return this.readinessScoreService.calculate(tenantId);
+  }
+
+  /**
+   * Grava telemetria geral do tenant (ex: Onboarding Readiness actions)
+   */
+  @Post('telemetry')
+  async trackTelemetry(
+    @CurrentTenant() tenantId: string,
+    @Body() body: { event: string; payload: any },
+  ) {
+    // Apenas registra no logger da API para análise (ou em um banco futuramente)
+    const logger = new Logger('TenantTelemetry');
+    logger.log({
+      message: 'tenant_telemetry_event',
+      tenantId,
+      event: body.event,
+      payload: body.payload,
+    });
+    return { success: true };
   }
 }
 

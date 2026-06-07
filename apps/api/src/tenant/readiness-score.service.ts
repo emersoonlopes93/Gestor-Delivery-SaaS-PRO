@@ -192,7 +192,7 @@ export class ReadinessScoreService {
       { key: 'businessPhone', label: 'Telefone de contato', passed: !!s?.businessPhone?.trim() },
       { key: 'logoConfigured', label: 'Logo configurada', passed: !!s?.logoUrl?.trim() },
     ];
-    return this.buildDimension('profile', 'Perfil da Loja', 0.10, '/settings', checks);
+    return this.buildDimension('profile', 'Perfil da Loja', 0.10, '/settings', 'Configurar perfil', 1, checks);
   }
 
   private evalLocalizacao(t: TenantSnapshot): ReadinessDimensionDto {
@@ -202,7 +202,7 @@ export class ReadinessScoreService {
       { key: 'neighborhood', label: 'Bairro e CEP', passed: !!(s?.neighborhood?.trim() && s?.zipCode?.trim()) },
       { key: 'coordinates', label: 'Coordenadas geográficas', passed: !!(typeof s?.lat === 'number' && typeof s?.lng === 'number') },
     ];
-    return this.buildDimension('location', 'Localização', 0.15, '/settings', checks);
+    return this.buildDimension('location', 'Localização', 0.15, '/settings', 'Configurar endereço', 2, checks);
   }
 
   private evalEntrega(d: DeliverySnapshot | null): ReadinessDimensionDto {
@@ -211,7 +211,7 @@ export class ReadinessScoreService {
       { key: 'deliveryEnabled', label: 'Entrega ativada', passed: !!(d?.isDeliveryEnabled) },
       { key: 'radius', label: 'Raio de cobertura definido', passed: !!(d && Number(d.maxRadiusKm) > 0) },
     ];
-    return this.buildDimension('delivery', 'Entrega', 0.10, '/delivery/rates', checks);
+    return this.buildDimension('delivery', 'Entrega', 0.10, '/delivery/rates', 'Configurar entrega', 3, checks);
   }
 
   private evalHorarios(t: TenantSnapshot): ReadinessDimensionDto {
@@ -219,7 +219,7 @@ export class ReadinessScoreService {
     const checks: ReadinessCheckDto[] = [
       { key: 'hasOperatingHours', label: 'Pelo menos 1 dia configurado', passed: hasOpen },
     ];
-    return this.buildDimension('hours', 'Horários', 0.15, '/settings', checks);
+    return this.buildDimension('hours', 'Horários', 0.15, '/settings', 'Configurar horários', 4, checks);
   }
 
   private evalPagamentos(t: TenantSnapshot): ReadinessDimensionDto {
@@ -228,14 +228,14 @@ export class ReadinessScoreService {
     const checks: ReadinessCheckDto[] = [
       { key: 'hasPaymentMethod', label: 'Pelo menos 1 método de pagamento', passed: methods.length > 0 },
     ];
-    return this.buildDimension('payments', 'Pagamentos', 0.15, '/settings', checks);
+    return this.buildDimension('payments', 'Pagamentos', 0.15, '/settings', 'Configurar pagamentos', 5, checks);
   }
 
   private evalCatalogo(count: number): ReadinessDimensionDto {
     const checks: ReadinessCheckDto[] = [
       { key: 'hasActiveProduct', label: 'Pelo menos 1 produto ativo', passed: count > 0 },
     ];
-    return this.buildDimension('catalog', 'Catálogo', 0.20, '/catalog/products', checks);
+    return this.buildDimension('catalog', 'Catálogo', 0.20, '/catalog/products', 'Adicionar produtos', 6, checks);
   }
 
   private evalStorefront(t: TenantSnapshot): ReadinessDimensionDto {
@@ -249,7 +249,7 @@ export class ReadinessScoreService {
       { key: 'logo', label: 'Logo da loja', passed: hasLogo },
       { key: 'banner', label: 'Imagem de fundo / banner', passed: hasBanner },
     ];
-    return this.buildDimension('storefront', 'Vitrine', 0.15, '/settings/storefront', checks);
+    return this.buildDimension('storefront', 'Vitrine', 0.15, '/settings/storefront', 'Personalizar loja', 7, checks);
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -259,12 +259,14 @@ export class ReadinessScoreService {
     label: string,
     weight: number,
     actionPath: string,
+    actionLabel: string,
+    priority: number,
     checks: ReadinessCheckDto[],
   ): ReadinessDimensionDto {
     const passedCount = checks.filter(c => c.passed).length;
     const score = checks.length > 0 ? Math.round((passedCount / checks.length) * 100) : 0;
     const allPassed = passedCount === checks.length;
-    return { key, label, score, weight, passed: allPassed, actionPath, checks };
+    return { key, label, score, weight, passed: allPassed, actionPath, actionLabel, priority, checks };
   }
 
   private resolveStatus(score: number): ReadinessStatus {

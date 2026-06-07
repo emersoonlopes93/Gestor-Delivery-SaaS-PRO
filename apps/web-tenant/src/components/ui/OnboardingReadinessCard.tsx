@@ -14,6 +14,7 @@ import {
   Palette,
 } from 'lucide-react';
 import type { ReadinessDimension, ReadinessScore, ReadinessStatus } from '../../hooks/useReadinessScore';
+import { api } from '../../lib/api-client';
 
 // ─── Mapa de ícones por dimensão ────────────────────────────────────────────
 
@@ -93,6 +94,35 @@ export function OnboardingReadinessCard({
     onViewed?.();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const sortedDimensions = [...data.dimensions].sort((a, b) => {
+    // 1. Requisitos obrigatórios primeiro (aqueles que falharam e são essenciais)
+    // No frontend não temos a isCritical exata do ReadinessDimension, mas `!a.passed` e `!b.passed`
+    // são a base para o sorting. Se a falhou e b não, a vem primeiro.
+    if (a.passed !== b.passed) return a.passed ? 1 : -1;
+
+    // 2. Score mais baixo
+    if (a.score !== b.score) return a.score - b.score;
+
+    // 3. Prioridade definida
+    return (a.priority || 99) - (b.priority || 99);
+  });
+
+  const handleNavigate = async (dim: ReadinessDimension) => {
+    // Telemetry: readiness_action_clicked
+    try {
+      await api.post('/tenant/telemetry', {
+        event: 'readiness_action_clicked',
+        payload: {
+          dimension: dim.key,
+          scoreBefore: data.score,
+        },
+      });
+    } catch (e) {
+      // ignore
+    }
+    navigate(dim.actionPath);
+  };
+
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
       {/* Cabeçalho */}
@@ -129,14 +159,41 @@ export function OnboardingReadinessCard({
         </div>
       </div>
 
+      {/* Quick Fix List */}
+      {!data.canActivate && sortedDimensions.filter(d => !d.passed).length > 0 && (
+        <div className="px-5 pb-4">
+          <h4 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">
+            O que falta para ativar sua loja
+          </h4>
+          <div className="space-y-1.5">
+            {sortedDimensions.filter(d => !d.passed).slice(0, 3).map(dim => (
+              <button
+                key={`qf-${dim.key}`}
+                onClick={() => handleNavigate(dim)}
+                aria-label={`Correção rápida: ${dim.actionLabel}`}
+                className="w-full flex items-center justify-between gap-3 px-3 py-2 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/50 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <span className="text-xs font-bold text-amber-700 dark:text-amber-400 truncate">
+                    {dim.actionLabel || dim.label}
+                  </span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Dimensões */}
       <div className="px-4 pb-4 space-y-2">
-        {data.dimensions.map((dim) => (
+        {sortedDimensions.map((dim) => (
           <DimensionRow
             key={dim.key}
             dim={dim}
             compact={compact}
-            onNavigate={(path) => navigate(path)}
+            onNavigate={() => handleNavigate(dim)}
           />
         ))}
       </div>
@@ -159,7 +216,7 @@ export function OnboardingReadinessCard({
 interface DimensionRowProps {
   dim: ReadinessDimension;
   compact: boolean;
-  onNavigate: (path: string) => void;
+  onNavigate: () => void;
 }
 
 function DimensionRow({ dim, compact, onNavigate }: DimensionRowProps) {
@@ -173,7 +230,7 @@ function DimensionRow({ dim, compact, onNavigate }: DimensionRowProps) {
           ? 'border-emerald-100 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-900/10'
           : 'border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-700'
       }`}
-      onClick={() => !isPassed && onNavigate(dim.actionPath)}
+      onClick={() => !isPassed && onNavigate()}
       role={!isPassed ? 'button' : undefined}
     >
       <div className="flex items-center gap-3 px-3 py-2.5">
@@ -228,27 +285,57 @@ function DimensionRow({ dim, compact, onNavigate }: DimensionRowProps) {
         )}
       </div>
 
-      {/* Checks individuais (apenas modo não-compacto e dimensão incompleta) */}
-      {!compact && !isPassed && dim.checks.length > 0 && (
-        <div className="px-3 pb-2.5 space-y-1">
-          {dim.checks.map((check) => (
-            <div key={check.key} className="flex items-center gap-2 pl-10">
-              <div
-                className={`w-2 h-2 rounded-full shrink-0 ${
-                  check.passed ? 'bg-emerald-400' : 'bg-slate-300 dark:bg-slate-600'
-                }`}
-              />
-              <span
-                className={`text-[10px] font-bold ${
-                  check.passed
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : 'text-slate-500 dark:text-slate-400'
-                }`}
-              >
-                {check.label}
-              </span>
+      {/* Checks individuais e Ações */}
+      {!compact && !isPassed && (
+        <div className="px-3 pb-2.5 space-y-3">
+          {dim.checks.length > 0 && (
+            <div className="space-y-1">
+              {dim.checks.map((check) => (
+                <div key={check.key} className="flex items-center gap-2 pl-10">
+                  <div
+                    className={`w-2 h-2 rounded-full shrink-0 ${
+                      check.passed ? 'bg-emerald-400' : 'bg-slate-300 dark:bg-slate-600'
+                    }`}
+                  />
+                  <span
+                    className={`text-[10px] font-bold ${
+                      check.passed
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-slate-500 dark:text-slate-400'
+                    }`}
+                  >
+                    {check.label}
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+
+          {/* Action CTA */}
+          {dim.actionLabel && (
+            <div className="pl-10 pr-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNavigate();
+                }}
+                aria-label={`Ação: ${dim.actionLabel}`}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-bold text-xs"
+              >
+                <span>{dim.actionLabel}</span>
+                <ChevronRight className="w-4 h-4 opacity-70" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Dimensão já concluída */}
+      {!compact && isPassed && (
+        <div className="px-3 pb-2.5 pl-13">
+          <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+            Configurado corretamente.
+          </p>
         </div>
       )}
     </div>

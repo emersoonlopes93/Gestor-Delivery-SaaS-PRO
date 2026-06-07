@@ -26,6 +26,10 @@ export interface ReadinessDimensionDto {
   passed: boolean;
   /** Rota existente para corrigir */
   actionPath: string;
+  /** Label para a ação (ex: Configurar pagamentos) */
+  actionLabel: string;
+  /** Ordem de prioridade no Quick Fix List (menor = maior prioridade) */
+  priority: number;
   checks: ReadinessCheckDto[];
 }
 

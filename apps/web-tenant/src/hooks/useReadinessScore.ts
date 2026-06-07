@@ -22,6 +22,8 @@ export interface ReadinessDimension {
   weight: number;
   passed: boolean;
   actionPath: string;
+  actionLabel: string;
+  priority: number;
   checks: ReadinessCheck[];
 }
 
@@ -48,8 +50,10 @@ export function useReadinessScore(): UseReadinessScoreResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetch = useCallback(async () => {
-    setLoading(true);
+  const fetchScore = useCallback(async (isSilent = false) => {
+    if (!isSilent) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const res = await api.get<ReadinessScore>('/tenant/readiness-score');
@@ -61,13 +65,25 @@ export function useReadinessScore(): UseReadinessScoreResult {
     } catch {
       setError('Erro ao conectar com o servidor.');
     } finally {
-      setLoading(false);
+      if (!isSilent) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    void fetch();
-  }, [fetch]);
+    void fetchScore();
+    
+    // Auto refresh ao voltar para a aba
+    const handleFocus = () => {
+      void fetchScore(true); // Atualização silenciosa em background
+    };
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [fetchScore]);
 
-  return { data, loading, error, refresh: fetch };
+  return { data, loading, error, refresh: fetchScore };
 }
