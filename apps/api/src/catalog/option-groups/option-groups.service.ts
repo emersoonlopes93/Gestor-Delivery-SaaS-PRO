@@ -113,6 +113,7 @@ export class OptionGroupsService {
         maxSelect,
         isActive: dto.isActive ?? true,
         order: dto.order ?? 0,
+        fractionalPricingRule: dto.fractionalPricingRule ?? null,
       } satisfies Prisma.OptionGroupUncheckedCreateInput,
       include: { items: { orderBy: { order: 'asc' } } },
     });
@@ -172,6 +173,7 @@ export class OptionGroupsService {
         maxSelect: dto.maxSelect,
         isActive: dto.isActive,
         order: dto.order,
+        fractionalPricingRule: dto.fractionalPricingRule,
       },
       include: { items: { orderBy: { order: 'asc' } } },
     });
@@ -185,6 +187,9 @@ export class OptionGroupsService {
   }
 
   async createItem(dto: CreateOptionItemDto) {
+    if (!dto.optionGroupId) {
+      throw new BadRequestException('optionGroupId é obrigatório.');
+    }
     await this.getGroup(dto.optionGroupId);
     const tenantId = this.getRequiredTenantId();
 

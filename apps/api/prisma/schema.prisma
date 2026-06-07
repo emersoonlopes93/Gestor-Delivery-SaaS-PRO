@@ -167,6 +167,7 @@ model OptionGroup {
   order         Int                      @default(0)
   createdAt     DateTime                 @default(now()) @map("created_at")
   updatedAt     DateTime                 @updatedAt @map("updated_at")
+  fractionalPricingRule FractionalPricingRule?       @map("fractional_pricing_rule")
   tenant        Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   items         OptionItem[]
   productLinks  ProductOptionGroupLink[]

@@ -50,6 +50,14 @@ export class OptionGroupsController {
     return this.service.createItem(dto);
   }
 
+  @Post(':id/items')
+  @RequirePermissions('catalog.manage_option_groups')
+  createItemWithId(@Param('id') id: string, @Body() dto: CreateOptionItemDto) {
+    dto.optionGroupId = id;
+    return this.service.createItem(dto);
+  }
+
+
   @Patch('items/:id')
   @RequirePermissions('catalog.manage_option_groups')
   updateItem(@Param('id') id: string, @Body() dto: UpdateOptionItemDto) {

@@ -1,4 +1,5 @@
 import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import { FractionalPricingRule } from '@prisma/client';
 
 export class CreateOptionGroupDto {
   @IsString()
@@ -30,4 +31,9 @@ export class CreateOptionGroupDto {
   @IsNumber()
   @IsOptional()
   order?: number;
+
+  @IsEnum(FractionalPricingRule)
+  @IsOptional()
+  fractionalPricingRule?: FractionalPricingRule;
 }
+

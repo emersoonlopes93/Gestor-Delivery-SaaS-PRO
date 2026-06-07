@@ -2,7 +2,8 @@ import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString } from 'class-validat
 
 export class CreateOptionItemDto {
   @IsString()
-  optionGroupId!: string;
+  @IsOptional()
+  optionGroupId?: string;
 
   @IsString()
   name!: string;
