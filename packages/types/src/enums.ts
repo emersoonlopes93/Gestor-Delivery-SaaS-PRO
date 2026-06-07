@@ -199,3 +199,15 @@ export enum PaymentTxStatus {
   failed = 'failed',
   refunded = 'refunded',
 }
+
+// ============================================================
+// Catalog Enums (Cardápio V3)
+// ============================================================
+
+export enum FractionalPricingRule {
+  HIGHEST_PRICE = 'HIGHEST_PRICE',
+  AVERAGE_PRICE = 'AVERAGE_PRICE',
+  PROPORTIONAL = 'PROPORTIONAL',
+  BASE_PLUS_DIFFERENCE = 'BASE_PLUS_DIFFERENCE',
+  FIXED_PRICE = 'FIXED_PRICE',
+}

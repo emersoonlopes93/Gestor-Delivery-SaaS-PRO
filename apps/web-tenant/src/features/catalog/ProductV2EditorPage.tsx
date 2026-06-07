@@ -9,8 +9,7 @@ import { ProductPersonalization } from './SubComponents/ProductPersonalization';
 import { ComboBuilder } from './SubComponents/ComboBuilder';
 import { PublicationSettings } from './SubComponents/PublicationSettings';
 import { InfoTooltip } from '../../components/InfoTooltip';
-
-
+import { VirtualMultiSelect } from '../../components/ui/VirtualMultiSelect';
 
 
 
@@ -222,6 +221,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
     additionalPrice: 0,
     order: 0,
   });
+  const [allowedFormProductIds, setAllowedFormProductIds] = useState<string[]>([]);
   const [isBundleItemModalOpen, setIsBundleItemModalOpen] = useState(false);
   const [editingBundleItem, setEditingBundleItem] = useState<BundleItemWithProduct | null>(null);
   const [bundleItemForm, setBundleItemForm] = useState<CreateComboBundleItemDto>({
@@ -730,14 +730,16 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
         additionalPrice: Number(allowed.additionalPrice ?? 0),
         order: allowed.order,
       });
+      setAllowedFormProductIds([allowed.productId]);
     } else {
       setEditingAllowed(null);
       setAllowedForm({
         comboSlotId: slotId,
-        productId: allowedProducts[0]?.id ?? '',
+        productId: '',
         additionalPrice: 0,
         order: 0,
       });
+      setAllowedFormProductIds([]);
     }
 
     setIsAllowedModalOpen(true);
@@ -745,24 +747,38 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
 
   const saveAllowed = async () => {
     if (!allowedTargetSlotId) return;
+    if (allowedFormProductIds.length === 0) {
+      setAlertModal({ isOpen: true, title: 'Atenção', message: 'Selecione ao menos um produto.' });
+      return;
+    }
     setSavingStates((p) => ({ ...p, saveAllowed: true }));
     try {
-      const payload: Omit<CreateComboSlotAllowedItemDto, 'comboSlotId'> = {
-        productId: allowedForm.productId,
-        additionalPrice: allowedForm.additionalPrice,
-        order: allowedForm.order,
-      };
-
       if (editingAllowed) {
-        const upd: UpdateComboSlotAllowedItemDto = payload as UpdateComboSlotAllowedItemDto;
+        // Modo edição: só salva o primeiro da lista, se mudaram
+        const payload: UpdateComboSlotAllowedItemDto = {
+          productId: allowedFormProductIds[0],
+          additionalPrice: allowedForm.additionalPrice,
+          order: allowedForm.order,
+        };
         if (!allowedTargetSlotId || !editingAllowed?.id) throw new Error('Parâmetros inválidos');
-      await api.patch(
-        `/catalog/products/${productId}/combo-slots/${allowedTargetSlotId}/allowed-items/${editingAllowed.id}`,
-        upd,
-      );
+        await api.patch(
+          `/catalog/products/${productId}/combo-slots/${allowedTargetSlotId}/allowed-items/${editingAllowed.id}`,
+          payload,
+        );
       } else {
+        // Modo criação: Promise.all para criar todos os selecionados
         if (!allowedTargetSlotId) throw new Error('allowedTargetSlotId não disponível');
-      await api.post(`/catalog/products/${productId}/combo-slots/${allowedTargetSlotId}/allowed-items`, payload);
+        const targetSlot = slots.find(s => s.id === allowedTargetSlotId);
+        const startIndex = targetSlot?.allowedItems?.length || 0;
+        
+        await Promise.all(allowedFormProductIds.map((prodId, index) => {
+          const payload: Omit<CreateComboSlotAllowedItemDto, 'comboSlotId'> = {
+            productId: prodId,
+            additionalPrice: allowedForm.additionalPrice,
+            order: startIndex + index,
+          };
+          return api.post(`/catalog/products/${productId}/combo-slots/${allowedTargetSlotId}/allowed-items`, payload);
+        }));
       }
 
       setIsAllowedModalOpen(false);
@@ -1117,6 +1133,7 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
               savingStates={savingStates}
               isNew={isNew}
               onOpenRecipe={() => setIsRecipeModalOpen(true)}
+              onCategoryCreated={(cat) => setCategories((prev) => [...prev, cat])}
             />
           )}
 
@@ -1616,18 +1633,13 @@ export function ProductV2EditorPage({ mode = 'product' }: ProductV2EditorPagePro
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Produto</label>
-            <select
-              value={allowedForm.productId}
-              onChange={(e) => setAllowedForm((p) => ({ ...p, productId: e.target.value }))}
-              className="input-premium"
-            >
-              {allowedProducts.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Produto(s)</label>
+            <VirtualMultiSelect
+              items={allowedProducts.map(p => ({ id: p.id, label: p.name, price: `R$ ${Number(p.basePrice ?? 0).toFixed(2)}` }))}
+              selectedIds={allowedFormProductIds}
+              onChange={setAllowedFormProductIds}
+              height={300}
+            />
           </div>
           <div>
             <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Preço adicional</label>

@@ -20,6 +20,7 @@ import { PublicationService } from './publication/publication.service';
 import { CatalogMigrationV2Service } from './migration-v2.service';
 import { PizzaEngineService } from './pizza-engine.service';
 import { CatalogTemplatesService } from './catalog-templates.service';
+import { FractionalPricingEngine } from './fractional-pricing.engine';
 import { DatabaseModule } from '../database/database.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { PizzaController } from './pizza.controller';
@@ -62,7 +63,8 @@ import { MenuImportController } from './menu-import/menu-import.controller';
     UpsellsService,
     AvailabilityService,
     MenuImportService,
+    FractionalPricingEngine,
   ],
-  exports: [PizzaEngineService, CatalogTemplatesService, UpsellsService, AvailabilityService],
+  exports: [PizzaEngineService, CatalogTemplatesService, UpsellsService, AvailabilityService, FractionalPricingEngine],
 })
 export class CatalogModule {}

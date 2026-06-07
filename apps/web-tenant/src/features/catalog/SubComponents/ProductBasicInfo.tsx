@@ -2,8 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { Images } from 'lucide-react';
 import { ProductCategory, ProductDetails, CreateProductDto, CatalogProductType } from '@gestor/types';
 import { ImagePickerModal } from '../../../components/ImagePickerModal';
-
-
+import CreatableSelect from 'react-select/creatable';
+import { api } from '../../../lib/api-client';
 
 
 type BundleSummary = {
@@ -33,6 +33,7 @@ interface ProductBasicInfoProps {
   savingStates: Record<string, boolean>;
   isNew: boolean;
   onOpenRecipe: () => void;
+  onCategoryCreated?: (category: ProductCategory) => void;
 }
 
 export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
@@ -53,6 +54,7 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
   savingStates,
   isNew,
   onOpenRecipe,
+  onCategoryCreated,
 }) => {
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
 
@@ -141,16 +143,44 @@ export const ProductBasicInfo: React.FC<ProductBasicInfoProps> = ({
 
             <div>
               <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Categoria</label>
-              <select
-                value={productForm.categoryId}
-                onChange={(e) => setProductForm({ ...productForm, categoryId: e.target.value })}
-                className="input-premium"
-              >
-                <option value="">Selecione uma categoria</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <CreatableSelect
+                isClearable
+                placeholder="Selecione ou digite para criar..."
+                value={categories.find(c => c.id === productForm.categoryId) ? { value: productForm.categoryId, label: categories.find(c => c.id === productForm.categoryId)?.name } : null}
+                options={categories.map(c => ({ value: c.id, label: c.name }))}
+                onChange={(selected) => {
+                  setProductForm({ ...productForm, categoryId: selected ? selected.value : '' });
+                }}
+                onCreateOption={async (inputValue) => {
+                  try {
+                    const res = await api.post<ProductCategory>('/catalog/categories', { name: inputValue, isActive: true });
+                    if (res.success && onCategoryCreated) {
+                      onCategoryCreated(res.data);
+                      setProductForm({ ...productForm, categoryId: res.data.id });
+                    }
+                  } catch (e) {
+                    console.error('Erro ao criar categoria', e);
+                  }
+                }}
+                styles={{
+                  control: (base) => ({
+                    ...base,
+                    borderRadius: '0.75rem',
+                    minHeight: '2.875rem',
+                    borderColor: 'hsl(var(--input))',
+                    backgroundColor: 'hsl(var(--background))',
+                    boxShadow: 'none',
+                    '&:hover': {
+                      borderColor: 'hsl(var(--ring))'
+                    }
+                  }),
+                  option: (base, state) => ({
+                    ...base,
+                    backgroundColor: state.isSelected ? 'hsl(var(--primary))' : state.isFocused ? 'hsl(var(--primary)/0.1)' : 'transparent',
+                    color: state.isSelected ? 'hsl(var(--primary-foreground))' : 'inherit',
+                  })
+                }}
+              />
             </div>
 
             {!isComboMode ? (
