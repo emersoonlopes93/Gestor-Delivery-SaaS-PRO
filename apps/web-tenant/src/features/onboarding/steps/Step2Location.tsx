@@ -12,6 +12,8 @@ interface Step2Data {
   state: string;
   deliveryRadiusKm: string;
   deliveryFeeBase: string;
+  lat?: number;
+  lng?: number;
 }
 
 interface Step2Props {
@@ -37,6 +39,7 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
     zipCode: '', street: '', number: '', complement: '',
     neighborhood: '', city: '', state: '',
     deliveryRadiusKm: '5', deliveryFeeBase: '5.00',
+    lat: undefined, lng: undefined,
   });
   const [loading, setLoading] = useState(true);
   const [cepLoading, setCepLoading] = useState(false);
@@ -62,6 +65,8 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
           neighborhood: s.neighborhood || '',
           city: s.city || '',
           state: s.state || '',
+          lat: s.lat,
+          lng: s.lng,
         }));
       }
     } catch { /* silent */ } finally { setLoading(false); }
@@ -105,8 +110,19 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
         city: form.city.trim(),
         state: form.state.trim() || undefined,
         address: derivedAddress,
-        lat: coords?.lat,
-        lng: coords?.lng,
+        lat: coords?.lat ?? form.lat,
+        lng: coords?.lng ?? form.lng,
+      });
+
+      const finalLat = coords?.lat ?? form.lat ?? 0;
+      const finalLng = coords?.lng ?? form.lng ?? 0;
+
+      await api.put('/delivery/coverage', {
+        storeLat: finalLat,
+        storeLng: finalLng,
+        maxRadiusKm: parseFloat(form.deliveryRadiusKm) || 5,
+        defaultPricePerKm: parseFloat(form.deliveryFeeBase) || 5,
+        isDeliveryEnabled: true,
       });
     });
   };

@@ -13,9 +13,14 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
   if (isLoading) return null;
 
   if (isAuthenticated && user) {
-    // If onboarding is not completed and trying to access something other than /onboarding
-    if (!user.onboardingCompletedAt && location.pathname !== '/onboarding') {
-      return <Navigate to="/onboarding" replace />;
+    // If onboarding is not completed, restrict access but allow specific paths
+    if (!user.onboardingCompletedAt) {
+      const allowedPaths = ['/onboarding', '/dashboard', '/settings', '/catalog/products'];
+      const isAllowed = allowedPaths.some(p => location.pathname === p || location.pathname.startsWith(p + '/'));
+      
+      if (!isAllowed) {
+        return <Navigate to="/onboarding" replace />;
+      }
     }
     
     // If onboarding is completed and trying to access /onboarding
