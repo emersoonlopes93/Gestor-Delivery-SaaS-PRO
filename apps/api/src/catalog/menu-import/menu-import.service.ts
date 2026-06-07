@@ -143,6 +143,7 @@ export class MenuImportService {
         title: true,
         altText: true,
         originalName: true,
+        filename: true,
         tagsJson: true,
         category: true,
       },
@@ -162,6 +163,7 @@ export class MenuImportService {
         title: true,
         altText: true,
         originalName: true,
+        filename: true,
         tagsJson: true,
         category: true,
       },
@@ -284,6 +286,7 @@ export class MenuImportService {
       title: string | null;
       altText: string | null;
       originalName: string | null;
+      filename: string;
       tagsJson: unknown;
       category: string | null;
     }>,
@@ -292,6 +295,7 @@ export class MenuImportService {
       title: string | null;
       altText: string | null;
       originalName: string | null;
+      filename: string;
       tagsJson: unknown;
       category: string | null;
     }>,
@@ -402,6 +406,7 @@ export class MenuImportService {
       title: string | null;
       altText: string | null;
       originalName: string | null;
+      filename: string;
       tagsJson: unknown;
       category: string | null;
     }>,
@@ -410,6 +415,7 @@ export class MenuImportService {
       title: string | null;
       altText: string | null;
       originalName: string | null;
+      filename: string;
       tagsJson: unknown;
       category: string | null;
     }>,
@@ -420,23 +426,33 @@ export class MenuImportService {
         title: string | null;
         altText: string | null;
         originalName: string | null;
+        filename: string;
         tagsJson: unknown;
       },
       key: string,
     ) => {
       const normalizedKey = key.toLowerCase().trim();
+      const normalizedKeyWithSpaces = normalizedKey.replace(/[-_]/g, ' ');
+
       const title = asset.title?.toLowerCase() || '';
       const altText = asset.altText?.toLowerCase() || '';
       const originalName = asset.originalName?.toLowerCase() || '';
+      const filename = asset.filename?.toLowerCase() || '';
       const tags = Array.isArray(asset.tagsJson)
         ? (asset.tagsJson as string[]).map((t) => String(t).toLowerCase())
         : [];
 
       return (
         title.includes(normalizedKey) ||
+        title.includes(normalizedKeyWithSpaces) ||
         altText.includes(normalizedKey) ||
+        altText.includes(normalizedKeyWithSpaces) ||
         originalName.includes(normalizedKey) ||
-        tags.includes(normalizedKey)
+        originalName.includes(normalizedKeyWithSpaces) ||
+        filename.includes(normalizedKey) ||
+        filename.includes(normalizedKeyWithSpaces) ||
+        tags.includes(normalizedKey) ||
+        tags.includes(normalizedKeyWithSpaces)
       );
     };
 
@@ -446,6 +462,7 @@ export class MenuImportService {
         title: string | null;
         altText: string | null;
         originalName: string | null;
+        filename: string;
         tagsJson: unknown;
       },
       tags: string[],
@@ -460,6 +477,7 @@ export class MenuImportService {
         title: string | null;
         altText: string | null;
         originalName: string | null;
+        filename: string;
         tagsJson: unknown;
         category: string | null;
       },
