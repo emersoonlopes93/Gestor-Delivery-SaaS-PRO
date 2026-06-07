@@ -8,6 +8,8 @@ import type {
   ReadinessStatus,
   ReadinessDimensionDto,
   ReadinessCheckDto,
+  ActivationMilestoneDto,
+  AchievementDto,
 } from './dto/readiness-score.dto';
 
 // ─── Tipos internos (mapeados dos campos reais do schema Prisma) ─────────────
@@ -27,6 +29,7 @@ interface SettingsSnapshot {
 
 interface TenantSnapshot {
   name: string;
+  createdAt: Date;
   settings: SettingsSnapshot | null;
   operatingHours: { isOpen: boolean }[];
 }
@@ -135,6 +138,7 @@ export class ReadinessScoreService {
 
     const tenant: TenantSnapshot = {
       name: tenantRaw.name,
+      createdAt: tenantRaw.createdAt,
       settings: tenantRaw.settings
         ? {
             businessPhone: tenantRaw.settings.businessPhone,
@@ -172,12 +176,17 @@ export class ReadinessScoreService {
     const missingRequirements = this.resolveMissingRequired(dims, activeProductCount, tenant);
     const canActivate = score >= 90 && missingRequirements.length === 0;
 
+    const timeline = this.buildTimeline(tenant, missingRequirements, canActivate, activeProductCount);
+    const achievements = this.buildAchievements(score, canActivate, activeProductCount);
+
     return {
       score,
       status,
       dimensions: dims,
       missingRequirements,
       canActivate,
+      timeline,
+      achievements,
       calculatedAt: new Date().toISOString(),
     };
   }
@@ -314,7 +323,97 @@ export class ReadinessScoreService {
       dimensions: [],
       missingRequirements: [...REQUIRED_KEYS],
       canActivate: false,
+      timeline: [],
+      achievements: [],
       calculatedAt: new Date().toISOString(),
     };
+  }
+
+  // ─── Gamificação (Timeline & Achievements) ────────────────────────────────
+
+  private buildTimeline(
+    tenant: TenantSnapshot,
+    missingRequirements: string[],
+    canActivate: boolean,
+    activeProductCount: number
+  ): ActivationMilestoneDto[] {
+    return [
+      {
+        key: 'account_created',
+        label: 'Conta criada',
+        completed: true,
+        date: tenant.createdAt.toISOString(),
+      },
+      {
+        key: 'address_configured',
+        label: 'Endereço configurado',
+        completed: !missingRequirements.includes('hasValidAddress'),
+      },
+      {
+        key: 'hours_configured',
+        label: 'Horários configurados',
+        completed: !missingRequirements.includes('hasOperatingHours'),
+      },
+      {
+        key: 'payments_configured',
+        label: 'Pagamentos configurados',
+        completed: !missingRequirements.includes('hasPaymentMethod'),
+      },
+      {
+        key: 'first_product',
+        label: 'Primeiro produto criado',
+        completed: activeProductCount > 0,
+      },
+      {
+        key: 'store_ready',
+        label: 'Loja pronta',
+        completed: canActivate,
+      },
+    ];
+  }
+
+  private buildAchievements(
+    score: number,
+    canActivate: boolean,
+    activeProductCount: number
+  ): AchievementDto[] {
+    return [
+      {
+        key: 'first_products',
+        title: 'Primeiros Produtos',
+        description: 'Cadastre seu primeiro produto para iniciar as vendas.',
+        unlocked: activeProductCount >= 1,
+        progress: Math.min(activeProductCount, 1),
+        max: 1,
+      },
+      {
+        key: 'initial_catalog',
+        title: 'Catálogo Inicial',
+        description: 'Tenha 5 produtos ativos na sua vitrine.',
+        unlocked: activeProductCount >= 5,
+        progress: Math.min(activeProductCount, 5),
+        max: 5,
+      },
+      {
+        key: 'complete_catalog',
+        title: 'Catálogo Completo',
+        description: 'Tenha 20 produtos ativos na sua vitrine.',
+        unlocked: activeProductCount >= 20,
+        progress: Math.min(activeProductCount, 20),
+        max: 20,
+      },
+      {
+        key: 'store_configured',
+        title: 'Loja Configurada',
+        description: 'Atingiu 90% ou mais de completude no setup.',
+        unlocked: score >= 90,
+      },
+      {
+        key: 'ready_to_sell',
+        title: 'Pronto para Vender',
+        description: 'Sua loja completou os requisitos mínimos.',
+        unlocked: canActivate,
+      },
+    ];
   }
 }

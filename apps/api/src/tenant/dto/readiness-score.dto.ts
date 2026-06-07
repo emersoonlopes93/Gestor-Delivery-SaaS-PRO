@@ -33,6 +33,22 @@ export interface ReadinessDimensionDto {
   checks: ReadinessCheckDto[];
 }
 
+export interface ActivationMilestoneDto {
+  key: string;
+  label: string;
+  completed: boolean;
+  date?: string;
+}
+
+export interface AchievementDto {
+  key: string;
+  title: string;
+  description: string;
+  unlocked: boolean;
+  progress?: number;
+  max?: number;
+}
+
 export interface ReadinessScoreDto {
   /** Score geral 0–100 */
   score: number;
@@ -42,5 +58,7 @@ export interface ReadinessScoreDto {
   missingRequirements: string[];
   /** score >= 90 E missingRequirements.length === 0 */
   canActivate: boolean;
+  timeline: ActivationMilestoneDto[];
+  achievements: AchievementDto[];
   calculatedAt: string;
 }

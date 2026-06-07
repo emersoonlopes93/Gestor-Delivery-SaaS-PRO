@@ -14,6 +14,7 @@ import {
 import { TenantSettings, TenantOperatingHours } from '@gestor/types';
 import { useReadinessScore } from '../../hooks/useReadinessScore';
 import { OnboardingReadinessCard, OnboardingReadinessCardSkeleton } from '../../components/ui/OnboardingReadinessCard';
+import { ActivationTimeline } from '../../components/ui/ActivationTimeline';
 import { api } from '../../lib/api-client';
 
 interface SetupStep {
@@ -92,7 +93,14 @@ export function SetupWizard({ settings, operatingHours, hasCategories, hasProduc
   const completedCount = steps.filter(s => s.isCompleted).length;
   const progressPercent = Math.round((completedCount / steps.length) * 100);
 
-  if (progressPercent === 100) return null;
+  if (progressPercent === 100) {
+    if (!readinessData) return null;
+    return (
+      <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-700">
+        <ActivationTimeline data={readinessData} />
+      </div>
+    );
+  }
 
   return (
     <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-700">
@@ -119,16 +127,19 @@ export function SetupWizard({ settings, operatingHours, hasCategories, hasProduc
         </div>
 
         <div className="p-4 sm:p-6 lg:p-8">
-          {/* Readiness Score compacto */}
-          <div className="mb-6">
+          {/* Readiness Score e Activation Timeline */}
+          <div className="mb-6 space-y-6">
             {readinessLoading ? (
               <OnboardingReadinessCardSkeleton />
             ) : readinessData ? (
-              <OnboardingReadinessCard
-                data={readinessData}
-                compact={true}
-                onViewed={handleViewed}
-              />
+              <>
+                <OnboardingReadinessCard
+                  data={readinessData}
+                  compact={true}
+                  onViewed={handleViewed}
+                />
+                <ActivationTimeline data={readinessData} />
+              </>
             ) : null}
           </div>
 

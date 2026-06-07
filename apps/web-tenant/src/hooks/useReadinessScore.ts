@@ -27,12 +27,30 @@ export interface ReadinessDimension {
   checks: ReadinessCheck[];
 }
 
+export interface ActivationMilestone {
+  key: string;
+  label: string;
+  completed: boolean;
+  date?: string;
+}
+
+export interface Achievement {
+  key: string;
+  title: string;
+  description: string;
+  unlocked: boolean;
+  progress?: number;
+  max?: number;
+}
+
 export interface ReadinessScore {
   score: number;
   status: ReadinessStatus;
   dimensions: ReadinessDimension[];
   missingRequirements: string[];
   canActivate: boolean;
+  timeline: ActivationMilestone[];
+  achievements: Achievement[];
   calculatedAt: string;
 }
 
