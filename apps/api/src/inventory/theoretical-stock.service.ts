@@ -15,12 +15,7 @@ export class TheoreticalStockService {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },
       include: {
-        items: {
-          include: {
-            complements: true,
-            comboSelections: true,
-          },
-        },
+        items: true,
       },
     });
 
@@ -29,29 +24,22 @@ export class TheoreticalStockService {
     for (const item of order.items) {
       // 1. Resolve Product Recipe
       if (item.productId) {
-        await this.applyRecipeDepletion(tenantId, orderId, 'product', item.productId, item.quantity);
+        await this.applyRecipeDepletion(tenantId, orderId, 'product', item.productId, Number(item.quantity));
       }
 
-      // 2. Resolve Complements
-      for (const comp of item.complements) {
-        await this.applyRecipeDepletion(tenantId, orderId, 'complement', comp.complementItemId, item.quantity);
-      }
-
-      // 3. Resolve Combo Selections
-      if (item.comboId) {
-        // First: Combo-specific items (box, specific combo packaging)
-        await this.applyRecipeDepletion(tenantId, orderId, 'combo', item.comboId, item.quantity);
-
-        // Second: The items selected within the combo
-        for (const selection of item.comboSelections) {
-          // Note: combo_block_item links to product. We find the product from the block item or snapshot.
-          // Since we might need the actual product ID for the recipe:
-          const blockItem = await this.prisma.productComboBlockItem.findUnique({
-            where: { id: selection.comboBlockItemId },
-          });
-          
-          if (blockItem) {
-            await this.applyRecipeDepletion(tenantId, orderId, 'product', blockItem.productId, item.quantity);
+      // 2. Resolve Combo V3 Slots (from snapshot)
+      if (item.snapshotCatalogV2Json) {
+        const v2 = item.snapshotCatalogV2Json as any;
+        if (v2.slots && Array.isArray(v2.slots)) {
+          for (const slot of v2.slots) {
+            if (slot.items && Array.isArray(slot.items)) {
+              for (const slotItem of slot.items) {
+                if (slotItem.productId) {
+                  // Os slots abatem como 'product' baseado na quantidade escolhida * a quantidade do item principal
+                  await this.applyRecipeDepletion(tenantId, orderId, 'product', slotItem.productId, Number(item.quantity) * Number(slotItem.qty || 1));
+                }
+              }
+            }
           }
         }
       }
@@ -95,7 +83,7 @@ export class TheoreticalStockService {
   private async applyRecipeDepletion(
     tenantId: string, 
     orderId: string, 
-    type: 'product' | 'complement' | 'combo', 
+    type: 'product', 
     id: string,
     quantityMultiplier: number
   ) {
@@ -103,10 +91,6 @@ export class TheoreticalStockService {
 
     if (type === 'product') {
       recipeItems = await this.prisma.productRecipeIngredient.findMany({ where: { productId: id, tenantId } });
-    } else if (type === 'complement') {
-      recipeItems = await this.prisma.complementRecipeIngredient.findMany({ where: { complementItemId: id, tenantId } });
-    } else if (type === 'combo') {
-      recipeItems = await this.prisma.comboRecipeIngredient.findMany({ where: { comboId: id, tenantId } });
     }
 
     for (const recipeItem of recipeItems) {

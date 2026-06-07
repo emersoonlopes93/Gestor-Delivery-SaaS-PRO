@@ -85,10 +85,36 @@ export class PrinterService {
         lines.push(`  >> OBS: ${item.notes.toUpperCase()}`);
       }
       
-      // Complements
+      // V3 Options and Combo Slots
+      if (item.snapshotCatalogV2Json) {
+        const v2 = item.snapshotCatalogV2Json as any;
+        if (v2.selections && Array.isArray(v2.selections)) {
+          for (const sel of v2.selections) {
+            const extraStr = sel.additionalPrice && sel.additionalPrice > 0 ? ` (+${Number(sel.additionalPrice).toFixed(2)})` : '';
+            lines.push(`     + ${sel.name.toUpperCase()} (x${sel.qty})${extraStr}`);
+          }
+        }
+        if (v2.slots && Array.isArray(v2.slots)) {
+          for (const slot of v2.slots) {
+            if (slot.items && Array.isArray(slot.items)) {
+              for (const slotItem of slot.items) {
+                const extraStr = slotItem.additionalPrice && slotItem.additionalPrice > 0 ? ` (+${Number(slotItem.additionalPrice).toFixed(2)})` : '';
+                lines.push(`     * ${slotItem.name.toUpperCase()} (x${slotItem.qty})${extraStr} [${slot.slotName.toUpperCase()}]`);
+              }
+            }
+          }
+        }
+      }
+
+      // Legacy Complements / Combos (Fallback)
       if (item.complements && item.complements.length > 0) {
         for (const comp of item.complements) {
           lines.push(`     + ${comp.snapshotName.toUpperCase()}`);
+        }
+      }
+      if (item.comboSelections && item.comboSelections.length > 0) {
+        for (const comp of item.comboSelections) {
+          lines.push(`     * ${comp.snapshotProductName.toUpperCase()} [${comp.snapshotBlockName.toUpperCase()}]`);
         }
       }
     }

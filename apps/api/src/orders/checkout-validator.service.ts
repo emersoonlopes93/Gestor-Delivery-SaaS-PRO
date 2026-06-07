@@ -23,7 +23,6 @@ import { PizzaEngineService } from '../catalog/pizza-engine.service';
 
 type ProductWithData = Prisma.ProductGetPayload<{
   include: {
-    complementGroups: { include: { group: { include: { items: true } } } };
     optionGroupLinks: { include: { optionGroup: { include: { items: true } } } };
     category: { select: { id: true, templateType: true, templateConfig: true } };
   };
@@ -33,20 +32,8 @@ type OptionGroupLinkWithData = Prisma.ProductOptionGroupLinkGetPayload<{
   include: { optionGroup: { include: { items: true } } };
 }>;
 
-type ComplementGroupWithItems = Prisma.ProductComplementGroupGetPayload<{
-  include: { items: true };
-}>;
-
-type ComplementGroupLinkWithData = Prisma.ProductComplementGroupLinkGetPayload<{
-  include: { group: { include: { items: true } } };
-}>;
-
 type ComboSlotWithItems = Prisma.ComboSlotGetPayload<{
   include: { allowedItems: { include: { product: true } } };
-}>;
-
-type ProductComboBlockWithItems = Prisma.ProductComboBlockGetPayload<{
-  include: { items: { include: { product: true } } };
 }>;
 
 @Injectable()
@@ -335,15 +322,6 @@ export class CheckoutValidatorService {
     const product = await this.prisma.product.findFirst({
       where: { id: item.productId, tenantId, deletedAt: null },
       include: {
-        complementGroups: {
-          include: {
-            group: {
-              include: {
-                items: true,
-              },
-            },
-          },
-        },
         optionGroupLinks: {
           include: {
             optionGroup: {
@@ -411,7 +389,6 @@ export class CheckoutValidatorService {
     let extrasTotal = 0;
     let unitPrice = 0;
     let composition = '';
-    let validatedComplements: Array<{ complementItemId: string; snapshotName: string; snapshotPrice: number }> = [];
     let snapshotCatalogV2Json: unknown | undefined;
 
     if (hasNewSelections) {
@@ -477,22 +454,31 @@ export class CheckoutValidatorService {
         } : null,
         slots: [],
       };
-
-      validatedComplements = [];
     } else {
-      // LEGACY FALLBACK
-      const complements = item.complements || [];
-      const complementGroups = typedProduct.complementGroups;
-
-      validatedComplements = this.validateComplements(
-        complements,
-        complementGroups,
-        typedProduct.name,
-      );
-
-      extrasTotal = validatedComplements.reduce((s, c) => s + c.snapshotPrice, 0);
-      unitPrice = basePrice + extrasTotal;
-      composition = validatedComplements.map(c => c.snapshotName).join(', ');
+      // V3 Sem Opções (Produto Simples)
+      unitPrice = basePrice;
+      composition = '';
+      snapshotCatalogV2Json = {
+        version: 'catalog_v2_snapshot_v1',
+        channel,
+        lineType: 'product',
+        capturedAt: new Date().toISOString(),
+        product: {
+          id: item.productId,
+          name: typedProduct.name,
+          type: typedProduct.type,
+        },
+        quantity: item.quantity,
+        notes: item.notes ?? null,
+        pricing: {
+          basePrice,
+          effectiveBasePrice: basePrice,
+          extrasTotal: 0,
+          unitPrice: basePrice,
+        },
+        selections: [],
+        slots: [],
+      };
     }
 
     const lineTotal = unitPrice * item.quantity;
@@ -511,7 +497,7 @@ export class CheckoutValidatorService {
       notes: item.notes,
       composition,
       sourceUpsellId: item.sourceUpsellId,
-      complements: validatedComplements,
+      complements: [], // Backward compatibility property set to empty
       snapshotCatalogV2Json,
     };
   }
@@ -716,67 +702,6 @@ export class CheckoutValidatorService {
     return { effectiveBasePrice, unitPrice, extrasTotal, composition, selectionsSnapshot };
   }
 
-  private validateComplements(
-    selected: CreateOrderItemComplementDTO[],
-    productGroups: ComplementGroupLinkWithData[],
-    productName: string,
-  ): Array<{ complementItemId: string; snapshotName: string; snapshotPrice: number }> {
-    const result: Array<{ complementItemId: string; snapshotName: string; snapshotPrice: number }> = [];
-
-    // Build lookup of groups available to this product
-    const groupMap = new Map<string, ComplementGroupWithItems>();
-    for (const link of productGroups) {
-      const group = link.group;
-      if (group.isActive) {
-        groupMap.set(group.id, group);
-      }
-    }
-
-    // Check each group for min/max
-    for (const [groupId, group] of groupMap.entries()) {
-      const selectedForGroup = selected.filter(s => s.groupId === groupId);
-      const minSelect = group.minSelect;
-      const maxSelect = group.maxSelect;
-      const groupName = group.name;
-
-      if (selectedForGroup.length < minSelect) {
-        throw new BadRequestException(
-          `Selecione pelo menos ${minSelect} opções em "${groupName}" para "${productName}".`,
-        );
-      }
-      if (selectedForGroup.length > maxSelect) {
-        throw new BadRequestException(
-          `Máximo de ${maxSelect} opções em "${groupName}" para "${productName}".`,
-        );
-      }
-
-      const groupItems = group.items;
-
-      for (const sel of selectedForGroup) {
-        const compItem = groupItems.find(i => i.id === sel.itemId);
-        if (!compItem) {
-          throw new BadRequestException(`Complemento não encontrado no grupo "${groupName}".`);
-        }
-        if (!compItem.isActive) {
-          throw new BadRequestException(`O complemento "${compItem.name}" não está disponível.`);
-        }
-        result.push({
-          complementItemId: sel.itemId,
-          snapshotName: compItem.name,
-          snapshotPrice: Number(compItem.additionalPrice),
-        });
-      }
-    }
-
-    // Check for extraneous group references
-    for (const sel of selected) {
-      if (!groupMap.has(sel.groupId)) {
-        throw new BadRequestException(`Grupo de complemento não reconhecido para "${productName}".`);
-      }
-    }
-
-    return result;
-  }
 
   private async validateComboLine(
     tenantId: string,
@@ -1012,75 +937,8 @@ export class CheckoutValidatorService {
       }
     }
 
-    // LEGACY FALLBACK
-    if (!item.comboId) {
-      throw new BadRequestException('comboId é obrigatório para combos legados sem bundle.');
-    }
-    const combo = await this.prisma.productCombo.findFirst({
-      where: { id: item.comboId, tenantId, deletedAt: null },
-      include: {
-        blocks: {
-          include: {
-            items: {
-              include: { product: true },
-            },
-          },
-        },
-      },
-    });
-
-    if (!combo) {
-      throw new BadRequestException('Combo não encontrado ou não pertence a esta loja.');
-    }
-
-    type LegacyCombo = Prisma.ProductComboGetPayload<{
-      include: {
-        blocks: {
-          include: {
-            items: {
-              include: { product: true },
-            },
-          },
-        },
-      },
-    }>;
-
-    const typedComboLegacy = (combo as unknown) as LegacyCombo;
-
-    if (!typedComboLegacy.isActive) {
-      throw new BadRequestException(`O combo "${typedComboLegacy.name}" não está ativo.`);
-    }
-
-    const basePrice = Number(typedComboLegacy.basePrice);
-    const selections = item.comboSelections || [];
-    const blocks = typedComboLegacy.blocks;
-
-    const validatedSelections = this.validateComboBlocks(
-      selections,
-      blocks,
-      typedComboLegacy.name,
-    );
-
-    const extrasTotal = validatedSelections.reduce((s, c) => s + c.snapshotAdditionalPrice, 0);
-    const unitPrice = basePrice + extrasTotal;
-    const lineTotal = unitPrice * item.quantity;
-    const composition = validatedSelections.map(s => `${s.snapshotBlockName}: ${s.snapshotProductName}`).join('; ');
-
-    return {
-      lineType: 'combo',
-      comboId: item.comboId,
-      name: combo['name'] as string,
-      image: (combo['image'] as string | null) || null,
-      basePrice,
-      effectiveBasePrice: basePrice,
-      extrasTotal,
-      unitPrice,
-      lineTotal,
-      quantity: item.quantity,
-      notes: item.notes,
-      composition,
-      comboSelections: validatedSelections,
-    };
+    // No legacy fallback anymore
+    throw new BadRequestException('Formato de combo inválido ou descontinuado. Use a versão V3 com "slots".');
   }
 
   private buildSlotsSnapshotFromValidated(
@@ -1240,76 +1098,6 @@ export class CheckoutValidatorService {
     return result;
   }
 
-  private validateComboBlocks(
-    selected: CreateOrderItemComboSelectionDTO[],
-    blocks: ProductComboBlockWithItems[],
-    comboName: string,
-  ): Array<{
-    comboBlockItemId: string;
-    snapshotBlockName: string;
-    snapshotProductName: string;
-    snapshotAdditionalPrice: number;
-  }> {
-    const result: Array<{
-      comboBlockItemId: string;
-      snapshotBlockName: string;
-      snapshotProductName: string;
-      snapshotAdditionalPrice: number;
-    }> = [];
-
-    const blockMap = new Map<string, ProductComboBlockWithItems>();
-    for (const block of blocks) {
-      blockMap.set(block.id, block);
-    }
-
-    for (const [blockId, block] of blockMap.entries()) {
-      const selectedForBlock = selected.filter(s => s.blockId === blockId);
-      const minSelect = block.minSelect;
-      const maxSelect = block.maxSelect;
-      const blockName = block.name;
-
-      if (selectedForBlock.length < minSelect) {
-        throw new BadRequestException(
-          `Selecione pelo menos ${minSelect} itens em "${blockName}" no combo "${comboName}".`,
-        );
-      }
-      if (selectedForBlock.length > maxSelect) {
-        throw new BadRequestException(
-          `Máximo de ${maxSelect} itens em "${blockName}" no combo "${comboName}".`,
-        );
-      }
-
-      const blockItems = block.items;
-
-      for (const sel of selectedForBlock) {
-        const blockItem = blockItems.find(i => i.id === sel.blockItemId);
-        if (!blockItem) {
-          throw new BadRequestException(`Item não reconhecido no bloco "${blockName}".`);
-        }
-
-        const product = blockItem.product;
-        if (!product.isActive || product.deletedAt !== null) {
-          throw new BadRequestException(`O produto "${product.name}" do bloco "${blockName}" não está disponível.`);
-        }
-
-        result.push({
-          comboBlockItemId: sel.blockItemId,
-          snapshotBlockName: blockName,
-          snapshotProductName: product.name,
-          snapshotAdditionalPrice: Number(blockItem.additionalPrice),
-        });
-      }
-    }
-
-    // Extraneous block check
-    for (const sel of selected) {
-      if (!blockMap.has(sel.blockId)) {
-        throw new BadRequestException(`Bloco não reconhecido no combo "${comboName}".`);
-      }
-    }
-
-    return result;
-  }
 
   private validatePayment(payment: PaymentInput | undefined, total: number) {
     if (!payment || !payment.method) {

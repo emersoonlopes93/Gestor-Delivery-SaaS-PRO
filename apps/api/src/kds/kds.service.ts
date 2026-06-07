@@ -450,6 +450,7 @@ export class KdsService {
         return [];
       }
 
+
       const order = await this.prisma.order.findUnique({
         where: { id: orderId, tenantId },
         include: {
@@ -460,8 +461,6 @@ export class KdsService {
                   category: true,
                 },
               },
-              complements: true,
-              comboSelections: true,
             },
           },
         },
@@ -516,19 +515,9 @@ export class KdsService {
             snapshotBasePrice: Number(orderItem.snapshotBasePrice),
             snapshotExtrasTotal: Number(orderItem.snapshotExtrasTotal),
             snapshotComposition: orderItem.snapshotComposition,
-            complements: (orderItem.complements || []).map(c => ({
-              id: c.id,
-              complementItemId: c.complementItemId,
-              snapshotName: c.snapshotName,
-              snapshotPrice: Number(c.snapshotPrice),
-            })),
-            comboSelections: (orderItem.comboSelections || []).map(s => ({
-              id: s.id,
-              comboBlockItemId: s.comboBlockItemId,
-              snapshotBlockName: s.snapshotBlockName,
-              snapshotProductName: s.snapshotProductName,
-              snapshotAdditionalPrice: Number(s.snapshotAdditionalPrice),
-            })),
+            snapshotCatalogV2Json: orderItem.snapshotCatalogV2Json,
+            complements: [],
+            comboSelections: [],
           };
         });
 
@@ -571,7 +560,6 @@ export class KdsService {
       this.activeJobsCreations.delete(lockKey);
     }
   }
-
   /**
    * Cria jobs incrementais (ex: quando um item é adicionado a uma mesa)
    */

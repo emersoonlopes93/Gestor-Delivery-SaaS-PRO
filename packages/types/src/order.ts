@@ -274,6 +274,7 @@ export interface OrderItemResponseDTO {
   snapshotBasePrice: number;
   snapshotExtrasTotal: number;
   snapshotComposition?: string | null;
+  snapshotCatalogV2Json?: unknown;
   complements: OrderItemComplementResponseDTO[];
   comboSelections: OrderItemComboSelectionResponseDTO[];
 }
