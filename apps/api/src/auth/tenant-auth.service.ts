@@ -8,7 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../database/prisma.service';
-import { TenantStatus } from '@gestor/core';
+import { TenantStatus, TenantDefaultRole } from '@gestor/core';
 import type { TenantJwtPayload } from '@gestor/types';
 
 // Slug generator
@@ -247,12 +247,23 @@ export class TenantAuthService {
       const createdUser = tenant.users[0];
 
       // Assign Owner Role
-      let ownerRole = await tx.tenantRole.findFirst({ where: { slug: 'owner', tenantId: tenant.id } });
+      let ownerRole = await tx.tenantRole.findFirst({ where: { slug: TenantDefaultRole.TENANT_OWNER, tenantId: tenant.id } });
       if (!ownerRole) {
          // Create default role if it doesn't exist
          ownerRole = await tx.tenantRole.create({
-           data: { name: 'Owner', slug: 'owner', tenantId: tenant.id, isSystem: true }
+           data: { name: 'Dono', slug: TenantDefaultRole.TENANT_OWNER, tenantId: tenant.id, isSystem: true }
          });
+
+         // Fetch all permissions and assign to owner
+         const allPermissions = await tx.tenantPermission.findMany();
+         if (allPermissions.length > 0) {
+           await tx.tenantRolePermission.createMany({
+             data: allPermissions.map(p => ({
+               roleId: ownerRole.id,
+               permissionId: p.id,
+             }))
+           });
+         }
       }
 
       await tx.tenantUserRole.create({
