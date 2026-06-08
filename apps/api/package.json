@@ -62,6 +62,8 @@
 
     "ai:e2e:order": "ts-node -r tsconfig-paths/register scripts/e2e-ai-agent-order.ts",
 
+    "e2e:ops": "ts-node -r tsconfig-paths/register scripts/e2e-certification-ops.ts",
+
     "prisma:studio": "prisma studio",
 
     "clean": "pnpm exec rimraf dist"

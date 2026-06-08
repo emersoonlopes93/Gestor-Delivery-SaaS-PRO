@@ -46,11 +46,11 @@ export const OrderPrintTemplate = memo(function OrderPrintTemplate({ order }: Or
               </div>
               
               {(() => {
-                const options = (item.snapshotCatalogV2Json as unknown)?.optionItems || [];
+                const options = (item.snapshotCatalogV2Json as any)?.optionItems || [];
                 if (options.length === 0) return null;
                 return (
                   <div className="pl-4 text-xs">
-                    {options.map((o: unknown, idx: number) => (
+                    {options.map((o: any, idx: number) => (
                       <div key={idx} className="flex justify-between">
                         <span>+ {o.snapshotName}</span>
                         {o.snapshotPrice > 0 && <span>{fmt(o.snapshotPrice)}</span>}

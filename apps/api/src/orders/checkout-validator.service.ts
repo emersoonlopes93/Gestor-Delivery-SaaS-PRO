@@ -442,6 +442,13 @@ export class CheckoutValidatorService {
           unitPrice,
         },
         selections: pricing.selectionsSnapshot,
+        optionItems: (pricing.selectionsSnapshot || []).flatMap(sel => 
+          (sel.items || []).map(opt => ({
+            optionItemId: opt.itemId,
+            snapshotName: opt.name,
+            snapshotPrice: opt.appliedAmount,
+          }))
+        ),
         pizzaComposition: item.pizzaComposition ? {
           ...item.pizzaComposition,
           // We could store the full engine result here for UI
@@ -476,6 +483,7 @@ export class CheckoutValidatorService {
           unitPrice: basePrice,
         },
         selections: [],
+        optionItems: [],
         slots: [],
       };
     }
@@ -805,6 +813,7 @@ export class CheckoutValidatorService {
             unitPrice,
           },
           selections: [],
+          optionItems: [],
           slots: slotsSnapshot,
         },
       };
@@ -914,6 +923,7 @@ export class CheckoutValidatorService {
                 finalPrice: unitPrice,
               },
               selections: [],
+              optionItems: [],
               slots: [],
               bundleItems: bundleItems.map((bundleItem) => {
                 const product = bundleItem.product;

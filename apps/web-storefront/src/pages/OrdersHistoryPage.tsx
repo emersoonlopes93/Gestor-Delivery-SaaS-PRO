@@ -100,11 +100,11 @@ export function OrdersHistoryPage() {
             productId: item.productId,
             quantity: item.quantity,
             notes: item.notes || undefined,
-            selectedOptions: ((item.snapshotCatalogV2Json as unknown)?.optionItems || []).map((c: unknown) => ({
+            selectedOptions: ((item.snapshotCatalogV2Json as any)?.optionItems || []).map((c: any) => ({
               groupId: '', 
               itemId: c.optionItemId,
               name: c.snapshotName,
-              price: c.snapshotPrice, // In a real V2 app, we'd also validate options prices
+              price: c.snapshotPrice,
             })),
             snapshot: {
               productName: currentProduct.name,

@@ -113,8 +113,8 @@ export const ProductBasicInfo: React.FC = () => {
               <CreatableSelect
                 isClearable
                 placeholder="Selecione ou digite para criar..."
-                value={categories.find(c => c.id === productForm.categoryId) ? { value: productForm.categoryId, label: categories.find(c => c.id === productForm.categoryId)?.name } : null}
-                options={categories.map(c => ({ value: c.id, label: c.name }))}
+                value={categories.find((c: any) => c.id === productForm.categoryId) ? { value: productForm.categoryId, label: (categories.find((c: any) => c.id === productForm.categoryId) as any)?.name } : null}
+                options={categories.map((c: any) => ({ value: c.id, label: c.name }))}
                 onChange={(selected) => {
                   setProductForm({ ...productForm, categoryId: selected ? selected.value : '' });
                 }}
@@ -303,9 +303,9 @@ export const ProductBasicInfo: React.FC = () => {
 
         {/* Configuração Especial para Template Pizza */}
         {(() => {
-          const selectedCategory = categories.find((c: unknown) => c.id === productForm.categoryId);
-          const isPizzaTemplate = selectedCategory?.templateType === 'pizza';
-          const pizzaSizesGroup = product?.optionGroupLinks?.find((l: { optionGroup?: { name: string, items: unknown[] } }) => 
+          const selectedCategory = categories.find((c: any) => c.id === productForm.categoryId);
+          const isPizzaTemplate = (selectedCategory as any)?.templateType === 'pizza';
+          const pizzaSizesGroup = product?.optionGroupLinks?.find((l: any) => 
             l.optionGroup?.name.includes('Tamanhos [Pizza]')
           )?.optionGroup;
           const pizzaSizes = pizzaSizesGroup?.items || [];

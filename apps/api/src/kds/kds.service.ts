@@ -514,8 +514,7 @@ export class KdsService {
             snapshotExtrasTotal: Number(orderItem.snapshotExtrasTotal),
             snapshotComposition: orderItem.snapshotComposition,
             snapshotCatalogV2Json: orderItem.snapshotCatalogV2Json,
-            complements: [],
-            comboSelections: [],
+
           };
         });
 
