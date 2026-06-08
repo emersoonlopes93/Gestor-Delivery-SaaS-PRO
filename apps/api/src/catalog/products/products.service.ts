@@ -280,7 +280,7 @@ export class ProductsService {
       include: {
         category: true,
         mediaAsset: true,
-        complementGroups: { include: { group: true } },
+
         optionGroupLinks: { include: { optionGroup: { include: { items: { orderBy: { order: 'asc' } } } } }, orderBy: { order: 'asc' } },
         comboSlots: { include: { allowedItems: { include: { product: true }, orderBy: { order: 'asc' } } }, orderBy: { order: 'asc' } },
         comboBundleItems: {
@@ -466,7 +466,7 @@ export class ProductsService {
         comboBundleItems: true,
         publication: true,
         recipeIngredients: true,
-        complementGroups: true,
+
         optionItemPrices: true,
         upsellLinks: true,
       },
@@ -530,17 +530,7 @@ export class ProductsService {
         });
       }
 
-      // Duplicate Complement Group Links
-      if (source.complementGroups && source.complementGroups.length > 0) {
-        await tx.productComplementGroupLink.createMany({
-          data: source.complementGroups.map((l) => ({
-            tenantId,
-            productId: duplicate.id,
-            complementGroupId: l.complementGroupId,
-            order: l.order,
-          })),
-        });
-      }
+
 
       // Duplicate Option Item Prices
       if (source.optionItemPrices && source.optionItemPrices.length > 0) {

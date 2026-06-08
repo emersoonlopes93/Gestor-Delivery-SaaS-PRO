@@ -29,39 +29,20 @@ export class AnalyticsService {
   private async buildOrderItemCostCache(
     items: Array<{
       productId: string | null;
-      complements: Array<{ complementItemId: string }>;
     }>,
   ): Promise<{
     productUnitCost: Map<string, number>;
-    complementUnitCost: Map<string, number>;
   }> {
     const productIds = Array.from(
       new Set(items.map((item) => item.productId).filter((id): id is string => typeof id === 'string')),
     );
-    const complementItemIds = Array.from(
-      new Set(
-        items.flatMap((item) =>
-          item.complements
-            .map((comp) => comp.complementItemId)
-            .filter((id): id is string => typeof id === 'string' && id.length > 0),
-        ),
-      ),
-    );
 
-    const [productRecipes, complementRecipes] = await Promise.all([
-      productIds.length
-        ? this.prisma.tenantClient.productRecipeIngredient.findMany({
+    const productRecipes = productIds.length
+        ? await this.prisma.tenantClient.productRecipeIngredient.findMany({
             where: { productId: { in: productIds } },
             include: { ingredient: true },
           })
-        : Promise.resolve([]),
-      complementItemIds.length
-        ? this.prisma.tenantClient.complementRecipeIngredient.findMany({
-            where: { complementItemId: { in: complementItemIds } },
-            include: { ingredient: true },
-          })
-        : Promise.resolve([]),
-    ]);
+        : [];
 
     const productsDirectCost = productIds.length
       ? await this.prisma.tenantClient.product.findMany({
@@ -79,10 +60,7 @@ export class AnalyticsService {
       }
     }
 
-    // Add/Override with recipe cost if recipe exists (Recipe is usually more specific)
-    // Actually, if a product has both, which one should we use?
-    // Usually, if there's a recipe, the user wants the recipe-based cost.
-    // If not, they use the direct cost.
+    // Add/Override with recipe cost if recipe exists
     const recipeCosts = new Map<string, number>();
     for (const recipe of productRecipes) {
       const current = recipeCosts.get(recipe.productId) ?? 0;
@@ -96,35 +74,19 @@ export class AnalyticsService {
       productUnitCost.set(pid, cost);
     }
 
-    const complementUnitCost = new Map<string, number>();
-    for (const recipe of complementRecipes) {
-      const current = complementUnitCost.get(recipe.complementItemId) ?? 0;
-      complementUnitCost.set(
-        recipe.complementItemId,
-        current + this.toNumber(recipe.quantity) * this.toNumber(recipe.ingredient.currentCost),
-      );
-    }
-
-    return { productUnitCost, complementUnitCost };
+    return { productUnitCost };
   }
 
   private estimateOrderItemCost(
     item: {
       productId: string | null;
       quantity: unknown;
-      complements: Array<{ complementItemId: string }>;
     },
     cache: {
       productUnitCost: Map<string, number>;
-      complementUnitCost: Map<string, number>;
     },
   ): number {
     let unitCost = item.productId ? cache.productUnitCost.get(item.productId) ?? 0 : 0;
-
-    for (const comp of item.complements) {
-      unitCost += cache.complementUnitCost.get(comp.complementItemId) ?? 0;
-    }
-
     return unitCost * this.toNumber(item.quantity);
   }
 
@@ -343,7 +305,6 @@ export class AnalyticsService {
     const cache = await this.buildOrderItemCostCache(
       items.map((item) => ({
         productId: item.productId,
-        complements: item.complements.map((comp) => ({ complementItemId: comp.complementItemId })),
       })),
     );
 
@@ -358,7 +319,6 @@ export class AnalyticsService {
         {
           productId: item.productId,
           quantity: item.quantity,
-          complements: item.complements.map((comp) => ({ complementItemId: comp.complementItemId })),
         },
         cache,
       );
@@ -395,7 +355,6 @@ export class AnalyticsService {
     const cache = await this.buildOrderItemCostCache(
       allItems.map((item) => ({
         productId: item.productId,
-        complements: item.complements.map((comp) => ({ complementItemId: comp.complementItemId })),
       })),
     );
 
@@ -412,7 +371,6 @@ export class AnalyticsService {
           {
             productId: item.productId,
             quantity: item.quantity,
-            complements: item.complements.map((comp) => ({ complementItemId: comp.complementItemId })),
           },
           cache,
         );

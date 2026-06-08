@@ -246,14 +246,14 @@ export class UpdateOrderNotesDTO {
 
 export interface OrderItemComplementResponseDTO {
   id: string; // response id
-  complementItemId: string; // original catalog id
+  complementItemId?: string; // original catalog id
   snapshotName: string;
   snapshotPrice: number;
 }
 
 export interface OrderItemComboSelectionResponseDTO {
   id: string; // response id
-  comboBlockItemId: string; // original catalog id
+  comboBlockItemId?: string; // original catalog id
   productId?: string; // original catalog product id
   snapshotBlockName: string;
   snapshotProductName: string;
@@ -275,8 +275,8 @@ export interface OrderItemResponseDTO {
   snapshotExtrasTotal: number;
   snapshotComposition?: string | null;
   snapshotCatalogV2Json?: unknown;
-  complements: OrderItemComplementResponseDTO[];
-  comboSelections: OrderItemComboSelectionResponseDTO[];
+  complements?: OrderItemComplementResponseDTO[];
+  comboSelections?: OrderItemComboSelectionResponseDTO[];
 }
 
 export interface OrderTimelineEntryDTO {
@@ -401,11 +401,11 @@ export interface OrderKdsItemDTO {
     notes?: string | null;
     snapshotName: string;
     snapshotComposition?: string | null;
-    complements: {
+    complements?: {
       id: string;
       snapshotName: string;
     }[];
-    comboSelections: {
+    comboSelections?: {
       id: string;
       snapshotBlockName: string;
       snapshotProductName: string;
@@ -451,7 +451,7 @@ export interface ValidatedProductLine {
   notes?: string;
   composition: string;
   sourceUpsellId?: string | null;
-  complements: Array<{
+  complements?: Array<{
     complementItemId: string;
     snapshotName: string;
     snapshotPrice: number;
@@ -472,7 +472,7 @@ export interface ValidatedComboLine {
   quantity: number;
   notes?: string;
   composition: string;
-  comboSelections: Array<{
+  comboSelections?: Array<{
     comboBlockItemId: string;
     snapshotBlockName: string;
     snapshotProductName: string;

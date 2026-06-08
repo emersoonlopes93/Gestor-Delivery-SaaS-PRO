@@ -214,37 +214,7 @@ export class OrdersService {
             },
           });
 
-          // Legacy complements support
-          if (!snapshotCatalogV2Json) {
-            if (line.lineType === 'product' && line.complements) {
-              for (const c of line.complements) {
-                const complementItemId = (c as { itemId?: string; complementItemId?: string }).itemId || (c as { itemId?: string; complementItemId?: string }).complementItemId || '';
-                await tx.orderItemComplement.create({
-                  data: {
-                    orderItemId: orderItem.id,
-                    tenantId,
-                    complementItemId,
-                    snapshotName: c.snapshotName,
-                    snapshotPrice: c.snapshotPrice,
-                  },
-                });
-              }
-            } else if (line.lineType === 'combo' && line.comboSelections) {
-              for (const s of line.comboSelections) {
-                const comboBlockItemId = (s as { blockItemId?: string; comboBlockItemId?: string }).blockItemId || (s as { blockItemId?: string; comboBlockItemId?: string }).comboBlockItemId || '';
-                await tx.orderItemComboSelection.create({
-                  data: {
-                    orderItemId: orderItem.id,
-                    tenantId,
-                    comboBlockItemId,
-                    snapshotBlockName: s.snapshotBlockName,
-                    snapshotProductName: s.snapshotProductName,
-                    snapshotAdditionalPrice: s.snapshotAdditionalPrice,
-                  },
-                });
-              }
-            }
-          }
+
         }
 
         // Delivery address
@@ -1060,8 +1030,7 @@ export class OrdersService {
       }
 
       // Delete old items and their relations
-      await tx.orderItemComplement.deleteMany({ where: { orderItem: { orderId: order.id } } });
-      await tx.orderItemComboSelection.deleteMany({ where: { orderItem: { orderId: order.id } } });
+
       await tx.orderItem.deleteMany({ where: { orderId: order.id } });
 
       // Update order totals
@@ -1101,35 +1070,7 @@ export class OrdersService {
           },
         });
 
-        // Legacy complements support
-        if (!snapshotCatalogV2Json) {
-          if (line.lineType === 'product' && line.complements) {
-            for (const c of line.complements) {
-              await tx.orderItemComplement.create({
-                data: {
-                  orderItemId: orderItem.id,
-                  tenantId,
-                  complementItemId: c.complementItemId,
-                  snapshotName: c.snapshotName,
-                  snapshotPrice: c.snapshotPrice,
-                },
-              });
-            }
-          } else if (line.lineType === 'combo' && line.comboSelections) {
-            for (const s of line.comboSelections) {
-              await tx.orderItemComboSelection.create({
-                data: {
-                  orderItemId: orderItem.id,
-                  tenantId,
-                  comboBlockItemId: s.comboBlockItemId,
-                  snapshotBlockName: s.snapshotBlockName,
-                  snapshotProductName: s.snapshotProductName,
-                  snapshotAdditionalPrice: s.snapshotAdditionalPrice,
-                },
-              });
-            }
-          }
-        }
+
       }
 
       // Add to timeline
@@ -1155,7 +1096,7 @@ export class OrdersService {
   }
 
   private mapOrderItemToCreateDTO(
-    item: Prisma.OrderItemGetPayload<{ include: { complements: true; comboSelections: true } }>,
+    item: Prisma.OrderItemGetPayload<{}>,
   ): CreateOrderItemDTO {
     // Se tiver snapshotCatalogV2Json, usamos ele como base
     if (item.snapshotCatalogV2Json) {
@@ -1171,27 +1112,13 @@ export class OrdersService {
       };
     }
 
-    // Fallback para legacy
+    // Fallback mínimo se não tiver json (pode acontecer com produtos muito simples migrados)
     return {
       lineType: item.lineType as OrderLineType,
       productId: item.productId || undefined,
       comboId: item.comboId || undefined,
       quantity: item.quantity,
       notes: item.notes || undefined,
-      complements: item.complements?.map((c) => {
-        const legacy = c as Record<string, unknown>;
-        return {
-          groupId: (legacy.groupId as string | undefined) || '',
-          itemId: c.complementItemId,
-        };
-      }),
-      comboSelections: item.comboSelections?.map((s) => {
-        const legacy = s as Record<string, unknown>;
-        return {
-          blockId: (legacy.blockId as string | undefined) || '',
-          blockItemId: s.comboBlockItemId,
-        };
-      }),
     };
   }
 

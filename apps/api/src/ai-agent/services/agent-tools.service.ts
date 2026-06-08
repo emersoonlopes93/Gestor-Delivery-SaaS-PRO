@@ -1403,10 +1403,6 @@ export class AgentToolsService {
       if (byId) {
         return byId;
       }
-      const legacyCombo = await this.resolveLegacyComboDetail(tenantId, targetId);
-      if (legacyCombo) {
-        return legacyCombo;
-      }
       return {
         status: 'error',
         code: 'NOT_FOUND',
@@ -1444,10 +1440,7 @@ export class AgentToolsService {
     }
 
     if (single.kind === 'combo') {
-      const legacyCombo = await this.resolveLegacyComboDetail(tenantId, single.id);
-      if (legacyCombo) {
-        return legacyCombo;
-      }
+      // Combos are now strictly verified using payload V3. No legacy fallback.
     }
 
     return {
@@ -1603,52 +1596,7 @@ export class AgentToolsService {
     return extended.bundleItems;
   }
 
-  private async resolveLegacyComboDetail(
-    tenantId: string,
-    comboId: string,
-  ): Promise<AgentComboDetailResult | null> {
-    const combo = await this.prisma.productCombo.findFirst({
-      where: { id: comboId, tenantId, deletedAt: null },
-      include: {
-        blocks: {
-          orderBy: { order: 'asc' },
-          include: {
-            items: {
-              orderBy: { order: 'asc' },
-              include: { product: true },
-            },
-          },
-        },
-      },
-    });
 
-    if (!combo || !combo.isActive) {
-      return null;
-    }
-
-    return {
-      type: 'combo',
-      id: combo.id,
-      name: combo.name,
-      description: combo.description,
-      basePrice: Number(combo.basePrice),
-      isAvailable: true,
-      blocks: combo.blocks.map((block) => ({
-        blockId: block.id,
-        name: block.name,
-        minSelect: block.minSelect,
-        maxSelect: block.maxSelect,
-        items: block.items
-          .filter((item) => item.product.isActive && item.product.deletedAt === null)
-          .map((item) => ({
-            blockItemId: item.id,
-            productId: item.productId,
-            name: item.product.name,
-            additionalPrice: Number(item.additionalPrice),
-          })),
-      })),
-    };
-  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // Novas tools de coleta do orderDraft

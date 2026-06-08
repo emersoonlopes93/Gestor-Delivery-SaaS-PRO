@@ -779,13 +779,11 @@ export class PosService {
         snapshotComposition: item.snapshotComposition,
         complements: item.complements.map((c) => ({
           id: c.id,
-          complementItemId: c.complementItemId,
           snapshotName: c.snapshotName,
           snapshotPrice: Number(c.snapshotPrice),
         })),
         comboSelections: item.comboSelections.map((s) => ({
           id: s.id,
-          comboBlockItemId: s.comboBlockItemId,
           snapshotBlockName: s.snapshotBlockName,
           snapshotProductName: s.snapshotProductName,
           snapshotAdditionalPrice: Number(s.snapshotAdditionalPrice),

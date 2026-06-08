@@ -68,19 +68,7 @@ export class StorefrontService {
           where: { isActive: true, deletedAt: null },
           orderBy: { order: 'asc' },
           include: {
-            complementGroups: {
-              orderBy: { order: 'asc' },
-              include: {
-                group: {
-                  include: {
-                    items: {
-                      where: { isActive: true },
-                      orderBy: { order: 'asc' },
-                    },
-                  },
-                },
-              },
-            },
+
             optionGroupLinks: {
               include: {
                 optionGroup: {
@@ -120,9 +108,7 @@ export class StorefrontService {
       include: {
         products: {
           include: {
-            complementGroups: {
-              include: { group: { include: { items: true } } };
-            };
+
             optionGroupLinks: {
               include: { optionGroup: { include: { items: true } } };
             };
@@ -224,27 +210,7 @@ export class StorefrontService {
               imageAltText: image.imageAltText,
               imageSource: image.imageSource,
               isAvailable,
-              complementGroups: (p.complementGroups || []).map((cg) => ({
-                id: cg.id,
-                complementGroupId: cg.complementGroupId,
-                order: cg.order,
-                group: {
-                  id: cg.group.id,
-                  name: cg.group.name,
-                  description: cg.group.description,
-                  minSelect: cg.group.minSelect,
-                  maxSelect: cg.group.maxSelect,
-                  isRequired: cg.group.isRequired,
-                  items: cg.group.items.map((ci) => ({
-                    id: ci.id,
-                    name: ci.name,
-                    description: ci.description,
-                    price: Number(ci.additionalPrice),
-                    isActive: ci.isActive,
-                    isAvailable: ci.isActive,
-                  })),
-                },
-              })),
+
               optionGroupLinks: (p.optionGroupLinks || []).map((ol) => ({
                 id: ol.id,
                 optionGroupId: ol.optionGroupId,

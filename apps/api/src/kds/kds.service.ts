@@ -22,9 +22,7 @@ import {
 
 type OrderWithItems = Order & { 
   items: Array<OrderItem & { 
-    product?: { category?: { name: string; templateConfig?: Prisma.JsonValue } | null } | null,
-    complements?: Array<{ id: string, complementItemId: string, snapshotName: string, snapshotPrice: Prisma.Decimal }>,
-    comboSelections?: Array<{ id: string, comboBlockItemId: string, snapshotBlockName: string, snapshotProductName: string, snapshotAdditionalPrice: Prisma.Decimal }>
+    product?: { category?: { name: string; templateConfig?: Prisma.JsonValue } | null } | null
   }>;
 };
 
