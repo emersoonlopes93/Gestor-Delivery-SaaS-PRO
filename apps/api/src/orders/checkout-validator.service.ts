@@ -3,8 +3,7 @@ import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '@prisma/client';
 import type {
   CreateOrderItemDTO,
-  CreateOrderItemComplementDTO,
-  CreateOrderItemComboSelectionDTO,
+
   CreateOrderItemSelectionGroupDTO,
   CreateOrderItemComboSlotSelectionDTO,
   DeliveryAddressDTO,

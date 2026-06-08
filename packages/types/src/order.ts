@@ -61,15 +61,6 @@ export class DeliveryAddressDTO {
   @IsNumber() @IsOptional() lng?: number;
 }
 
-export class CreateOrderItemComplementDTO {
-  @IsString() @IsNotEmpty() groupId!: string;
-  @IsString() @IsNotEmpty() itemId!: string;
-}
-
-export class CreateOrderItemComboSelectionDTO {
-  @IsString() @IsNotEmpty() blockId!: string;
-  @IsString() @IsNotEmpty() blockItemId!: string;
-}
 
 export class CreateOrderItemSelectionItemDTO {
   @IsString() @IsNotEmpty() optionItemId!: string;

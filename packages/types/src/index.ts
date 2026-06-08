@@ -69,8 +69,7 @@ export type {
 export { 
   ORDER_STATUS_TRANSITIONS, 
   DeliveryAddressDTO, 
-  CreateOrderItemComplementDTO, 
-  CreateOrderItemComboSelectionDTO, 
+
   CreateOrderItemSelectionItemDTO,
   CreateOrderItemSelectionGroupDTO,
   CreateOrderItemComboSlotSelectionItemDTO,
