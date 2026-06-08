@@ -100,7 +100,7 @@ export function OrdersHistoryPage() {
             productId: item.productId,
             quantity: item.quantity,
             notes: item.notes || undefined,
-            selectedOptions: ((item.snapshotCatalogV2Json as any)?.optionItems || []).map((c: any) => ({
+            selectedOptions: ((item.snapshotCatalogV2Json as { optionItems?: Array<{ optionItemId: string; snapshotName: string; snapshotPrice: number }> })?.optionItems || []).map((c) => ({
               groupId: '', 
               itemId: c.optionItemId,
               name: c.snapshotName,

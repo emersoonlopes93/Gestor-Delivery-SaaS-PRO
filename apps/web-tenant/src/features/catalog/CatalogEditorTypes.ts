@@ -4,6 +4,7 @@ import {
   CreateComboSlotDto,
   CreateProductDto,
   UpsertPublicationDto,
+  ProductCategory,
 } from '@gestor/types';
 
 export type CatalogProductFormState = {
@@ -15,7 +16,7 @@ export type CatalogProductFormState = {
   imageFile: File | null;
   imagePreviewUrl: string | null;
   pizzaPrices: Record<string, number>;
-  categories: unknown[]; // will be typed properly later
+  categories: ProductCategory[];
   bundleSummary?: {
     subtotal: number;
     discountTotal: number;
