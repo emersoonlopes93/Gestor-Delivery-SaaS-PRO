@@ -2,13 +2,12 @@ import { useState, useMemo, useEffect } from 'react';
 import { X, Minus, Plus, ChevronRight, AlertCircle, Sparkles } from 'lucide-react';
 import { 
   StorefrontProductPayload, 
-  CartSelectedComplement, 
   StorefrontUpsellPayload, 
   StorefrontUpsellItemPayload,
   CartSelectedOptionGroup,
   StorefrontOptionItemPayload
 } from '@gestor/types';
-import { CartValidator } from '@gestor/core';
+
 import { useCartStore } from '../store/use-cart-store';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -28,8 +27,7 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
 
-  // V1 State
-  const [selectedOptions, setSelectedOptions] = useState<CartSelectedComplement[]>([]);
+
   
   // V2 State
   const [selections, setSelections] = useState<CartSelectedOptionGroup[]>([]);
@@ -49,7 +47,7 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
 
   const isProductAvailable = product.isAvailable && !isStoreClosed;
 
-  const hasLegacyComplements = product.complements?.length > 0;
+
   const hasV2Options = product.optionGroupLinks?.length > 0;
 
   // Pricing V2 Logic
@@ -57,11 +55,7 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
     let extras = 0;
     const parts: string[] = [];
 
-    // Legacy logic
-    if (hasLegacyComplements) {
-      extras += selectedOptions.reduce((sum, opt) => sum + opt.price, 0);
-      selectedOptions.forEach(opt => parts.push(opt.name));
-    }
+
 
     // V2 logic
     if (hasV2Options) {
@@ -82,18 +76,11 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
       totalPrice: (product.basePrice + extras) * quantity,
       compositionLabel: parts.join(', ')
     };
-  }, [product, selectedOptions, selections, quantity, hasLegacyComplements, hasV2Options]);
+  }, [product, selections, quantity, hasV2Options]);
 
   // Validation Logic
   const validationError = useMemo(() => {
-    // For now, maintain legacy validation if present
-    if (hasLegacyComplements) {
-      try {
-        CartValidator.validateProductComplements(product, selectedOptions);
-      } catch (e) {
-        return (e as Error).message;
-      }
-    }
+
 
     // V2 Validation
     if (hasV2Options) {
@@ -113,17 +100,9 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
     }
 
     return null;
-  }, [product, selectedOptions, selections, hasLegacyComplements, hasV2Options]);
+  }, [product, selections, hasV2Options]);
 
-  const toggleLegacyOption = (groupId: string, itemId: string, name: string, price: number, maxSelect: number) => {
-    setSelectedOptions(prev => {
-      const alreadySelected = prev.find(o => o.itemId === itemId);
-      if (alreadySelected) return prev.filter(o => o.itemId !== itemId);
-      if (maxSelect === 1) return [...prev.filter(o => o.groupId !== groupId), { groupId, itemId, name, price }];
-      if (prev.filter(o => o.groupId === groupId).length >= maxSelect) return prev;
-      return [...prev, { groupId, itemId, name, price }];
-    });
-  };
+
 
   const toggleV2Option = (groupId: string, item: StorefrontOptionItemPayload, _minSelect: number, maxSelect: number, selectionType: string) => {
     setSelections(prev => {
@@ -184,7 +163,6 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
       product,
       quantity,
       notes: notes.trim() || undefined,
-      selectedOptions: hasLegacyComplements ? selectedOptions : undefined,
       selections: hasV2Options ? selections : undefined,
       computedUnitPrice: computed.unitPrice,
       compositionLabel: computed.compositionLabel,
@@ -202,7 +180,6 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
       image: item.image || '',
       type: 'simple',
       isAvailable: true,
-      complements: [],
       optionGroupLinks: [],
       complementGroups: [],
       upsellLinks: [],
@@ -342,62 +319,7 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
               );
             })}
 
-            {/* Legacy Complements Rendering */}
-            {!hasV2Options && hasLegacyComplements && product.complements.map((group) => (
-              <div key={group.id} className="bg-gray-50/50 rounded-2xl p-4 border border-gray-100">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="font-bold text-gray-900 text-sm uppercase tracking-wider">{group.name}</h3>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {group.minSelect > 0 ? `Obrigatório • ` : ''} 
-                      {group.maxSelect === 1 ? 'Escolha 1' : `Escolha até ${group.maxSelect}`}
-                    </p>
-                  </div>
-                  {group.isRequired && !selectedOptions.some(o => o.groupId === group.id) && (
-                    <span className="bg-primary-100 text-primary-700 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Obrigatório</span>
-                  )}
-                </div>
 
-                <div className="space-y-2">
-                  {group.items.map((item) => {
-                    const isSelected = selectedOptions.some(o => o.itemId === item.id);
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => toggleLegacyOption(group.id, item.id, item.name, item.additionalPrice, group.maxSelect)}
-                        disabled={!item.isAvailable}
-                        className={cn(
-                          "w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left",
-                          isSelected 
-                            ? "bg-primary-50 border-primary-200 ring-1 ring-primary-200" 
-                            : "bg-white border-gray-100 hover:border-gray-200",
-                          !item.isAvailable && "opacity-50 grayscale cursor-not-allowed"
-                        )}
-                      >
-                        <div className="flex-1">
-                          <span className={cn("text-sm font-bold", isSelected ? "text-primary-900" : "text-gray-700")}>
-                            {item.name}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {item.additionalPrice > 0 && (
-                            <span className="text-xs font-black text-primary-600">
-                              + R$ {item.additionalPrice.toFixed(2)}
-                            </span>
-                          )}
-                          <div className={cn(
-                            "w-5 h-5 rounded-md border flex items-center justify-center transition-colors",
-                            isSelected ? "bg-primary-600 border-primary-600 text-white" : "bg-white border-gray-200"
-                          )}>
-                            {isSelected && <ChevronRight className="w-3.5 h-3.5 stroke-[3]" />}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
           </div>
 
           {/* Upsells */}

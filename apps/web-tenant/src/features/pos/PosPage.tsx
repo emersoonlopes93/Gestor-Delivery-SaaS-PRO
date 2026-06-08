@@ -582,7 +582,7 @@ export default function PosPage() {
       ...(item.lineType === 'product'
         ? {
             productId: item.productId,
-            complements: item.complements,
+
             selections: item.selections,
             pizzaComposition: item.pizzaComposition,
           }
@@ -966,7 +966,7 @@ export default function PosPage() {
                   ? { comboId: res.productId, productId: res.productId, slots: res.slots }
                   : {
                       productId: res.productId,
-                      complements: res.complements,
+
                       selections: res.selections,
                       pizzaComposition: res.pizzaComposition,
                     }),

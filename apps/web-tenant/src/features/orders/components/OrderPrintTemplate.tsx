@@ -45,27 +45,20 @@ export const OrderPrintTemplate = memo(function OrderPrintTemplate({ order }: Or
                 <span>{fmt(item.lineTotal)}</span>
               </div>
               
-              {item.complements && item.complements.length > 0 && (
-                <div className="pl-4 text-xs">
-                  {item.complements.map(c => (
-                    <div key={c.id} className="flex justify-between">
-                      <span>+ {c.snapshotName}</span>
-                      {c.snapshotPrice > 0 && <span>{fmt(c.snapshotPrice)}</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {item.comboSelections && item.comboSelections.length > 0 && (
-                <div className="pl-4 text-xs">
-                  {item.comboSelections.map(s => (
-                    <div key={s.id} className="flex justify-between">
-                      <span>- {s.snapshotProductName}</span>
-                      {s.snapshotAdditionalPrice > 0 && <span>{fmt(s.snapshotAdditionalPrice)}</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
+              {(() => {
+                const options = (item.snapshotCatalogV2Json as any)?.optionItems || [];
+                if (options.length === 0) return null;
+                return (
+                  <div className="pl-4 text-xs">
+                    {options.map((o: any, idx: number) => (
+                      <div key={idx} className="flex justify-between">
+                        <span>+ {o.snapshotName}</span>
+                        {o.snapshotPrice > 0 && <span>{fmt(o.snapshotPrice)}</span>}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
 
               {item.notes && (
                 <p className="pl-4 text-xs italic mt-1">Obs: {item.notes}</p>

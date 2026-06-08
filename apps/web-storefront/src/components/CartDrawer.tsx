@@ -27,7 +27,6 @@ export function CartDrawer({ onClose, upsells }: CartDrawerProps) {
       image: item.image,
       type: 'simple',
       isAvailable: true,
-      complements: [],
       optionGroupLinks: [],
       complementGroups: [],
       upsellLinks: [],

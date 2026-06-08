@@ -11,9 +11,6 @@ export interface PosCreateSalePayload {
     productId?: string;
     comboId?: string;
     quantity: number;
-    notes?: string;
-    complements?: Array<{ groupId: string; itemId: string }>;
-    comboSelections?: Array<{ blockId: string; blockItemId: string }>;
     selections?: CreateOrderItemSelectionGroupDTO[];
     pizzaComposition?: PizzaCompositionDTO;
     slots?: CreateOrderItemComboSlotSelectionDTO[];

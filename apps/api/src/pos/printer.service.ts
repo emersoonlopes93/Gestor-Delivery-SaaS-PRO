@@ -106,17 +106,7 @@ export class PrinterService {
         }
       }
 
-      // Legacy Complements / Combos (Fallback)
-      if (item.complements && item.complements.length > 0) {
-        for (const comp of item.complements) {
-          lines.push(`     + ${comp.snapshotName.toUpperCase()}`);
-        }
-      }
-      if (item.comboSelections && item.comboSelections.length > 0) {
-        for (const comp of item.comboSelections) {
-          lines.push(`     * ${comp.snapshotProductName.toUpperCase()} [${comp.snapshotBlockName.toUpperCase()}]`);
-        }
-      }
+
     }
 
     lines.push(separator);

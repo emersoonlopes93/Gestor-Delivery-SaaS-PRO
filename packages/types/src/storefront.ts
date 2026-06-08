@@ -106,7 +106,7 @@ export interface StorefrontProductPayload {
   categoryId?: string;
   optionGroupLinks: StorefrontOptionGroupLinkPayload[];
   complementGroups: StorefrontComplementGroupLinkPayload[];
-  complements?: StorefrontComplementGroupPayload[]; // Legacy support for validator
+
   upsellLinks: Array<{
     id: string;
     upsell: StorefrontUpsellPayload;
@@ -249,7 +249,7 @@ export interface CartLineItem {
   quantity: number;
   notes?: string;
   options?: unknown[];
-  complements?: CartSelectedComplement[];
+
   comboItems?: CartSelectedComboItem[];
   type?: 'simple' | 'combo';
   selections?: CartSelectedOptionGroup[];

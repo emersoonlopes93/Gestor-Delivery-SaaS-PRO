@@ -32,41 +32,4 @@ export class RecipesController {
     return this.recipesService.upsertProductRecipe(tenantId, productId, ingredients);
   }
 
-  @Get('complement/:itemId')
-  @RequirePermissions('inventory.read')
-  async getComplementRecipe(
-    @CurrentTenant() tenantId: string,
-    @Param('itemId') itemId: string
-  ): Promise<RecipeIngredientDTO[]> {
-    return this.recipesService.getComplementRecipe(tenantId, itemId);
-  }
-
-  @Post('complement/:itemId')
-  @RequirePermissions('inventory.manage_recipe')
-  async upsertComplementRecipe(
-    @CurrentTenant() tenantId: string,
-    @Param('itemId') itemId: string,
-    @Body() ingredients: UpsertRecipeDTO[]
-  ) {
-    return this.recipesService.upsertComplementRecipe(tenantId, itemId, ingredients);
-  }
-
-  @Get('combo/:comboId')
-  @RequirePermissions('inventory.read')
-  async getComboRecipe(
-    @CurrentTenant() tenantId: string,
-    @Param('comboId') comboId: string
-  ): Promise<RecipeIngredientDTO[]> {
-    return this.recipesService.getComboRecipe(tenantId, comboId);
-  }
-
-  @Post('combo/:comboId')
-  @RequirePermissions('inventory.manage_recipe')
-  async upsertComboRecipe(
-    @CurrentTenant() tenantId: string,
-    @Param('comboId') comboId: string,
-    @Body() ingredients: UpsertRecipeDTO[]
-  ) {
-    return this.recipesService.upsertComboRecipe(tenantId, comboId, ingredients);
-  }
 }

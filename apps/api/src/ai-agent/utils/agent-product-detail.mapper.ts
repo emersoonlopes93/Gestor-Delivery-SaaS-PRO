@@ -71,21 +71,6 @@ export function mapStorefrontProductToAgentDetail(
 ): AgentProductDetailResult {
   const optionGroups: AgentProductOptionGroup[] = [];
 
-  for (const complement of product.complements) {
-    const activeItems = complement.items.filter((item) => item.isAvailable);
-    optionGroups.push({
-      groupId: complement.id,
-      name: complement.name,
-      required: complement.isRequired,
-      minSelect: complement.minSelect,
-      maxSelect: complement.maxSelect,
-      options: activeItems.map((item) => ({
-        id: item.id,
-        name: item.name,
-        additionalPrice: item.additionalPrice,
-      })),
-    });
-  }
 
   for (const link of product.optionGroupLinks) {
     const group = link.optionGroup;

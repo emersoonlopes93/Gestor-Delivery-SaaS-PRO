@@ -45,15 +45,7 @@ export interface KdsOrderItemDTO {
   notes?: string | null;
   snapshotName: string;
   snapshotComposition?: string | null;
-  complements: {
-    id: string;
-    snapshotName: string;
-  }[];
-  comboSelections: {
-    id: string;
-    snapshotBlockName: string;
-    snapshotProductName: string;
-  }[];
+  snapshotCatalogV2Json?: unknown;
 }
 
 export interface KdsOrderDTO {

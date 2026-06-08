@@ -611,8 +611,7 @@ export class OrdersService {
       include: {
         items: {
           include: {
-            complements: true,
-            comboSelections: true,
+
           },
         },
       },
@@ -631,15 +630,7 @@ export class OrdersService {
         notes: i.notes,
         snapshotName: i.snapshotName,
         snapshotComposition: i.snapshotComposition,
-        complements: i.complements.map((c) => ({
-          id: c.id,
-          snapshotName: c.snapshotName,
-        })),
-        comboSelections: i.comboSelections.map((s) => ({
-          id: s.id,
-          snapshotBlockName: s.snapshotBlockName,
-          snapshotProductName: s.snapshotProductName,
-        })),
+
       })),
       createdAt: o.createdAt.toISOString(),
       scheduledFor: o.scheduledFor ? o.scheduledFor.toISOString() : null,
@@ -653,8 +644,7 @@ export class OrdersService {
       include: {
         items: {
           include: {
-            complements: true,
-            comboSelections: true,
+
           },
         },
         deliveryAddress: true,
@@ -708,19 +698,6 @@ export class OrdersService {
         snapshotBasePrice: Number(item.snapshotBasePrice),
         snapshotExtrasTotal: Number(item.snapshotExtrasTotal),
         snapshotComposition: item.snapshotComposition,
-        complements: item.complements.map((c) => ({
-          id: c.id,
-          complementItemId: c.complementItemId,
-          snapshotName: c.snapshotName,
-          snapshotPrice: Number(c.snapshotPrice),
-        })),
-        comboSelections: item.comboSelections.map((s) => ({
-          id: s.id,
-          comboBlockItemId: s.comboBlockItemId,
-          snapshotBlockName: s.snapshotBlockName,
-          snapshotProductName: s.snapshotProductName,
-          snapshotAdditionalPrice: Number(s.snapshotAdditionalPrice),
-        })),
       })),
       deliveryAddress: order.deliveryAddress
         ? {
@@ -898,8 +875,7 @@ export class OrdersService {
       include: {
         items: {
           include: {
-            complements: true,
-            comboSelections: true,
+
           },
         },
         deliveryAddress: true,

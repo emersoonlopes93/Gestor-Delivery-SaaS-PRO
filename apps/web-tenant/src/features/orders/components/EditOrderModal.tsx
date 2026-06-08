@@ -141,7 +141,7 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
     computedUnitPrice: number;
     name: string;
     notes?: string;
-    complements?: CreateOrderItemDTO['complements'];
+
     selections?: CreateOrderItemDTO['selections'];
     pizzaComposition?: CreateOrderItemDTO['pizzaComposition'];
     slots?: CreateOrderItemDTO['slots'];
@@ -164,7 +164,7 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
         productId: result.productId,
         quantity: result.quantity,
         notes: result.notes,
-        complements: result.complements,
+
         selections: result.selections,
         pizzaComposition: result.pizzaComposition,
         slots: result.slots,

@@ -730,12 +730,7 @@ export class PosService {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },
       include: {
-        items: {
-          include: {
-            complements: true,
-            comboSelections: true,
-          },
-        },
+        items: true,
         deliveryAddress: true,
         timeline: { orderBy: { createdAt: 'asc' } },
       },
@@ -777,17 +772,6 @@ export class PosService {
         snapshotBasePrice: Number(item.snapshotBasePrice),
         snapshotExtrasTotal: Number(item.snapshotExtrasTotal),
         snapshotComposition: item.snapshotComposition,
-        complements: item.complements.map((c) => ({
-          id: c.id,
-          snapshotName: c.snapshotName,
-          snapshotPrice: Number(c.snapshotPrice),
-        })),
-        comboSelections: item.comboSelections.map((s) => ({
-          id: s.id,
-          snapshotBlockName: s.snapshotBlockName,
-          snapshotProductName: s.snapshotProductName,
-          snapshotAdditionalPrice: Number(s.snapshotAdditionalPrice),
-        })),
       })),
       deliveryAddress: order.deliveryAddress
         ? {

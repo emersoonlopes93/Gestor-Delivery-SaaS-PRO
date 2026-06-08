@@ -298,7 +298,6 @@ export class AnalyticsService {
       },
       include: {
         product: { include: { category: true } },
-        complements: true,
       }
     });
 
@@ -348,7 +347,7 @@ export class AnalyticsService {
         status: 'completed',
         createdAt,
       },
-      include: { items: { include: { complements: true } } }
+      include: { items: true }
     });
 
     const allItems = orders.flatMap((order) => order.items);

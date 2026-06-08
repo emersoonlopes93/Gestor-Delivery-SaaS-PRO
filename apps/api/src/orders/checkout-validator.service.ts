@@ -497,7 +497,6 @@ export class CheckoutValidatorService {
       notes: item.notes,
       composition,
       sourceUpsellId: item.sourceUpsellId,
-      complements: [], // Backward compatibility property set to empty
       snapshotCatalogV2Json,
     };
   }
@@ -788,7 +787,6 @@ export class CheckoutValidatorService {
         quantity: item.quantity,
         notes: item.notes,
         composition,
-        comboSelections: [],
         snapshotCatalogV2Json: {
           version: 'catalog_v2_snapshot_v1',
           channel,
@@ -892,7 +890,6 @@ export class CheckoutValidatorService {
             quantity: item.quantity,
             notes: item.notes,
             composition,
-            comboSelections: [],
             snapshotCatalogV2Json: {
               version: 'catalog_v2_snapshot_v1',
               channel,

@@ -181,10 +181,7 @@ export function CheckoutPage() {
                 qty: i.qty,
               }))
             })),
-            complements: item.selectedOptions?.map(o => ({
-              groupId: o.groupId,
-              itemId: o.itemId,
-            })) || [],
+
           };
           return itemPayload;
         });
@@ -337,10 +334,7 @@ export function CheckoutPage() {
                 qty: i.qty,
               }))
             })),
-            complements: item.selectedOptions?.map(o => ({
-              groupId: o.groupId,
-              itemId: o.itemId,
-            })) || [],
+
           };
         }
         return {
@@ -355,10 +349,7 @@ export function CheckoutPage() {
               qty: i.qty,
             }))
           })),
-          complements: item.selectedOptions?.map(o => ({
-            groupId: o.groupId,
-            itemId: o.itemId,
-          })) || [],
+
         };
       });
 
@@ -449,10 +440,7 @@ export function CheckoutPage() {
                 qty: i.qty,
               }))
             })),
-            complements: item.selectedOptions?.map(o => ({
-              groupId: o.groupId,
-              itemId: o.itemId,
-            })) || [],
+
           };
         }
         return {
@@ -467,10 +455,7 @@ export function CheckoutPage() {
               qty: i.qty,
             }))
           })),
-          complements: item.selectedOptions?.map(o => ({
-            groupId: o.groupId,
-            itemId: o.itemId,
-          })) || [],
+
         };
       });
 

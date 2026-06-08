@@ -42,36 +42,7 @@ export const OrderItemsSection = memo(function OrderItemsSection({ items }: Orde
                   </p>
                 )}
 
-                {/* Complementos */}
-                {item.complements && item.complements.length > 0 && (
-                  <div className="mt-1.5 space-y-0.5 pl-5">
-                    {item.complements.map((c) => (
-                      <div key={c.id} className="flex justify-between items-center text-[11px] text-muted-foreground/80">
-                        <span>+ {c.snapshotName}</span>
-                        {c.snapshotPrice > 0 && (
-                          <span className="text-muted-foreground/60 font-medium">{fmt(c.snapshotPrice)}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
 
-                {/* Seleções de Combo */}
-                {item.comboSelections && item.comboSelections.length > 0 && (
-                  <div className="mt-1.5 space-y-0.5 pl-5">
-                    {item.comboSelections.map((s) => (
-                      <div key={s.id} className="flex justify-between items-center text-[11px] text-muted-foreground/80">
-                        <span className="truncate">
-                          <span className="text-muted-foreground/60 mr-1">{s.snapshotBlockName}:</span>
-                          {s.snapshotProductName}
-                        </span>
-                        {s.snapshotAdditionalPrice > 0 && (
-                          <span className="text-muted-foreground/60 font-medium">{fmt(s.snapshotAdditionalPrice)}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
 
                 {/* Observações do Item */}
                 {item.notes && (

@@ -212,7 +212,6 @@ export function PosItemConfiguratorModal(props: {
     lineType: 'product' | 'combo';
     quantity: number;
     notes?: string;
-    complements?: SelectedComplement[];
     selections?: CreateOrderItemSelectionGroupDTO[];
     pizzaComposition?: PizzaCompositionDTO;
     slots?: CreateOrderItemComboSlotSelectionDTO[];
@@ -819,7 +818,6 @@ export function PosItemConfiguratorModal(props: {
                   lineType: detail.type === 'combo' ? 'combo' : 'product',
                   quantity,
                   notes: notes || undefined,
-                  complements: !hasV2Options && hasLegacyComplements ? selectedComplements : undefined,
                   selections: hasV2Options ? selectionsDto : undefined,
                   pizzaComposition,
                   slots: isSlotCombo ? slotsDto : undefined,

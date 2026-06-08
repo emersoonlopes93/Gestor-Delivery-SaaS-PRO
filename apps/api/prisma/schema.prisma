@@ -70,20 +70,12 @@ model Tenant {
   optionGroups                OptionGroup[]
   optionItems                 OptionItem[]
   orderDeliveryAddresses      OrderDeliveryAddress[]
-  orderItemComboSelections    OrderItemComboSelection[]
-  orderItemComplements        OrderItemComplement[]
   orderItems                  OrderItem[]
   orderSplits                 OrderSplit[]
   orderTimelines              OrderTimeline[]
   orders                      Order[]
   printJobs                   PrintJob[]
   categories                  ProductCategory[]
-  productComboBlockItems      ProductComboBlockItem[]
-  productComboBlocks          ProductComboBlock[]
-  productCombos               ProductCombo[]
-  productComplementLinks      ProductComplementGroupLink[]
-  complementGroups            ProductComplementGroup[]
-  complementItems             ProductComplementItem[]
   productOptionGroupLinks     ProductOptionGroupLink[]
   productOptionItemPrices     ProductOptionItemPrice[]
   productRecipeIngredients    ProductRecipeIngredient[]
@@ -651,8 +643,6 @@ model Product {
   allowedInComboSlots   ComboSlotAllowedItem[]
   comboSlots            ComboSlot[]
   orderItems            OrderItem[]
-  comboBlockItems       ProductComboBlockItem[]
-  complementGroups      ProductComplementGroupLink[]
   optionGroupLinks      ProductOptionGroupLink[]
   optionItemPrices      ProductOptionItemPrice[]
   recipeIngredients     ProductRecipeIngredient[]
@@ -688,123 +678,17 @@ model ComboBundleItem {
   @@map("combo_bundle_items")
 }
 
-model ProductComplementGroup {
-  id           String                       @id @default(uuid())
-  tenantId     String                       @map("tenant_id")
-  name         String
-  description  String?
-  minSelect    Int                          @default(0) @map("min_select")
-  maxSelect    Int                          @default(1) @map("max_select")
-  isRequired   Boolean                      @default(false) @map("is_required")
-  isActive     Boolean                      @default(true) @map("is_active")
-  order        Int                          @default(0)
-  createdAt    DateTime                     @default(now()) @map("created_at")
-  updatedAt    DateTime                     @updatedAt @map("updated_at")
-  productLinks ProductComplementGroupLink[]
-  tenant       Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  items        ProductComplementItem[]
 
-  @@index([tenantId])
-  @@map("product_complement_groups")
-}
 
-model ProductComplementItem {
-  id                String                       @id @default(uuid())
-  tenantId          String                       @map("tenant_id")
-  groupId           String                       @map("group_id")
-  name              String
-  description       String?
-  additionalPrice   Decimal                      @default(0) @map("additional_price") @db.Decimal(10, 2)
-  sku               String?
-  isActive          Boolean                      @default(true) @map("is_active")
-  order             Int                          @default(0)
-  createdAt         DateTime                     @default(now()) @map("created_at")
-  updatedAt         DateTime                     @updatedAt @map("updated_at")
-  recipeIngredients ComplementRecipeIngredient[]
-  group             ProductComplementGroup       @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  tenant            Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@index([tenantId])
-  @@index([groupId])
-  @@map("product_complement_items")
-}
 
-model ProductComplementGroupLink {
-  id                String                 @id @default(uuid())
-  tenantId          String                 @map("tenant_id")
-  productId         String                 @map("product_id")
-  complementGroupId String                 @map("complement_group_id")
-  order             Int                    @default(0)
-  group             ProductComplementGroup @relation(fields: [complementGroupId], references: [id], onDelete: Cascade)
-  product           Product                @relation(fields: [productId], references: [id], onDelete: Cascade)
-  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([productId, complementGroupId])
-  @@index([tenantId])
-  @@map("product_complement_group_links")
-}
 
-model ProductCombo {
-  id                String                  @id @default(uuid())
-  tenantId          String                  @map("tenant_id")
-  name              String
-  slug              String
-  description       String?
-  basePrice         Decimal                 @map("base_price") @db.Decimal(10, 2)
-  image             String?
-  isActive          Boolean                 @default(true) @map("is_active")
-  isFeatured        Boolean                 @default(false) @map("is_featured")
-  order             Int                     @default(0)
-  createdAt         DateTime                @default(now()) @map("created_at")
-  updatedAt         DateTime                @updatedAt @map("updated_at")
-  deletedAt         DateTime?               @map("deleted_at")
-  recipeIngredients ComboRecipeIngredient[]
-  blocks            ProductComboBlock[]
-  tenant            Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, slug])
-  @@index([tenantId])
-  @@map("product_combos")
-}
 
-model ProductComboBlock {
-  id          String                  @id @default(uuid())
-  tenantId    String                  @map("tenant_id")
-  comboId     String                  @map("combo_id")
-  name        String
-  description String?
-  minSelect   Int                     @default(1) @map("min_select")
-  maxSelect   Int                     @default(1) @map("max_select")
-  order       Int                     @default(0)
-  createdAt   DateTime                @default(now()) @map("created_at")
-  updatedAt   DateTime                @updatedAt @map("updated_at")
-  items       ProductComboBlockItem[]
-  combo       ProductCombo            @relation(fields: [comboId], references: [id], onDelete: Cascade)
-  tenant      Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@index([tenantId])
-  @@index([comboId])
-  @@map("product_combo_blocks")
-}
 
-model ProductComboBlockItem {
-  id              String            @id @default(uuid())
-  tenantId        String            @map("tenant_id")
-  blockId         String            @map("block_id")
-  productId       String            @map("product_id")
-  additionalPrice Decimal           @default(0) @map("additional_price") @db.Decimal(10, 2)
-  order           Int               @default(0)
-  createdAt       DateTime          @default(now()) @map("created_at")
-  updatedAt       DateTime          @updatedAt @map("updated_at")
-  block           ProductComboBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
-  product         Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
-  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([blockId, productId])
-  @@index([tenantId])
-  @@index([productId])
-  @@map("product_combo_block_items")
-}
 
 model Upsell {
   id               String            @id @default(uuid())
@@ -936,8 +820,6 @@ model OrderItem {
   snapshotCatalogV2Json     Json?                     @map("snapshot_catalog_v2_json")
   snapshotFractionalPricing Json?                     @map("snapshot_fractional_pricing")
   sourceUpsellId            String?                   @map("source_upsell_id")
-  comboSelections           OrderItemComboSelection[]
-  complements               OrderItemComplement[]
   order                     Order                     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product                   Product?                  @relation(fields: [productId], references: [id])
   sourceUpsell              Upsell?                   @relation(fields: [sourceUpsellId], references: [id])
@@ -948,34 +830,9 @@ model OrderItem {
   @@map("order_items")
 }
 
-model OrderItemComplement {
-  id               String    @id @default(uuid())
-  orderItemId      String    @map("order_item_id")
-  tenantId         String    @map("tenant_id")
-  complementItemId String    @map("complement_item_id")
-  snapshotName     String    @map("snapshot_name") @db.VarChar(200)
-  snapshotPrice    Decimal   @map("snapshot_price") @db.Decimal(10, 2)
-  orderItem        OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  tenant           Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@index([orderItemId])
-  @@map("order_item_complements")
-}
 
-model OrderItemComboSelection {
-  id                      String    @id @default(uuid())
-  orderItemId             String    @map("order_item_id")
-  tenantId                String    @map("tenant_id")
-  comboBlockItemId        String    @map("combo_block_item_id")
-  snapshotBlockName       String    @map("snapshot_block_name") @db.VarChar(200)
-  snapshotProductName     String    @map("snapshot_product_name") @db.VarChar(200)
-  snapshotAdditionalPrice Decimal   @map("snapshot_additional_price") @db.Decimal(10, 2)
-  orderItem               OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  tenant                  Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@index([orderItemId])
-  @@map("order_item_combo_selections")
-}
 
 model OrderDeliveryAddress {
   id           String  @id @default(uuid())
@@ -1599,7 +1456,6 @@ model ComplementRecipeIngredient {
   complementItemId String                @map("complement_item_id")
   ingredientId     String                @map("ingredient_id")
   quantity         Decimal               @db.Decimal(10, 4)
-  complement       ProductComplementItem @relation(fields: [complementItemId], references: [id], onDelete: Cascade)
   ingredient       Ingredient            @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
   tenant           Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -1614,7 +1470,6 @@ model ComboRecipeIngredient {
   comboId      String       @map("combo_id")
   ingredientId String       @map("ingredient_id")
   quantity     Decimal      @db.Decimal(10, 4)
-  combo        ProductCombo @relation(fields: [comboId], references: [id], onDelete: Cascade)
   ingredient   Ingredient   @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
   tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
