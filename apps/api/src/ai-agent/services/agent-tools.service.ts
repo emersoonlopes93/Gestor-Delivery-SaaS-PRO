@@ -8,7 +8,7 @@ import { AvailabilityService } from '../../catalog/publication/availability.serv
 import { CashbackService } from '../../promotions/cashback.service';
 import { CouponsService } from '../../promotions/coupons.service';
 import { SchedulingService } from '../../scheduling/scheduling.service';
-import { CreateOrderDTO, DeliveryAddressDTO } from '@gestor/types';
+import { CreateOrderDTO, DeliveryAddressDTO, CreateOrderItemSelectionGroupDTO, CreateOrderItemComboSlotSelectionDTO } from '@gestor/types';
 
 import { PrismaService } from '../../database/prisma.service';
 import { StorefrontService } from '../../storefront/storefront.service';
@@ -90,6 +90,57 @@ function normalizeCriarPedidoArgs(raw: unknown): unknown {
         normItem['comboId'] = it['combo_id'];
         delete normItem['combo_id'];
       }
+      
+      if (Array.isArray(it['selections'])) {
+        normItem['selections'] = it['selections'].map((sel: unknown) => {
+          if (typeof sel !== 'object' || sel === null) return sel;
+          const s = sel as Record<string, unknown>;
+          const normSel: Record<string, unknown> = { ...s };
+          if (s['option_group_id'] !== undefined && s['optionGroupId'] === undefined) {
+            normSel['optionGroupId'] = s['option_group_id'];
+            delete normSel['option_group_id'];
+          }
+          if (Array.isArray(s['items'])) {
+            normSel['items'] = s['items'].map((i: unknown) => {
+              if (typeof i !== 'object' || i === null) return i;
+              const it2 = i as Record<string, unknown>;
+              const normIt2: Record<string, unknown> = { ...it2 };
+              if (it2['option_item_id'] !== undefined && it2['optionItemId'] === undefined) {
+                normIt2['optionItemId'] = it2['option_item_id'];
+                delete normIt2['option_item_id'];
+              }
+              return normIt2;
+            });
+          }
+          return normSel;
+        });
+      }
+      
+      if (Array.isArray(it['slots'])) {
+        normItem['slots'] = it['slots'].map((slot: unknown) => {
+          if (typeof slot !== 'object' || slot === null) return slot;
+          const sl = slot as Record<string, unknown>;
+          const normSl: Record<string, unknown> = { ...sl };
+          if (sl['combo_slot_id'] !== undefined && sl['comboSlotId'] === undefined) {
+            normSl['comboSlotId'] = sl['combo_slot_id'];
+            delete normSl['combo_slot_id'];
+          }
+          if (Array.isArray(sl['items'])) {
+            normSl['items'] = sl['items'].map((i: unknown) => {
+              if (typeof i !== 'object' || i === null) return i;
+              const it2 = i as Record<string, unknown>;
+              const normIt2: Record<string, unknown> = { ...it2 };
+              if (it2['product_id'] !== undefined && it2['productId'] === undefined) {
+                normIt2['productId'] = it2['product_id'];
+                delete normIt2['product_id'];
+              }
+              return normIt2;
+            });
+          }
+          return normSl;
+        });
+      }
+
       return normItem;
     });
   }
@@ -105,6 +156,20 @@ const CriarPedidoSchema = z.preprocess(
       comboId: z.string().optional(),
       quantity: z.number().int(),
       notes: z.string().optional(),
+      selections: z.array(z.object({
+        optionGroupId: z.string(),
+        items: z.array(z.object({
+          optionItemId: z.string(),
+          qty: z.number().optional(),
+        })),
+      })).optional(),
+      slots: z.array(z.object({
+        comboSlotId: z.string(),
+        items: z.array(z.object({
+          productId: z.string(),
+          qty: z.number().optional(),
+        })),
+      })).optional(),
     })),
     fulfillmentType: z.enum(['delivery', 'pickup']).default('delivery'),
     endereco: z.object({
@@ -271,7 +336,7 @@ export class AgentToolsService {
       },
       {
         name: 'criar_pedido',
-        description: 'Cria um pedido final no sistema. Só chame esta função quando o cliente confirmar explicitamente todos os itens, endereço (para delivery) e forma de pagamento. Para pickup (retirada no balcão), omita o campo endereco. IMPORTANTE: se o produto tiver complementos obrigatórios (ex: escolha de borda de pizza), você DEVE chamar consultar_detalhe_produto antes para obter os groupId e itemId corretos e incluí-los no campo complements do item. Nunca crie o pedido sem os complementos obrigatórios.',
+        description: 'Cria um pedido final no sistema. Só chame esta função quando o cliente confirmar explicitamente todos os itens, endereço (para delivery) e forma de pagamento. Para pickup (retirada no balcão), omita o campo endereco. IMPORTANTE: se o produto tiver opções obrigatórias (ex: escolha de borda de pizza), você DEVE chamar consultar_detalhe_produto antes para obter os optionGroupId e optionItemId corretos e incluí-los no campo selections do item. Nunca crie o pedido sem as opções obrigatórias.',
         parameters: {
           type: 'object',
           properties: {
@@ -282,7 +347,7 @@ export class AgentToolsService {
             },
             itens: {
               type: 'array',
-              description: 'Lista de itens do pedido. Para produtos com complementos obrigatórios, inclua o campo complements com os IDs obtidos via consultar_detalhe_produto.',
+              description: 'Lista de itens do pedido. Para produtos com opções obrigatórias, inclua o campo selections com os IDs obtidos via consultar_detalhe_produto.',
               items: {
                 type: 'object',
                 properties: {
@@ -911,6 +976,8 @@ export class AgentToolsService {
           comboId: i.comboId || undefined,
           quantity: i.quantity,
           notes: i.notes || undefined,
+          selections: i.selections as unknown as CreateOrderItemSelectionGroupDTO[],
+          slots: i.slots as unknown as CreateOrderItemComboSlotSelectionDTO[],
         })),
         customerName: ctx.customerName || 'Cliente WhatsApp',
         customerPhone: ctx.customerPhone || '00000000000',

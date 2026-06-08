@@ -118,7 +118,7 @@ export function App() {
           }
         />
         <Route
-          path="/catalog/complements"
+          path="/catalog/option-groups"
           element={
             <PermissionGate permission="catalog.manage_option_groups">
               <OptionGroupsPage />

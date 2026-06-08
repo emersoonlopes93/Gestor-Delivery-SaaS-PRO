@@ -4,14 +4,14 @@ import type {
 } from '@gestor/types';
 
 export interface AgentProductOption {
-  /** Use este id como `itemId` em complements ao criar o pedido */
+  /** Use este id como `optionItemId` em selections ao criar o pedido */
   id: string;
   name: string;
   additionalPrice: number;
 }
 
 export interface AgentProductOptionGroup {
-  /** Use este id como `groupId` em complements ao criar o pedido */
+  /** Use este id como `optionGroupId` em selections ao criar o pedido */
   groupId: string;
   name: string;
   required: boolean;
@@ -32,7 +32,7 @@ export interface AgentProductDetailResult {
 }
 
 export interface AgentComboBlockItem {
-  /** Use este id como `blockItemId` em comboSelections ao criar o pedido */
+  /** Use este id como `productId` em slots ao criar o pedido */
   blockItemId: string;
   productId: string;
   name: string;
@@ -40,7 +40,7 @@ export interface AgentComboBlockItem {
 }
 
 export interface AgentComboBlock {
-  /** Use este id como `blockId` em comboSelections ao criar o pedido */
+  /** Use este id como `comboSlotId` em slots ao criar o pedido */
   blockId: string;
   name: string;
   minSelect: number;

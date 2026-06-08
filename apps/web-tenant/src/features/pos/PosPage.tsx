@@ -54,7 +54,6 @@ interface CartItem {
   basePrice: number;
   quantity: number;
   notes: string;
-  complements?: Array<{ groupId: string; itemId: string }>;
   selections?: CreateOrderItemSelectionGroupDTO[];
   slots?: CreateOrderItemComboSlotSelectionDTO[];
   pizzaComposition?: PizzaCompositionDTO;

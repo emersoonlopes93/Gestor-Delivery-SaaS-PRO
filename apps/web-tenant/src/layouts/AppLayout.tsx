@@ -96,7 +96,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     items: [
       { id: 'catalog-categories', label: 'Categorias', to: '/catalog/categories', icon: BookOpen, permission: 'catalog.read' },
       { id: 'catalog-products', label: 'Produtos', to: '/catalog/products', icon: Box, permission: 'catalog.read' },
-      { id: 'catalog-complements', label: 'Grupos e Tamanhos', to: '/catalog/complements', icon: SlidersHorizontal, permission: 'catalog.manage_option_groups' },
+      { id: 'catalog-complements', label: 'Grupos de Opções', to: '/catalog/option-groups', icon: SlidersHorizontal, permission: 'catalog.manage_option_groups' },
       { id: 'catalog-combos', label: 'Combos', to: '/catalog/combos', icon: Package, permission: 'catalog.manage_combos' },
       { id: 'catalog-upsells', label: 'Upsells', to: '/catalog/upsells', icon: SlidersHorizontal, permission: 'catalog.read' },
       { id: 'catalog-inventory', label: 'Estoque & Ficha Técnica', to: '/inventory', icon: ClipboardList, permission: 'inventory.read' },

@@ -24,9 +24,9 @@ export const ProductPersonalization: React.FC = () => {
       <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <div className="font-black text-foreground">Complementos vinculados</div>
+            <div className="font-black text-foreground">Grupos de Opções vinculados</div>
             <div className="text-sm text-muted-foreground font-medium mt-1">
-              Vincule complementos reutilizáveis para personalização deste produto.
+              Vincule grupos de opções reutilizáveis para personalização deste produto.
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -35,14 +35,14 @@ export const ProductPersonalization: React.FC = () => {
               onClick={openAddGroupModal}
               className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-all"
             >
-              Vincular complemento
+              Vincular opções
             </button>
             <button
               type="button"
               onClick={() => setIsCreateComplementModalOpen(true)}
               className="px-4 py-2 text-sm font-bold bg-muted text-foreground border border-border hover:bg-muted/80 rounded-xl transition-all"
             >
-              Criar novo complemento
+              Criar novas opções
             </button>
           </div>
         </div>
@@ -51,7 +51,7 @@ export const ProductPersonalization: React.FC = () => {
       <div className="space-y-3 md:hidden">
         {[...links].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((l) => (
           <div key={l.id} className="bg-card border border-border rounded-2xl p-4 shadow-sm">
-            <div className="font-black text-foreground">{l.optionGroup?.name ?? 'Complemento'}</div>
+            <div className="font-black text-foreground">{l.optionGroup?.name ?? 'Opções'}</div>
             <div className="text-xs text-muted-foreground font-medium mt-1">
               Base: req={String(l.optionGroup?.isRequired)} min={l.optionGroup?.minSelect} max={l.optionGroup?.maxSelect}
             </div>
@@ -98,7 +98,7 @@ export const ProductPersonalization: React.FC = () => {
         ))}
         {links.length === 0 ? (
           <div className="bg-card border border-border rounded-2xl p-6 text-center text-muted-foreground text-sm italic shadow-sm">
-            Nenhum complemento vinculado.
+            Nenhuma opção vinculada.
           </div>
         ) : null}
       </div>
@@ -107,7 +107,7 @@ export const ProductPersonalization: React.FC = () => {
         <table className="w-full text-left border-collapse">
           <thead className="bg-muted/30 dark:bg-muted/80 border-b border-border">
             <tr>
-              <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider">Complemento</th>
+              <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider">Grupo de Opções</th>
               <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider">Overrides</th>
               <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider">Axis</th>
               <th className="px-6 py-3 text-xs font-black text-muted-foreground uppercase tracking-wider text-right">Ações</th>
@@ -117,7 +117,7 @@ export const ProductPersonalization: React.FC = () => {
             {[...links].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((l) => (
               <tr key={l.id} className="hover:bg-muted/50 dark:hover:bg-muted/80 dark:bg-card/40 transition-colors group">
                 <td className="px-6 py-4">
-                  <div className="font-bold text-foreground">{l.optionGroup?.name ?? 'Complemento'}</div>
+                  <div className="font-bold text-foreground">{l.optionGroup?.name ?? 'Grupo de Opções'}</div>
                   <div className="text-xs text-muted-foreground font-medium mt-1">
                     Base: req={String(l.optionGroup?.isRequired)} min={l.optionGroup?.minSelect} max={l.optionGroup?.maxSelect}
                   </div>
@@ -175,14 +175,14 @@ export const ProductPersonalization: React.FC = () => {
             <div className="text-3xl mb-4">⚙️</div>
             <div className="font-black text-foreground mb-1">Nenhum adicional vinculado</div>
             <div className="text-sm text-muted-foreground mb-6 mx-auto max-w-sm">
-              Vincule um complemento reutilizável (como "Molhos" ou "Ingredientes Extras") para permitir a personalização deste produto.
+              Vincule um grupo de opções reutilizável (como "Molhos" ou "Ingredientes Extras") para permitir a personalização deste produto.
             </div>
             <button
               type="button"
               onClick={openAddGroupModal}
               className="px-6 py-2.5 text-sm font-black text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl transition-all"
             >
-              Vincular meu primeiro complemento
+              Vincular primeiro grupo de opções
             </button>
           </div>
         )}

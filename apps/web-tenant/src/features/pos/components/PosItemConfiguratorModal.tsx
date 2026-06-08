@@ -17,23 +17,6 @@ type ProductDetail = {
   basePrice: number;
   image?: string | null;
   category?: { id: string; templateType?: string | null; templateConfig?: unknown } | null;
-  complementGroups?: Array<{
-    group: {
-      id: string;
-      name: string;
-      description?: string | null;
-      minSelect: number;
-      maxSelect: number;
-      isRequired: boolean;
-      items: Array<{
-        id: string;
-        name: string;
-        description?: string | null;
-        additionalPrice: number;
-        isActive: boolean;
-      }>;
-    };
-  }>;
   optionGroupLinks?: Array<{
     id: string;
     pricingAxis?: PricingAxis;
@@ -85,7 +68,6 @@ type ProductDetail = {
   }>;
 };
 
-type SelectedComplement = { groupId: string; itemId: string };
 
 type SelectionState = Array<{ optionGroupId: string; items: Array<{ optionItemId: string; qty?: number }> }>;
 
@@ -227,7 +209,6 @@ export function PosItemConfiguratorModal(props: {
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedComplements, setSelectedComplements] = useState<SelectedComplement[]>([]);
   const [selectionState, setSelectionState] = useState<SelectionState>([]);
   const [slotState, setSlotState] = useState<SlotState>([]);
 
@@ -243,7 +224,6 @@ export function PosItemConfiguratorModal(props: {
     setQuantity(1);
     setNotes('');
     setError(null);
-    setSelectedComplements([]);
     setSelectionState([]);
     setSlotState([]);
 
@@ -279,7 +259,6 @@ export function PosItemConfiguratorModal(props: {
       .finally(() => setLoading(false));
   }, [isOpen, productId]);
 
-  const hasLegacyComplements = Boolean((detail?.complementGroups ?? []).length > 0);
   const hasV2Options = Boolean((detail?.optionGroupLinks ?? []).some((l) => l.optionGroup?.isActive));
   const isPizzaTemplate = detail?.category?.templateType === 'pizza';
   const isCombo = detail?.type === 'combo';
@@ -318,29 +297,6 @@ export function PosItemConfiguratorModal(props: {
       return { unitPrice: priced.unitPrice, label: priced.composition };
     }
 
-    if (hasLegacyComplements) {
-      let extras = 0;
-      const parts: string[] = [];
-
-      for (const link of detail.complementGroups ?? []) {
-        const group = link.group;
-        const selected = selectedComplements.filter((s) => s.groupId === group.id);
-        const names: string[] = [];
-
-        for (const sel of selected) {
-          const item = group.items.find((i) => i.id === sel.itemId);
-          if (item) {
-            extras += Number(item.additionalPrice ?? 0);
-            names.push(item.name);
-          }
-        }
-
-        if (names.length > 0) parts.push(`${group.name}: ${names.join(', ')}`);
-      }
-
-      return { unitPrice: Number((base + extras).toFixed(2)), label: parts.join('; ') };
-    }
-
     if (isPizzaTemplate) {
       // Simplistic price: highest of selected flavors at selected size
       // We need the sizeId from primary axis
@@ -367,7 +323,7 @@ export function PosItemConfiguratorModal(props: {
     }
 
     return { unitPrice: base, label: '' };
-  }, [detail, hasLegacyComplements, hasV2Options, isSlotCombo, selectionState, selectedComplements, slotState, categoryFlavors, isPizzaTemplate, selectedPizzaFlavors]);
+  }, [detail, hasV2Options, isSlotCombo, selectionState, slotState, categoryFlavors, isPizzaTemplate, selectedPizzaFlavors]);
 
   const total = computed.unitPrice * quantity;
 
@@ -381,22 +337,6 @@ export function PosItemConfiguratorModal(props: {
         return e instanceof Error ? e.message : 'Seleção inválida.';
       }
     }
- 
-    if (hasLegacyComplements) {
-      for (const link of detail.complementGroups ?? []) {
-        const group = link.group;
-        const selectedCount = selectedComplements.filter((s) => s.groupId === group.id).length;
- 
-        const effectiveMin = group.isRequired ? Math.max(1, Number(group.minSelect ?? 0)) : Number(group.minSelect ?? 0);
-        if (selectedCount < effectiveMin) {
-          return `Selecione pelo menos ${effectiveMin} opções em "${group.name}".`;
-        }
-        if (selectedCount > Number(group.maxSelect ?? 0)) {
-          return `Máximo de ${group.maxSelect} opções em "${group.name}".`;
-        }
-      }
-    }
- 
     if (isSlotCombo) {
       for (const slot of detail.comboSlots ?? []) {
         const selected = slotState.find((s) => s.comboSlotId === slot.id)?.items ?? [];
@@ -419,24 +359,13 @@ export function PosItemConfiguratorModal(props: {
     }
  
     return null;
-  }, [detail, hasV2Options, hasLegacyComplements, selectedComplements, isSlotCombo, slotState, isPizzaTemplate, selectionState, selectedPizzaFlavors]);
+  }, [detail, hasV2Options, isSlotCombo, slotState, isPizzaTemplate, selectionState, selectedPizzaFlavors]);
  
   const currentValidationError = useMemo(() => {
     if (!isOpen) return null;
     return validateNow();
   }, [isOpen, validateNow]);
 
-  const toggleComplement = (groupId: string, itemId: string, maxSelect: number) => {
-    setSelectedComplements((prev) => {
-      const exists = prev.some((p) => p.groupId === groupId && p.itemId === itemId);
-      if (exists) return prev.filter((p) => !(p.groupId === groupId && p.itemId === itemId));
-
-      const groupCount = prev.filter((p) => p.groupId === groupId).length;
-      if (groupCount >= maxSelect) return prev;
-
-      return [...prev, { groupId, itemId }];
-    });
-  };
 
   const toggleOption = (optionGroupId: string, optionItemId: string, selectionType: 'single' | 'multiple' | 'quantity', maxSelect: number) => {
     setSelectionState((prev) => {
@@ -714,57 +643,6 @@ export function PosItemConfiguratorModal(props: {
                 </div>
               ) : null}
 
-              {!isSlotCombo && !hasV2Options && hasLegacyComplements ? (
-                <div className="space-y-5">
-                  {(detail.complementGroups ?? []).map((link) => {
-                    const group = link.group;
-                    const selected = selectedComplements.filter((s) => s.groupId === group.id);
-                    return (
-                      <div key={group.id} className="bg-card dark:bg-muted900/40 border border-border dark:border-border800 rounded-2xl p-4">
-                        <div className="flex items-start justify-between gap-4 mb-3">
-                          <div>
-                            <div className="text-foreground font-black text-sm uppercase tracking-wider">{group.name}</div>
-                            <div className="text-[10px] text-muted-foreground font-bold">
-                              {group.isRequired ? `Obrigatório • ` : ''}
-                              {group.maxSelect === 1 ? 'Escolha 1' : `Escolha até ${group.maxSelect}`}
-                            </div>
-                          </div>
-                          <div className="text-[10px] font-black uppercase text-muted-foreground">{selected.length}/{group.maxSelect}</div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {group.items
-                            .filter((i) => i.isActive)
-                            .map((i) => {
-                              const isSelected = selected.some((s) => s.itemId === i.id);
-                              return (
-                                  <button
-                                  key={i.id}
-                                  onClick={() => toggleComplement(group.id, i.id, group.maxSelect)}
-                                  className={`p-3 rounded-xl border text-left transition-all ${
-                                    isSelected
-                                      ? 'bg-status-success/10 border-status-success/20'
-                                      : 'bg-card dark:bg-muted900 border-border dark:border-border800 hover:border-border'
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between gap-3">
-                                    <div className="min-w-0">
-                                      <div className="text-foreground font-bold text-xs truncate">{i.name}</div>
-                                      <div className="text-[10px] text-muted-foreground font-bold">+ {formatCurrency(Number(i.additionalPrice ?? 0))}</div>
-                                    </div>
-                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${isSelected ? 'bg-status-success border-status-success text-foreground' : 'border-border dark:border-border700 text-muted-foreground'}`}>
-                                      {isSelected ? <ChevronRight className="w-4 h-4" /> : null}
-                                    </div>
-                                  </div>
-                                </button>
-                              );
-                            })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : null}
 
               <div className="bg-card dark:bg-muted900/40 border border-border dark:border-border800 rounded-2xl p-4">
                 <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Observações</div>
