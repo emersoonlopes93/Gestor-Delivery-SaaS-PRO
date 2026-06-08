@@ -242,14 +242,14 @@ async function configureTenant(prisma: PrismaService, tenantSlug: string) {
     throw new Error('Não foi possível preparar Pizza de Calabresa para o teste.');
   }
 
-  const e2eComplementGroups = await prisma.productComplementGroup.findMany({
+  const e2eOptionGroups = await prisma.optionGroup.findMany({
     where: { tenantId: tenant.id, name: { contains: 'E2E Test' } },
     select: { id: true },
   });
-  for (const group of e2eComplementGroups) {
-    await prisma.productComplementGroupLink.deleteMany({ where: { complementGroupId: group.id } });
-    await prisma.productComplementItem.deleteMany({ where: { groupId: group.id } });
-    await prisma.productComplementGroup.delete({ where: { id: group.id } });
+  for (const group of e2eOptionGroups) {
+    await prisma.optionGroupLink.deleteMany({ where: { optionGroupId: group.id } });
+    await prisma.optionItem.deleteMany({ where: { optionGroupId: group.id } });
+    await prisma.optionGroup.delete({ where: { id: group.id } });
   }
 
   await prisma.whatsAppInstance.upsert({

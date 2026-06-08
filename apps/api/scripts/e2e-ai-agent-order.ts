@@ -96,11 +96,19 @@ async function main() {
     });
 
     const currentDay = new Date().getDay();
-    await prisma.tenantOperatingHours.upsert({
-      where: { tenantId_dayOfWeek: { tenantId: tenant.id, dayOfWeek: currentDay } },
-      create: { tenantId: tenant.id, dayOfWeek: currentDay, isOpen: true, openTime: '00:00', closeTime: '23:59' },
-      update: { isOpen: true, openTime: '00:00', closeTime: '23:59' },
+    const existingHours = await prisma.tenantOperatingHours.findFirst({
+      where: { tenantId: tenant.id, dayOfWeek: currentDay },
     });
+    if (existingHours) {
+      await prisma.tenantOperatingHours.update({
+        where: { id: existingHours.id },
+        data: { isOpen: true, openTime: '00:00', closeTime: '23:59' },
+      });
+    } else {
+      await prisma.tenantOperatingHours.create({
+        data: { tenantId: tenant.id, dayOfWeek: currentDay, isOpen: true, openTime: '00:00', closeTime: '23:59' },
+      });
+    }
 
     // 5. Seed a mock WhatsApp Instance so the webhook controller can resolve the tenant
     const mockInstanceId = 'e2e-evolution-instance';
@@ -139,48 +147,48 @@ async function main() {
     const BORDA_GROUP_NAME = 'Escolha a Borda (E2E Test)';
     const CATUPIRY_ITEM_NAME = 'Catupiry';
 
-    // Remove previous E2E complement group link + group for idempotency
-    const prevGroup = await prisma.productComplementGroup.findFirst({
+    // Remove previous E2E option group link + group for idempotency
+    const prevGroup = await prisma.optionGroup.findFirst({
       where: { tenantId: tenant.id, name: BORDA_GROUP_NAME },
     });
     if (prevGroup) {
-      await prisma.productComplementGroupLink.deleteMany({ where: { complementGroupId: prevGroup.id } });
-      await prisma.productComplementItem.deleteMany({ where: { groupId: prevGroup.id } });
-      await prisma.productComplementGroup.delete({ where: { id: prevGroup.id } });
+      await prisma.productOptionGroupLink.deleteMany({ where: { optionGroupId: prevGroup.id } });
+      await prisma.optionItem.deleteMany({ where: { optionGroupId: prevGroup.id } });
+      await prisma.optionGroup.delete({ where: { id: prevGroup.id } });
     }
 
-    const complementGroup = await prisma.productComplementGroup.create({
+    const optionGroup = await prisma.optionGroup.create({
       data: {
         tenantId: tenant.id,
         name: BORDA_GROUP_NAME,
         minSelect: 1,
         maxSelect: 1,
         isRequired: true,
-        order: 99,
+        selectionType: 'single',
         items: {
           create: [
-            { tenantId: tenant.id, name: CATUPIRY_ITEM_NAME, additionalPrice: 5, isActive: true, order: 0 },
-            { tenantId: tenant.id, name: 'Sem Borda', additionalPrice: 0, isActive: true, order: 1 },
+            { tenantId: tenant.id, name: CATUPIRY_ITEM_NAME, isActive: true },
+            { tenantId: tenant.id, name: 'Sem Borda', isActive: true },
           ],
         },
       },
       include: { items: true },
     });
 
-    // Link the complement group to the selected product
-    await prisma.productComplementGroupLink.create({
+    // Link the option group to the selected product
+    await prisma.productOptionGroupLink.create({
       data: {
         tenantId: tenant.id,
         productId: product.id,
-        complementGroupId: complementGroup.id,
+        optionGroupId: optionGroup.id,
         order: 99,
       },
     });
 
-    const catupiryItem = complementGroup.items.find((i) => i.name === CATUPIRY_ITEM_NAME);
-    if (!catupiryItem) throw new Error('Complement item Catupiry not found after seed!');
+    const catupiryItem = optionGroup.items.find((i) => i.name === CATUPIRY_ITEM_NAME);
+    if (!catupiryItem) throw new Error('Option item Catupiry not found after seed!');
 
-    console.log(`✅ Complement group seeded: "${BORDA_GROUP_NAME}" (id=${complementGroup.id})`);
+    console.log(`✅ Option group seeded: "${BORDA_GROUP_NAME}" (id=${optionGroup.id})`);
     console.log(`   - Catupiry item id: ${catupiryItem.id}`);
     console.log(`   - Group linked to product: ${product.name} (id=${product.id})`);
 
@@ -260,11 +268,7 @@ async function main() {
         customerPhone: cleanPhone,
       },
       include: {
-        items: {
-          include: {
-            complements: true,
-          },
-        },
+        items: true,
         deliveryAddress: true,
         timeline: true,
       },
@@ -308,14 +312,16 @@ async function main() {
       // Verify items and complements
       for (const item of order.items) {
         console.log(`   - Item: ${item.snapshotName} x${item.quantity}`);
-        if (item.complements && item.complements.length > 0) {
-          for (const comp of item.complements) {
-            console.log(`     • Complement: ${comp.snapshotName} (R$ ${comp.snapshotPrice})`);
+        // For V3, the selected options and complements are serialized in snapshotCatalogV2Json
+        const parsedJson = item.snapshotCatalogV2Json ? (typeof item.snapshotCatalogV2Json === 'string' ? JSON.parse(item.snapshotCatalogV2Json) : item.snapshotCatalogV2Json) as any : null;
+        if (parsedJson?.complements && parsedJson.complements.length > 0) {
+          for (const comp of parsedJson.complements) {
+            console.log(`     • Option Selection: ${comp.name} (R$ ${comp.price})`);
           }
         } else {
-          console.log('     • Complements: NONE');
+          console.log('     • Option Selections: NONE');
           if (item.snapshotName.includes('Calabresa')) {
-            console.error('   ❌ Pizza de Calabresa has NO complements! Expected required choice validation.');
+            console.error('   ❌ Pizza de Calabresa has NO option selections! Expected required choice validation.');
             testFailed = true;
           }
         }
