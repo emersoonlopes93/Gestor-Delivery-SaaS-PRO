@@ -153,7 +153,7 @@ export class TenantController {
   @Post('telemetry')
   async trackTelemetry(
     @CurrentTenant() tenantId: string,
-    @Body() body: { event: string; payload: any },
+    @Body() body: { event: string; payload: unknown },
   ) {
     // Apenas registra no logger da API para análise (ou em um banco futuramente)
     const logger = new Logger('TenantTelemetry');

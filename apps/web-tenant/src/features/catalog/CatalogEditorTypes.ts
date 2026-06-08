@@ -15,7 +15,7 @@ export type CatalogProductFormState = {
   imageFile: File | null;
   imagePreviewUrl: string | null;
   pizzaPrices: Record<string, number>;
-  categories: any[]; // will be typed properly later
+  categories: unknown[]; // will be typed properly later
   bundleSummary?: {
     subtotal: number;
     discountTotal: number;

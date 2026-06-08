@@ -29,7 +29,7 @@ export class TheoreticalStockService {
 
       // 2. Resolve Combo V3 Slots (from snapshot)
       if (item.snapshotCatalogV2Json) {
-        const v2 = item.snapshotCatalogV2Json as any;
+        const v2 = item.snapshotCatalogV2Json as unknown;
         if (v2.slots && Array.isArray(v2.slots)) {
           for (const slot of v2.slots) {
             if (slot.items && Array.isArray(slot.items)) {

@@ -13,7 +13,7 @@ function request(
   path: string,
   body?: unknown,
   token?: string,
-): Promise<{ status: number; data: any }> {
+): Promise<{ status: number; data: unknown }> {
   return new Promise((resolve, reject) => {
     const bodyStr = body ? JSON.stringify(body) : undefined;
     const headers: Record<string, string> = {

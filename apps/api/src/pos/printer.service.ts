@@ -87,7 +87,7 @@ export class PrinterService {
       
       // V3 Options and Combo Slots
       if (item.snapshotCatalogV2Json) {
-        const v2 = item.snapshotCatalogV2Json as any;
+        const v2 = item.snapshotCatalogV2Json as unknown;
         if (v2.selections && Array.isArray(v2.selections)) {
           for (const sel of v2.selections) {
             const extraStr = sel.additionalPrice && sel.additionalPrice > 0 ? ` (+${Number(sel.additionalPrice).toFixed(2)})` : '';

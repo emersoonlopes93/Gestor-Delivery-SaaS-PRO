@@ -34,9 +34,9 @@ function request(
         method,
         headers,
       },
-      (res: any) => {
+      (res: import("http").IncomingMessage) => {
         let data = '';
-        res.on('data', (chunk: any) => (data += chunk));
+        res.on('data', (chunk: Buffer) => (data += chunk));
         res.on('end', () => {
           try {
             resolve({ status: res.statusCode, data: JSON.parse(data) });
@@ -72,7 +72,7 @@ async function main() {
         email: EMAIL,
         password: pwd,
       });
-      const d = loginRes.data as any;
+      const d = loginRes.data as Record<string, unknown>;
       if (loginRes.status === 200 || loginRes.status === 201) {
         const accessToken = d?.data?.accessToken || d?.accessToken;
         if (accessToken) {
@@ -103,7 +103,7 @@ async function main() {
       },
       token,
     );
-    const pd = createProduct.data as any;
+    const pd = createProduct.data as Record<string, unknown>;
     const productId = pd?.data?.id || pd?.id;
     console.log(`  Status: ${createProduct.status} | Produto ID: ${productId || 'N/A'}`);
     if (createProduct.status >= 200 && createProduct.status < 300 && productId) {
@@ -132,7 +132,7 @@ async function main() {
         },
         token,
       );
-      const gd = createGroup.data as any;
+      const gd = createGroup.data as Record<string, unknown>;
       const groupId = gd?.data?.id || gd?.id;
       console.log(`  Status: ${createGroup.status} | Group ID: ${groupId || 'N/A'}`);
 
@@ -161,7 +161,7 @@ async function main() {
 
         // Verificar grupo vinculado
         const verifyRes = await request('GET', `/catalog/products/${productId}/option-groups`, undefined, token);
-        const links = (verifyRes.data as any)?.data;
+        const links = (verifyRes.data as { data: unknown })?.data;
         console.log(`  ✅ Grupos vinculados ao produto: ${Array.isArray(links) ? links.length : 'N/A'}`);
       } else {
         console.log(`  ❌ Falha ao criar OptionGroup: ${JSON.stringify(gd).substring(0, 200)}`);
@@ -189,7 +189,7 @@ async function main() {
         },
         token,
       );
-      const cd = createCombo.data as any;
+      const cd = createCombo.data as Record<string, unknown>;
       const comboId = cd?.data?.id || cd?.id;
       console.log(`  Status: ${createCombo.status} | Combo ID: ${comboId || 'N/A'}`);
 
@@ -202,7 +202,7 @@ async function main() {
             { name: slotName, minSelect: 1, maxSelect: 1, order: 0 },
             token,
           );
-          const sd = slotRes.data as any;
+          const sd = slotRes.data as Record<string, unknown>;
           console.log(`  ${slotRes.status < 300 ? '✅' : '❌'} Slot "${slotName}": Status ${slotRes.status} | ${slotRes.status >= 300 ? JSON.stringify(sd).substring(0, 150) : 'OK'}`);
         }
       } else {
@@ -224,7 +224,7 @@ async function main() {
         },
         token,
       );
-      const pgd = pizzaGroup.data as any;
+      const pgd = pizzaGroup.data as Record<string, unknown>;
       const pgId = pgd?.data?.id || pgd?.id;
       if (pizzaGroup.status < 300 && pgId) {
         console.log(`  ✅ Grupo de Sabores criado: ${pgId}`);
@@ -250,7 +250,7 @@ async function main() {
   console.log('\n🌐 ETAPA 10 — Verificar Storefront API\n');
   try {
     const storefrontRes = await request('GET', '/public/storefront/kigula-delivery');
-    const sf = (storefrontRes.data as any)?.data || storefrontRes.data;
+    const sf = (storefrontRes.data as { data: unknown })?.data || storefrontRes.data;
     if (storefrontRes.status < 300 && sf) {
       console.log(`  ✅ Storefront carregado! Status: ${storefrontRes.status}`);
       console.log(`  Tenant: "${sf.tenant?.name}" | isOpen: ${sf.tenant?.isOpen}`);

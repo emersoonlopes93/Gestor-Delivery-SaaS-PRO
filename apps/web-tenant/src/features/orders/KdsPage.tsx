@@ -114,11 +114,11 @@ function KdsCard({ job, onPrint, onComplete, updatingId, onViewTicket }: KdsCard
               </div>
 
               {(() => {
-                const options = (item.snapshotCatalogV2Json as any)?.optionItems || [];
+                const options = (item.snapshotCatalogV2Json as unknown)?.optionItems || [];
                 if (options.length === 0) return null;
                 return (
                   <div className="pl-6 mt-1.5 text-xs text-muted-foreground font-medium space-y-0.5">
-                    {options.map((o: any, idx: number) => (
+                    {options.map((o: unknown, idx: number) => (
                       <div key={idx} className="flex justify-between">
                         <span>+ {o.snapshotName}</span>
                       </div>

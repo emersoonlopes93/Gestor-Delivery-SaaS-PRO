@@ -25,7 +25,7 @@ async function runAudit() {
 
     const tenant = order.tenant;
     tenantContext['tenantId'] = tenant.id;
-    (tenantContext as any).getTenantId = () => tenant.id;
+    (tenantContext as Record<string, unknown>).getTenantId = () => tenant.id;
     console.log(`✅ Tenant carregado a partir do pedido: ${tenant.slug} (${tenant.id})`);
 
     console.log(`\n📦 Analisando pedido mais recente: ${order.orderNumber} (${order.id})`);
@@ -45,12 +45,12 @@ async function runAudit() {
         lineType: firstItem.lineType,
         snapshotName: firstItem.snapshotName,
         snapshotCatalogV2Json: firstItem.snapshotCatalogV2Json ? '✅ PRESENTE' : '❌ AUSENTE',
-        complements: (firstItem as any).complements,
-        comboSelections: (firstItem as any).comboSelections
+        complements: (firstItem as Record<string, unknown>).complements,
+        comboSelections: (firstItem as Record<string, unknown>).comboSelections
     }, null, 2));
     
-    const hasLegacyComplements = 'complements' in firstItem && (firstItem as any).complements?.length > 0;
-    const hasLegacyCombos = 'comboSelections' in firstItem && (firstItem as any).comboSelections?.length > 0;
+    const hasLegacyComplements = 'complements' in firstItem && (firstItem as Record<string, unknown>).complements?.length > 0;
+    const hasLegacyCombos = 'comboSelections' in firstItem && (firstItem as Record<string, unknown>).comboSelections?.length > 0;
 
     console.log(`\n🕵️‍♂️ Verificação de Legado no Payload:`);
     console.log(`   - Contém complements legados? ${hasLegacyComplements ? '❌ SIM' : '✅ NÃO'}`);

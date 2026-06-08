@@ -100,7 +100,7 @@ export function OrdersHistoryPage() {
             productId: item.productId,
             quantity: item.quantity,
             notes: item.notes || undefined,
-            selectedOptions: ((item.snapshotCatalogV2Json as any)?.optionItems || []).map((c: any) => ({
+            selectedOptions: ((item.snapshotCatalogV2Json as unknown)?.optionItems || []).map((c: unknown) => ({
               groupId: '', 
               itemId: c.optionItemId,
               name: c.snapshotName,
@@ -111,7 +111,7 @@ export function OrdersHistoryPage() {
               productImage: currentProduct.image || undefined,
               basePrice: currentProduct.basePrice,
               lineSubtotal: (currentProduct.basePrice + item.snapshotExtrasTotal) * item.quantity,
-              extrasDescription: ((item.snapshotCatalogV2Json as any)?.optionItems || []).map((c: any) => c.snapshotName).join(', '),
+              extrasDescription: ((item.snapshotCatalogV2Json as Record<string, unknown>)?.optionItems as Array<{snapshotName: string}> || []).map((c) => c.snapshotName).join(', '),
             }
           };
           

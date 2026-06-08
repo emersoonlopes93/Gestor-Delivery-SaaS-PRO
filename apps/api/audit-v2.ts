@@ -6,7 +6,7 @@ async function countTable(tableName: string) {
   try {
     const t = await prisma.$queryRawUnsafe(`SELECT COUNT(*) FROM "${tableName}"`);
     console.log(`${tableName}:`, Number(t[0].count));
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.log(`${tableName}: 0 (Table does not exist)`);
   }
 }

@@ -303,9 +303,9 @@ export const ProductBasicInfo: React.FC = () => {
 
         {/* Configuração Especial para Template Pizza */}
         {(() => {
-          const selectedCategory = categories.find((c: any) => c.id === productForm.categoryId);
+          const selectedCategory = categories.find((c: unknown) => c.id === productForm.categoryId);
           const isPizzaTemplate = selectedCategory?.templateType === 'pizza';
-          const pizzaSizesGroup = product?.optionGroupLinks?.find((l: any) => 
+          const pizzaSizesGroup = product?.optionGroupLinks?.find((l: { optionGroup?: { name: string, items: unknown[] } }) => 
             l.optionGroup?.name.includes('Tamanhos [Pizza]')
           )?.optionGroup;
           const pizzaSizes = pizzaSizesGroup?.items || [];
@@ -327,7 +327,7 @@ export const ProductBasicInfo: React.FC = () => {
                   </p>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {pizzaSizes.map((size: any) => (
+                    {pizzaSizes.map((size: { id: string; name: string }) => (
                       <div key={size.id} className="bg-card p-6 rounded-2xl border border-border shadow-sm hover:shadow-md hover:scale-[1.02] transition-all group">
                         <label className="block text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 group-hover:text-primary transition-colors">
                           {size.name}

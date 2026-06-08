@@ -95,7 +95,7 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
     }
   };
 
-  const handleItemChange = (index: number, field: keyof OptionItem, value: any) => {
+  const handleItemChange = (index: number, field: keyof OptionItem, value: unknown) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
     setItems(newItems);
@@ -150,7 +150,7 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
       const validItems = items.filter(it => it.name && it.name.trim() !== '');
       for (let i = 0; i < validItems.length; i++) {
         const it = validItems[i];
-        const payload: any = {
+        const payload: Record<string, unknown> = {
           name: it.name,
           description: it.description,
           priceImpactType: it.priceImpactType,
