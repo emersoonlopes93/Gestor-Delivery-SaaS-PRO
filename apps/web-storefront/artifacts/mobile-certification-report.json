@@ -1,0 +1,165 @@
+{
+  "phase": "11.1",
+  "status": "REPROVADO",
+  "generatedAt": "2026-06-09T16:18:35-03:00",
+  "rule": "No item was marked PASS without direct evidence.",
+  "reuseInventory": {
+    "storefront": [
+      "StorefrontPage",
+      "CheckoutPage",
+      "CustomerProfilePage",
+      "OrdersHistoryPage",
+      "OrderTrackingPage"
+    ],
+    "cart": [
+      "use-cart-store",
+      "CartDrawer"
+    ],
+    "customer": [
+      "LoginModal",
+      "useCustomerStore",
+      "CustomerAuthGuard"
+    ],
+    "loyaltyAndWallet": [
+      "LoyaltyService",
+      "CashbackService",
+      "WalletService",
+      "CouponsService"
+    ],
+    "commercial": [
+      "CustomerIntelligenceService",
+      "CampaignAutomationService"
+    ],
+    "push": [
+      "usePushNotifications",
+      "Notification Controllers",
+      "Service Worker",
+      "@capacitor/push-notifications"
+    ],
+    "mobile": [
+      "capacitor.config.ts",
+      "apps/web-storefront/android",
+      "apps/web-storefront/ios"
+    ]
+  },
+  "android": {
+    "status": "PARTIAL_PASS",
+    "capacitorSync": {
+      "status": "PASS",
+      "evidence": "pnpm --filter @gestor/web-storefront exec cap sync android completed with Sync finished."
+    },
+    "gradleReleaseBuild": {
+      "status": "PASS",
+      "evidence": "gradlew assembleRelease bundleRelease completed with BUILD SUCCESSFUL."
+    },
+    "apkRelease": {
+      "status": "PASS",
+      "path": "C:/Users/Emerson/Documents/GitHub/Gestor-Delivery-SaaS-PRO/apps/web-storefront/artifacts/mobile/app-release-homologacao.apk",
+      "bytes": 6370389,
+      "megabytes": 6.08,
+      "signature": "PASS: apksigner verifies v1=true, v2=true, v3=true with one signer.",
+      "note": "Signed with a local self-signed homologation keystore, not a production Play/App Store signing identity."
+    },
+    "aabRelease": {
+      "status": "PASS",
+      "path": "C:/Users/Emerson/Documents/GitHub/Gestor-Delivery-SaaS-PRO/apps/web-storefront/artifacts/mobile/app-release-homologacao.aab",
+      "bytes": 5696714,
+      "megabytes": 5.43,
+      "signature": "PASS_WITH_WARNING: jarsigner verified, certificate is self-signed and has no timestamp.",
+      "note": "Generated and signed for homologation only."
+    },
+    "realDevice": {
+      "status": "FAIL",
+      "evidence": "adb devices -l returned only 'List of devices attached' with no physical device."
+    },
+    "push": {
+      "status": "FAIL",
+      "evidence": "No physical Android device/token available; push receipt and notification click were not proven."
+    },
+    "deepLinks": {
+      "status": "PARTIAL_PASS",
+      "evidence": "APK manifest contains android.intent.action.VIEW, android.intent.category.BROWSABLE, scheme=app and scheme=gestordelivery.",
+      "notProven": "No physical device launch via app://tracking/{id}, app://profile, app://wallet or app://offers was executed."
+    },
+    "offline": {
+      "status": "FAIL",
+      "evidence": "No physical Android device offline navigation test was executed."
+    }
+  },
+  "ios": {
+    "status": "FAIL",
+    "capacitorProject": {
+      "status": "PASS",
+      "evidence": "iOS Capacitor project exists and Info.plist includes CFBundleURLTypes for app and gestordelivery."
+    },
+    "podInstall": {
+      "status": "FAIL",
+      "evidence": "pod is not available in PATH on this Windows environment."
+    },
+    "xcodebuild": {
+      "status": "FAIL",
+      "evidence": "xcodebuild is not available in PATH on this Windows environment."
+    },
+    "ipa": {
+      "status": "FAIL",
+      "evidence": "IPA was not generated."
+    },
+    "realDevice": {
+      "status": "FAIL",
+      "evidence": "No iPhone physical device validation was executed."
+    },
+    "push": {
+      "status": "FAIL",
+      "evidence": "APNs token, receipt and notification click were not proven."
+    },
+    "testFlight": {
+      "status": "FAIL",
+      "evidence": "No build was uploaded or processed in TestFlight."
+    }
+  },
+  "deepLinkInfrastructure": {
+    "status": "PARTIAL_PASS",
+    "androidEvidence": "AndroidManifest.xml and built APK include VIEW/BROWSABLE schemes app and gestordelivery.",
+    "iosEvidence": "Info.plist includes CFBundleURLTypes for app and gestordelivery.",
+    "webEvidence": "PwaLifecycle listens to Capacitor App appUrlOpen and routes profile/wallet/cashback/offers/tracking to existing Storefront routes.",
+    "realDeviceStatus": "FAIL"
+  },
+  "performance": {
+    "status": "FAIL",
+    "evidence": "No real-device Android/iPhone measurements for initial load, catalog, checkout or profile were captured.",
+    "previousWebLighthouse": {
+      "performance": 90,
+      "accessibility": 100,
+      "bestPractices": 100,
+      "seo": 91,
+      "note": "Browser Lighthouse evidence from Fase 11 is not a substitute for Fase 11.1 real mobile P95."
+    }
+  },
+  "security": {
+    "status": "FAIL",
+    "evidence": "Tenant isolation, expired token, logout and reauthentication were not validated on physical Android/iPhone apps in this run."
+  },
+  "matrix": {
+    "APK Release": "PASS",
+    "AAB Release": "PASS",
+    "Android Real Device": "FAIL",
+    "Push Android": "FAIL",
+    "Deep Link Android": "FAIL",
+    "Offline Android": "FAIL",
+    "IPA": "FAIL",
+    "iPhone Real Device": "FAIL",
+    "Push iOS": "FAIL",
+    "Deep Link iOS": "FAIL",
+    "TestFlight": "FAIL",
+    "Performance": "FAIL",
+    "Seguranca": "FAIL"
+  },
+  "commands": {
+    "typecheck": "PASS: pnpm typecheck",
+    "build": "PASS: pnpm build",
+    "androidSdk": "PASS: commandlinetools-win-14742923_latest.zip installed locally under .tmp/android-sdk with platform-tools, platforms;android-35 and build-tools;35.0.0",
+    "androidBuild": "PASS: gradlew assembleRelease bundleRelease --no-daemon --console=plain",
+    "adbDevices": "FAIL: no devices listed",
+    "iosTools": "FAIL: pod and xcodebuild not found"
+  }
+}

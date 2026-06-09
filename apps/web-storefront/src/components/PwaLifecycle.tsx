@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
 import { Download } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from './Toast';
 
 const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.1.0';
@@ -15,7 +17,16 @@ function isStandalone() {
 
 export function PwaLifecycle() {
   const { showToast } = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+
+  useEffect(() => {
+    const tenantSlug = location.pathname.split('/').filter(Boolean)[0];
+    if (tenantSlug && !['precos', 'cadastro', 'login'].includes(tenantSlug)) {
+      localStorage.setItem('storefront:lastTenantSlug', tenantSlug);
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
@@ -54,6 +65,21 @@ export function PwaLifecycle() {
   }, [showToast]);
 
   useEffect(() => {
+    let cleanup: (() => void) | undefined;
+
+    CapacitorApp.addListener('appUrlOpen', ({ url }) => {
+      const target = resolveDeepLink(url);
+      if (target) {
+        navigate(target);
+      }
+    }).then((handle) => {
+      cleanup = () => handle.remove();
+    }).catch(() => undefined);
+
+    return () => cleanup?.();
+  }, [navigate]);
+
+  useEffect(() => {
     const onBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
       if (!isStandalone()) setInstallPrompt(event as BeforeInstallPromptEvent);
@@ -88,4 +114,29 @@ export function PwaLifecycle() {
       Instalar app
     </button>
   );
+}
+
+function resolveDeepLink(rawUrl: string) {
+  try {
+    const url = new URL(rawUrl);
+    const tenantSlug = localStorage.getItem('storefront:lastTenantSlug');
+    if (!tenantSlug) return '/';
+
+    const host = url.hostname.toLowerCase();
+    const segments = url.pathname.split('/').filter(Boolean);
+    const first = host || segments[0] || '';
+
+    if (first === 'tracking') {
+      const token = segments[0];
+      return token ? `/${tenantSlug}/tracking/${encodeURIComponent(token)}` : `/${tenantSlug}/orders`;
+    }
+
+    if (first === 'profile' || first === 'wallet' || first === 'cashback' || first === 'offers') {
+      return `/${tenantSlug}/profile`;
+    }
+
+    return `/${tenantSlug}`;
+  } catch {
+    return null;
+  }
 }
