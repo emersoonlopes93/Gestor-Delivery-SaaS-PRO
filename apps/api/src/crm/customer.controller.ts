@@ -5,6 +5,7 @@ import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
 import { CreateCustomerDTO, UpdateCustomerDTO, UpsertCustomerAddressDTO } from '@gestor/types';
 import { CrmSegmentationService } from './crm-segmentation.service';
+import { CustomerIntelligenceService } from './customer-intelligence.service';
 
 @Controller('crm/customers')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -12,6 +13,7 @@ export class CustomerController {
   constructor(
     private readonly customerService: CustomerService,
     private readonly crmSegmentationService: CrmSegmentationService,
+    private readonly customerIntelligenceService: CustomerIntelligenceService,
   ) {}
 
   @Get()
@@ -43,6 +45,18 @@ export class CustomerController {
   @RequirePermissions('crm.read')
   async getRetentionMetrics(@Request() req: { user: { tenantId: string } }) {
     return this.crmSegmentationService.getRetentionMetrics(req.user.tenantId);
+  }
+
+  @Get('intelligence/segments')
+  @RequirePermissions('crm.read')
+  async getIntelligenceSegments(@Request() req: { user: { tenantId: string } }) {
+    return this.customerIntelligenceService.getSegments(req.user.tenantId);
+  }
+
+  @Get('intelligence/kpis')
+  @RequirePermissions('crm.read')
+  async getRevenueKpis(@Request() req: { user: { tenantId: string } }) {
+    return this.customerIntelligenceService.getRevenueKpis(req.user.tenantId);
   }
 
   @Get(':id/addresses')
@@ -93,6 +107,15 @@ export class CustomerController {
     @Param('id') id: string
   ) {
     return this.customerService.getCustomer(req.user.tenantId, id);
+  }
+
+  @Get(':id/intelligence')
+  @RequirePermissions('crm.read', 'crm.manage_customers')
+  async getCustomerIntelligence(
+    @Request() req: { user: { tenantId: string } },
+    @Param('id') id: string,
+  ) {
+    return this.customerIntelligenceService.analyzeCustomer(req.user.tenantId, id);
   }
 
   @Patch(':id')

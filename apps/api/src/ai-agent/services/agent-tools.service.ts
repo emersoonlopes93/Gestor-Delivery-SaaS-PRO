@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
+﻿import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import axios from 'axios';
 import { OrdersService } from '../../orders/orders.service';
@@ -29,6 +29,7 @@ import {
 import { buildAgentPaymentMethodsResult } from '../utils/agent-payment-methods.util';
 import { ConversationService } from './conversation.service';
 import { validateOrderDraft } from '../utils/order-draft-validator.util';
+import { UpsellRecommendationEngine } from '../../campaigns/services/upsell-recommendation.engine';
 
 export interface AgentSessionContext {
   customerId?: string;
@@ -279,36 +280,37 @@ export class AgentToolsService {
     private readonly toolsFilterService: AgentToolsFilterService,
     @Inject(forwardRef(() => ConversationService))
     private readonly conversationService: ConversationService,
+    private readonly upsellRecommendationEngine: UpsellRecommendationEngine,
   ) {}
 
   /**
-   * Retorna as definições das tools disponíveis para o LLM.
+   * Retorna as definiÃ§Ãµes das tools disponÃ­veis para o LLM.
    */
   getAvailableTools(): AiToolDefinition[] {
     return [
       {
         name: 'consultar_cardapio',
-        description: 'Consulta os produtos disponíveis no cardápio, incluindo preços e descrições. Opcionalmente filtra por categoria ou termo de busca.',
+        description: 'Consulta os produtos disponÃ­veis no cardÃ¡pio, incluindo preÃ§os e descriÃ§Ãµes. Opcionalmente filtra por categoria ou termo de busca.',
         parameters: {
           type: 'object',
           properties: {
             categoria: { type: 'string', description: 'Nome da categoria para filtrar (opcional)' },
-            busca: { type: 'string', description: 'Termo de busca para encontrar produtos específicos (opcional)' },
+            busca: { type: 'string', description: 'Termo de busca para encontrar produtos especÃ­ficos (opcional)' },
           },
         },
       },
       {
         name: 'consultar_detalhe_produto',
         description:
-          'Consulta detalhes reais de um produto ou combo: preço, disponibilidade, complementos, grupos de opções e blocos do combo. Use antes de responder sobre tamanhos, bordas, adicionais ou composição.',
+          'Consulta detalhes reais de um produto ou combo: preÃ§o, disponibilidade, complementos, grupos de opÃ§Ãµes e blocos do combo. Use antes de responder sobre tamanhos, bordas, adicionais ou composiÃ§Ã£o.',
         parameters: {
           type: 'object',
           properties: {
-            productId: { type: 'string', description: 'ID do produto no cardápio' },
+            productId: { type: 'string', description: 'ID do produto no cardÃ¡pio' },
             comboId: { type: 'string', description: 'ID do combo (produto tipo combo ou combo legado)' },
             nomeOuBusca: {
               type: 'string',
-              description: 'Nome ou termo para buscar no cardápio quando o ID não for conhecido',
+              description: 'Nome ou termo para buscar no cardÃ¡pio quando o ID nÃ£o for conhecido',
             },
           },
         },
@@ -316,7 +318,7 @@ export class AgentToolsService {
       {
         name: 'consultar_formas_pagamento',
         description:
-          'Lista as formas de pagamento aceitas pela loja (Pix, cartão, dinheiro, etc.) conforme configuração real. Use antes de responder sobre pagamento — não invente chave Pix.',
+          'Lista as formas de pagamento aceitas pela loja (Pix, cartÃ£o, dinheiro, etc.) conforme configuraÃ§Ã£o real. Use antes de responder sobre pagamento â€” nÃ£o invente chave Pix.',
         parameters: {
           type: 'object',
           properties: {},
@@ -324,48 +326,48 @@ export class AgentToolsService {
       },
       {
         name: 'consultar_taxa_entrega',
-        description: 'Calcula a taxa de entrega baseada no endereço ou CEP do cliente.',
+        description: 'Calcula a taxa de entrega baseada no endereÃ§o ou CEP do cliente.',
         parameters: {
           type: 'object',
           properties: {
-            enderecoCompleto: { type: 'string', description: 'Endereço completo para calcular a taxa (Rua, Número, Bairro, Cidade)' },
-            cep: { type: 'string', description: 'CEP (opcional se enviar endereço completo)' },
+            enderecoCompleto: { type: 'string', description: 'EndereÃ§o completo para calcular a taxa (Rua, NÃºmero, Bairro, Cidade)' },
+            cep: { type: 'string', description: 'CEP (opcional se enviar endereÃ§o completo)' },
           },
           required: ['enderecoCompleto'],
         },
       },
       {
         name: 'criar_pedido',
-        description: 'Cria um pedido final no sistema. Só chame esta função quando o cliente confirmar explicitamente todos os itens, endereço (para delivery) e forma de pagamento. Para pickup (retirada no balcão), omita o campo endereco. IMPORTANTE: se o produto tiver opções obrigatórias (ex: escolha de borda de pizza), você DEVE chamar consultar_detalhe_produto antes para obter os optionGroupId e optionItemId corretos e incluí-los no campo selections do item. Nunca crie o pedido sem as opções obrigatórias.',
+        description: 'Cria um pedido final no sistema. SÃ³ chame esta funÃ§Ã£o quando o cliente confirmar explicitamente todos os itens, endereÃ§o (para delivery) e forma de pagamento. Para pickup (retirada no balcÃ£o), omita o campo endereco. IMPORTANTE: se o produto tiver opÃ§Ãµes obrigatÃ³rias (ex: escolha de borda de pizza), vocÃª DEVE chamar consultar_detalhe_produto antes para obter os optionGroupId e optionItemId corretos e incluÃ­-los no campo selections do item. Nunca crie o pedido sem as opÃ§Ãµes obrigatÃ³rias.',
         parameters: {
           type: 'object',
           properties: {
             fulfillmentType: {
               type: 'string',
               enum: ['delivery', 'pickup'],
-              description: 'Tipo de entrega: delivery (entrega no endereço) ou pickup (retirada no balcão)',
+              description: 'Tipo de entrega: delivery (entrega no endereÃ§o) ou pickup (retirada no balcÃ£o)',
             },
             itens: {
               type: 'array',
-              description: 'Lista de itens do pedido. Para produtos com opções obrigatórias, inclua o campo selections com os IDs obtidos via consultar_detalhe_produto.',
+              description: 'Lista de itens do pedido. Para produtos com opÃ§Ãµes obrigatÃ³rias, inclua o campo selections com os IDs obtidos via consultar_detalhe_produto.',
               items: {
                 type: 'object',
                 properties: {
                   productId: { type: 'string', description: 'ID do produto (use consultar_cardapio ou consultar_detalhe_produto para obter)' },
-                  comboId: { type: 'string', description: 'ID do combo — use este OU productId, nunca ambos' },
+                  comboId: { type: 'string', description: 'ID do combo â€” use este OU productId, nunca ambos' },
                   quantity: { type: 'integer', description: 'Quantidade solicitada pelo cliente' },
-                  notes: { type: 'string', description: 'Observações do item (ex: sem cebola, bem passado)' },
+                  notes: { type: 'string', description: 'ObservaÃ§Ãµes do item (ex: sem cebola, bem passado)' },
                 },
                 required: ['quantity'],
               },
             },
             endereco: {
               type: 'object',
-              description: 'Obrigatório para delivery. Omitir para pickup.',
+              description: 'ObrigatÃ³rio para delivery. Omitir para pickup.',
               properties: {
                 street: { type: 'string', description: 'Nome da rua' },
-                number: { type: 'string', description: 'Número do imóvel' },
-                neighborhood: { type: 'string', description: 'Bairro (obrigatório para calcular entrega)' },
+                number: { type: 'string', description: 'NÃºmero do imÃ³vel' },
+                neighborhood: { type: 'string', description: 'Bairro (obrigatÃ³rio para calcular entrega)' },
                 city: { type: 'string', description: 'Cidade' },
                 state: { type: 'string' },
                 zipCode: { type: 'string' },
@@ -375,7 +377,7 @@ export class AgentToolsService {
             },
             formaPagamento: { type: 'string', enum: ['pix', 'credit_card', 'cash'], description: 'Forma de pagamento confirmada pelo cliente' },
             troco: { type: 'number', description: 'Valor para troco quando formaPagamento=cash (ex: 100 para troco de R$100)' },
-            scheduledFor: { type: 'string', description: 'Data/hora para agendamento (ISO string) se aplicável' },
+            scheduledFor: { type: 'string', description: 'Data/hora para agendamento (ISO string) se aplicÃ¡vel' },
             timeSlotId: { type: 'string', description: 'ID do slot de tempo se for agendado' },
           },
           required: ['itens', 'fulfillmentType', 'formaPagamento'],
@@ -387,13 +389,13 @@ export class AgentToolsService {
         parameters: {
           type: 'object',
           properties: {
-            motivo: { type: 'string', description: 'Motivo resumido da transferência' },
+            motivo: { type: 'string', description: 'Motivo resumido da transferÃªncia' },
           },
         },
       },
       {
         name: 'consultar_horario_atendimento',
-        description: 'Consulta os horários de funcionamento da loja e se ela está aberta no momento.',
+        description: 'Consulta os horÃ¡rios de funcionamento da loja e se ela estÃ¡ aberta no momento.',
         parameters: {
           type: 'object',
           properties: {},
@@ -401,7 +403,7 @@ export class AgentToolsService {
       },
       {
         name: 'consultar_status_pedido',
-        description: 'Verifica o status atual do último pedido realizado pelo cliente.',
+        description: 'Verifica o status atual do Ãºltimo pedido realizado pelo cliente.',
         parameters: {
           type: 'object',
           properties: {},
@@ -417,7 +419,7 @@ export class AgentToolsService {
       },
       {
         name: 'repetir_ultimo_pedido',
-        description: 'Busca os itens do último pedido do cliente para sugerir a repetição.',
+        description: 'Busca os itens do Ãºltimo pedido do cliente para sugerir a repetiÃ§Ã£o.',
         parameters: {
           type: 'object',
           properties: {},
@@ -429,7 +431,7 @@ export class AgentToolsService {
         parameters: {
           type: 'object',
           properties: {
-            cupom: { type: 'string', description: 'Código do cupom (ex: BEMVINDO10)' },
+            cupom: { type: 'string', description: 'CÃ³digo do cupom (ex: BEMVINDO10)' },
             valorCarrinho: { type: 'number', description: 'Valor total atual dos produtos no carrinho' },
           },
           required: ['cupom', 'valorCarrinho'],
@@ -447,7 +449,7 @@ export class AgentToolsService {
       },
       {
         name: 'obter_link_rastreamento',
-        description: 'Gera e envia o link do mapa de rastreamento em tempo real do último pedido.',
+        description: 'Gera e envia o link do mapa de rastreamento em tempo real do Ãºltimo pedido.',
         parameters: {
           type: 'object',
           properties: {},
@@ -455,19 +457,19 @@ export class AgentToolsService {
       },
       {
         name: 'verificar_disponibilidade_ingrediente',
-        description: 'Consulta se um produto específico contém um determinado ingrediente (ex: glúten, lactose).',
+        description: 'Consulta se um produto especÃ­fico contÃ©m um determinado ingrediente (ex: glÃºten, lactose).',
         parameters: {
           type: 'object',
           properties: {
             productId: { type: 'string', description: 'ID do produto a ser verificado' },
-            ingrediente: { type: 'string', description: 'Nome do ingrediente para buscar na ficha técnica' },
+            ingrediente: { type: 'string', description: 'Nome do ingrediente para buscar na ficha tÃ©cnica' },
           },
           required: ['productId', 'ingrediente'],
         },
       },
       {
         name: 'consultar_slots_agendamento',
-        description: 'Consulta horários (slots) disponíveis para agendamento de pedidos em uma data específica.',
+        description: 'Consulta horÃ¡rios (slots) disponÃ­veis para agendamento de pedidos em uma data especÃ­fica.',
         parameters: {
           type: 'object',
           properties: {
@@ -477,7 +479,7 @@ export class AgentToolsService {
       },
       {
         name: 'consultar_ofertas_checkout',
-        description: 'Consulta ofertas globais e acompanhamentos (upsells) sugeridos para aumentar o pedido antes de finalizar.',
+        description: 'Consulta uma sugestao comercial relevante para o carrinho atual. Use no maximo uma vez por etapa e nunca seja insistente.',
         parameters: {
           type: 'object',
           properties: {},
@@ -485,28 +487,28 @@ export class AgentToolsService {
       },
       {
         name: 'adicionar_item_pedido',
-        description: 'Adiciona um item ao rascunho do pedido (orderDraft) e persiste no backend. Use IMEDIATAMENTE quando o cliente informar o que quer pedir. Resolve o produto real no cardápio antes de adicionar.',
+        description: 'Adiciona um item ao rascunho do pedido (orderDraft) e persiste no backend. Use IMEDIATAMENTE quando o cliente informar o que quer pedir. Resolve o produto real no cardÃ¡pio antes de adicionar.',
         parameters: {
           type: 'object',
           properties: {
             productId: { type: 'string', description: 'ID do produto (se conhecido). Prefira este campo.' },
-            nomeOuBusca: { type: 'string', description: 'Nome ou termo para buscar no cardápio quando o ID não for conhecido' },
+            nomeOuBusca: { type: 'string', description: 'Nome ou termo para buscar no cardÃ¡pio quando o ID nÃ£o for conhecido' },
             quantidade: { type: 'integer', description: 'Quantidade solicitada pelo cliente' },
-            notas: { type: 'string', description: 'Observações do item (ex: sem cebola)' },
+            notas: { type: 'string', description: 'ObservaÃ§Ãµes do item (ex: sem cebola)' },
           },
           required: ['quantidade'],
         },
       },
       {
         name: 'definir_entrega_retirada',
-        description: 'Define se o pedido será entrega (delivery) ou retirada (pickup) no balcão. Salva no orderDraft. Use quando o cliente informar o tipo de entrega.',
+        description: 'Define se o pedido serÃ¡ entrega (delivery) ou retirada (pickup) no balcÃ£o. Salva no orderDraft. Use quando o cliente informar o tipo de entrega.',
         parameters: {
           type: 'object',
           properties: {
             tipo: {
               type: 'string',
               enum: ['delivery', 'pickup'],
-              description: 'delivery = entrega no endereço; pickup = retirada no balcão',
+              description: 'delivery = entrega no endereÃ§o; pickup = retirada no balcÃ£o',
             },
           },
           required: ['tipo'],
@@ -514,18 +516,18 @@ export class AgentToolsService {
       },
       {
         name: 'definir_endereco_entrega',
-        description: 'Define ou atualiza o endereço de entrega no orderDraft. Mantenha fulfillmentType=delivery. Use sempre que o cliente informar qualquer parte do endereço.',
+        description: 'Define ou atualiza o endereÃ§o de entrega no orderDraft. Mantenha fulfillmentType=delivery. Use sempre que o cliente informar qualquer parte do endereÃ§o.',
         parameters: {
           type: 'object',
           properties: {
             rua: { type: 'string', description: 'Nome da rua' },
-            numero: { type: 'string', description: 'Número do imóvel' },
-            bairro: { type: 'string', description: 'Bairro (obrigatório para delivery)' },
+            numero: { type: 'string', description: 'NÃºmero do imÃ³vel' },
+            bairro: { type: 'string', description: 'Bairro (obrigatÃ³rio para delivery)' },
             cidade: { type: 'string', description: 'Cidade' },
             estado: { type: 'string', description: 'Estado (sigla)' },
             cep: { type: 'string', description: 'CEP (opcional)' },
             complemento: { type: 'string', description: 'Complemento (apto, bloco, etc.)' },
-            referencia: { type: 'string', description: 'Ponto de referência' },
+            referencia: { type: 'string', description: 'Ponto de referÃªncia' },
           },
         },
       },
@@ -540,8 +542,8 @@ export class AgentToolsService {
               enum: ['pix', 'credit_card', 'debit_card', 'cash'],
               description: 'Forma de pagamento: pix, credit_card, debit_card ou cash (dinheiro)',
             },
-            troco: { type: 'number', description: 'Valor para troco quando metodo=cash (ex: 100 para troco de R$100). Use 0 se não precisar de troco.' },
-            semTroco: { type: 'boolean', description: 'true se o cliente confirmar que não precisa de troco' },
+            troco: { type: 'number', description: 'Valor para troco quando metodo=cash (ex: 100 para troco de R$100). Use 0 se nÃ£o precisar de troco.' },
+            semTroco: { type: 'boolean', description: 'true se o cliente confirmar que nÃ£o precisa de troco' },
           },
           required: ['metodo'],
         },
@@ -558,7 +560,7 @@ export class AgentToolsService {
   }
 
   /**
-   * Tools filtradas por módulo do tenant (mapeamento em agent-tool-modules.ts).
+   * Tools filtradas por mÃ³dulo do tenant (mapeamento em agent-tool-modules.ts).
    */
   async getAvailableToolsForTenant(tenantId: string): Promise<AiToolDefinition[]> {
     const all = this.getAvailableTools();
@@ -566,7 +568,7 @@ export class AgentToolsService {
   }
 
   /**
-   * Executa uma tool específica requisitada pelo LLM.
+   * Executa uma tool especÃ­fica requisitada pelo LLM.
    */
   async executeTool(
     tenantId: string,
@@ -607,7 +609,7 @@ export class AgentToolsService {
 
         case 'transferir_atendimento_humano': {
           TransferirAtendimentoSchema.parse(args || {});
-          return { status: 'success', message: 'Transferência solicitada, aguardando operador humano.' };
+          return { status: 'success', message: 'TransferÃªncia solicitada, aguardando operador humano.' };
         }
 
         case 'consultar_horario_atendimento':
@@ -646,7 +648,7 @@ export class AgentToolsService {
         }
 
         case 'consultar_ofertas_checkout':
-          return await this.executeConsultarOfertasCheckout(tenantId);
+          return await this.executeConsultarOfertasCheckout(tenantId, sessionContext);
 
         case 'adicionar_item_pedido': {
           const parsedArgs = AdicionarItemPedidoSchema.parse(args || {});
@@ -684,7 +686,7 @@ export class AgentToolsService {
         return {
           status: 'error',
           code: 'INVALID_TOOL_ARGS',
-          message: 'Parâmetros inválidos para executar a ferramenta.',
+          message: 'ParÃ¢metros invÃ¡lidos para executar a ferramenta.',
         };
       }
 
@@ -700,11 +702,11 @@ export class AgentToolsService {
 
   private async executeConsultarCardapio(tenantId: string, args: z.infer<typeof ConsultarCardapioSchema>) {
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
-    if (!tenant) throw new Error('Loja não encontrada');
+    if (!tenant) throw new Error('Loja nÃ£o encontrada');
 
     const payload = await this.storefrontService.getStorefrontPayload(tenant.slug);
     
-    // Simplificamos o retorno para não estourar os tokens do LLM
+    // Simplificamos o retorno para nÃ£o estourar os tokens do LLM
     let result = payload.categories.map((cat) => ({
       categoria: cat.name,
       produtos: cat.products.map((p) => ({
@@ -737,7 +739,7 @@ export class AgentToolsService {
       });
     }
 
-    // Remove categorias vazias após o filtro
+    // Remove categorias vazias apÃ³s o filtro
     result = result.filter((c) => c.produtos.length > 0);
 
     return result;
@@ -745,7 +747,7 @@ export class AgentToolsService {
 
   private async executeConsultarTaxaEntrega(tenantId: string, args: z.infer<typeof ConsultarTaxaEntregaSchema>) {
     if (!args.enderecoCompleto) {
-      return { disponivel: false, mensagem: 'Por favor, informe o endereço completo para calcularmos a taxa de entrega.' };
+      return { disponivel: false, mensagem: 'Por favor, informe o endereÃ§o completo para calcularmos a taxa de entrega.' };
     }
 
     let lat: number;
@@ -768,15 +770,15 @@ export class AgentToolsService {
           lat = location.lat;
           lng = location.lng;
         } else {
-          return { disponivel: false, mensagem: 'Não conseguimos localizar este endereço com precisão. Poderia confirmar o nome da rua e o bairro?' };
+          return { disponivel: false, mensagem: 'NÃ£o conseguimos localizar este endereÃ§o com precisÃ£o. Poderia confirmar o nome da rua e o bairro?' };
         }
       } catch (err) {
         this.logger.error(`Geocoding error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-        return { disponivel: false, mensagem: 'Tivemos um problema temporário ao consultar o endereço. Deseja falar com um atendente?' };
+        return { disponivel: false, mensagem: 'Tivemos um problema temporÃ¡rio ao consultar o endereÃ§o. Deseja falar com um atendente?' };
       }
     } else {
-      // Fallback fallback: se não tiver chave, pedimos desculpas (evita mock fixo)
-      return { disponivel: false, mensagem: 'O cálculo automático de taxa está indisponível no momento devido a falta de configuração de mapas.' };
+      // Fallback fallback: se nÃ£o tiver chave, pedimos desculpas (evita mock fixo)
+      return { disponivel: false, mensagem: 'O cÃ¡lculo automÃ¡tico de taxa estÃ¡ indisponÃ­vel no momento devido a falta de configuraÃ§Ã£o de mapas.' };
     }
     
     try {
@@ -794,11 +796,11 @@ export class AgentToolsService {
         taxa: decision.fee ? Number(decision.fee) : 0,
         distanciaKm: decision.distanceKm ? Number(decision.distanceKm) : 0,
         mensagem: decision.canDeliver 
-          ? `Entrega disponível. Taxa: R$ ${decision.fee}` 
-          : 'Infelizmente não entregamos neste endereço.',
+          ? `Entrega disponÃ­vel. Taxa: R$ ${decision.fee}` 
+          : 'Infelizmente nÃ£o entregamos neste endereÃ§o.',
       };
     } catch {
-      return { disponivel: false, mensagem: 'Erro ao calcular taxa. Peça mais detalhes do endereço.' };
+      return { disponivel: false, mensagem: 'Erro ao calcular taxa. PeÃ§a mais detalhes do endereÃ§o.' };
     }
   }
 
@@ -809,7 +811,6 @@ export class AgentToolsService {
       credit_card: PaymentMethod.credit_card,
       'credit card': PaymentMethod.credit_card,
       cartao: PaymentMethod.credit_card,
-      cartão: PaymentMethod.credit_card,
       debit_card: PaymentMethod.debit_card,
       'debit card': PaymentMethod.debit_card,
       dinheiro: PaymentMethod.cash,
@@ -849,9 +850,9 @@ export class AgentToolsService {
   }
 
   /**
-   * Resolve o endereço de entrega. Geocoding é best-effort:
-   * se não tiver Google Maps Key ou se falhar, prossegue com lat/lng nulo.
-   * O CheckoutValidatorService calculará a taxa por bairro/fixo.
+   * Resolve o endereÃ§o de entrega. Geocoding Ã© best-effort:
+   * se nÃ£o tiver Google Maps Key ou se falhar, prossegue com lat/lng nulo.
+   * O CheckoutValidatorService calcularÃ¡ a taxa por bairro/fixo.
    */
   private async resolveDeliveryAddress(
     endereco: NonNullable<z.infer<typeof CriarPedidoSchema>['endereco']>,
@@ -883,8 +884,8 @@ export class AgentToolsService {
         address.lat = coords.lat;
         address.lng = coords.lng;
       } else {
-        // Best-effort: continua sem coordenadas; CheckoutValidator usará taxa por bairro/fixa
-        this.logger.warn(`[AI_ORDER] geocoding_best_effort_failed address="${fullAddress}" — proceeding without coords`);
+        // Best-effort: continua sem coordenadas; CheckoutValidator usarÃ¡ taxa por bairro/fixa
+        this.logger.warn(`[AI_ORDER] geocoding_best_effort_failed address="${fullAddress}" â€” proceeding without coords`);
       }
     }
 
@@ -919,7 +920,7 @@ export class AgentToolsService {
       return {
         status: 'error',
         code: 'CUSTOMER_NOT_IDENTIFIED',
-        message: 'Cliente não identificado. Confirme o telefone ou transfira para atendente.',
+        message: 'Cliente nÃ£o identificado. Confirme o telefone ou transfira para atendente.',
       };
     }
 
@@ -930,10 +931,10 @@ export class AgentToolsService {
     if (!ctx.customerPhone) missingFields.push('telefone do cliente');
 
     if (fulfillmentType === 'delivery') {
-      if (!args.endereco?.street) missingFields.push('rua do endereço');
-      if (!args.endereco?.number) missingFields.push('número do endereço');
-      if (!args.endereco?.neighborhood) missingFields.push('bairro do endereço');
-      if (!args.endereco?.city) missingFields.push('cidade do endereço');
+      if (!args.endereco?.street) missingFields.push('rua do endereÃ§o');
+      if (!args.endereco?.number) missingFields.push('nÃºmero do endereÃ§o');
+      if (!args.endereco?.neighborhood) missingFields.push('bairro do endereÃ§o');
+      if (!args.endereco?.city) missingFields.push('cidade do endereÃ§o');
     }
 
     if (missingFields.length > 0) {
@@ -941,25 +942,25 @@ export class AgentToolsService {
       return {
         status: 'error',
         code: 'MISSING_REQUIRED_FIELDS',
-        message: `Dados obrigatórios faltando: ${missingFields.join(', ')}.`,
+        message: `Dados obrigatÃ³rios faltando: ${missingFields.join(', ')}.`,
         missingFields,
       };
     }
 
     try {
       const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
-      if (!tenant) throw new Error('Loja não encontrada');
+      if (!tenant) throw new Error('Loja nÃ£o encontrada');
 
       const paymentMethod = this.normalizePaymentMethod(args.formaPagamento);
       if (!paymentMethod) {
         return {
           status: 'error',
           code: 'INVALID_PAYMENT_METHOD',
-          message: 'Forma de pagamento inválida. Use pix, credit_card ou cash.',
+          message: 'Forma de pagamento invÃ¡lida. Use pix, credit_card ou cash.',
         };
       }
 
-      // Resolve delivery address (geocoding is best-effort — won't throw if Maps key is absent)
+      // Resolve delivery address (geocoding is best-effort â€” won't throw if Maps key is absent)
       let deliveryAddress: DeliveryAddressDTO | undefined;
       if (fulfillmentType === 'delivery' && args.endereco) {
         deliveryAddress = await this.resolveDeliveryAddress(args.endereco);
@@ -1009,7 +1010,7 @@ export class AgentToolsService {
         orderId: order.id,
         orderNumber: order.orderNumber,
         totalAmount: Number(order.total),
-        message: `Pedido #${order.orderNumber} criado com sucesso! O total é R$ ${order.total}.`,
+        message: `Pedido #${order.orderNumber} criado com sucesso! O total Ã© R$ ${order.total}.`,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -1027,35 +1028,35 @@ export class AgentToolsService {
     });
 
     const status = await this.availabilityService.getStoreStatus(tenantId);
-    const dayNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+    const dayNames = ['Domingo', 'Segunda-feira', 'TerÃ§a-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'SÃ¡bado'];
 
     const formattedHours = hours.map(h => ({
       dia: dayNames[h.dayOfWeek],
       status: h.isOpen ? 'Aberto' : 'Fechado',
-      horario: h.isOpen ? `${h.openTime} às ${h.closeTime}` : '-',
+      horario: h.isOpen ? `${h.openTime} Ã s ${h.closeTime}` : '-',
     }));
 
     return {
       statusAtual: status.message,
       isOpen: status.isOpen,
       proximaAbertura: status.nextOpenAt,
-      escalaSemanal: formattedHours.length > 0 ? formattedHours : 'Horário não configurado (Aberto 24h)',
+      escalaSemanal: formattedHours.length > 0 ? formattedHours : 'HorÃ¡rio nÃ£o configurado (Aberto 24h)',
     };
   }
 
   private async executeConsultarStatusPedido(tenantId: string, sessionContext?: AgentSessionContext) {
-    if (!sessionContext?.customerId) return { status: 'error', message: 'Cliente não identificado.' };
+    if (!sessionContext?.customerId) return { status: 'error', message: 'Cliente nÃ£o identificado.' };
     
     const order = await this.ordersService.getLatestCustomerOrder(tenantId, sessionContext.customerId);
-    if (!order) return { message: 'Você ainda não possui pedidos realizados.' };
+    if (!order) return { message: 'VocÃª ainda nÃ£o possui pedidos realizados.' };
 
     const statusLabels: Record<string, string> = {
-      pending: 'Aguardando confirmação',
+      pending: 'Aguardando confirmaÃ§Ã£o',
       confirmed: 'Confirmado e em fila',
       preparing: 'Sendo preparado com carinho',
       ready_for_delivery: 'Pronto para entrega',
       out_for_delivery: 'Em rota de entrega',
-      completed: 'Entregue / Concluído',
+      completed: 'Entregue / ConcluÃ­do',
       cancelled: 'Cancelado',
     };
 
@@ -1069,33 +1070,33 @@ export class AgentToolsService {
   }
 
   private async executeConsultarFidelidade(tenantId: string, sessionContext?: AgentSessionContext) {
-    if (!sessionContext?.customerId) return { status: 'error', message: 'Cliente não identificado.' };
+    if (!sessionContext?.customerId) return { status: 'error', message: 'Cliente nÃ£o identificado.' };
     
     const balance = await this.cashbackService.getCashbackBalance(tenantId, sessionContext.customerId);
     return {
       saldoCashback: balance,
       mensagem: balance > 0 
-        ? `Você tem R$ ${balance.toFixed(2)} de saldo para usar!` 
-        : 'Você ainda não possui saldo de cashback, mas ganhará nesta compra!'
+        ? `VocÃª tem R$ ${balance.toFixed(2)} de saldo para usar!` 
+        : 'VocÃª ainda nÃ£o possui saldo de cashback, mas ganharÃ¡ nesta compra!'
     };
   }
 
   private async executeRepetirUltimoPedido(tenantId: string, sessionContext?: AgentSessionContext) {
     if (!sessionContext?.customerId) {
-      return { status: 'error', message: 'Cliente não identificado.' };
+      return { status: 'error', message: 'Cliente nÃ£o identificado.' };
     }
 
     if (sessionContext.allowRepeatLastOrder === false) {
       return {
         status: 'error',
         code: 'REPEAT_ORDER_DISABLED',
-        message: 'Repetir último pedido não está habilitado para este tenant.',
+        message: 'Repetir Ãºltimo pedido nÃ£o estÃ¡ habilitado para este tenant.',
       };
     }
 
     const order = await this.ordersService.getLatestCustomerOrder(tenantId, sessionContext.customerId);
     if (!order) {
-      return { message: 'Não encontramos pedidos anteriores para repetir.' };
+      return { message: 'NÃ£o encontramos pedidos anteriores para repetir.' };
     }
 
     // Build summary of last order for memory
@@ -1122,7 +1123,7 @@ export class AgentToolsService {
       total: Number(order.total),
       createdAt: order.createdAt.toISOString(),
       summary: lastOrderSummary,
-      mensagem: `Seu último pedido foi o ${order.orderNumber} com ${itemsSummary}. Deseja repetir esses itens? Vou recalcular preços e confirmar a entrega.`,
+      mensagem: `Seu Ãºltimo pedido foi o ${order.orderNumber} com ${itemsSummary}. Deseja repetir esses itens? Vou recalcular preÃ§os e confirmar a entrega.`,
     };
   }
 
@@ -1155,15 +1156,15 @@ export class AgentToolsService {
     return {
       tempoEstimado: `${minTime}-${maxTime} minutos`,
       pedidosNaFila: orders,
-      mensagem: `O tempo estimado para ${args.tipo === 'pickup' ? 'retirada' : 'entrega'} é de ${minTime} a ${maxTime} minutos.`
+      mensagem: `O tempo estimado para ${args.tipo === 'pickup' ? 'retirada' : 'entrega'} Ã© de ${minTime} a ${maxTime} minutos.`
     };
   }
 
   private async executeObterLinkRastreamento(tenantId: string, sessionContext?: AgentSessionContext) {
-    if (!sessionContext?.customerId) return { status: 'error', message: 'Cliente não identificado.' };
+    if (!sessionContext?.customerId) return { status: 'error', message: 'Cliente nÃ£o identificado.' };
     
     const order = await this.ordersService.getLatestCustomerOrder(tenantId, sessionContext.customerId);
-    if (!order) return { message: 'Não encontramos pedidos ativos para rastreio.' };
+    if (!order) return { message: 'NÃ£o encontramos pedidos ativos para rastreio.' };
 
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
     const trackingUrl = `https://${tenant?.slug}.gestordelivery.com.br/track/${order.orderNumber}`;
@@ -1172,7 +1173,7 @@ export class AgentToolsService {
       pedido: order.orderNumber,
       status: order.status,
       linkRastreamento: trackingUrl,
-      mensagem: `Você pode acompanhar seu pedido em tempo real aqui: ${trackingUrl}`
+      mensagem: `VocÃª pode acompanhar seu pedido em tempo real aqui: ${trackingUrl}`
     };
   }
 
@@ -1192,8 +1193,8 @@ export class AgentToolsService {
       contemIngrediente: found,
       listaIngredientes: list,
       mensagem: found 
-        ? `Sim, este item contém ${args.ingrediente}.` 
-        : `Não encontramos ${args.ingrediente} na ficha técnica deste item. Ingredientes principais: ${list}`
+        ? `Sim, este item contÃ©m ${args.ingrediente}.` 
+        : `NÃ£o encontramos ${args.ingrediente} na ficha tÃ©cnica deste item. Ingredientes principais: ${list}`
     };
   }
 
@@ -1204,7 +1205,7 @@ export class AgentToolsService {
       select: { timezone: true } as { timezone: true },
     }).catch(() => null);
 
-    // Fallback para America/Sao_Paulo se não configurado
+    // Fallback para America/Sao_Paulo se nÃ£o configurado
     const timezone = (tenantSettings as { timezone?: string } | null)?.timezone || 'America/Sao_Paulo';
 
     let date: Date;
@@ -1225,7 +1226,7 @@ export class AgentToolsService {
 
     const slots = await this.schedulingService.getAvailableTimeSlots(date, tenantId);
 
-    // Formatar horários no timezone do tenant
+    // Formatar horÃ¡rios no timezone do tenant
     const timeFormatter = new Intl.DateTimeFormat('pt-BR', {
       timeZone: timezone,
       hour: '2-digit',
@@ -1255,31 +1256,61 @@ export class AgentToolsService {
       timezone,
       slotsDisponiveis: slotsFormatados,
       mensagem: slots.length > 0
-        ? `Temos ${slots.length} horários disponíveis para agendamento em ${dateLabel}: ${slotsFormatados.map((s) => s.horario).join(', ')}.`
-        : `Infelizmente não há horários disponíveis para ${dateLabel}.`,
+        ? `Temos ${slots.length} horÃ¡rios disponÃ­veis para agendamento em ${dateLabel}: ${slotsFormatados.map((s) => s.horario).join(', ')}.`
+        : `Infelizmente nÃ£o hÃ¡ horÃ¡rios disponÃ­veis para ${dateLabel}.`,
     };
   }
 
-  private async executeConsultarOfertasCheckout(tenantId: string) {
+  private async executeConsultarOfertasCheckout(tenantId: string, sessionContext?: AgentSessionContext) {
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
-    if (!tenant) throw new Error('Loja não encontrada');
+    if (!tenant) throw new Error('Loja nao encontrada');
+
+    const memory = sessionContext?.sessionId
+      ? await this.conversationService.getSessionAiMemory(sessionContext.sessionId)
+      : null;
+    const draftItems = memory?.orderDraft?.items?.map((item) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+    })) ?? [];
+
+    if (draftItems.length > 0) {
+      const recommendations = await this.upsellRecommendationEngine.recommend(tenantId, {
+        items: draftItems,
+        customerId: sessionContext?.customerId,
+        limit: 1,
+      });
+
+      if (recommendations.recommendations.length > 0) {
+        return {
+          sugestoes: recommendations.recommendations,
+          limiteConversa: {
+            maximoPorEtapa: 1,
+            maximoPorConversa: 3,
+          },
+          mensagem: 'Tenho uma sugestao que combina com seu pedido. Deseja incluir?',
+        };
+      }
+    }
 
     const payload = await this.storefrontService.getStorefrontPayload(tenant.slug);
-    
+
     return {
-      ofertas: payload.upsells.map((u: { name: string, description?: string | null, items: { productId: string, name: string, finalPrice: number }[] }) => ({
+      ofertas: payload.upsells.slice(0, 1).map((u: { name: string, description?: string | null, items: { productId: string, name: string, finalPrice: number }[] }) => ({
         titulo: u.name,
         descricao: u.description || '',
-        opcoes: u.items.map((i) => ({
+        opcoes: u.items.slice(0, 1).map((i) => ({
           productId: i.productId,
           nome: i.name,
-          preco: i.finalPrice
-        }))
+          preco: i.finalPrice,
+        })),
       })),
-      mensagem: 'Aqui estão algumas sugestões para acompanhar seu pedido!'
+      limiteConversa: {
+        maximoPorEtapa: 1,
+        maximoPorConversa: 3,
+      },
+      mensagem: 'Tenho uma sugestao para acompanhar seu pedido. Deseja incluir?',
     };
   }
-
   private async executeConsultarFormasPagamento(
     tenantId: string,
   ): Promise<ReturnType<typeof buildAgentPaymentMethodsResult>> {
@@ -1295,7 +1326,7 @@ export class AgentToolsService {
     if (!settings) {
       return {
         methods: [],
-        notes: 'Configurações de pagamento não encontradas para esta loja.',
+        notes: 'ConfiguraÃ§Ãµes de pagamento nÃ£o encontradas para esta loja.',
         pixAutomaticAvailable: false,
       };
     }
@@ -1318,7 +1349,7 @@ export class AgentToolsService {
   > {
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) {
-      return { status: 'error', code: 'TENANT_NOT_FOUND', message: 'Loja não encontrada.' };
+      return { status: 'error', code: 'TENANT_NOT_FOUND', message: 'Loja nÃ£o encontrada.' };
     }
 
     const payload = await this.storefrontService.getStorefrontPayload(tenant.slug);
@@ -1332,7 +1363,7 @@ export class AgentToolsService {
       return {
         status: 'error',
         code: 'NOT_FOUND',
-        message: 'Produto ou combo não encontrado ou indisponível no cardápio.',
+        message: 'Produto ou combo nÃ£o encontrado ou indisponÃ­vel no cardÃ¡pio.',
       };
     }
 
@@ -1344,7 +1375,7 @@ export class AgentToolsService {
       return {
         status: 'error',
         code: 'NOT_FOUND',
-        message: 'Nenhum produto ou combo encontrado com esse nome. Peça mais detalhes ou use consultar_cardapio.',
+        message: 'Nenhum produto ou combo encontrado com esse nome. PeÃ§a mais detalhes ou use consultar_cardapio.',
       };
     }
 
@@ -1372,7 +1403,7 @@ export class AgentToolsService {
     return {
       status: 'error',
       code: 'NOT_AVAILABLE',
-      message: 'Item encontrado mas indisponível no momento.',
+      message: 'Item encontrado mas indisponÃ­vel no momento.',
     };
   }
 
@@ -1524,9 +1555,9 @@ export class AgentToolsService {
 
 
 
-  // ─────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Novas tools de coleta do orderDraft
-  // ─────────────────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   private async executeAdicionarItemPedido(
     tenantId: string,
@@ -1535,12 +1566,12 @@ export class AgentToolsService {
   ) {
     const sessionId = typeof sessionContext?.sessionId === 'string' ? sessionContext.sessionId : null;
     if (!sessionId) {
-      return { status: 'error', code: 'NO_SESSION', message: 'Sessão não identificada.' };
+      return { status: 'error', code: 'NO_SESSION', message: 'SessÃ£o nÃ£o identificada.' };
     }
 
-    // Resolver produto no catálogo
+    // Resolver produto no catÃ¡logo
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
-    if (!tenant) return { status: 'error', code: 'TENANT_NOT_FOUND', message: 'Loja não encontrada.' };
+    if (!tenant) return { status: 'error', code: 'TENANT_NOT_FOUND', message: 'Loja nÃ£o encontrada.' };
 
     const payload = await this.storefrontService.getStorefrontPayload(tenant.slug);
 
@@ -1573,7 +1604,7 @@ export class AgentToolsService {
       if (bestMatch) {
         resolvedId = bestMatch.id;
         resolvedName = bestMatch.name;
-        // Buscar preço
+        // Buscar preÃ§o
         for (const cat of payload.categories) {
           const found = cat.products.find((p) => p.id === resolvedId);
           if (found) { resolvedPrice = Number(found.basePrice); break; }
@@ -1585,18 +1616,18 @@ export class AgentToolsService {
       } else if (matches.length > 1) {
         return {
           status: 'multiple_matches',
-          message: `Encontrei ${matches.length} produtos com esse nome. Qual você quer?`,
+          message: `Encontrei ${matches.length} produtos com esse nome. Qual vocÃª quer?`,
           matches: matches.slice(0, 5).map((m) => ({ id: m.id, nome: m.name })),
         };
       } else {
-        return { status: 'error', code: 'NOT_FOUND', message: `Produto "${args.nomeOuBusca}" não encontrado no cardápio. Use consultar_cardapio para ver os itens disponíveis.` };
+        return { status: 'error', code: 'NOT_FOUND', message: `Produto "${args.nomeOuBusca}" nÃ£o encontrado no cardÃ¡pio. Use consultar_cardapio para ver os itens disponÃ­veis.` };
       }
     } else {
       return { status: 'error', code: 'INVALID_ARGS', message: 'Informe productId ou nomeOuBusca.' };
     }
 
     if (!resolvedId || !resolvedName) {
-      return { status: 'error', code: 'NOT_FOUND', message: 'Produto não encontrado ou indisponível no cardápio.' };
+      return { status: 'error', code: 'NOT_FOUND', message: 'Produto nÃ£o encontrado ou indisponÃ­vel no cardÃ¡pio.' };
     }
 
     // Carregar draft atual e adicionar/atualizar item
@@ -1659,7 +1690,7 @@ export class AgentToolsService {
     sessionContext?: AgentSessionContext,
   ) {
     const sessionId = typeof sessionContext?.sessionId === 'string' ? sessionContext.sessionId : null;
-    if (!sessionId) return { status: 'error', code: 'NO_SESSION', message: 'Sessão não identificada.' };
+    if (!sessionId) return { status: 'error', code: 'NO_SESSION', message: 'SessÃ£o nÃ£o identificada.' };
 
     await this.conversationService.updateOrderDraft(sessionId, {
       fulfillmentType: args.tipo,
@@ -1668,8 +1699,8 @@ export class AgentToolsService {
     this.logger.log(`[AI_DRAFT] fulfillment_set ${args.tipo} sessionId=${sessionId}`);
 
     const msg = args.tipo === 'delivery'
-      ? 'Entrega em domicílio confirmada! Qual é o seu endereço?'
-      : 'Retirada no balcão confirmada!';
+      ? 'Entrega em domicÃ­lio confirmada! Qual Ã© o seu endereÃ§o?'
+      : 'Retirada no balcÃ£o confirmada!';
 
     return { status: 'success', tipo: args.tipo, mensagem: msg };
   }
@@ -1679,7 +1710,7 @@ export class AgentToolsService {
     sessionContext?: AgentSessionContext,
   ) {
     const sessionId = typeof sessionContext?.sessionId === 'string' ? sessionContext.sessionId : null;
-    if (!sessionId) return { status: 'error', code: 'NO_SESSION', message: 'Sessão não identificada.' };
+    if (!sessionId) return { status: 'error', code: 'NO_SESSION', message: 'SessÃ£o nÃ£o identificada.' };
 
     const memory = await this.conversationService.getSessionAiMemory(sessionId);
     const existing = memory.orderDraft.deliveryAddress;
@@ -1707,7 +1738,7 @@ export class AgentToolsService {
 
     const partsPreenchidos = [
       merged.street ? `Rua: ${merged.street}` : null,
-      merged.number ? `Nº ${merged.number}` : null,
+      merged.number ? `NÂº ${merged.number}` : null,
       merged.neighborhood ? `Bairro: ${merged.neighborhood}` : null,
       merged.city ? `Cidade: ${merged.city}` : null,
     ].filter(Boolean);
@@ -1716,7 +1747,7 @@ export class AgentToolsService {
       status: 'success',
       fulfillmentType: 'delivery',
       enderecoAtual: merged,
-      mensagem: `Endereço atualizado: ${partsPreenchidos.join(', ')}.`,
+      mensagem: `EndereÃ§o atualizado: ${partsPreenchidos.join(', ')}.`,
     };
   }
 
@@ -1725,11 +1756,11 @@ export class AgentToolsService {
     sessionContext?: AgentSessionContext,
   ) {
     const sessionId = typeof sessionContext?.sessionId === 'string' ? sessionContext.sessionId : null;
-    if (!sessionId) return { status: 'error', code: 'NO_SESSION', message: 'Sessão não identificada.' };
+    if (!sessionId) return { status: 'error', code: 'NO_SESSION', message: 'SessÃ£o nÃ£o identificada.' };
 
     const method = this.normalizePaymentMethod(args.metodo);
     if (!method) {
-      return { status: 'error', code: 'INVALID_METHOD', message: 'Forma de pagamento inválida. Use pix, credit_card, debit_card ou cash.' };
+      return { status: 'error', code: 'INVALID_METHOD', message: 'Forma de pagamento invÃ¡lida. Use pix, credit_card, debit_card ou cash.' };
     }
 
     const payment: { method: string; changeFor: number | null; changeConfirmed?: boolean | null } = {
@@ -1756,8 +1787,8 @@ export class AgentToolsService {
     const methodLabels: Record<string, string> = {
       cash: 'Dinheiro',
       pix: 'Pix',
-      credit_card: 'Cartão de crédito',
-      debit_card: 'Cartão de débito',
+      credit_card: 'CartÃ£o de crÃ©dito',
+      debit_card: 'CartÃ£o de dÃ©bito',
     };
 
     const needsChange = method === PaymentMethod.cash && payment.changeFor === null;
@@ -1774,7 +1805,7 @@ export class AgentToolsService {
 
   private async executeConsultarResumoPedido(sessionContext?: AgentSessionContext) {
     const sessionId = typeof sessionContext?.sessionId === 'string' ? sessionContext.sessionId : null;
-    if (!sessionId) return { status: 'error', code: 'NO_SESSION', message: 'Sessão não identificada.' };
+    if (!sessionId) return { status: 'error', code: 'NO_SESSION', message: 'SessÃ£o nÃ£o identificada.' };
 
     const memory = await this.conversationService.getSessionAiMemory(sessionId);
     const draft = memory.orderDraft;
@@ -1811,7 +1842,7 @@ export class AgentToolsService {
       missingFields,
       readyToConfirm,
       mensagem: readyToConfirm
-        ? 'Pedido pronto para confirmação! Mostre o resumo ao cliente e peça confirmação.'
+        ? 'Pedido pronto para confirmaÃ§Ã£o! Mostre o resumo ao cliente e peÃ§a confirmaÃ§Ã£o.'
         : `Dados faltantes: ${missingFields.join(', ')}.`,
     };
   }

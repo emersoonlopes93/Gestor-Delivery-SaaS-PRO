@@ -52,6 +52,7 @@ import { EmployeesPage } from './features/management/employees/EmployeesPage';
 import { WhatsAppConfigPage } from './features/whatsapp/pages/WhatsAppConfigPage';
 import { InboxPage } from './features/whatsapp/pages/InboxPage';
 import { CampaignsPage } from './features/campaigns/pages/CampaignsPage';
+import { AutomationsPage } from './features/campaigns/pages/AutomationsPage';
 import { AuthThemeBoundary } from './components/AuthThemeBoundary';
 
 
@@ -296,6 +297,14 @@ export function App() {
           element={
             <PermissionGate permission="crm.manage_coupons">
               <CampaignsPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/marketing/automations"
+          element={
+            <PermissionGate permission="crm.read">
+              <AutomationsPage />
             </PermissionGate>
           }
         />

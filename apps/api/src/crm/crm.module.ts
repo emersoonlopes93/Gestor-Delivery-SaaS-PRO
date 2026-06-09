@@ -5,11 +5,12 @@ import { CustomerService } from './customer.service';
 import { AuthModule } from '../auth/auth.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { CrmSegmentationService } from './crm-segmentation.service';
+import { CustomerIntelligenceService } from './customer-intelligence.service';
 
 @Module({
   imports: [DatabaseModule, AuthModule, RbacModule],
   controllers: [CustomerController],
-  providers: [CustomerService, CrmSegmentationService],
-  exports: [CustomerService, CrmSegmentationService],
+  providers: [CustomerService, CrmSegmentationService, CustomerIntelligenceService],
+  exports: [CustomerService, CrmSegmentationService, CustomerIntelligenceService],
 })
 export class CrmModule {}

@@ -4,6 +4,9 @@ import { WhatsAppChannelModule } from '../whatsapp-channel/whatsapp-channel.modu
 import { CampaignsService } from './services/campaigns.service';
 import { CampaignDispatcherService } from './services/campaign-dispatcher.service';
 import { CampaignProcessor } from './services/campaign.processor';
+import { RecoveryCampaignService } from './services/recovery-campaign.service';
+import { UpsellRecommendationEngine } from './services/upsell-recommendation.engine';
+import { AbandonedCartService } from './services/abandoned-cart.service';
 import { CampaignsController } from './controllers/campaigns.controller';
 import { BullModule } from '@nestjs/bullmq';
 import { RbacModule } from '../rbac/rbac.module';
@@ -44,10 +47,16 @@ if (!enableCampaignDispatch && process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true'
   controllers: [CampaignsController],
   providers: [
     CampaignsService,
+    RecoveryCampaignService,
+    UpsellRecommendationEngine,
+    AbandonedCartService,
     ...(enableCampaignDispatch ? [CampaignDispatcherService, CampaignProcessor] : []),
   ],
   exports: [
     CampaignsService,
+    RecoveryCampaignService,
+    UpsellRecommendationEngine,
+    AbandonedCartService,
     ...(enableCampaignDispatch ? [CampaignDispatcherService] : []),
   ],
 })

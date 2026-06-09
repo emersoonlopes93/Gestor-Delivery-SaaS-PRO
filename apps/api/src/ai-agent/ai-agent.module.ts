@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+﻿import { Module, forwardRef } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { WhatsAppChannelModule } from '../whatsapp-channel/whatsapp-channel.module';
@@ -10,6 +10,7 @@ import { DeliveryModule } from '../delivery/delivery.module';
 import { PromotionsModule } from '../promotions/promotions.module';
 import { SchedulingModule } from '../scheduling/scheduling.module';
 import { AdminModulesModule } from '../admin/modules/admin-modules.module';
+import { UpsellRecommendationEngine } from '../campaigns/services/upsell-recommendation.engine';
 
 import { OpenAiProvider } from './providers/openai.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
@@ -35,11 +36,11 @@ import { AiProviderConfigService } from './services/ai-provider-config.service';
     forwardRef(() => WhatsAppChannelModule), // para enviar as mensagens de volta
     forwardRef(() => CatalogModule),         // para as tools lerem produtos
     forwardRef(() => OrdersModule),          // para as tools criarem pedidos
-    forwardRef(() => StorefrontModule),      // para checkout e validação
+    forwardRef(() => StorefrontModule),      // para checkout e validaÃ§Ã£o
     forwardRef(() => DeliveryModule),        // para calcular taxas de entrega
     forwardRef(() => PromotionsModule),      // para cashback e cupons
     forwardRef(() => SchedulingModule),      // para agendamentos
-    AdminModulesModule,                      // para verificar permissões de módulo
+    AdminModulesModule,                      // para verificar permissÃµes de mÃ³dulo
   ],
   controllers: [AiAgentController],
   providers: [
@@ -56,6 +57,7 @@ import { AiProviderConfigService } from './services/ai-provider-config.service';
     AiAgentConfigService,
     ConversationService,
     AgentToolsFilterService,
+    UpsellRecommendationEngine,
     AgentToolsService,
     AiOrchestratorService,
   ],

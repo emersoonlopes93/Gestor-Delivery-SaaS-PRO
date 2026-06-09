@@ -1,5 +1,6 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
+import { BusinessInsightsService } from './business-insights.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions, CurrentTenant } from '../common/decorators';
@@ -8,7 +9,10 @@ import { MetricFilterDTO, DashboardStatsDTO } from '@gestor/types';
 @Controller('analytics')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class AnalyticsController {
-  constructor(private readonly analyticsService: AnalyticsService) {}
+  constructor(
+    private readonly analyticsService: AnalyticsService,
+    private readonly businessInsightsService: BusinessInsightsService,
+  ) {}
 
   @Get('dashboard')
   @RequirePermissions('reports.read')
@@ -60,5 +64,11 @@ export class AnalyticsController {
     @Query() filter: MetricFilterDTO
   ) {
     return this.analyticsService.getFinancialMetrics(tenantId, filter);
+  }
+
+  @Get('insights')
+  @RequirePermissions('reports.read')
+  async getInsights(@CurrentTenant() tenantId: string) {
+    return this.businessInsightsService.generateInsights(tenantId);
   }
 }
