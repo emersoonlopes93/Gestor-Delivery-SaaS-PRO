@@ -1,0 +1,278 @@
+import { BadRequestException, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { CampaignsService } from './campaigns.service';
+import { RecoveryCampaignService } from './recovery-campaign.service';
+import { AbandonedCartService } from './abandoned-cart.service';
+import { UpsellRecommendationEngine } from './upsell-recommendation.engine';
+import { CustomerIntelligenceService } from '../../crm/customer-intelligence.service';
+import { BusinessInsightsService } from '../../analytics/business-insights.service';
+import { PrismaService } from '../../database/prisma.service';
+
+type AutomationRunResult = {
+  tenantId: string;
+  scheduledCampaignsStarted: number;
+  conversions: number;
+  revenueGenerated: number;
+  recoveryCampaigns: number;
+  abandonedCartReminders: number;
+  reorderCampaigns: number;
+  upsellCampaigns: number;
+  failures: Array<{ automation: string; reason: string }>;
+};
+
+@Injectable()
+export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(CampaignAutomationService.name);
+  private intervalId?: NodeJS.Timeout;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly campaignsService: CampaignsService,
+    private readonly recoveryCampaignService: RecoveryCampaignService,
+    private readonly abandonedCartService: AbandonedCartService,
+    private readonly upsellRecommendationEngine: UpsellRecommendationEngine,
+    private readonly customerIntelligenceService: CustomerIntelligenceService,
+    private readonly businessInsightsService: BusinessInsightsService,
+  ) {}
+
+  onModuleInit() {
+    if (process.env.CAMPAIGN_AUTOMATION_ENABLED !== 'true') {
+      this.logger.log('Campaign automation scheduler disabled. Set CAMPAIGN_AUTOMATION_ENABLED=true to enable.');
+      return;
+    }
+
+    this.logger.log('Campaign automation scheduler enabled.');
+    this.intervalId = setInterval(() => {
+      this.runAllTenants().catch((error) => {
+        const message = error instanceof Error ? error.message : 'unknown_error';
+        this.logger.error(`automation_run_failed reason=${message}`);
+      });
+    }, 5 * 60 * 1000);
+  }
+
+  onModuleDestroy() {
+    if (this.intervalId) clearInterval(this.intervalId);
+  }
+
+  async getReuseInventory(tenantId: string) {
+    const [recoveryPreview, abandonedCarts, insights, reorderCandidates] = await Promise.all([
+      this.recoveryCampaignService.preview(tenantId),
+      this.abandonedCartService.getDueCarts(tenantId),
+      this.businessInsightsService.generateInsights(tenantId),
+      this.customerIntelligenceService.getReorderCandidates(tenantId),
+    ]);
+
+    return {
+      CustomerIntelligenceService: {
+        reusedFor: ['recompra_programada', 'segmentos', 'historico_cliente'],
+        availableCandidates: reorderCandidates.length,
+      },
+      RecoveryCampaignService: {
+        reusedFor: ['recuperacao_30_dias', 'recuperacao_60_dias', 'recuperacao_90_dias'],
+        preview: recoveryPreview,
+      },
+      UpsellRecommendationEngine: {
+        reusedFor: ['upsell_pos_compra', 'produtos_comprados_juntos'],
+      },
+      AbandonedCartService: {
+        reusedFor: ['carrinho_abandonado_30m_2h_24h'],
+        dueCarts: abandonedCarts.length,
+      },
+      BusinessInsightsService: {
+        reusedFor: ['insights_do_centro_de_automacoes'],
+        insights: insights.insights.length,
+      },
+      EvolutionWhatsAppIntegration: {
+        reusedFor: ['envio_real_ou_mock_via_WhatsAppSenderService'],
+      },
+      SchedulerCronExistente: {
+        reusedFor: ['setInterval_do_modulo_campaigns', 'CampaignDispatcherService_BullMQ_quando_habilitado'],
+      },
+      NotificationServices: {
+        reusedFor: ['WhatsAppSenderService', 'registro_em_chat_outbound'],
+      },
+      justificationForNewCode:
+        'Foi criado apenas um orquestrador dentro do modulo campaigns para coordenar servicos existentes; nenhuma regra de segmentacao, recuperacao, upsell ou carrinho foi duplicada.',
+    };
+  }
+
+  async runAllTenants() {
+    const tenants = await this.prisma.tenant.findMany({
+      where: { status: { in: ['active', 'trial'] } },
+      select: { id: true },
+      take: 100,
+    });
+
+    const results: AutomationRunResult[] = [];
+    for (const tenant of tenants) {
+      results.push(await this.runTenantAutomations(tenant.id));
+    }
+    return results;
+  }
+
+  async runTenantAutomations(tenantId: string): Promise<AutomationRunResult> {
+    const result: AutomationRunResult = {
+      tenantId,
+      scheduledCampaignsStarted: 0,
+      conversions: 0,
+      revenueGenerated: 0,
+      recoveryCampaigns: 0,
+      abandonedCartReminders: 0,
+      reorderCampaigns: 0,
+      upsellCampaigns: 0,
+      failures: [],
+    };
+
+    const due = await this.campaignsService.startDueScheduledCampaigns(tenantId);
+    result.scheduledCampaignsStarted = due.started;
+
+    const conversions = await this.campaignsService.markConversionsFromOrders(tenantId);
+    result.conversions = conversions.converted;
+    result.revenueGenerated = conversions.revenueGenerated;
+
+    await this.runRecovery(tenantId, result);
+    await this.runAbandonedCart(tenantId, result);
+    await this.runReorder(tenantId, result);
+    await this.runPostPurchaseUpsell(tenantId, result);
+
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId,
+        userType: 'system',
+        action: 'campaign_automation_run',
+        resource: 'campaign',
+        details: result as unknown as Prisma.JsonObject,
+      },
+    });
+
+    return result;
+  }
+
+  private async runRecovery(tenantId: string, result: AutomationRunResult) {
+    for (const days of [30, 60, 90] as const) {
+      try {
+        if (await this.hasCampaignCreatedToday(tenantId, `recovery_${days}`)) continue;
+        const campaign = await this.recoveryCampaignService.createRecoveryCampaign(tenantId, days);
+        await this.campaignsService.startCampaign(tenantId, campaign.id);
+        result.recoveryCampaigns += 1;
+      } catch (error) {
+        this.captureFailure(result, `recovery_${days}`, error);
+      }
+    }
+  }
+
+  private async runAbandonedCart(tenantId: string, result: AutomationRunResult) {
+    try {
+      const dispatched = await this.abandonedCartService.dispatchDueReminders(tenantId, 25);
+      result.abandonedCartReminders = dispatched.results.filter((item) => item.sent).length;
+    } catch (error) {
+      this.captureFailure(result, 'abandoned_cart', error);
+    }
+  }
+
+  private async runReorder(tenantId: string, result: AutomationRunResult) {
+    try {
+      const candidates = await this.customerIntelligenceService.getReorderCandidates(tenantId);
+      for (const candidate of candidates.slice(0, 25)) {
+        if (await this.hasRecentCustomerCampaign(tenantId, candidate.customerId, 'scheduled_reorder', 7)) continue;
+
+        const productText = candidate.favoriteProduct ? ` de ${candidate.favoriteProduct.name}` : '';
+        const campaign = await this.campaignsService.createCampaign(tenantId, {
+          name: `Recompra programada - ${candidate.name}`,
+          objective: 'scheduled_reorder',
+          messageTemplate: `Oi {{nome}}, seu intervalo medio de compra e de ${candidate.averageIntervalDays} dias. Que tal repetir seu pedido${productText} hoje?`,
+          segmentRules: { specificCustomers: [candidate.customerId] },
+          maxDispatches: 1,
+        });
+        await this.campaignsService.startCampaign(tenantId, campaign.id);
+        result.reorderCampaigns += 1;
+      }
+    } catch (error) {
+      this.captureFailure(result, 'scheduled_reorder', error);
+    }
+  }
+
+  private async runPostPurchaseUpsell(tenantId: string, result: AutomationRunResult) {
+    const delayMinutes = Number(process.env.POST_PURCHASE_UPSELL_DELAY_MINUTES ?? 60);
+    const dueBefore = new Date(Date.now() - delayMinutes * 60 * 1000);
+    const recentSince = new Date(Date.now() - 48 * 60 * 60 * 1000);
+
+    const orders = await this.prisma.order.findMany({
+      where: {
+        tenantId,
+        status: 'completed',
+        customerId: { not: null },
+        createdAt: { gte: recentSince, lte: dueBefore },
+      },
+      include: { items: true, customer: true },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    for (const order of orders) {
+      try {
+        if (!order.customerId || !order.customer) continue;
+        if (await this.hasNamedCampaign(tenantId, `Upsell pos-compra ${order.orderNumber}`)) continue;
+
+        const recommendations = await this.upsellRecommendationEngine.recommend(tenantId, {
+          customerId: order.customerId,
+          items: order.items.map((item) => ({ productId: item.productId, comboId: item.comboId, quantity: item.quantity })),
+          limit: 1,
+        });
+        const recommendation = recommendations.recommendations[0];
+        if (!recommendation) continue;
+
+        const campaign = await this.campaignsService.createCampaign(tenantId, {
+          name: `Upsell pos-compra ${order.orderNumber}`,
+          objective: 'post_purchase_upsell',
+          messageTemplate: `{{nome}}, obrigado pelo pedido! Para completar a experiencia, que tal adicionar ${recommendation.name} no proximo pedido?`,
+          segmentRules: { specificCustomers: [order.customerId] },
+          maxDispatches: 1,
+        });
+        await this.campaignsService.startCampaign(tenantId, campaign.id);
+        result.upsellCampaigns += 1;
+      } catch (error) {
+        this.captureFailure(result, 'post_purchase_upsell', error);
+      }
+    }
+  }
+
+  private async hasCampaignCreatedToday(tenantId: string, objective: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Boolean(
+      await this.prisma.campaign.findFirst({
+        where: { tenantId, objective, createdAt: { gte: today } },
+        select: { id: true },
+      }),
+    );
+  }
+
+  private async hasRecentCustomerCampaign(tenantId: string, customerId: string, objective: string, days: number) {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    return Boolean(
+      await this.prisma.campaignDispatch.findFirst({
+        where: {
+          customerId,
+          createdAt: { gte: since },
+          campaign: { tenantId, objective },
+        },
+        select: { id: true },
+      }),
+    );
+  }
+
+  private async hasNamedCampaign(tenantId: string, name: string) {
+    return Boolean(await this.prisma.campaign.findFirst({ where: { tenantId, name }, select: { id: true } }));
+  }
+
+  private captureFailure(result: AutomationRunResult, automation: string, error: unknown) {
+    if (error instanceof BadRequestException) {
+      result.failures.push({ automation, reason: error.message });
+      return;
+    }
+    const reason = error instanceof Error ? error.message : 'unknown_error';
+    result.failures.push({ automation, reason });
+  }
+}

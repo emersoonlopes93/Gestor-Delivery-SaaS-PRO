@@ -15,6 +15,7 @@ import { CampaignsService, CreateCampaignDto } from '../services/campaigns.servi
 import { RecoveryCampaignService } from '../services/recovery-campaign.service';
 import { UpsellRecommendationEngine, UpsellRecommendationInput } from '../services/upsell-recommendation.engine';
 import { AbandonedCartService } from '../services/abandoned-cart.service';
+import { CampaignAutomationService } from '../services/campaign-automation.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions as Permissions } from '../../common/decorators';
@@ -28,6 +29,7 @@ export class CampaignsController {
     private readonly recoveryCampaignService: RecoveryCampaignService,
     private readonly upsellRecommendationEngine: UpsellRecommendationEngine,
     private readonly abandonedCartService: AbandonedCartService,
+    private readonly campaignAutomationService: CampaignAutomationService,
   ) {}
 
   @Get()
@@ -39,21 +41,38 @@ export class CampaignsController {
   @Get('automations')
   @Permissions('crm.read')
   async automations(@Request() req: AuthenticatedRequest) {
-    const [recovery, abandonedCarts] = await Promise.all([
+    const [recovery, abandonedCarts, center] = await Promise.all([
       this.recoveryCampaignService.preview(req.user.tenantId),
       this.abandonedCartService.getDueCarts(req.user.tenantId),
+      this.campaignsService.getAutomationCenter(req.user.tenantId),
     ]);
 
     return {
       recovery,
       abandonedCarts,
+      center,
       automations: [
         { id: 'customer_recovery', name: 'Recuperacao de clientes', enabled: true },
         { id: 'abandoned_cart', name: 'Carrinho abandonado', enabled: true },
+        { id: 'scheduled_reorder', name: 'Recompra programada', enabled: true },
+        { id: 'post_purchase_upsell', name: 'Upsell pos-compra', enabled: true },
         { id: 'scheduled_promotions', name: 'Promocoes agendadas', enabled: true },
         { id: 'whatsapp_messages', name: 'Mensagens WhatsApp', enabled: true },
       ],
     };
+  }
+
+  @Get('automations/inventory')
+  @Permissions('crm.read')
+  async automationInventory(@Request() req: AuthenticatedRequest) {
+    return this.campaignAutomationService.getReuseInventory(req.user.tenantId);
+  }
+
+  @Post('automations/run')
+  @HttpCode(200)
+  @Permissions('crm.manage_coupons')
+  async runAutomations(@Request() req: AuthenticatedRequest) {
+    return this.campaignAutomationService.runTenantAutomations(req.user.tenantId);
   }
 
   @Post('recovery/:days')

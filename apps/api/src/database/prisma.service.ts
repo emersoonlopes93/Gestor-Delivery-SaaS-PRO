@@ -47,6 +47,7 @@ export class PrismaService
         'TenantUserRole',
         'Plan',
         'TenantSubscription',
+        'CampaignDispatch',
         'ChatMessage',
         'SystemConfig',
         'BillingPlan',

@@ -32,6 +32,15 @@ export interface CustomerIntelligenceProfile {
   optedOut: boolean;
 }
 
+export interface ReorderCandidate {
+  customerId: string;
+  name: string;
+  phone: string;
+  daysSinceLastOrder: number;
+  averageIntervalDays: number;
+  favoriteProduct: { id: string; name: string } | null;
+}
+
 @Injectable()
 export class CustomerIntelligenceService {
   constructor(private readonly prisma: PrismaService) {}
@@ -142,6 +151,37 @@ export class CustomerIntelligenceService {
       campaignConversionRate: sentCampaigns ? convertedCampaigns / sentCampaigns : 0,
       revenueLast30Days: last30Orders.reduce((sum, order) => sum + Number(order.total), 0),
     };
+  }
+
+  async getReorderCandidates(tenantId: string): Promise<ReorderCandidate[]> {
+    const { profiles } = await this.getSegments(tenantId);
+    const candidates: ReorderCandidate[] = [];
+
+    for (const profile of profiles) {
+      if (profile.optedOut || !profile.daysSinceLastOrder || profile.totalOrders < 2) continue;
+
+      const orders = await this.getCompletedOrders(tenantId, profile.customerId);
+      if (orders.length < 2) continue;
+
+      const gaps = orders.slice(1).map((order, index) => this.daysBetween(orders[index].createdAt, order.createdAt));
+      const averageIntervalDays = Math.max(1, Math.round(gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length));
+
+      if (profile.daysSinceLastOrder >= averageIntervalDays + 2) {
+        const favoriteProduct = profile.favoriteProducts[0]
+          ? { id: profile.favoriteProducts[0].id, name: profile.favoriteProducts[0].name }
+          : null;
+        candidates.push({
+          customerId: profile.customerId,
+          name: profile.name,
+          phone: profile.phone,
+          daysSinceLastOrder: profile.daysSinceLastOrder,
+          averageIntervalDays,
+          favoriteProduct,
+        });
+      }
+    }
+
+    return candidates.sort((a, b) => b.daysSinceLastOrder - a.daysSinceLastOrder).slice(0, 100);
   }
 
   private async getCompletedOrders(tenantId: string, customerId: string) {

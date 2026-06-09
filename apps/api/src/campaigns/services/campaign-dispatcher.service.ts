@@ -33,8 +33,12 @@ export class CampaignDispatcherService implements OnModuleInit, OnModuleDestroy 
    */
   async feedQueue() {
     try {
+      const now = new Date();
       const runningCampaigns = await this.prisma.campaign.findMany({
-        where: { status: 'running' },
+        where: {
+          status: 'running',
+          OR: [{ scheduledAt: null }, { scheduledAt: { lte: now } }],
+        },
         select: { 
           id: true, 
           tenantId: true, 
@@ -82,6 +86,7 @@ export class CampaignDispatcherService implements OnModuleInit, OnModuleDestroy 
             campaignId: campaign.id,
             dispatchId: dispatch.id,
             tenantId: campaign.tenantId,
+            customerId: dispatch.customerId,
             phone: dispatch.phone,
             customerName: dispatch.customer.name,
             messageTemplate: campaign.messageTemplate,

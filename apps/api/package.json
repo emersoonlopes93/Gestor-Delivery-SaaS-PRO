@@ -63,6 +63,7 @@
     "ai:e2e:order": "ts-node -r tsconfig-paths/register scripts/e2e-ai-agent-order.ts",
 
     "e2e:ops": "ts-node -r tsconfig-paths/register scripts/e2e-certification-ops.ts",
+    "e2e:commercial-ai": "ts-node --transpile-only -r tsconfig-paths/register scripts/e2e-certification-commercial-ai.ts",
 
     "prisma:studio": "prisma studio",
 

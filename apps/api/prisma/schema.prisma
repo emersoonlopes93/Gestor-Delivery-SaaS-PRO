@@ -360,6 +360,8 @@ model TenantSettings {
   handoffSound                String  @default("notification.mp3") @map("handoff_sound") // IA transfer to human agent
   readySound                  String  @default("notification.mp3") @map("ready_sound") // Order ready notification
   browserNotificationsEnabled Boolean @default(true) @map("browser_notifications_enabled")
+  automationCooldownHours      Int     @default(24) @map("automation_cooldown_hours")
+  automationMaxMessagesPerDay  Int     @default(1) @map("automation_max_messages_per_day")
 
   // --- Storefront Customization ---
   storefrontThemeJson  Json? @map("storefront_theme_json")
@@ -2105,9 +2107,11 @@ model Campaign {
   totalSent       Int                @default(0) @map("total_sent")
   totalDelivered  Int                @default(0) @map("total_delivered")
   totalRead       Int                @default(0) @map("total_read")
+  totalClicked    Int                @default(0) @map("total_clicked")
   totalReplied    Int                @default(0) @map("total_replied")
   totalConverted  Int                @default(0) @map("total_converted")
   totalOptOut     Int                @default(0) @map("total_opt_out")
+  revenueGenerated Decimal           @default(0) @map("revenue_generated") @db.Decimal(10, 2)
   maxDispatches   Int                @default(500) @map("max_dispatches")
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @updatedAt @map("updated_at")
@@ -2128,7 +2132,10 @@ model CampaignDispatch {
   sentAt      DateTime?              @map("sent_at")
   deliveredAt DateTime?              @map("delivered_at")
   readAt      DateTime?              @map("read_at")
+  clickedAt   DateTime?              @map("clicked_at")
   repliedAt   DateTime?              @map("replied_at")
+  convertedAt DateTime?              @map("converted_at")
+  revenueGenerated Decimal           @default(0) @map("revenue_generated") @db.Decimal(10, 2)
   failReason  String?                @map("fail_reason")
   externalId  String?                @map("external_id") @db.VarChar(100)
   createdAt   DateTime               @default(now()) @map("created_at")

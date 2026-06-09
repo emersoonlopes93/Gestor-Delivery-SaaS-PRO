@@ -7,9 +7,12 @@ import { CampaignProcessor } from './services/campaign.processor';
 import { RecoveryCampaignService } from './services/recovery-campaign.service';
 import { UpsellRecommendationEngine } from './services/upsell-recommendation.engine';
 import { AbandonedCartService } from './services/abandoned-cart.service';
+import { CampaignAutomationService } from './services/campaign-automation.service';
 import { CampaignsController } from './controllers/campaigns.controller';
 import { BullModule } from '@nestjs/bullmq';
 import { RbacModule } from '../rbac/rbac.module';
+import { CrmModule } from '../crm/crm.module';
+import { AnalyticsModule } from '../analytics/analytics.module';
 
 const enableCampaignDispatch = 
   process.env.REDIS_ENABLED !== 'false' && 
@@ -27,6 +30,8 @@ if (!enableCampaignDispatch && process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true'
     DatabaseModule,
     WhatsAppChannelModule, // para enviar as mensagens das campanhas
     RbacModule, // para PermissionsGuard e RbacService
+    CrmModule,
+    AnalyticsModule,
     ...(enableCampaignDispatch
       ? [
           BullModule.registerQueue({
@@ -50,6 +55,7 @@ if (!enableCampaignDispatch && process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true'
     RecoveryCampaignService,
     UpsellRecommendationEngine,
     AbandonedCartService,
+    CampaignAutomationService,
     ...(enableCampaignDispatch ? [CampaignDispatcherService, CampaignProcessor] : []),
   ],
   exports: [
@@ -57,6 +63,7 @@ if (!enableCampaignDispatch && process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true'
     RecoveryCampaignService,
     UpsellRecommendationEngine,
     AbandonedCartService,
+    CampaignAutomationService,
     ...(enableCampaignDispatch ? [CampaignDispatcherService] : []),
   ],
 })

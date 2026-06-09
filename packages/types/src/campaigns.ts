@@ -23,9 +23,11 @@ export interface Campaign {
   totalSent: number;
   totalDelivered: number;
   totalRead: number;
+  totalClicked: number;
   totalReplied: number;
   totalConverted: number;
   totalOptOut: number;
+  revenueGenerated: number;
   maxDispatches: number;
   createdAt: string;
   updatedAt: string;
@@ -36,15 +38,15 @@ export interface CampaignDispatch {
   campaignId: string;
   customerId: string;
   phone: string;
-  status: 'queued' | 'sent' | 'delivered' | 'read' | 'replied' | 'converted' | 'opt_out' | 'failed';
+  status: 'queued' | 'processing' | 'sent' | 'delivered' | 'read' | 'replied' | 'opt_out' | 'failed';
   sentAt?: string;
   deliveredAt?: string;
   readAt?: string;
+  clickedAt?: string;
   repliedAt?: string;
   convertedAt?: string;
-  optOutAt?: string;
-  failedAt?: string;
-  errorMessage?: string;
+  revenueGenerated?: number;
+  failReason?: string;
   createdAt: string;
   updatedAt: string;
 }

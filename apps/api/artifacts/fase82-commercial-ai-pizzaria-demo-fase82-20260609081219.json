@@ -1,0 +1,577 @@
+{
+  "generatedAt": "2026-06-09T08:12:52.047Z",
+  "apiBaseUrl": "http://127.0.0.1:54073",
+  "tenant": {
+    "id": "77a2719f-2df2-44bb-8597-cdb571ecb86c",
+    "slug": "pizzaria-demo-fase82-20260609081219",
+    "name": "Pizzaria Demo Fase 8.2"
+  },
+  "seed": {
+    "customers": 70,
+    "completedOrders": 150,
+    "orderItems": 360,
+    "abandonedSessions": 61,
+    "optOuts": 1
+  },
+  "results": [
+    {
+      "etapa": "Seed",
+      "teste": "tenant e massa controlada criados",
+      "status": "PASS",
+      "evidencia": {
+        "tenantId": "77a2719f-2df2-44bb-8597-cdb571ecb86c",
+        "slug": "pizzaria-demo-fase82-20260609081219",
+        "customers": 70,
+        "completedOrders": 150,
+        "orderItems": 360,
+        "abandonedSessions": 61,
+        "optOuts": 1
+      }
+    },
+    {
+      "etapa": "CRM",
+      "teste": "segmentacao automatica via API",
+      "status": "PASS",
+      "evidencia": {
+        "httpStatus": 200,
+        "segmentCounts": {
+          "vip": 10,
+          "frequent": 40,
+          "inactive_30": 30,
+          "inactive_60": 20,
+          "inactive_90": 10,
+          "new": 10,
+          "at_risk": 10
+        },
+        "totalProfiles": 70
+      }
+    },
+    {
+      "etapa": "CRM",
+      "teste": "analise individual contem ticket, favoritos e horario",
+      "status": "PASS",
+      "evidencia": {
+        "customerId": "a6736495-e6ed-4d52-bf9d-4f17c0eeb6c0",
+        "favoriteProducts": [
+          {
+            "id": "6e6c7c0f-375e-4493-b2ff-692c04934e79",
+            "name": "Combo Familia",
+            "orders": 6,
+            "quantity": 6
+          },
+          {
+            "id": "73f3f785-7cea-47a6-8f1e-fbba7c910535",
+            "name": "Coca 2L",
+            "orders": 6,
+            "quantity": 6
+          },
+          {
+            "id": "5d966a1c-52e5-491b-8672-b4f8414670c3",
+            "name": "Pudim",
+            "orders": 6,
+            "quantity": 6
+          }
+        ],
+        "purchaseHours": [
+          {
+            "hour": 19,
+            "orders": 6
+          }
+        ],
+        "averageTicket": 161,
+        "tenantAverageTicket": 105.6
+      }
+    },
+    {
+      "etapa": "Metricas",
+      "teste": "KPIs comerciais via API",
+      "status": "PASS",
+      "evidencia": {
+        "httpStatus": 200,
+        "averageTicket": 105.6,
+        "ltv": 226.28571428571428,
+        "purchaseFrequency": 2.142857142857143,
+        "retentionRate": 4
+      }
+    },
+    {
+      "etapa": "Recovery",
+      "teste": "previews 30/60/90 respeitam audiencia",
+      "status": "PASS",
+      "evidencia": {
+        "days30": {
+          "days": 30,
+          "audience": 30,
+          "message": "Sentimos sua falta. Que tal aproveitar uma condicao especial hoje?"
+        },
+        "days60": {
+          "days": 60,
+          "audience": 20,
+          "message": "Faz tempo que voce nao pede com a gente. Hoje preparamos uma oferta especial para voce voltar."
+        },
+        "days90": {
+          "days": 90,
+          "audience": 10,
+          "message": "Queremos reconquistar voce. Volte hoje e aproveite uma campanha exclusiva de reativacao."
+        }
+      }
+    },
+    {
+      "etapa": "Recovery",
+      "teste": "campanhas de recuperacao criadas via API",
+      "status": "PASS",
+      "evidencia": {
+        "status30": 201,
+        "status60": 201,
+        "status90": 201,
+        "campaign30": {
+          "id": "599d789f-627c-472f-bdc6-75c8472a5bbe",
+          "tenantId": "77a2719f-2df2-44bb-8597-cdb571ecb86c",
+          "name": "Recuperacao 30 dias",
+          "objective": "recovery_30",
+          "status": "draft",
+          "messageTemplate": "Sentimos sua falta. Que tal aproveitar uma condicao especial hoje?",
+          "mediaUrl": null,
+          "segmentRules": {
+            "daysSinceLastOrder": 30
+          },
+          "scheduledAt": null,
+          "startedAt": null,
+          "completedAt": null,
+          "cancelledAt": null,
+          "totalAudience": 30,
+          "totalSent": 0,
+          "totalDelivered": 0,
+          "totalRead": 0,
+          "totalClicked": 0,
+          "totalReplied": 0,
+          "totalConverted": 0,
+          "totalOptOut": 0,
+          "revenueGenerated": "0",
+          "maxDispatches": 300,
+          "createdAt": "2026-06-09T08:12:37.696Z",
+          "updatedAt": "2026-06-09T08:12:37.696Z"
+        }
+      }
+    },
+    {
+      "etapa": "Upsell",
+      "teste": "recomendacoes por coocorrencia via API",
+      "status": "PASS",
+      "evidencia": {
+        "pizzaRecommendation": {
+          "productId": "f28e5f44-b21b-45f4-a196-6804b905be18",
+          "name": "Coca-Cola",
+          "price": 12,
+          "image": null,
+          "type": "simple",
+          "score": 30,
+          "reason": "Frequentemente comprado junto"
+        },
+        "comboRecommendation": {
+          "productId": "5d966a1c-52e5-491b-8672-b4f8414670c3",
+          "name": "Pudim",
+          "price": 16,
+          "image": null,
+          "type": "simple",
+          "score": 31.5,
+          "reason": "Frequentemente comprado junto"
+        }
+      }
+    },
+    {
+      "etapa": "IA WhatsApp",
+      "teste": "tool consultar_ofertas_checkout executa upsell real",
+      "status": "PASS",
+      "evidencia": {
+        "sugestoes": [
+          {
+            "productId": "f28e5f44-b21b-45f4-a196-6804b905be18",
+            "name": "Coca-Cola",
+            "price": 12,
+            "image": null,
+            "type": "simple",
+            "score": 30.5,
+            "reason": "Frequentemente comprado junto"
+          }
+        ],
+        "limiteConversa": {
+          "maximoPorEtapa": 1,
+          "maximoPorConversa": 3
+        },
+        "mensagem": "Tenho uma sugestao que combina com seu pedido. Deseja incluir?"
+      }
+    },
+    {
+      "etapa": "Carrinho Abandonado",
+      "teste": "detecta, envia, audita e evita duplicidade imediata",
+      "status": "FAIL",
+      "evidencia": {
+        "dueBefore": 60,
+        "firstDispatch": {
+          "processed": 25,
+          "results": [
+            {
+              "sessionId": "7ae257dd-4875-435b-acb0-ea6206706fd9",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "4e544186-8d4b-405c-b41c-beb998e0cad2",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "7df1c50c-aa45-45bb-a85f-5606ad64d821",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "5dcad72e-424b-475a-9dc5-e0a2c2f76fc3",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "16c635b8-c8c8-4721-8bd0-6e31c4d47e71",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "e1af27f3-c469-4029-9ca2-90bdb8ec8b8d",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "ebab407d-e6a1-4dbb-8f6c-4f919fbb5f9b",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "b7bb9ddf-3602-47fe-af5a-7b38ae9c58c5",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "e51b1ffb-dc4b-46a5-a7b8-b5a312916835",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "3964174d-55ba-4927-8390-85afc4f713fe",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "55fc4272-b5b7-4fb4-9f92-3a31c0de95fb",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "0665041b-87f0-4dd2-bdee-1c26962e58dc",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "456a385e-8fd1-44b2-a69f-15add66e4c30",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "3fdee443-e1aa-4bad-930d-be478df4ed4e",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "b5048608-893f-4d77-88eb-42bfbfa39c61",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "844526aa-ccb4-47e8-9b73-236977710756",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "ff4967f5-d2f0-43b8-a82e-6df24e3b2821",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "d0bd9ccb-0965-458c-8134-61befa2cd166",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "277dff1b-bddf-4e80-b82b-4f76e958dbc7",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "ae90e250-c3d1-40c2-8730-94819956676e",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "f33ea441-8148-441a-89b4-0621edaec92d",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "3a615366-7e75-4fb4-9352-2632a6a3971b",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "0cbabf59-8100-4f9a-ae17-af4557263fc3",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "58c4ddb0-d4c4-4858-a206-e4168bb44f46",
+              "step": "30m",
+              "sent": true
+            },
+            {
+              "sessionId": "e35de603-de32-4fd1-a679-d48116ae13b5",
+              "step": "30m",
+              "sent": true
+            }
+          ]
+        },
+        "secondDispatch": {
+          "processed": 25,
+          "results": [
+            {
+              "sessionId": "7ae257dd-4875-435b-acb0-ea6206706fd9",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "4e544186-8d4b-405c-b41c-beb998e0cad2",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "7df1c50c-aa45-45bb-a85f-5606ad64d821",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "5dcad72e-424b-475a-9dc5-e0a2c2f76fc3",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "16c635b8-c8c8-4721-8bd0-6e31c4d47e71",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "e1af27f3-c469-4029-9ca2-90bdb8ec8b8d",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "ebab407d-e6a1-4dbb-8f6c-4f919fbb5f9b",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "b7bb9ddf-3602-47fe-af5a-7b38ae9c58c5",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "e51b1ffb-dc4b-46a5-a7b8-b5a312916835",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "3964174d-55ba-4927-8390-85afc4f713fe",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "55fc4272-b5b7-4fb4-9f92-3a31c0de95fb",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "0665041b-87f0-4dd2-bdee-1c26962e58dc",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "456a385e-8fd1-44b2-a69f-15add66e4c30",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "3fdee443-e1aa-4bad-930d-be478df4ed4e",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "b5048608-893f-4d77-88eb-42bfbfa39c61",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "844526aa-ccb4-47e8-9b73-236977710756",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "ff4967f5-d2f0-43b8-a82e-6df24e3b2821",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "d0bd9ccb-0965-458c-8134-61befa2cd166",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "277dff1b-bddf-4e80-b82b-4f76e958dbc7",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "ae90e250-c3d1-40c2-8730-94819956676e",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "f33ea441-8148-441a-89b4-0621edaec92d",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "3a615366-7e75-4fb4-9352-2632a6a3971b",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "0cbabf59-8100-4f9a-ae17-af4557263fc3",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "58c4ddb0-d4c4-4858-a206-e4168bb44f46",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            },
+            {
+              "sessionId": "e35de603-de32-4fd1-a679-d48116ae13b5",
+              "step": "2h",
+              "sent": false,
+              "error": "cooldown_24h"
+            }
+          ]
+        },
+        "mockWhatsAppSends": 25,
+        "auditCount": 2
+      }
+    },
+    {
+      "etapa": "Seguranca",
+      "teste": "opt-out LGPD respeitado no carrinho abandonado",
+      "status": "PASS",
+      "evidencia": {
+        "optOutPhone": "5511991219001",
+        "totalOptOuts": 1,
+        "mockSendPayloadsInspected": 25
+      }
+    },
+    {
+      "etapa": "Dashboard",
+      "teste": "insights automaticos via API",
+      "status": "PASS",
+      "evidencia": {
+        "httpStatus": 200,
+        "insightCount": 4,
+        "sample": [
+          {
+            "type": "top_product",
+            "severity": "success",
+            "message": "Seu produto mais vendido esta semana foi Pizza Calabresa.",
+            "value": 10
+          },
+          {
+            "type": "product_pairing",
+            "severity": "info",
+            "message": "Clientes que compram Coca 2L tambem compram Combo Familia.",
+            "value": 60
+          },
+          {
+            "type": "average_ticket_change",
+            "severity": "warning",
+            "message": "Seu ticket medio caiu 18%.",
+            "value": -18.1651376146789
+          }
+        ]
+      }
+    },
+    {
+      "etapa": "Performance",
+      "teste": "50 chamadas autenticadas com p95 abaixo de 2s",
+      "status": "PASS",
+      "evidencia": {
+        "samples": 50,
+        "avgMs": 104,
+        "p95Ms": 129,
+        "maxMs": 805
+      }
+    },
+    {
+      "etapa": "Seguranca",
+      "teste": "tenantId do token controla isolamento",
+      "status": "PASS",
+      "evidencia": {
+        "httpStatus": 200,
+        "response": {
+          "tenantAverageTicket": 0,
+          "profiles": [],
+          "bySegment": {
+            "vip": [],
+            "frequent": [],
+            "inactive_30": [],
+            "inactive_60": [],
+            "inactive_90": [],
+            "new": [],
+            "at_risk": []
+          }
+        }
+      }
+    }
+  ],
+  "summary": {
+    "total": 13,
+    "passed": 12,
+    "failed": 1
+  }
+}

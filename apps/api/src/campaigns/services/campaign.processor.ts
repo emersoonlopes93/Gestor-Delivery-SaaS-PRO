@@ -8,6 +8,7 @@ export interface CampaignJobData {
   campaignId: string;
   dispatchId: string;
   tenantId: string;
+  customerId: string;
   phone: string;
   customerName: string;
   messageTemplate: string;
@@ -25,59 +26,60 @@ export class CampaignProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<CampaignJobData, { success: boolean; messageId?: string; skipped?: boolean; reason?: string }, string>): Promise<{ success: boolean; messageId?: string; skipped?: boolean; reason?: string }> {
-    const { campaignId, dispatchId, tenantId, phone, customerName, messageTemplate, mediaUrl } = job.data;
+  async process(
+    job: Job<CampaignJobData, { success: boolean; messageId?: string; skipped?: boolean; reason?: string }, string>,
+  ): Promise<{ success: boolean; messageId?: string; skipped?: boolean; reason?: string }> {
+    const { campaignId, dispatchId, tenantId, customerId, phone, customerName, messageTemplate, mediaUrl } = job.data;
 
     this.logger.log(`Processing campaign dispatch ${dispatchId} for phone ${phone}`);
 
-    // 1. Check for Opt-Out (Feature critical for Anti-Ban)
     const optOut = await this.prisma.customerOptOut.findUnique({
-      where: {
-        tenantId_phone: {
-          tenantId,
-          phone,
-        },
-      },
+      where: { tenantId_phone: { tenantId, phone } },
     });
 
     if (optOut) {
       this.logger.warn(`Customer ${phone} has opted out. Skipping dispatch.`);
       await this.prisma.campaignDispatch.update({
         where: { id: dispatchId },
-        data: { 
-          status: 'failed', 
-          failReason: 'Opt-out: Cliente solicitou não receber mensagens.' 
+        data: {
+          status: 'opt_out',
+          failReason: 'Opt-out: cliente solicitou nao receber mensagens.',
         },
+      });
+      await this.prisma.campaign.update({
+        where: { id: campaignId },
+        data: { totalOptOut: { increment: 1 } },
       });
       return { success: false, skipped: true, reason: 'opt-out' };
     }
 
-    // 2. Personalize Message
-    const personalizedMessage = messageTemplate.replace(
-      /{{nome}}/gi,
-      customerName.split(' ')[0],
-    );
+    const antiSpam = await this.checkAntiSpam(tenantId, customerId, dispatchId);
+    if (!antiSpam.allowed) {
+      await this.prisma.campaignDispatch.update({
+        where: { id: dispatchId },
+        data: { status: 'failed', failReason: antiSpam.reason },
+      });
+      return { success: false, skipped: true, reason: antiSpam.reason };
+    }
+
+    const firstName = customerName.trim().split(' ')[0] || 'cliente';
+    const personalizedMessage = messageTemplate.replace(/{{nome}}/gi, firstName);
 
     try {
-      let result;
+      const result = mediaUrl
+        ? await this.whatsappSender.sendMedia(tenantId, {
+            to: phone,
+            type: 'image',
+            url: mediaUrl,
+            caption: personalizedMessage,
+          })
+        : await this.whatsappSender.sendText(tenantId, {
+            to: phone,
+            text: personalizedMessage,
+          });
 
-      if (mediaUrl) {
-        result = await this.whatsappSender.sendMedia(tenantId, {
-          to: phone,
-          type: 'image',
-          url: mediaUrl,
-          caption: personalizedMessage,
-        });
-      } else {
-        result = await this.whatsappSender.sendText(tenantId, {
-          to: phone,
-          text: personalizedMessage,
-        });
-      }
-
-      // 3. Update Status
       const status = result.success ? 'sent' : 'failed';
-      
+
       await this.prisma.campaignDispatch.update({
         where: { id: dispatchId },
         data: {
@@ -94,7 +96,6 @@ export class CampaignProcessor extends WorkerHost {
           data: { totalSent: { increment: 1 } },
         });
 
-        // Registrar na inbox (chat) como outbound, para ficar sincronizado com a caixa de entrada
         let session = await this.prisma.chatSession.findFirst({
           where: {
             tenantId,
@@ -108,6 +109,7 @@ export class CampaignProcessor extends WorkerHost {
           session = await this.prisma.chatSession.create({
             data: {
               tenantId,
+              customerId,
               customerPhone: phone,
               state: 'greeting',
               lastMessageAt: new Date(),
@@ -120,7 +122,7 @@ export class CampaignProcessor extends WorkerHost {
             sessionId: session.id,
             direction: 'outbound',
             senderType: 'human',
-            content: mediaUrl ? `${personalizedMessage}` : personalizedMessage,
+            content: personalizedMessage,
             messageType: 'text',
             externalId: result.messageId || undefined,
             externalStatus: result.success ? 'sent' : 'failed',
@@ -136,11 +138,10 @@ export class CampaignProcessor extends WorkerHost {
       }
 
       return { success: result.success, messageId: result.messageId };
-
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Error processing dispatch ${dispatchId}: ${message}`);
-      
+
       await this.prisma.campaignDispatch.update({
         where: { id: dispatchId },
         data: {
@@ -151,6 +152,43 @@ export class CampaignProcessor extends WorkerHost {
 
       throw error;
     }
+  }
+
+  private async checkAntiSpam(tenantId: string, customerId: string, dispatchId: string) {
+    const settings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+      select: { automationCooldownHours: true, automationMaxMessagesPerDay: true },
+    });
+    const cooldownHours = settings?.automationCooldownHours ?? 24;
+    const maxPerDay = settings?.automationMaxMessagesPerDay ?? 1;
+    const cooldownSince = new Date(Date.now() - cooldownHours * 60 * 60 * 1000);
+    const daySince = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const [recentSent, sentToday] = await Promise.all([
+      this.prisma.campaignDispatch.findFirst({
+        where: {
+          customerId,
+          id: { not: dispatchId },
+          status: { in: ['sent', 'delivered', 'read', 'replied'] },
+          sentAt: { gte: cooldownSince },
+          campaign: { tenantId },
+        },
+        select: { id: true },
+      }),
+      this.prisma.campaignDispatch.count({
+        where: {
+          customerId,
+          id: { not: dispatchId },
+          status: { in: ['sent', 'delivered', 'read', 'replied'] },
+          sentAt: { gte: daySince },
+          campaign: { tenantId },
+        },
+      }),
+    ]);
+
+    if (recentSent) return { allowed: false, reason: `cooldown_${cooldownHours}h` };
+    if (sentToday >= maxPerDay) return { allowed: false, reason: `max_frequency_${maxPerDay}_per_day` };
+    return { allowed: true };
   }
 
   @OnWorkerEvent('failed')
