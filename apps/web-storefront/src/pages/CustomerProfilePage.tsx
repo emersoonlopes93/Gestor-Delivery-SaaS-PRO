@@ -1,9 +1,10 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Award, ChevronLeft, Gift, History, Percent, User, Wallet } from 'lucide-react';
+import { Award, Bell, BellRing, ChevronLeft, Gift, History, Percent, Target, User, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { api } from '../lib/api-client';
 import { useCustomerStore } from '../store/useCustomerStore';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 type CustomerProfilePayload = {
   profile: { name: string; phone: string; email?: string | null; birthDate?: string | null; totalOrders: number; totalSpent: string | number };
@@ -15,7 +16,7 @@ type CustomerProfilePayload = {
     transactions: Array<{ id: string; amount: number; type: string; source: string; description?: string | null; createdAt: string }>;
   };
   coupons: Array<{ id: string; code: string; type: string; value: number; expiresAt?: string | null }>;
-  orders: Array<{ id: string; orderNumber: string; total: number; status: string; createdAt: string }>;
+  orders: Array<{ id: string; orderNumber: string; total: number; status: string; createdAt: string; couponId?: string | null; cashbackUsed?: number }>;
 };
 
 function money(value: number) {
@@ -24,14 +25,22 @@ function money(value: number) {
 
 export function CustomerProfilePage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
-  const { isLoggedIn, logout } = useCustomerStore();
+  const { isLoggedIn, logout, customer } = useCustomerStore();
   const navigate = useNavigate();
+  const { isSupported: pushSupported, isSubscribed, subscribeUser } = usePushNotifications();
 
   const { data, isLoading } = useQuery({
     queryKey: ['customer-profile', tenantSlug],
     queryFn: async () => (await api.get<CustomerProfilePayload>('/public/customer-profile')).data,
     enabled: isLoggedIn,
   });
+
+  const usedCouponOrders = data?.orders.filter((order) => order.couponId) ?? [];
+  const activeCoupons =
+    data?.coupons.filter((coupon) => !coupon.expiresAt || new Date(coupon.expiresAt) >= new Date()) ?? [];
+  const expiredCoupons =
+    data?.coupons.filter((coupon) => coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) ?? [];
+  const nextAchievement = getNextAchievement(data?.profile.totalOrders ?? 0, data?.loyalty.badges ?? []);
 
   if (!isLoggedIn) {
     return (
@@ -79,6 +88,17 @@ export function CustomerProfilePage() {
                   <User className="h-6 w-6" />
                 </div>
               </div>
+              {pushSupported && customer ? (
+                <button
+                  type="button"
+                  onClick={() => subscribeUser(customer.tenantId, customer.id, 'customer')}
+                  disabled={isSubscribed}
+                  className="mt-5 inline-flex h-11 items-center gap-2 rounded-xl bg-gray-950 px-4 text-sm font-black text-white disabled:bg-gray-200 disabled:text-gray-500"
+                >
+                  {isSubscribed ? <BellRing className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+                  {isSubscribed ? 'Notificacoes ativas' : 'Ativar notificacoes'}
+                </button>
+              ) : null}
             </section>
 
             <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -93,11 +113,18 @@ export function CustomerProfilePage() {
                 Conquistas
               </h2>
               <div className="mt-4 flex flex-wrap gap-2">
-                {data.loyalty.badges.map((badge) => (
+                {data.loyalty.badges.length ? data.loyalty.badges.map((badge) => (
                   <span key={badge} className="rounded-full bg-primary-50 px-3 py-1 text-sm font-bold text-primary-700">
                     {badge}
                   </span>
-                ))}
+                )) : <span className="text-sm font-bold text-gray-500">Sua primeira conquista chega no primeiro pedido.</span>}
+              </div>
+              <div className="mt-5 rounded-xl bg-gray-50 p-4">
+                <p className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-400">
+                  <Target className="h-4 w-4" />
+                  Proximo objetivo
+                </p>
+                <p className="mt-2 font-bold text-gray-800">{nextAchievement}</p>
               </div>
             </section>
 
@@ -106,8 +133,13 @@ export function CustomerProfilePage() {
                 <Percent className="h-5 w-5 text-primary-600" />
                 Cupons
               </h2>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                <MiniMetric label="Disponiveis" value={activeCoupons.length} />
+                <MiniMetric label="Utilizados" value={usedCouponOrders.length} />
+                <MiniMetric label="Expirados" value={expiredCoupons.length} />
+              </div>
               <div className="mt-4 grid gap-3">
-                {data.coupons.slice(0, 6).map((coupon) => (
+                {activeCoupons.slice(0, 6).map((coupon) => (
                   <div key={coupon.id} className="flex items-center justify-between rounded-xl border border-dashed border-gray-200 p-4">
                     <span className="font-black">{coupon.code}</span>
                     <span className="text-sm font-bold text-primary-700">
@@ -115,7 +147,29 @@ export function CustomerProfilePage() {
                     </span>
                   </div>
                 ))}
+                {activeCoupons.length === 0 ? <p className="text-sm font-bold text-gray-500">Nenhum cupom disponivel agora.</p> : null}
               </div>
+            </section>
+
+            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <HistoryPanel
+                title="Pontos"
+                rows={data.loyalty.history.slice(0, 5).map((item) => ({
+                  id: item.id,
+                  label: item.description || item.type,
+                  detail: new Date(item.createdAt).toLocaleDateString('pt-BR'),
+                  value: `${item.points > 0 ? '+' : ''}${item.points} pts`,
+                }))}
+              />
+              <HistoryPanel
+                title="Carteira"
+                rows={[...data.wallet.cashbackHistory, ...data.wallet.transactions].slice(0, 5).map((item) => ({
+                  id: item.id,
+                  label: item.description || item.type,
+                  detail: new Date(item.createdAt).toLocaleDateString('pt-BR'),
+                  value: money(item.amount),
+                }))}
+              />
             </section>
 
             <section className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
@@ -150,4 +204,43 @@ function Metric({ icon: Icon, label, value }: { icon: LucideIcon; label: string;
       <p className="mt-1 text-xl font-black text-gray-900">{value}</p>
     </div>
   );
+}
+
+function MiniMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl bg-gray-50 p-3">
+      <p className="text-lg font-black text-gray-900">{value}</p>
+      <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-gray-400">{label}</p>
+    </div>
+  );
+}
+
+function HistoryPanel({ title, rows }: { title: string; rows: Array<{ id: string; label: string; detail: string; value: string }> }) {
+  return (
+    <section className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
+      <h2 className="flex items-center gap-2 text-lg font-black text-gray-900">
+        <History className="h-5 w-5 text-primary-600" />
+        {title}
+      </h2>
+      <div className="mt-4 divide-y divide-gray-100">
+        {rows.length ? rows.map((row) => (
+          <div key={row.id} className="flex items-center justify-between gap-3 py-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-gray-900">{row.label}</p>
+              <p className="text-xs text-gray-500">{row.detail}</p>
+            </div>
+            <span className="shrink-0 text-sm font-black text-primary-700">{row.value}</span>
+          </div>
+        )) : <p className="text-sm font-bold text-gray-500">Sem movimentacoes ainda.</p>}
+      </div>
+    </section>
+  );
+}
+
+function getNextAchievement(totalOrders: number, badges: string[]) {
+  if (!badges.includes('Primeira Compra')) return 'Faca seu primeiro pedido para liberar a primeira conquista.';
+  if (totalOrders < 5) return `Faltam ${5 - totalOrders} pedido(s) para 5 Pedidos.`;
+  if (totalOrders < 10) return `Faltam ${10 - totalOrders} pedido(s) para 10 Pedidos.`;
+  if (!badges.includes('Cliente VIP')) return 'Aumente sua frequencia e ticket medio para virar Cliente VIP.';
+  return 'Voce ja liberou as principais conquistas.';
 }

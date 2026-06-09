@@ -5,14 +5,27 @@ import type { StorefrontPayload, StorefrontProductPayload, StorefrontComboPayloa
 import { useCartStore } from '../store/use-cart-store';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Store, ShoppingBag, Box, AlertCircle } from 'lucide-react';
+import {
+  Award,
+  Box,
+  Gift,
+  Heart,
+  LogOut,
+  Repeat2,
+  ShoppingBag,
+  Store,
+  User,
+  Wallet,
+  AlertCircle,
+  ClipboardList,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { ProductDetailsModal } from '../components/ProductDetailsModal';
 import { CartDrawer } from '../components/CartDrawer';
 import { ComboDetailsModal } from '../components/ComboDetailsModal';
 import { ProductSkeleton, ComboSkeleton } from '../components/ProductSkeleton';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { LoginModal } from '../components/LoginModal';
-import { User, LogOut, ClipboardList } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { 
   StorefrontButton, 
@@ -22,6 +35,24 @@ import {
   cn
 } from '@gestor/storefront-ui';
 import type { StorefrontProductLayout, StorefrontLayoutSettings } from '@gestor/theme';
+
+type CustomerHomePayload = {
+  profile: { name: string; totalOrders: number };
+  intelligence: {
+    daysSinceLastOrder: number | null;
+    favoriteProducts: Array<{ id: string; name: string; orders: number; quantity: number }>;
+    purchaseHours: Array<{ hour: number; orders: number }>;
+    segments: string[];
+  } | null;
+  loyalty: { balance: number; badges: string[] };
+  wallet: { cashbackBalance: number; promotionalCredits: number };
+  coupons: Array<{ id: string; code: string; type: string; value: number; expiresAt?: string | null }>;
+  orders: Array<{ id: string; orderNumber: string; total: number; status: string; createdAt: string }>;
+};
+
+function money(value: number) {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
 
 export function StorefrontPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -52,6 +83,13 @@ export function StorefrontPage() {
       return res.data;
     },
     enabled: !!tenantSlug,
+  });
+
+  const { data: customerHome } = useQuery({
+    queryKey: ['customer-profile', tenantSlug],
+    queryFn: async () => (await api.get<CustomerHomePayload>('/public/customer-profile')).data,
+    enabled: isLoggedIn,
+    staleTime: 60_000,
   });
 
   useEffect(() => {
@@ -181,6 +219,13 @@ export function StorefrontPage() {
               >
                 <ClipboardList className="w-6 h-6" />
               </Link>
+              <Link 
+                to={`/${tenantSlug}/profile`}
+                className="p-2 text-[var(--storefront-muted-foreground)] hover:text-[var(--storefront-primary)] transition-colors"
+                title="Meu Perfil"
+              >
+                <User className="w-6 h-6" />
+              </Link>
               <div className="text-right hidden sm:block">
                 <p className="text-xs text-[var(--storefront-muted-foreground)]">Olá,</p>
                 <p className="text-sm font-bold text-[var(--storefront-foreground)]">{customer?.name}</p>
@@ -214,6 +259,42 @@ export function StorefrontPage() {
           <AlertCircle className="w-5 h-5 shrink-0" />
           {data.tenant.statusMessage || 'Loja fechada no momento.'}
         </div>
+      ) : null}
+
+      {customerHome ? (
+        <section className="mb-6 rounded-[var(--storefront-radius)] border border-[var(--storefront-border)] bg-[var(--storefront-card)] p-4 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-[var(--storefront-muted-foreground)]">
+                Feito para voce
+              </p>
+              <h2 className="mt-1 text-lg font-black text-[var(--storefront-foreground)]">
+                {customerHome.intelligence?.favoriteProducts[0]
+                  ? `Que tal repetir ${customerHome.intelligence.favoriteProducts[0].name}?`
+                  : `Bem-vindo de volta, ${customerHome.profile.name}`}
+              </h2>
+              <p className="mt-1 text-sm text-[var(--storefront-muted-foreground)]">
+                {customerHome.intelligence?.daysSinceLastOrder == null
+                  ? 'Seu historico, pontos e carteira ficam sempre no perfil.'
+                  : `Ultimo pedido ha ${customerHome.intelligence.daysSinceLastOrder} dia(s).`}
+              </p>
+            </div>
+            <Link
+              to={`/${tenantSlug}/orders`}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--storefront-primary)] px-4 text-sm font-black text-[var(--storefront-primary-foreground)]"
+            >
+              <Repeat2 className="h-4 w-4" />
+              Comprar novamente
+            </Link>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <SmartMetric icon={Wallet} label="Cashback" value={money(customerHome.wallet.cashbackBalance)} />
+            <SmartMetric icon={Award} label="Pontos" value={customerHome.loyalty.balance} />
+            <SmartMetric icon={Gift} label="Cupons" value={customerHome.coupons.length} />
+            <SmartMetric icon={Heart} label="Favoritos" value={customerHome.intelligence?.favoriteProducts.length ?? 0} />
+          </div>
+        </section>
       ) : null}
 
       {/* Demo Layout Switcher (DEV ONLY) */}
@@ -414,6 +495,24 @@ export function StorefrontPage() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function SmartMetric({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="rounded-xl border border-[var(--storefront-border)] bg-[var(--storefront-muted)] p-3">
+      <Icon className="h-4 w-4 text-[var(--storefront-primary)]" />
+      <p className="mt-2 text-[10px] font-black uppercase tracking-widest text-[var(--storefront-muted-foreground)]">{label}</p>
+      <p className="mt-1 truncate text-sm font-black text-[var(--storefront-foreground)]">{value}</p>
     </div>
   );
 }

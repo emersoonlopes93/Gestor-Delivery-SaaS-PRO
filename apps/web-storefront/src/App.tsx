@@ -10,6 +10,7 @@ import { CustomerProfilePage } from './pages/CustomerProfilePage';
 import { StorefrontLayout } from './layouts/StorefrontLayout';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
+import { PwaLifecycle } from './components/PwaLifecycle';
 import { useStorefrontThemeStore } from './stores/theme.store';
 
 import { SaasLayout } from './layouts/SaasLayout';
@@ -26,6 +27,7 @@ export function App() {
 
   return (
     <ToastProvider>
+      <PwaLifecycle />
       <ErrorBoundary>
         <Routes>
           {/* Public SaaS Routes */}

@@ -1,0 +1,38 @@
+{
+  "id": "/",
+  "name": "Gestor Delivery",
+  "short_name": "Delivery",
+  "description": "Cardapio, pedidos, carteira, fidelidade e tracking em tempo real.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#111827",
+  "categories": ["food", "shopping", "business"],
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/app-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Meus pedidos",
+      "short_name": "Pedidos",
+      "description": "Abrir historico de pedidos do cliente.",
+      "url": "/",
+      "icons": [{ "src": "/icons/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}
