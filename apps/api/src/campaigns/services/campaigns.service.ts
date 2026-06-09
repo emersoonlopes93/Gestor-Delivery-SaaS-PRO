@@ -162,14 +162,20 @@ export class CampaignsService {
    * Lógica interna para filtrar clientes com base nas regras.
    */
   private async calculateAudience(tenantId: string, rules: CreateCampaignDto['segmentRules']): Promise<string[]> {
+    const optedOutCustomers = await this.prisma.customerOptOut.findMany({
+      where: { tenantId },
+      select: { customerId: true },
+    });
+    const optedOutCustomerIds = optedOutCustomers.map((optOut) => optOut.customerId);
+
     const whereClause: Prisma.CustomerWhereInput = {
       tenantId,
       // Não incluir quem fez opt-out
-      optOuts: { none: {} },
+      id: { notIn: optedOutCustomerIds },
     };
 
     if (rules.specificCustomers && rules.specificCustomers.length > 0) {
-      whereClause.id = { in: rules.specificCustomers };
+      whereClause.id = { in: rules.specificCustomers, notIn: optedOutCustomerIds };
     } else {
       if (rules.minOrders !== undefined) {
         whereClause.totalOrders = { gte: rules.minOrders };

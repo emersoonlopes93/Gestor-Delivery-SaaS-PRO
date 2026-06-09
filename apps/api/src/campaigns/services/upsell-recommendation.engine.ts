@@ -16,15 +16,21 @@ export class UpsellRecommendationEngine {
     const baseIds = new Set(input.items.map((item) => item.productId ?? item.comboId).filter(Boolean) as string[]);
     if (baseIds.size === 0) return { recommendations: [], reason: 'empty_cart' };
 
+    const matchingItems = await this.prisma.orderItem.findMany({
+      where: {
+        tenantId,
+        OR: [{ productId: { in: Array.from(baseIds) } }, { comboId: { in: Array.from(baseIds) } }],
+      },
+      select: { orderId: true },
+      distinct: ['orderId'],
+      take: 500,
+    });
+
     const completedOrders = await this.prisma.order.findMany({
       where: {
         tenantId,
         status: 'completed',
-        items: {
-          some: {
-            OR: [{ productId: { in: Array.from(baseIds) } }, { comboId: { in: Array.from(baseIds) } }],
-          },
-        },
+        id: { in: matchingItems.map((item) => item.orderId) },
       },
       include: { items: true },
       take: 500,

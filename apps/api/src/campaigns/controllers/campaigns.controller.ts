@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Param,
+  Query,
   HttpCode,
   UseGuards,
   Request,
@@ -63,6 +64,33 @@ export class CampaignsController {
       throw new BadRequestException('Janela de recuperacao invalida. Use 30, 60 ou 90 dias.');
     }
     return this.recoveryCampaignService.createRecoveryCampaign(req.user.tenantId, parsedDays);
+  }
+
+  @Get('recovery/:days')
+  @Permissions('crm.read')
+  async previewRecovery(@Request() req: AuthenticatedRequest, @Param('days') days: string) {
+    const parsedDays = Number(days);
+    if (parsedDays !== 30 && parsedDays !== 60 && parsedDays !== 90) {
+      throw new BadRequestException('Janela de recuperacao invalida. Use 30, 60 ou 90 dias.');
+    }
+    const preview = await this.recoveryCampaignService.preview(req.user.tenantId);
+    return preview.find((scenario) => scenario.days === parsedDays);
+  }
+
+  @Get('upsell/recommendations')
+  @Permissions('crm.read')
+  async previewUpsells(
+    @Request() req: AuthenticatedRequest,
+    @Query('productId') productId?: string,
+    @Query('comboId') comboId?: string,
+    @Query('customerId') customerId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.upsellRecommendationEngine.recommend(req.user.tenantId, {
+      items: productId || comboId ? [{ productId, comboId, quantity: 1 }] : [],
+      customerId,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   @Post('upsell/recommendations')

@@ -55,11 +55,16 @@ export class RecoveryCampaignService {
   private async countAudience(tenantId: string, days: number) {
     const dateLimit = new Date();
     dateLimit.setDate(dateLimit.getDate() - days);
+    const optedOutCustomers = await this.prisma.customerOptOut.findMany({
+      where: { tenantId },
+      select: { customerId: true },
+    });
+
     return this.prisma.customer.count({
       where: {
         tenantId,
         lastOrderDate: { lte: dateLimit },
-        optOuts: { none: {} },
+        id: { notIn: optedOutCustomers.map((optOut) => optOut.customerId) },
       },
     });
   }

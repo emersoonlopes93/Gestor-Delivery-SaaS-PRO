@@ -65,12 +65,19 @@ export class BusinessInsightsService {
   }
 
   private async getTopProduct(tenantId: string, start: Date, end: Date) {
+    const orders = await this.prisma.order.findMany({
+      where: { tenantId, status: 'completed', createdAt: { gte: start, lte: end } },
+      select: { id: true },
+    });
+    const orderIds = orders.map((order) => order.id);
+    if (orderIds.length === 0) return null;
+
     const items = await this.prisma.orderItem.groupBy({
       by: ['productId', 'snapshotName'],
       where: {
         tenantId,
+        orderId: { in: orderIds },
         productId: { not: null },
-        order: { status: 'completed', createdAt: { gte: start, lte: end } },
       },
       _sum: { quantity: true },
       orderBy: { _sum: { quantity: 'desc' } },
