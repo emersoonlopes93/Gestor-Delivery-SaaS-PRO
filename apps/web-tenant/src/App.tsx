@@ -37,6 +37,7 @@ import { MenuImportPage } from './features/settings/MenuImportPage';
 
 // CRM & Promotions
 import { CustomersListPage } from './features/crm/CustomersListPage';
+import { CrmDashboardPage } from './features/crm/CrmDashboardPage';
 // import { CustomerProfilePage } from './features/crm/CustomerProfilePage'; // Optional next
 import { PromotionsPage } from './features/promotions/PromotionsPage';
 import { InventoryPage } from './features/inventory/InventoryPage';
@@ -272,6 +273,14 @@ export function App() {
         />
 
         {/* CRM (Phase 8) */}
+        <Route
+          path="/crm/dashboard"
+          element={
+            <PermissionGate permission="crm.read">
+              <CrmDashboardPage />
+            </PermissionGate>
+          }
+        />
         <Route
           path="/customers"
           element={

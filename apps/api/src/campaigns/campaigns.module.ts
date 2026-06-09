@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { WhatsAppChannelModule } from '../whatsapp-channel/whatsapp-channel.module';
 import { CampaignsService } from './services/campaigns.service';
@@ -31,7 +31,7 @@ if (!enableCampaignDispatch && process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true'
     DatabaseModule,
     WhatsAppChannelModule, // para enviar as mensagens das campanhas
     RbacModule, // para PermissionsGuard e RbacService
-    CrmModule,
+    forwardRef(() => CrmModule),
     AnalyticsModule,
     PromotionsModule,
     ...(enableCampaignDispatch

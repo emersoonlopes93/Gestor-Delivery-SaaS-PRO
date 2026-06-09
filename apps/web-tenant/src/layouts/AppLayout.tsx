@@ -148,6 +148,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     label: 'CRM e Marketing',
     items: [
       { id: 'customers', label: 'Clientes (CRM)', to: '/customers', icon: Users, permission: 'crm.read' },
+      { id: 'crm-dashboard', label: 'CRM Enterprise', to: '/crm/dashboard', icon: ChartLine, permission: 'crm.read' },
       { id: 'marketing-automations', label: 'Automacoes', to: '/marketing/automations', icon: Bot, permission: 'crm.read' },
       { id: 'promotions', label: 'PromoÃ§Ãµes & Cupons', to: '/promotions', icon: Ticket, permission: 'crm.manage_coupons' },
     ],

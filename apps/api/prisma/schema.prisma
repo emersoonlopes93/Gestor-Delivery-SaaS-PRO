@@ -52,6 +52,9 @@ model Tenant {
   complementRecipeIngredients ComplementRecipeIngredient[]
   coupons                     Coupon[]
   customerOptOuts             CustomerOptOut[]
+  crmNotes                    CrmNote[]
+  crmPipelineEntries          CrmPipelineEntry[]
+  crmTasks                    CrmTask[]
   customerOtps                CustomerOTP[]
   customerAddresses           CustomerAddress[]
   customers                   Customer[]
@@ -1347,6 +1350,9 @@ model Customer {
   walletHistory      CustomerWalletTransaction[]
   chatSessions       ChatSession[]
   optOuts            CustomerOptOut[]
+  crmNotes           CrmNote[]
+  crmPipelineEntries CrmPipelineEntry[]
+  crmTasks           CrmTask[]
   addresses          CustomerAddress[]
   tenant             Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orders             Order[]
@@ -1438,6 +1444,61 @@ model CustomerWalletTransaction {
   @@index([tenantId])
   @@index([customerId])
   @@map("customer_wallet_transactions")
+}
+
+model CrmPipelineEntry {
+  id         String           @id @default(uuid())
+  tenantId   String           @map("tenant_id")
+  customerId String           @map("customer_id")
+  stage      CrmPipelineStage @default(lead)
+  source     String?          @db.VarChar(80)
+  reason     String?
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+  customer   Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, customerId])
+  @@index([tenantId])
+  @@index([tenantId, stage])
+  @@map("crm_pipeline_entries")
+}
+
+model CrmTask {
+  id          String        @id @default(uuid())
+  tenantId    String        @map("tenant_id")
+  customerId  String        @map("customer_id")
+  title       String        @db.VarChar(180)
+  description String?
+  dueAt       DateTime?     @map("due_at")
+  status      CrmTaskStatus @default(open)
+  createdBy   String?       @map("created_by")
+  completedAt DateTime?     @map("completed_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  customer    Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, status])
+  @@map("crm_tasks")
+}
+
+model CrmNote {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  customerId String   @map("customer_id")
+  content    String
+  createdBy  String?  @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, customerId])
+  @@map("crm_notes")
 }
 
 model Ingredient {
@@ -2500,6 +2561,22 @@ enum WalletTransactionType {
   debit
   expired
   refunded
+}
+
+enum CrmPipelineStage {
+  lead
+  prospect
+  customer
+  vip_customer
+  at_risk_customer
+  recovered_customer
+}
+
+enum CrmTaskStatus {
+  open
+  scheduled
+  completed
+  cancelled
 }
 
 enum UnitType {
