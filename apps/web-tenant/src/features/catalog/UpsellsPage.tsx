@@ -230,7 +230,7 @@ export function UpsellsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`h-2 w-2 rounded-full inline-block mr-2 ${u.isActive ? 'bg-green-500' : 'bg-gray-300'}`} />
-                      <span className="text-xs uppercase font-medium">{u.isActive ? 'Ativa' : 'Inativa'}</span>
+                      <span className="text-xs uppercase font-medium">{u.isActive ? 'Ativa' : 'Pausada'}</span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">

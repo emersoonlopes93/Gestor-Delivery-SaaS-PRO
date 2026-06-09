@@ -155,8 +155,8 @@ export function OptionGroupsPage() {
                             {it.allowQuantity ? ' | Permite Qtd' : ''}
                           </td>
                           <td className="px-6 py-4">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${it.isActive ? 'status-badge-success' : 'status-badge-danger'}`}>
-                              {it.isActive ? 'Ativo' : 'Inativo'}
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${it.isActive ? 'status-badge-success' : 'bg-status-warning/20 text-status-warning border border-status-warning/30'}`}>
+                              {it.isActive ? 'Ativo' : 'Pausado'}
                             </span>
                           </td>
                           <td className="px-6 py-4 text-right">

@@ -155,8 +155,8 @@ export function CategoriesPage() {
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <div className="flex items-center gap-2">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${category.isActive ? 'bg-status-success text-white border-status-success' : 'bg-status-danger text-white border-status-danger'}`}>
-                          {category.isActive ? 'Ativo' : 'Inativo'}
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${category.isActive ? 'bg-status-success text-white border-status-success' : 'bg-status-warning text-white border-status-warning'}`}>
+                          {category.isActive ? 'Ativa' : 'Pausada'}
                         </span>
                         {category.isFeatured && (
                           <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-status-warning text-white border border-status-warning">
@@ -206,8 +206,8 @@ export function CategoriesPage() {
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{category.description || 'Sem descrição'}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${category.isActive ? 'bg-status-success text-white border-status-success' : 'bg-status-danger text-white border-status-danger'}`}>
-                      {category.isActive ? 'Ativo' : 'Inativo'}
+                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${category.isActive ? 'bg-status-success text-white border-status-success' : 'bg-status-warning text-white border-status-warning'}`}>
+                      {category.isActive ? 'Ativa' : 'Pausada'}
                     </span>
                   </div>
                 </div>
@@ -325,7 +325,7 @@ export function CategoriesPage() {
                   onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                   className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 dark:border-gray-700 rounded focus:ring-primary-500"
                 />
-                <span className="text-sm font-bold text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:text-gray-100 transition-colors">Ativo</span>
+                <span className="text-sm font-bold text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:text-gray-100 transition-colors">Ativa</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer group">
                 <input

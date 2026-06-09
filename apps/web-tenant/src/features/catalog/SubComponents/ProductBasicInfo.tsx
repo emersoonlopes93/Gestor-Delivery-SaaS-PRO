@@ -269,8 +269,8 @@ export const ProductBasicInfo: React.FC = () => {
               className="w-5 h-5 rounded border-input text-primary focus:ring-primary"
             />
             <div>
-              <div className="text-sm font-bold text-foreground group-hover:text-foreground transition-colors">Ativo no Sistema</div>
-              <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Controle mestre</div>
+              <div className="text-sm font-bold text-foreground group-hover:text-foreground transition-colors">Ativo</div>
+              <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Desmarque para pausar</div>
             </div>
           </label>
 

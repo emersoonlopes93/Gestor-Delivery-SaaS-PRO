@@ -1,14 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api-client';
-import { Product } from '@gestor/types';
+import { CreateProductDto, Product } from '@gestor/types';
 import { Plus } from 'lucide-react';
 
-type ComboListItem = Product & {
-  publication?: {
-    publicationStatus?: string;
-    operationalStatus?: string;
-  } | null;
+type ComboListItem = Product & { publication?: unknown };
+type ComboBusinessStatus = 'active' | 'paused' | 'sold_out';
+
+const getComboStatus = (combo: Pick<Product, 'isActive' | 'isAvailable'>): ComboBusinessStatus => {
+  if (!combo.isActive) return 'paused';
+  if (!combo.isAvailable) return 'sold_out';
+  return 'active';
+};
+
+const STATUS_LABEL: Record<ComboBusinessStatus, string> = {
+  active: 'Ativo',
+  paused: 'Pausado',
+  sold_out: 'Esgotado',
+};
+
+const STATUS_BADGE: Record<ComboBusinessStatus, string> = {
+  active: 'status-badge-success',
+  paused: 'bg-status-warning/20 text-status-warning border border-status-warning/30',
+  sold_out: 'bg-destructive/20 text-destructive border border-destructive/30',
 };
 
 
@@ -51,24 +65,18 @@ export function CombosV2Page() {
     navigate('/catalog/combos/new/v2');
   };
 
-  const handleTogglePublication = async (combo: ComboListItem) => {
-    const key = `pub-${combo.id}`;
+  const setComboStatus = async (combo: ComboListItem, status: ComboBusinessStatus) => {
+    const key = `status-${combo.id}`;
     setBusy(key, true);
+    const next =
+      status === 'active'
+        ? { isActive: true, isAvailable: true }
+        : status === 'paused'
+          ? { isActive: false, isAvailable: combo.isAvailable }
+          : { isActive: true, isAvailable: false };
     try {
-      const nextStatus = combo.publication?.publicationStatus === 'published' ? 'draft' : 'published';
-      await api.patch(`/catalog/products/${combo.id}/publication`, { publicationStatus: nextStatus });
-      await loadData();
-    } finally {
-      setBusy(key, false);
-    }
-  };
-
-  const handleToggleOperational = async (combo: ComboListItem) => {
-    const key = `op-${combo.id}`;
-    setBusy(key, true);
-    try {
-      const nextStatus = combo.publication?.operationalStatus === 'active' ? 'inactive' : 'active';
-      await api.patch(`/catalog/products/${combo.id}/publication`, { operationalStatus: nextStatus });
+      const payload: Partial<CreateProductDto> = next;
+      await api.patch(`/catalog/products/${combo.id}`, payload);
       await loadData();
     } finally {
       setBusy(key, false);
@@ -131,13 +139,14 @@ export function CombosV2Page() {
                 <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Imagem</th>
                 <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Combo</th>
                 <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Preço Base</th>
-                <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Publicação</th>
-                <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Operação</th>
+                <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Status</th>
                 <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
-              {sortedCombos.map((combo) => (
+              {sortedCombos.map((combo) => {
+                const status = getComboStatus(combo);
+                return (
                 <tr key={combo.id} className="hover:bg-muted transition-colors group">
                   <td className="px-6 py-4">
                     {combo.image ? (
@@ -156,13 +165,8 @@ export function CombosV2Page() {
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(combo.basePrice ?? 0))}
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${combo.publication?.publicationStatus === 'published' ? 'status-badge-confirmed' : 'status-badge-neutral'}`}>
-                      {combo.publication?.publicationStatus === 'published' ? 'Publicado' : 'Rascunho'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${combo.publication?.operationalStatus === 'active' ? 'status-badge-success' : (combo.publication?.operationalStatus === 'inactive' ? 'status-badge-danger' : 'status-badge-warning')}`}>
-                      {combo.publication?.operationalStatus === 'active' ? 'Ativo' : (combo.publication?.operationalStatus === 'hidden' ? 'Oculto' : (combo.publication?.operationalStatus === 'sold_out_manual' ? 'Esgotado' : 'Inativo'))}
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${STATUS_BADGE[status]}`}>
+                      {STATUS_LABEL[status]}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
@@ -174,22 +178,9 @@ export function CombosV2Page() {
                       >
                         Editar
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleTogglePublication(combo)}
-                        disabled={savingMap[`pub-${combo.id}`]}
-                        className="btn-ghost text-muted-foreground hover:text-foreground"
-                      >
-                        {combo.publication?.publicationStatus === 'published' ? 'Despublicar' : 'Publicar'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleOperational(combo)}
-                        disabled={savingMap[`op-${combo.id}`]}
-                        className="btn-ghost text-muted-foreground hover:text-foreground"
-                      >
-                        {combo.publication?.operationalStatus === 'active' ? 'Inativar' : 'Ativar'}
-                      </button>
+                      <button type="button" onClick={() => setComboStatus(combo, 'active')} disabled={savingMap[`status-${combo.id}`]} className="btn-ghost text-status-success hover:text-status-success">Ativo</button>
+                      <button type="button" onClick={() => setComboStatus(combo, 'paused')} disabled={savingMap[`status-${combo.id}`]} className="btn-ghost text-status-warning hover:text-status-warning">Pausar</button>
+                      <button type="button" onClick={() => setComboStatus(combo, 'sold_out')} disabled={savingMap[`status-${combo.id}`]} className="btn-ghost text-destructive hover:text-destructive">Esgotar</button>
                       <button
                         type="button"
                         onClick={() => handleDuplicate(combo)}
@@ -209,10 +200,10 @@ export function CombosV2Page() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              );})}
               {sortedCombos.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground font-medium italic">
+                  <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground font-medium italic">
                     Nenhum combo cadastrado ainda.
                   </td>
                 </tr>

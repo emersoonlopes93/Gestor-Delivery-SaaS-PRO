@@ -281,7 +281,7 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
                   onChange={(e) => setGroupForm((p) => ({ ...p, isActive: e.target.checked }))}
                   className="w-5 h-5 text-primary border-input rounded"
                 />
-                <span className="text-sm font-bold text-foreground">Grupo Ativo</span>
+                <span className="text-sm font-bold text-foreground">Grupo ativo</span>
               </label>
             </div>
           </div>
@@ -307,7 +307,7 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
                       <th className="px-4 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider w-[35%]">Nome da Opção *</th>
                       <th className="px-4 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider w-[20%]">Impacto no Preço</th>
                       <th className="px-4 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider w-[15%]">Valor (R$)</th>
-                      <th className="px-4 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider w-[10%] text-center">Ativo</th>
+                      <th className="px-4 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider w-[10%] text-center">Status</th>
                       <th className="px-4 py-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider w-[20%]">Ações</th>
                     </tr>
                   </thead>

@@ -35,6 +35,8 @@ type ComboSlotWithItems = Prisma.ComboSlotGetPayload<{
   include: { allowedItems: { include: { product: true } } };
 }>;
 
+type CheckoutSalesChannel = 'storefront_delivery' | 'storefront_pickup' | 'pos';
+
 @Injectable()
 export class CheckoutValidatorService {
   constructor(
@@ -132,7 +134,7 @@ export class CheckoutValidatorService {
         );
         validatedLines.push(line);
       } else if (item.lineType === 'combo') {
-        const line = await this.validateComboLine(tenantId, item, resolvedCheckChannel, availabilityContext);
+        const line = await this.validateComboLine(tenantId, item, checkSellableOnline, resolvedCheckChannel, availabilityContext);
         validatedLines.push(line);
       } else {
         throw new BadRequestException('Tipo de linha inválido.');
@@ -251,7 +253,7 @@ export class CheckoutValidatorService {
         const line = await this.validateProductLine(tenantId, item, false, 'pos');
         validatedLines.push(line);
       } else if (item.lineType === 'combo') {
-        const line = await this.validateComboLine(tenantId, item, 'pos');
+        const line = await this.validateComboLine(tenantId, item, false, 'pos');
         validatedLines.push(line);
       } else {
         throw new BadRequestException('Tipo de linha inválido.');
@@ -304,11 +306,42 @@ export class CheckoutValidatorService {
     };
   }
 
+  private async assertCatalogItemCanSell(input: {
+    tenantId: string;
+    productId: string;
+    name: string;
+    kind: 'produto' | 'combo';
+    isActive: boolean;
+    isAvailable: boolean;
+    sellableOnline: boolean;
+    checkSellableOnline: boolean;
+    channel: CheckoutSalesChannel;
+    context?: { settings?: Prisma.TenantSettingsGetPayload<{ select: { isStorePaused: true, storePauseReason: true, timezone: true } }> | null; operatingHours?: Prisma.TenantOperatingHoursGetPayload<Record<string, never>>[] };
+  }) {
+    if (input.channel !== 'pos') {
+      await this.availabilityService.assertCanSell({
+        tenantId: input.tenantId,
+        productId: input.productId,
+        channel: input.channel,
+        context: input.context,
+      });
+    }
+    if (!input.isActive) {
+      throw new BadRequestException(`O ${input.kind} "${input.name}" não está ativo.`);
+    }
+    if (!input.isAvailable) {
+      throw new BadRequestException(`O ${input.kind} "${input.name}" não está disponível no momento.`);
+    }
+    if (input.checkSellableOnline && !input.sellableOnline) {
+      throw new BadRequestException(`O ${input.kind} "${input.name}" não está disponível para venda online.`);
+    }
+  }
+
   private async validateProductLine(
     tenantId: string,
     item: CreateOrderItemDTO,
     checkSellableOnline: boolean = true,
-    channel: 'storefront_delivery' | 'storefront_pickup' | 'pos' = 'storefront_delivery',
+    channel: CheckoutSalesChannel = 'storefront_delivery',
     context?: { settings?: Prisma.TenantSettingsGetPayload<{ select: { isStorePaused: true, storePauseReason: true, timezone: true } }> | null; operatingHours?: Prisma.TenantOperatingHoursGetPayload<Record<string, never>>[] },
   ): Promise<ValidatedProductLine> {
     if (!item.productId) {
@@ -343,25 +376,18 @@ export class CheckoutValidatorService {
 
     const typedProduct = product as ProductWithData;
 
-    const shouldCheckAvailabilityByChannel = channel !== 'pos';
-
-    if (shouldCheckAvailabilityByChannel) {
-      await this.availabilityService.assertCanSell({
-        tenantId,
-        productId: item.productId,
-        channel,
-        context,
-      });
-    }
-    if (!typedProduct.isActive) {
-      throw new BadRequestException(`O produto "${typedProduct.name}" não está ativo.`);
-    }
-    if (!typedProduct.isAvailable) {
-      throw new BadRequestException(`O produto "${typedProduct.name}" não está disponível no momento.`);
-    }
-    if (checkSellableOnline && !typedProduct.sellableOnline) {
-      throw new BadRequestException(`O produto "${typedProduct.name}" não está disponível para venda online.`);
-    }
+    await this.assertCatalogItemCanSell({
+      tenantId,
+      productId: item.productId,
+      name: typedProduct.name,
+      kind: 'produto',
+      isActive: typedProduct.isActive,
+      isAvailable: typedProduct.isAvailable,
+      sellableOnline: typedProduct.sellableOnline,
+      checkSellableOnline,
+      channel,
+      context,
+    });
 
     const basePrice = Number(typedProduct.basePrice);
 
@@ -712,7 +738,8 @@ export class CheckoutValidatorService {
   private async validateComboLine(
     tenantId: string,
     item: CreateOrderItemDTO,
-    channel: 'storefront_delivery' | 'storefront_pickup' | 'pos' = 'storefront_delivery',
+    checkSellableOnline: boolean = true,
+    channel: CheckoutSalesChannel = 'storefront_delivery',
     context?: { settings?: Prisma.TenantSettingsGetPayload<{ select: { isStorePaused: true, storePauseReason: true, timezone: true } }> | null; operatingHours?: Prisma.TenantOperatingHoursGetPayload<Record<string, never>>[] },
   ): Promise<ValidatedComboLine> {
     const hasNewSlots = Array.isArray(item.slots) && item.slots.length > 0;
@@ -755,15 +782,18 @@ export class CheckoutValidatorService {
 
       const typedCombo = comboProduct as ComboWithSlots;
 
-      await this.availabilityService.assertCanSell({
+      await this.assertCatalogItemCanSell({
         tenantId,
         productId: item.productId,
+        name: typedCombo.name,
+        kind: 'combo',
+        isActive: typedCombo.isActive,
+        isAvailable: typedCombo.isAvailable,
+        sellableOnline: typedCombo.sellableOnline,
+        checkSellableOnline,
         channel,
         context,
       });
-      if (!typedCombo.isActive) {
-        throw new BadRequestException(`O combo "${typedCombo.name}" não está ativo.`);
-      }
 
       const basePrice = Number(typedCombo.basePrice);
       const validatedSlots = this.validateComboSlots(
@@ -841,15 +871,18 @@ export class CheckoutValidatorService {
 
         const typedCombo = comboProduct as ComboWithBundle;
 
-        await this.availabilityService.assertCanSell({
+        await this.assertCatalogItemCanSell({
           tenantId,
           productId: comboProductId,
+          name: typedCombo.name,
+          kind: 'combo',
+          isActive: typedCombo.isActive,
+          isAvailable: typedCombo.isAvailable,
+          sellableOnline: typedCombo.sellableOnline,
+          checkSellableOnline,
           channel,
+          context,
         });
-
-        if (!typedCombo.isActive) {
-          throw new BadRequestException(`O combo "${typedCombo.name}" não está ativo.`);
-        }
 
         const comboMode = typedCombo.comboMode ?? 'bundle';
         if (comboMode === 'bundle') {
