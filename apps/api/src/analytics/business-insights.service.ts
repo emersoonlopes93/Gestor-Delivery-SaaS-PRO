@@ -64,6 +64,58 @@ export class BusinessInsightsService {
     return { generatedAt: now, insights };
   }
 
+  async getRetentionDashboard(tenantId: string) {
+    const [orders, campaigns, cashbackEarned, loyaltyEarned, customers] = await Promise.all([
+      this.prisma.order.findMany({
+        where: { tenantId, status: 'completed' },
+        select: { total: true, customerId: true, couponId: true, cashbackUsed: true, createdAt: true },
+      }),
+      this.prisma.campaign.findMany({
+        where: { tenantId },
+        select: { totalConverted: true, revenueGenerated: true },
+      }),
+      this.prisma.cashbackTransaction.aggregate({
+        where: { tenantId, type: 'earned' },
+        _sum: { amount: true },
+      }),
+      this.prisma.customerLoyaltyTransaction.aggregate({
+        where: { tenantId, type: 'earned' },
+        _sum: { points: true },
+      }),
+      this.prisma.customer.findMany({
+        where: { tenantId },
+        select: { id: true, totalOrders: true, totalSpent: true, lastOrderDate: true },
+      }),
+    ]);
+
+    const totalRevenue = orders.reduce((sum, order) => sum + Number(order.total), 0);
+    const loyaltyCustomerIds = new Set(
+      await this.prisma.customerLoyaltyTransaction
+        .findMany({ where: { tenantId }, select: { customerId: true }, distinct: ['customerId'] })
+        .then((rows) => rows.map((row) => row.customerId)),
+    );
+    const revenueByLoyalty = orders
+      .filter((order) => order.customerId && loyaltyCustomerIds.has(order.customerId))
+      .reduce((sum, order) => sum + Number(order.total), 0);
+    const revenueByCashback = orders
+      .filter((order) => Number(order.cashbackUsed ?? 0) > 0)
+      .reduce((sum, order) => sum + Number(order.total), 0);
+    const revenueByCampaign = campaigns.reduce((sum, campaign) => sum + Number(campaign.revenueGenerated), 0);
+    const repeatCustomers = customers.filter((customer) => customer.totalOrders >= 2).length;
+
+    return {
+      revenueByLoyalty,
+      revenueByCashback,
+      revenueByCampaign,
+      cashbackGenerated: Number(cashbackEarned._sum.amount ?? 0),
+      loyaltyPointsGenerated: Number(loyaltyEarned._sum.points ?? 0),
+      retentionRate: customers.length ? repeatCustomers / customers.length : 0,
+      ltv: customers.length ? totalRevenue / customers.length : 0,
+      averageFrequency: customers.length ? orders.length / customers.length : 0,
+      reorderRate: orders.length ? orders.filter((order) => order.customerId).length / orders.length : 0,
+    };
+  }
+
   private async getTopProduct(tenantId: string, start: Date, end: Date) {
     const orders = await this.prisma.order.findMany({
       where: { tenantId, status: 'completed', createdAt: { gte: start, lte: end } },

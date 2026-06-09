@@ -5,7 +5,7 @@ import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
 import { CreateCouponDTO, UpdateCouponDTO } from '@gestor/types';
 
-@Controller('promotions/coupons')
+@Controller(['promotions/coupons', 'coupons'])
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class CouponsController {
   constructor(private readonly couponsService: CouponsService) {}

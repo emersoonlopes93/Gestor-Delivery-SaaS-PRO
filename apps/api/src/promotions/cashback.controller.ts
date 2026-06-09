@@ -5,7 +5,7 @@ import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
 import { CashbackTransactionType } from '@prisma/client';
 
-@Controller('promotions/cashback')
+@Controller(['promotions/cashback', 'cashback'])
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class CashbackController {
   constructor(private readonly cashbackService: CashbackService) {}

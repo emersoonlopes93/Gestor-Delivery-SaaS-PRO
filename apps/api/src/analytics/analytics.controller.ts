@@ -71,4 +71,10 @@ export class AnalyticsController {
   async getInsights(@CurrentTenant() tenantId: string) {
     return this.businessInsightsService.generateInsights(tenantId);
   }
+
+  @Get('retention')
+  @RequirePermissions('reports.read')
+  async getRetention(@CurrentTenant() tenantId: string) {
+    return this.businessInsightsService.getRetentionDashboard(tenantId);
+  }
 }

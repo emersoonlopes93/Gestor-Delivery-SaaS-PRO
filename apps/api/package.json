@@ -64,6 +64,7 @@
 
     "e2e:ops": "ts-node -r tsconfig-paths/register scripts/e2e-certification-ops.ts",
     "e2e:commercial-ai": "ts-node --transpile-only -r tsconfig-paths/register scripts/e2e-certification-commercial-ai.ts",
+    "e2e:phase10": "ts-node --transpile-only -r tsconfig-paths/register scripts/e2e-phase10-loyalty.ts",
 
     "prisma:studio": "prisma studio",
 

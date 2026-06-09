@@ -7,6 +7,7 @@ import { UpsellRecommendationEngine } from './upsell-recommendation.engine';
 import { CustomerIntelligenceService } from '../../crm/customer-intelligence.service';
 import { BusinessInsightsService } from '../../analytics/business-insights.service';
 import { PrismaService } from '../../database/prisma.service';
+import { CouponsService } from '../../promotions/coupons.service';
 
 type AutomationRunResult = {
   tenantId: string;
@@ -17,6 +18,7 @@ type AutomationRunResult = {
   abandonedCartReminders: number;
   reorderCampaigns: number;
   upsellCampaigns: number;
+  smartCoupons: number;
   failures: Array<{ automation: string; reason: string }>;
 };
 
@@ -33,6 +35,7 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
     private readonly upsellRecommendationEngine: UpsellRecommendationEngine,
     private readonly customerIntelligenceService: CustomerIntelligenceService,
     private readonly businessInsightsService: BusinessInsightsService,
+    private readonly couponsService: CouponsService,
   ) {}
 
   onModuleInit() {
@@ -96,6 +99,54 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
     };
   }
 
+  async getCommercialAiRecommendations(tenantId: string) {
+    const [segments, insights, retention] = await Promise.all([
+      this.customerIntelligenceService.getSegments(tenantId),
+      this.businessInsightsService.generateInsights(tenantId),
+      this.businessInsightsService.getRetentionDashboard(tenantId),
+    ]);
+
+    const suggestions: Array<{ type: string; priority: 'high' | 'medium' | 'low'; message: string; audience?: number }> = [];
+    if (segments.bySegment.inactive_30.length) {
+      suggestions.push({
+        type: 'coupon',
+        priority: 'high',
+        message: 'Criar cupom de retorno para clientes inativos ha 30 dias.',
+        audience: segments.bySegment.inactive_30.length,
+      });
+    }
+    if (segments.bySegment.vip.length) {
+      suggestions.push({
+        type: 'benefit',
+        priority: 'medium',
+        message: 'Oferecer beneficio exclusivo para clientes VIP.',
+        audience: segments.bySegment.vip.length,
+      });
+    }
+    if (retention.retentionRate < 0.35) {
+      suggestions.push({
+        type: 'cashback',
+        priority: 'high',
+        message: 'Aumentar cashback temporariamente para elevar recompra.',
+      });
+    }
+    for (const insight of insights.insights.filter((item) => item.type === 'product_pairing')) {
+      suggestions.push({
+        type: 'campaign',
+        priority: 'medium',
+        message: `Usar insight de compra combinada: ${insight.message}`,
+      });
+    }
+
+    return {
+      generatedAt: new Date(),
+      source: 'CustomerIntelligenceService+BusinessInsightsService',
+      churnRiskCustomers: segments.bySegment.at_risk.length,
+      vipCustomers: segments.bySegment.vip.length,
+      suggestions,
+    };
+  }
+
   async runAllTenants() {
     const tenants = await this.prisma.tenant.findMany({
       where: { status: { in: ['active', 'trial'] } },
@@ -120,6 +171,7 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
       abandonedCartReminders: 0,
       reorderCampaigns: 0,
       upsellCampaigns: 0,
+      smartCoupons: 0,
       failures: [],
     };
 
@@ -134,6 +186,7 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
     await this.runAbandonedCart(tenantId, result);
     await this.runReorder(tenantId, result);
     await this.runPostPurchaseUpsell(tenantId, result);
+    await this.runSmartCoupons(tenantId, result);
 
     await this.prisma.auditLog.create({
       data: {
@@ -234,6 +287,37 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
       } catch (error) {
         this.captureFailure(result, 'post_purchase_upsell', error);
       }
+    }
+  }
+
+  private async runSmartCoupons(tenantId: string, result: AutomationRunResult) {
+    try {
+      const { bySegment } = await this.customerIntelligenceService.getSegments(tenantId);
+      const specs = [
+        { key: 'inactive_30', prefix: 'VOLTE', value: 10, type: 'percentage' as const },
+        { key: 'new', prefix: 'BEMVINDO', value: 8, type: 'percentage' as const },
+        { key: 'vip', prefix: 'VIP', value: 15, type: 'percentage' as const },
+      ];
+      for (const spec of specs) {
+        const audience = bySegment[spec.key as keyof typeof bySegment] ?? [];
+        if (!audience.length) continue;
+        const code = `${spec.prefix}${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+        const existing = await this.prisma.coupon.findFirst({ where: { tenantId, code }, select: { id: true } });
+        if (existing) continue;
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 14);
+        await this.couponsService.createCoupon(tenantId, {
+          code,
+          type: spec.type,
+          value: spec.value,
+          usageLimit: audience.length,
+          expiresAt: expiresAt.toISOString(),
+          isActive: true,
+        });
+        result.smartCoupons += 1;
+      }
+    } catch (error) {
+      this.captureFailure(result, 'smart_coupons', error);
     }
   }
 

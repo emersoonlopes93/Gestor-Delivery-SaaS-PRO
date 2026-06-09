@@ -75,6 +75,12 @@ export class CampaignsController {
     return this.campaignAutomationService.runTenantAutomations(req.user.tenantId);
   }
 
+  @Get('ai/recommendations')
+  @Permissions('crm.read')
+  async aiRecommendations(@Request() req: AuthenticatedRequest) {
+    return this.campaignAutomationService.getCommercialAiRecommendations(req.user.tenantId);
+  }
+
   @Post('recovery/:days')
   @Permissions('crm.manage_coupons')
   async createRecovery(@Request() req: AuthenticatedRequest, @Param('days') days: string) {

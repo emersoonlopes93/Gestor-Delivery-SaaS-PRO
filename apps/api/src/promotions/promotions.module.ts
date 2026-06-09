@@ -6,11 +6,22 @@ import { CouponsController } from './coupons.controller';
 import { CouponsService } from './coupons.service';
 import { CashbackController } from './cashback.controller';
 import { CashbackService } from './cashback.service';
+import { LoyaltyController, PublicCustomerLoyaltyController } from './loyalty.controller';
+import { LoyaltyService } from './loyalty.service';
+import { WalletController, PublicCustomerWalletController } from './wallet.controller';
+import { WalletService } from './wallet.service';
 
 @Module({
   imports: [DatabaseModule, AuthModule, RbacModule],
-  controllers: [CouponsController, CashbackController],
-  providers: [CouponsService, CashbackService],
-  exports: [CouponsService, CashbackService],
+  controllers: [
+    CouponsController,
+    CashbackController,
+    LoyaltyController,
+    PublicCustomerLoyaltyController,
+    WalletController,
+    PublicCustomerWalletController,
+  ],
+  providers: [CouponsService, CashbackService, LoyaltyService, WalletService],
+  exports: [CouponsService, CashbackService, LoyaltyService, WalletService],
 })
 export class PromotionsModule {}

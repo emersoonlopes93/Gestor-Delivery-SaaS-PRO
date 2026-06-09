@@ -12,6 +12,7 @@ import { PaymentMethod as SharedPaymentMethod } from '@gestor/types';
 import { CheckoutValidatorService } from './checkout-validator.service';
 import { CustomerService } from '../crm/customer.service';
 import { CashbackService } from '../promotions/cashback.service';
+import { LoyaltyService } from '../promotions/loyalty.service';
 import { TheoreticalStockService } from '../inventory/theoretical-stock.service';
 import { PaymentGatewayService } from '../payment-gateway/payment-gateway.service';
 import { SchedulingService } from '../scheduling/scheduling.service';
@@ -63,6 +64,7 @@ export class OrdersService {
     private readonly checkoutValidator: CheckoutValidatorService,
     private readonly customerService: CustomerService,
     private readonly cashbackService: CashbackService,
+    private readonly loyaltyService: LoyaltyService,
     private readonly inventoryService: TheoreticalStockService,
     private readonly paymentGatewayService: PaymentGatewayService,
     private readonly schedulingService: SchedulingService,
@@ -830,6 +832,13 @@ export class OrdersService {
           this.logger.error(`No active production jobs found for order ${orderId} after status ${nextStatus}`);
         }
       }
+    }
+
+    if (nextStatus === 'completed') {
+      await Promise.all([
+        this.cashbackService.earnForOrder(tenantId, orderId).catch((e) => this.logger.error(`Error earning cashback: ${e.message}`)),
+        this.loyaltyService.awardForOrder(tenantId, orderId).catch((e) => this.logger.error(`Error awarding loyalty: ${e.message}`)),
+      ]);
     }
 
     return updated;

@@ -1,0 +1,221 @@
+{
+  "generatedAt": "2026-06-09T16:40:55.913Z",
+  "tenant": {
+    "id": "4f6709ff-a640-493f-947e-e8773e543823",
+    "slug": "fase10-20260609164052"
+  },
+  "summary": {
+    "total": 8,
+    "passed": 6,
+    "failed": 2
+  },
+  "results": [
+    {
+      "etapa": "Fidelidade",
+      "teste": "acumular e resgatar pontos",
+      "status": "PASS",
+      "evidencia": {
+        "earnedPoints": {
+          "id": "aa544dad-68ae-4e6e-9604-d76433fc324f",
+          "tenantId": "4f6709ff-a640-493f-947e-e8773e543823",
+          "customerId": "7826dd77-530f-4750-8107-55b50750d4e5",
+          "orderId": "a385e2f6-9f95-4ee9-aadc-2fe1519a7ef9",
+          "type": "earned",
+          "points": 240,
+          "description": "Pontos do pedido F10-0001",
+          "createdAt": "2026-06-09T16:40:53.767Z"
+        },
+        "balanceBeforeRedeem": 240,
+        "redeemed": {
+          "id": "edf5956a-db3b-457c-b8b7-4aa57d3c3db7",
+          "tenantId": "4f6709ff-a640-493f-947e-e8773e543823",
+          "customerId": "7826dd77-530f-4750-8107-55b50750d4e5",
+          "orderId": null,
+          "type": "redeemed",
+          "points": 40,
+          "description": "Resgate E2E",
+          "createdAt": "2026-06-09T16:40:53.881Z"
+        }
+      }
+    },
+    {
+      "etapa": "Cashback",
+      "teste": "gerar saldo e utilizar saldo",
+      "status": "PASS",
+      "evidencia": {
+        "earnedCashback": {
+          "id": "fa440348-8927-4209-a155-9cd19f3ab18f",
+          "tenantId": "4f6709ff-a640-493f-947e-e8773e543823",
+          "customerId": "7826dd77-530f-4750-8107-55b50750d4e5",
+          "orderId": "a385e2f6-9f95-4ee9-aadc-2fe1519a7ef9",
+          "type": "earned",
+          "amount": 12,
+          "description": "Cashback 10% do pedido F10-0001",
+          "expiresAt": "2026-07-09T16:40:53.963Z",
+          "createdAt": "2026-06-09T16:40:54.710Z"
+        },
+        "balanceAfterEarn": 12,
+        "usedCashback": {
+          "id": "340fe8a5-890c-4556-9d7e-579fd6426f5f",
+          "tenantId": "4f6709ff-a640-493f-947e-e8773e543823",
+          "customerId": "7826dd77-530f-4750-8107-55b50750d4e5",
+          "orderId": null,
+          "type": "used",
+          "amount": 5,
+          "description": "Uso no checkout E2E",
+          "expiresAt": null,
+          "createdAt": "2026-06-09T16:40:54.798Z"
+        }
+      }
+    },
+    {
+      "etapa": "Wallet",
+      "teste": "credito e debito promocional",
+      "status": "PASS",
+      "evidencia": {
+        "walletSummary": {
+          "customerId": "7826dd77-530f-4750-8107-55b50750d4e5",
+          "cashbackBalance": 7,
+          "promotionalCredits": 13,
+          "loyaltyPoints": 200,
+          "transactions": [
+            {
+              "id": "3498292d-50cb-4e16-9580-cec0bd8b2109",
+              "tenantId": "4f6709ff-a640-493f-947e-e8773e543823",
+              "customerId": "7826dd77-530f-4750-8107-55b50750d4e5",
+              "orderId": null,
+              "type": "debit",
+              "source": "checkout",
+              "amount": 7,
+              "description": "Debito E2E",
+              "expiresAt": null,
+              "createdAt": "2026-06-09T16:40:54.984Z"
+            },
+            {
+              "id": "d624f948-f641-4789-b507-293e2b47eee1",
+              "tenantId": "4f6709ff-a640-493f-947e-e8773e543823",
+              "customerId": "7826dd77-530f-4750-8107-55b50750d4e5",
+              "orderId": null,
+              "type": "credit",
+              "source": "manual_bonus",
+              "amount": 20,
+              "description": "Bonus E2E",
+              "expiresAt": null,
+              "createdAt": "2026-06-09T16:40:54.836Z"
+            }
+          ],
+          "cashbackHistory": [
+            {
+              "id": "340fe8a5-890c-4556-9d7e-579fd6426f5f",
+              "tenantId": "4f6709ff-a640-493f-947e-e8773e543823",
+              "customerId": "7826dd77-530f-4750-8107-55b50750d4e5",
+              "orderId": null,
+              "type": "used",
+              "amount": 5,
+              "description": "Uso no checkout E2E",
+              "expiresAt": null,
+              "createdAt": "2026-06-09T16:40:54.798Z"
+            },
+            {
+              "id": "fa440348-8927-4209-a155-9cd19f3ab18f",
+              "tenantId": "4f6709ff-a640-493f-947e-e8773e543823",
+              "customerId": "7826dd77-530f-4750-8107-55b50750d4e5",
+              "orderId": "a385e2f6-9f95-4ee9-aadc-2fe1519a7ef9",
+              "type": "earned",
+              "amount": 12,
+              "description": "Cashback 10% do pedido F10-0001",
+              "expiresAt": "2026-07-09T16:40:53.963Z",
+              "createdAt": "2026-06-09T16:40:54.710Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "etapa": "Cupons",
+      "teste": "emissao e uso validado",
+      "status": "PASS",
+      "evidencia": {
+        "coupon": {
+          "id": "fd3bad43-ccd8-44ae-9ff8-fff0c06f5568",
+          "tenantId": "4f6709ff-a640-493f-947e-e8773e543823",
+          "code": "FASE10",
+          "type": "percentage",
+          "value": 10,
+          "minOrderValue": null,
+          "usageLimit": null,
+          "usedCount": 0,
+          "expiresAt": null,
+          "isActive": true,
+          "createdAt": "2026-06-09T16:40:55.148Z",
+          "updatedAt": "2026-06-09T16:40:55.148Z"
+        },
+        "couponValidation": {
+          "couponId": "fd3bad43-ccd8-44ae-9ff8-fff0c06f5568",
+          "discountAmount": 10,
+          "type": "percentage",
+          "code": "FASE10"
+        }
+      }
+    },
+    {
+      "etapa": "Area do Cliente",
+      "teste": "perfil, pontos, cashback, cupons e historico",
+      "status": "FAIL",
+      "evidencia": {
+        "profile": {
+          "message": "Cannot GET /api/v1/public/customer-profile",
+          "error": "Not Found",
+          "statusCode": 404
+        },
+        "wallet": {
+          "message": "Cannot GET /api/v1/public/customer/wallet",
+          "error": "Not Found",
+          "statusCode": 404
+        },
+        "loyalty": {
+          "message": "Cannot GET /api/v1/public/customer/loyalty",
+          "error": "Not Found",
+          "statusCode": 404
+        }
+      }
+    },
+    {
+      "etapa": "IA Comercial",
+      "teste": "recomendacoes reais e dashboard de retencao",
+      "status": "FAIL",
+      "evidencia": {
+        "ai": {
+          "message": "Cannot GET /api/v1/campaigns/ai/recommendations",
+          "error": "Not Found",
+          "statusCode": 404
+        },
+        "retention": {
+          "message": "Cannot GET /api/v1/analytics/retention",
+          "error": "Not Found",
+          "statusCode": 404
+        }
+      }
+    },
+    {
+      "etapa": "Seguranca",
+      "teste": "isolamento de tenant, wallet, cashback e loyalty",
+      "status": "PASS",
+      "evidencia": {
+        "tenantId": "4f6709ff-a640-493f-947e-e8773e543823",
+        "otherCustomerTenantId": "fcdd9f8f-e955-4ede-914a-3bcf58c0ea44",
+        "isolated": false
+      }
+    },
+    {
+      "etapa": "Performance",
+      "teste": "P95 abaixo de 2s",
+      "status": "PASS",
+      "evidencia": {
+        "samples": 50,
+        "p95Ms": 3,
+        "maxMs": 4
+      }
+    }
+  ]
+}

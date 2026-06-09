@@ -13,6 +13,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { RbacModule } from '../rbac/rbac.module';
 import { CrmModule } from '../crm/crm.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
+import { PromotionsModule } from '../promotions/promotions.module';
 
 const enableCampaignDispatch = 
   process.env.REDIS_ENABLED !== 'false' && 
@@ -32,6 +33,7 @@ if (!enableCampaignDispatch && process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true'
     RbacModule, // para PermissionsGuard e RbacService
     CrmModule,
     AnalyticsModule,
+    PromotionsModule,
     ...(enableCampaignDispatch
       ? [
           BullModule.registerQueue({

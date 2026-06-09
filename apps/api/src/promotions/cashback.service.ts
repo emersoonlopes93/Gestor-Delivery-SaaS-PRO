@@ -26,6 +26,7 @@ export class CashbackService {
     amount: number;
     orderId?: string;
     description?: string;
+    expiresAt?: Date;
   }) {
     if (params.amount < 0) {
       throw new BadRequestException('Amount must be positive');
@@ -82,6 +83,7 @@ export class CashbackService {
           amount: params.amount,
           orderId: params.orderId || null,
           description: params.description || null,
+          expiresAt: params.expiresAt || null,
         },
       });
 
@@ -100,5 +102,42 @@ export class CashbackService {
     });
     if (!customer) throw new NotFoundException('Customer not found');
     return Number(customer.cashbackBalance);
+  }
+
+  async earnForOrder(tenantId: string, orderId: string) {
+    const order = await this.db.order.findFirst({
+      where: { id: orderId, tenantId, customerId: { not: null } },
+      select: { id: true, orderNumber: true, customerId: true, total: true },
+    });
+    if (!order?.customerId) return null;
+
+    const existing = await this.db.cashbackTransaction.findFirst({
+      where: { tenantId, orderId, type: 'earned' },
+      select: { id: true },
+    });
+    if (existing) return null;
+
+    const settings = await this.db.tenantSettings.findUnique({
+      where: { tenantId },
+      select: { cashbackEnabled: true, cashbackPercent: true, cashbackValidityDays: true },
+    });
+    if (settings && !settings.cashbackEnabled) return null;
+
+    const percent = settings?.cashbackPercent ?? 5;
+    const amount = Number((Number(order.total) * (percent / 100)).toFixed(2));
+    if (amount <= 0) return null;
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + (settings?.cashbackValidityDays ?? 90));
+
+    return this.createTransaction({
+      tenantId,
+      customerId: order.customerId,
+      type: 'earned',
+      amount,
+      orderId: order.id,
+      description: `Cashback ${percent}% do pedido ${order.orderNumber}`,
+      expiresAt,
+    });
   }
 }

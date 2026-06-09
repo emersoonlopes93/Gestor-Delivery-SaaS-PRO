@@ -1,0 +1,460 @@
+{
+  "generatedAt": "2026-06-09T16:46:13.412Z",
+  "tenant": {
+    "id": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+    "slug": "fase10-20260609164610"
+  },
+  "summary": {
+    "total": 8,
+    "passed": 7,
+    "failed": 1
+  },
+  "results": [
+    {
+      "etapa": "Fidelidade",
+      "teste": "acumular e resgatar pontos",
+      "status": "PASS",
+      "evidencia": {
+        "earnedPoints": {
+          "id": "541a1b9c-e97a-4a32-885f-0e58f316d9ed",
+          "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+          "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+          "orderId": "89ef24c9-1424-4670-8875-749ba63e934c",
+          "type": "earned",
+          "points": 240,
+          "description": "Pontos do pedido F10-0001",
+          "createdAt": "2026-06-09T16:46:10.843Z"
+        },
+        "balanceBeforeRedeem": 240,
+        "redeemed": {
+          "id": "82027d7a-f7fa-4146-a97b-f04c5069717e",
+          "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+          "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+          "orderId": null,
+          "type": "redeemed",
+          "points": 40,
+          "description": "Resgate E2E",
+          "createdAt": "2026-06-09T16:46:10.938Z"
+        }
+      }
+    },
+    {
+      "etapa": "Cashback",
+      "teste": "gerar saldo e utilizar saldo",
+      "status": "PASS",
+      "evidencia": {
+        "earnedCashback": {
+          "id": "afdf4e76-a70f-40af-96c1-53187a40aa84",
+          "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+          "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+          "orderId": "89ef24c9-1424-4670-8875-749ba63e934c",
+          "type": "earned",
+          "amount": 12,
+          "description": "Cashback 10% do pedido F10-0001",
+          "expiresAt": "2026-07-09T16:46:11.001Z",
+          "createdAt": "2026-06-09T16:46:11.037Z"
+        },
+        "balanceAfterEarn": 12,
+        "usedCashback": {
+          "id": "83b51dbd-f58d-44d9-b552-f8f567485257",
+          "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+          "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+          "orderId": null,
+          "type": "used",
+          "amount": 5,
+          "description": "Uso no checkout E2E",
+          "expiresAt": null,
+          "createdAt": "2026-06-09T16:46:11.112Z"
+        }
+      }
+    },
+    {
+      "etapa": "Wallet",
+      "teste": "credito e debito promocional",
+      "status": "PASS",
+      "evidencia": {
+        "walletSummary": {
+          "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+          "cashbackBalance": 7,
+          "promotionalCredits": 13,
+          "loyaltyPoints": 200,
+          "transactions": [
+            {
+              "id": "0a909730-34ca-496f-9c8a-8a3cf3a9e7ff",
+              "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+              "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+              "orderId": null,
+              "type": "debit",
+              "source": "checkout",
+              "amount": 7,
+              "description": "Debito E2E",
+              "expiresAt": null,
+              "createdAt": "2026-06-09T16:46:11.263Z"
+            },
+            {
+              "id": "6868bccf-ec2b-4027-9162-231c9b4f47d3",
+              "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+              "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+              "orderId": null,
+              "type": "credit",
+              "source": "manual_bonus",
+              "amount": 20,
+              "description": "Bonus E2E",
+              "expiresAt": null,
+              "createdAt": "2026-06-09T16:46:11.146Z"
+            }
+          ],
+          "cashbackHistory": [
+            {
+              "id": "83b51dbd-f58d-44d9-b552-f8f567485257",
+              "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+              "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+              "orderId": null,
+              "type": "used",
+              "amount": 5,
+              "description": "Uso no checkout E2E",
+              "expiresAt": null,
+              "createdAt": "2026-06-09T16:46:11.112Z"
+            },
+            {
+              "id": "afdf4e76-a70f-40af-96c1-53187a40aa84",
+              "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+              "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+              "orderId": "89ef24c9-1424-4670-8875-749ba63e934c",
+              "type": "earned",
+              "amount": 12,
+              "description": "Cashback 10% do pedido F10-0001",
+              "expiresAt": "2026-07-09T16:46:11.001Z",
+              "createdAt": "2026-06-09T16:46:11.037Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "etapa": "Cupons",
+      "teste": "emissao e uso validado",
+      "status": "PASS",
+      "evidencia": {
+        "coupon": {
+          "id": "b3ddd2d4-e660-45ef-ab08-f9463c459020",
+          "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+          "code": "FASE10",
+          "type": "percentage",
+          "value": 10,
+          "minOrderValue": null,
+          "usageLimit": null,
+          "usedCount": 0,
+          "expiresAt": null,
+          "isActive": true,
+          "createdAt": "2026-06-09T16:46:11.390Z",
+          "updatedAt": "2026-06-09T16:46:11.390Z"
+        },
+        "couponValidation": {
+          "couponId": "b3ddd2d4-e660-45ef-ab08-f9463c459020",
+          "discountAmount": 10,
+          "type": "percentage",
+          "code": "FASE10"
+        }
+      }
+    },
+    {
+      "etapa": "Area do Cliente",
+      "teste": "perfil, pontos, cashback, cupons e historico",
+      "status": "PASS",
+      "evidencia": {
+        "profile": {
+          "profile": {
+            "id": "63a35436-6ed7-47c3-b583-899207d67a85",
+            "name": "Cliente Retencao",
+            "phone": "551198164610",
+            "email": "cliente.20260609164610@demo.local",
+            "birthDate": "1990-06-09T00:00:00.000Z",
+            "totalOrders": 1,
+            "totalSpent": "120"
+          },
+          "intelligence": {
+            "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+            "name": "Cliente Retencao",
+            "phone": "551198164610",
+            "email": "cliente.20260609164610@demo.local",
+            "totalOrders": 1,
+            "totalSpent": 120,
+            "averageTicket": 120,
+            "tenantAverageTicket": 120,
+            "daysSinceLastOrder": 0,
+            "firstOrderAt": "2026-06-09T16:46:10.664Z",
+            "lastOrderAt": "2026-06-09T16:46:10.664Z",
+            "preferredChannel": "storefront",
+            "favoriteProducts": [],
+            "purchaseHours": [
+              {
+                "hour": 13,
+                "orders": 1
+              }
+            ],
+            "segments": [
+              "frequent",
+              "new"
+            ],
+            "optedOut": false
+          },
+          "loyalty": {
+            "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+            "name": "Cliente Retencao",
+            "balance": 200,
+            "totalOrders": 1,
+            "totalSpent": 120,
+            "badges": [
+              "Primeira Compra"
+            ],
+            "history": [
+              {
+                "id": "82027d7a-f7fa-4146-a97b-f04c5069717e",
+                "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+                "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+                "orderId": null,
+                "type": "redeemed",
+                "points": 40,
+                "description": "Resgate E2E",
+                "createdAt": "2026-06-09T16:46:10.938Z"
+              },
+              {
+                "id": "541a1b9c-e97a-4a32-885f-0e58f316d9ed",
+                "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+                "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+                "orderId": "89ef24c9-1424-4670-8875-749ba63e934c",
+                "type": "earned",
+                "points": 240,
+                "description": "Pontos do pedido F10-0001",
+                "createdAt": "2026-06-09T16:46:10.843Z"
+              }
+            ]
+          },
+          "wallet": {
+            "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+            "cashbackBalance": 7,
+            "promotionalCredits": 13,
+            "loyaltyPoints": 200,
+            "transactions": [
+              {
+                "id": "0a909730-34ca-496f-9c8a-8a3cf3a9e7ff",
+                "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+                "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+                "orderId": null,
+                "type": "debit",
+                "source": "checkout",
+                "amount": 7,
+                "description": "Debito E2E",
+                "expiresAt": null,
+                "createdAt": "2026-06-09T16:46:11.263Z"
+              },
+              {
+                "id": "6868bccf-ec2b-4027-9162-231c9b4f47d3",
+                "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+                "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+                "orderId": null,
+                "type": "credit",
+                "source": "manual_bonus",
+                "amount": 20,
+                "description": "Bonus E2E",
+                "expiresAt": null,
+                "createdAt": "2026-06-09T16:46:11.146Z"
+              }
+            ],
+            "cashbackHistory": [
+              {
+                "id": "83b51dbd-f58d-44d9-b552-f8f567485257",
+                "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+                "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+                "orderId": null,
+                "type": "used",
+                "amount": 5,
+                "description": "Uso no checkout E2E",
+                "expiresAt": null,
+                "createdAt": "2026-06-09T16:46:11.112Z"
+              },
+              {
+                "id": "afdf4e76-a70f-40af-96c1-53187a40aa84",
+                "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+                "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+                "orderId": "89ef24c9-1424-4670-8875-749ba63e934c",
+                "type": "earned",
+                "amount": 12,
+                "description": "Cashback 10% do pedido F10-0001",
+                "expiresAt": "2026-07-09T16:46:11.001Z",
+                "createdAt": "2026-06-09T16:46:11.037Z"
+              }
+            ]
+          },
+          "coupons": [
+            {
+              "id": "b3ddd2d4-e660-45ef-ab08-f9463c459020",
+              "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+              "code": "FASE10",
+              "type": "percentage",
+              "value": 10,
+              "minOrderValue": null,
+              "usageLimit": null,
+              "usedCount": 0,
+              "expiresAt": null,
+              "isActive": true,
+              "createdAt": "2026-06-09T16:46:11.390Z",
+              "updatedAt": "2026-06-09T16:46:11.390Z"
+            }
+          ],
+          "orders": [
+            {
+              "id": "89ef24c9-1424-4670-8875-749ba63e934c",
+              "orderNumber": "F10-0001",
+              "total": 120,
+              "status": "completed",
+              "createdAt": "2026-06-09T16:46:10.664Z",
+              "couponId": null,
+              "cashbackUsed": 0
+            }
+          ]
+        },
+        "wallet": {
+          "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+          "cashbackBalance": 7,
+          "promotionalCredits": 13,
+          "loyaltyPoints": 200,
+          "transactions": [
+            {
+              "id": "0a909730-34ca-496f-9c8a-8a3cf3a9e7ff",
+              "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+              "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+              "orderId": null,
+              "type": "debit",
+              "source": "checkout",
+              "amount": 7,
+              "description": "Debito E2E",
+              "expiresAt": null,
+              "createdAt": "2026-06-09T16:46:11.263Z"
+            },
+            {
+              "id": "6868bccf-ec2b-4027-9162-231c9b4f47d3",
+              "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+              "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+              "orderId": null,
+              "type": "credit",
+              "source": "manual_bonus",
+              "amount": 20,
+              "description": "Bonus E2E",
+              "expiresAt": null,
+              "createdAt": "2026-06-09T16:46:11.146Z"
+            }
+          ],
+          "cashbackHistory": [
+            {
+              "id": "83b51dbd-f58d-44d9-b552-f8f567485257",
+              "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+              "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+              "orderId": null,
+              "type": "used",
+              "amount": 5,
+              "description": "Uso no checkout E2E",
+              "expiresAt": null,
+              "createdAt": "2026-06-09T16:46:11.112Z"
+            },
+            {
+              "id": "afdf4e76-a70f-40af-96c1-53187a40aa84",
+              "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+              "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+              "orderId": "89ef24c9-1424-4670-8875-749ba63e934c",
+              "type": "earned",
+              "amount": 12,
+              "description": "Cashback 10% do pedido F10-0001",
+              "expiresAt": "2026-07-09T16:46:11.001Z",
+              "createdAt": "2026-06-09T16:46:11.037Z"
+            }
+          ]
+        },
+        "loyalty": {
+          "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+          "name": "Cliente Retencao",
+          "balance": 200,
+          "totalOrders": 1,
+          "totalSpent": 120,
+          "badges": [
+            "Primeira Compra"
+          ],
+          "history": [
+            {
+              "id": "82027d7a-f7fa-4146-a97b-f04c5069717e",
+              "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+              "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+              "orderId": null,
+              "type": "redeemed",
+              "points": 40,
+              "description": "Resgate E2E",
+              "createdAt": "2026-06-09T16:46:10.938Z"
+            },
+            {
+              "id": "541a1b9c-e97a-4a32-885f-0e58f316d9ed",
+              "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+              "customerId": "63a35436-6ed7-47c3-b583-899207d67a85",
+              "orderId": "89ef24c9-1424-4670-8875-749ba63e934c",
+              "type": "earned",
+              "points": 240,
+              "description": "Pontos do pedido F10-0001",
+              "createdAt": "2026-06-09T16:46:10.843Z"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "etapa": "IA Comercial",
+      "teste": "recomendacoes reais e dashboard de retencao",
+      "status": "FAIL",
+      "evidencia": {
+        "ai": {
+          "generatedAt": "2026-06-09T16:46:11.806Z",
+          "source": "CustomerIntelligenceService+BusinessInsightsService",
+          "churnRiskCustomers": 0,
+          "vipCustomers": 0,
+          "suggestions": [
+            {
+              "type": "cashback",
+              "priority": "high",
+              "message": "Aumentar cashback temporariamente para elevar recompra."
+            }
+          ]
+        },
+        "retention": {
+          "revenueByLoyalty": 120,
+          "revenueByCashback": 0,
+          "revenueByCampaign": 0,
+          "cashbackGenerated": 12,
+          "loyaltyPointsGenerated": 240,
+          "retentionRate": 0,
+          "ltv": 120,
+          "averageFrequency": 1,
+          "reorderRate": 1
+        }
+      }
+    },
+    {
+      "etapa": "Seguranca",
+      "teste": "isolamento de tenant, wallet, cashback e loyalty",
+      "status": "PASS",
+      "evidencia": {
+        "tenantId": "fa9046a1-9f2b-4298-b42a-cfc2e8c5d718",
+        "otherCustomerTenantId": "7b141a88-76ed-4303-8937-7686ae9f82c5",
+        "isolated": false
+      }
+    },
+    {
+      "etapa": "Performance",
+      "teste": "P95 abaixo de 2s",
+      "status": "PASS",
+      "evidencia": {
+        "samples": 50,
+        "p95Ms": 53,
+        "maxMs": 66
+      }
+    }
+  ]
+}
