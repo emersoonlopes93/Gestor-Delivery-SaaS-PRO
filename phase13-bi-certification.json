@@ -1,0 +1,209 @@
+{
+  "phase": "FASE 13 - BI & DATA WAREHOUSE ENTERPRISE",
+  "status": "PASS",
+  "generatedAt": "2026-06-09T23:56:28.041Z",
+  "tenantId": "43ed984a-f90e-47c3-9dd8-dd1a16894eb8",
+  "dataUsed": {
+    "tenants": 2,
+    "products": 3,
+    "completedOrders": 3,
+    "cancelledOrders": 1,
+    "campaignDispatches": 1,
+    "loyaltyTransactions": 2,
+    "cashbackTransactions": 2
+  },
+  "performance": {
+    "p95Ms": 0.015900000000328873,
+    "samples": [
+      0.0018000000000029104,
+      0.0018000000000029104,
+      0.0018000000000029104,
+      0.0018999999997504347,
+      0.001900000000205182,
+      0.002199999999902502,
+      0.0029999999997016857,
+      0.003200000000106229,
+      0.006300000000010186,
+      0.006900000000314321,
+      0.01110000000016953,
+      0.015900000000328873
+    ]
+  },
+  "validations": [
+    {
+      "name": "Receita diaria/semanal/mensal",
+      "status": "PASS",
+      "evidence": {
+        "today": 112,
+        "yesterday": 0,
+        "week": 197,
+        "month": 197,
+        "year": 244
+      }
+    },
+    {
+      "name": "Rentabilidade produto/categoria",
+      "status": "PASS",
+      "evidence": {
+        "products": 3,
+        "categories": 2
+      }
+    },
+    {
+      "name": "Curva ABC correta",
+      "status": "PASS",
+      "evidence": {
+        "first": {
+          "id": "bfd52ca0-4427-421c-9e52-b5e04e52a3a7",
+          "name": "Pizza BI Margem Alta",
+          "quantity": 3,
+          "revenue": 150,
+          "estimatedCost": 22.799999999999997,
+          "grossProfit": 127.2,
+          "marginPercentage": 84.8,
+          "metric": "revenue",
+          "cumulativePercentage": 0.6147540983606558,
+          "classification": "A"
+        }
+      }
+    },
+    {
+      "name": "Heatmap dias e horarios",
+      "status": "PASS",
+      "evidence": {
+        "cells": 112
+      }
+    },
+    {
+      "name": "Forecast 7 e 30 dias",
+      "status": "PASS",
+      "evidence": {
+        "generatedAt": "2026-06-09T23:56:27.803Z",
+        "method": "moving_average_internal_history",
+        "next7Days": {
+          "predictedOrders": 2,
+          "predictedRevenue": 197
+        },
+        "next30Days": {
+          "predictedOrders": 3,
+          "predictedRevenue": 244
+        }
+      }
+    },
+    {
+      "name": "Clientes LTV churn frequencia",
+      "status": "PASS",
+      "evidence": {
+        "source": "CustomerIntelligenceService",
+        "ltv": 122,
+        "averageFrequency": 1.5,
+        "averageTicket": 81.33333333333333,
+        "atRiskCustomers": 0,
+        "estimatedChurn": 0,
+        "summary": {
+          "newCustomers": 1,
+          "recurringCustomers": 1,
+          "vipCustomers": 0,
+          "atRiskCustomers": 0
+        }
+      }
+    },
+    {
+      "name": "Campanhas ROI conversao",
+      "status": "PASS",
+      "evidence": {
+        "source": "CampaignsService+CampaignAutomationService",
+        "sent": 2,
+        "delivered": 2,
+        "read": 1,
+        "clicked": 1,
+        "converted": 1,
+        "revenueGenerated": 112,
+        "roi": 0,
+        "conversionRate": 0.5,
+        "active": 0,
+        "paused": 0
+      }
+    },
+    {
+      "name": "Fidelidade pontos cashback",
+      "status": "PASS",
+      "evidence": {
+        "source": "LoyaltyService+CashbackService+WalletService ledgers",
+        "loyalCustomers": 1,
+        "pointsIssued": 100,
+        "pointsRedeemed": 25,
+        "cashbackIssued": 10,
+        "cashbackUsed": 4
+      }
+    },
+    {
+      "name": "IA insights automatica",
+      "status": "PASS",
+      "evidence": {
+        "insights": 10
+      }
+    },
+    {
+      "name": "Tenant isolation",
+      "status": "PASS",
+      "evidence": {
+        "tenantRevenue": 197,
+        "otherTenantRevenue": 999
+      }
+    },
+    {
+      "name": "Performance P95 < 1s",
+      "status": "PASS",
+      "evidence": {
+        "p95Ms": 0.015900000000328873,
+        "samples": [
+          0.0018000000000029104,
+          0.0018000000000029104,
+          0.0018000000000029104,
+          0.0018999999997504347,
+          0.001900000000205182,
+          0.002199999999902502,
+          0.0029999999997016857,
+          0.003200000000106229,
+          0.006300000000010186,
+          0.006900000000314321,
+          0.01110000000016953,
+          0.015900000000328873
+        ]
+      }
+    }
+  ],
+  "reuseInventory": {
+    "finance": [
+      "AnalyticsService",
+      "OrdersService data",
+      "CashbackService ledger",
+      "WalletService ledger"
+    ],
+    "crm": [
+      "CustomerIntelligenceService",
+      "CRM Enterprise data model",
+      "LoyaltyService ledger",
+      "CampaignAutomationService"
+    ],
+    "inventory": [
+      "RecipesService data",
+      "Stock movements",
+      "Ingredient costs"
+    ],
+    "commercial": [
+      "BusinessInsightsService",
+      "Campaigns",
+      "Coupons",
+      "Cashback",
+      "Fidelidade"
+    ],
+    "ai": [
+      "Agent Tools data",
+      "Customer Intelligence",
+      "Business Insights"
+    ]
+  },
+  "duplicationDetected": false
+}

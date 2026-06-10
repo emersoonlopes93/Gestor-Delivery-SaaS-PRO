@@ -14,7 +14,7 @@ import { CrmEnterpriseController } from './crm-enterprise.controller';
 import { CrmEnterpriseService } from './crm-enterprise.service';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, RbacModule, PromotionsModule, AnalyticsModule, forwardRef(() => CampaignsModule)],
+  imports: [DatabaseModule, AuthModule, RbacModule, PromotionsModule, forwardRef(() => AnalyticsModule), forwardRef(() => CampaignsModule)],
   controllers: [CustomerController, CustomerProfileController, CrmEnterpriseController],
   providers: [CustomerService, CrmSegmentationService, CustomerIntelligenceService, CrmEnterpriseService],
   exports: [CustomerService, CrmSegmentationService, CustomerIntelligenceService, CrmEnterpriseService],

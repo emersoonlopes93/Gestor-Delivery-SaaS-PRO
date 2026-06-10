@@ -158,6 +158,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     label: 'GestÃ£o & Performance',
     items: [
       { id: 'analytics-reports', label: 'RelatÃ³rios Gerenciais', to: '/analytics/reports', icon: ChartLine, permission: 'reports.read' },
+      { id: 'analytics-bi', label: 'Business Intelligence', to: '/analytics/business-intelligence', icon: BarChart3, permission: 'reports.read' },
       { id: 'analytics-goals', label: 'Metas e Desempenho', to: '/analytics/goals', icon: Goal, permission: 'goals.read' },
     ],
   },

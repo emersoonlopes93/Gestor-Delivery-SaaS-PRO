@@ -32,7 +32,7 @@ if (!enableCampaignDispatch && process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true'
     WhatsAppChannelModule, // para enviar as mensagens das campanhas
     RbacModule, // para PermissionsGuard e RbacService
     forwardRef(() => CrmModule),
-    AnalyticsModule,
+    forwardRef(() => AnalyticsModule),
     PromotionsModule,
     ...(enableCampaignDispatch
       ? [

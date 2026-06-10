@@ -1,6 +1,7 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
 import { BusinessInsightsService } from './business-insights.service';
+import { BusinessIntelligenceService } from './business-intelligence.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions, CurrentTenant } from '../common/decorators';
@@ -12,6 +13,7 @@ export class AnalyticsController {
   constructor(
     private readonly analyticsService: AnalyticsService,
     private readonly businessInsightsService: BusinessInsightsService,
+    private readonly businessIntelligenceService: BusinessIntelligenceService,
   ) {}
 
   @Get('dashboard')
@@ -76,5 +78,40 @@ export class AnalyticsController {
   @RequirePermissions('reports.read')
   async getRetention(@CurrentTenant() tenantId: string) {
     return this.businessInsightsService.getRetentionDashboard(tenantId);
+  }
+
+  @Get('business-intelligence')
+  @RequirePermissions('reports.read')
+  async getBusinessIntelligence(@CurrentTenant() tenantId: string) {
+    const [dashboard, profitability, abcCurve, customerIntelligence, heatmap, forecast, products, campaigns, loyalty] =
+      await Promise.all([
+        this.businessIntelligenceService.getDashboard(tenantId),
+        this.businessIntelligenceService.getProfitability(tenantId),
+        this.businessIntelligenceService.getAbcCurve(tenantId),
+        this.businessIntelligenceService.getCustomerIntelligence(tenantId),
+        this.businessIntelligenceService.getHeatmap(tenantId),
+        this.businessIntelligenceService.getForecast(tenantId),
+        this.businessIntelligenceService.getProductDashboard(tenantId),
+        this.businessIntelligenceService.getCampaignDashboard(tenantId),
+        this.businessIntelligenceService.getLoyaltyDashboard(tenantId),
+      ]);
+
+    return {
+      dashboard,
+      profitability,
+      abcCurve,
+      customerIntelligence,
+      heatmap,
+      forecast,
+      products,
+      campaigns,
+      loyalty,
+    };
+  }
+
+  @Get('ai-insights')
+  @RequirePermissions('reports.read')
+  async getAiInsights(@CurrentTenant() tenantId: string) {
+    return this.businessIntelligenceService.getAiInsights(tenantId);
   }
 }

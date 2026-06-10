@@ -42,6 +42,7 @@ import { CrmDashboardPage } from './features/crm/CrmDashboardPage';
 import { PromotionsPage } from './features/promotions/PromotionsPage';
 import { InventoryPage } from './features/inventory/InventoryPage';
 import { ReportsPage, GoalsPage } from './features/analytics';
+import { BusinessIntelligencePage } from './features/analytics/BusinessIntelligencePage';
 import { SuppliersPage } from './features/purchasing/SuppliersPage';
 import { PurchasesPage } from './features/purchasing/PurchasesPage';
 import { InventoryCountPage } from './features/purchasing/InventoryCountPage';
@@ -402,6 +403,14 @@ export function App() {
           element={
             <PermissionGate permission="reports.read">
               <ReportsPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/analytics/business-intelligence"
+          element={
+            <PermissionGate permission="reports.read">
+              <BusinessIntelligencePage />
             </PermissionGate>
           }
         />
