@@ -113,4 +113,47 @@ describe('RevenueLedgerService', () => {
       }),
     }));
   });
+
+  it('creates a negative compensation when an order is cancelled after positive events', async () => {
+    const prisma = makePrisma();
+    prisma.revenueEvent.findMany.mockResolvedValue([
+      { amount: new Prisma.Decimal(100) },
+      { amount: new Prisma.Decimal(25) },
+    ]);
+    prisma.revenueEvent.create.mockImplementation(({ data }) => Promise.resolve({
+      id: 'event-cancel',
+      ...data,
+    }));
+
+    const service = new RevenueLedgerService(prisma as never);
+    const events = await service.recordOrderStatusEvent({
+      tenantId: 'tenant-1',
+      orderId: 'order-1',
+      orderStatus: OrderStatus.cancelled,
+      orderTotal: new Prisma.Decimal(125),
+      sourceChannel: 'storefront',
+      occurredAt: new Date('2026-06-10T12:00:00.000Z'),
+    });
+
+    expect(events[0]).toEqual(expect.objectContaining({
+      type: RevenueEventType.order_cancelled,
+      amount: new Prisma.Decimal(-125),
+      idempotencyKey: 'order:order-1:status:cancelled:compensation',
+    }));
+  });
+
+  it('ignores non-financial order status changes', async () => {
+    const prisma = makePrisma();
+    const service = new RevenueLedgerService(prisma as never);
+
+    const events = await service.recordOrderStatusEvent({
+      tenantId: 'tenant-1',
+      orderId: 'order-1',
+      orderStatus: OrderStatus.preparing,
+      orderTotal: new Prisma.Decimal(100),
+    });
+
+    expect(events).toEqual([]);
+    expect(prisma.revenueEvent.create).not.toHaveBeenCalled();
+  });
 });

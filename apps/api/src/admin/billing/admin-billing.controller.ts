@@ -487,7 +487,7 @@ export class AdminBillingController {
   }
 
   @Get('audit/revenue-events')
-  @RequireAdminPermissions('saas.billing.read')
+  @RequireAdminPermissions('saas.billing.audit')
   async listRevenueEvents(
     @Query('tenantId') tenantId: string,
     @Query('periodStart') periodStart?: string,
@@ -503,7 +503,7 @@ export class AdminBillingController {
   }
 
   @Get('audit/snapshots')
-  @RequireAdminPermissions('saas.billing.read')
+  @RequireAdminPermissions('saas.billing.audit')
   async listUsageSnapshots(@Query('tenantId') tenantId: string) {
     const parsedTenantId = this.requireString(tenantId, 'tenantId');
     return this.prisma.billingUsageSnapshot.findMany({
@@ -527,7 +527,7 @@ export class AdminBillingController {
   }
 
   @Get('audit/subscription-history')
-  @RequireAdminPermissions('saas.billing.read')
+  @RequireAdminPermissions('saas.billing.audit')
   async listSubscriptionStatusHistory(@Query('tenantId') tenantId: string) {
     const parsedTenantId = this.requireString(tenantId, 'tenantId');
     return this.prisma.subscriptionStatusHistory.findMany({

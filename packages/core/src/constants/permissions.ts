@@ -134,6 +134,7 @@ export const ADMIN_PERMISSIONS = {
   'saas.plans.read': 'View plans',
   'saas.plans.manage': 'Manage plans',
   'saas.billing.read': 'View billing',
+  'saas.billing.audit': 'Audit billing ledger',
   'saas.billing.manage': 'Manage billing',
   'saas.support.access': 'Access support tools',
   'saas.support.impersonate': 'Impersonate tenant users',
@@ -246,7 +247,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
   ],
   financial: [
     'saas.tenants.read',
-    'saas.billing.read', 'saas.billing.manage',
+    'saas.billing.read', 'saas.billing.audit', 'saas.billing.manage',
     'saas.metrics.read',
   ],
   commercial: [
@@ -272,5 +273,6 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
     'saas.audit.read',
     'saas.metrics.read',
     'saas.billing.read',
+    'saas.billing.audit',
   ],
 };
