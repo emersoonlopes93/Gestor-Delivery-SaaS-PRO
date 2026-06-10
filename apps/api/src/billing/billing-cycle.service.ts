@@ -205,15 +205,12 @@ export class BillingCycleService {
       cycleId: input.cycleId,
       planId: input.planId,
     });
-    const periodEnd = this.requireCycleEnd(preview.cycle);
 
     return this.prisma.$transaction(async (tx) => {
-      const snapshot = await this.billingUsageService.getOrCreateUsageSnapshot({
+      const snapshot = await this.getOrCreateUsageSnapshotFromPreview({
         tenantId: input.tenantId,
         cycleId: input.cycleId,
-        periodStart: preview.cycle.startedAt,
-        periodEnd,
-        planId: input.planId,
+        preview,
         tx,
       });
 
@@ -303,6 +300,62 @@ export class BillingCycleService {
       throw new BadRequestException('Ciclo sem data final não pode ser fechado.');
     }
     return cycle.endedAt;
+  }
+
+  private async getOrCreateUsageSnapshotFromPreview(input: {
+    tenantId: string;
+    cycleId: string;
+    preview: BillingCycleInvoicePreview;
+    tx: Prisma.TransactionClient;
+  }) {
+    const usage = input.preview.usage;
+    const existing = await input.tx.billingUsageSnapshot.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        cycleId: input.cycleId,
+        periodStart: usage.periodStart,
+        periodEnd: usage.periodEnd,
+      },
+    });
+
+    const data = {
+      sourceChannel: usage.includedChannels.join(','),
+      ordersCount: usage.ordersCount,
+      grossOrdersAmount: usage.grossOrdersAmount,
+      discountsAmount: usage.discountsAmount,
+      deliveryFeeAmount: usage.deliveryFeeAmount,
+      serviceFeeAmount: usage.serviceFeeAmount,
+      billableAmount: usage.billableAmount,
+      source: usage.source,
+      totalRevenue: usage.grossOrdersAmount,
+      totalOrders: usage.ordersCount,
+      totalAdjustments: usage.totalAdjustments ?? ZERO,
+      billingRuleVersionId: usage.billingRuleVersionId ?? null,
+      generatedAt: usage.calculatedAt,
+      generatedBy: 'billing-usage-service',
+      checksum: usage.checksum ?? null,
+    };
+
+    if (existing) {
+      if (input.preview.cycle.status !== 'open') {
+        return existing;
+      }
+
+      return input.tx.billingUsageSnapshot.update({
+        where: { id: existing.id },
+        data,
+      });
+    }
+
+    return input.tx.billingUsageSnapshot.create({
+      data: {
+        tenantId: usage.tenantId,
+        cycleId: input.cycleId,
+        periodStart: usage.periodStart,
+        periodEnd: usage.periodEnd,
+        ...data,
+      },
+    });
   }
 
   private assertValidPeriod(periodStart: Date, periodEnd: Date): void {
