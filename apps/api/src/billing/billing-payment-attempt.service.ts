@@ -529,6 +529,23 @@ export class BillingPaymentAttemptService {
         },
       });
 
+      await tx.subscriptionStatusHistory.create({
+        data: {
+          tenantId: invoice.tenantId,
+          subscriptionId: invoice.subscriptionId,
+          previousStatus: invoice.subscription.status,
+          nextStatus: 'active',
+          reason: 'payment_confirmed',
+          source: 'billing_payment_attempt',
+          actorType: 'system',
+          actorId: null,
+          metadata: {
+            invoiceId,
+            paidAt: paidAt.toISOString(),
+          },
+        },
+      });
+
       await tx.tenant.update({
         where: { id: invoice.tenantId },
         data: { status: 'active' },

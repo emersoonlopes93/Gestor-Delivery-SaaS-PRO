@@ -13,6 +13,7 @@ import { BillingPaymentGatewayService } from '../../billing/billing-payment-gate
 import { BillingGatewayMode, PaymentProvider, Prisma } from '@prisma/client';
 import { TenantBillingResolverService } from '../../billing/tenant-billing-resolver.service';
 import { normalizeSeededRevenueTierLabel } from '../../billing/revenue-tier-label';
+import { RevenueLedgerService } from '../../billing/revenue-ledger.service';
 
 type BillingRevenueTierInput = {
   id?: string;
@@ -70,6 +71,7 @@ export class AdminBillingController {
     private readonly billingPaymentAttemptService: BillingPaymentAttemptService,
     private readonly billingPaymentGatewayService: BillingPaymentGatewayService,
     private readonly tenantBillingResolver: TenantBillingResolverService,
+    private readonly revenueLedgerService: RevenueLedgerService,
   ) {}
 
   @Get('plans')
@@ -484,6 +486,57 @@ export class AdminBillingController {
     });
   }
 
+  @Get('audit/revenue-events')
+  @RequireAdminPermissions('saas.billing.read')
+  async listRevenueEvents(
+    @Query('tenantId') tenantId: string,
+    @Query('periodStart') periodStart?: string,
+    @Query('periodEnd') periodEnd?: string,
+  ) {
+    const parsedTenantId = this.requireString(tenantId, 'tenantId');
+    return this.revenueLedgerService.listEvents({
+      tenantId: parsedTenantId,
+      periodStart: this.parseOptionalDate(periodStart, 'periodStart'),
+      periodEnd: this.parseOptionalDate(periodEnd, 'periodEnd'),
+      take: 200,
+    });
+  }
+
+  @Get('audit/snapshots')
+  @RequireAdminPermissions('saas.billing.read')
+  async listUsageSnapshots(@Query('tenantId') tenantId: string) {
+    const parsedTenantId = this.requireString(tenantId, 'tenantId');
+    return this.prisma.billingUsageSnapshot.findMany({
+      where: { tenantId: parsedTenantId },
+      include: {
+        billingRuleVersion: true,
+        cycle: true,
+        invoices: {
+          select: {
+            id: true,
+            number: true,
+            status: true,
+            total: true,
+            createdAt: true,
+          },
+        },
+      },
+      orderBy: [{ periodStart: 'desc' }, { createdAt: 'desc' }],
+      take: 100,
+    });
+  }
+
+  @Get('audit/subscription-history')
+  @RequireAdminPermissions('saas.billing.read')
+  async listSubscriptionStatusHistory(@Query('tenantId') tenantId: string) {
+    const parsedTenantId = this.requireString(tenantId, 'tenantId');
+    return this.prisma.subscriptionStatusHistory.findMany({
+      where: { tenantId: parsedTenantId },
+      orderBy: [{ createdAt: 'desc' }],
+      take: 100,
+    });
+  }
+
   @Get('invoices/:invoiceId')
   @RequireAdminPermissions('saas.billing.read')
   async getInvoiceDetails(@Param('invoiceId') invoiceId: string) {
@@ -495,6 +548,12 @@ export class AdminBillingController {
         paymentAttempts: {
           orderBy: [{ attemptedAt: 'desc' }, { createdAt: 'desc' }],
         },
+        usageSnapshot: {
+          include: {
+            billingRuleVersion: true,
+          },
+        },
+        billingRuleVersion: true,
         cycle: {
           include: {
             selectedTier: true,
@@ -527,7 +586,7 @@ export class AdminBillingController {
       items: invoice.items,
       paymentAttempts: invoice.paymentAttempts,
       cycle: invoice.cycle,
-      snapshot: invoice.cycle?.usageSnapshots[0] ?? null,
+      snapshot: invoice.usageSnapshot ?? invoice.cycle?.usageSnapshots[0] ?? null,
       subscription: invoice.subscription,
       plan: invoice.subscription.billingPlan,
       tier: invoice.cycle?.selectedTier ?? null,
@@ -757,6 +816,15 @@ export class AdminBillingController {
       throw new BadRequestException(`${field} deve ser uma data válida.`);
     }
 
+    return date;
+  }
+
+  private parseOptionalDate(value: string | undefined, field: string): Date | undefined {
+    if (!value?.trim()) return undefined;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException(`${field} deve ser uma data valida.`);
+    }
     return date;
   }
 

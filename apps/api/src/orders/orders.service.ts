@@ -37,6 +37,7 @@ import { ORDER_STATUS_TRANSITIONS, UpdateOrderStatusDTO } from '@gestor/types';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
 import { OrdersGateway } from './orders.gateway';
 import { KdsService } from '../kds/kds.service';
+import { RevenueLedgerService } from '../billing/revenue-ledger.service';
 
 @Injectable()
 export class OrdersService {
@@ -72,6 +73,7 @@ export class OrdersService {
     private readonly whatsappService: WhatsappService,
     private readonly ordersGateway: OrdersGateway,
     private readonly kdsService: KdsService,
+    private readonly revenueLedgerService: RevenueLedgerService,
   ) {}
 
   async createOrder(slug: string, dto: CreateOrderDTO): Promise<OrderResponseDTO> {
@@ -773,6 +775,19 @@ export class OrdersService {
           note: dto.note || `Status alterado para ${nextStatus}.`,
           actorId,
         },
+      });
+
+      await this.revenueLedgerService.recordOrderStatusEvent({
+        tenantId,
+        orderId,
+        orderStatus: nextStatus,
+        orderTotal: order.total,
+        sourceChannel: order.sourceChannel,
+        occurredAt: new Date(),
+        actorType: actorId ? 'tenant_user' : 'system',
+        actorId,
+        reason: dto.note ?? null,
+        tx,
       });
 
       // Emitir via Socket para o storefront (tempo real)

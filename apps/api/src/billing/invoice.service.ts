@@ -41,6 +41,7 @@ export class InvoiceService {
     subscriptionId: string;
     cycleId: string;
     planId: string;
+    usageSnapshotId?: string;
     tx?: Prisma.TransactionClient;
   }): Promise<Invoice> {
     return this.getOrCreateDraftInvoiceForCycle(input);
@@ -51,6 +52,7 @@ export class InvoiceService {
     subscriptionId: string;
     cycleId: string;
     planId: string;
+    usageSnapshotId?: string;
     tx?: Prisma.TransactionClient;
   }): Promise<Invoice> {
     const client = input.tx ?? this.prisma;
@@ -83,11 +85,24 @@ export class InvoiceService {
       throw new NotFoundException('Ciclo de billing não encontrado.');
     }
 
+    const usageSnapshot = input.usageSnapshotId
+      ? await client.billingUsageSnapshot.findFirst({
+          where: {
+            id: input.usageSnapshotId,
+            tenantId: input.tenantId,
+            cycleId: input.cycleId,
+          },
+          select: { id: true, billingRuleVersionId: true },
+        })
+      : null;
+
     const invoice = await client.invoice.create({
       data: {
         tenantId: input.tenantId,
         subscriptionId: input.subscriptionId,
         cycleId: input.cycleId,
+        usageSnapshotId: usageSnapshot?.id ?? null,
+        billingRuleVersionId: usageSnapshot?.billingRuleVersionId ?? null,
         number: this.buildInvoiceNumber(input.tenantId, input.cycleId),
         status: 'draft',
         subtotal: cycle.totalAmount,

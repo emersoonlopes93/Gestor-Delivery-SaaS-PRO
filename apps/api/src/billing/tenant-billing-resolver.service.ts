@@ -164,6 +164,24 @@ export class TenantBillingResolverService {
         },
       });
 
+      await tx.subscriptionStatusHistory.create({
+        data: {
+          tenantId,
+          subscriptionId: subscription.id,
+          previousStatus: subscription.status,
+          nextStatus: next.status,
+          reason: next.reason,
+          source: 'billing_reconciler',
+          actorType: 'system',
+          actorId: null,
+          metadata: {
+            trialEndsAt: subscription.trialEndsAt?.toISOString() ?? null,
+            gracePeriodEndsAt: (next.gracePeriodEndsAt ?? subscription.gracePeriodEndsAt)?.toISOString() ?? null,
+            reconciledAt: now.toISOString(),
+          },
+        },
+      });
+
       if (next.status === TenantSubscriptionStatus.suspended) {
         await tx.tenant.update({
           where: { id: tenantId },
@@ -248,6 +266,24 @@ export class TenantBillingResolverService {
         requiresPaymentMethod: plan.requiresPaymentMethod,
         provider,
         legacyTenantSubscriptionId: legacySubscription?.id ?? null,
+      },
+    });
+
+    await this.prisma.subscriptionStatusHistory.create({
+      data: {
+        tenantId,
+        subscriptionId: subscription.id,
+        previousStatus: null,
+        nextStatus: subscription.status,
+        reason: 'subscription_created',
+        source: 'billing_resolver',
+        actorType: 'system',
+        actorId: null,
+        metadata: {
+          billingPlanId: plan.id,
+          provider,
+          trialEndsAt: trialEndsAt?.toISOString() ?? null,
+        },
       },
     });
 

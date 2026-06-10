@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import {
   BillingRevenueTier,
@@ -9,6 +9,7 @@ import {
 } from '@prisma/client';
 import { BillingSettingsService } from './billing-settings.service';
 import { BillingRatingService } from './billing-rating.service';
+import { RevenueLedgerService } from './revenue-ledger.service';
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -35,16 +36,24 @@ export type BillingUsagePreview = {
   deliveryFeeAmount: Prisma.Decimal;
   serviceFeeAmount: Prisma.Decimal;
   billableAmount: Prisma.Decimal;
+  source: 'ledger' | 'orders_fallback';
+  billingRuleVersionId?: string | null;
+  ledgerEventsCount?: number;
+  totalAdjustments?: Prisma.Decimal;
+  checksum?: string | null;
   calculatedAt: Date;
   rating?: BillingUsageRatingPreview;
 };
 
 @Injectable()
 export class BillingUsageService {
+  private readonly logger = new Logger(BillingUsageService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly billingSettingsService: BillingSettingsService,
     private readonly billingRatingService: BillingRatingService,
+    private readonly revenueLedgerService: RevenueLedgerService,
   ) {}
 
   async getBillableRevenuePreview(input: {
@@ -59,6 +68,54 @@ export class BillingUsageService {
     const settings = input.settings ?? await this.billingSettingsService.ensureDefaultSettings();
     const includedChannels = this.resolveIncludedChannels(settings);
     const includedStatuses = this.resolveIncludedStatuses(settings);
+
+    const ledgerPreview = await this.revenueLedgerService.getLedgerPreview({
+      tenantId: input.tenantId,
+      periodStart: input.periodStart,
+      periodEnd: input.periodEnd,
+    });
+
+    if (ledgerPreview.eventsCount > 0) {
+      const billableAmount = Prisma.Decimal.max(ledgerPreview.totalRevenue, ZERO);
+      const preview: BillingUsagePreview = {
+        tenantId: input.tenantId,
+        periodStart: input.periodStart,
+        periodEnd: input.periodEnd,
+        includedChannels,
+        includedStatuses,
+        ordersCount: ledgerPreview.totalOrders,
+        excludedOrdersCount: 0,
+        grossOrdersAmount: ledgerPreview.totalRevenue,
+        itemsSubtotalAmount: ledgerPreview.totalRevenue,
+        discountsAmount: ZERO,
+        deliveryFeeAmount: ZERO,
+        serviceFeeAmount: ZERO,
+        billableAmount,
+        source: 'ledger',
+        billingRuleVersionId: ledgerPreview.ruleVersionId,
+        ledgerEventsCount: ledgerPreview.eventsCount,
+        totalAdjustments: ledgerPreview.totalAdjustments,
+        checksum: ledgerPreview.checksum,
+        calculatedAt: new Date(),
+      };
+
+      if (!input.planId) {
+        return preview;
+      }
+
+      return {
+        ...preview,
+        rating: await this.buildRatingPreview(input.planId, billableAmount),
+      };
+    }
+
+    this.logger.warn({
+      message: 'billing_usage_orders_fallback',
+      tenantId: input.tenantId,
+      periodStart: input.periodStart.toISOString(),
+      periodEnd: input.periodEnd.toISOString(),
+    });
+
     const includedWhere = this.buildOrderWhereForBilling({
       tenantId: input.tenantId,
       periodStart: input.periodStart,
@@ -118,6 +175,11 @@ export class BillingUsageService {
       deliveryFeeAmount,
       serviceFeeAmount,
       billableAmount,
+      source: 'orders_fallback',
+      billingRuleVersionId: null,
+      ledgerEventsCount: 0,
+      totalAdjustments: ZERO,
+      checksum: null,
       calculatedAt: new Date(),
     };
 
@@ -175,6 +237,14 @@ export class BillingUsageService {
       deliveryFeeAmount: preview.deliveryFeeAmount,
       serviceFeeAmount: preview.serviceFeeAmount,
       billableAmount: preview.billableAmount,
+      source: preview.source,
+      totalRevenue: preview.grossOrdersAmount,
+      totalOrders: preview.ordersCount,
+      totalAdjustments: preview.totalAdjustments ?? ZERO,
+      billingRuleVersionId: preview.billingRuleVersionId ?? null,
+      generatedAt: preview.calculatedAt,
+      generatedBy: 'billing-usage-service',
+      checksum: preview.checksum ?? null,
     };
 
     if (existing) {

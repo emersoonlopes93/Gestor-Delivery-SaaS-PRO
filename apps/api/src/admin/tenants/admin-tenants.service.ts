@@ -129,14 +129,34 @@ export class AdminTenantsService {
       });
 
       if (subscription && (status === 'suspended' || status === 'active')) {
+        const nextBillingStatus = status === 'suspended' ? 'suspended' : 'active';
         await tx.tenantBillingSubscription.update({
           where: { id: subscription.id },
           data: {
-            status: status === 'suspended' ? 'suspended' : 'active',
+            status: nextBillingStatus,
             suspendedAt: status === 'suspended' ? new Date() : null,
             gracePeriodEndsAt: status === 'active' ? null : subscription.gracePeriodEndsAt,
           },
         });
+
+        if (subscription.status !== nextBillingStatus) {
+          await tx.subscriptionStatusHistory.create({
+            data: {
+              tenantId: id,
+              subscriptionId: subscription.id,
+              previousStatus: subscription.status,
+              nextStatus: nextBillingStatus,
+              reason: status === 'suspended' ? 'admin_suspended_tenant' : 'admin_reactivated_tenant',
+              source: 'saas_admin',
+              actorType: adminId ? 'admin' : 'system',
+              actorId: adminId ?? null,
+              metadata: {
+                previousTenantStatus: tenant.status,
+                nextTenantStatus: status,
+              },
+            },
+          });
+        }
       }
 
       await tx.auditLog.create({

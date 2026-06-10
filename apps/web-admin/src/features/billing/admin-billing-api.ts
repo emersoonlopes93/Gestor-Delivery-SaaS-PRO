@@ -141,7 +141,33 @@ export type BillingUsageSnapshot = {
   deliveryFeeAmount: DecimalLike;
   serviceFeeAmount: DecimalLike;
   billableAmount: DecimalLike;
+  source: string;
+  totalRevenue: DecimalLike;
+  totalOrders: number;
+  totalAdjustments: DecimalLike;
+  billingRuleVersionId: string | null;
+  generatedAt: string | null;
+  generatedBy: string | null;
+  checksum: string | null;
   createdAt: string;
+  billingRuleVersion?: BillingRuleVersion | null;
+  invoices?: Array<Pick<InvoiceSummary, 'id' | 'number' | 'status' | 'total' | 'createdAt'>>;
+};
+
+export type BillingRuleVersion = {
+  id: string;
+  version: number;
+  name: string;
+  description: string | null;
+  includedOrderStatuses: unknown;
+  includedChannels: unknown;
+  revenueEventTypes: unknown;
+  tierConfig: unknown;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  isActive: boolean;
+  createdAt: string;
+  createdByAdminId: string | null;
 };
 
 export type BillingCycleRecord = {
@@ -182,6 +208,8 @@ export type InvoiceSummary = {
   tenantId: string;
   subscriptionId: string;
   cycleId: string | null;
+  usageSnapshotId: string | null;
+  billingRuleVersionId: string | null;
   number: string;
   status: string;
   subtotal: DecimalLike;
@@ -257,8 +285,47 @@ export type BillingUsagePreview = {
   deliveryFeeAmount: DecimalLike;
   serviceFeeAmount: DecimalLike;
   billableAmount: DecimalLike;
+  source: 'ledger' | 'orders_fallback';
+  billingRuleVersionId?: string | null;
+  ledgerEventsCount?: number;
+  totalAdjustments?: DecimalLike;
+  checksum?: string | null;
   calculatedAt: string;
   rating?: UsageRatingPreview;
+};
+
+export type RevenueEvent = {
+  id: string;
+  tenantId: string;
+  orderId: string | null;
+  idempotencyKey: string;
+  source: string;
+  type: string;
+  amount: DecimalLike;
+  currency: string;
+  occurredAt: string;
+  billingPeriodYear: number;
+  billingPeriodMonth: number;
+  status: string;
+  reason: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  createdByType: string;
+  createdById: string | null;
+};
+
+export type SubscriptionStatusHistory = {
+  id: string;
+  tenantId: string;
+  subscriptionId: string;
+  previousStatus: string | null;
+  nextStatus: string;
+  reason: string;
+  source: string;
+  actorType: string;
+  actorId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
 };
 
 export type DraftInvoiceItemPreview = {
@@ -398,6 +465,18 @@ export const adminBillingApi = {
   },
   getTenantBillingInvoices: async (tenantId: string) => {
     const res = await api.get<InvoiceSummary[]>(`/admin/billing/tenants/${tenantId}/invoices`);
+    return res.data;
+  },
+  listRevenueEvents: async (tenantId: string) => {
+    const res = await api.get<RevenueEvent[]>(`/admin/billing/audit/revenue-events${buildQuery({ tenantId })}`);
+    return res.data;
+  },
+  listUsageSnapshots: async (tenantId: string) => {
+    const res = await api.get<BillingUsageSnapshot[]>(`/admin/billing/audit/snapshots${buildQuery({ tenantId })}`);
+    return res.data;
+  },
+  listSubscriptionStatusHistory: async (tenantId: string) => {
+    const res = await api.get<SubscriptionStatusHistory[]>(`/admin/billing/audit/subscription-history${buildQuery({ tenantId })}`);
     return res.data;
   },
   listDraftInvoices: async () => {

@@ -16,6 +16,7 @@ import { PaymentGatewayModule } from '../payment-gateway/payment-gateway.module'
 import { SchedulingModule } from '../scheduling/scheduling.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { KdsModule } from '../kds/kds.module';
+import { BillingDomainModule } from '../billing/billing-domain.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { KdsModule } from '../kds/kds.module';
     SchedulingModule,
     forwardRef(() => NotificationsModule),
     KdsModule,
+    BillingDomainModule,
   ],
   controllers: [OrdersController, PublicOrdersController],
   providers: [OrdersService, CheckoutValidatorService, OrdersGateway],

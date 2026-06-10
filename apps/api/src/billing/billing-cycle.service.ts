@@ -242,6 +242,7 @@ export class BillingCycleService {
         subscriptionId: input.subscriptionId,
         cycleId: input.cycleId,
         planId: input.planId,
+        usageSnapshotId: snapshot.id,
         tx,
       });
 
