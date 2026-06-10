@@ -64,6 +64,10 @@ const baseEnvSchema = z.object({
   ASAAS_BILLING_BASE_URL: z.string().default('https://api-sandbox.asaas.com/v3'),
   ASAAS_BILLING_WEBHOOK_SECRET: z.string().default(''),
   ASAAS_WEBHOOK_TOKEN: z.string().default(''),
+  ASAAS_WEBHOOK_HMAC_SECRET: z.string().default(''),
+  ASAAS_WEBHOOK_ALLOW_LEGACY_TOKEN: z.enum(['true', 'false']).default('false'),
+  WEBHOOK_SECURITY_SMOKE_ENABLED: z.enum(['true', 'false']).default('false'),
+  WEBHOOK_REPLAY_WINDOW_SECONDS: z.coerce.number().int().positive().default(300),
 
   // Storage Driver & Cloudflare R2
   STORAGE_DRIVER: z.enum(['local', 'r2']).optional(),
@@ -183,6 +187,62 @@ const envSchema = baseEnvSchema
     }
 
     if (isProduction) {
+      if (data.JWT_SECRET === data.JWT_REFRESH_SECRET) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['JWT_REFRESH_SECRET'],
+          message: `JWT_REFRESH_SECRET deve ser diferente de JWT_SECRET em producao.`,
+        });
+      }
+
+      if (data.JWT_SECRET.length < 32 || data.JWT_REFRESH_SECRET.length < 32) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['JWT_SECRET'],
+          message: `JWT_SECRET e JWT_REFRESH_SECRET devem ter pelo menos 32 caracteres em producao.`,
+        });
+      }
+
+      if (!data.CORS_ORIGINS.trim() || data.CORS_ORIGINS.includes('localhost')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['CORS_ORIGINS'],
+          message: `CORS_ORIGINS deve ser restrito a dominios reais em producao e nao pode conter localhost.`,
+        });
+      }
+
+      if (data.SWAGGER_ENABLED !== 'false') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['SWAGGER_ENABLED'],
+          message: `SWAGGER_ENABLED deve ser 'false' em producao.`,
+        });
+      }
+
+      if (!data.ASAAS_WEBHOOK_HMAC_SECRET.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['ASAAS_WEBHOOK_HMAC_SECRET'],
+          message: `ASAAS_WEBHOOK_HMAC_SECRET e obrigatorio em producao.`,
+        });
+      }
+
+      if (data.ASAAS_WEBHOOK_ALLOW_LEGACY_TOKEN !== 'false') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['ASAAS_WEBHOOK_ALLOW_LEGACY_TOKEN'],
+          message: `ASAAS_WEBHOOK_ALLOW_LEGACY_TOKEN deve ser 'false' em producao.`,
+        });
+      }
+
+      if (data.WEBHOOK_SECURITY_SMOKE_ENABLED !== 'false') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['WEBHOOK_SECURITY_SMOKE_ENABLED'],
+          message: `WEBHOOK_SECURITY_SMOKE_ENABLED deve ser 'false' em producao.`,
+        });
+      }
+
       if (data.REDIS_ENABLED === 'false') {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -196,6 +256,14 @@ const envSchema = baseEnvSchema
           code: z.ZodIssueCode.custom,
           path: ['REDIS_HOST'],
           message: `REDIS_HOST não pode ser localhost ou vazio em produção.`,
+        });
+      }
+
+      if (data.BULLMQ_ENABLED !== 'true') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['BULLMQ_ENABLED'],
+          message: `BULLMQ_ENABLED must be 'true' in production.`,
         });
       }
     }

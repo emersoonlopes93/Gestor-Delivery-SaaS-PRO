@@ -13,6 +13,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request as ExpressRequest } from 'express';
 import { memoryStorage } from 'multer';
@@ -107,6 +108,7 @@ export class AdminMediaController {
   constructor(private readonly media: MediaLibraryService) {}
 
   @Post('gallery/upload')
+  @Throttle({ public: { limit: 20, ttl: 60 } })
   @RequireAdminPermissions('saas.settings.manage')
   @UseInterceptors(imageUploadInterceptor)
   uploadGlobal(
@@ -167,6 +169,7 @@ export class TenantMediaController {
   constructor(private readonly media: MediaLibraryService) {}
 
   @Post('upload')
+  @Throttle({ public: { limit: 30, ttl: 60 } })
   @RequirePermissions('catalog.update')
   @UseInterceptors(imageUploadInterceptor)
   uploadTenant(

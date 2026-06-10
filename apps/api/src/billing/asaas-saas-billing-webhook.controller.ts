@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, Headers, Logger, Post, Req } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { z } from 'zod';
 import { Public } from '../common/decorators';
@@ -26,6 +27,7 @@ export class AsaasSaasBillingWebhookController {
   ) {}
 
   @Public()
+  @Throttle({ public: { limit: 120, ttl: 60 } })
   @Post('asaas-saas')
   async handleAsaasSaasWebhook(
     @Body() body: unknown,

@@ -82,3 +82,37 @@ pnpm --filter @gestor/api test
 pnpm lint
 pnpm build
 ```
+
+## Production Release Gates
+
+Gates obrigatorios para promover producao controlada:
+
+- typecheck verde;
+- lint verde ou com warnings nao bloqueantes documentados;
+- testes unitarios/integracao verdes;
+- build verde;
+- `pnpm prisma:validate` verde;
+- `pnpm --filter @gestor/api prisma:generate` verde;
+- `pnpm --filter @gestor/api prisma:migrate:deploy` aplicado em staging;
+- Staging Smoke Gate verde;
+- backup recente confirmado;
+- restore testado nos ultimos 7 dias;
+- health staging `ok`;
+- Redis remoto e BullMQ ativos em producao;
+- storage remoto/CDN configurados;
+- secrets/env hardening revisado;
+- aprovacao manual de release;
+- deploy producao;
+- health producao publico/admin `ok`;
+- smoke minimo pos-producao sem dados reais indevidos.
+
+Bloqueie o release se qualquer item abaixo acontecer:
+
+- migration falha;
+- billing smoke falha;
+- backup ou restore indisponivel;
+- `WEBHOOK_SECURITY_SMOKE_ENABLED=true` em producao;
+- `ASAAS_WEBHOOK_ALLOW_LEGACY_TOKEN=true` em producao;
+- Redis/BullMQ degradado antes do go-live;
+- storage local configurado em producao;
+- plano de rollback ausente.

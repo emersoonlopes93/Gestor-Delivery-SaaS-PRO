@@ -1,4 +1,5 @@
 import { Controller, Post, Body, Get, UseGuards, Req } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 import { AdminAuthService } from './admin-auth.service';
@@ -30,12 +31,14 @@ export class AdminAuthController {
   ) {}
 
   @Public()
+  @Throttle({ auth: { limit: 5, ttl: 60 } })
   @Post('login')
   async login(@Body() dto: AdminLoginDto, @Req() req: Request) {
     return this.authService.login(dto.email, dto.password, sessionContext(req));
   }
 
   @Public()
+  @Throttle({ auth: { limit: 10, ttl: 60 } })
   @Post('refresh')
   async refresh(@Body() dto: AdminRefreshDto, @Req() req: Request) {
     return this.authService.refreshToken(dto.refreshToken, sessionContext(req));

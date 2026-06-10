@@ -1,4 +1,5 @@
 import { Controller, Get, Param, NotFoundException, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { StorefrontService } from './storefront.service';
 import { Public } from '../common/decorators';
 
@@ -8,6 +9,7 @@ export class StorefrontController {
 
   @Get(':slug')
   @Public() // Explicitly open to the public without generic JWT rules
+  @Throttle({ public: { limit: 120, ttl: 60 } })
   async getStorefront(
     @Param('slug') slug: string,
     @Query('fulfillmentType') fulfillmentType?: 'delivery' | 'pickup',
@@ -21,6 +23,7 @@ export class StorefrontController {
   
   @Get(':slug/slots')
   @Public()
+  @Throttle({ public: { limit: 120, ttl: 60 } })
   async getSlots(
     @Param('slug') slug: string,
     @Query('date') date?: string,
