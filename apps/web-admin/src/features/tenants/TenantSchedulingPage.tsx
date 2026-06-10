@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api-client';
 
@@ -68,33 +68,23 @@ export function TenantSchedulingPage() {
 
   const canShowSlotsPreview = useMemo(() => settings?.enabled && settings.acceptScheduledOrders, [settings]);
 
-  useEffect(() => {
-    if (!tenantId) return;
-    setLoading(true);
-    setErrorMessage(null);
-    Promise.all([loadSettings(), loadWindows()])
-      .then(() => loadAvailableSlots())
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [tenantId]);
-
-  async function loadSettings() {
+  const loadSettings = useCallback(async () => {
     if (!tenantId) return;
     const res = await api.get<SchedulingSettings>('/scheduling/settings');
     if (res.success) {
       setSettings(res.data);
     }
-  }
+  }, [tenantId]);
 
-  async function loadWindows() {
+  const loadWindows = useCallback(async () => {
     if (!tenantId) return;
     const res = await api.get<SchedulingWindow[]>('/scheduling/windows');
     if (res.success) {
       setWindows(res.data);
     }
-  }
+  }, [tenantId]);
 
-  async function loadAvailableSlots() {
+  const loadAvailableSlots = useCallback(async () => {
     if (!tenantId || !previewDate) return;
     try {
       const res = await api.get<AvailableSlot[]>(`/scheduling/time-slots/available?date=${previewDate}`);
@@ -104,7 +94,17 @@ export function TenantSchedulingPage() {
     } catch {
       setAvailableSlots([]);
     }
-  }
+  }, [previewDate, tenantId]);
+
+  useEffect(() => {
+    if (!tenantId) return;
+    setLoading(true);
+    setErrorMessage(null);
+    Promise.all([loadSettings(), loadWindows()])
+      .then(() => loadAvailableSlots())
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [tenantId, loadSettings, loadWindows, loadAvailableSlots]);
 
   function setSettingField<Key extends keyof SchedulingSettings>(key: Key, value: SchedulingSettings[Key]) {
     setSettings((prev) => (prev ? { ...prev, [key]: value } : prev));

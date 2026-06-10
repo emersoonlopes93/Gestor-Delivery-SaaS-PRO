@@ -195,7 +195,7 @@ export class OrdersService {
 
           const sourceUpsellId = (line as ValidatedLine & { sourceUpsellId?: string }).sourceUpsellId || null;
 
-          const orderItem = await tx.orderItem.create({
+          await tx.orderItem.create({
             data: {
               orderId: newOrder.id,
               tenantId,
@@ -1036,7 +1036,7 @@ export class OrdersService {
         const snapshotCatalogV2Json = line.snapshotCatalogV2Json;
         const sourceUpsellId = line.lineType === 'product' ? line.sourceUpsellId || null : null;
 
-        const orderItem = await tx.orderItem.create({
+        await tx.orderItem.create({
           data: {
             orderId: order.id,
             tenantId,
@@ -1083,7 +1083,7 @@ export class OrdersService {
   }
 
   private mapOrderItemToCreateDTO(
-    item: Prisma.OrderItemGetPayload<{}>,
+    item: Prisma.OrderItemGetPayload<Record<string, never>>,
   ): CreateOrderItemDTO {
     // Se tiver snapshotCatalogV2Json, usamos ele como base
     if (item.snapshotCatalogV2Json) {

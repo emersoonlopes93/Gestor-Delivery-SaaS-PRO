@@ -33,6 +33,12 @@ describe('ConversationService - Session Expiration & Exit Commands', () => {
             customer: {
               upsert: jest.fn(),
             },
+            aiAgentConfig: {
+              findUnique: jest.fn().mockResolvedValue(null),
+            },
+            systemConfig: {
+              findFirst: jest.fn().mockResolvedValue(null),
+            },
           },
         },
         {

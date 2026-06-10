@@ -2,19 +2,22 @@ import { Controller, Get, Post, Body, Put, Param, Delete, UseGuards } from '@nes
 import { SuppliersService } from './suppliers.service';
 import { CreateSupplierDTO, UpdateSupplierDTO, SupplierDTO } from '@gestor/types';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
-import { CurrentTenant } from '../common/decorators';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
+import { CurrentTenant, RequirePermissions } from '../common/decorators';
 
 @Controller('suppliers')
-@UseGuards(TenantAuthGuard)
+@UseGuards(TenantAuthGuard, PermissionsGuard)
 export class SuppliersController {
   constructor(private readonly suppliersService: SuppliersService) {}
 
   @Get()
+  @RequirePermissions('purchasing.read')
   async findAll(@CurrentTenant() tenantId: string): Promise<SupplierDTO[]> {
     return this.suppliersService.findAll(tenantId);
   }
 
   @Get(':id')
+  @RequirePermissions('purchasing.read')
   async findOne(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,
@@ -23,6 +26,7 @@ export class SuppliersController {
   }
 
   @Post()
+  @RequirePermissions('purchasing.manage')
   async create(
     @CurrentTenant() tenantId: string,
     @Body() dto: CreateSupplierDTO,
@@ -31,6 +35,7 @@ export class SuppliersController {
   }
 
   @Put(':id')
+  @RequirePermissions('purchasing.manage')
   async update(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,
@@ -40,6 +45,7 @@ export class SuppliersController {
   }
 
   @Delete(':id')
+  @RequirePermissions('purchasing.manage')
   async remove(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,

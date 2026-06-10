@@ -82,6 +82,10 @@ export const TENANT_PERMISSIONS = {
   'finance.read': 'View financial data',
   'finance.manage': 'Manage financial data',
 
+  // Purchasing module
+  'purchasing.read': 'View suppliers and purchases',
+  'purchasing.manage': 'Manage suppliers and purchases',
+
   // Settings module
   'settings.read': 'View settings',
   'settings.manage': 'Manage settings',
@@ -166,6 +170,7 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
     'crm.read', 'crm.manage_customers', 'crm.manage_coupons', 'crm.manage_loyalty_cashback', 'crm.apply_benefits',
     'delivery.read', 'delivery.manage_drivers', 'delivery.dispatch', 'delivery.manage',
     'inventory.read', 'inventory.create', 'inventory.update', 'inventory.adjust', 'inventory.manage_recipe', 'inventory.view_costs', 'inventory.view_margin',
+    'purchasing.read', 'purchasing.manage',
     'finance.read',
     'settings.read',
     'users.read',
@@ -212,6 +217,7 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
     'orders.read',
     'reports.read', 'reports.view_costs', 'reports.view_margin', 'reports.export',
     'finance.read', 'finance.manage',
+    'purchasing.read', 'purchasing.manage',
     'cash.close',
     'dashboard.view',
     'billing.read', 'billing.write',

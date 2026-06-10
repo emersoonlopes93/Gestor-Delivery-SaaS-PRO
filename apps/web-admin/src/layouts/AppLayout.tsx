@@ -29,6 +29,7 @@ type SidebarItem = {
   to: string;
   icon: LucideIcon;
   permission?: string;
+  featureFlag?: string;
 };
 
 type SidebarGroup = {
@@ -38,6 +39,12 @@ type SidebarGroup = {
 };
 
 const SIDEBAR_STORAGE_KEY = 'admin_sidebar_state_v1';
+
+function isFeatureVisible(flag: string | undefined): boolean {
+  if (!flag) return true;
+  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
+  return env[flag] === 'true';
+}
 
 const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
   {
@@ -52,11 +59,11 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     id: 'platform',
     label: 'Plataforma',
     items: [
-      { id: 'franchise', label: 'Franquias', to: '/franchise', icon: Globe, permission: 'saas.franchise.read' },
+      { id: 'franchise', label: 'Franquias', to: '/franchise', icon: Globe, permission: 'saas.franchise.read', featureFlag: 'VITE_FEATURE_FRANCHISE' },
       { id: 'billing', label: 'Billing Console', to: '/billing', icon: CreditCard, permission: 'saas.billing.read' },
-      { id: 'integrations', label: 'Marketplace & IA', to: '/integrations', icon: Puzzle, permission: 'saas.settings.read' },
+      { id: 'integrations', label: 'Marketplace & IA', to: '/integrations', icon: Puzzle, permission: 'saas.settings.read', featureFlag: 'VITE_FEATURE_ADMIN_INTEGRATIONS' },
       { id: 'media', label: 'Biblioteca Global', to: '/media', icon: Images, permission: 'saas.settings.read' },
-      { id: 'ai-global', label: 'Agente IA Global', to: '/ai-agent/global', icon: Bot, permission: 'saas.ai.read' },
+      { id: 'ai-global', label: 'Agente IA Global', to: '/ai-agent/global', icon: Bot, permission: 'saas.ai.read', featureFlag: 'VITE_FEATURE_AI_AGENT' },
       { id: 'audit-logs', label: 'Auditoria', to: '/audit-logs', icon: Shield, permission: 'saas.audit.read' },
     ],
   },
@@ -179,7 +186,9 @@ export function AppLayout() {
   const groups = useMemo(() => {
     const filtered: SidebarGroup[] = [];
     for (const g of SIDEBAR_GROUPS) {
-      const items = g.items.filter((it) => (it.permission ? hasPermission(userPermissions, it.permission) : true));
+      const items = g.items
+        .filter((it) => isFeatureVisible(it.featureFlag))
+        .filter((it) => (it.permission ? hasPermission(userPermissions, it.permission) : true));
       if (items.length) filtered.push({ ...g, items });
     }
     return filtered;

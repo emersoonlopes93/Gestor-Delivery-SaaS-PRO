@@ -5,7 +5,6 @@ import { ProductsService } from '../products/products.service';
 import { CategoriesService } from '../categories/categories.service';
 import { MediaLibraryService } from '../../upload/media-library.service';
 import {
-  MENU_TEMPLATES,
   getTemplateById,
   getTemplateBySegment,
   listTemplatesSummary,

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { AdminTenantsService } from './admin-tenants.service';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
 import { AdminPermissionsGuard } from '../rbac/admin-permissions.guard';
@@ -29,7 +29,7 @@ export class AdminTenantsController {
   }
 
   @Post()
-  @RequireAdminPermissions('saas.tenants.update')
+  @RequireAdminPermissions('saas.tenants.create')
   async create(
     @Body() body: { name: string; slug: string; status?: 'active' | 'inactive' | 'suspended' | 'trial'; billingPlanId?: string },
   ) {
@@ -41,8 +41,9 @@ export class AdminTenantsController {
   async updateStatus(
     @Param('id') id: string,
     @Body() body: { status: 'active' | 'inactive' | 'suspended' | 'trial' },
+    @CurrentUser('id') adminId: string,
   ) {
-    return this.tenantsService.updateStatus(id, body.status);
+    return this.tenantsService.updateStatus(id, body.status, adminId);
   }
 
   @Put(':id')
@@ -63,13 +64,17 @@ export class AdminTenantsController {
     return this.tenantsService.createBillingV2Subscription(id, body.billingPlanId);
   }
   
-  @Get(':id/impersonate')
-  @RequireAdminPermissions('saas.tenants.update')
+  @Post(':id/impersonate')
+  @RequireAdminPermissions('saas.support.impersonate')
   async impersonate(
     @Param('id') id: string,
     @CurrentUser('id') adminId: string,
-    @Query('reason') reason?: string,
+    @Body() body: { reason?: string },
   ) {
-    return this.tenantAuthService.impersonate(id, adminId, reason || 'Support request');
+    const reason = body.reason?.trim();
+    if (!reason) {
+      throw new BadRequestException('Motivo da impersonation e obrigatorio.');
+    }
+    return this.tenantAuthService.impersonate(id, adminId, reason);
   }
 }

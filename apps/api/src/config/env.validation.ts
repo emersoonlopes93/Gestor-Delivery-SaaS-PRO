@@ -63,6 +63,7 @@ const baseEnvSchema = z.object({
   ASAAS_BILLING_API_KEY: z.string().default(''),
   ASAAS_BILLING_BASE_URL: z.string().default('https://api-sandbox.asaas.com/v3'),
   ASAAS_BILLING_WEBHOOK_SECRET: z.string().default(''),
+  ASAAS_WEBHOOK_TOKEN: z.string().default(''),
 
   // Storage Driver & Cloudflare R2
   STORAGE_DRIVER: z.enum(['local', 'r2']).optional(),

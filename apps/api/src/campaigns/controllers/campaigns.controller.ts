@@ -16,13 +16,13 @@ import { RecoveryCampaignService } from '../services/recovery-campaign.service';
 import { UpsellRecommendationEngine, UpsellRecommendationInput } from '../services/upsell-recommendation.engine';
 import { AbandonedCartService } from '../services/abandoned-cart.service';
 import { CampaignAutomationService } from '../services/campaign-automation.service';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions as Permissions } from '../../common/decorators';
 import { AuthenticatedRequest } from '../../common/interfaces/request.interface';
 
 @Controller('campaigns')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(TenantAuthGuard, PermissionsGuard)
 export class CampaignsController {
   constructor(
     private readonly campaignsService: CampaignsService,

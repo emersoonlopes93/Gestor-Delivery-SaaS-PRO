@@ -17,7 +17,7 @@ import type { ChatSession, Prisma } from '@prisma/client';
 import type { TenantJwtPayload } from '@gestor/types';
 import { ConversationService, CreateMessageDto } from '../../ai-agent/services/conversation.service';
 import { PrismaService } from '../../database/prisma.service';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions as Permissions } from '../../common/decorators';
 import { QuickRepliesService } from '../services/quick-replies.service';
@@ -28,7 +28,7 @@ import { ChatGateway } from '../chat.gateway';
 type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
 
 @Controller('chat')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(TenantAuthGuard, PermissionsGuard)
 export class ChatController {
   private readonly logger = new Logger('ChatController');
   constructor(

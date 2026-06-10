@@ -86,7 +86,7 @@ export class AnalyticsService {
       productUnitCost: Map<string, number>;
     },
   ): number {
-    let unitCost = item.productId ? cache.productUnitCost.get(item.productId) ?? 0 : 0;
+    const unitCost = item.productId ? cache.productUnitCost.get(item.productId) ?? 0 : 0;
     return unitCost * this.toNumber(item.quantity);
   }
 

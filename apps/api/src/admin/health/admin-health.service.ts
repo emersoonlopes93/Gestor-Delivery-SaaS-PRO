@@ -7,6 +7,39 @@ export class AdminHealthService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  async getSystemHealth() {
+    const dbStartedAt = Date.now();
+    const databaseOk = await this.prisma.isHealthy();
+
+    return {
+      status: databaseOk ? 'ok' : 'degraded',
+      checkedAt: new Date().toISOString(),
+      services: {
+        database: {
+          ok: databaseOk,
+          latencyMs: Date.now() - dbStartedAt,
+        },
+        redis: {
+          enabled: process.env.REDIS_ENABLED !== 'false',
+          configured: Boolean(process.env.REDIS_HOST && process.env.REDIS_HOST !== 'localhost'),
+        },
+        bullmq: {
+          enabled: process.env.BULLMQ_ENABLED === 'true',
+        },
+        campaignsDispatch: {
+          enabled: process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true',
+        },
+      },
+      productionReadiness: {
+        nodeEnv: process.env.NODE_ENV ?? 'development',
+        storageDriver: process.env.MEDIA_STORAGE_PROVIDER || process.env.MEDIA_STORAGE_DRIVER || process.env.STORAGE_DRIVER || 'local',
+        billingPaymentsEnabled: process.env.BILLING_PAYMENTS_ENABLED === 'true',
+        billingGatewayProvider: process.env.BILLING_GATEWAY_PROVIDER ?? 'manual',
+        billingGatewayMode: process.env.BILLING_GATEWAY_MODE ?? 'disabled',
+      },
+    };
+  }
+
   /**
    * Check health/status of a specific tenant.
    */

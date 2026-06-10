@@ -15,6 +15,12 @@ export class AdminHealthController {
     return this.healthService.getHealthOverview();
   }
 
+  @Get('system')
+  @RequireAdminPermissions('saas.metrics.read')
+  async getSystemHealth() {
+    return this.healthService.getSystemHealth();
+  }
+
   @Get('tenant/:id')
   @RequireAdminPermissions('saas.tenants.read')
   async getTenantHealth(@Param('id') id: string) {

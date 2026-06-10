@@ -9,6 +9,7 @@ describe('SchedulingGeneratorService', () => {
   let prismaMock: {
     schedulingSettings: { findUnique: jest.Mock };
     schedulingWindow: { findMany: jest.Mock };
+    timeSlot: { updateMany: jest.Mock };
   };
   let schedulingServiceMock: { generateTimeSlots: jest.Mock };
 
@@ -19,6 +20,9 @@ describe('SchedulingGeneratorService', () => {
       },
       schedulingWindow: {
         findMany: jest.fn(),
+      },
+      timeSlot: {
+        updateMany: jest.fn(),
       },
     };
 

@@ -55,6 +55,7 @@ type SidebarItem = {
   to: string;
   icon: LucideIcon;
   permission?: string;
+  featureFlag?: string;
   isExternal?: boolean;
   match?: (pathname: string) => boolean;
 };
@@ -66,6 +67,12 @@ type SidebarGroup = {
 };
 
 const SIDEBAR_STORAGE_KEY = 'tenant_sidebar_state_v1';
+
+function isFeatureVisible(flag: string | undefined): boolean {
+  if (!flag) return true;
+  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
+  return env[flag] === 'true';
+}
 
 const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
   {
@@ -98,8 +105,8 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
       { id: 'catalog-products', label: 'Produtos', to: '/catalog/products', icon: Box, permission: 'catalog.read' },
       { id: 'catalog-complements', label: 'Grupos de OpÃ§Ãµes', to: '/catalog/option-groups', icon: SlidersHorizontal, permission: 'catalog.manage_option_groups' },
       { id: 'catalog-combos', label: 'Combos', to: '/catalog/combos', icon: Package, permission: 'catalog.manage_combos' },
-      { id: 'catalog-upsells', label: 'Upsells', to: '/catalog/upsells', icon: SlidersHorizontal, permission: 'catalog.read' },
-      { id: 'catalog-inventory', label: 'Estoque & Ficha TÃ©cnica', to: '/inventory', icon: ClipboardList, permission: 'inventory.read' },
+      { id: 'catalog-upsells', label: 'Upsells', to: '/catalog/upsells', icon: SlidersHorizontal, permission: 'catalog.read', featureFlag: 'VITE_FEATURE_UPSELLS' },
+      { id: 'catalog-inventory', label: 'Estoque & Ficha TÃ©cnica', to: '/inventory', icon: ClipboardList, permission: 'inventory.read', featureFlag: 'VITE_FEATURE_INVENTORY_ADVANCED' },
     ],
   },
   {
@@ -116,7 +123,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     label: 'LogÃ­stica',
     items: [
       { id: 'delivery-dispatch', label: 'Despacho Em Tempo Real', to: '/delivery/dispatch', icon: Truck, permission: 'delivery.read' },
-      { id: 'delivery-map', label: 'Mapa (Tempo Real)', to: '/delivery/map', icon: MapPin, permission: 'delivery.read' },
+      { id: 'delivery-map', label: 'Mapa (Tempo Real)', to: '/delivery/map', icon: MapPin, permission: 'delivery.read', featureFlag: 'VITE_FEATURE_DELIVERY_LIVE_MAP' },
       { id: 'delivery-drivers', label: 'Entregadores', to: '/delivery/drivers', icon: Users, permission: 'delivery.manage_drivers' },
       { id: 'delivery-zones', label: 'Zonas de Entrega', to: '/delivery/rates', icon: SlidersHorizontal, permission: 'delivery.manage' },
     ],
@@ -138,9 +145,9 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
       { id: 'management-employees', label: 'FuncionÃ¡rios', to: '/management/employees', icon: Users, permission: 'users.read' },
       { id: 'management-suppliers', label: 'Fornecedores', to: '/management/suppliers', icon: Truck, permission: 'purchasing.read' },
       { id: 'management-purchases', label: 'Compras / Entradas', to: '/management/purchases', icon: ShoppingCart, permission: 'purchasing.read' },
-      { id: 'management-inventory-count', label: 'InventÃ¡rio FÃ­sico', to: '/management/inventory-count', icon: ClipboardList, permission: 'inventory.adjust' },
-      { id: 'management-losses', label: 'Perdas e DesperdÃ­cios', to: '/management/losses', icon: SlidersHorizontal, permission: 'inventory.adjust' },
-      { id: 'management-finance', label: 'Financeiro / Fluxo', to: '/management/finance', icon: Wallet, permission: 'finance.read' },
+      { id: 'management-inventory-count', label: 'InventÃ¡rio FÃ­sico', to: '/management/inventory-count', icon: ClipboardList, permission: 'inventory.adjust', featureFlag: 'VITE_FEATURE_INVENTORY_ADVANCED' },
+      { id: 'management-losses', label: 'Perdas e DesperdÃ­cios', to: '/management/losses', icon: SlidersHorizontal, permission: 'inventory.adjust', featureFlag: 'VITE_FEATURE_INVENTORY_ADVANCED' },
+      { id: 'management-finance', label: 'Financeiro / Fluxo', to: '/management/finance', icon: Wallet, permission: 'finance.read', featureFlag: 'VITE_FEATURE_FINANCE_ADVANCED' },
     ],
   },
   {
@@ -148,8 +155,8 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     label: 'CRM e Marketing',
     items: [
       { id: 'customers', label: 'Clientes (CRM)', to: '/customers', icon: Users, permission: 'crm.read' },
-      { id: 'crm-dashboard', label: 'CRM Enterprise', to: '/crm/dashboard', icon: ChartLine, permission: 'crm.read' },
-      { id: 'marketing-automations', label: 'Automacoes', to: '/marketing/automations', icon: Bot, permission: 'crm.read' },
+      { id: 'crm-dashboard', label: 'CRM Enterprise', to: '/crm/dashboard', icon: ChartLine, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CRM_ADVANCED' },
+      { id: 'marketing-automations', label: 'Automacoes', to: '/marketing/automations', icon: Bot, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CAMPAIGNS' },
       { id: 'promotions', label: 'PromoÃ§Ãµes & Cupons', to: '/promotions', icon: Ticket, permission: 'crm.manage_coupons' },
     ],
   },
@@ -158,17 +165,17 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     label: 'GestÃ£o & Performance',
     items: [
       { id: 'analytics-reports', label: 'RelatÃ³rios Gerenciais', to: '/analytics/reports', icon: ChartLine, permission: 'reports.read' },
-      { id: 'analytics-bi', label: 'Business Intelligence', to: '/analytics/business-intelligence', icon: BarChart3, permission: 'reports.read' },
-      { id: 'analytics-goals', label: 'Metas e Desempenho', to: '/analytics/goals', icon: Goal, permission: 'goals.read' },
+      { id: 'analytics-bi', label: 'Business Intelligence', to: '/analytics/business-intelligence', icon: BarChart3, permission: 'reports.read', featureFlag: 'VITE_FEATURE_BI_ADVANCED' },
+      { id: 'analytics-goals', label: 'Metas e Desempenho', to: '/analytics/goals', icon: Goal, permission: 'goals.read', featureFlag: 'VITE_FEATURE_GOALS' },
     ],
   },
   {
     id: 'whatsapp',
     label: 'WhatsApp & IA',
     items: [
-      { id: 'whatsapp-inbox', label: 'Caixa de Entrada', to: '/whatsapp/inbox', icon: MessageSquare, permission: 'orders.read' },
-      { id: 'whatsapp-campaigns', label: 'Campanhas', to: '/campaigns', icon: Megaphone, permission: 'crm.manage_coupons' },
-      { id: 'whatsapp-config', label: 'Agente IA', to: '/whatsapp/config', icon: Bot, permission: 'settings.manage' },
+      { id: 'whatsapp-inbox', label: 'Caixa de Entrada', to: '/whatsapp/inbox', icon: MessageSquare, permission: 'orders.read', featureFlag: 'VITE_FEATURE_WHATSAPP_ADVANCED' },
+      { id: 'whatsapp-campaigns', label: 'Campanhas', to: '/campaigns', icon: Megaphone, permission: 'crm.manage_coupons', featureFlag: 'VITE_FEATURE_CAMPAIGNS' },
+      { id: 'whatsapp-config', label: 'Agente IA', to: '/whatsapp/config', icon: Bot, permission: 'settings.manage', featureFlag: 'VITE_FEATURE_AI_AGENT' },
     ],
   },
   {
@@ -493,6 +500,7 @@ export function AppLayout() {
     const filtered: SidebarGroup[] = [];
     for (const g of SIDEBAR_GROUPS) {
       const items = g.items
+        .filter((it) => isFeatureVisible(it.featureFlag))
         .filter((it) => (it.permission ? hasPermission(userPermissions, it.permission) : true))
         .map((it) => it);
 

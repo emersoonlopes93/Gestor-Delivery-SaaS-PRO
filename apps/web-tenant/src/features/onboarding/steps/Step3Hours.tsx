@@ -98,7 +98,7 @@ export function Step3Hours({ onNext, onPrev, onMarkValid }: Step3Props) {
   const copyToAll = (fromDay: number) => {
     const fromShifts = hours.filter(h => h.dayOfWeek === fromDay);
     if (fromShifts.length === 0) return;
-    let newHours = hours.filter(h => h.dayOfWeek === fromDay);
+    const newHours = hours.filter(h => h.dayOfWeek === fromDay);
     for (let d = 0; d < 7; d++) {
       if (d === fromDay) continue;
       fromShifts.forEach(s => newHours.push({ ...s, dayOfWeek: d }));
@@ -110,7 +110,7 @@ export function Step3Hours({ onNext, onPrev, onMarkValid }: Step3Props) {
     const fromShifts = hours.filter(h => h.dayOfWeek === fromDay);
     if (fromShifts.length === 0) return;
     const weekdays = [1, 2, 3, 4, 5];
-    let newHours = hours.filter(h => !weekdays.includes(h.dayOfWeek));
+    const newHours = hours.filter(h => !weekdays.includes(h.dayOfWeek));
     weekdays.forEach(d => fromShifts.forEach(s => newHours.push({ ...s, dayOfWeek: d })));
     setHours(newHours);
   };

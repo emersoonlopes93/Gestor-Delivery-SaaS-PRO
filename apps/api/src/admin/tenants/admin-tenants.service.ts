@@ -108,7 +108,7 @@ export class AdminTenantsService {
   /**
    * Update tenant status (activate/suspend).
    */
-  async updateStatus(id: string, status: 'active' | 'inactive' | 'suspended' | 'trial') {
+  async updateStatus(id: string, status: 'active' | 'inactive' | 'suspended' | 'trial', adminId?: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id },
     });
@@ -117,9 +117,45 @@ export class AdminTenantsService {
       throw new Error('Tenant não encontrado');
     }
 
-    return this.prisma.tenant.update({
-      where: { id },
-      data: { status },
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.tenant.update({
+        where: { id },
+        data: { status },
+      });
+
+      const subscription = await tx.tenantBillingSubscription.findFirst({
+        where: { tenantId: id },
+        orderBy: [{ createdAt: 'desc' }],
+      });
+
+      if (subscription && (status === 'suspended' || status === 'active')) {
+        await tx.tenantBillingSubscription.update({
+          where: { id: subscription.id },
+          data: {
+            status: status === 'suspended' ? 'suspended' : 'active',
+            suspendedAt: status === 'suspended' ? new Date() : null,
+            gracePeriodEndsAt: status === 'active' ? null : subscription.gracePeriodEndsAt,
+          },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          tenantId: id,
+          userId: adminId ?? null,
+          userType: adminId ? 'admin' : 'system',
+          action: 'admin.tenant_status_updated',
+          resource: 'tenant',
+          details: {
+            previousStatus: tenant.status,
+            nextStatus: status,
+            billingSubscriptionId: subscription?.id ?? null,
+            billingStatusUpdated: Boolean(subscription && (status === 'suspended' || status === 'active')),
+          },
+        },
+      });
+
+      return updated;
     });
   }
 

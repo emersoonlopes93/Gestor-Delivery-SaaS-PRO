@@ -36,7 +36,7 @@ export class FractionalPricingEngine {
     }
 
     // Ensure total fraction is roughly 1 (100%)
-    const totalFraction = items.reduce((sum, item) => sum + item.fraction, 0);
+    const _totalFraction = items.reduce((sum, item) => sum + item.fraction, 0);
     // Note: We might want to allow > 1 in some edge cases, but mathematically this engine
     // operates best when resolving a single unified product price. 
     // We will just process the math regardless of the sum to stay pure.

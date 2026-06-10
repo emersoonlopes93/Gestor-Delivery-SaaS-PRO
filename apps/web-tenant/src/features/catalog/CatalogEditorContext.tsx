@@ -85,6 +85,7 @@ export function CatalogEditorProvider({ children, value }: { children: React.Rea
   return <CatalogEditorContext.Provider value={value}>{children}</CatalogEditorContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useCatalogEditor() {
   const context = useContext(CatalogEditorContext);
   if (!context) {

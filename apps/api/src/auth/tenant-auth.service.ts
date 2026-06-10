@@ -2,6 +2,7 @@ import {
   Injectable,
   UnauthorizedException,
   NotFoundException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -99,8 +100,9 @@ export class TenantAuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    if ((user.tenant.status as string) !== (TenantStatus.ACTIVE as string) && 
-        (user.tenant.status as string) !== (TenantStatus.TRIAL as string)) {
+    if ((user.tenant.status as string) !== (TenantStatus.ACTIVE as string) &&
+        (user.tenant.status as string) !== (TenantStatus.TRIAL as string) &&
+        (user.tenant.status as string) !== 'suspended') {
       throw new UnauthorizedException('Tenant is not active');
     }
 
@@ -438,6 +440,11 @@ export class TenantAuthService {
    * This should only be callable by Admin users with proper permissions.
    */
   async impersonate(tenantId: string, adminId: string, reason: string) {
+    const normalizedReason = reason?.trim();
+    if (!normalizedReason) {
+      throw new BadRequestException('Motivo da impersonation e obrigatorio.');
+    }
+
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
     });
@@ -464,7 +471,7 @@ export class TenantAuthService {
       impersonatedBy: adminId,
     };
 
-    const accessToken = this.jwtService.sign(payload);
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
 
     // Log the impersonation action
     await this.prisma.auditLog.create({
@@ -476,15 +483,18 @@ export class TenantAuthService {
         resource: 'tenant',
         details: {
           impersonatedUserId: user.id,
-          reason,
+          reason: normalizedReason,
+          expiresIn: '15m',
+          issuedAt: new Date().toISOString(),
         },
       },
     });
 
-    this.logger.log(`Admin ${adminId} impersonating tenant ${tenantId} (Reason: ${reason})`);
+    this.logger.warn(`Admin ${adminId} impersonating tenant ${tenantId} for 15m (Reason: ${normalizedReason})`);
 
     return {
       accessToken,
+      expiresIn: 900,
       tenant: {
         id: tenant.id,
         name: tenant.name,

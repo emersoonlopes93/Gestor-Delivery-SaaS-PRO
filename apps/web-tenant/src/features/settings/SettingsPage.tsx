@@ -46,6 +46,7 @@ const DAY_NAMES = [
 ];
 
 export function SettingsPage() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<Partial<TenantSettings>>({
@@ -327,7 +328,7 @@ export function SettingsPage() {
     const sundayShifts = hours.filter(h => h.dayOfWeek === 0);
     if (sundayShifts.length === 0) return;
     
-    let newHours = hours.filter(h => h.dayOfWeek === 0);
+    const newHours = hours.filter(h => h.dayOfWeek === 0);
     for (let day = 1; day <= 6; day++) {
       sundayShifts.forEach(shift => {
         newHours.push({
@@ -345,7 +346,7 @@ export function SettingsPage() {
     const mondayShifts = hours.filter(h => h.dayOfWeek === 1);
     if (mondayShifts.length === 0) return;
 
-    let newHours = hours.filter(h => h.dayOfWeek < 2 || h.dayOfWeek > 5);
+    const newHours = hours.filter(h => h.dayOfWeek < 2 || h.dayOfWeek > 5);
     for (let day = 2; day <= 5; day++) {
       mondayShifts.forEach(shift => {
         newHours.push({
@@ -366,8 +367,6 @@ export function SettingsPage() {
       </div>
     );
   }
-
-  const navigate = useNavigate();
 
   return (
     <div className="p-6 max-w-5xl mx-auto text-left space-y-8">

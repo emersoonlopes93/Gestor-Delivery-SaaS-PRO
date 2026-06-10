@@ -16,9 +16,12 @@ export class BillingWebhookController {
     @Body() body: unknown,
     @Headers('asaas-access-token') token?: string,
   ) {
-    const asaasWebhookToken = process.env.ASAAS_WEBHOOK_TOKEN;
-    if (asaasWebhookToken && token !== asaasWebhookToken) {
-      throw new BadRequestException('Token de webhook inválido');
+    const asaasWebhookToken = process.env.ASAAS_WEBHOOK_TOKEN?.trim();
+    if (!asaasWebhookToken) {
+      throw new BadRequestException('ASAAS_WEBHOOK_TOKEN nao configurado.');
+    }
+    if (!token || token !== asaasWebhookToken) {
+      throw new BadRequestException('Token de webhook invalido');
     }
 
     const parsed = AsaasWebhookSchema.safeParse(body);
@@ -34,7 +37,7 @@ export class BillingWebhookController {
     const { event, subscription } = parsed.data;
     this.logger.log(`Received Asaas webhook event: ${event}${subscription?.id ? ` (subscriptionId=${subscription.id})` : ''}`);
 
-    if (!subscription || !subscription.id) {
+    if (!subscription?.id) {
       return { received: true };
     }
 
@@ -68,7 +71,6 @@ export class BillingWebhookController {
         statusToUpdate = SubscriptionStatus.canceled;
         break;
       default:
-        // OUTROS EVENTOS NÃO MUDAM STATUS
         break;
     }
 

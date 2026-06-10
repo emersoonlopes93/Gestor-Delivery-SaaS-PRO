@@ -501,14 +501,51 @@ export class BillingPaymentAttemptService {
   }
 
   private async markInvoicePaid(tx: Prisma.TransactionClient, invoiceId: string): Promise<void> {
-    await tx.invoice.update({
+    const paidAt = new Date();
+    const invoice = await tx.invoice.update({
       where: { id: invoiceId },
       data: {
         status: InvoiceStatus.paid,
-        paidAt: new Date(),
+        paidAt,
         failedAt: null,
       },
+      include: { subscription: true },
     });
+
+    if (
+      [
+        'trialing',
+        'past_due',
+        'grace_period',
+        'suspended',
+      ].includes(invoice.subscription.status)
+    ) {
+      await tx.tenantBillingSubscription.update({
+        where: { id: invoice.subscriptionId },
+        data: {
+          status: 'active',
+          suspendedAt: null,
+          gracePeriodEndsAt: null,
+        },
+      });
+
+      await tx.tenant.update({
+        where: { id: invoice.tenantId },
+        data: { status: 'active' },
+      });
+
+      await this.createBillingAuditLog(tx, {
+        tenantId: invoice.tenantId,
+        action: 'billing.subscription_reactivated_after_payment',
+        details: {
+          invoiceId,
+          subscriptionId: invoice.subscriptionId,
+          previousStatus: invoice.subscription.status,
+          nextStatus: 'active',
+          paidAt: paidAt.toISOString(),
+        },
+      });
+    }
   }
 
   private async failInvoiceIfNoPendingAttempts(tx: Prisma.TransactionClient, invoiceId: string): Promise<void> {

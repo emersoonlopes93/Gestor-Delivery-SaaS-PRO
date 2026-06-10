@@ -12,14 +12,14 @@ import {
 import { WhatsAppInstanceService, CreateInstanceDto } from '../services/whatsapp-instance.service';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../database/prisma.service';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions as Permissions } from '../../common/decorators';
 
 import { AuthenticatedRequest } from '../../common/interfaces/request.interface';
 
 @Controller('whatsapp/instance')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(TenantAuthGuard, PermissionsGuard)
 export class WhatsAppInstanceController {
   private readonly logger = new Logger('WhatsAppInstanceController');
 

@@ -2,19 +2,22 @@ import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
 import { PurchasesService } from './purchases.service';
 import { CreatePurchaseDTO, PurchaseDTO } from '@gestor/types';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
-import { CurrentTenant } from '../common/decorators';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
+import { CurrentTenant, RequirePermissions } from '../common/decorators';
 
 @Controller('purchases')
-@UseGuards(TenantAuthGuard)
+@UseGuards(TenantAuthGuard, PermissionsGuard)
 export class PurchasesController {
   constructor(private readonly purchasesService: PurchasesService) {}
 
   @Get()
+  @RequirePermissions('purchasing.read')
   async findAll(@CurrentTenant() tenantId: string): Promise<PurchaseDTO[]> {
     return this.purchasesService.findAll(tenantId);
   }
 
   @Get(':id')
+  @RequirePermissions('purchasing.read')
   async findOne(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,
@@ -23,6 +26,7 @@ export class PurchasesController {
   }
 
   @Post()
+  @RequirePermissions('purchasing.manage')
   async create(
     @CurrentTenant() tenantId: string,
     @Body() dto: CreatePurchaseDTO,

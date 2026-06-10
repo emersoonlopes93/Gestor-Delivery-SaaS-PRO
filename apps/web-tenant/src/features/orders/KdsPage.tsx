@@ -28,10 +28,10 @@ function KdsCard({ job, onPrint, onComplete, updatingId, onViewTicket }: KdsCard
     ? new Date(order.scheduledFor).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
     : '';
 
-  const getElapsedMin = () => {
+  const getElapsedMin = useCallback(() => {
     const min = Math.floor((new Date().getTime() - new Date(job.createdAt).getTime()) / 60000);
     return min >= 0 ? min : 0;
-  };
+  }, [job.createdAt]);
 
   const [elapsed, setElapsed] = useState(getElapsedMin());
 
@@ -41,7 +41,7 @@ function KdsCard({ job, onPrint, onComplete, updatingId, onViewTicket }: KdsCard
       setElapsed(getElapsedMin());
     }, 30000); // atualiza a cada 30 segundos
     return () => clearInterval(timer);
-  }, [job.createdAt]);
+  }, [getElapsedMin]);
 
   // SLA Indicator por cores
   let slaBadge = null;

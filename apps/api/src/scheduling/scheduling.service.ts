@@ -278,7 +278,7 @@ export class SchedulingService {
   private validateTimezone(timezone: string) {
     try {
       Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date());
-    } catch (err) {
+    } catch {
       throw new BadRequestException('Invalid timezone');
     }
   }

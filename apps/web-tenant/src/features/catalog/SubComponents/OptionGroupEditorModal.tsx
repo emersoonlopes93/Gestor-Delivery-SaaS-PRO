@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { CreateOptionGroupDto, OptionGroup, OptionItem } from '@gestor/types';
 import { Modal } from '../../../components/Modal';
 import { api } from '../../../lib/api-client';
@@ -37,28 +37,7 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
   const [items, setItems] = useState<Array<Partial<OptionItem> & { _tempId?: string }>>([]);
   const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
 
-  useEffect(() => {
-    if (isOpen) {
-      if (groupId) {
-        loadGroup(groupId);
-      } else {
-        setGroupForm({
-          name: '',
-          description: '',
-          selectionType: 'multiple',
-          isRequired: false,
-          minSelect: 0,
-          maxSelect: 1,
-          isActive: true,
-          order: 0,
-        });
-        setItems([createEmptyItem()]);
-        setDeletedItemIds([]);
-      }
-    }
-  }, [isOpen, groupId]);
-
-  const createEmptyItem = () => ({
+  const createEmptyItem = useCallback(() => ({
     _tempId: Math.random().toString(36).substring(7),
     name: '',
     description: '',
@@ -68,9 +47,9 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
     allowQuantity: false,
     minQty: 1,
     maxQty: 1,
-  });
+  }), []);
 
-  const loadGroup = async (id: string) => {
+  const loadGroup = useCallback(async (id: string) => {
     setIsLoading(true);
     try {
       const res = await api.get<GroupWithItems>(`/catalog/option-groups/${id}`);
@@ -93,7 +72,28 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [createEmptyItem]);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (groupId) {
+        loadGroup(groupId);
+      } else {
+        setGroupForm({
+          name: '',
+          description: '',
+          selectionType: 'multiple',
+          isRequired: false,
+          minSelect: 0,
+          maxSelect: 1,
+          isActive: true,
+          order: 0,
+        });
+        setItems([createEmptyItem()]);
+        setDeletedItemIds([]);
+      }
+    }
+  }, [createEmptyItem, isOpen, groupId, loadGroup]);
 
   const handleItemChange = (index: number, field: keyof OptionItem, value: unknown) => {
     const newItems = [...items];

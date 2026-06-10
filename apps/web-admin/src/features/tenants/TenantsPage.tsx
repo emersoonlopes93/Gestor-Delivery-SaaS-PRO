@@ -40,8 +40,11 @@ export function TenantsPage() {
   };
 
   const handleImpersonate = async (tenantId: string) => {
+    const reason = window.prompt('Informe o motivo do acesso de suporte:')?.trim();
+    if (!reason) return;
+
     try {
-      const res = await api.get<{ accessToken: string }>(`/admin/tenants/${tenantId}/impersonate`);
+      const res = await api.post<{ accessToken: string }>(`/admin/tenants/${tenantId}/impersonate`, { reason });
       if (res.success && res.data.accessToken) {
         window.open(`http://localhost:5173?impersonate_token=${res.data.accessToken}`, '_blank');
       }

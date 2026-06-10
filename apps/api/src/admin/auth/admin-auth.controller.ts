@@ -2,7 +2,8 @@ import { Controller, Post, Body, Get, UseGuards } from '@nestjs/common';
 import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 import { AdminAuthService } from './admin-auth.service';
 import { AdminAuthGuard } from './admin-auth.guard';
-import { CurrentUser, Public } from '../../common/decorators';
+import { AdminPermissionsGuard } from '../rbac/admin-permissions.guard';
+import { CurrentUser, Public, RequireAdminPermissions } from '../../common/decorators';
 import { TenantAuthService } from '../../auth/tenant-auth.service';
 
 class AdminLoginDto {
@@ -45,7 +46,8 @@ export class AdminAuthController {
     return this.authService.getSession(userId);
   }
 
-  @UseGuards(AdminAuthGuard)
+  @UseGuards(AdminAuthGuard, AdminPermissionsGuard)
+  @RequireAdminPermissions('saas.support.impersonate')
   @Post('impersonate')
   async impersonate(
     @CurrentUser('sub') adminId: string,

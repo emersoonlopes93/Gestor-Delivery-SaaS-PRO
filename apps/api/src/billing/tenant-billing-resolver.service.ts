@@ -5,6 +5,7 @@ import {
   PaymentProvider,
   Prisma,
   TenantBillingSubscription,
+  TenantStatus,
   TenantSubscription,
   TenantSubscriptionStatus,
 } from '@prisma/client';
@@ -142,6 +143,66 @@ export class TenantBillingResolverService {
     };
   }
 
+  async reconcileTenantBillingStatus(tenantId: string, now = new Date()): Promise<TenantBillingState> {
+    const subscription = await this.findLatestBillingV2Subscription(tenantId);
+    if (!subscription) {
+      return this.getTenantBillingState(tenantId);
+    }
+
+    const next = this.resolveNextStatus(subscription, now);
+    if (!next) {
+      return this.getTenantBillingState(tenantId);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.tenantBillingSubscription.update({
+        where: { id: subscription.id },
+        data: {
+          status: next.status,
+          gracePeriodEndsAt: next.gracePeriodEndsAt ?? subscription.gracePeriodEndsAt,
+          suspendedAt: next.status === TenantSubscriptionStatus.suspended ? now : subscription.suspendedAt,
+        },
+      });
+
+      if (next.status === TenantSubscriptionStatus.suspended) {
+        await tx.tenant.update({
+          where: { id: tenantId },
+          data: { status: TenantStatus.suspended },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          tenantId,
+          userId: null,
+          userType: 'system',
+          action: 'billing.subscription_status_reconciled',
+          resource: 'billing',
+          details: {
+            subscriptionId: subscription.id,
+            previousStatus: subscription.status,
+            nextStatus: next.status,
+            reason: next.reason,
+            trialEndsAt: subscription.trialEndsAt?.toISOString() ?? null,
+            gracePeriodEndsAt: (next.gracePeriodEndsAt ?? subscription.gracePeriodEndsAt)?.toISOString() ?? null,
+            reconciledAt: now.toISOString(),
+          },
+        },
+      });
+    });
+
+    this.logger.warn({
+      message: 'billing_subscription_status_reconciled',
+      tenantId,
+      subscriptionId: subscription.id,
+      previousStatus: subscription.status,
+      nextStatus: next.status,
+      reason: next.reason,
+    });
+
+    return this.getTenantBillingState(tenantId);
+  }
+
   async getOrCreateTenantBillingSubscription(tenantId: string, planId?: string): Promise<TenantBillingSubscription> {
     const existing = await this.prisma.tenantBillingSubscription.findFirst({
       where: { tenantId },
@@ -216,6 +277,32 @@ export class TenantBillingResolverService {
       },
       orderBy: [{ createdAt: 'desc' }],
     });
+  }
+
+  private resolveNextStatus(
+    subscription: TenantBillingSubscription,
+    now: Date,
+  ): { status: TenantSubscriptionStatus; gracePeriodEndsAt?: Date; reason: string } | null {
+    if (subscription.status === TenantSubscriptionStatus.trialing && subscription.trialEndsAt && subscription.trialEndsAt < now) {
+      return {
+        status: TenantSubscriptionStatus.grace_period,
+        gracePeriodEndsAt: subscription.gracePeriodEndsAt ?? this.addDays(now, 7),
+        reason: 'trial_expired',
+      };
+    }
+
+    if (
+      (subscription.status === TenantSubscriptionStatus.grace_period || subscription.status === TenantSubscriptionStatus.past_due) &&
+      subscription.gracePeriodEndsAt &&
+      subscription.gracePeriodEndsAt < now
+    ) {
+      return {
+        status: TenantSubscriptionStatus.suspended,
+        reason: 'grace_period_expired',
+      };
+    }
+
+    return null;
   }
 
   private resolveBillingPlanModules(plan: BillingPlan & { modules: { moduleKey: string; isIncluded: boolean }[] }): string[] {

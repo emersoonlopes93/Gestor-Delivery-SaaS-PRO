@@ -178,6 +178,16 @@ export class BillingUsageService {
     };
 
     if (existing) {
+      if (input.cycleId) {
+        const cycle = await client.billingCycleRecord.findUnique({
+          where: { id: input.cycleId },
+          select: { status: true },
+        });
+        if (cycle && cycle.status !== 'open') {
+          return existing;
+        }
+      }
+
       return client.billingUsageSnapshot.update({
         where: { id: existing.id },
         data,
