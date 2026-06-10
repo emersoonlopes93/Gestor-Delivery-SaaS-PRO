@@ -9,12 +9,17 @@ type SmokeConfig = {
   expectBullmq: boolean;
   expectStorageRemote: boolean;
   expectSwaggerDisabled: boolean;
+  expectWebhookEnv: boolean;
   expectedCommit?: string;
   requestTimeoutMs: number;
 };
 
 type SmokeReport = {
   baseUrl: string;
+  mode: 'strict' | 'relaxed';
+  result?: 'GO' | 'GO parcial';
+  productionReady: boolean;
+  productionReadyReasons: string[];
   checks: string[];
   warnings: string[];
   health?: JsonObject;
@@ -81,6 +86,7 @@ function loadConfig(): SmokeConfig {
     expectBullmq: readBoolEnv('SMOKE_EXPECT_BULLMQ', true),
     expectStorageRemote: readBoolEnv('SMOKE_EXPECT_STORAGE_REMOTE', true),
     expectSwaggerDisabled: readBoolEnv('SMOKE_EXPECT_SWAGGER_DISABLED', true),
+    expectWebhookEnv: readBoolEnv('SMOKE_EXPECT_WEBHOOK_ENV', true),
     expectedCommit: process.env.SMOKE_EXPECT_COMMIT?.trim(),
     requestTimeoutMs: readPositiveIntEnv('SMOKE_REQUEST_TIMEOUT_MS', 30000),
   };
@@ -161,10 +167,19 @@ function getNested(value: unknown, path: string): unknown {
   }, value);
 }
 
+function collectReasons(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string' && item.length > 0);
+}
+
 async function main() {
   const config = loadConfig();
+  const strictMode = config.expectRedis && config.expectBullmq;
   const report: SmokeReport = {
     baseUrl: config.baseUrl,
+    mode: strictMode ? 'strict' : 'relaxed',
+    productionReady: false,
+    productionReadyReasons: [],
     checks: [],
     warnings: [],
   };
@@ -172,9 +187,15 @@ async function main() {
   try {
     const healthResponse = await request<JsonObject>(config, 'GET', '/health', [200]);
     report.health = sanitizeForLog(healthResponse.body) as JsonObject;
-    assert(getNested(healthResponse.body, 'status') === 'ok', 'Public health status must be ok.');
     assert(getNested(healthResponse.body, 'checks.database.ok') === true, 'Database health must be ok.');
-    report.checks.push('public health ok');
+    if (strictMode) {
+      assert(getNested(healthResponse.body, 'status') === 'ok', 'Public health status must be ok in strict mode.');
+    } else if (getNested(healthResponse.body, 'status') !== 'ok') {
+      report.warnings.push('public health degraded in relaxed mode');
+    }
+    report.productionReady = getNested(healthResponse.body, 'productionReady') === true;
+    report.productionReadyReasons.push(...collectReasons(getNested(healthResponse.body, 'productionReadiness.reasons')));
+    report.checks.push(strictMode ? 'public health ok' : 'public health checked');
     report.checks.push('database health ok');
 
     if (config.expectRedis) {
@@ -182,6 +203,7 @@ async function main() {
       report.checks.push('redis health ok');
     } else if (getNested(healthResponse.body, 'checks.redis.connected') !== true) {
       report.warnings.push('redis not connected');
+      report.productionReadyReasons.push('Redis not required in relaxed smoke, but productionReady=false');
     }
 
     if (config.expectBullmq) {
@@ -190,6 +212,7 @@ async function main() {
       report.checks.push('bullmq health ok');
     } else if (getNested(healthResponse.body, 'checks.bullmq.enabled') !== true) {
       report.warnings.push('bullmq disabled');
+      report.productionReadyReasons.push('BullMQ not required in relaxed smoke, but productionReady=false');
     }
 
     if (config.adminEmail && config.adminPassword) {
@@ -203,8 +226,15 @@ async function main() {
 
       const adminHealthResponse = await request<JsonObject>(config, 'GET', '/admin/health/system', [200], undefined, accessToken);
       report.adminHealth = sanitizeForLog(adminHealthResponse.body) as JsonObject;
-      assert(getNested(adminHealthResponse.body, 'status') === 'ok', 'Admin health status must be ok.');
-      report.checks.push('admin health ok');
+      if (strictMode) {
+        assert(getNested(adminHealthResponse.body, 'status') === 'ok', 'Admin health status must be ok in strict mode.');
+      } else if (getNested(adminHealthResponse.body, 'status') !== 'ok') {
+        report.warnings.push('admin health degraded in relaxed mode');
+      }
+      report.productionReady =
+        report.productionReady && getNested(adminHealthResponse.body, 'productionReadiness.productionReady') === true;
+      report.productionReadyReasons.push(...collectReasons(getNested(adminHealthResponse.body, 'productionReadiness.reasons')));
+      report.checks.push(strictMode ? 'admin health ok' : 'admin health checked');
 
       if (config.expectProduction) {
         assert(getNested(adminHealthResponse.body, 'productionReadiness.nodeEnv') === 'production', 'NODE_ENV must be production.');
@@ -221,6 +251,8 @@ async function main() {
       report.checks.push('billing env ok');
     } else {
       report.warnings.push('admin health skipped because SMOKE_ADMIN_EMAIL/SMOKE_ADMIN_PASSWORD are not set');
+      report.productionReady = false;
+      report.productionReadyReasons.push('Admin health not checked');
     }
 
     if (config.expectSwaggerDisabled) {
@@ -228,6 +260,20 @@ async function main() {
       report.swaggerStatus = swagger.status;
       assert(swagger.status !== 200, 'Swagger must not be publicly available.');
       report.checks.push('swagger not public');
+    }
+
+    if (config.expectWebhookEnv) {
+      const webhookSmoke = await request<unknown>(config, 'POST', '/billing/webhooks/security-smoke', [200, 201, 400, 401, 403, 404], {});
+      if ([200, 201].includes(webhookSmoke.status)) {
+        report.checks.push('webhook security smoke endpoint available');
+      } else if ([401, 403, 404].includes(webhookSmoke.status)) {
+        report.checks.push('webhook security endpoint guarded or disabled');
+      } else {
+        report.warnings.push(`webhook security endpoint returned HTTP ${webhookSmoke.status}`);
+      }
+      if (config.expectProduction && [200, 201].includes(webhookSmoke.status)) {
+        throw new Error('Webhook security smoke endpoint must not be exposed in production.');
+      }
     }
 
     const corsOrigin = process.env.SMOKE_CORS_ORIGIN?.trim();
@@ -241,6 +287,18 @@ async function main() {
       const version = String(getNested(healthResponse.body, 'version') ?? '');
       if (!version.includes(config.expectedCommit)) {
         report.warnings.push('expected commit check skipped: health does not expose commit sha');
+      }
+    }
+
+    if (strictMode) {
+      assert(report.productionReady === true, `Strict smoke requires productionReady=true. Reasons: ${report.productionReadyReasons.join('; ') || 'unknown'}`);
+      report.result = 'GO';
+    } else {
+      report.productionReady = false;
+      report.result = 'GO parcial';
+      report.warnings.push('relaxed smoke does not authorize production promotion');
+      if (report.productionReadyReasons.length === 0) {
+        report.productionReadyReasons.push('Relaxed smoke was requested');
       }
     }
 

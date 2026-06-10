@@ -16,7 +16,7 @@ Data da ultima revisao: 2026-06-10.
 | `pnpm lint` | validated | Passou; warnings antigos no storefront documentados | Sim |
 | `pnpm build` | validated | Build passou; warnings de chunk grande em frontend | Sim |
 | Staging Smoke Gate | validated | Run verde: `27301493201` | Sim |
-| Health staging | validated | `/api/v1/health` status `ok`, DB `ok` em 2026-06-10 | Sim |
+| Health staging | blocked | API/DB ok, mas Redis/BullMQ degradados deixam `productionReady=false` | Sim |
 | Rollback documentado | configured | `docs/release-rollback-runbook.md` | Sim |
 | Admin access documentado | configured | `docs/admin-access-runbook.md` | Sim |
 | Primeiro tenant checklist | configured | `docs/first-paying-tenant-checklist.md` | Sim |
@@ -30,9 +30,12 @@ Data da ultima revisao: 2026-06-10.
 | Retencao 7 diarios / 4 semanais | pending | Politica documentada, nao comprovada no provedor | Sim |
 | PITR | pending | Nao comprovado no provedor | Sim |
 | Restore testado nos ultimos 7 dias | pending | Procedimento documentado, restore real ainda nao executado | Sim |
-| Redis remoto | blocked | Health atual: Redis `degraded`, conectado `false` | Sim |
-| `REDIS_ENABLED=true` | configured | Health indica Redis enabled, mas sem conexao | Sim |
-| BullMQ real | blocked | Health atual: BullMQ `disabled`; Render `BULLMQ_ENABLED=false` | Sim |
+| Redis configurado | blocked | Health atual: Redis `degraded`, conectado `false`; ultimo smoke de filas pendente/NO-GO sem Redis real | Sim |
+| `REDIS_ENABLED=true` | configured | Health indica Redis enabled, mas sem conexao validada | Sim |
+| BullMQ configurado | blocked | Health atual: BullMQ `disabled`; `BULLMQ_ENABLED=false`; ultimo smoke de filas pendente/NO-GO | Sim |
+| Ultimo health Redis | blocked | Redis `connected=false` em 2026-06-10; responsavel: Operacao | Sim |
+| Ultimo health BullMQ | blocked | BullMQ `disabled` em 2026-06-10; responsavel: Operacao | Sim |
+| Ultimo smoke de filas | blocked | `QUEUES_SMOKE_GO` local em 2026-06-10 20:16 BRT; staging/producao aguardam Redis/BullMQ real | Sim |
 | Storage remoto R2/S3 | configured | Render tem R2 bucket/base URL configurados; upload real ainda pendente | Sim |
 | Upload real em storage remoto | pending | Nao executado nesta fase | Sim |
 | CDN validado | pending | Base publica R2 presente; CDN/cache/storefront ainda nao validados | Sim |

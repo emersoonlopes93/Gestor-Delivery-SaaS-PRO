@@ -2,102 +2,170 @@
 
 ## Escopo
 
-Redis e BullMQ sao obrigatorios em producao para filas, jobs assincronos e campanhas.
+Redis e BullMQ sustentam cache, health operacional e filas assincronas. Em producao controlada, Redis real e BullMQ saudavel sao obrigatorios. Free-tier instavel ou sem cota adequada e `NO-GO`.
+
+## Auditoria Atual De Redis
+
+| Uso | Critico? | Pode rodar sem Redis? | Comportamento atual | Comportamento desejado |
+| --- | --- | --- | --- | --- |
+| Cache global Nest `CacheModule` | Opcional em producao | Sim, com memoria local e menor eficiencia | Tenta Redis e cai para memoria | Redis ativo em producao; fallback apenas dev/staging |
+| Rate limit `ThrottlerModule` | Obrigatorio como controle, Redis opcional no codigo atual | Sim, usa memoria do processo | Nao usa Redis diretamente | Em producao multi-instancia, usar storage compartilhado ou aceitar limite por instancia documentado |
+| Health publico/admin | Obrigatorio | Sim para responder, mas deve marcar degradado | Mostra Redis/BullMQ no health | Degradado com `productionReady=false` e motivo claro |
+| BullMQ base connection | Obrigatorio se jobs criticos ativos | Nao para jobs criticos | So inicializa se Redis/BullMQ/campanhas habilitados | Falhar gate em producao se Redis ou BullMQ off |
+| Campaign dispatch | Deve ficar desligado no piloto salvo liberacao operacional | Sim, campanhas ficam sem dispatcher | Dispatcher/processor nao registram se Redis desabilitado | Campanhas off no piloto; ligar somente com Redis pago e monitorado |
+| Storefront/cache/catalog/upload/tenant readiness | Opcional em producao | Sim | Leitura/escrita em cache usam fallback do cache manager | Redis saudavel para reduzir custo/latencia; sem falha funcional se cair |
+| Billing jobs | Obrigatorio se forem introduzidos como fila critica | Hoje nao ha BullMQ real para billing | Billing smoke HTTP roda sem fila | Modo manual/HTTP explicito se fila off; nao fingir job processado |
+| Webhooks | Obrigatorio por HTTP, fila nao usada hoje | Sim | Persistencia/idempotencia por DB | Se virar job assincrono, fila vira critica e bloqueia GO |
+| Sessoes | Nao usa Redis hoje | Sim | Sessao/token via DB/JWT | Se Redis entrar para sessoes, vira obrigatorio e precisa de smoke proprio |
+
+Classificacao:
+
+- Obrigatorio em producao: Redis real, BullMQ real se qualquer job critico estiver ativo, health com `productionReady=true`.
+- Opcional em producao: cache de leitura e cache agressivo.
+- Apenas staging/dev: Redis desligado por custo/cota com health `degraded`.
+- Deve ficar desligado no piloto: campanhas em massa ate existir cota, alerta e operador responsavel.
+
+## Auditoria Atual De BullMQ
+
+| Fila/job | Critico? | Pode rodar sem BullMQ? | Comportamento atual | Comportamento desejado |
+| --- | --- | --- | --- | --- |
+| `campaign-dispatch` | Nao no piloto | Sim, campanhas ficam sem dispatch automatico | Registrada apenas com `CAMPAIGNS_DISPATCH_ENABLED=true` e Redis habilitado | Manter off no piloto; ligar somente com Redis validado |
+| Smoke `queues-smoke-*` | Operacional | Nao aplicavel | Criado apenas pelo script de smoke | Enfileira, processa, falha controlada e limpa a fila |
+| Billing async | Potencialmente critico futuro | Hoje sim, porque fluxo e HTTP/manual | Nao ha fila de billing registrada | Se existir, `BULLMQ_ENABLED=false` deve bloquear ou exigir modo manual explicito |
+
+## Politica Por Ambiente
+
+### Development
+
+- Redis pode ser opcional.
+- `REDIS_ENABLED=false` e aceitavel.
+- Logs devem ser `warn` controlado, sem spam a cada request.
+- Redis local so deve ser usado para desenvolvimento.
+
+### Staging
+
+- Redis preferencialmente ativo.
+- Se Redis/BullMQ forem desligados por custo ou cota, `/health` deve ficar `degraded`.
+- Smokes estritos devem retornar `NO-GO`.
+- Smokes relaxed podem retornar `PRODUCTION_INFRA_SMOKE_GO` com `result=GO parcial`, `productionReady=false` e motivo explicito.
+
+### Production
+
+- `REDIS_ENABLED=true` obrigatorio.
+- `REDIS_HOST` remoto obrigatorio; proibido `localhost` e `127.0.0.1`.
+- `BULLMQ_ENABLED=true` obrigatorio quando houver jobs criticos.
+- API/gate deve falhar startup ou release se Redis nao conecta, BullMQ esta off, ou filas criticas estao degradadas.
+
+## Protecao Contra Ruido De Log
+
+O startup/cache Redis aplica:
+
+- throttling de logs repetidos por chave;
+- reconexao com backoff exponencial;
+- circuito simples apos limite de tentativas;
+- classificacao de erro: `quota_or_rate_limit`, `authentication`, `network_or_timeout`, `unavailable`, `unknown`;
+- health consolidado com `productionReady=false` e motivos.
+
+Estados esperados:
+
+- Redis disabled intencionalmente: warn unico e health `degraded`.
+- Redis enabled mas indisponivel: warn controlado e fallback de cache em memoria.
+- Quota/rate limit: classificado como `quota_or_rate_limit`; acao e trocar/plano/cota.
+- Auth invalida: classificado como `authentication`; acao e corrigir secret/env.
+
+## Health De Filas
+
+`/api/v1/health` expoe:
+
+- `services.redis`;
+- `services.bullmq`;
+- `checks.redis`;
+- `checks.bullmq`;
+- `queues`;
+- `productionReady`;
+- `productionReadiness.reasons`.
+
+Sem Redis/BullMQ:
+
+- `services.bullmq=disabled`;
+- `productionReady=false`;
+- motivo claro em `productionReadiness.reasons`.
+
+Contagens `waiting`, `active`, `failed` e `delayed` ficam `null` quando a API nao tem conexao BullMQ saudavel. O smoke de filas valida contagens reais em uma fila segura isolada.
 
 ## Configuracao Obrigatoria
 
 - `REDIS_ENABLED=true`.
-- `REDIS_HOST` remoto; proibido `localhost` ou `127.0.0.1`.
+- `REDIS_HOST` remoto.
 - `REDIS_TLS=true` quando exigido pelo provedor.
+- `REDIS_PASSWORD` configurado quando exigido.
 - `BULLMQ_ENABLED=true`.
-- `CAMPAIGNS_DISPATCH_ENABLED=true` apenas quando campanhas estiverem operacionalmente liberadas.
+- `CAMPAIGNS_DISPATCH_ENABLED=false` no piloto, salvo liberacao operacional.
 
-## Filas E Jobs Atuais
+## Tamanho Inicial Recomendado
 
-- Campaign dispatch: modulo `campaigns`, processadores de campanhas e recuperacao.
-- Jobs futuros criticos devem usar BullMQ com retry e idempotencia.
-- Cache Redis e health devem refletir indisponibilidade.
+- Piloto controlado: instancia pequena paga, com SLA/cota previsivel.
+- Nao depender de free-tier para producao.
+- Separar Redis de dev, staging e producao.
+- Nunca compartilhar Redis de producao com teste.
+- Campanhas desativadas inicialmente.
+- Cache agressivo opcional.
+- Jobs criticos apenas.
+- Monitorar uso diariamente na primeira semana.
+- Definir alerta de consumo/cota antes do primeiro cliente real.
 
-## Retry Policy Padrao
+## Smoke De Filas
 
-Configurada em `apps/api/src/app.module.ts`:
+Comando:
 
-- `attempts: 3`.
-- backoff exponencial com `delay: 5000`.
-- `removeOnComplete: 1000`.
-- `removeOnFail: 5000`.
+```bash
+pnpm --filter @gestor/api smoke:queues
+```
 
-## Identificar Falhas
+Fluxo:
 
-1. Verificar admin health.
-2. Verificar logs por `BullMQ`, `campaign`, `job failed`, `redis_connection_failed`.
-3. Consultar painel do provedor Redis para conexoes, memoria e latencia.
-4. Se houver painel BullMQ externo, revisar jobs failed/delayed/waiting.
+1. Valida env Redis e BullMQ.
+2. Conecta no Redis.
+3. Executa `PING`.
+4. Cria fila `queues-smoke-*`.
+5. Enfileira e processa job de sucesso.
+6. Simula falha controlada.
+7. Confirma `failed`.
+8. Le contagens da fila.
+9. Limpa a fila.
 
-## Reprocessar Falhas
+Marcadores:
 
-- Reprocessar somente jobs idempotentes.
-- Antes de retry em massa, confirmar que a causa raiz foi corrigida.
-- Para campanhas, pausar disparos antes de retry se houver risco de duplicidade.
-- Registrar IDs de jobs reprocessados no incidente.
-
-## Fila Travada
-
-Sinais:
-
-- `waiting` ou `delayed` cresce continuamente.
-- Nenhum job completado por mais de 10 minutos.
-- Redis health degradado.
-- Latencia de checkout/admin aumenta por dependencia indireta.
-
-Acao:
-
-1. Pausar campanhas se estiverem causando acumulacao.
-2. Validar Redis.
-3. Reiniciar worker/API se necessario.
-4. Reprocessar jobs falhos em lotes pequenos.
-5. Abrir incidente se afetar pedidos, billing ou comunicacao com cliente.
-
-## Alertas Minimos
-
-- Redis indisponivel.
-- BullMQ sem processamento.
-- Jobs failed acima do limiar.
-- Fila waiting/delayed crescendo.
-- Campanha com falhas repetidas.
+- `QUEUES_SMOKE_GO`
+- `QUEUES_SMOKE_NO_GO`
 
 ## Evidencia Operacional Atual
 
 Ultima verificacao: 2026-06-10.
 
-| Item | Status |
-| --- | --- |
-| Provedor Redis | Pendente de comprovacao |
-| Endpoint | Nao documentado; nao imprimir valor em logs |
-| `REDIS_ENABLED` | Health indica enabled |
-| Redis conectado | NO-GO: health atual `connected=false`, servico `degraded` |
-| `BULLMQ_ENABLED` | NO-GO: Render/staging atual `false` |
-| BullMQ conectado | NO-GO: health atual `disabled` |
-| Retry policy | Configurada no `BullModule` com 3 tentativas e backoff exponencial |
-| Health validation | `/api/v1/health` mostra Redis/BullMQ |
+| Item | Status | Evidencia | Responsavel | Data/hora |
+| --- | --- | --- | --- | --- |
+| Redis configurado | blocked | Staging health: Redis `degraded`, `connected=false` | Operacao | 2026-06-10 |
+| BullMQ configurado | blocked | Staging health: BullMQ `disabled`, `BULLMQ_ENABLED=false` | Operacao | 2026-06-10 |
+| Ultimo smoke de filas | validated local / blocked staging | `QUEUES_SMOKE_GO` local em 2026-06-10 20:16 BRT; staging/producao ainda precisam Redis/BullMQ real | Operacao | 2026-06-10 20:16 BRT |
+| Ultimo health Redis | blocked | `connected=false` | Operacao | 2026-06-10 |
+| Ultimo health BullMQ | blocked | `disabled` | Operacao | 2026-06-10 |
 
 Resultado atual: NO-GO para producao controlada.
 
 ## Queda De Redis
 
 1. Confirmar health publico e admin.
-2. Validar status do provedor Redis.
+2. Validar status/cota do provedor Redis.
 3. Pausar campanhas e produtores de jobs nao criticos.
-4. Reiniciar API/worker se a conexao nao recuperar apos provedor verde.
-5. Reprocessar jobs falhos em lotes pequenos.
+4. Se o provedor estiver verde, reiniciar API/worker.
+5. Reprocessar jobs falhos em lotes pequenos e idempotentes.
 6. Abrir incidente se afetar checkout, billing ou comunicacao.
 
-## Teste Operacional BullMQ
+## Regras De NO-GO
 
-Pendente. Para marcar GO:
-
-- enfileirar job seguro;
-- processar job;
-- validar sucesso;
-- simular falha controlada quando existir mecanismo seguro;
-- confirmar retry/failure em logs ou painel.
+- Redis/BullMQ disabled em producao.
+- Redis em free-tier sem cota/garantia adequada.
+- Redis degradado no smoke estrito.
+- BullMQ degradado no smoke estrito.
+- Filas criticas sem fallback manual documentado.

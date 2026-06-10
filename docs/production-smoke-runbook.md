@@ -51,6 +51,7 @@ Smoke seguro disponivel:
 
 ```bash
 pnpm --filter @gestor/api smoke:production-infra
+pnpm --filter @gestor/api smoke:queues
 ```
 
 Variaveis:
@@ -62,11 +63,47 @@ Variaveis:
 - `SMOKE_EXPECT_BULLMQ=true`: exige BullMQ habilitado/conectado.
 - `SMOKE_EXPECT_STORAGE_REMOTE=true`: exige storage `r2` ou `s3`.
 - `SMOKE_EXPECT_SWAGGER_DISABLED=true`: exige Swagger nao publico.
+- `SMOKE_EXPECT_WEBHOOK_ENV=true`: valida endpoint de webhook security smoke sem imprimir secrets.
 
 Marcadores:
 
 - `PRODUCTION_INFRA_SMOKE_GO`
 - `PRODUCTION_INFRA_SMOKE_NO_GO`
+- `QUEUES_SMOKE_GO`
+- `QUEUES_SMOKE_NO_GO`
+
+## Modo Estrito E Relaxed
+
+Modo estrito e o padrao:
+
+```bash
+SMOKE_EXPECT_REDIS=true SMOKE_EXPECT_BULLMQ=true pnpm --filter @gestor/api smoke:production-infra
+```
+
+So pode retornar GO se API health, DB, Redis, BullMQ, storage remoto, Swagger off, billing env e webhook env estiverem ok.
+
+Modo relaxed e permitido apenas para staging quando Redis/BullMQ foram desligados por custo/cota:
+
+```bash
+SMOKE_EXPECT_REDIS=false SMOKE_EXPECT_BULLMQ=false pnpm --filter @gestor/api smoke:production-infra
+```
+
+Resultado esperado neste caso:
+
+- marcador `PRODUCTION_INFRA_SMOKE_GO`;
+- `result=GO parcial`;
+- `productionReady=false`;
+- motivos em `productionReadyReasons`.
+
+Modo relaxed nao autoriza promocao para producao.
+
+## Smoke De Filas
+
+```bash
+pnpm --filter @gestor/api smoke:queues
+```
+
+O script cria fila `queues-smoke-*`, processa job seguro, registra falha controlada e remove a fila. Ele nao toca filas reais nem tenants.
 
 ## Evidencia Operacional Atual
 
@@ -88,7 +125,7 @@ Smoke relaxado para coletar evidencias nao bloqueadas por Redis/BullMQ:
 SMOKE_EXPECT_REDIS=false SMOKE_EXPECT_BULLMQ=false pnpm --filter @gestor/api smoke:production-infra
 ```
 
-Resultado: `PRODUCTION_INFRA_SMOKE_GO` parcial.
+Resultado esperado apos Fase 4.1.1: `PRODUCTION_INFRA_SMOKE_GO` com `result=GO parcial` e `productionReady=false`.
 
 Checks confirmados:
 
@@ -104,3 +141,5 @@ Warnings:
 
 - Redis not connected;
 - BullMQ disabled.
+
+Ultimo smoke de filas: `QUEUES_SMOKE_GO` local em 2026-06-10 20:16 BRT. Para staging/producao, continua bloqueado ate Redis real e BullMQ real estarem ativos no ambiente alvo.

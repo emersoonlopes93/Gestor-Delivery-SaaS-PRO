@@ -81,6 +81,7 @@ pnpm typecheck
 pnpm --filter @gestor/api test
 pnpm lint
 pnpm build
+pnpm --filter @gestor/api smoke:queues
 ```
 
 ## Production Release Gates
@@ -98,7 +99,10 @@ Gates obrigatorios para promover producao controlada:
 - backup recente confirmado;
 - restore testado nos ultimos 7 dias;
 - health staging `ok`;
-- Redis remoto e BullMQ ativos em producao;
+- Redis remoto ativo, pago/production-grade e separado por ambiente;
+- BullMQ ativo e conectado;
+- `pnpm --filter @gestor/api smoke:queues` com `QUEUES_SMOKE_GO`;
+- `pnpm --filter @gestor/api smoke:production-infra` em modo estrito com `PRODUCTION_INFRA_SMOKE_GO` e `productionReady=true`;
 - storage remoto/CDN configurados;
 - secrets/env hardening revisado;
 - aprovacao manual de release;
@@ -114,5 +118,9 @@ Bloqueie o release se qualquer item abaixo acontecer:
 - `WEBHOOK_SECURITY_SMOKE_ENABLED=true` em producao;
 - `ASAAS_WEBHOOK_ALLOW_LEGACY_TOKEN=true` em producao;
 - Redis/BullMQ degradado antes do go-live;
+- Redis em free-tier sem garantia/cota adequada;
+- `REDIS_ENABLED=false` ou `BULLMQ_ENABLED=false` em producao;
+- `smoke:production-infra` retornando apenas `GO parcial`;
+- `smoke:queues` retornando `QUEUES_SMOKE_NO_GO`;
 - storage local configurado em producao;
 - plano de rollback ausente.

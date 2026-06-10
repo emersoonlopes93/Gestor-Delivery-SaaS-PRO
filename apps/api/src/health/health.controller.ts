@@ -6,6 +6,32 @@ import { AdminAuthGuard } from '../admin/auth/admin-auth.guard';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 
+type QueueHealth = {
+  name: string;
+  critical: boolean;
+  status: 'ok' | 'degraded' | 'disabled';
+  waiting: number | null;
+  active: number | null;
+  failed: number | null;
+  delayed: number | null;
+  lastError: string | null;
+};
+
+function getRedisReadinessReason(redisEnvEnabled: boolean, redisConnected: boolean): string | null {
+  const host = process.env.REDIS_HOST;
+  if (!redisEnvEnabled) return 'REDIS_ENABLED=false';
+  if (!host) return 'REDIS_HOST missing';
+  if (host === 'localhost' || host === '127.0.0.1') return 'REDIS_HOST points to localhost';
+  if (!redisConnected) return 'Redis enabled but unavailable';
+  return null;
+}
+
+function getBullmqReadinessReason(bullmqEnvEnabled: boolean, redisConnected: boolean): string | null {
+  if (!bullmqEnvEnabled) return 'BULLMQ_ENABLED=false';
+  if (!redisConnected) return 'BullMQ waiting for healthy Redis';
+  return null;
+}
+
 @Controller('health')
 export class HealthController {
   constructor(
@@ -69,12 +95,35 @@ export class HealthController {
     }
 
     // BullMQ / Campaigns flags depend on env + redis connectivity
-    const bullmqEnabled = process.env.BULLMQ_ENABLED === 'true' && redisEnvEnabled;
+    const bullmqEnvEnabled = process.env.BULLMQ_ENABLED === 'true';
+    const bullmqEnabled = bullmqEnvEnabled && redisEnvEnabled;
     const campaignsEnabled = process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true' && redisEnvEnabled;
     const bullmqConnected = bullmqEnabled && redisConnected;
+    const queues: QueueHealth[] = [
+      {
+        name: 'campaign-dispatch',
+        critical: false,
+        status: campaignsEnabled ? (bullmqConnected ? 'ok' : 'degraded') : 'disabled',
+        waiting: null,
+        active: null,
+        failed: null,
+        delayed: null,
+        lastError: campaignsEnabled && !bullmqConnected ? 'queue registered but BullMQ/Redis is not healthy' : null,
+      },
+    ];
+    const readinessReasons = [
+      !dbHealthy ? 'Database health check failed' : null,
+      getRedisReadinessReason(redisEnvEnabled, redisConnected),
+      getBullmqReadinessReason(bullmqEnvEnabled, redisConnected),
+      process.env.NODE_ENV === 'production' && process.env.REDIS_HOST && ['localhost', '127.0.0.1'].includes(process.env.REDIS_HOST)
+        ? 'Production Redis cannot point to localhost'
+        : null,
+      process.env.NODE_ENV === 'production' && !bullmqEnvEnabled ? 'Production requires BULLMQ_ENABLED=true' : null,
+    ].filter((reason): reason is string => Boolean(reason));
+    const productionReady = dbHealthy && redisConnected && bullmqEnvEnabled && bullmqConnected && readinessReasons.length === 0;
 
     return {
-      status: dbHealthy ? 'ok' : 'degraded',
+      status: dbHealthy && redisConnected ? 'ok' : 'degraded',
       version: '0.1.0',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
@@ -101,8 +150,9 @@ export class HealthController {
           latencyMs: redisLatencyMs,
         },
         bullmq: {
-          enabled: bullmqEnabled,
+          enabled: bullmqEnvEnabled,
           connected: bullmqConnected,
+          registeredQueues: queues.map((queue) => queue.name),
         },
         campaignsDispatch: {
           enabled: campaignsEnabled,
@@ -111,6 +161,12 @@ export class HealthController {
         cache: {
           driver: cacheDriver,
         },
+      },
+      queues,
+      productionReady,
+      productionReadiness: {
+        productionReady,
+        reasons: readinessReasons,
       },
     };
   }

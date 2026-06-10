@@ -45,13 +45,58 @@ import { getApiEnvFilePaths, loadApiEnvFiles } from './config/env-paths';
 
 loadApiEnvFiles();
 
-// Log Redis initialization status at startup
+const REDIS_CONNECT_TIMEOUT_MS = Number(process.env.REDIS_CONNECT_TIMEOUT_MS ?? 3000);
+const REDIS_RECONNECT_BASE_DELAY_MS = Number(process.env.REDIS_RECONNECT_BASE_DELAY_MS ?? 500);
+const REDIS_RECONNECT_MAX_DELAY_MS = Number(process.env.REDIS_RECONNECT_MAX_DELAY_MS ?? 5000);
+const REDIS_RECONNECT_MAX_ATTEMPTS = Number(process.env.REDIS_RECONNECT_MAX_ATTEMPTS ?? 3);
+const REDIS_LOG_THROTTLE_MS = Number(process.env.REDIS_LOG_THROTTLE_MS ?? 60000);
+const redisLogState = new Map<string, { lastAt: number; suppressed: number }>();
+
+function classifyRedisError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  if (/quota|rate.?limit|too many|limit exceeded|request limit/i.test(message)) return 'quota_or_rate_limit';
+  if (/auth|password|credential|unauthorized|invalid username|invalid password|noperm/i.test(message)) return 'authentication';
+  if (/timeout|etimedout|econnrefused|enotfound|econnreset|network|socket/i.test(message)) return 'network_or_timeout';
+  if (/closed|unavailable|offline|disconnect/i.test(message)) return 'unavailable';
+  return 'unknown';
+}
+
+function logRedisState(level: 'log' | 'warn' | 'error', key: string, message: string, error?: unknown) {
+  const now = Date.now();
+  const state = redisLogState.get(key);
+  if (state && now - state.lastAt < REDIS_LOG_THROTTLE_MS) {
+    state.suppressed += 1;
+    return;
+  }
+  const suppressedSuffix = state?.suppressed ? ` suppressed=${state.suppressed}` : '';
+  const errorSuffix = error ? ` reason=${classifyRedisError(error)} message=${error instanceof Error ? error.message : String(error)}` : '';
+  console[level](`${message}${suppressedSuffix}${errorSuffix}`);
+  redisLogState.set(key, { lastAt: now, suppressed: 0 });
+}
+
+function getRedisReconnectDelay(attempt: number): number | undefined {
+  if (attempt > REDIS_RECONNECT_MAX_ATTEMPTS) {
+    logRedisState('warn', 'redis_reconnect_circuit_open', `[REDIS] reconnect_circuit_open attempts=${attempt - 1}`);
+    return undefined;
+  }
+  const delay = Math.min(REDIS_RECONNECT_BASE_DELAY_MS * 2 ** Math.max(0, attempt - 1), REDIS_RECONNECT_MAX_DELAY_MS);
+  logRedisState('warn', 'redis_reconnect_backoff', `[REDIS] reconnect_backoff attempt=${attempt} delayMs=${delay}`);
+  return delay;
+}
+
+function getRedisCacheReconnectDelay(attempt: number): false | number {
+  return getRedisReconnectDelay(attempt) ?? false;
+}
+
+// Log Redis initialization status at startup with throttling and without secrets.
 if (process.env.REDIS_ENABLED === 'false') {
-  console.log('[REDIS] disabled_for_dev');
+  logRedisState('warn', 'redis_disabled', '[REDIS] disabled_intentionally - cache_fallback_memory bullmq_unavailable productionReady=false');
 } else if (process.env.REDIS_HOST && process.env.REDIS_HOST !== 'localhost') {
-  console.log(`[REDIS] attempting_connection host=${process.env.REDIS_HOST} port=${process.env.REDIS_PORT || 6379}`);
+  logRedisState('log', 'redis_attempting_connection', `[REDIS] attempting_connection remote_host_configured port=${process.env.REDIS_PORT || 6379}`);
 } else if (!process.env.REDIS_HOST) {
-  console.log('[REDIS] no_host_configured_will_use_cache_fallback');
+  logRedisState('warn', 'redis_missing_host', '[REDIS] no_host_configured - cache_fallback_memory productionReady=false');
+} else {
+  logRedisState('warn', 'redis_localhost', '[REDIS] localhost_configured - not_production_ready');
 }
 
 @Module({
@@ -90,6 +135,10 @@ if (process.env.REDIS_ENABLED === 'false') {
               port: Number(process.env.REDIS_PORT || 6379),
               password: process.env.REDIS_PASSWORD || undefined,
               tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
+              connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
+              maxRetriesPerRequest: null,
+              enableReadyCheck: true,
+              retryStrategy: getRedisReconnectDelay,
             },
             defaultJobOptions: {
               removeOnComplete: 1000,
@@ -110,11 +159,11 @@ if (process.env.REDIS_ENABLED === 'false') {
       useFactory: async () => {
         try {
           if (process.env.REDIS_ENABLED === 'false') {
-            console.log('[CACHE] forced_in_memory - redis_disabled');
+            logRedisState('warn', 'cache_redis_disabled', '[CACHE] forced_in_memory - redis_disabled_intentionally productionReady=false');
             return {};
           }
           if (!process.env.REDIS_HOST) {
-            console.log('[CACHE] fallback_in_memory - no_redis_host');
+            logRedisState('warn', 'cache_no_redis_host', '[CACHE] fallback_in_memory - no_redis_host productionReady=false');
             return {};
           }
           const store = await redisStore({
@@ -122,17 +171,18 @@ if (process.env.REDIS_ENABLED === 'false') {
               host: process.env.REDIS_HOST,
               port: Number(process.env.REDIS_PORT || 6379),
               tls: process.env.REDIS_TLS === 'true' ? true : undefined,
-              connectTimeout: 3000,
+              connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
+              reconnectStrategy: getRedisCacheReconnectDelay,
             },
             password: process.env.REDIS_PASSWORD || undefined,
             ttl: 60000, // Default 60s
           }) as { client: { ping(): Promise<string> } };
           // Testa ping
           await store.client.ping();
-          console.log('[CACHE] redis_connected');
+          logRedisState('log', 'cache_redis_connected', '[CACHE] redis_connected');
           return { store };
         } catch (err) {
-          console.warn('[CACHE] redis_connection_failed - using_fallback_in_memory:', err instanceof Error ? err.message : err);
+          logRedisState('warn', `cache_redis_connection_failed:${classifyRedisError(err)}`, '[CACHE] redis_connection_failed - using_fallback_in_memory productionReady=false', err);
           return {};
         }
       },
