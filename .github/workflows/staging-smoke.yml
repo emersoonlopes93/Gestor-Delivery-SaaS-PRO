@@ -1,0 +1,94 @@
+name: Staging Smoke Gate
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Docker Publish"]
+    types: [completed]
+    branches: ["main", "master"]
+
+concurrency:
+  group: staging-smoke-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  billing-ledger-http-smoke:
+    name: Billing ledger HTTP smoke
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_ENV: test
+      SMOKE_API_BASE_URL: ${{ secrets.SMOKE_API_BASE_URL }}
+      SMOKE_ADMIN_EMAIL: ${{ secrets.SMOKE_ADMIN_EMAIL }}
+      SMOKE_ADMIN_PASSWORD: ${{ secrets.SMOKE_ADMIN_PASSWORD }}
+      SMOKE_TENANT_OWNER_EMAIL: ${{ secrets.SMOKE_TENANT_OWNER_EMAIL }}
+      SMOKE_TENANT_OWNER_PASSWORD: ${{ secrets.SMOKE_TENANT_OWNER_PASSWORD }}
+      SMOKE_CLEANUP: "true"
+      SMOKE_TENANT_PREFIX: billing-ledger-http-smoke-ci
+      DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.0.0
+
+      - name: Install
+        run: pnpm -w install --frozen-lockfile
+
+      - name: Validate smoke secrets
+        shell: bash
+        run: |
+          missing=0
+          for name in \
+            SMOKE_API_BASE_URL \
+            SMOKE_ADMIN_EMAIL \
+            SMOKE_ADMIN_PASSWORD \
+            SMOKE_TENANT_OWNER_EMAIL \
+            SMOKE_TENANT_OWNER_PASSWORD \
+            DATABASE_URL
+          do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is required for staging smoke"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Validate Prisma schema
+        run: pnpm prisma:validate
+
+      - name: Generate Prisma Client
+        run: pnpm --filter @gestor/api prisma:generate
+
+      - name: Billing ledger HTTP smoke
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @gestor/api smoke:billing-ledger-http-flow 2>&1 | tee billing-ledger-http-smoke.log
+          grep -q "BILLING_LEDGER_HTTP_SMOKE_GO" billing-ledger-http-smoke.log
+          if grep -q "BILLING_LEDGER_HTTP_SMOKE_NO_GO" billing-ledger-http-smoke.log; then
+            exit 1
+          fi
+
+      - name: Upload smoke log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: billing-ledger-http-smoke-log
+          path: billing-ledger-http-smoke.log
+          if-no-files-found: ignore

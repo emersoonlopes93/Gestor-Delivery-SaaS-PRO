@@ -37,9 +37,14 @@ Envs opcionais:
 ```bash
 SMOKE_CLEANUP=true
 SMOKE_TENANT_PREFIX=billing-ledger-http-smoke
+SMOKE_REQUEST_TIMEOUT_MS=30000
+SMOKE_RETRY_ATTEMPTS=4
+SMOKE_RETRY_DELAY_MS=1500
 ```
 
 O email do tenant owner recebe sufixo unico usando `+timestamp`, para evitar colisao entre execucoes.
+
+`SMOKE_API_BASE_URL` deve ser uma URL absoluta HTTP(S) ja com prefixo `/api/v1`.
 
 ## Configuracao Do Gateway De Billing
 
@@ -111,6 +116,50 @@ Possiveis causas comuns:
 - loja nao abre por falta de configuracao operacional;
 - endpoint de auditoria nao protegido por `saas.billing.audit`;
 - cleanup recusado porque tenant nao tem prefixo de smoke.
+
+## CI/CD Staging Smoke Gate
+
+O gate de staging roda em:
+
+```bash
+.github/workflows/staging-smoke.yml
+```
+
+Disparos:
+
+- manual por `workflow_dispatch`;
+- automaticamente apos o workflow `Docker Publish` concluir com sucesso em `main` ou `master`.
+
+Secrets exigidos no GitHub Actions:
+
+```bash
+SMOKE_API_BASE_URL
+SMOKE_ADMIN_EMAIL
+SMOKE_ADMIN_PASSWORD
+SMOKE_TENANT_OWNER_EMAIL
+SMOKE_TENANT_OWNER_PASSWORD
+STAGING_DATABASE_URL
+```
+
+`STAGING_DATABASE_URL` e mapeado para `DATABASE_URL` apenas para o cleanup Prisma do tenant de smoke. Enquanto nao existir endpoint admin seguro para delete de tenant de teste, esse segredo e necessario para manter `SMOKE_CLEANUP=true`.
+
+Envs fixas do gate:
+
+```bash
+SMOKE_CLEANUP=true
+SMOKE_TENANT_PREFIX=billing-ledger-http-smoke-ci
+```
+
+O job falha quando:
+
+- algum secret obrigatorio esta ausente;
+- `pnpm prisma:validate` falha;
+- `pnpm --filter @gestor/api prisma:generate` falha;
+- o smoke nao imprime `BILLING_LEDGER_HTTP_SMOKE_GO`;
+- o smoke imprime `BILLING_LEDGER_HTTP_SMOKE_NO_GO`;
+- o cleanup falha.
+
+O log do smoke e publicado como artifact `billing-ledger-http-smoke-log`.
 
 ## Cuidados Com Staging
 

@@ -10,14 +10,17 @@ type SmokeConfig = {
   tenantOwnerPassword: string;
   cleanup: boolean;
   tenantPrefix: string;
+  requestTimeoutMs: number;
+  retryAttempts: number;
+  retryDelayMs: number;
 };
 
 type SmokeReport = {
   baseUrl: string;
   cleanup: boolean;
+  cleanupStatus: 'pending' | 'skipped' | 'completed' | 'failed';
   tenantId?: string;
   tenantSlug?: string;
-  ownerEmail?: string;
   categoryId?: string;
   productId?: string;
   orderId?: string;
@@ -47,6 +50,11 @@ class HttpSmokeError extends Error {
   }
 }
 
+type RequestOptions = {
+  expectedStatuses?: number[];
+  retry?: boolean;
+};
+
 function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) {
@@ -55,20 +63,50 @@ function requireEnv(name: string): string {
   return value;
 }
 
+function readPositiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer.`);
+  }
+  return value;
+}
+
+function normalizeBaseUrl(value: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error('SMOKE_API_BASE_URL must be a valid absolute HTTP(S) URL.');
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('SMOKE_API_BASE_URL must use http or https.');
+  }
+  const normalized = value.replace(/\/$/, '');
+  if (!normalized.endsWith('/api/v1')) {
+    throw new Error('SMOKE_API_BASE_URL must include the API prefix, for example https://staging.example.com/api/v1.');
+  }
+  return normalized;
+}
+
 function loadConfig(): SmokeConfig {
   const tenantPrefix = process.env.SMOKE_TENANT_PREFIX?.trim() || 'billing-ledger-http-smoke';
-  if (!/^[a-z0-9-]+$/.test(tenantPrefix)) {
-    throw new Error('SMOKE_TENANT_PREFIX must contain only lowercase letters, numbers and hyphens.');
+  if (!/^[a-z0-9][a-z0-9-]{4,48}[a-z0-9]$/.test(tenantPrefix) || tenantPrefix.includes('--')) {
+    throw new Error('SMOKE_TENANT_PREFIX must be 6-50 chars, lowercase letters/numbers/hyphens, without leading/trailing/repeated hyphens.');
   }
 
   return {
-    baseUrl: requireEnv('SMOKE_API_BASE_URL').replace(/\/$/, ''),
+    baseUrl: normalizeBaseUrl(requireEnv('SMOKE_API_BASE_URL')),
     adminEmail: requireEnv('SMOKE_ADMIN_EMAIL'),
     adminPassword: requireEnv('SMOKE_ADMIN_PASSWORD'),
     tenantOwnerEmail: requireEnv('SMOKE_TENANT_OWNER_EMAIL'),
     tenantOwnerPassword: requireEnv('SMOKE_TENANT_OWNER_PASSWORD'),
     cleanup: (process.env.SMOKE_CLEANUP ?? 'true').toLowerCase() !== 'false',
     tenantPrefix,
+    requestTimeoutMs: readPositiveIntEnv('SMOKE_REQUEST_TIMEOUT_MS', 30000),
+    retryAttempts: readPositiveIntEnv('SMOKE_RETRY_ATTEMPTS', 4),
+    retryDelayMs: readPositiveIntEnv('SMOKE_RETRY_DELAY_MS', 1500),
   };
 }
 
@@ -86,6 +124,27 @@ function unwrap<T = unknown>(body: unknown): T {
     return (body as { data: T }).data;
   }
   return body as T;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function sanitizeForLog(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeForLog(item));
+  }
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+  return Object.fromEntries(
+    Object.entries(value as JsonObject).map(([key, entry]) => {
+      if (/password|token|authorization|secret|credential/i.test(key)) {
+        return [key, '[REDACTED]'];
+      }
+      return [key, sanitizeForLog(entry)];
+    }),
+  );
 }
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -116,54 +175,94 @@ function getNestedString(value: unknown, path: string): string {
 }
 
 class ApiClient {
-  constructor(private readonly baseUrl: string, private readonly token?: string) {}
+  constructor(
+    private readonly baseUrl: string,
+    private readonly config: SmokeConfig,
+    private readonly token?: string,
+  ) {}
 
   withToken(token: string): ApiClient {
-    return new ApiClient(this.baseUrl, token);
+    return new ApiClient(this.baseUrl, this.config, token);
   }
 
   async request<T = unknown>(
     method: string,
     path: string,
     body?: unknown,
-    expectedStatuses = [200, 201],
+    options: RequestOptions | number[] = {},
   ): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
-      method,
-      headers: {
-        accept: 'application/json',
-        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-        ...(this.token ? { authorization: `Bearer ${this.token}` } : {}),
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    const raw = await res.text();
-    const parsed = raw ? this.parseJson(raw) : null;
-    if (!expectedStatuses.includes(res.status)) {
-      throw new HttpSmokeError(`${method} ${path} failed with HTTP ${res.status}`, res.status, parsed);
-    }
+    const requestOptions = Array.isArray(options) ? { expectedStatuses: options } : options;
+    const expectedStatuses = requestOptions.expectedStatuses ?? [200, 201];
+    const parsed = await this.fetchParsed(method, path, body, expectedStatuses, requestOptions.retry ?? false);
     return unwrap<T>(parsed);
   }
 
-  async expectStatus(method: string, path: string, expectedStatuses: number[], body?: unknown): Promise<number> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
-      method,
-      headers: {
-        accept: 'application/json',
-        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-        ...(this.token ? { authorization: `Bearer ${this.token}` } : {}),
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    if (!expectedStatuses.includes(res.status)) {
-      const raw = await res.text();
-      throw new HttpSmokeError(
-        `${method} ${path} expected ${expectedStatuses.join('/')} but got HTTP ${res.status}`,
-        res.status,
-        raw ? this.parseJson(raw) : null,
-      );
+  async expectStatus(
+    method: string,
+    path: string,
+    expectedStatuses: number[],
+    body?: unknown,
+    options: Omit<RequestOptions, 'expectedStatuses'> = {},
+  ): Promise<number> {
+    await this.fetchParsed(method, path, body, expectedStatuses, options.retry ?? false);
+    return expectedStatuses[0];
+  }
+
+  private async fetchParsed(
+    method: string,
+    path: string,
+    body: unknown,
+    expectedStatuses: number[],
+    retry: boolean,
+  ): Promise<unknown> {
+    let lastError: unknown;
+    const attempts = retry ? this.config.retryAttempts : 1;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      let timeout: NodeJS.Timeout | undefined;
+      try {
+        const controller = new AbortController();
+        timeout = setTimeout(() => controller.abort(), this.config.requestTimeoutMs);
+        const res = await fetch(`${this.baseUrl}${path}`, {
+          method,
+          signal: controller.signal,
+          headers: {
+            accept: 'application/json',
+            ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+            ...(this.token ? { authorization: `Bearer ${this.token}` } : {}),
+          },
+          body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        const raw = await res.text();
+        const parsed = raw ? this.parseJson(raw) : null;
+        if (expectedStatuses.includes(res.status)) {
+          return parsed;
+        }
+        const error = new HttpSmokeError(`${method} ${path} failed with HTTP ${res.status}`, res.status, sanitizeForLog(parsed));
+        if (!retry || (res.status < 500 && res.status !== 429) || attempt === attempts) {
+          throw error;
+        }
+        lastError = error;
+      } catch (error) {
+        lastError = error;
+        if (
+          error instanceof HttpSmokeError &&
+          error.status !== undefined &&
+          error.status < 500 &&
+          error.status !== 429
+        ) {
+          throw error;
+        }
+        if (!retry || attempt === attempts) {
+          throw error;
+        }
+      } finally {
+        if (timeout) {
+          clearTimeout(timeout);
+        }
+      }
+      await sleep(this.config.retryDelayMs * attempt);
     }
-    return res.status;
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
   }
 
   private parseJson(raw: string): unknown {
@@ -201,11 +300,11 @@ async function main() {
   const suffix = `${Date.now()}`;
   const shopName = `${config.tenantPrefix}-${suffix}`;
   const ownerEmail = uniqueOwnerEmail(config.tenantOwnerEmail, suffix);
-  const anonymous = new ApiClient(config.baseUrl);
+  const anonymous = new ApiClient(config.baseUrl, config);
   const report: SmokeReport = {
     baseUrl: config.baseUrl,
     cleanup: config.cleanup,
-    ownerEmail,
+    cleanupStatus: config.cleanup ? 'pending' : 'skipped',
     historyIds: [],
     authChecks: [],
     rbacChecks: [],
@@ -213,6 +312,8 @@ async function main() {
     auditChecks: [],
     cleanupIds: [],
   };
+  let smokePassed = false;
+  let smokeError: unknown;
 
   try {
     await anonymous.expectStatus('GET', '/admin/billing/audit/revenue-events?tenantId=missing', [401, 403]);
@@ -347,6 +448,8 @@ async function main() {
     const auditEvents = await admin.request<JsonObject[]>(
       'GET',
       `/admin/billing/audit/revenue-events?tenantId=${tenantId}&periodStart=${encodeURIComponent(periodStart.toISOString())}&periodEnd=${encodeURIComponent(periodEnd.toISOString())}`,
+      undefined,
+      { retry: true },
     );
     const completedEvent = auditEvents.find((event) => event.orderId === report.orderId && event.type === 'order_completed');
     assert(completedEvent, 'order_completed revenue_event not found via admin audit HTTP.');
@@ -369,7 +472,9 @@ async function main() {
     report.snapshotId = getNestedString(closeResult, 'usageSnapshotId');
     report.invoiceId = getNestedString(closeResult, 'invoice.id');
 
-    const snapshots = await admin.request<JsonObject[]>('GET', `/admin/billing/audit/snapshots?tenantId=${tenantId}`);
+    const snapshots = await admin.request<JsonObject[]>('GET', `/admin/billing/audit/snapshots?tenantId=${tenantId}`, undefined, {
+      retry: true,
+    });
     const snapshot = snapshots.find((item) => item.id === report.snapshotId);
     assert(snapshot, 'Snapshot not found via admin audit HTTP.');
     assertEquals(snapshot.tenantId, tenantId, 'snapshot.tenantId');
@@ -379,7 +484,9 @@ async function main() {
     report.tenantContextChecks.push('snapshot tenantId ok');
     report.auditChecks.push('snapshot audit ok');
 
-    const invoiceDetails = await admin.request<JsonObject>('GET', `/admin/billing/invoices/${report.invoiceId}`);
+    const invoiceDetails = await admin.request<JsonObject>('GET', `/admin/billing/invoices/${report.invoiceId}`, undefined, {
+      retry: true,
+    });
     const invoice = invoiceDetails.invoice as JsonObject;
     assert(invoice, 'Invoice details missing invoice.');
     assertEquals(invoice.tenantId, tenantId, 'invoice.tenantId');
@@ -416,11 +523,15 @@ async function main() {
       reason: 'billing_ledger_http_smoke_confirmed',
     });
 
-    const tenantAfterPayment = await admin.request<JsonObject>('GET', `/admin/billing/tenants/${tenantId}/subscription`);
+    const tenantAfterPayment = await admin.request<JsonObject>('GET', `/admin/billing/tenants/${tenantId}/subscription`, undefined, {
+      retry: true,
+    });
     const subscriptionAfterPayment = tenantAfterPayment.subscription as JsonObject;
     assertEquals(subscriptionAfterPayment.status, 'active', 'subscription after payment');
 
-    const history = await admin.request<JsonObject[]>('GET', `/admin/billing/audit/subscription-history?tenantId=${tenantId}`);
+    const history = await admin.request<JsonObject[]>('GET', `/admin/billing/audit/subscription-history?tenantId=${tenantId}`, undefined, {
+      retry: true,
+    });
     assert(history.some((entry) => entry.reason === 'subscription_created'), 'subscription_created history missing.');
     assert(history.some((entry) => entry.reason === 'admin_suspended_tenant'), 'admin_suspended_tenant history missing.');
     assert(history.some((entry) => entry.reason === 'payment_confirmed'), 'payment_confirmed history missing.');
@@ -432,30 +543,45 @@ async function main() {
     await anonymous.withToken(tenantToken).expectStatus('GET', `/admin/billing/audit/revenue-events?tenantId=${tenantId}`, [401, 403]);
     report.rbacChecks.push('tenant token cannot access billing audit');
 
-    const health = await admin.request<JsonObject>('GET', '/admin/health/system');
+    const health = await admin.request<JsonObject>('GET', '/admin/health/system', undefined, { retry: true });
     report.healthStatus = String(health.status);
     assertEquals(health.status, 'ok', 'admin health status');
     report.auditChecks.push('admin health ok');
 
-    if (config.cleanup) {
-      report.cleanupIds = await cleanupTenant(report.tenantId, config.tenantPrefix);
-    }
-
-    console.log('BILLING_LEDGER_HTTP_SMOKE_GO', JSON.stringify(report, null, 2));
+    smokePassed = true;
   } catch (error) {
-    if (config.cleanup && report.tenantId) {
+    smokeError = error;
+  } finally {
+    if (config.cleanup) {
       try {
         report.cleanupIds = await cleanupTenant(report.tenantId, config.tenantPrefix);
+        report.cleanupStatus = 'completed';
       } catch (cleanupError) {
-        console.error('Cleanup failed:', cleanupError);
+        report.cleanupStatus = 'failed';
+        smokePassed = false;
+        smokeError = cleanupError;
       }
     }
+  }
+
+  if (smokePassed) {
+    console.log('BILLING_LEDGER_HTTP_SMOKE_GO', JSON.stringify(report, null, 2));
+    return;
+  }
+
+  {
     console.error('BILLING_LEDGER_HTTP_SMOKE_NO_GO');
-    if (error instanceof HttpSmokeError) {
-      console.error(JSON.stringify({ message: error.message, status: error.status, body: error.body, report }, null, 2));
+    if (smokeError instanceof HttpSmokeError) {
+      console.error(
+        JSON.stringify(
+          { message: smokeError.message, status: smokeError.status, body: smokeError.body, report: sanitizeForLog(report) },
+          null,
+          2,
+        ),
+      );
     } else {
-      console.error(error);
-      console.error(JSON.stringify({ report }, null, 2));
+      console.error(sanitizeForLog(smokeError));
+      console.error(JSON.stringify({ report: sanitizeForLog(report) }, null, 2));
     }
     process.exit(1);
   }
