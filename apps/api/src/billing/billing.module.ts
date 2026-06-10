@@ -10,10 +10,11 @@ import { BillingDomainModule } from './billing-domain.module';
 import { AsaasSaasBillingWebhookController } from './asaas-saas-billing-webhook.controller';
 import { PublicSaasController } from './public-saas.controller';
 import { WebhookSecurityService } from './webhook-security.service';
+import { WebhookSecuritySmokeController } from './webhook-security-smoke.controller';
 
 @Module({
   imports: [RbacModule, BillingDomainModule],
-  controllers: [BillingController, BillingWebhookController, AsaasSaasBillingWebhookController, PublicSaasController],
+  controllers: [BillingController, BillingWebhookController, AsaasSaasBillingWebhookController, PublicSaasController, WebhookSecuritySmokeController],
   providers: [BillingService, AsaasService, PrismaService, TenantContextService, WebhookSecurityService],
   exports: [BillingService, BillingDomainModule],
 })

@@ -70,6 +70,9 @@ Checklist para primeiros clientes pagantes em producao controlada.
 - Webhooks com assinatura HMAC, raw body, janela anti-replay e idempotencia persistida.
 - `ASAAS_WEBHOOK_HMAC_SECRET` configurado; token legado desabilitado salvo janela de migracao explicita.
 - `WEBHOOK_REPLAY_WINDOW_SECONDS=300` ou valor aprovado por seguranca.
+- Smoke `smoke:session-security-http-flow` com `SESSION_SECURITY_HTTP_SMOKE_GO`.
+- Smoke `smoke:webhook-security-flow` com `WEBHOOK_SECURITY_SMOKE_GO`.
+- Smoke `smoke:billing-ledger-http-flow` com `BILLING_LEDGER_HTTP_SMOKE_GO` apos auth/session.
 - Rate limit especifico para auth, endpoints publicos e webhooks.
 - Helmet ativo.
 - Validacao global com whitelist ativa.

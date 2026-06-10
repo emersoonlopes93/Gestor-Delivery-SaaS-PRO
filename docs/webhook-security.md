@@ -47,3 +47,26 @@ Asaas payment attempt webhooks pass through HMAC/idempotency before updating att
 - `401 Webhook timestamp outside replay window`: provider clock drift or replayed event.
 - `401 Invalid webhook signature`: wrong secret or different raw body in signature generation.
 - `Raw webhook body unavailable`: API bootstrap must keep the Express JSON `verify` hook enabled.
+
+## Staging Smoke
+
+Run the HMAC/idempotency smoke before release:
+
+```bash
+pnpm --filter @gestor/api smoke:webhook-security-flow
+```
+
+Required envs:
+
+- `SMOKE_API_BASE_URL`
+- `ASAAS_WEBHOOK_HMAC_SECRET`
+- `WEBHOOK_REPLAY_WINDOW_SECONDS=300`
+- `DATABASE_URL`
+
+The API exposes `POST /billing/webhooks/security-smoke` only when `NODE_ENV !== production` or `WEBHOOK_SECURITY_SMOKE_ENABLED=true`. Enable that flag only in staging/test environments.
+
+GO requires `WEBHOOK_SECURITY_SMOKE_GO`. NO-GO prints `WEBHOOK_SECURITY_SMOKE_NO_GO`.
+
+The smoke sends unsigned, invalid-signature and old-timestamp events and expects rejection. It then sends a valid signed event, verifies `ExternalWebhookEvent.status=processed`, resends the same `x-webhook-id`, and expects an idempotent duplicate response without reprocessing.
+
+To investigate duplicates, query `external_webhook_events` by `provider` and `event_id`. Compare `status`, `attempts`, `payload_hash`, `processed_at` and `last_error`. The smoke uses provider `security-smoke` and event ids prefixed with `webhook-security-smoke-`.

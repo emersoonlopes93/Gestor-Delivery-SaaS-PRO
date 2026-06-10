@@ -28,7 +28,9 @@ jobs:
       SMOKE_TENANT_OWNER_EMAIL: ${{ secrets.SMOKE_TENANT_OWNER_EMAIL }}
       SMOKE_TENANT_OWNER_PASSWORD: ${{ secrets.SMOKE_TENANT_OWNER_PASSWORD }}
       SMOKE_CLEANUP: "true"
-      SMOKE_TENANT_PREFIX: billing-ledger-http-smoke-ci
+      SMOKE_TENANT_PREFIX: session-security-smoke-ci
+      ASAAS_WEBHOOK_HMAC_SECRET: ${{ secrets.ASAAS_WEBHOOK_HMAC_SECRET }}
+      WEBHOOK_REPLAY_WINDOW_SECONDS: "300"
       DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
 
     steps:
@@ -58,6 +60,7 @@ jobs:
             SMOKE_ADMIN_PASSWORD \
             SMOKE_TENANT_OWNER_EMAIL \
             SMOKE_TENANT_OWNER_PASSWORD \
+            ASAAS_WEBHOOK_HMAC_SECRET \
             DATABASE_URL
           do
             if [ -z "${!name}" ]; then
@@ -69,11 +72,34 @@ jobs:
             exit 1
           fi
 
+      - name: Deploy staging migrations
+        run: pnpm --filter @gestor/api prisma:migrate:deploy
+
       - name: Validate Prisma schema
         run: pnpm prisma:validate
 
       - name: Generate Prisma Client
         run: pnpm --filter @gestor/api prisma:generate
+
+      - name: Session security HTTP smoke
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @gestor/api smoke:session-security-http-flow 2>&1 | tee session-security-http-smoke.log
+          grep -q "SESSION_SECURITY_HTTP_SMOKE_GO" session-security-http-smoke.log
+          if grep -q "SESSION_SECURITY_HTTP_SMOKE_NO_GO" session-security-http-smoke.log; then
+            exit 1
+          fi
+
+      - name: Webhook security smoke
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @gestor/api smoke:webhook-security-flow 2>&1 | tee webhook-security-smoke.log
+          grep -q "WEBHOOK_SECURITY_SMOKE_GO" webhook-security-smoke.log
+          if grep -q "WEBHOOK_SECURITY_SMOKE_NO_GO" webhook-security-smoke.log; then
+            exit 1
+          fi
 
       - name: Billing ledger HTTP smoke
         shell: bash
@@ -89,6 +115,9 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: billing-ledger-http-smoke-log
-          path: billing-ledger-http-smoke.log
+          name: staging-smoke-logs
+          path: |
+            session-security-http-smoke.log
+            webhook-security-smoke.log
+            billing-ledger-http-smoke.log
           if-no-files-found: ignore
