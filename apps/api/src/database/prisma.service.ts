@@ -58,6 +58,8 @@ export class PrismaService
         'InvoiceItem',
         'MediaAsset',
         'MediaCategory',
+        'AuthSession',
+        'ExternalWebhookEvent',
       ];
 
       const model = params.model ?? '';

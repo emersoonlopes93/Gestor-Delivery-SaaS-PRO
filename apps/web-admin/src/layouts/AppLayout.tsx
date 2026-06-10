@@ -22,6 +22,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeStore } from '../stores/theme.store';
+import { api } from '../lib/api-client';
 
 type SidebarItem = {
   id: string;
@@ -202,7 +203,8 @@ export function AppLayout() {
   const openMobile = useCallback(() => setIsMobileOpen(true), []);
   const closeMobile = useCallback(() => setIsMobileOpen(false), []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await api.post('/auth/admin/logout').catch(() => undefined);
     localStorage.removeItem('admin_accessToken');
     localStorage.removeItem('admin_refreshToken');
     clearUser();

@@ -87,8 +87,9 @@ export function ActiveDeliveryPage() {
     window.location.href = `tel:${phone}`;
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     stopTracking();
+    await api.post('/auth/driver/logout').catch(() => undefined);
     logout();
     navigate('/login');
   };

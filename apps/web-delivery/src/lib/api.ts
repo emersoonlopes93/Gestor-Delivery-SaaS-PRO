@@ -16,6 +16,8 @@ export const api = axios.create({
   },
 });
 
+let refreshPromise: Promise<{ accessToken: string; refreshToken?: string }> | null = null;
+
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken;
   if (token) {
@@ -33,22 +35,27 @@ api.interceptors.response.use(
       try {
         const refreshTokenStr = useAuthStore.getState().refreshToken;
         if (!refreshTokenStr) throw new Error('No refresh token');
-        
-        const baseUrl = API_BASE_URL.replace(/\/+$/, '');
-        const { data: raw } = await axios.post(`${baseUrl}/auth/driver/refresh`, {
-          refreshToken: refreshTokenStr,
-        });
 
-        const payload =
-          raw && typeof raw === 'object' && 'success' in raw && raw.success && 'data' in raw
-            ? (raw as { data: { accessToken: string } }).data
-            : (raw as { accessToken: string });
+        if (!refreshPromise) {
+          const baseUrl = API_BASE_URL.replace(/\/+$/, '');
+          refreshPromise = axios.post(`${baseUrl}/auth/driver/refresh`, {
+            refreshToken: refreshTokenStr,
+          }).then(({ data: raw }) => (
+            raw && typeof raw === 'object' && 'success' in raw && raw.success && 'data' in raw
+              ? (raw as { data: { accessToken: string; refreshToken?: string } }).data
+              : (raw as { accessToken: string; refreshToken?: string })
+          )).finally(() => {
+            refreshPromise = null;
+          });
+        }
+
+        const payload = await refreshPromise;
 
         if (!payload?.accessToken) {
           throw new Error('Invalid refresh response');
         }
 
-        useAuthStore.getState().setTokens(payload.accessToken, refreshTokenStr);
+        useAuthStore.getState().setTokens(payload.accessToken, payload.refreshToken || refreshTokenStr);
         originalRequest.headers.Authorization = `Bearer ${payload.accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {

@@ -6,11 +6,17 @@ import {
   Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../database/prisma.service';
 import { TenantStatus, TenantDefaultRole } from '@gestor/core';
 import type { TenantJwtPayload } from '@gestor/types';
+import { AuthSessionService } from './auth-session.service';
+import { AuthSubjectType } from '@prisma/client';
+
+type RequestSessionContext = {
+  userAgent?: string;
+  ipAddress?: string;
+};
 
 // Slug generator
 function generateSlug(name: string): string {
@@ -29,14 +35,14 @@ export class TenantAuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    private readonly config: ConfigService,
+    private readonly authSessionService: AuthSessionService,
   ) {}
 
   /**
    * Authenticate a tenant user by email + password.
    * Resolves the tenant from the user record.
    */
-  async login(email: string, password: string, tenantSlug?: string) {
+  async login(email: string, password: string, tenantSlug?: string, context?: RequestSessionContext) {
     const normalizedEmail = email.toLowerCase();
     this.logger.debug(`Login attempt for email: ${normalizedEmail} (tenantSlug: ${tenantSlug})`);
 
@@ -130,11 +136,16 @@ export class TenantAuthService {
       email: user.email,
     };
 
-    const accessToken = this.jwtService.sign(payload);
-    const refreshToken = this.jwtService.sign(payload, {
-      secret: this.config.get('JWT_REFRESH_SECRET', 'dev-refresh-secret'),
-      expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN', '7d'),
+    const session = await this.authSessionService.createSession({
+      subjectType: AuthSubjectType.tenant,
+      subjectId: user.id,
+      tenantId: user.tenantId,
+      userId: user.id,
+      role: roles.join(','),
+      payload,
+      context,
     });
+    const accessToken = this.jwtService.sign({ ...payload, sid: session.sessionId });
 
     this.logger.log(
       `Tenant user logged in: ${normalizedEmail} (tenant: ${user.tenant.slug})`,
@@ -142,7 +153,7 @@ export class TenantAuthService {
 
     return {
       accessToken,
-      refreshToken,
+      refreshToken: session.refreshToken,
       user: {
         userId: user.id,
         email: user.email,
@@ -170,6 +181,7 @@ export class TenantAuthService {
     phone: string,
     email: string,
     passwordRaw: string,
+    context?: RequestSessionContext,
   ) {
     const normalizedEmail = email.toLowerCase();
     
@@ -313,11 +325,16 @@ export class TenantAuthService {
       email: user.email,
     };
 
-    const accessToken = this.jwtService.sign(payload);
-    const refreshToken = this.jwtService.sign(payload, {
-      secret: this.config.get('JWT_REFRESH_SECRET', 'dev-refresh-secret'),
-      expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN', '7d'),
+    const session = await this.authSessionService.createSession({
+      subjectType: AuthSubjectType.tenant,
+      subjectId: user.id,
+      tenantId: user.tenantId,
+      userId: user.id,
+      role: roles.join(','),
+      payload,
+      context,
     });
+    const accessToken = this.jwtService.sign({ ...payload, sid: session.sessionId });
 
     this.logger.log(
       `New Tenant provisioned: ${slug} by ${normalizedEmail}`,
@@ -325,7 +342,7 @@ export class TenantAuthService {
 
     return {
       accessToken,
-      refreshToken,
+      refreshToken: session.refreshToken,
       user: {
         userId: user.id,
         email: user.email,
@@ -347,11 +364,14 @@ export class TenantAuthService {
   /**
    * Refresh the access token using a valid refresh token.
    */
-  async refreshToken(refreshToken: string) {
+  async refreshToken(refreshToken: string, context?: RequestSessionContext) {
     try {
-      const payload = this.jwtService.verify<TenantJwtPayload>(refreshToken, {
-        secret: this.config.get('JWT_REFRESH_SECRET', 'dev-refresh-secret'),
+      const rotated = await this.authSessionService.rotateSession({
+        refreshToken,
+        expectedSubjectType: AuthSubjectType.tenant,
+        context,
       });
+      const payload = rotated.payload as unknown as TenantJwtPayload;
 
       // Verify user still exists and is active using the isolated client
       const user = await this.prisma.tenantClient.tenantUser.findUnique({
@@ -362,6 +382,12 @@ export class TenantAuthService {
       if (!user || !user.isActive) {
         throw new UnauthorizedException('User no longer active');
       }
+      if (
+        (user.tenant.status as string) !== (TenantStatus.ACTIVE as string) &&
+        (user.tenant.status as string) !== (TenantStatus.TRIAL as string)
+      ) {
+        throw new UnauthorizedException('Tenant is not active');
+      }
 
       const newPayload: TenantJwtPayload = {
         sub: user.id,
@@ -370,12 +396,26 @@ export class TenantAuthService {
         email: user.email,
       };
 
-      const newAccessToken = this.jwtService.sign(newPayload);
+      const newAccessToken = this.jwtService.sign({ ...newPayload, sid: rotated.sessionId });
 
-      return { accessToken: newAccessToken };
+      return { accessToken: newAccessToken, refreshToken: rotated.refreshToken };
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
+  }
+
+  async logout(sessionId?: string) {
+    await this.authSessionService.revokeSession(sessionId, 'logout');
+    return { success: true };
+  }
+
+  async logoutGlobal(userId: string) {
+    await this.authSessionService.revokeSubjectSessions(AuthSubjectType.tenant, userId, 'logout_global');
+    return { success: true };
+  }
+
+  async listSessions(userId: string) {
+    return this.authSessionService.listActiveSessions(AuthSubjectType.tenant, userId);
   }
 
   /**

@@ -1,13 +1,19 @@
 import {
   Injectable,
-  UnauthorizedException,
   Logger,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
-import { PrismaService } from '../database/prisma.service';
+import { AuthSubjectType } from '@prisma/client';
 import type { DriverJwtPayload } from '@gestor/types';
+import { PrismaService } from '../database/prisma.service';
+import { AuthSessionService } from './auth-session.service';
+
+type RequestSessionContext = {
+  userAgent?: string;
+  ipAddress?: string;
+};
 
 @Injectable()
 export class DriverAuthService {
@@ -16,24 +22,20 @@ export class DriverAuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    private readonly config: ConfigService,
+    private readonly authSessionService: AuthSessionService,
   ) {}
 
-  /**
-   * Authenticate a driver by phone + PIN + tenantSlug.
-   */
-  async login(phone: string, pin: string, tenantSlug: string) {
+  async login(phone: string, pin: string, tenantSlug: string, context?: RequestSessionContext) {
     this.logger.debug(`Login attempt for driver phone: ${phone} in tenant: ${tenantSlug}`);
 
     const normalizedPhone = phone.replace(/\D/g, '');
-
     const tenant = await this.prisma.tenant.findUnique({
       where: { slug: tenantSlug },
     });
 
     if (!tenant) {
       this.logger.warn(`Login failed: Tenant not found with slug: ${tenantSlug}`);
-      throw new UnauthorizedException('Credenciais inválidas.');
+      throw new UnauthorizedException('Credenciais invalidas.');
     }
 
     const driver = await this.prisma.deliveryDriver.findUnique({
@@ -43,28 +45,19 @@ export class DriverAuthService {
           phone: normalizedPhone,
         },
       },
-      include: {
-        tenant: true,
-      },
+      include: { tenant: true },
     });
 
-    if (!driver || !driver.isActive) {
-      this.logger.warn(`Login failed: Driver not found or inactive for phone: ${normalizedPhone} in tenant: ${tenant.id}`);
-      throw new UnauthorizedException('Credenciais inválidas.');
-    }
-
-    if (!driver.pin) {
-      this.logger.warn(`Login failed: Driver has no PIN set: ${normalizedPhone}`);
-      throw new UnauthorizedException('Credenciais inválidas.');
+    if (!driver || !driver.isActive || !driver.pin) {
+      this.logger.warn(`Login failed: Driver not found, inactive or without PIN: ${normalizedPhone}`);
+      throw new UnauthorizedException('Credenciais invalidas.');
     }
 
     const isPinValid = await bcrypt.compare(pin, driver.pin);
-
     if (!isPinValid) {
-      throw new UnauthorizedException('Credenciais inválidas.');
+      throw new UnauthorizedException('Credenciais invalidas.');
     }
 
-    // Generate tokens
     const payload: DriverJwtPayload = {
       sub: driver.id,
       tenantId: driver.tenantId,
@@ -73,15 +66,20 @@ export class DriverAuthService {
       name: driver.name,
     };
 
-    const accessToken = this.jwtService.sign(payload);
-    const refreshToken = this.jwtService.sign(payload, {
-      secret: this.config.get('JWT_REFRESH_SECRET', 'dev-refresh-secret'),
-      expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN', '7d'),
+    const session = await this.authSessionService.createSession({
+      subjectType: AuthSubjectType.driver,
+      subjectId: driver.id,
+      tenantId: driver.tenantId,
+      userId: driver.id,
+      role: 'driver',
+      payload,
+      context,
     });
+    const accessToken = this.jwtService.sign({ ...payload, sid: session.sessionId });
 
     return {
       accessToken,
-      refreshToken,
+      refreshToken: session.refreshToken,
       driver: {
         driverId: driver.id,
         tenantId: driver.tenantId,
@@ -97,21 +95,25 @@ export class DriverAuthService {
     };
   }
 
-  /**
-   * Refresh the access token using a valid refresh token.
-   */
-  async refreshToken(refreshToken: string) {
+  async refreshToken(refreshToken: string, context?: RequestSessionContext) {
     try {
-      const payload = this.jwtService.verify<DriverJwtPayload>(refreshToken, {
-        secret: this.config.get('JWT_REFRESH_SECRET', 'dev-refresh-secret'),
+      const rotated = await this.authSessionService.rotateSession({
+        refreshToken,
+        expectedSubjectType: AuthSubjectType.driver,
+        context,
       });
+      const payload = rotated.payload as unknown as DriverJwtPayload;
 
       const driver = await this.prisma.deliveryDriver.findUnique({
         where: { id: payload.sub },
+        include: { tenant: true },
       });
 
       if (!driver || !driver.isActive) {
-        throw new UnauthorizedException('Motorista inativo ou não existe mais.');
+        throw new UnauthorizedException('Motorista inativo ou nao existe mais.');
+      }
+      if (!['active', 'trial'].includes(String(driver.tenant.status))) {
+        throw new UnauthorizedException('Tenant is not active');
       }
 
       const newPayload: DriverJwtPayload = {
@@ -122,23 +124,33 @@ export class DriverAuthService {
         name: driver.name,
       };
 
-      const newAccessToken = this.jwtService.sign(newPayload);
-
-      return { accessToken: newAccessToken };
+      return {
+        accessToken: this.jwtService.sign({ ...newPayload, sid: rotated.sessionId }),
+        refreshToken: rotated.refreshToken,
+      };
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
 
-  /**
-   * Load session data (for /me endpoint).
-   */
+  async logout(sessionId?: string) {
+    await this.authSessionService.revokeSession(sessionId, 'logout');
+    return { success: true };
+  }
+
+  async logoutGlobal(driverId: string) {
+    await this.authSessionService.revokeSubjectSessions(AuthSubjectType.driver, driverId, 'logout_global');
+    return { success: true };
+  }
+
+  async listSessions(driverId: string) {
+    return this.authSessionService.listActiveSessions(AuthSubjectType.driver, driverId);
+  }
+
   async getSession(driverId: string) {
     const driver = await this.prisma.deliveryDriver.findUnique({
       where: { id: driverId },
-      include: {
-        tenant: true,
-      },
+      include: { tenant: true },
     });
 
     if (!driver || !driver.isActive) {

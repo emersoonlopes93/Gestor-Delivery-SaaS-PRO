@@ -61,9 +61,15 @@ Checklist para primeiros clientes pagantes em producao controlada.
 ## Seguranca
 
 - JWT secrets fortes e diferentes entre acesso e refresh.
+- `AuthSession` migrado e `JWT_REFRESH_EXPIRES_IN` definido.
+- Refresh token rotation validado para admin, tenant e driver.
+- Logout e logout global validam revogacao persistida.
+- Reuse de refresh token antigo marca familia como comprometida.
 - Impersonation apenas via `POST`, com motivo e permissao especifica.
 - Tokens impersonados com expiracao curta.
-- Webhooks com assinatura e idempotencia.
+- Webhooks com assinatura HMAC, raw body, janela anti-replay e idempotencia persistida.
+- `ASAAS_WEBHOOK_HMAC_SECRET` configurado; token legado desabilitado salvo janela de migracao explicita.
+- `WEBHOOK_REPLAY_WINDOW_SECONDS=300` ou valor aprovado por seguranca.
 - Rate limit especifico para auth, endpoints publicos e webhooks.
 - Helmet ativo.
 - Validacao global com whitelist ativa.

@@ -7,6 +7,7 @@ import { TenantAuthService } from './tenant-auth.service';
 import { DriverAuthController } from './driver-auth.controller';
 import { DriverAuthService } from './driver-auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { AuthSessionService } from './auth-session.service';
 
 @Module({
   imports: [
@@ -23,7 +24,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
   ],
   controllers: [TenantAuthController, DriverAuthController],
-  providers: [TenantAuthService, DriverAuthService, JwtStrategy],
-  exports: [JwtModule, TenantAuthService, DriverAuthService],
+  providers: [TenantAuthService, DriverAuthService, AuthSessionService, JwtStrategy],
+  exports: [JwtModule, TenantAuthService, DriverAuthService, AuthSessionService],
 })
 export class AuthModule {}

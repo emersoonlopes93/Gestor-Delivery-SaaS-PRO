@@ -9,11 +9,12 @@ import { BillingWebhookController } from './billing-webhook.controller';
 import { BillingDomainModule } from './billing-domain.module';
 import { AsaasSaasBillingWebhookController } from './asaas-saas-billing-webhook.controller';
 import { PublicSaasController } from './public-saas.controller';
+import { WebhookSecurityService } from './webhook-security.service';
 
 @Module({
   imports: [RbacModule, BillingDomainModule],
   controllers: [BillingController, BillingWebhookController, AsaasSaasBillingWebhookController, PublicSaasController],
-  providers: [BillingService, AsaasService, PrismaService, TenantContextService],
+  providers: [BillingService, AsaasService, PrismaService, TenantContextService, WebhookSecurityService],
   exports: [BillingService, BillingDomainModule],
 })
 export class BillingModule {}

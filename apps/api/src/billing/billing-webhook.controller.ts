@@ -1,29 +1,27 @@
-import { Controller, Post, Body, Headers, Logger, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Body, Headers, Logger, Req } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { SubscriptionStatus } from '@prisma/client';
 import { Public } from '../common/decorators';
 import { AsaasWebhookSchema } from './dto/asaas.dto';
+import { WebhookSecurityService } from './webhook-security.service';
+import type { Request } from 'express';
 
 @Controller('billing/webhooks')
 export class BillingWebhookController {
   private readonly logger = new Logger('BillingWebhookController');
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly webhookSecurity: WebhookSecurityService,
+  ) {}
 
   @Public()
   @Post('asaas')
   async handleAsaasWebhook(
     @Body() body: unknown,
+    @Req() req: Request,
     @Headers('asaas-access-token') token?: string,
   ) {
-    const asaasWebhookToken = process.env.ASAAS_WEBHOOK_TOKEN?.trim();
-    if (!asaasWebhookToken) {
-      throw new BadRequestException('ASAAS_WEBHOOK_TOKEN nao configurado.');
-    }
-    if (!token || token !== asaasWebhookToken) {
-      throw new BadRequestException('Token de webhook invalido');
-    }
-
     const parsed = AsaasWebhookSchema.safeParse(body);
     if (!parsed.success) {
       const issues = parsed.error.issues.map((i) => ({
@@ -37,7 +35,26 @@ export class BillingWebhookController {
     const { event, subscription } = parsed.data;
     this.logger.log(`Received Asaas webhook event: ${event}${subscription?.id ? ` (subscriptionId=${subscription.id})` : ''}`);
 
+    const eventId = req.get('x-webhook-id')?.trim()
+      || `${event}:${subscription?.id ?? 'no-subscription'}`;
+    const webhookEvent = await this.webhookSecurity.verifyAndRegister({
+      req,
+      provider: 'asaas',
+      eventId,
+      legacyToken: token,
+      legacySecretEnv: 'ASAAS_WEBHOOK_TOKEN',
+      hmacSecretEnv: 'ASAAS_WEBHOOK_HMAC_SECRET',
+      allowLegacyEnv: 'ASAAS_WEBHOOK_ALLOW_LEGACY_TOKEN',
+      relatedEntityType: 'subscription',
+      relatedEntityId: subscription?.id ?? null,
+    });
+
+    if (webhookEvent.duplicate) {
+      return { received: true, duplicate: true };
+    }
+
     if (!subscription?.id) {
+      await this.webhookSecurity.markProcessed(webhookEvent.dbEventId);
       return { received: true };
     }
 
@@ -48,6 +65,7 @@ export class BillingWebhookController {
 
     if (!tenantSub) {
       this.logger.warn(`Subscription ${asaasSubscriptionId} not found in DB`);
+      await this.webhookSecurity.markProcessed(webhookEvent.dbEventId);
       return { received: true };
     }
 
@@ -85,6 +103,7 @@ export class BillingWebhookController {
       this.logger.log(`Updated subscription ${tenantSub.id} to status ${statusToUpdate || tenantSub.status}`);
     }
 
+    await this.webhookSecurity.markProcessed(webhookEvent.dbEventId);
     return { received: true };
   }
 }

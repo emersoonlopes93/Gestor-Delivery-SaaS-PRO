@@ -20,7 +20,12 @@ async function bootstrap() {
     bodyParser: false,
   });
 
-  app.use(express.json({ limit: '10mb' }));
+  app.use(express.json({
+    limit: '10mb',
+    verify: (req, _res, buf) => {
+      (req as express.Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
+    },
+  }));
   app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
   const configService = app.get(ConfigService);

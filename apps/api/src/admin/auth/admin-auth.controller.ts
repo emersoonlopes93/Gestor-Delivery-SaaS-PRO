@@ -1,4 +1,5 @@
-import { Controller, Post, Body, Get, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 import { AdminAuthService } from './admin-auth.service';
 import { AdminAuthGuard } from './admin-auth.guard';
@@ -30,20 +31,38 @@ export class AdminAuthController {
 
   @Public()
   @Post('login')
-  async login(@Body() dto: AdminLoginDto) {
-    return this.authService.login(dto.email, dto.password);
+  async login(@Body() dto: AdminLoginDto, @Req() req: Request) {
+    return this.authService.login(dto.email, dto.password, sessionContext(req));
   }
 
   @Public()
   @Post('refresh')
-  async refresh(@Body() dto: AdminRefreshDto) {
-    return this.authService.refreshToken(dto.refreshToken);
+  async refresh(@Body() dto: AdminRefreshDto, @Req() req: Request) {
+    return this.authService.refreshToken(dto.refreshToken, sessionContext(req));
   }
 
   @UseGuards(AdminAuthGuard)
   @Get('me')
   async me(@CurrentUser('sub') userId: string) {
     return this.authService.getSession(userId);
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Post('logout')
+  async logout(@CurrentUser('sid') sessionId?: string) {
+    return this.authService.logout(sessionId);
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Post('logout-global')
+  async logoutGlobal(@CurrentUser('sub') userId: string) {
+    return this.authService.logoutGlobal(userId);
+  }
+
+  @UseGuards(AdminAuthGuard)
+  @Get('sessions')
+  async sessions(@CurrentUser('sub') userId: string) {
+    return this.authService.listSessions(userId);
   }
 
   @UseGuards(AdminAuthGuard, AdminPermissionsGuard)
@@ -55,4 +74,11 @@ export class AdminAuthController {
   ) {
     return this.tenantAuthService.impersonate(body.tenantId, adminId, body.reason);
   }
+}
+
+function sessionContext(req: Request) {
+  return {
+    userAgent: req.get('user-agent'),
+    ipAddress: req.ip,
+  };
 }

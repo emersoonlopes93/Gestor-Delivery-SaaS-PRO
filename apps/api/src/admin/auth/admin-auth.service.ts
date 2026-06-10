@@ -4,10 +4,16 @@ import {
   Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../database/prisma.service';
 import type { AdminJwtPayload } from '@gestor/types';
+import { AuthSessionService } from '../../auth/auth-session.service';
+import { AuthSubjectType } from '@prisma/client';
+
+type RequestSessionContext = {
+  userAgent?: string;
+  ipAddress?: string;
+};
 
 @Injectable()
 export class AdminAuthService {
@@ -16,13 +22,13 @@ export class AdminAuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    private readonly config: ConfigService,
+    private readonly authSessionService: AuthSessionService,
   ) {}
 
   /**
    * Authenticate a SaaS admin user.
    */
-  async login(email: string, password: string) {
+  async login(email: string, password: string, context?: RequestSessionContext) {
     const normalizedEmail = email.toLowerCase();
     const user = await this.prisma.adminUser.findUnique({
       where: { email: normalizedEmail },
@@ -67,17 +73,21 @@ export class AdminAuthService {
       email: user.email,
     };
 
-    const accessToken = this.jwtService.sign(payload);
-    const refreshToken = this.jwtService.sign(payload, {
-      secret: this.config.get('JWT_REFRESH_SECRET', 'dev-refresh-secret'),
-      expiresIn: this.config.get('JWT_REFRESH_EXPIRES_IN', '7d'),
+    const session = await this.authSessionService.createSession({
+      subjectType: AuthSubjectType.admin,
+      subjectId: user.id,
+      adminUserId: user.id,
+      role: roles.join(','),
+      payload,
+      context,
     });
+    const accessToken = this.jwtService.sign({ ...payload, sid: session.sessionId });
 
     this.logger.log(`Admin user logged in: ${user.email}`);
 
     return {
       accessToken,
-      refreshToken,
+      refreshToken: session.refreshToken,
       user: {
         id: user.id,
         email: user.email,
@@ -91,11 +101,14 @@ export class AdminAuthService {
   /**
    * Refresh admin access token.
    */
-  async refreshToken(refreshToken: string) {
+  async refreshToken(refreshToken: string, context?: RequestSessionContext) {
     try {
-      const payload = this.jwtService.verify<AdminJwtPayload>(refreshToken, {
-        secret: this.config.get('JWT_REFRESH_SECRET', 'dev-refresh-secret'),
+      const rotated = await this.authSessionService.rotateSession({
+        refreshToken,
+        expectedSubjectType: AuthSubjectType.admin,
+        context,
       });
+      const payload = rotated.payload as unknown as AdminJwtPayload;
 
       if (payload.type !== 'admin') {
         throw new UnauthorizedException('Invalid token type');
@@ -115,10 +128,27 @@ export class AdminAuthService {
         email: user.email,
       };
 
-      return { accessToken: this.jwtService.sign(newPayload) };
+      return {
+        accessToken: this.jwtService.sign({ ...newPayload, sid: rotated.sessionId }),
+        refreshToken: rotated.refreshToken,
+      };
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
+  }
+
+  async logout(sessionId?: string) {
+    await this.authSessionService.revokeSession(sessionId, 'logout');
+    return { success: true };
+  }
+
+  async logoutGlobal(userId: string) {
+    await this.authSessionService.revokeSubjectSessions(AuthSubjectType.admin, userId, 'logout_global');
+    return { success: true };
+  }
+
+  async listSessions(userId: string) {
+    return this.authSessionService.listActiveSessions(AuthSubjectType.admin, userId);
   }
 
   /**

@@ -119,9 +119,12 @@ async function tryRefreshToken(): Promise<boolean> {
   })
     .then(async (res) => {
       if (!res.ok) return false;
-      const data: ApiResponse<{ accessToken: string }> = await res.json();
+      const data: ApiResponse<{ accessToken: string; refreshToken?: string }> = await res.json();
       if (data?.success && data?.data?.accessToken) {
         localStorage.setItem('accessToken', data.data.accessToken);
+        if (data.data.refreshToken) {
+          localStorage.setItem('refreshToken', data.data.refreshToken);
+        }
         return true;
       }
       return false;

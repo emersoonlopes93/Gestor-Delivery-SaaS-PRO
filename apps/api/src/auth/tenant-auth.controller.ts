@@ -1,9 +1,10 @@
-import { Controller, Post, Body, Get, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Req } from '@nestjs/common';
 import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 import { TenantAuthService } from './tenant-auth.service';
 import { CurrentUser, Public } from '../common/decorators';
 import { TenantAuthGuard } from './guards/tenant-auth.guard';
 import { Throttle } from '@nestjs/throttler';
+import type { Request } from 'express';
 
 class LoginDto {
   @IsEmail()
@@ -52,28 +53,29 @@ export class TenantAuthController {
   @Public()
   @Post('login')
   @Throttle({ auth: { limit: 10, ttl: 60 } })
-  async login(@Body() dto: LoginDto) {
-    return this.authService.login(dto.email, dto.password, dto.tenantSlug);
+  async login(@Body() dto: LoginDto, @Req() req: Request) {
+    return this.authService.login(dto.email, dto.password, dto.tenantSlug, sessionContext(req));
   }
 
   @Public()
   @Post('register')
   @Throttle({ auth: { limit: 5, ttl: 300 } }) // Limite de 5 registros a cada 5 minutos
-  async register(@Body() dto: RegisterDto) {
+  async register(@Body() dto: RegisterDto, @Req() req: Request) {
     return this.authService.register(
       dto.ownerName,
       dto.shopName,
       dto.phone,
       dto.email,
       dto.password,
+      sessionContext(req),
     );
   }
 
   @Public()
   @Post('refresh')
   @Throttle({ auth: { limit: 10, ttl: 60 } })
-  async refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refreshToken(dto.refreshToken);
+  async refresh(@Body() dto: RefreshTokenDto, @Req() req: Request) {
+    return this.authService.refreshToken(dto.refreshToken, sessionContext(req));
   }
 
   @UseGuards(TenantAuthGuard)
@@ -81,4 +83,29 @@ export class TenantAuthController {
   async me(@CurrentUser('sub') userId: string) {
     return this.authService.getSession(userId);
   }
+
+  @UseGuards(TenantAuthGuard)
+  @Post('logout')
+  async logout(@CurrentUser('sid') sessionId?: string) {
+    return this.authService.logout(sessionId);
+  }
+
+  @UseGuards(TenantAuthGuard)
+  @Post('logout-global')
+  async logoutGlobal(@CurrentUser('sub') userId: string) {
+    return this.authService.logoutGlobal(userId);
+  }
+
+  @UseGuards(TenantAuthGuard)
+  @Get('sessions')
+  async sessions(@CurrentUser('sub') userId: string) {
+    return this.authService.listSessions(userId);
+  }
+}
+
+function sessionContext(req: Request) {
+  return {
+    userAgent: req.get('user-agent'),
+    ipAddress: req.ip,
+  };
 }

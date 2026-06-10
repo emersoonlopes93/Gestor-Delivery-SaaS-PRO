@@ -41,8 +41,8 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeStore } from '../stores/theme.store';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api-client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Tenant, TenantSettings, TenantOperatingHours } from '@gestor/types';
 import { useNotificationAudio } from '../hooks/useNotificationAudio';
 import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
@@ -558,7 +558,8 @@ export function AppLayout() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isMobileOpen]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await api.post('/auth/tenant/logout').catch(() => undefined);
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     clearUser();
