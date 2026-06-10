@@ -32,6 +32,7 @@ jobs:
       ASAAS_WEBHOOK_HMAC_SECRET: ${{ secrets.ASAAS_WEBHOOK_HMAC_SECRET }}
       WEBHOOK_REPLAY_WINDOW_SECONDS: "300"
       DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.STAGING_DIRECT_URL }}
 
     steps:
       - name: Checkout
@@ -61,7 +62,8 @@ jobs:
             SMOKE_TENANT_OWNER_EMAIL \
             SMOKE_TENANT_OWNER_PASSWORD \
             ASAAS_WEBHOOK_HMAC_SECRET \
-            DATABASE_URL
+            DATABASE_URL \
+            DIRECT_URL
           do
             if [ -z "${!name}" ]; then
               echo "::error::$name is required for staging smoke"
