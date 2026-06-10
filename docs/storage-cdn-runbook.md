@@ -46,3 +46,21 @@ Storage local e proibido em producao. Use R2/S3 com CDN para midias publicas.
 - URL publica vazia.
 - Bucket com listagem publica.
 - Upload funcionando sem tenant isolation.
+
+## Evidencia Operacional Atual
+
+Ultima verificacao: 2026-06-10.
+
+| Campo | Status |
+| --- | --- |
+| Provider | Cloudflare R2 configurado em staging por envs R2 |
+| Bucket | Presente no Render; valor nao deve ser impresso |
+| Base publica | Presente no Render; valor mascarado em relatorios |
+| Storage driver | Pendente de comprovacao completa no health/admin |
+| Upload real de produto | Pendente |
+| Imagem no storefront | Pendente |
+| Isolamento tenant | Pendente de teste real de media |
+| Delete/retention | Documentado; teste real pendente |
+| CDN/cache | Pendente de validacao; base publica R2 nao substitui validacao de CDN/cache |
+
+Resultado atual: NO-GO ate upload remoto e storefront/CDN serem validados.

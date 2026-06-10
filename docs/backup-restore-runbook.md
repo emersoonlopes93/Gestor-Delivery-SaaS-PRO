@@ -74,3 +74,35 @@ pnpm --filter @gestor/api prisma:migrate:deploy
 ## Criterio De GO
 
 GO somente com backup automatico ativo e restore testado em staging nos ultimos 7 dias.
+
+## Evidencia Operacional Atual
+
+Ultima verificacao: 2026-06-10.
+
+| Campo | Status |
+| --- | --- |
+| Provedor | Neon PostgreSQL inferido pelo host do banco staging |
+| Politica ativa | Pendente de comprovacao no painel/provedor |
+| Frequencia | Pendente |
+| Retencao | Pendente; requisito minimo 7 diarios e 4 semanais |
+| PITR | Pendente de comprovacao |
+| Acesso restrito | Pendente de comprovacao |
+| Responsavel | Operador de release/infra |
+| Restore testado | Pendente |
+
+Resultado atual: NO-GO para producao controlada ate backup automatico e restore real serem comprovados.
+
+## Registro De Teste De Restore
+
+Ainda nao executado nesta fase.
+
+Para marcar GO, preencher:
+
+- data/hora do teste;
+- banco origem;
+- banco destino isolado;
+- comando usado;
+- tempo estimado de restore;
+- validacoes executadas;
+- problemas encontrados;
+- resultado final.

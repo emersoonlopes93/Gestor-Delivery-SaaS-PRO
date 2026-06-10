@@ -44,3 +44,63 @@ Permitido somente com tenant interno marcado e documentado como `internal_smoke`
 - Login admin controlado funciona.
 - Storefront demo/internal responde.
 - Sem aumento de 5xx/latencia nos primeiros 30 minutos.
+
+## Script Automatizado
+
+Smoke seguro disponivel:
+
+```bash
+pnpm --filter @gestor/api smoke:production-infra
+```
+
+Variaveis:
+
+- `SMOKE_API_BASE_URL`: URL da API com `/api/v1`.
+- `SMOKE_ADMIN_EMAIL` e `SMOKE_ADMIN_PASSWORD`: opcionais; habilitam admin health.
+- `SMOKE_EXPECT_PRODUCTION=true`: exige `NODE_ENV=production` no admin health.
+- `SMOKE_EXPECT_REDIS=true`: exige Redis conectado.
+- `SMOKE_EXPECT_BULLMQ=true`: exige BullMQ habilitado/conectado.
+- `SMOKE_EXPECT_STORAGE_REMOTE=true`: exige storage `r2` ou `s3`.
+- `SMOKE_EXPECT_SWAGGER_DISABLED=true`: exige Swagger nao publico.
+
+Marcadores:
+
+- `PRODUCTION_INFRA_SMOKE_GO`
+- `PRODUCTION_INFRA_SMOKE_NO_GO`
+
+## Evidencia Operacional Atual
+
+Ultima execucao: 2026-06-10.
+
+Smoke estrito contra staging:
+
+```bash
+pnpm --filter @gestor/api smoke:production-infra
+```
+
+Resultado: `PRODUCTION_INFRA_SMOKE_NO_GO`.
+
+Motivo: Redis nao conectado; BullMQ desabilitado. O smoke confirmou health publico e DB `ok` antes de falhar.
+
+Smoke relaxado para coletar evidencias nao bloqueadas por Redis/BullMQ:
+
+```bash
+SMOKE_EXPECT_REDIS=false SMOKE_EXPECT_BULLMQ=false pnpm --filter @gestor/api smoke:production-infra
+```
+
+Resultado: `PRODUCTION_INFRA_SMOKE_GO` parcial.
+
+Checks confirmados:
+
+- public health ok;
+- database health ok;
+- admin login ok;
+- admin health ok;
+- remote storage configurado;
+- billing env ok;
+- Swagger nao publico.
+
+Warnings:
+
+- Redis not connected;
+- BullMQ disabled.

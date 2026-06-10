@@ -65,3 +65,24 @@ Deve conter:
 - [ ] Clientes impactados mapeados.
 - [ ] Correcao testada em staging.
 - [ ] Gate de release atualizado se necessario.
+
+## Evidencia Operacional Atual
+
+Ultima verificacao: 2026-06-10.
+
+| Item | Status |
+| --- | --- |
+| Logs centralizados | Render logs disponiveis para API staging |
+| Sentry/equivalente | Pendente |
+| Alerta 5xx | Pendente |
+| Alerta latencia alta | Pendente |
+| Alerta DB indisponivel | Pendente |
+| Alerta Redis indisponivel | Pendente |
+| Alerta fila acumulada | Pendente |
+| Alerta webhook falhando | Pendente |
+| Alerta billing cycle falhando | Pendente |
+| Alerta checkout falhando | Pendente |
+| Canal de alerta | Pendente |
+| Teste de alerta | Pendente |
+
+Resultado atual: NO-GO ate ferramenta/canal/alertas serem configurados e testados.

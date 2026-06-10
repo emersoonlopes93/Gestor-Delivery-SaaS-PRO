@@ -65,3 +65,39 @@ Acao:
 - Jobs failed acima do limiar.
 - Fila waiting/delayed crescendo.
 - Campanha com falhas repetidas.
+
+## Evidencia Operacional Atual
+
+Ultima verificacao: 2026-06-10.
+
+| Item | Status |
+| --- | --- |
+| Provedor Redis | Pendente de comprovacao |
+| Endpoint | Nao documentado; nao imprimir valor em logs |
+| `REDIS_ENABLED` | Health indica enabled |
+| Redis conectado | NO-GO: health atual `connected=false`, servico `degraded` |
+| `BULLMQ_ENABLED` | NO-GO: Render/staging atual `false` |
+| BullMQ conectado | NO-GO: health atual `disabled` |
+| Retry policy | Configurada no `BullModule` com 3 tentativas e backoff exponencial |
+| Health validation | `/api/v1/health` mostra Redis/BullMQ |
+
+Resultado atual: NO-GO para producao controlada.
+
+## Queda De Redis
+
+1. Confirmar health publico e admin.
+2. Validar status do provedor Redis.
+3. Pausar campanhas e produtores de jobs nao criticos.
+4. Reiniciar API/worker se a conexao nao recuperar apos provedor verde.
+5. Reprocessar jobs falhos em lotes pequenos.
+6. Abrir incidente se afetar checkout, billing ou comunicacao.
+
+## Teste Operacional BullMQ
+
+Pendente. Para marcar GO:
+
+- enfileirar job seguro;
+- processar job;
+- validar sucesso;
+- simular falha controlada quando existir mecanismo seguro;
+- confirmar retry/failure em logs ou painel.
