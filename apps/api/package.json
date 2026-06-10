@@ -37,6 +37,8 @@
     "smoke:billing-usage": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-usage.ts",
     "smoke:billing-cycle": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-cycle.ts",
     "smoke:billing-payment": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-payment.ts",
+    "smoke:billing-ledger-flow": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-ledger-flow.ts",
+    "smoke:billing-ledger-http-flow": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-ledger-http-flow.ts",
     "smoke:tenant-billing-v2": "ts-node -r tsconfig-paths/register scripts/smoke-test-tenant-billing-v2.ts",
     "smoke:tenant-billing-portal": "ts-node -r tsconfig-paths/register scripts/smoke-test-tenant-billing-portal.ts",
     "smoke:billing-asaas-sandbox": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-asaas-sandbox.ts",

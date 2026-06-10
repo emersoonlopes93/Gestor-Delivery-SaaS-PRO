@@ -4,9 +4,10 @@ import { SuppliersController } from './suppliers.controller';
 import { PurchasesService } from './purchases.service';
 import { PurchasesController } from './purchases.controller';
 import { DatabaseModule } from '../database/database.module';
+import { RbacModule } from '../rbac/rbac.module';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, RbacModule],
   controllers: [SuppliersController, PurchasesController],
   providers: [SuppliersService, PurchasesService],
   exports: [SuppliersService, PurchasesService],
