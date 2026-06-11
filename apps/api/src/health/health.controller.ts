@@ -1,10 +1,11 @@
-import { Controller, Get, Param, UseGuards, Inject } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { Public } from '../common/decorators';
 import { TenantHealthService } from './tenant-health.service';
 import { AdminAuthGuard } from '../admin/auth/admin-auth.guard';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
+import { connect as connectTcp } from 'node:net';
+import { connect as connectTls } from 'node:tls';
+import type { Socket } from 'node:net';
 
 type QueueHealth = {
   name: string;
@@ -32,12 +33,131 @@ function getBullmqReadinessReason(bullmqEnvEnabled: boolean, redisConnected: boo
   return null;
 }
 
+type RedisPingCache = {
+  checkedAt: number;
+  connected: boolean;
+  latencyMs: number | null;
+  reason: string | null;
+};
+
+const REDIS_HEALTH_CACHE_TTL_MS = Number(process.env.REDIS_HEALTH_CACHE_TTL_MS ?? 30000);
+let redisPingCache: RedisPingCache | null = null;
+
+function writeRedisCommand(socket: Socket, command: string[]): void {
+  const payload = `*${command.length}\r\n${command.map((item) => `$${Buffer.byteLength(item)}\r\n${item}\r\n`).join('')}`;
+  socket.write(payload);
+}
+
+function readRedisResponse(socket: Socket, timeoutMs: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('redis_health_timeout'));
+    }, timeoutMs);
+    const cleanup = () => {
+      clearTimeout(timeout);
+      socket.off('data', onData);
+      socket.off('error', onError);
+    };
+    const onData = (chunk: Buffer) => {
+      chunks.push(chunk);
+      const response = Buffer.concat(chunks).toString('utf8');
+      if (response.includes('\r\n')) {
+        cleanup();
+        resolve(response);
+      }
+    };
+    const onError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+    socket.on('data', onData);
+    socket.once('error', onError);
+  });
+}
+
+async function pingRedisFromEnv(): Promise<RedisPingCache> {
+  const now = Date.now();
+  if (redisPingCache && now - redisPingCache.checkedAt < REDIS_HEALTH_CACHE_TTL_MS) {
+    return redisPingCache;
+  }
+
+  const startedAt = Date.now();
+  const host = process.env.REDIS_HOST;
+  const port = Number(process.env.REDIS_PORT || 6379);
+  const timeoutMs = Number(process.env.REDIS_HEALTH_TIMEOUT_MS ?? 1500);
+
+  if (!host) {
+    redisPingCache = { checkedAt: now, connected: false, latencyMs: null, reason: 'REDIS_HOST missing' };
+    return redisPingCache;
+  }
+
+  const socket = process.env.REDIS_TLS === 'true'
+    ? connectTls({ host, port, servername: host, rejectUnauthorized: process.env.REDIS_TLS_REJECT_UNAUTHORIZED === 'false' ? false : undefined })
+    : connectTcp({ host, port });
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error('redis_health_connect_timeout'));
+      }, timeoutMs);
+      const cleanup = () => {
+        clearTimeout(timeout);
+        socket.off('connect', onConnect);
+        socket.off('secureConnect', onConnect);
+        socket.off('error', onError);
+      };
+      const onConnect = () => {
+        cleanup();
+        resolve();
+      };
+      const onError = (error: Error) => {
+        cleanup();
+        reject(error);
+      };
+      socket.once(process.env.REDIS_TLS === 'true' ? 'secureConnect' : 'connect', onConnect);
+      socket.once('error', onError);
+    });
+
+    const password = process.env.REDIS_PASSWORD;
+    if (password) {
+      writeRedisCommand(socket, ['AUTH', password]);
+      const authResponse = await readRedisResponse(socket, timeoutMs);
+      if (!authResponse.startsWith('+OK')) {
+        throw new Error('redis_health_auth_failed');
+      }
+    }
+
+    writeRedisCommand(socket, ['PING']);
+    const pingResponse = await readRedisResponse(socket, timeoutMs);
+    const connected = pingResponse.startsWith('+PONG');
+    redisPingCache = {
+      checkedAt: now,
+      connected,
+      latencyMs: connected ? Date.now() - startedAt : null,
+      reason: connected ? null : 'redis_ping_failed',
+    };
+    return redisPingCache;
+  } catch (error) {
+    redisPingCache = {
+      checkedAt: now,
+      connected: false,
+      latencyMs: null,
+      reason: error instanceof Error ? error.message : 'redis_health_unknown_error',
+    };
+    return redisPingCache;
+  } finally {
+    socket.destroy();
+  }
+}
+
 @Controller('health')
 export class HealthController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenantHealthService: TenantHealthService,
-    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
   @Public()
@@ -58,40 +178,13 @@ export class HealthController {
     let redisConnected = false;
     let redisLatencyMs: number | null = null;
 
-    try {
-      if (!redisEnvEnabled) {
-        cacheDriver = 'memory';
-      } else {
-        const cmObj: unknown = this.cacheManager;
-        let store: unknown = undefined;
-        if (cmObj && typeof cmObj === 'object' && 'store' in cmObj) {
-          store = (cmObj as { store?: unknown }).store;
-        }
-
-        if (store && typeof store === 'object') {
-          const s = store as { client?: unknown; getClient?: unknown };
-          const client = s.client ?? (typeof s.getClient === 'function' ? (s.getClient as () => unknown)() : undefined);
-          if (client && typeof (client as { ping?: unknown }).ping === 'function') {
-            cacheDriver = 'redis';
-            const pingStart = Date.now();
-            const pingResult = await Promise.race([
-              (client as { ping: () => Promise<unknown> }).ping(),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500)),
-            ]);
-            if (typeof pingResult === 'string') {
-              redisConnected = true;
-              redisLatencyMs = Date.now() - pingStart;
-            }
-          } else {
-            cacheDriver = 'memory';
-          }
-        } else {
-          cacheDriver = 'memory';
-        }
-      }
-    } catch {
+    if (!redisEnvEnabled) {
       cacheDriver = 'memory';
-      redisConnected = false;
+    } else {
+      const redisPing = await pingRedisFromEnv();
+      redisConnected = redisPing.connected;
+      redisLatencyMs = redisPing.latencyMs;
+      cacheDriver = redisPing.connected ? 'redis' : 'memory';
     }
 
     // BullMQ / Campaigns flags depend on env + redis connectivity
