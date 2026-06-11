@@ -86,6 +86,13 @@ pnpm --filter @gestor/api smoke:queues
 
 ## Production Release Gates
 
+Ultima evidencia Redis/BullMQ: 2026-06-10 21:11 BRT.
+
+- Redis/BullMQ no ambiente alvo: validated.
+- `smoke:queues`: `QUEUES_SMOKE_GO`.
+- `smoke:production-infra` estrito: `PRODUCTION_INFRA_SMOKE_GO`, `productionReady=true`.
+- Risco: Redis inferido como Upstash, mas plano/cota ainda nao comprovados. Se for free-tier, liberar apenas GO parcial operacional.
+
 Gates obrigatorios para promover producao controlada:
 
 - typecheck verde;

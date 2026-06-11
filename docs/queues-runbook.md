@@ -141,17 +141,19 @@ Marcadores:
 
 ## Evidencia Operacional Atual
 
-Ultima verificacao: 2026-06-10.
+Ultima verificacao: 2026-06-10 21:11 BRT.
 
 | Item | Status | Evidencia | Responsavel | Data/hora |
 | --- | --- | --- | --- | --- |
-| Redis configurado | blocked | Staging health: Redis `degraded`, `connected=false` | Operacao | 2026-06-10 |
-| BullMQ configurado | blocked | Staging health: BullMQ `disabled`, `BULLMQ_ENABLED=false` | Operacao | 2026-06-10 |
-| Ultimo smoke de filas | validated local / blocked staging | `QUEUES_SMOKE_GO` local em 2026-06-10 20:16 BRT; staging/producao ainda precisam Redis/BullMQ real | Operacao | 2026-06-10 20:16 BRT |
-| Ultimo health Redis | blocked | `connected=false` | Operacao | 2026-06-10 |
-| Ultimo health BullMQ | blocked | `disabled` | Operacao | 2026-06-10 |
+| Redis configurado | validated / risk pending | Provider inferido por host: Upstash; porta `6379`; TLS `true`; senha configurada; plano/cota nao evidenciados pelo painel | Operacao | 2026-06-10 21:11 BRT |
+| BullMQ configurado | validated | `BULLMQ_ENABLED=true`; `CAMPAIGNS_DISPATCH_ENABLED=false`; health `bullmq=ok` | Operacao | 2026-06-10 21:11 BRT |
+| Ultimo smoke de filas | validated | `QUEUES_SMOKE_GO`; ping Redis ok; job processado; falha controlada registrada; fila smoke limpa | Operacao | 2026-06-10 21:11 BRT |
+| Ultimo health Redis | validated | `/api/v1/health`: Redis `ok`, `connected=true`, cache `redis` | Operacao | 2026-06-10 21:11 BRT |
+| Ultimo health BullMQ | validated | `/api/v1/health`: BullMQ `ok`, `enabled=true`, `connected=true` | Operacao | 2026-06-10 21:11 BRT |
 
-Resultado atual: NO-GO para producao controlada.
+Resultado atual do gate Redis/BullMQ: GO parcial.
+
+Risco pendente: plano/cota do Redis Upstash nao foi comprovado no painel. Se for free-tier, e aceitavel apenas para staging ou piloto muito controlado com contingencia; continua NO-GO para producao controlada ampla.
 
 ## Queda De Redis
 

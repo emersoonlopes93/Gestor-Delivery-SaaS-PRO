@@ -2,7 +2,7 @@
 
 Status permitidos: `pending`, `configured`, `validated`, `blocked`.
 
-Data da ultima revisao: 2026-06-10.
+Data da ultima revisao: 2026-06-10 21:11 BRT.
 
 ## Gates Criticos
 
@@ -16,7 +16,7 @@ Data da ultima revisao: 2026-06-10.
 | `pnpm lint` | validated | Passou; warnings antigos no storefront documentados | Sim |
 | `pnpm build` | validated | Build passou; warnings de chunk grande em frontend | Sim |
 | Staging Smoke Gate | validated | Run verde: `27301493201` | Sim |
-| Health staging | blocked | API/DB ok, mas Redis/BullMQ degradados deixam `productionReady=false` | Sim |
+| Health staging | validated | API/DB/Redis/BullMQ ok; `productionReady=true` em 2026-06-10 21:11 BRT | Sim |
 | Rollback documentado | configured | `docs/release-rollback-runbook.md` | Sim |
 | Admin access documentado | configured | `docs/admin-access-runbook.md` | Sim |
 | Primeiro tenant checklist | configured | `docs/first-paying-tenant-checklist.md` | Sim |
@@ -30,12 +30,13 @@ Data da ultima revisao: 2026-06-10.
 | Retencao 7 diarios / 4 semanais | pending | Politica documentada, nao comprovada no provedor | Sim |
 | PITR | pending | Nao comprovado no provedor | Sim |
 | Restore testado nos ultimos 7 dias | pending | Procedimento documentado, restore real ainda nao executado | Sim |
-| Redis configurado | blocked | Health atual: Redis `degraded`, conectado `false`; ultimo smoke de filas pendente/NO-GO sem Redis real | Sim |
-| `REDIS_ENABLED=true` | configured | Health indica Redis enabled, mas sem conexao validada | Sim |
-| BullMQ configurado | blocked | Health atual: BullMQ `disabled`; `BULLMQ_ENABLED=false`; ultimo smoke de filas pendente/NO-GO | Sim |
-| Ultimo health Redis | blocked | Redis `connected=false` em 2026-06-10; responsavel: Operacao | Sim |
-| Ultimo health BullMQ | blocked | BullMQ `disabled` em 2026-06-10; responsavel: Operacao | Sim |
-| Ultimo smoke de filas | blocked | `QUEUES_SMOKE_GO` local em 2026-06-10 20:16 BRT; staging/producao aguardam Redis/BullMQ real | Sim |
+| Redis configurado | validated | Provider inferido: Upstash; TLS true; senha configurada; `connected=true`; plano/cota pendente de evidencia | Sim |
+| `REDIS_ENABLED=true` | validated | Render/API alvo com `REDIS_ENABLED=true` | Sim |
+| BullMQ configurado | validated | Render/API alvo com `BULLMQ_ENABLED=true`; health `bullmq=ok` | Sim |
+| Ultimo health Redis | validated | Redis `ok`, `connected=true`, cache `redis` em 2026-06-10 21:11 BRT; responsavel: Operacao | Sim |
+| Ultimo health BullMQ | validated | BullMQ `ok`, `enabled=true`, `connected=true` em 2026-06-10 21:11 BRT; responsavel: Operacao | Sim |
+| Ultimo smoke de filas | validated | `QUEUES_SMOKE_GO` em 2026-06-10 21:11 BRT; fila smoke limpa | Sim |
+| Plano/cota Redis | blocked | Plano/cota Upstash nao comprovados; risco se free-tier | Sim |
 | Storage remoto R2/S3 | configured | Render tem R2 bucket/base URL configurados; upload real ainda pendente | Sim |
 | Upload real em storage remoto | pending | Nao executado nesta fase | Sim |
 | CDN validado | pending | Base publica R2 presente; CDN/cache/storefront ainda nao validados | Sim |
@@ -81,7 +82,6 @@ Bloqueadores principais:
 
 - backup automatico sem evidencia;
 - restore real ainda nao testado;
-- Redis health nao esta verde;
-- BullMQ esta desabilitado;
+- plano/cota Redis ainda nao comprovados;
 - upload/CDN real ainda nao validado;
 - observabilidade/alertas reais ainda nao comprovados.

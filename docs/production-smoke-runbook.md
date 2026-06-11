@@ -107,17 +107,29 @@ O script cria fila `queues-smoke-*`, processa job seguro, registra falha control
 
 ## Evidencia Operacional Atual
 
-Ultima execucao: 2026-06-10.
+Ultima execucao: 2026-06-10 21:11 BRT.
 
-Smoke estrito contra staging:
+Smoke estrito contra ambiente alvo:
 
 ```bash
 pnpm --filter @gestor/api smoke:production-infra
 ```
 
-Resultado: `PRODUCTION_INFRA_SMOKE_NO_GO`.
+Resultado: `PRODUCTION_INFRA_SMOKE_GO`.
 
-Motivo: Redis nao conectado; BullMQ desabilitado. O smoke confirmou health publico e DB `ok` antes de falhar.
+Checks confirmados:
+
+- public health ok;
+- database health ok;
+- redis health ok;
+- bullmq health ok;
+- admin login ok;
+- admin health ok;
+- remote storage configurado;
+- billing env ok;
+- Swagger nao publico;
+- webhook security endpoint guarded or disabled;
+- `productionReady=true`.
 
 Smoke relaxado para coletar evidencias nao bloqueadas por Redis/BullMQ:
 
@@ -125,7 +137,7 @@ Smoke relaxado para coletar evidencias nao bloqueadas por Redis/BullMQ:
 SMOKE_EXPECT_REDIS=false SMOKE_EXPECT_BULLMQ=false pnpm --filter @gestor/api smoke:production-infra
 ```
 
-Resultado esperado apos Fase 4.1.1: `PRODUCTION_INFRA_SMOKE_GO` com `result=GO parcial` e `productionReady=false`.
+Resultado historico antes da Fase 4.1.2: `PRODUCTION_INFRA_SMOKE_GO` com `result=GO parcial` e `productionReady=false`.
 
 Checks confirmados:
 
@@ -142,4 +154,6 @@ Warnings:
 - Redis not connected;
 - BullMQ disabled.
 
-Ultimo smoke de filas: `QUEUES_SMOKE_GO` local em 2026-06-10 20:16 BRT. Para staging/producao, continua bloqueado ate Redis real e BullMQ real estarem ativos no ambiente alvo.
+Ultimo smoke de filas: `QUEUES_SMOKE_GO` contra Redis alvo em 2026-06-10 21:11 BRT. Ping Redis ok, job processado, falha controlada registrada, contagens lidas e fila smoke limpa.
+
+Risco pendente: Redis inferido como Upstash, mas plano/cota nao foram comprovados pelo painel. Se for free-tier, o resultado e GO parcial operacional, nao GO final para producao controlada.
