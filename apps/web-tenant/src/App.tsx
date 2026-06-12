@@ -1,6 +1,7 @@
 
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './features/auth/LoginPage';
+import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { BillingPage } from './features/billing/BillingPage';
 import { AuthLayout } from './layouts/AuthLayout';
@@ -65,6 +66,7 @@ export function App() {
       {/* Public routes */}
       <Route element={<AuthThemeBoundary><AuthLayout /></AuthThemeBoundary>}>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       </Route>
 
       {/* Protected routes */}

@@ -82,6 +82,7 @@ pnpm --filter @gestor/api test
 pnpm lint
 pnpm build
 pnpm --filter @gestor/api smoke:queues
+pnpm --filter @gestor/api smoke:database-restore
 ```
 
 ## Production Release Gates
@@ -105,6 +106,7 @@ Gates obrigatorios para promover producao controlada:
 - Staging Smoke Gate verde;
 - backup recente confirmado;
 - restore testado nos ultimos 7 dias;
+- `pnpm --filter @gestor/api smoke:database-restore` com `DATABASE_RESTORE_SMOKE_GO` contra banco/branch restore isolado;
 - health staging `ok`;
 - Redis remoto ativo, pago/production-grade e separado por ambiente;
 - BullMQ ativo e conectado;
@@ -122,6 +124,10 @@ Bloqueie o release se qualquer item abaixo acontecer:
 - migration falha;
 - billing smoke falha;
 - backup ou restore indisponivel;
+- backup automatico sem evidencia do provedor;
+- restore real sem teste nos ultimos 7 dias;
+- `smoke:database-restore` sem `DATABASE_RESTORE_SMOKE_GO`;
+- ausencia de PITR sem risco aceito explicitamente;
 - `WEBHOOK_SECURITY_SMOKE_ENABLED=true` em producao;
 - `ASAAS_WEBHOOK_ALLOW_LEGACY_TOKEN=true` em producao;
 - Redis/BullMQ degradado antes do go-live;

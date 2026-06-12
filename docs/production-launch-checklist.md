@@ -2,7 +2,7 @@
 
 Status permitidos: `pending`, `configured`, `validated`, `blocked`.
 
-Data da ultima revisao: 2026-06-10 21:11 BRT.
+Data da ultima revisao: 2026-06-11.
 
 ## Gates Criticos
 
@@ -25,11 +25,13 @@ Data da ultima revisao: 2026-06-10 21:11 BRT.
 
 | Item | Status | Evidencia | Bloqueia GO |
 | --- | --- | --- | --- |
-| Banco de producao/staging-final definido | pending | Banco staging atual em Neon identificado, mas producao final nao evidenciada | Sim |
-| Backup automatico diario | pending | Sem acesso/evidencia do painel Neon/backup automatico | Sim |
-| Retencao 7 diarios / 4 semanais | pending | Politica documentada, nao comprovada no provedor | Sim |
-| PITR | pending | Nao comprovado no provedor | Sim |
-| Restore testado nos ultimos 7 dias | pending | Procedimento documentado, restore real ainda nao executado | Sim |
+| Banco de producao/staging-final definido | configured | Banco atual inferido como Neon PostgreSQL, host `aws.neon.tech`, DB `neondb`; projeto/branch Neon pendentes do painel | Sim |
+| Backup automatico diario | blocked | Sem acesso/evidencia do painel Neon/backup automatico | Sim |
+| Retencao 7 diarios / 4 semanais | blocked | Politica documentada em `docs/backup-restore-runbook.md`, nao comprovada no provedor | Sim |
+| PITR | blocked | Nao comprovado no provedor; requer painel Neon ou API Neon | Sim |
+| Restore testado nos ultimos 7 dias | blocked | Script `smoke:database-restore` criado; restore real ainda nao executado por falta de branch/banco restore isolado | Sim |
+| Ultimo restore | blocked | Nenhum restore real executado; data pendente | Sim |
+| Proximo restore recomendado | pending | Criar branch Neon restore ou banco temporario e rodar `DATABASE_RESTORE_SMOKE_GO` | Sim |
 | Redis configurado | validated | Provider inferido: Upstash; TLS true; senha configurada; `connected=true`; plano/cota pendente de evidencia | Sim |
 | `REDIS_ENABLED=true` | validated | Render/API alvo com `REDIS_ENABLED=true` | Sim |
 | BullMQ configurado | validated | Render/API alvo com `BULLMQ_ENABLED=true`; health `bullmq=ok` | Sim |

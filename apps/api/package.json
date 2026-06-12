@@ -39,6 +39,7 @@
     "smoke:billing-payment": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-payment.ts",
     "smoke:billing-ledger-flow": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-ledger-flow.ts",
     "smoke:billing-ledger-http-flow": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-ledger-http-flow.ts",
+    "smoke:database-restore": "ts-node -r tsconfig-paths/register scripts/smoke-test-database-restore.ts",
     "smoke:production-infra": "ts-node -r tsconfig-paths/register scripts/smoke-test-production-infra.ts",
     "smoke:queues": "ts-node -r tsconfig-paths/register scripts/smoke-test-queues.ts",
     "smoke:session-security-http-flow": "ts-node -r tsconfig-paths/register scripts/smoke-test-session-security-http-flow.ts",

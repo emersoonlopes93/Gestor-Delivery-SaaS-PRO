@@ -46,6 +46,11 @@ class RegisterDto {
   password!: string;
 }
 
+class ForgotPasswordDto {
+  @IsEmail()
+  email!: string;
+}
+
 @Controller('auth/tenant')
 export class TenantAuthController {
   constructor(private readonly authService: TenantAuthService) {}
@@ -69,6 +74,13 @@ export class TenantAuthController {
       dto.password,
       sessionContext(req),
     );
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @Throttle({ auth: { limit: 3, ttl: 300 } }) // Limite de 3 solicitações a cada 5 minutos
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto.email);
   }
 
   @Public()

@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { hasPermission } from '@gestor/auth';
 import {
@@ -36,7 +36,8 @@ import {
   Bot,
   Palette,
   CreditCard,
-  CalendarClock
+  CalendarClock,
+  Smartphone
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
@@ -81,7 +82,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     items: [
       {
         id: 'dashboard-overview',
-        label: 'VisÃ£o Geral',
+        label: 'Visão Geral',
         to: '/dashboard',
         icon: LayoutGrid,
         permission: 'dashboard.view',
@@ -89,7 +90,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
       },
       {
         id: 'billing-plan',
-        label: 'Plano e CobranÃ§a',
+        label: 'Plano e Cobrança',
         to: '/billing',
         icon: CreditCard,
         permission: 'billing.read',
@@ -99,14 +100,14 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
   },
   {
     id: 'catalog',
-    label: 'CardÃ¡pio',
+    label: 'Cardápio',
     items: [
       { id: 'catalog-categories', label: 'Categorias', to: '/catalog/categories', icon: BookOpen, permission: 'catalog.read' },
       { id: 'catalog-products', label: 'Produtos', to: '/catalog/products', icon: Box, permission: 'catalog.read' },
-      { id: 'catalog-complements', label: 'Grupos de OpÃ§Ãµes', to: '/catalog/option-groups', icon: SlidersHorizontal, permission: 'catalog.manage_option_groups' },
+      { id: 'catalog-complements', label: 'Grupos de Opções', to: '/catalog/option-groups', icon: SlidersHorizontal, permission: 'catalog.manage_option_groups' },
       { id: 'catalog-combos', label: 'Combos', to: '/catalog/combos', icon: Package, permission: 'catalog.manage_combos' },
       { id: 'catalog-upsells', label: 'Upsells', to: '/catalog/upsells', icon: SlidersHorizontal, permission: 'catalog.read', featureFlag: 'VITE_FEATURE_UPSELLS' },
-      { id: 'catalog-inventory', label: 'Estoque & Ficha TÃ©cnica', to: '/inventory', icon: ClipboardList, permission: 'inventory.read', featureFlag: 'VITE_FEATURE_INVENTORY_ADVANCED' },
+      { id: 'catalog-inventory', label: 'Estoque & Ficha Técnica', to: '/inventory', icon: ClipboardList, permission: 'inventory.read', featureFlag: 'VITE_FEATURE_INVENTORY_ADVANCED' },
     ],
   },
   {
@@ -120,7 +121,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
   },
   {
     id: 'delivery',
-    label: 'LogÃ­stica',
+    label: 'Logística',
     items: [
       { id: 'delivery-dispatch', label: 'Despacho Em Tempo Real', to: '/delivery/dispatch', icon: Truck, permission: 'delivery.read' },
       { id: 'delivery-map', label: 'Mapa (Tempo Real)', to: '/delivery/map', icon: MapPin, permission: 'delivery.read', featureFlag: 'VITE_FEATURE_DELIVERY_LIVE_MAP' },
@@ -133,20 +134,20 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     label: 'PDV e Caixa',
     items: [
       { id: 'pos', label: 'Ponto de Venda', to: '/pos', icon: ShoppingCart, permission: 'pos.read' },
-      { id: 'pos-tables', label: 'GestÃ£o de Mesas', to: '/pos/tables', icon: QrCode, permission: 'pos.read' },
+      { id: 'pos-tables', label: 'Gestão de Mesas', to: '/pos/tables', icon: QrCode, permission: 'pos.read' },
       { id: 'pos-printers', label: 'Impressoras', to: '/pos/printers', icon: Printer, permission: 'settings.manage' },
       { id: 'cash', label: 'Caixa', to: '/cash', icon: Wallet, permission: 'cash.read' },
     ],
   },
   {
     id: 'management',
-    label: 'GestÃ£o',
+    label: 'Gestão',
     items: [
-      { id: 'management-employees', label: 'FuncionÃ¡rios', to: '/management/employees', icon: Users, permission: 'users.read' },
+      { id: 'management-employees', label: 'Funcionários', to: '/management/employees', icon: Users, permission: 'users.read' },
       { id: 'management-suppliers', label: 'Fornecedores', to: '/management/suppliers', icon: Truck, permission: 'purchasing.read' },
       { id: 'management-purchases', label: 'Compras / Entradas', to: '/management/purchases', icon: ShoppingCart, permission: 'purchasing.read' },
-      { id: 'management-inventory-count', label: 'InventÃ¡rio FÃ­sico', to: '/management/inventory-count', icon: ClipboardList, permission: 'inventory.adjust', featureFlag: 'VITE_FEATURE_INVENTORY_ADVANCED' },
-      { id: 'management-losses', label: 'Perdas e DesperdÃ­cios', to: '/management/losses', icon: SlidersHorizontal, permission: 'inventory.adjust', featureFlag: 'VITE_FEATURE_INVENTORY_ADVANCED' },
+      { id: 'management-inventory-count', label: 'Inventário Físico', to: '/management/inventory-count', icon: ClipboardList, permission: 'inventory.adjust', featureFlag: 'VITE_FEATURE_INVENTORY_ADVANCED' },
+      { id: 'management-losses', label: 'Perdas e Desperdícios', to: '/management/losses', icon: SlidersHorizontal, permission: 'inventory.adjust', featureFlag: 'VITE_FEATURE_INVENTORY_ADVANCED' },
       { id: 'management-finance', label: 'Financeiro / Fluxo', to: '/management/finance', icon: Wallet, permission: 'finance.read', featureFlag: 'VITE_FEATURE_FINANCE_ADVANCED' },
     ],
   },
@@ -157,35 +158,35 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
       { id: 'customers', label: 'Clientes (CRM)', to: '/customers', icon: Users, permission: 'crm.read' },
       { id: 'crm-dashboard', label: 'CRM Enterprise', to: '/crm/dashboard', icon: ChartLine, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CRM_ADVANCED' },
       { id: 'marketing-automations', label: 'Automacoes', to: '/marketing/automations', icon: Bot, permission: 'crm.read', featureFlag: 'VITE_FEATURE_CAMPAIGNS' },
-      { id: 'promotions', label: 'PromoÃ§Ãµes & Cupons', to: '/promotions', icon: Ticket, permission: 'crm.manage_coupons' },
+      { id: 'promotions', label: 'Promoções & Cupons', to: '/promotions', icon: Ticket, permission: 'crm.manage_coupons' },
     ],
   },
   {
     id: 'analytics',
-    label: 'GestÃ£o & Performance',
+    label: 'Gestão & Performance',
     items: [
-      { id: 'analytics-reports', label: 'RelatÃ³rios Gerenciais', to: '/analytics/reports', icon: ChartLine, permission: 'reports.read' },
+      { id: 'analytics-reports', label: 'Relatórios Gerenciais', to: '/analytics/reports', icon: ChartLine, permission: 'reports.read' },
       { id: 'analytics-bi', label: 'Business Intelligence', to: '/analytics/business-intelligence', icon: BarChart3, permission: 'reports.read', featureFlag: 'VITE_FEATURE_BI_ADVANCED' },
       { id: 'analytics-goals', label: 'Metas e Desempenho', to: '/analytics/goals', icon: Goal, permission: 'goals.read', featureFlag: 'VITE_FEATURE_GOALS' },
     ],
   },
   {
     id: 'whatsapp',
-    label: 'WhatsApp & IA',
+    label: 'WhatsApp',
     items: [
       { id: 'whatsapp-inbox', label: 'Caixa de Entrada', to: '/whatsapp/inbox', icon: MessageSquare, permission: 'orders.read', featureFlag: 'VITE_FEATURE_WHATSAPP_ADVANCED' },
       { id: 'whatsapp-campaigns', label: 'Campanhas', to: '/campaigns', icon: Megaphone, permission: 'crm.manage_coupons', featureFlag: 'VITE_FEATURE_CAMPAIGNS' },
-      { id: 'whatsapp-config', label: 'Agente IA', to: '/whatsapp/config', icon: Bot, permission: 'settings.manage', featureFlag: 'VITE_FEATURE_AI_AGENT' },
+      { id: 'whatsapp-config', label: 'WhatsApp', to: '/whatsapp/config', icon: Smartphone, permission: 'settings.manage', featureFlag: 'VITE_FEATURE_WHATSAPP_CONNECT' },
     ],
   },
   {
     id: 'system',
     label: 'Sistema',
     items: [
-      { id: 'settings', label: 'ConfiguraÃ§Ãµes', to: '/settings', icon: Settings, permission: 'settings.manage' },
+      { id: 'settings', label: 'Configurações', to: '/settings', icon: Settings, permission: 'settings.manage' },
       { id: 'settings-storefront', label: 'Personalizar Vitrine', to: '/settings/storefront', icon: Palette, permission: 'settings.manage' },
       { id: 'settings-scheduling', label: 'Agendamentos', to: '/settings/scheduling', icon: CalendarClock, permission: 'settings.manage' },
-      { id: 'notifications', label: 'NotificaÃ§Ãµes', to: '/settings/notifications', icon: Bell, permission: 'settings.manage' },
+      { id: 'notifications', label: 'Notificações', to: '/settings/notifications', icon: Bell, permission: 'settings.manage' },
     ],
   },
 ];
@@ -671,7 +672,7 @@ export function AppLayout() {
                   className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border border-border bg-card hover:bg-muted/50 hover:border-primary-500/30 transition-all group shadow-sm"
                 >
                   <Globe className="w-4 h-4 text-primary-500 group-hover:scale-110 transition-transform" />
-                  <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">CardÃ¡pio</span>
+                  <span className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">Cardápio</span>
                 </a>
                 <button
                   type="button"
@@ -734,7 +735,7 @@ export function AppLayout() {
               <input
                 value={desktopSearch}
                 onChange={(e) => setDesktopSearch(e.target.value)}
-                placeholder="Buscar (atalhos, pÃ¡ginas, aÃ§Ãµes)"
+                placeholder="Buscar (atalhos, páginas, ações)"
                 className="input-premium pl-10"
               />
             </div>
@@ -763,8 +764,8 @@ export function AppLayout() {
             <button
               type="button"
               className="inline-flex items-center justify-center w-10 h-10 p-0 rounded-full bg-muted/50 text-foreground hover:bg-muted transition-all"
-              title="NotificaÃ§Ãµes"
-              aria-label="NotificaÃ§Ãµes"
+              title="Notificações"
+              aria-label="Notificações"
             >
               <Bell className="h-4 w-4" aria-hidden />
             </button>

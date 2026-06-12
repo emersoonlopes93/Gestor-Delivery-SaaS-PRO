@@ -542,4 +542,33 @@ export class TenantAuthService {
       },
     };
   }
+
+  /**
+   * Send password reset email for tenant user
+   */
+  async forgotPassword(email: string) {
+    const normalizedEmail = email.toLowerCase();
+    this.logger.debug(`Password reset requested for email: ${normalizedEmail}`);
+
+    // Find user by email
+    const user = await this.prisma.tenantUser.findFirst({
+      where: { email: normalizedEmail },
+      include: { tenant: true },
+    });
+
+    // Always return success to prevent email enumeration
+    // But only send email if user exists
+    if (user) {
+      // TODO: Implement actual email sending logic
+      // For now, just log that we would send an email
+      this.logger.log(`Password reset email would be sent to: ${normalizedEmail} (tenant: ${user.tenant.slug})`);
+      
+      // Here you would typically:
+      // 1. Generate a reset token
+      // 2. Save it to the database with expiration
+      // 3. Send email with reset link
+    }
+
+    return { message: 'Se o e-mail existir em nosso sistema, você receberá instruções para redefinir sua senha.' };
+  }
 }

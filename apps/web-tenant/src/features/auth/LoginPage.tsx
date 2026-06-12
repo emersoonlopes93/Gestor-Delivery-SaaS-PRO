@@ -100,7 +100,7 @@ export function LoginPage() {
               >
                 Sua Senha
               </label>
-              <button type="button" className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline decoration-2 underline-offset-4">
+              <button type="button" onClick={() => navigate('/forgot-password')} className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline decoration-2 underline-offset-4">
                 Esqueci a senha
               </button>
             </div>
