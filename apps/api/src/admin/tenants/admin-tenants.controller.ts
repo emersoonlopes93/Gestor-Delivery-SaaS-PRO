@@ -13,6 +13,8 @@ export class AdminTenantsController {
     private readonly tenantAuthService: TenantAuthService,
   ) {}
 
+
+
   @Get()
   @RequireAdminPermissions('saas.tenants.read')
   async findAll(
@@ -20,6 +22,21 @@ export class AdminTenantsController {
     @Query('pageSize') pageSize?: number,
   ) {
     return this.tenantsService.findAll(page || 1, pageSize || 20);
+  }
+
+  @Get('health')
+  @RequireAdminPermissions('saas.tenants.read')
+  async getHealthOverview(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('search') search?: string,
+    @Query('operationalStatus') operationalStatus?: string,
+    @Query('billingStatus') billingStatus?: string,
+    @Query('whatsappStatus') whatsappStatus?: string,
+  ) {
+    const p = page ? parseInt(page, 10) : 1;
+    const size = pageSize ? parseInt(pageSize, 10) : 20;
+    return this.tenantsService.getHealthOverview(p, size, search, operationalStatus, billingStatus, whatsappStatus);
   }
 
   @Get(':id')
