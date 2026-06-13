@@ -259,8 +259,9 @@ export class WhatsAppWebhookController {
     try {
       // Resolve or update Customer with pushName if available
       let customerId: string | undefined;
+      let currentCustomer: { id: string; profilePictureUrl: string | null; profilePictureUpdatedAt: Date | null } | null = null;
       if (pushName && pushName.trim()) {
-        const customer = await this.prisma.customer.upsert({
+        currentCustomer = await this.prisma.customer.upsert({
           where: {
             tenantId_phone: { tenantId, phone },
           },
@@ -272,27 +273,35 @@ export class WhatsAppWebhookController {
           update: {
             name: pushName.trim(),
           },
-          select: { id: true },
+          select: { id: true, profilePictureUrl: true, profilePictureUpdatedAt: true },
         });
-        customerId = customer.id;
+        customerId = currentCustomer.id;
         AiFlowLogger.flow('contact_resolved', trace, {
           source: 'pushName',
           customerId,
         });
       } else {
         // Try to find existing customer
-        const existingCustomer = await this.prisma.customer.findUnique({
+        currentCustomer = await this.prisma.customer.findUnique({
           where: {
             tenantId_phone: { tenantId, phone },
           },
-          select: { id: true, name: true },
+          select: { id: true, name: true, profilePictureUrl: true, profilePictureUpdatedAt: true },
         });
-        if (existingCustomer) {
-          customerId = existingCustomer.id;
+        if (currentCustomer) {
+          customerId = currentCustomer.id;
           AiFlowLogger.flow('contact_resolved', trace, {
             source: 'existing_customer',
             customerId,
           });
+        }
+      }
+
+      if (currentCustomer) {
+        const now = new Date();
+        const lastUpdated = currentCustomer.profilePictureUpdatedAt;
+        if (!currentCustomer.profilePictureUrl || !lastUpdated || (now.getTime() - lastUpdated.getTime() > 24 * 60 * 60 * 1000)) {
+          this.refreshCustomerProfilePicture(tenantId, phone, currentCustomer.id);
         }
       }
 
@@ -443,5 +452,37 @@ export class WhatsAppWebhookController {
 
   private async handleNormalizedAck(event: WhatsAppWebhookEvent) {
     this.logger.debug(`ACK received for ${event.externalId}: ${event.status}`);
+  }
+
+  private refreshCustomerProfilePicture(tenantId: string, phone: string, customerId: string) {
+    // Fire and forget
+    void (async () => {
+      try {
+        const instance = await this.prisma.whatsAppInstance.findUnique({
+          where: { tenantId },
+          select: { providerType: true, apiUrl: true, apiKey: true, instanceId: true },
+        });
+        if (!instance || !instance.apiUrl || !instance.apiKey || !instance.instanceId) return;
+
+        const provider = this.providerRegistry.getProvider(instance.providerType);
+        if (typeof provider.getProfilePictureUrl !== 'function') return;
+
+        const url = await provider.getProfilePictureUrl(instance.apiUrl, instance.apiKey, instance.instanceId, phone);
+        if (url) {
+          await this.prisma.customer.update({
+            where: { id: customerId },
+            data: { profilePictureUrl: url, profilePictureUpdatedAt: new Date() },
+          });
+        } else {
+          // Atualiza a data para não tentar na próxima mensagem
+          await this.prisma.customer.update({
+            where: { id: customerId },
+            data: { profilePictureUpdatedAt: new Date() },
+          });
+        }
+      } catch (err) {
+        this.logger.debug(`Erro background ao atualizar foto de perfil do customer ${customerId}`);
+      }
+    })();
   }
 }

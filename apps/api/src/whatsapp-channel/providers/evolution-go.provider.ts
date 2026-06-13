@@ -670,6 +670,43 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     return null;
   }
 
+  async getProfilePictureUrl(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+    phone: string,
+  ): Promise<string | null> {
+    try {
+      const client = this.buildInstanceClient(apiUrl, apiKey, instanceId);
+      // Alguns endpoints em Evolution Go para foto são GET /chat/fetchProfilePictureUrl
+      // ou POST /chat/profilePic. Tentaremos o GET por padrão passando number.
+      // O number pode ser com ou sem @s.whatsapp.net, o provider Evolution Go normalmente lida com isso.
+      const normalizedNumber = normalizeWhatsAppSendNumber(phone);
+      
+      const { data } = await client.get('/chat/fetchProfilePictureUrl', {
+        params: { number: normalizedNumber },
+      });
+
+      const responseData = (data && typeof data === 'object' && 'data' in data)
+        ? (data as { data: Record<string, unknown> }).data
+        : (data as Record<string, unknown>);
+
+      const url = responseData?.profilePictureUrl || responseData?.picture || responseData?.url;
+      if (typeof url === 'string' && url.trim()) {
+        return url.trim();
+      }
+
+      return null;
+    } catch (error: unknown) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        // Contato sem foto ou endpoint diferente
+        return null;
+      }
+      this.logger.debug(`Falha ao buscar foto de perfil para ${phone}: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      return null; // Silencia o erro para não quebrar o fluxo
+    }
+  }
+
   private extractFlowContext(
     payload: Record<string, unknown>,
     tenantId: string,

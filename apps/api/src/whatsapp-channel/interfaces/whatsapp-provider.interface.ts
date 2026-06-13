@@ -227,6 +227,16 @@ export interface IWhatsAppProvider {
   ): Promise<void>;
 
   /**
+   * Busca a URL da foto de perfil de um contato
+   */
+  getProfilePictureUrl(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+    phone: string,
+  ): Promise<string | null>;
+
+  /**
    * Faz o parsing de um payload de webhook específico do provider
    */
   parseWebhook(payload: unknown, tenantId: string): WhatsAppWebhookEvent | null;

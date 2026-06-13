@@ -1492,6 +1492,8 @@ model Customer {
   lastOrderDate      DateTime?             @map("last_order_date")
   loyaltyPoints      Int                   @default(0) @map("loyalty_points")
   cashbackBalance    Decimal               @default(0) @map("cashback_balance") @db.Decimal(10, 2)
+  profilePictureUrl       String?               @map("profile_picture_url")
+  profilePictureUpdatedAt DateTime?             @map("profile_picture_updated_at")
   createdAt          DateTime              @default(now()) @map("created_at")
   updatedAt          DateTime              @updatedAt @map("updated_at")
   campaignDispatches CampaignDispatch[]

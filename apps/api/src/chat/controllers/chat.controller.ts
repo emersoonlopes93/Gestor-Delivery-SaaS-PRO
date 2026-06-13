@@ -232,6 +232,7 @@ export class ChatController {
       skip,
       take: limit,
       include: {
+        customer: { select: { profilePictureUrl: true } },
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 5,
@@ -265,6 +266,7 @@ export class ChatController {
           aiBlockedTools: aiSummary.blockedTools,
           aiLastFailureAt: aiSummary.lastFailureAt,
           aiToolFailures: aiSummary.failures,
+          profilePictureUrl: s.customer?.profilePictureUrl || null,
         };
       }),
       meta: {
@@ -281,6 +283,7 @@ export class ChatController {
   async getSession(@Request() req: TenantRequest, @Param('id') sessionId: string) {
     const session = await this.prisma.chatSession.findFirst({
       where: { id: sessionId, tenantId: req.user.tenantId },
+      include: { customer: { select: { profilePictureUrl: true } } },
     });
     return session;
   }
