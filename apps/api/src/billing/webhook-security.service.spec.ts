@@ -9,15 +9,22 @@ function mockRequest(body: string, headers: Record<string, string>): Request {
   const lowerHeaders = Object.fromEntries(
     Object.entries(headers).map(([key, value]) => [key.toLowerCase(), value]),
   );
-  return {
+  const req: Partial<Request> = {
     ip: '127.0.0.1',
     rawBody: Buffer.from(body),
     get: (name: string) => lowerHeaders[name.toLowerCase()],
-  } as unknown as Request;
+  };
+  return req as Request;
 }
 
 describe('WebhookSecurityService', () => {
-  let mockPrisma: any;
+  let mockPrisma: {
+    externalWebhookEvent: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+    };
+  };
   let service: WebhookSecurityService;
 
   beforeEach(() => {
@@ -28,13 +35,16 @@ describe('WebhookSecurityService', () => {
         update: jest.fn(),
       },
     };
-    service = new WebhookSecurityService(
-      (mockPrisma as unknown) as any,
-      { get: jest.fn((key: string, fallback?: string) => ({
+    const mockConfig: Partial<ConfigService> = {
+      get: jest.fn((key: string, fallback?: string) => ({
         ASAAS_WEBHOOK_HMAC_SECRET: 'webhook-secret',
         WEBHOOK_REPLAY_WINDOW_SECONDS: '300',
         NODE_ENV: 'production',
-      }[key] ?? fallback)) } as unknown as ConfigService,
+      }[key] ?? fallback))
+    };
+    service = new WebhookSecurityService(
+      mockPrisma as never,
+      mockConfig as ConfigService,
     );
   });
 

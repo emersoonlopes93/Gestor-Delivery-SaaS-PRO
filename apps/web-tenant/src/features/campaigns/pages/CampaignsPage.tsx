@@ -179,7 +179,7 @@ export function CampaignsPage() {
                       </div>
                       <div className="flex gap-3 text-xs text-muted-foreground mt-1">
                         <span title="Entregues" className="text-status-success">{c.totalDelivered} entregues</span>
-                        <span title="Falhas" className="text-status-error">{(c as any)._count?.dispatches || 0} falhas</span>
+                        <span title="Falhas" className="text-status-error">{(c as Campaign & { _count?: { dispatches: number } })._count?.dispatches || 0} falhas</span>
                         <span title="Opt-outs" className="text-status-warning">{c.totalOptOut} saíram</span>
                       </div>
                     </div>

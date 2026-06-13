@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { TenantBillingResolverService } from '../../billing/tenant-billing-resolver.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AdminTenantsService {
@@ -51,7 +52,7 @@ export class AdminTenantsService {
    */
   async getHealthOverview(page = 1, pageSize = 20, search?: string, operationalStatus?: string, billingStatus?: string, whatsappStatus?: string) {
     const skip = (page - 1) * pageSize;
-    const where: any = {};
+    const where: Prisma.TenantWhereInput = {};
     
     if (search) {
       where.OR = [
@@ -61,14 +62,14 @@ export class AdminTenantsService {
     }
     
     if (operationalStatus) {
-      where.status = operationalStatus;
+      where.status = operationalStatus as import('@prisma/client').TenantStatus;
     }
 
     if (whatsappStatus) {
       if (whatsappStatus === 'none') {
         where.whatsappInstance = { is: null };
       } else {
-        where.whatsappInstance = { status: whatsappStatus };
+        where.whatsappInstance = { status: whatsappStatus as import('@prisma/client').WhatsAppInstanceStatus };
       }
     }
 
@@ -76,7 +77,7 @@ export class AdminTenantsService {
       if (billingStatus === 'none') {
         where.billingSubscriptions = { none: {} };
       } else {
-        where.billingSubscriptions = { some: { status: billingStatus } };
+        where.billingSubscriptions = { some: { status: billingStatus as import('@prisma/client').TenantSubscriptionStatus } };
       }
     }
 

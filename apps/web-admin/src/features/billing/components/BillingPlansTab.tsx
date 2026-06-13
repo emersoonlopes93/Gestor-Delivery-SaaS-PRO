@@ -13,7 +13,7 @@ function planToForm(plan: BillingPlanV2): BillingPlanFormState {
     allowAllModules: plan.allowAllModules,
     isActive: plan.isActive,
     isPublic: plan.isPublic,
-    tiers: plan.revenueTiers.map((tier: any) => ({
+    tiers: plan.revenueTiers.map((tier: { id?: string; minRevenue: string; maxRevenue: string | null; price: string; label?: string }) => ({
       rowId: tier.id || shortId(tier.id),
       id: tier.id,
       minRevenue: tier.minRevenue,
@@ -58,7 +58,7 @@ function PlanEditor(props: {
   const updateTier = (rowId: string, patch: Partial<BillingTierForm>) => {
     setForm((current: BillingPlanFormState) => ({
       ...current,
-      tiers: current.tiers.map((tier: any) => (tier.rowId === rowId ? { ...tier, ...patch } : tier)),
+      tiers: current.tiers.map((tier: BillingTierForm) => (tier.rowId === rowId ? { ...tier, ...patch } : tier)),
     }));
   };
 

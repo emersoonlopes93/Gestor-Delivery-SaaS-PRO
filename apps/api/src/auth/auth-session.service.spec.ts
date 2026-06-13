@@ -5,7 +5,16 @@ import { AuthSessionStatus, AuthSubjectType } from '@prisma/client';
 import { AuthSessionService } from './auth-session.service';
 
 describe('AuthSessionService', () => {
-  let mockPrismaService: any;
+  let mockPrismaService: {
+    authSession: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+      findMany: jest.Mock;
+    };
+    $transaction: jest.Mock;
+  };
   let service: AuthSessionService;
 
   beforeEach(() => {
@@ -19,13 +28,16 @@ describe('AuthSessionService', () => {
       },
       $transaction: jest.fn((callback: Function) => callback(mockPrismaService)),
     };
-    service = new AuthSessionService(
-      (mockPrismaService as unknown) as any,
-      new JwtService(),
-      { get: jest.fn((key: string, fallback?: string) => ({
+    const mockConfig: Partial<ConfigService> = {
+      get: jest.fn((key: string, fallback?: string) => ({
         JWT_REFRESH_SECRET: 'test-refresh-secret',
         JWT_REFRESH_EXPIRES_IN: '7d',
-      }[key] ?? fallback)) } as unknown as ConfigService,
+      }[key] ?? fallback))
+    };
+    service = new AuthSessionService(
+      mockPrismaService as never,
+      new JwtService(),
+      mockConfig as ConfigService,
     );
   });
 
