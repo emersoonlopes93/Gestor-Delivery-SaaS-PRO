@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 
-import { MessageSquare, Send, Paperclip, Smile, Clock, CheckCircle, Check } from 'lucide-react';
+import { MessageSquare, Send, Paperclip, Smile, Clock, CheckCircle, Check, Zap } from 'lucide-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../../lib/api-client';
 import type { ChatMessage, ChatSession } from '@gestor/types';
@@ -18,6 +18,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const [showQuickReplies, setShowQuickReplies] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -255,26 +256,25 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
     if (meta?.type === 'tool_call' || meta?.type === 'tool_result') return false;
     return true;
   });
-
   return (
-    <div className="flex-1 flex flex-col bg-card dark:bg-card">
+    <div className="flex-1 flex flex-col bg-card dark:bg-card relative">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card z-10 shadow-sm">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="p-2 hover:bg-muted/40 dark:hover:bg-muted/40 rounded-lg transition-colors"
+            className="p-1.5 -ml-1.5 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground md:hidden"
           >
-            <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
           <div>
-            <h3 className="font-semibold text-foreground">
+            <h3 className="font-semibold text-foreground text-base">
               {session.displayName || `Cliente ${session.customerPhone}`}
             </h3>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full border ${
+              <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
                 session.state === 'closed' || session.state === 'expired'
                   ? 'bg-muted text-muted-foreground border-border'
                   : session.handoffActive
@@ -293,90 +293,76 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {!session.handoffActive && (
+          {!session.handoffActive && session.state !== 'closed' && session.state !== 'expired' && (
             <input
               value={handoffReason}
               onChange={(e) => setHandoffReason(e.target.value)}
-              placeholder="Motivo da transferência..."
-              className="ml-3 w-48 rounded-lg bg-card text-foreground placeholder:text-muted-foreground border border-input focus:outline-none focus:ring-2 focus:ring-ring px-3 py-1.5 text-xs"
+              placeholder="Motivo (opcional)..."
+              className="hidden sm:block w-40 rounded-md bg-muted/50 text-foreground placeholder:text-muted-foreground border border-input focus:outline-none focus:ring-1 focus:ring-ring px-2.5 py-1.5 text-xs transition-colors focus:bg-card"
             />
           )}
-          <button
-            onClick={handleActivateHandoff}
-            disabled={handoffMutation.isPending || session.handoffActive}
-            className="px-3 py-1.5 bg-status-warning/10 text-status-warning border border-status-warning/20 hover:bg-status-warning/20 disabled:opacity-70 disabled:cursor-not-allowed text-xs font-semibold rounded-lg transition-colors"
-          >
-            {session.handoffActive ? 'Humano Ativo' : 'Transferir'}
-          </button>
-          <button
-            onClick={() => closeSessionMutation.mutate()}
-            disabled={closeSessionMutation.isPending}
-            className="px-3 py-1.5 bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20 disabled:opacity-70 disabled:cursor-not-allowed text-xs font-semibold rounded-lg transition-colors"
-          >
-            Encerrar
-          </button>
+          {session.state !== 'closed' && session.state !== 'expired' && (
+            <button
+              onClick={handleActivateHandoff}
+              disabled={handoffMutation.isPending || session.handoffActive}
+              className="px-3 py-1.5 bg-status-warning/10 text-status-warning border border-status-warning/20 hover:bg-status-warning/20 disabled:opacity-50 disabled:hidden text-xs font-semibold rounded-md transition-colors"
+            >
+              Transferir
+            </button>
+          )}
+          {session.state !== 'closed' && session.state !== 'expired' && (
+            <button
+              onClick={() => closeSessionMutation.mutate()}
+              disabled={closeSessionMutation.isPending}
+              className="px-3 py-1.5 bg-muted text-muted-foreground border border-border hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20 disabled:opacity-50 text-xs font-semibold rounded-md transition-colors"
+            >
+              Encerrar
+            </button>
+          )}
         </div>
       </div>
 
       {session.handoffActive && (
-        <div className="bg-destructive/10 dark:bg-destructive/5 border-b border-destructive/20 dark:border-destructive/30 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 animate-in slide-in-from-top">
+        <div className="bg-status-warning/5 border-b border-status-warning/20 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm z-10 relative">
           <div className="flex items-center gap-2">
             <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-warning opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-status-warning"></span>
             </span>
-            <p className="text-xs font-medium text-destructive">
-              Atendimento humano ativo. O Agente IA está silenciado para esta conversa.
-            </p>
+            <div className="flex flex-col">
+              <p className="text-[13px] font-medium text-status-warning">
+                Atendimento humano ativo
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                O bot está silenciado e não responderá mensagens automaticamente.
+              </p>
+            </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 shrink-0">
             <button
               onClick={() => deactivateHandoffMutation.mutate()}
               disabled={deactivateHandoffMutation.isPending}
-              className="px-2.5 py-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs font-semibold rounded-lg transition-colors disabled:opacity-70"
+              className="px-2.5 py-1.5 bg-status-warning text-status-warning-foreground hover:bg-status-warning/90 text-[11px] font-semibold rounded-md transition-colors shadow-sm"
             >
               {deactivateHandoffMutation.isPending ? 'Reativando...' : 'Reativar IA'}
-            </button>
-            <button
-              onClick={() => closeSessionMutation.mutate()}
-              disabled={closeSessionMutation.isPending}
-              className="px-2.5 py-1 bg-muted hover:bg-muted/80 dark:bg-muted dark:hover:bg-muted/80 text-muted-foreground dark:text-muted-foreground text-xs font-semibold rounded-lg transition-colors"
-            >
-              Encerrar atendimento humano
             </button>
           </div>
         </div>
       )}
 
       {session.handoffActive && (session.handoffReason || session.handoffOperator || session.handoffAt) && (
-        <div className="px-4 py-3 border-b border-border bg-muted text-xs text-foreground space-y-1">
+        <div className="px-4 py-2 border-b border-border bg-muted/30 text-[11px] text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
           {session.handoffReason && (
-            <p>
-              <span className="font-semibold text-muted-foreground">Motivo:</span> {session.handoffReason}
-            </p>
+            <span><strong className="font-medium text-foreground">Motivo:</strong> {session.handoffReason}</span>
           )}
           {session.handoffOperator && (
-            <p>
-              <span className="font-semibold text-muted-foreground">Operador:</span> {session.handoffOperator}
-            </p>
+            <span><strong className="font-medium text-foreground">Operador:</strong> {session.handoffOperator}</span>
           )}
           {session.handoffAt && (
-            <p>
-              <span className="font-semibold text-muted-foreground">Iniciado em:</span>{' '}
-              {new Date(session.handoffAt).toLocaleString('pt-BR', {
-                dateStyle: 'short',
-                timeStyle: 'short',
-              })}
-            </p>
-          )}
-          {session.handoffUntil && (
-            <p>
-              <span className="font-semibold text-muted-foreground">IA retoma em:</span>{' '}
-              {new Date(session.handoffUntil).toLocaleString('pt-BR', {
-                dateStyle: 'short',
-                timeStyle: 'short',
-              })}
-            </p>
+            <span>
+              <strong className="font-medium text-foreground">Início:</strong>{' '}
+              {new Date(session.handoffAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+            </span>
           )}
         </div>
       )}
@@ -385,7 +371,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4 space-y-4"
+        className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/10"
       >
         {visibleMessages.map((msg) => {
           const isSystem = msg.senderType === 'system';
@@ -393,11 +379,11 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
           
           let bubbleClasses = '';
           if (isSystem) {
-            bubbleClasses = 'bg-muted text-muted-foreground border border-border';
+            bubbleClasses = 'bg-card text-muted-foreground border border-border shadow-sm mx-auto max-w-[80%]';
           } else if (isOutbound) {
-            bubbleClasses = 'bg-primary text-primary-foreground';
+            bubbleClasses = 'bg-primary text-primary-foreground shadow-sm';
           } else {
-            bubbleClasses = 'bg-card text-card-foreground border border-border';
+            bubbleClasses = 'bg-card text-card-foreground border border-border shadow-sm';
           }
 
           return (
@@ -406,22 +392,28 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
               className={`flex ${isSystem ? 'justify-center' : isOutbound ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${bubbleClasses}`}
+                className={`max-w-[85%] sm:max-w-md px-3.5 py-2 rounded-2xl ${
+                  isSystem ? 'rounded-lg' : isOutbound ? 'rounded-br-sm' : 'rounded-bl-sm'
+                } ${bubbleClasses}`}
               >
-                {msg.senderType && msg.senderType !== 'customer' && (
-                  <p className={`text-[10px] uppercase font-bold mb-1 ${
-                    isOutbound ? 'text-primary-foreground/95' : getSenderColor(msg.senderType)
+                {msg.senderType && msg.senderType !== 'customer' && !isSystem && (
+                  <p className={`text-[10px] uppercase font-bold mb-0.5 ${
+                    isOutbound ? 'text-primary-foreground/90' : getSenderColor(msg.senderType)
                   }`}>
                     {getSenderLabel(msg.senderType)}
                   </p>
                 )}
-                <p className="text-sm break-words whitespace-pre-wrap">{msg.content}</p>
-                <div className={`flex items-center gap-1.5 mt-1 text-[10px] justify-end ${
-                  isOutbound ? 'text-primary-foreground/80' : 'text-muted-foreground'
-                }`}>
-                  {!isSystem && isOutbound && getStatusIcon(msg.externalStatus || 'sent')}
-                  <span>{formatTime(msg.timestamp || msg.createdAt)}</span>
-                </div>
+                <p className={`text-[13px] leading-relaxed break-words whitespace-pre-wrap ${isSystem ? 'text-center text-xs' : ''}`}>
+                  {msg.content}
+                </p>
+                {!isSystem && (
+                  <div className={`flex items-center gap-1 mt-1 text-[9px] font-medium justify-end ${
+                    isOutbound ? 'text-primary-foreground/70' : 'text-muted-foreground/70'
+                  }`}>
+                    <span>{formatTime(msg.timestamp || msg.createdAt)}</span>
+                    {isOutbound && getStatusIcon(msg.externalStatus || 'sent')}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -429,59 +421,87 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Replies */}
-      <QuickReplies onReplySelect={handleQuickReply} />
-
-      {/* Input */}
-      <div className="p-4 border-t border-border bg-card">
-        <div className="flex items-end gap-2">
-          <button
-            onClick={handleFileUpload}
-            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-          >
-            <Paperclip className="w-5 h-5" />
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            onChange={handleFileChange}
-            accept="image/*,video/*,audio/*,.pdf"
-            className="hidden"
-          />
-          <button
-            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-          >
-            <Smile className="w-5 h-5" />
-          </button>
-          <div className="flex-1">
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              disabled={
-                session?.state === 'closed' || session?.state === 'expired' || sendMessageMutation.isPending
-              }
-              placeholder={
-                session?.state === 'closed' || session?.state === 'expired'
-                  ? 'Conversa encerrada'
-                  : 'Digite uma mensagem...'
-              }
-              rows={1}
-              className="w-full px-4 py-2 border border-input rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-ring bg-card text-foreground placeholder:text-muted-foreground disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed disabled:bg-muted"
-              style={{ minHeight: '40px', maxHeight: '120px' }}
+      {/* Input Area relative container */}
+      <div className="relative">
+        {/* Quick Replies Drawer */}
+        {showQuickReplies && (
+          <div className="absolute bottom-full left-0 w-full px-2 pb-2 z-20">
+            <QuickReplies 
+              onReplySelect={handleQuickReply} 
+              onClose={() => setShowQuickReplies(false)}
+              className="rounded-xl border border-border shadow-lg bg-card/95 backdrop-blur-sm"
             />
           </div>
-          <button
-            onClick={handleSend}
-            disabled={!message.trim() || session?.state === 'closed' || session?.state === 'expired' || sendMessageMutation.isPending}
-            className="p-2 text-primary hover:text-primary/80 hover:bg-primary/10 rounded-lg disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
-          >
-            {sendMessageMutation.isPending ? (
-              <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Send className="w-5 h-5" />
-            )}
-          </button>
+        )}
+
+        {/* Input */}
+        <div className="p-3 border-t border-border bg-card">
+          <div className="flex items-end gap-1.5 max-w-4xl mx-auto">
+            <button
+              onClick={handleFileUpload}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors"
+              title="Anexar arquivo"
+            >
+              <Paperclip className="w-5 h-5" />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={handleFileChange}
+              accept="image/*,video/*,audio/*,.pdf"
+              className="hidden"
+            />
+            
+            <button
+              onClick={() => setShowQuickReplies(!showQuickReplies)}
+              className={`p-2 rounded-full transition-colors ${
+                showQuickReplies 
+                  ? 'text-primary bg-primary/10' 
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+              title="Respostas Rápidas"
+            >
+              <Zap className="w-5 h-5" />
+            </button>
+
+            <button
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors hidden sm:block"
+              title="Emoji"
+            >
+              <Smile className="w-5 h-5" />
+            </button>
+
+            <div className="flex-1 bg-muted/30 border border-input focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 rounded-2xl transition-all">
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                disabled={
+                  session?.state === 'closed' || session?.state === 'expired' || sendMessageMutation.isPending
+                }
+                placeholder={
+                  session?.state === 'closed' || session?.state === 'expired'
+                    ? 'Conversa encerrada'
+                    : 'Digite uma mensagem...'
+                }
+                rows={1}
+                className="w-full px-4 py-2.5 bg-transparent resize-none focus:outline-none text-sm text-foreground placeholder:text-muted-foreground disabled:text-muted-foreground disabled:cursor-not-allowed"
+                style={{ minHeight: '44px', maxHeight: '120px' }}
+              />
+            </div>
+
+            <button
+              onClick={handleSend}
+              disabled={!message.trim() || session?.state === 'closed' || session?.state === 'expired' || sendMessageMutation.isPending}
+              className="p-2.5 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0 shadow-sm"
+            >
+              {sendMessageMutation.isPending ? (
+                <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+              ) : (
+                <Send className="w-5 h-5" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
