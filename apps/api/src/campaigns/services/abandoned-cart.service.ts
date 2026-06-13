@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
-import { WhatsAppSenderService } from '../../whatsapp-channel/services/whatsapp-sender.service';
 
 type ReminderStep = '30m' | '2h' | '24h';
 
@@ -15,10 +14,7 @@ const REMINDER_MINUTES: Record<ReminderStep, number> = {
 export class AbandonedCartService {
   private readonly logger = new Logger('AbandonedCartService');
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly whatsappSender: WhatsAppSenderService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async getDueCarts(tenantId: string) {
     const sessions = await this.prisma.chatSession.findMany({
@@ -66,7 +62,15 @@ export class AbandonedCartService {
     for (const cart of dueCarts) {
       const message = this.messageForStep(cart.step);
       try {
-        const metric = await this.createDispatchMetric(tenantId, cart.phone, cart.customerId, `Carrinho abandonado ${cart.step}`, message);
+        const metric = await this.createDispatchMetric(
+          tenantId,
+          cart.phone,
+          cart.customerId,
+          `Carrinho abandonado ${cart.step}`,
+          message,
+          cart.sessionId,
+          cart.step,
+        );
         if (metric) {
           // Marca no chat_session que já foi criado para não recriar no proximo loop
           await this.markReminderSent(cart.sessionId, cart.step);
@@ -135,18 +139,54 @@ export class AbandonedCartService {
     return 'Ultimo lembrete: seu carrinho ainda pode virar pedido hoje. Quer retomar?';
   }
 
+  /**
+   * Cria (ou recupera idempotente) o par Campaign/CampaignDispatch para um lembrete de carrinho.
+   *
+   * Idempotência: antes de criar, verifica se já existe uma campanha para a mesma
+   * combinação tenantId + sessionId + step (gravada em segmentRules). Se existir,
+   * retorna os IDs do registro existente sem criar duplicata — tornando a operação
+   * segura mesmo que o processo reinicie entre a criação e o markReminderSent.
+   */
   private async createDispatchMetric(
     tenantId: string,
     phone: string,
     customerId: string | null,
     name: string,
     messageTemplate: string,
+    sessionId: string,
+    step: ReminderStep,
   ): Promise<{ campaignId: string; dispatchId: string } | null> {
     const customer = customerId
       ? await this.prisma.customer.findFirst({ where: { id: customerId, tenantId }, select: { id: true } })
       : await this.prisma.customer.findFirst({ where: { tenantId, phone }, select: { id: true } });
 
     if (!customer) return null;
+
+    // Idempotência: verificar se já existe campanha para essa sessão e step
+    const existingCampaign = await this.prisma.campaign.findFirst({
+      where: {
+        tenantId,
+        objective: 'abandoned_cart',
+        name,
+        segmentRules: {
+          path: ['sessionId'],
+          equals: sessionId,
+        },
+      },
+      include: {
+        dispatches: { select: { id: true }, take: 1 },
+      },
+    });
+
+    if (existingCampaign) {
+      const existingDispatch = existingCampaign.dispatches[0];
+      if (existingDispatch) {
+        this.logger.log(
+          `abandoned_cart_idempotent sessionId=${sessionId} step=${step} campaignId=${existingCampaign.id} — reutilizando dispatch existente`,
+        );
+        return { campaignId: existingCampaign.id, dispatchId: existingDispatch.id };
+      }
+    }
 
     const campaign = await this.prisma.campaign.create({
       data: {
@@ -155,7 +195,13 @@ export class AbandonedCartService {
         objective: 'abandoned_cart',
         status: 'running',
         messageTemplate,
-        segmentRules: { specificCustomers: [customer.id], source: 'abandoned_cart' } as Prisma.JsonObject,
+        // sessionId e step gravados em segmentRules para permitir lookup idempotente
+        segmentRules: {
+          specificCustomers: [customer.id],
+          source: 'abandoned_cart',
+          sessionId,
+          step,
+        } as Prisma.JsonObject,
         totalAudience: 1,
         maxDispatches: 1,
         startedAt: new Date(),
@@ -173,6 +219,4 @@ export class AbandonedCartService {
 
     return { campaignId: campaign.id, dispatchId: dispatch.id };
   }
-
-
 }

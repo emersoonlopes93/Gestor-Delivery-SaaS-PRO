@@ -110,6 +110,19 @@ export class CampaignProcessor extends WorkerHost {
 
     const antiSpam = await this.checkAntiSpam(tenantId, customerId, dispatchId);
     if (!antiSpam.allowed) {
+      if (antiSpam.reason.startsWith('outside_quiet_hours')) {
+        // Reagendar: reverter para queued para ser reprocessado no próximo ciclo do feedQueue (a cada 60s)
+        // O dispatch não é perdido — será enviado quando a janela de 08h-21h (America/Sao_Paulo) abrir
+        await this.prisma.campaignDispatch.update({
+          where: { id: dispatchId },
+          data: { status: 'queued', failReason: null },
+        });
+        this.logger.warn(
+          `rescheduled_due_to_quiet_hours dispatchId=${dispatchId} tenantId=${tenantId} — aguardando janela 08h-21h (America/Sao_Paulo)`,
+        );
+        return { success: false, skipped: true, reason: 'rescheduled_quiet_hours' };
+      }
+      // Demais motivos de anti-spam (cooldown, max_frequency) → falha definitiva para este ciclo
       this.logger.warn(`Dispatch ${dispatchId} skipped due to anti-spam: ${antiSpam.reason}`);
       await this.prisma.campaignDispatch.update({
         where: { id: dispatchId },
@@ -218,13 +231,15 @@ export class CampaignProcessor extends WorkerHost {
 
   private async checkAntiSpam(tenantId: string, customerId: string, dispatchId: string) {
     // Verificacao de janela de silencio central (08:00 - 21:00)
-    // Obtem a hora em America/Sao_Paulo nativamente
+    // TODO P1-TECH: buscar tenantSettings.timezone para suportar múltiplos fusos horários.
+    // Por enquanto, America/Sao_Paulo como fallback — impacto zero para tenants brasileiros.
+    // Quando implementado: const tz = (await prisma.tenantSettings.findUnique(...))?.timezone ?? 'America/Sao_Paulo';
     const hourFormatter = new Intl.DateTimeFormat('pt-BR', {
-      timeZone: 'America/Sao_Paulo',
+      timeZone: 'America/Sao_Paulo', // TODO P1-TECH: substituir por tenantSettings.timezone
       hour: 'numeric',
       hour12: false,
     });
-    
+
     try {
       const currentHour = parseInt(hourFormatter.format(new Date()), 10);
       if (currentHour < 8 || currentHour >= 21) {
