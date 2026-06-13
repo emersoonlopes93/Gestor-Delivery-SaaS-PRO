@@ -7,7 +7,6 @@ import { CampaignJobData } from './campaign.processor';
 @Injectable()
 export class CampaignDispatcherService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger('CampaignDispatcherService');
-  private intervalId?: NodeJS.Timeout;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -16,16 +15,23 @@ export class CampaignDispatcherService implements OnModuleInit, OnModuleDestroy 
 
   onModuleInit() {
     this.logger.log('Inicializando alimentador de fila de campanhas (BullMQ)...');
-    // Roda a cada 1 minuto para carregar novos lotes para a fila
-    this.intervalId = setInterval(() => {
-      this.feedQueue();
-    }, 60000);
+    // Adiciona job repetível para alimentar a fila a cada 1 minuto
+    this.campaignQueue.add(
+      'system-feed-queue',
+      { isSystemJob: true },
+      {
+        jobId: 'system-feed-queue',
+        repeat: {
+          every: 60000,
+        },
+      },
+    ).catch(err => {
+      this.logger.error(`Erro ao registrar job system-feed-queue: ${err.message}`);
+    });
   }
 
   onModuleDestroy() {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-    }
+    // Nada a fazer, o BullMQ gerencia os jobs repetíveis
   }
 
   /**

@@ -3,18 +3,21 @@ import { Job } from 'bullmq';
 import { Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { WhatsAppSenderService } from '../../whatsapp-channel/services/whatsapp-sender.service';
+import { CampaignDispatcherService } from './campaign-dispatcher.service';
+import { CampaignAutomationService } from './campaign-automation.service';
 
 export interface CampaignJobData {
-  campaignId: string;
-  dispatchId: string;
-  tenantId: string;
-  customerId: string;
-  phone: string;
-  customerName: string;
-  messageTemplate: string;
+  campaignId?: string;
+  dispatchId?: string;
+  tenantId?: string;
+  customerId?: string;
+  phone?: string;
+  customerName?: string;
+  messageTemplate?: string;
   mediaUrl?: string | null;
   mediaType?: string | null;
   isStatus?: boolean;
+  isSystemJob?: boolean;
 }
 
 @Processor('campaign-dispatch')
@@ -24,6 +27,8 @@ export class CampaignProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
     private readonly whatsappSender: WhatsAppSenderService,
+    private readonly campaignDispatcher: CampaignDispatcherService,
+    private readonly campaignAutomationService: CampaignAutomationService,
   ) {
     super();
   }
@@ -31,16 +36,33 @@ export class CampaignProcessor extends WorkerHost {
   async process(
     job: Job<CampaignJobData, { success: boolean; messageId?: string; skipped?: boolean; reason?: string }, string>,
   ): Promise<{ success: boolean; messageId?: string; skipped?: boolean; reason?: string }> {
+    if (job.name === 'system-feed-queue') {
+      this.logger.log('Processing system-feed-queue job...');
+      await this.campaignDispatcher.feedQueue();
+      return { success: true };
+    }
+
+    if (job.name === 'system-automation-scan') {
+      this.logger.log('Processing system-automation-scan job...');
+      await this.campaignAutomationService.runAllTenants();
+      return { success: true };
+    }
+
+    // A partir daqui, esperamos que seja um job de campanha (status ou dispatch)
     const { campaignId, dispatchId, tenantId, customerId, phone, customerName, messageTemplate, mediaUrl, mediaType, isStatus } = job.data;
+    
+    if (!campaignId || !tenantId) {
+      throw new Error(`Invalid job data: missing campaignId or tenantId for job ${job.id}`);
+    }
 
     if (isStatus) {
       this.logger.log(`Processing status campaign ${campaignId}`);
       try {
         const result = await this.whatsappSender.publishStatus(tenantId, {
-          text: messageTemplate,
+          text: messageTemplate!,
           mediaUrl: mediaUrl || undefined,
           mediaType: mediaType || undefined,
-          caption: messageTemplate,
+          caption: messageTemplate!,
         });
         
         await this.prisma.campaign.update({
@@ -58,6 +80,10 @@ export class CampaignProcessor extends WorkerHost {
         });
         throw error;
       }
+    }
+
+    if (!dispatchId || !customerId || !phone || !customerName || !messageTemplate) {
+      throw new Error(`Invalid job data: missing required dispatch fields for job ${job.id}`);
     }
 
     this.logger.log(`Processing campaign dispatch ${dispatchId} for phone ${phone}`);
@@ -84,6 +110,7 @@ export class CampaignProcessor extends WorkerHost {
 
     const antiSpam = await this.checkAntiSpam(tenantId, customerId, dispatchId);
     if (!antiSpam.allowed) {
+      this.logger.warn(`Dispatch ${dispatchId} skipped due to anti-spam: ${antiSpam.reason}`);
       await this.prisma.campaignDispatch.update({
         where: { id: dispatchId },
         data: { status: 'failed', failReason: antiSpam.reason },
@@ -190,6 +217,27 @@ export class CampaignProcessor extends WorkerHost {
   }
 
   private async checkAntiSpam(tenantId: string, customerId: string, dispatchId: string) {
+    // Verificacao de janela de silencio central (08:00 - 21:00)
+    // Obtem a hora em America/Sao_Paulo nativamente
+    const hourFormatter = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      hour: 'numeric',
+      hour12: false,
+    });
+    
+    try {
+      const currentHour = parseInt(hourFormatter.format(new Date()), 10);
+      if (currentHour < 8 || currentHour >= 21) {
+        return { allowed: false, reason: 'outside_quiet_hours - Horário não permitido (Silêncio Noturno)' };
+      }
+    } catch (e) {
+      this.logger.error('Failed to parse timezone hour, falling back to local system hour', e);
+      const currentHour = new Date().getHours();
+      if (currentHour < 8 || currentHour >= 21) {
+        return { allowed: false, reason: 'outside_quiet_hours - Horário não permitido (Silêncio Noturno)' };
+      }
+    }
+
     const settings = await this.prisma.tenantSettings.findUnique({
       where: { tenantId },
       select: { automationCooldownHours: true, automationMaxMessagesPerDay: true },

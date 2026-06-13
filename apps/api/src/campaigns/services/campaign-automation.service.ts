@@ -1,5 +1,7 @@
-import { BadRequestException, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { CampaignsService } from './campaigns.service';
 import { RecoveryCampaignService } from './recovery-campaign.service';
 import { AbandonedCartService } from './abandoned-cart.service';
@@ -25,7 +27,6 @@ type AutomationRunResult = {
 @Injectable()
 export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CampaignAutomationService.name);
-  private intervalId?: NodeJS.Timeout;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -36,6 +37,7 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
     private readonly customerIntelligenceService: CustomerIntelligenceService,
     private readonly businessInsightsService: BusinessInsightsService,
     private readonly couponsService: CouponsService,
+    @Optional() @InjectQueue('campaign-dispatch') private readonly campaignQueue?: Queue,
   ) {}
 
   onModuleInit() {
@@ -44,17 +46,28 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
       return;
     }
 
-    this.logger.log('Campaign automation scheduler enabled.');
-    this.intervalId = setInterval(() => {
-      this.runAllTenants().catch((error) => {
-        const message = error instanceof Error ? error.message : 'unknown_error';
-        this.logger.error(`automation_run_failed reason=${message}`);
-      });
-    }, 5 * 60 * 1000);
+    if (!this.campaignQueue) {
+      this.logger.warn('Campaign automation scheduler requires campaign-dispatch queue, but it is not available (Redis disabled).');
+      return;
+    }
+
+    this.logger.log('Campaign automation scheduler enabled via BullMQ.');
+    this.campaignQueue.add(
+      'system-automation-scan',
+      { isSystemJob: true },
+      {
+        jobId: 'system-automation-scan',
+        repeat: {
+          every: 5 * 60 * 1000,
+        },
+      },
+    ).catch(err => {
+      this.logger.error(`Erro ao registrar job system-automation-scan: ${err.message}`);
+    });
   }
 
   onModuleDestroy() {
-    if (this.intervalId) clearInterval(this.intervalId);
+    // Nada a fazer, o BullMQ gerencia os jobs repetíveis
   }
 
   async getReuseInventory(tenantId: string) {
@@ -217,7 +230,7 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
   private async runAbandonedCart(tenantId: string, result: AutomationRunResult) {
     try {
       const dispatched = await this.abandonedCartService.dispatchDueReminders(tenantId, 25);
-      result.abandonedCartReminders = dispatched.results.filter((item) => item.sent).length;
+      result.abandonedCartReminders = dispatched.results.filter((item) => item.queued).length;
     } catch (error) {
       this.captureFailure(result, 'abandoned_cart', error);
     }
