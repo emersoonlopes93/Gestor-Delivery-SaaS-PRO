@@ -61,11 +61,11 @@ export function WhatsAppConfigPage() {
   });
 
   // Fetch Tenant Settings (for WhatsApp notification triggers)
-  const { data: tenantSettings, isLoading: loadingSettings } = useQuery({
+  const { data: tenantSettings, isLoading: loadingSettings } = useQuery<TenantSettings | null>({
     queryKey: ['tenant-settings'],
     queryFn: async () => {
-      const res = await api.get<Record<string, unknown>>('/tenant/me');
-      return res.data?.settings;
+      const res = await api.get<{ settings?: TenantSettings }>('/tenant/me');
+      return res.success && res.data?.settings ? res.data.settings : null;
     },
     enabled: featureOrderNotifications,
   });

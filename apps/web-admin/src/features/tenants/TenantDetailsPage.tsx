@@ -58,8 +58,8 @@ export function TenantDetailsPage() {
       setLoadingActivity(true);
       const res = await api.get<{ success: boolean; data: { items: ActivityItem[] } }>(`/admin/dashboard/recent-activity`);
       // Filtra localmente se a API não suportar query param
-      if (res.success && res.data?.items) {
-         setActivity(res.data.items.filter((a: ActivityItem) => a.tenantId === tenantId).slice(0, 5));
+      if (res.success && res.data?.data?.items) {
+         setActivity(res.data.data.items.slice(0, 5));
       }
     } catch (err) {
       console.error('Erro ao carregar atividade:', err);

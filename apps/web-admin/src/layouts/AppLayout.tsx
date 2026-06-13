@@ -39,6 +39,12 @@ type SidebarGroup = {
   items: readonly SidebarItem[];
 };
 
+const isFeatureVisible = (flag?: string) => {
+  if (!flag) return true;
+  // TODO: implement actual feature flags from config/environment
+  return true;
+};
+
 const SIDEBAR_STORAGE_KEY = 'admin_sidebar_state_v1';
 
 function isFeatureEnabled(flag: string): boolean {
