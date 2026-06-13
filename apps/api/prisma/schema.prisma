@@ -110,6 +110,7 @@ model Tenant {
   upsellItems                 UpsellItem[]
   upsells                     Upsell[]
   whatsappInstance            WhatsAppInstance?
+  marketingAutomations        MarketingAutomation[]
 
   @@map("tenants")
 }
@@ -2418,6 +2419,22 @@ model CampaignDispatch {
   @@index([customerId])
   @@index([campaignId, status])
   @@map("campaign_dispatches")
+}
+
+model MarketingAutomation {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  type            String   @db.VarChar(50) // post_order_review, inactive_customer_winback, birthday_greeting
+  enabled         Boolean  @default(false)
+  messageTemplate String   @map("message_template") @db.Text
+  config          Json     @default("{}") // ex: delayHours, daysInactive, couponCode
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, type])
+  @@index([tenantId])
+  @@map("marketing_automations")
 }
 
 model CustomerOptOut {

@@ -10,6 +10,7 @@ import {
   Request,
   NotFoundException,
   BadRequestException,
+  Put,
 } from '@nestjs/common';
 import { CampaignsService, CreateCampaignDto } from '../services/campaigns.service';
 import { RecoveryCampaignService } from '../services/recovery-campaign.service';
@@ -60,6 +61,26 @@ export class CampaignsController {
         { id: 'whatsapp_messages', name: 'Mensagens WhatsApp', enabled: true },
       ],
     };
+  }
+
+  @Get('automations/config')
+  @Permissions('crm.read')
+  async getAutomationConfigs(@Request() req: AuthenticatedRequest) {
+    return this.campaignAutomationService.getAutomationConfigs(req.user.tenantId);
+  }
+
+  @Put('automations/config/:type')
+  @Permissions('crm.manage_coupons')
+  async saveAutomationConfig(
+    @Request() req: AuthenticatedRequest,
+    @Param('type') type: string,
+    @Body() body: { enabled: boolean; messageTemplate: string; config: Record<string, unknown> },
+  ) {
+    return this.campaignAutomationService.saveAutomationConfig(req.user.tenantId, type, {
+      enabled: body.enabled,
+      messageTemplate: body.messageTemplate,
+      config: (body.config || {}) as unknown as import('@prisma/client').Prisma.InputJsonValue,
+    });
   }
 
   @Get('automations/inventory')

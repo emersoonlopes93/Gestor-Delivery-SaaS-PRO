@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Bot, Clock, DollarSign, Megaphone, PauseCircle, RefreshCw, Send, ShoppingCart, Sparkles, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -72,6 +73,51 @@ function formatPercent(value: number) {
   return `${(value * 100).toFixed(1)}%`;
 }
 
+export function AutomationConfigCard({ 
+  title, 
+  description, 
+  type, 
+  configs, 
+  onSave, 
+  defaultTemplate,
+  extraConfigUI 
+}: {
+  title: string;
+  description: string;
+  type: string;
+  configs?: Array<{ type: string; enabled: boolean; messageTemplate: string; config: Record<string, unknown> }>;
+  onSave: (data: { type: string; payload: { enabled: boolean; messageTemplate: string; config: Record<string, unknown> } }) => void;
+  defaultTemplate: string;
+  extraConfigUI: (config: Record<string, unknown>, setConfig: (c: Record<string, unknown>) => void) => React.ReactNode;
+}) {
+  const config = configs?.find(c => c.type === type);
+  const [enabled, setEnabled] = useState(config?.enabled ?? false);
+  const [template, setTemplate] = useState(config?.messageTemplate ?? defaultTemplate);
+  const [localConfig, setLocalConfig] = useState(config?.config ?? {});
+
+  return (
+    <Card className="flex flex-col gap-4">
+      <div>
+        <h3 className="font-semibold">{title}</h3>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+        <span className="text-sm">Habilitado</span>
+      </div>
+      <textarea
+        className="w-full p-2 border rounded-md text-sm min-h-[80px]"
+        value={template}
+        onChange={(e) => setTemplate(e.target.value)}
+      />
+      {extraConfigUI(localConfig, setLocalConfig)}
+      <Button size="sm" onClick={() => onSave({ type, payload: { enabled, messageTemplate: template, config: localConfig } })}>
+        Salvar
+      </Button>
+    </Card>
+  );
+}
+
 export function AutomationsPage() {
   const queryClient = useQueryClient();
 
@@ -111,6 +157,21 @@ export function AutomationsPage() {
       await api.post('/campaigns/abandoned-cart/dispatch', { limit: 20 });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['marketing-automations'] }),
+  });
+
+  const { data: configs } = useQuery({
+    queryKey: ['automation-configs'],
+    queryFn: async () => {
+      const res = await api.get<{ id: string; type: string; enabled: boolean; messageTemplate: string; config: Record<string, unknown> }[]>('/campaigns/automations/config');
+      return res.success ? res.data : [];
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async ({ type, payload }: { type: string; payload: { enabled: boolean; messageTemplate: string; config: Record<string, unknown> } }) => {
+      await api.put(`/campaigns/automations/config/${type}`, payload);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['automation-configs'] }),
   });
 
   const recoveryScenarios = automations?.recovery ?? [];
@@ -249,21 +310,97 @@ export function AutomationsPage() {
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
             </div>
           ) : abandonedCarts.length ? (
-            <div className="space-y-3">
-              {abandonedCarts.slice(0, 5).map((cart) => (
-                <div key={cart.sessionId} className="border border-border rounded-lg p-4 flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{cart.displayName || cart.phone}</p>
-                    <p className="text-sm text-muted-foreground">{cart.minutesInactive} min parado</p>
-                  </div>
-                  <StatusBadge status="warning">{cart.step}</StatusBadge>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState icon={Clock} title="Nenhum carrinho pendente" description="Os lembretes aparecem aqui quando houver abandono detectado." />
-          )}
+             <div className="space-y-3">
+               {abandonedCarts.slice(0, 5).map((cart, i) => (
+                 <div key={i} className="border border-border rounded-lg p-3 flex items-center justify-between gap-4">
+                   <div className="min-w-0">
+                     <p className="font-medium text-sm truncate">{cart.phone} {cart.displayName && `(${cart.displayName})`}</p>
+                     <p className="text-xs text-muted-foreground mt-1">Inativo há {cart.minutesInactive} min</p>
+                   </div>
+                   <StatusBadge status="warning">Passo: {cart.step}</StatusBadge>
+                 </div>
+               ))}
+             </div>
+           ) : (
+             <EmptyState icon={Clock} title="Nenhum carrinho pendente" description="Os lembretes aparecem aqui quando houver abandono detectado." />
+           )}
         </Card>
+      </div>
+
+      <div className="pt-6">
+        <h2 className="text-xl font-bold mb-4">Automações P1</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <AutomationConfigCard
+            title="Pós-pedido / Avaliação"
+            description="Envia mensagem X horas após o pedido ser entregue."
+            type="post_order_review"
+            configs={configs}
+            onSave={saveMutation.mutate}
+            defaultTemplate="Olá {nome}, recebemos seu pedido {pedido}! O que achou? Avalie nossa loja!"
+            extraConfigUI={(config: Record<string, unknown>, setConfig: (c: Record<string, unknown>) => void) => (
+              <div>
+                <label className="text-sm font-medium">Aguardar (horas)</label>
+                <input
+                  type="number"
+                  className="w-full mt-1 p-2 border rounded-md text-sm"
+                  value={config.delayHours as number ?? 2}
+                  onChange={(e) => setConfig({ ...config, delayHours: Number(e.target.value) })}
+                />
+              </div>
+            )}
+          />
+
+          <AutomationConfigCard
+            title="Cliente Inativo"
+            description="Traz de volta clientes que não compram há Y dias."
+            type="inactive_customer_winback"
+            configs={configs}
+            onSave={saveMutation.mutate}
+            defaultTemplate="Faz tempo que não te vemos, {nome}! Que tal um pedido com o cupom {cupom}?"
+            extraConfigUI={(config: Record<string, unknown>, setConfig: (c: Record<string, unknown>) => void) => (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-sm font-medium">Dias Inativo</label>
+                  <input
+                    type="number"
+                    className="w-full mt-1 p-2 border rounded-md text-sm"
+                    value={config.daysInactive as number ?? 30}
+                    onChange={(e) => setConfig({ ...config, daysInactive: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Cupom</label>
+                  <input
+                    type="text"
+                    className="w-full mt-1 p-2 border rounded-md text-sm"
+                    value={config.couponCode as string ?? ''}
+                    onChange={(e) => setConfig({ ...config, couponCode: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
+          />
+
+          <AutomationConfigCard
+            title="Aniversário"
+            description="Envia mensagem no aniversário do cliente (se houver birthDate)."
+            type="birthday_greeting"
+            configs={configs}
+            onSave={saveMutation.mutate}
+            defaultTemplate="Feliz aniversário, {nome}! Aproveite seu dia com {cupom} no nosso cardápio: {link_cardapio}"
+            extraConfigUI={(config: Record<string, unknown>, setConfig: (c: Record<string, unknown>) => void) => (
+              <div>
+                <label className="text-sm font-medium">Cupom</label>
+                <input
+                  type="text"
+                  className="w-full mt-1 p-2 border rounded-md text-sm"
+                  value={config.couponCode as string ?? ''}
+                  onChange={(e) => setConfig({ ...config, couponCode: e.target.value })}
+                />
+              </div>
+            )}
+          />
+        </div>
       </div>
 
       <Card>

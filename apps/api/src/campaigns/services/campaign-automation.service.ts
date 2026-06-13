@@ -70,6 +70,20 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
     // Nada a fazer, o BullMQ gerencia os jobs repetíveis
   }
 
+  async getAutomationConfigs(tenantId: string) {
+    return this.prisma.marketingAutomation.findMany({
+      where: { tenantId },
+    });
+  }
+
+  async saveAutomationConfig(tenantId: string, type: string, data: { enabled: boolean; messageTemplate: string; config: Prisma.InputJsonValue }) {
+    return this.prisma.marketingAutomation.upsert({
+      where: { tenantId_type: { tenantId, type } },
+      create: { tenantId, type, ...data },
+      update: data,
+    });
+  }
+
   async getReuseInventory(tenantId: string) {
     const [recoveryPreview, abandonedCarts, insights, reorderCandidates] = await Promise.all([
       this.recoveryCampaignService.preview(tenantId),
@@ -200,6 +214,11 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
     await this.runReorder(tenantId, result);
     await this.runPostPurchaseUpsell(tenantId, result);
     await this.runSmartCoupons(tenantId, result);
+    
+    // P1 Automations
+    await this.runPostOrderReview(tenantId, result);
+    await this.runInactiveWinback(tenantId, result);
+    await this.runBirthdayGreeting(tenantId, result);
 
     await this.prisma.auditLog.create({
       data: {
@@ -212,6 +231,154 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
     });
 
     return result;
+  }
+
+  private async getTemplateVariables(tenantId: string, customer: { name: string }, order?: { orderNumber: string, total: import('@prisma/client').Prisma.Decimal | number }, config?: { config: import('@prisma/client').Prisma.JsonValue }) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    const storeName = tenant?.name || 'nossa loja';
+    const menuLink = `https://${tenant?.slug}.gestordelivery.com`;
+    const couponCode = (config?.config as Record<string, string>)?.couponCode || '';
+    
+    return {
+      '{nome}': customer?.name ? customer.name.split(' ')[0] : 'cliente',
+      '{nome_loja}': storeName,
+      '{link_cardapio}': menuLink,
+      '{cupom}': couponCode,
+      '{pedido}': order ? `#${order.orderNumber}` : '',
+      '{total}': order ? `R$ ${Number(order.total).toFixed(2).replace('.', ',')}` : '',
+    };
+  }
+
+  private applyTemplate(template: string, vars: Record<string, string>) {
+    let result = template;
+    for (const [key, value] of Object.entries(vars)) {
+      result = result.replace(new RegExp(key, 'g'), value);
+    }
+    return result;
+  }
+
+  private async runPostOrderReview(tenantId: string, result: AutomationRunResult) {
+    try {
+      const config = await this.prisma.marketingAutomation.findUnique({
+        where: { tenantId_type: { tenantId, type: 'post_order_review' } }
+      });
+      if (!config || !config.enabled) return;
+
+      const delayHours = Number((config.config as Record<string, number>)?.delayHours ?? 2);
+      const limitDate = new Date(Date.now() - delayHours * 60 * 60 * 1000);
+      const limitWindow = new Date(Date.now() - (delayHours + 24) * 60 * 60 * 1000);
+
+      const orders = await this.prisma.order.findMany({
+        where: {
+          tenantId,
+          status: { in: ['completed'] },
+          customerId: { not: null },
+          updatedAt: { gte: limitWindow, lte: limitDate },
+        },
+        include: { customer: true },
+      });
+
+      for (const order of orders) {
+        if (!order.customerId) continue;
+        const name = `Pos-pedido #${order.orderNumber}`;
+        if (await this.hasNamedCampaign(tenantId, name)) continue;
+
+        const vars = await this.getTemplateVariables(tenantId, { name: order.customerName }, order, config);
+        const message = this.applyTemplate(config.messageTemplate, vars);
+
+        const campaign = await this.campaignsService.createCampaign(tenantId, {
+          name,
+          objective: 'post_order_review',
+          messageTemplate: message,
+          segmentRules: { specificCustomers: [order.customerId] },
+          maxDispatches: 1,
+        });
+        await this.campaignsService.startCampaign(tenantId, campaign.id);
+      }
+    } catch (e) {
+      this.captureFailure(result, 'post_order_review', e);
+    }
+  }
+
+  private async runInactiveWinback(tenantId: string, result: AutomationRunResult) {
+    try {
+      const config = await this.prisma.marketingAutomation.findUnique({
+        where: { tenantId_type: { tenantId, type: 'inactive_customer_winback' } }
+      });
+      if (!config || !config.enabled) return;
+
+      const daysInactive = Number((config.config as Record<string, number>)?.daysInactive ?? 30);
+      const limitDate = new Date();
+      limitDate.setDate(limitDate.getDate() - daysInactive);
+
+      const limitWindow = new Date(limitDate);
+      limitWindow.setDate(limitWindow.getDate() - 7);
+
+      const customers = await this.prisma.customer.findMany({
+        where: {
+          tenantId,
+          lastOrderDate: { gte: limitWindow, lte: limitDate },
+          totalOrders: { gt: 0 }
+        }
+      });
+
+      for (const customer of customers) {
+        if (await this.hasRecentCustomerCampaign(tenantId, customer.id, 'inactive_customer_winback', 30)) continue;
+
+        const vars = await this.getTemplateVariables(tenantId, customer, undefined, config);
+        const message = this.applyTemplate(config.messageTemplate, vars);
+
+        const campaign = await this.campaignsService.createCampaign(tenantId, {
+          name: `Retorno inativo - ${customer.name}`,
+          objective: 'inactive_customer_winback',
+          messageTemplate: message,
+          segmentRules: { specificCustomers: [customer.id] },
+          maxDispatches: 1,
+        });
+        await this.campaignsService.startCampaign(tenantId, campaign.id);
+      }
+    } catch (e) {
+      this.captureFailure(result, 'inactive_customer_winback', e);
+    }
+  }
+
+  private async runBirthdayGreeting(tenantId: string, result: AutomationRunResult) {
+    try {
+      const config = await this.prisma.marketingAutomation.findUnique({
+        where: { tenantId_type: { tenantId, type: 'birthday_greeting' } }
+      });
+      if (!config || !config.enabled) return;
+
+      const today = new Date();
+      const month = today.getMonth() + 1;
+      const day = today.getDate();
+
+      const customers = await this.prisma.$queryRaw<{id: string, name: string}[]>`
+        SELECT id, name FROM customers 
+        WHERE tenant_id = ${tenantId} 
+        AND birth_date IS NOT NULL 
+        AND EXTRACT(MONTH FROM birth_date) = ${month} 
+        AND EXTRACT(DAY FROM birth_date) = ${day}
+      `;
+
+      for (const customer of customers) {
+        if (await this.hasRecentCustomerCampaign(tenantId, customer.id, 'birthday_greeting', 360)) continue;
+
+        const vars = await this.getTemplateVariables(tenantId, customer, undefined, config);
+        const message = this.applyTemplate(config.messageTemplate, vars);
+
+        const campaign = await this.campaignsService.createCampaign(tenantId, {
+          name: `Feliz aniversario - ${customer.name}`,
+          objective: 'birthday_greeting',
+          messageTemplate: message,
+          segmentRules: { specificCustomers: [customer.id] },
+          maxDispatches: 1,
+        });
+        await this.campaignsService.startCampaign(tenantId, campaign.id);
+      }
+    } catch (e) {
+      this.captureFailure(result, 'birthday_greeting', e);
+    }
   }
 
   private async runRecovery(tenantId: string, result: AutomationRunResult) {
