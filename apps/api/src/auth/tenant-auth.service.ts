@@ -371,7 +371,7 @@ export class TenantAuthService {
         expectedSubjectType: AuthSubjectType.tenant,
         context,
       });
-      const payload = rotated.payload as unknown as TenantJwtPayload;
+      const payload = (rotated.payload as unknown) as TenantJwtPayload;
 
       // Verify user still exists and is active using the isolated client
       const user = await this.prisma.tenantClient.tenantUser.findUnique({

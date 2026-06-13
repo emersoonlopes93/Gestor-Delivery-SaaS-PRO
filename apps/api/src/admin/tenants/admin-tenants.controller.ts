@@ -41,7 +41,7 @@ export class AdminTenantsController {
   async updateStatus(
     @Param('id') id: string,
     @Body() body: { status: 'active' | 'inactive' | 'suspended' | 'trial' },
-    @CurrentUser('id') adminId: string,
+    @CurrentUser('sub') adminId: string,
   ) {
     return this.tenantsService.updateStatus(id, body.status, adminId);
   }
@@ -68,7 +68,7 @@ export class AdminTenantsController {
   @RequireAdminPermissions('saas.support.impersonate')
   async impersonate(
     @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @CurrentUser('sub') adminId: string,
     @Body() body: { reason?: string },
   ) {
     const reason = body.reason?.trim();

@@ -13,15 +13,15 @@ function mockRequest(body: string, headers: Record<string, string>): Request {
     ip: '127.0.0.1',
     rawBody: Buffer.from(body),
     get: (name: string) => lowerHeaders[name.toLowerCase()],
-  } as unknown as Request;
+  } as Request;
 }
 
 describe('WebhookSecurityService', () => {
-  let prisma: any;
+  let mockPrisma: Record<string, unknown>;
   let service: WebhookSecurityService;
 
   beforeEach(() => {
-    prisma = {
+    mockPrisma = {
       externalWebhookEvent: {
         create: jest.fn().mockResolvedValue({ id: 'evt-db-1' }),
         findUnique: jest.fn(),
@@ -29,12 +29,12 @@ describe('WebhookSecurityService', () => {
       },
     };
     service = new WebhookSecurityService(
-      prisma,
+      (mockPrisma as unknown) as PrismaService,
       { get: jest.fn((key: string, fallback?: string) => ({
         ASAAS_WEBHOOK_HMAC_SECRET: 'webhook-secret',
         WEBHOOK_REPLAY_WINDOW_SECONDS: '300',
         NODE_ENV: 'production',
-      }[key] ?? fallback)) } as unknown as ConfigService,
+      }[key] ?? fallback)) } as ConfigService,
     );
   });
 
@@ -58,7 +58,7 @@ describe('WebhookSecurityService', () => {
     });
 
     expect(result.duplicate).toBe(false);
-    expect(prisma.externalWebhookEvent.create).toHaveBeenCalledWith({
+    expect(mockPrisma.externalWebhookEvent.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         provider: 'asaas',
         eventId: 'evt-1',

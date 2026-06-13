@@ -41,31 +41,50 @@ type SidebarGroup = {
 
 const SIDEBAR_STORAGE_KEY = 'admin_sidebar_state_v1';
 
-function isFeatureVisible(flag: string | undefined): boolean {
+function isFeatureEnabled(flag: string): boolean {
   if (!flag) return true;
-  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
+  const envMeta = import.meta as { env?: Record<string, string | undefined> };
+  const env = envMeta.env ?? {};
   return env[flag] === 'true';
 }
 
 const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
   {
     id: 'core',
-    label: 'Admin',
+    label: 'Visão Geral',
     items: [
-      { id: 'dashboard', label: 'Dashboard', to: '/dashboard', icon: LayoutGrid },
-      { id: 'tenants', label: 'Tenants (Lojas)', to: '/tenants', icon: Store, permission: 'saas.tenants.read' },
+      { id: 'dashboard', label: 'Dashboard Analítico', to: '/dashboard', icon: LayoutGrid },
     ],
   },
   {
-    id: 'platform',
-    label: 'Plataforma',
+    id: 'clients',
+    label: 'Clientes',
     items: [
+      { id: 'tenants', label: 'Lojas (Tenants)', to: '/tenants', icon: Store, permission: 'saas.tenants.read' },
       { id: 'franchise', label: 'Franquias', to: '/franchise', icon: Globe, permission: 'saas.franchise.read', featureFlag: 'VITE_FEATURE_FRANCHISE' },
+    ],
+  },
+  {
+    id: 'financial',
+    label: 'Financeiro',
+    items: [
       { id: 'billing', label: 'Billing Console', to: '/billing', icon: CreditCard, permission: 'saas.billing.read' },
+    ],
+  },
+  {
+    id: 'operation',
+    label: 'Operação',
+    items: [
       { id: 'integrations', label: 'Marketplace & IA', to: '/integrations', icon: Puzzle, permission: 'saas.settings.read', featureFlag: 'VITE_FEATURE_ADMIN_INTEGRATIONS' },
       { id: 'media', label: 'Biblioteca Global', to: '/media', icon: Images, permission: 'saas.settings.read' },
       { id: 'ai-global', label: 'Agente IA Global', to: '/ai-agent/global', icon: Bot, permission: 'saas.ai.read', featureFlag: 'VITE_FEATURE_AI_AGENT' },
-      { id: 'audit-logs', label: 'Auditoria', to: '/audit-logs', icon: Shield, permission: 'saas.audit.read' },
+    ],
+  },
+  {
+    id: 'security',
+    label: 'Segurança',
+    items: [
+      { id: 'audit-logs', label: 'Logs de Auditoria', to: '/audit-logs', icon: Shield, permission: 'saas.audit.read' },
     ],
   },
 ];

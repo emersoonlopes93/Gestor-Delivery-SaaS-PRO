@@ -64,7 +64,7 @@ export function WhatsAppConfigPage() {
   const { data: tenantSettings, isLoading: loadingSettings } = useQuery({
     queryKey: ['tenant-settings'],
     queryFn: async () => {
-      const res = await api.get<any>('/tenant/me');
+      const res = await api.get<Record<string, unknown>>('/tenant/me');
       return res.data?.settings;
     },
     enabled: featureOrderNotifications,
@@ -173,7 +173,7 @@ export function WhatsAppConfigPage() {
   });
 
   const updateSettingsMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       await api.patch('/tenant/settings', data);
     },
     onSuccess: () => {

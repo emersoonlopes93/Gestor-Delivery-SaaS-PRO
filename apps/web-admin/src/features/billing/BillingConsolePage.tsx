@@ -169,9 +169,9 @@ function SafetyAlert() {
       <div className="flex gap-3">
         <ShieldAlert className="mt-0.5 h-5 w-5 flex-shrink-0" />
         <div>
-          <p className="font-black">Operação manual/sandbox sem cobrança real</p>
+          <p className="font-black">Modo Operacional Manual</p>
           <p className="mt-1 text-sm font-semibold">
-            Esta ação ainda não cobra automaticamente em produção. Manual e mock/sandbox apenas registram tentativas locais, sem gateway real e sem bloquear tenants.
+            O gateway de pagamento automático ainda não está conectado. As ações financeiras executadas aqui afetam o status interno da loja, mas não processam cobranças reais ou bloqueios automáticos externos.
           </p>
         </div>
       </div>
@@ -551,7 +551,7 @@ function TenantTab(props: {
             }
           >
             <div className="p-5">
-              <EmptyState icon={AlertTriangle} title="Fallback legado ativo" text="Não há TenantBillingSubscription V2 para este tenant. A ação manual cria a assinatura sem gateway, sem cobrança automática e sem bloquear o tenant." />
+              <EmptyState icon={AlertTriangle} title="Assinatura Billing V2 Pendente" text="Não há uma assinatura V2 para este tenant. Clique em criar para ativar a gestão operacional de faturamento manual." />
             </div>
           </Panel>
         ) : (
@@ -606,7 +606,11 @@ function TenantTab(props: {
                     Preview invoice
                   </button>
                   <button
-                    onClick={props.onOpenCloseModal}
+                    onClick={() => {
+                      if (window.confirm("Atenção: Fechar este ciclo gerará uma fatura real (draft) no sistema para este tenant. Deseja prosseguir?")) {
+                        props.onOpenCloseModal();
+                      }
+                    }}
                     disabled={!currentCycle || props.closingCycle}
                     className="btn-primary inline-flex items-center gap-2 px-3 py-2 text-sm font-black disabled:opacity-50 text-primary-foreground"
                   >

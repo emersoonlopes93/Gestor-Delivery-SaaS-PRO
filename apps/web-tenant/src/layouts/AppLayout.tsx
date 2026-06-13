@@ -69,9 +69,10 @@ type SidebarGroup = {
 
 const SIDEBAR_STORAGE_KEY = 'tenant_sidebar_state_v1';
 
-function isFeatureVisible(flag: string | undefined): boolean {
+function isFeatureEnabled(flag: string): boolean {
   if (!flag) return true;
-  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
+  const envMeta = import.meta as { env?: Record<string, string | undefined> };
+  const env = envMeta.env ?? {};
   return env[flag] === 'true';
 }
 

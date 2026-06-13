@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './features/auth/LoginPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { TenantsPage } from './features/tenants/TenantsPage';
+import { TenantDetailsPage } from './features/tenants/TenantDetailsPage';
 import { TenantModulesPage } from './features/tenants/TenantModulesPage';
 import { TenantSchedulingPage } from './features/tenants/TenantSchedulingPage';
 import { TenantAiAgentConfigPage } from './features/tenants/TenantAiAgentConfigPage';
@@ -42,6 +43,14 @@ export function App() {
             element={
               <PermissionGate permission="saas.tenants.read">
                 <TenantsPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="/tenants/:tenantId"
+            element={
+              <PermissionGate permission="saas.tenants.read">
+                <TenantDetailsPage />
               </PermissionGate>
             }
           />

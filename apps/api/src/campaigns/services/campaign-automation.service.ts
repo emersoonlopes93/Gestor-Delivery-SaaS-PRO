@@ -194,7 +194,7 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
         userType: 'system',
         action: 'campaign_automation_run',
         resource: 'campaign',
-        details: result as unknown as Prisma.JsonObject,
+        details: result as Record<string, unknown> as Prisma.JsonObject,
       },
     });
 

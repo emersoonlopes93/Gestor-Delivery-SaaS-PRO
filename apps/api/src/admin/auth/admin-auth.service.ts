@@ -108,7 +108,7 @@ export class AdminAuthService {
         expectedSubjectType: AuthSubjectType.admin,
         context,
       });
-      const payload = rotated.payload as unknown as AdminJwtPayload;
+      const payload = (rotated.payload as unknown) as AdminJwtPayload;
 
       if (payload.type !== 'admin') {
         throw new UnauthorizedException('Invalid token type');

@@ -102,7 +102,7 @@ export class DriverAuthService {
         expectedSubjectType: AuthSubjectType.driver,
         context,
       });
-      const payload = rotated.payload as unknown as DriverJwtPayload;
+      const payload = (rotated.payload as unknown) as DriverJwtPayload;
 
       const driver = await this.prisma.deliveryDriver.findUnique({
         where: { id: payload.sub },
