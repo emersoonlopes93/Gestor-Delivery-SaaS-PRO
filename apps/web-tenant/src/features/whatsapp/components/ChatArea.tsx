@@ -259,113 +259,128 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
   return (
     <div className="flex-1 flex flex-col bg-card dark:bg-card relative">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card z-10 shadow-sm">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="p-1.5 -ml-1.5 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground md:hidden"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <div>
-            <h3 className="font-semibold text-foreground text-base">
-              {session.displayName || `Cliente ${session.customerPhone}`}
-            </h3>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
-                session.state === 'closed' || session.state === 'expired'
-                  ? 'bg-muted text-muted-foreground border-border'
-                  : session.handoffActive
-                  ? 'bg-status-warning/10 text-status-warning border-status-warning/20'
-                  : 'bg-status-success/10 text-status-success border-status-success/20'
-              }`}>
-                {session.state === 'closed'
-                  ? 'Encerrado'
-                  : session.state === 'expired'
-                  ? 'Expirada'
-                  : session.handoffActive
-                  ? 'Atendimento Humano'
-                  : 'Bot Ativo'}
-              </span>
+      <div className="flex flex-col border-b border-border bg-card z-10 shadow-sm relative">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onBack}
+              className="p-1.5 -ml-1.5 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground md:hidden"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            
+            {/* Avatar */}
+            <div className="relative shrink-0 w-10 h-10 rounded-full overflow-hidden flex items-center justify-center font-bold text-sm bg-primary text-primary-foreground">
+              {session.profilePictureUrl && (
+                <img 
+                  src={session.profilePictureUrl} 
+                  alt={session.displayName || `Cliente ${session.customerPhone}`} 
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+              )}
+              <span>{(session.displayName || `Cliente ${session.customerPhone}`).charAt(0).toUpperCase()}</span>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-foreground text-base">
+                {session.displayName || `Cliente ${session.customerPhone}`}
+              </h3>
+              {/* Badge simples de status SE NÃO FOR HANDOFF (pois handoff ganha bloco consolidado abaixo) */}
+              {!session.handoffActive && (
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${
+                    session.state === 'closed' || session.state === 'expired'
+                      ? 'bg-muted text-muted-foreground border-border'
+                      : 'bg-status-success/10 text-status-success border-status-success/20'
+                  }`}>
+                    {session.state === 'closed'
+                      ? 'Encerrado'
+                      : session.state === 'expired'
+                      ? 'Expirada'
+                      : 'Bot Ativo'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {!session.handoffActive && session.state !== 'closed' && session.state !== 'expired' && (
-            <input
-              value={handoffReason}
-              onChange={(e) => setHandoffReason(e.target.value)}
-              placeholder="Motivo (opcional)..."
-              className="hidden sm:block w-40 rounded-md bg-muted/50 text-foreground placeholder:text-muted-foreground border border-input focus:outline-none focus:ring-1 focus:ring-ring px-2.5 py-1.5 text-xs transition-colors focus:bg-card"
-            />
-          )}
-          {session.state !== 'closed' && session.state !== 'expired' && (
-            <button
-              onClick={handleActivateHandoff}
-              disabled={handoffMutation.isPending || session.handoffActive}
-              className="px-3 py-1.5 bg-status-warning/10 text-status-warning border border-status-warning/20 hover:bg-status-warning/20 disabled:opacity-50 disabled:hidden text-xs font-semibold rounded-md transition-colors"
-            >
-              Transferir
-            </button>
-          )}
-          {session.state !== 'closed' && session.state !== 'expired' && (
-            <button
-              onClick={() => closeSessionMutation.mutate()}
-              disabled={closeSessionMutation.isPending}
-              className="px-3 py-1.5 bg-muted text-muted-foreground border border-border hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20 disabled:opacity-50 text-xs font-semibold rounded-md transition-colors"
-            >
-              Encerrar
-            </button>
-          )}
-        </div>
-      </div>
-
-      {session.handoffActive && (
-        <div className="bg-status-warning/5 border-b border-status-warning/20 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm z-10 relative">
           <div className="flex items-center gap-2">
-            <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-warning opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-status-warning"></span>
-            </span>
-            <div className="flex flex-col">
-              <p className="text-[13px] font-medium text-status-warning">
-                Atendimento humano ativo
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                O bot está silenciado e não responderá mensagens automaticamente.
-              </p>
+            {!session.handoffActive && session.state !== 'closed' && session.state !== 'expired' && (
+              <>
+                <input
+                  value={handoffReason}
+                  onChange={(e) => setHandoffReason(e.target.value)}
+                  placeholder="Motivo (opcional)..."
+                  className="hidden sm:block w-40 rounded-md bg-muted/50 text-foreground placeholder:text-muted-foreground border border-input focus:outline-none focus:ring-1 focus:ring-ring px-2.5 py-1.5 text-xs transition-colors focus:bg-card"
+                />
+                <button
+                  onClick={handleActivateHandoff}
+                  disabled={handoffMutation.isPending}
+                  className="px-3 py-1.5 bg-status-warning/10 text-status-warning border border-status-warning/20 hover:bg-status-warning/20 disabled:opacity-50 disabled:hidden text-xs font-semibold rounded-md transition-colors"
+                >
+                  Transferir
+                </button>
+              </>
+            )}
+            {session.state !== 'closed' && session.state !== 'expired' && (
+              <button
+                onClick={() => closeSessionMutation.mutate()}
+                disabled={closeSessionMutation.isPending}
+                className="px-3 py-1.5 bg-muted text-muted-foreground border border-border hover:bg-destructive/10 hover:text-destructive hover:border-destructive/20 disabled:opacity-50 text-xs font-semibold rounded-md transition-colors"
+              >
+                Encerrar
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Bloco exclusivo de Handoff Consolidado */}
+        {session.handoffActive && (
+          <div className="bg-status-warning/5 border-t border-status-warning/20 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-inner">
+            <div className="flex items-start gap-2">
+              <span className="flex h-2 w-2 relative mt-1.5 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-warning opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-status-warning"></span>
+              </span>
+              <div className="flex flex-col">
+                <p className="text-[13px] font-semibold text-status-warning flex items-center gap-2">
+                  Atendimento humano ativo
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  O bot está silenciado e não responderá mensagens automaticamente.
+                </p>
+                
+                {/* Metadados da transferência consolidados */}
+                {(session.handoffReason || session.handoffOperator || session.handoffAt) && (
+                  <div className="mt-1.5 text-[11px] text-muted-foreground/80 flex flex-wrap gap-x-3 gap-y-1">
+                    {session.handoffReason && (
+                      <span><strong className="font-medium text-muted-foreground">Motivo:</strong> {session.handoffReason}</span>
+                    )}
+                    {session.handoffOperator && (
+                      <span><strong className="font-medium text-muted-foreground">Operador:</strong> {session.handoffOperator}</span>
+                    )}
+                    {session.handoffAt && (
+                      <span><strong className="font-medium text-muted-foreground">Início:</strong> {new Date(session.handoffAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex gap-2 shrink-0 self-start sm:self-center">
+              <button
+                onClick={() => deactivateHandoffMutation.mutate()}
+                disabled={deactivateHandoffMutation.isPending}
+                className="px-3 py-1.5 bg-status-warning text-status-warning-foreground hover:bg-status-warning/90 text-xs font-semibold rounded-md transition-colors shadow-sm"
+              >
+                {deactivateHandoffMutation.isPending ? 'Reativando...' : 'Reativar IA'}
+              </button>
             </div>
           </div>
-          <div className="flex gap-2 shrink-0">
-            <button
-              onClick={() => deactivateHandoffMutation.mutate()}
-              disabled={deactivateHandoffMutation.isPending}
-              className="px-2.5 py-1.5 bg-status-warning text-status-warning-foreground hover:bg-status-warning/90 text-[11px] font-semibold rounded-md transition-colors shadow-sm"
-            >
-              {deactivateHandoffMutation.isPending ? 'Reativando...' : 'Reativar IA'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {session.handoffActive && (session.handoffReason || session.handoffOperator || session.handoffAt) && (
-        <div className="px-4 py-2 border-b border-border bg-muted/30 text-[11px] text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
-          {session.handoffReason && (
-            <span><strong className="font-medium text-foreground">Motivo:</strong> {session.handoffReason}</span>
-          )}
-          {session.handoffOperator && (
-            <span><strong className="font-medium text-foreground">Operador:</strong> {session.handoffOperator}</span>
-          )}
-          {session.handoffAt && (
-            <span>
-              <strong className="font-medium text-foreground">Início:</strong>{' '}
-              {new Date(session.handoffAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
-            </span>
-          )}
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Messages */}
       <div

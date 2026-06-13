@@ -259,6 +259,8 @@ export function InboxPage() {
               {sessions.map((s, i) => {
                 const isActive = selectedSession?.customerPhone === s.customerPhone; // Usando phone como âncora agora
                 const isLast = i === sessions.length - 1;
+                const displayName = s.displayName || s.name || `Cliente ${s.customerPhone}`;
+                const initial = displayName.charAt(0).toUpperCase();
                 
                 return (
                   <div 
@@ -274,26 +276,45 @@ export function InboxPage() {
                     {s.handoffActive && !isActive && (
                       <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-status-warning" />
                     )}
-                    <div className="flex items-start justify-between mb-1.5 gap-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <h3 className={`text-[13px] truncate ${isActive ? 'font-bold text-foreground' : 'font-semibold text-foreground/90'}`}>
-                          {s.displayName || s.name || `Cliente ${s.customerPhone}`}
-                        </h3>
-                        {s.unreadCount && s.unreadCount > 0 ? (
-                          <span className="bg-destructive text-destructive-foreground text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm shrink-0 leading-none">
-                            {s.unreadCount}
-                          </span>
-                        ) : null}
+                    <div className="flex items-start gap-3">
+                      {/* Avatar */}
+                      <div className={`relative shrink-0 w-10 h-10 rounded-full overflow-hidden flex items-center justify-center font-bold text-sm ${
+                        isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {s.profilePictureUrl && (
+                          <img 
+                            src={s.profilePictureUrl} 
+                            alt={displayName} 
+                            className="absolute inset-0 w-full h-full object-cover"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
+                        )}
+                        <span>{initial}</span>
                       </div>
-                      <span className={`text-[10px] whitespace-nowrap shrink-0 ${isActive ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
-                        {s.time || new Date(s.lastMessageAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    <p className={`text-[12px] truncate mb-2 ${s.unreadCount && s.unreadCount > 0 ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
-                      {s.lastMessage || 'Sem mensagens'}
-                    </p>
-                    <div className="flex items-center gap-1.5">
-                      {renderBadge(s)}
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-1 gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <h3 className={`text-[13px] truncate ${isActive ? 'font-bold text-foreground' : 'font-semibold text-foreground/90'}`}>
+                              {displayName}
+                            </h3>
+                            {s.unreadCount && s.unreadCount > 0 ? (
+                              <span className="bg-destructive text-destructive-foreground text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm shrink-0 leading-none">
+                                {s.unreadCount}
+                              </span>
+                            ) : null}
+                          </div>
+                          <span className={`text-[10px] whitespace-nowrap shrink-0 ${isActive ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                            {s.time || new Date(s.lastMessageAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className={`text-[12px] truncate mb-2 ${s.unreadCount && s.unreadCount > 0 ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                          {s.lastMessage || 'Sem mensagens'}
+                        </p>
+                        <div className="flex items-center gap-1.5">
+                          {renderBadge(s)}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );

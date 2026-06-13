@@ -21,6 +21,7 @@ export interface ChatSession {
   customerPhone: string;
   customerId?: string;
   displayName?: string;
+  profilePictureUrl?: string | null;
   channel: string;
   remoteJid?: string;
   state: ChatState;
@@ -85,6 +86,7 @@ export interface ChatSessionListItem {
   id: string;
   customerPhone: string;
   displayName?: string;
+  profilePictureUrl?: string | null;
   state: ChatState;
   lastMessageAt: string;
   lastMessage: string | null;

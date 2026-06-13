@@ -75,12 +75,7 @@ const isFeatureVisible = (flag?: string) => {
 
 const SIDEBAR_STORAGE_KEY = 'tenant_sidebar_state_v1';
 
-function isFeatureEnabled(flag: string): boolean {
-  if (!flag) return true;
-  const envMeta = import.meta as { env?: Record<string, string | undefined> };
-  const env = envMeta.env ?? {};
-  return env[flag] === 'true';
-}
+
 
 const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
   {
