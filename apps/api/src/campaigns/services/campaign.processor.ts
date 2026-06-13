@@ -65,6 +65,12 @@ export class CampaignProcessor extends WorkerHost {
     const firstName = customerName.trim().split(' ')[0] || 'cliente';
     const personalizedMessage = messageTemplate.replace(/{{nome}}/gi, firstName);
 
+    // Jitter/Delay aleatório para evitar banimento do WhatsApp (Anti-Spam)
+    // Entre 5000ms e 15000ms
+    const jitterMs = Math.floor(Math.random() * (15000 - 5000 + 1)) + 5000;
+    this.logger.log(`Aguardando ${jitterMs}ms antes de enviar para ${phone}...`);
+    await new Promise(resolve => setTimeout(resolve, jitterMs));
+
     try {
       const result = mediaUrl
         ? await this.whatsappSender.sendMedia(tenantId, {

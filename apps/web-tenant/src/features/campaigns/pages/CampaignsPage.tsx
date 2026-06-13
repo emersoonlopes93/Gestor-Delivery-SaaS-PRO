@@ -154,14 +154,21 @@ export function CampaignsPage() {
                   </StatusBadge>
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary rounded-full" 
-                        style={{ width: `${c.totalAudience > 0 ? (c.totalSent / c.totalAudience) * 100 : 0}%` }}
-                      />
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-primary rounded-full" 
+                          style={{ width: `${c.totalAudience > 0 ? (c.totalSent / c.totalAudience) * 100 : 0}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-medium text-foreground">{c.totalSent}/{c.totalAudience}</span>
                     </div>
-                    <span className="text-sm text-muted-foreground">{c.totalSent}/{c.totalAudience}</span>
+                    <div className="flex gap-3 text-xs text-muted-foreground mt-1">
+                      <span title="Entregues" className="text-status-success">{c.totalDelivered} entregues</span>
+                      <span title="Falhas" className="text-status-error">{(c as any)._count?.dispatches || 0} falhas</span>
+                      <span title="Opt-outs" className="text-status-warning">{c.totalOptOut} saíram</span>
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{new Date(c.createdAt).toLocaleDateString('pt-BR')}</TableCell>

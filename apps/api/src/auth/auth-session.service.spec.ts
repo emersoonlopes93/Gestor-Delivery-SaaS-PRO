@@ -25,7 +25,7 @@ describe('AuthSessionService', () => {
       { get: jest.fn((key: string, fallback?: string) => ({
         JWT_REFRESH_SECRET: 'test-refresh-secret',
         JWT_REFRESH_EXPIRES_IN: '7d',
-        }[key] ?? fallback)) } as unknown) as ConfigService,
+      }[key] ?? fallback)) } as unknown as ConfigService,
     );
   });
 

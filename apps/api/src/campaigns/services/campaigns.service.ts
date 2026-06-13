@@ -275,6 +275,16 @@ export class CampaignsService {
   }
 
   /**
+   * Estima o tamanho do público sem criar a campanha
+   */
+  async estimateAudience(tenantId: string, rules: CreateCampaignDto['segmentRules']) {
+    const audienceIds = await this.calculateAudience(tenantId, rules);
+    return {
+      estimatedAudience: audienceIds.length,
+    };
+  }
+
+  /**
    * Lógica interna para filtrar clientes com base nas regras.
    */
   private async calculateAudience(tenantId: string, rules: CreateCampaignDto['segmentRules']): Promise<string[]> {

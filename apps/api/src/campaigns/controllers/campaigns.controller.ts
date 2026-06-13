@@ -130,6 +130,13 @@ export class CampaignsController {
     return this.abandonedCartService.dispatchDueReminders(req.user.tenantId, body?.limit);
   }
 
+  @Post('estimate')
+  @Permissions('crm.read')
+  @HttpCode(200)
+  async estimate(@Request() req: AuthenticatedRequest, @Body() dto: CreateCampaignDto) {
+    return this.campaignsService.estimateAudience(req.user.tenantId, dto.segmentRules);
+  }
+
   @Get(':id')
   @Permissions('crm.read')
   async get(@Request() req: AuthenticatedRequest, @Param('id') id: string) {
