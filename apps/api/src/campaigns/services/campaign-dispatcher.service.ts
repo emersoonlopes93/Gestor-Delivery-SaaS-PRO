@@ -42,14 +42,35 @@ export class CampaignDispatcherService implements OnModuleInit, OnModuleDestroy 
         select: { 
           id: true, 
           tenantId: true, 
+          type: true,
           messageTemplate: true, 
-          mediaUrl: true 
+          mediaUrl: true,
+          mediaType: true
         },
       });
 
       if (runningCampaigns.length === 0) return;
 
       for (const campaign of runningCampaigns) {
+        if (campaign.type === 'whatsapp_status') {
+          await this.campaignQueue.add('status-job', {
+            campaignId: campaign.id,
+            tenantId: campaign.tenantId,
+            messageTemplate: campaign.messageTemplate,
+            mediaUrl: campaign.mediaUrl,
+            mediaType: campaign.mediaType,
+            isStatus: true
+          }, {
+            jobId: `status-${campaign.id}`, // Idempotência
+          });
+
+          await this.prisma.campaign.update({
+            where: { id: campaign.id },
+            data: { status: 'completed', completedAt: new Date() },
+          });
+          continue;
+        }
+
         // Pega mensagens pendentes que ainda não foram enviadas para o BullMQ
         // Usamos status 'queued' e mudamos para 'processing' ao adicionar na fila Bull
         const dispatches = await this.prisma.campaignDispatch.findMany({

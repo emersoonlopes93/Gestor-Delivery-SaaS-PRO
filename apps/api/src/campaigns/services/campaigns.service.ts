@@ -4,9 +4,11 @@ import { Prisma } from '@prisma/client';
 
 export interface CreateCampaignDto {
   name: string;
+  type?: 'whatsapp_message' | 'whatsapp_status';
   objective?: string;
   messageTemplate: string;
   mediaUrl?: string;
+  mediaType?: string;
   segmentRules: {
     minOrders?: number;
     maxOrders?: number;
@@ -28,16 +30,26 @@ export class CampaignsService {
    * Cria uma nova campanha e calcula a audiência inicial baseada nas regras de segmentação.
    */
   async createCampaign(tenantId: string, dto: CreateCampaignDto) {
-    // 1. Encontra clientes que batem com as regras (e não estão em opt-out)
-    const audienceIds = await this.calculateAudience(tenantId, dto.segmentRules);
+    const isStatus = dto.type === 'whatsapp_status';
 
-    // Limit audience by maxDispatches
-    const finalAudienceIds = dto.maxDispatches 
-      ? audienceIds.slice(0, dto.maxDispatches) 
-      : audienceIds;
+    if (isStatus && process.env.FEATURE_WHATSAPP_STATUS_CAMPAIGNS !== 'true') {
+      throw new BadRequestException('Campanha de Status do WhatsApp está desativada.');
+    }
 
-    if (finalAudienceIds.length === 0) {
-      throw new BadRequestException('Nenhum cliente atende aos critérios de segmentação desta campanha.');
+    let finalAudienceIds: string[] = [];
+
+    if (!isStatus) {
+      // 1. Encontra clientes que batem com as regras (e não estão em opt-out)
+      const audienceIds = await this.calculateAudience(tenantId, dto.segmentRules);
+
+      // Limit audience by maxDispatches
+      finalAudienceIds = dto.maxDispatches 
+        ? audienceIds.slice(0, dto.maxDispatches) 
+        : audienceIds;
+
+      if (finalAudienceIds.length === 0) {
+        throw new BadRequestException('Nenhum cliente atende aos critérios de segmentação desta campanha.');
+      }
     }
 
     // 2. Cria a campanha
@@ -46,10 +58,12 @@ export class CampaignsService {
       data: {
         tenantId,
         name: dto.name,
+        type: dto.type || 'whatsapp_message',
         objective: dto.objective,
         messageTemplate: dto.messageTemplate,
         mediaUrl: dto.mediaUrl,
-        segmentRules: dto.segmentRules as Prisma.JsonObject,
+        mediaType: dto.mediaType,
+        segmentRules: isStatus ? undefined : dto.segmentRules as Prisma.JsonObject,
         scheduledAt,
         status: scheduledAt && scheduledAt > new Date() ? 'scheduled' : 'draft',
         totalAudience: finalAudienceIds.length,
@@ -57,31 +71,36 @@ export class CampaignsService {
       },
     });
 
-    // 3. Cria os dispatches em massa (status: queued)
-    const dispatchesData = finalAudienceIds.map(customerId => ({
-      campaignId: campaign.id,
-      customerId: customerId,
-      phone: '', // Preencheremos na query abaixo
-      status: 'queued' as const,
-    }));
+    if (!isStatus) {
+      // 3. Cria os dispatches em massa (status: queued)
+      const dispatchesData = finalAudienceIds.map(customerId => ({
+        campaignId: campaign.id,
+        customerId: customerId,
+        phone: '', // Preencheremos na query abaixo
+        status: 'queued' as const,
+      }));
 
-    // Buscar os telefones para gravar no dispatch
-    const customers = await this.prisma.customer.findMany({
-      where: { id: { in: finalAudienceIds } },
-      select: { id: true, phone: true },
-    });
+      // Buscar os telefones para gravar no dispatch
+      const customers = await this.prisma.customer.findMany({
+        where: { id: { in: finalAudienceIds } },
+        select: { id: true, phone: true },
+      });
 
-    const phoneMap = new Map(customers.map(c => [c.id, c.phone]));
-    dispatchesData.forEach(d => {
-      d.phone = phoneMap.get(d.customerId) || '';
-    });
+      const phoneMap = new Map(customers.map(c => [c.id, c.phone]));
+      dispatchesData.forEach(d => {
+        d.phone = phoneMap.get(d.customerId) || '';
+      });
 
-    await this.prisma.campaignDispatch.createMany({
-      data: dispatchesData,
-      skipDuplicates: true,
-    });
+      await this.prisma.campaignDispatch.createMany({
+        data: dispatchesData,
+        skipDuplicates: true,
+      });
 
-    this.logger.log(`Campaign ${campaign.id} created with ${finalAudienceIds.length} queued dispatches.`);
+      this.logger.log(`Campaign ${campaign.id} created with ${finalAudienceIds.length} queued dispatches.`);
+    } else {
+      this.logger.log(`Status Campaign ${campaign.id} created.`);
+    }
+    
     return campaign;
   }
 

@@ -4,10 +4,12 @@ export interface Campaign {
   id: string;
   tenantId: string;
   name: string;
+  type: 'whatsapp_message' | 'whatsapp_status';
   objective?: string;
   status: CampaignStatus;
   messageTemplate: string;
   mediaUrl?: string;
+  mediaType?: string;
   segmentRules: {
     minOrders?: number;
     maxOrders?: number;
@@ -53,9 +55,11 @@ export interface CampaignDispatch {
 
 export interface CreateCampaignDto {
   name: string;
+  type?: 'whatsapp_message' | 'whatsapp_status';
   objective?: string;
   messageTemplate: string;
   mediaUrl?: string;
+  mediaType?: string;
   segmentRules: {
     minOrders?: number;
     maxOrders?: number;

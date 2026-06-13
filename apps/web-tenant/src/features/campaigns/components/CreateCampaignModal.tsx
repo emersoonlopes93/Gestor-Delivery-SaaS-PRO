@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { api } from '../../../lib/api-client';
 import type { CreateCampaignDto } from '@gestor/types';
 import { CAMPAIGN_TEMPLATES } from '../constants/campaignTemplates';
+import { CAMPAIGN_STATUS_TEMPLATES } from '../constants/campaignStatusTemplates';
 
 interface CreateCampaignModalProps {
   isOpen: boolean;
@@ -64,7 +65,8 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
   };
 
   const handleTemplateSelect = (templateId: string) => {
-    const template = CAMPAIGN_TEMPLATES.find(t => t.id === templateId);
+    const templates = formData.type === 'whatsapp_status' ? CAMPAIGN_STATUS_TEMPLATES : CAMPAIGN_TEMPLATES;
+    const template = templates.find(t => t.id === templateId);
     if (template) {
       updateFormData('name', template.name);
       updateFormData('objective', template.description);
@@ -83,23 +85,30 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
 
   const nextStep = async () => {
     if (currentStep === 2) {
-      // Force opt-out phrasing
-      updateFormData('messageTemplate', ensureOptOutMessage(formData.messageTemplate));
+      // Force opt-out phrasing only if it's a message campaign
+      if (formData.type !== 'whatsapp_status') {
+        updateFormData('messageTemplate', ensureOptOutMessage(formData.messageTemplate));
+      }
     }
     if (currentStep === 3) {
-      // Fetch audience estimation
-      setIsEstimating(true);
-      try {
-        const res = await api.post<{ estimatedAudience: number }>('/campaigns/estimate', {
-          segmentRules: formData.segmentRules,
-        });
-        if (res.success && res.data) {
-          setEstimatedAudience(res.data.estimatedAudience);
+      if (formData.type === 'whatsapp_status') {
+        // No audience estimation needed for Status
+        setEstimatedAudience(null);
+      } else {
+        // Fetch audience estimation
+        setIsEstimating(true);
+        try {
+          const res = await api.post<{ estimatedAudience: number }>('/campaigns/estimate', {
+            segmentRules: formData.segmentRules,
+          });
+          if (res.success && res.data) {
+            setEstimatedAudience(res.data.estimatedAudience);
+          }
+        } catch (err) {
+          console.error('Failed to estimate audience', err);
+        } finally {
+          setIsEstimating(false);
         }
-      } catch (err) {
-        console.error('Failed to estimate audience', err);
-      } finally {
-        setIsEstimating(false);
       }
     }
     if (currentStep < 4) setCurrentStep(currentStep + 1);
@@ -171,9 +180,37 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
           {/* Step 1: Template */}
           {currentStep === 1 && (
             <div className="space-y-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Escolha um Template Prático</h3>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo de Campanha *</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div 
+                    onClick={() => updateFormData('type', 'whatsapp_message')}
+                    className={`p-4 border rounded-xl cursor-pointer transition-all ${
+                      (!formData.type || formData.type === 'whatsapp_message')
+                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 ring-2 ring-primary-500/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-700'
+                    }`}
+                  >
+                    <h4 className="font-semibold text-gray-900 dark:text-white">Mensagem Privada</h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Dispara para a caixa de entrada dos clientes.</p>
+                  </div>
+                  <div 
+                    onClick={() => updateFormData('type', 'whatsapp_status')}
+                    className={`p-4 border rounded-xl cursor-pointer transition-all ${
+                      formData.type === 'whatsapp_status'
+                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 ring-2 ring-primary-500/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-700'
+                    }`}
+                  >
+                    <h4 className="font-semibold text-gray-900 dark:text-white">Status do WhatsApp</h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Publica na aba de Status (Stories).</p>
+                  </div>
+                </div>
+              </div>
+
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mt-6">Escolha um Template Prático</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {CAMPAIGN_TEMPLATES.map(template => (
+                {(formData.type === 'whatsapp_status' ? CAMPAIGN_STATUS_TEMPLATES : CAMPAIGN_TEMPLATES).map(template => (
                   <div 
                     key={template.id}
                     onClick={() => handleTemplateSelect(template.id)}
@@ -241,11 +278,19 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
           {/* Step 3: Público (Segmentação) */}
           {currentStep === 3 && (
             <div className="space-y-6">
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                <p className="text-sm text-blue-800 dark:text-blue-200">
-                  Filtre para quem você quer enviar. Se não preencher nada, a campanha irá para <strong>todos os clientes</strong> (que não pediram para sair).
-                </p>
-              </div>
+              {formData.type === 'whatsapp_status' ? (
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    <strong>Status do WhatsApp:</strong> Esta campanha será publicada diretamente no seu Status (Stories) do WhatsApp. Não há filtros de público, pois o WhatsApp exibe o Status para todos os seus contatos salvos (dependendo das configurações de privacidade do seu aparelho).
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      Filtre para quem você quer enviar. Se não preencher nada, a campanha irá para <strong>todos os clientes</strong> (que não pediram para sair).
+                    </p>
+                  </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -305,6 +350,8 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
                 />
                 <p className="text-xs text-gray-500 mt-1">Corta a audiência se exceder esse limite de segurança.</p>
               </div>
+              </>
+              )}
             </div>
           )}
 
@@ -328,27 +375,31 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
                       <div className="flex justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
                         <span className="text-gray-600 dark:text-gray-400">Audiência Estimada:</span>
                         <span className="font-bold text-primary-600 dark:text-primary-400">
-                          {estimatedAudience !== null ? `${estimatedAudience} contatos` : 'Desconhecido'}
+                          {formData.type === 'whatsapp_status' ? 'Todos os contatos' : (estimatedAudience !== null ? `${estimatedAudience} contatos` : 'Desconhecido')}
                         </span>
                       </div>
-                      <div className="flex justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
-                        <span className="text-gray-600 dark:text-gray-400">Limite de Segurança:</span>
-                        <span className="font-medium text-gray-900 dark:text-white">{formData.maxDispatches} disparos</span>
+                      {formData.type !== 'whatsapp_status' && (
+                        <div className="flex justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
+                          <span className="text-gray-600 dark:text-gray-400">Limite de Segurança:</span>
+                          <span className="font-medium text-gray-900 dark:text-white">{formData.maxDispatches} disparos</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {formData.type !== 'whatsapp_status' && (
+                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-xl flex gap-3">
+                      <AlertTriangle className="w-6 h-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
+                      <div>
+                        <h5 className="font-medium text-yellow-800 dark:text-yellow-300">Atenção ao Risco de Spam</h5>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
+                          Disparos em massa podem causar bloqueio do seu número de WhatsApp se muitos clientes denunciarem. O sistema possui um atraso de segurança (Jitter) entre as mensagens para simular envio humano.
+                        </p>
                       </div>
                     </div>
-                  </div>
+                  )}
 
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-xl flex gap-3">
-                    <AlertTriangle className="w-6 h-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
-                    <div>
-                      <h5 className="font-medium text-yellow-800 dark:text-yellow-300">Atenção ao Risco de Spam</h5>
-                      <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
-                        Disparos em massa podem causar bloqueio do seu número de WhatsApp se muitos clientes denunciarem. O sistema possui um atraso de segurança (Jitter) entre as mensagens para simular envio humano.
-                      </p>
-                    </div>
-                  </div>
-
-                  {isLargeAudience && (
+                  {isLargeAudience && formData.type !== 'whatsapp_status' && (
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-xl">
                       <label className="block text-sm font-medium text-red-800 dark:text-red-300 mb-2">
                         Como a audiência estimada é maior que 50 contatos, digite <strong>ENVIAR</strong> para confirmar.

@@ -13,6 +13,8 @@ export interface CampaignJobData {
   customerName: string;
   messageTemplate: string;
   mediaUrl?: string | null;
+  mediaType?: string | null;
+  isStatus?: boolean;
 }
 
 @Processor('campaign-dispatch')
@@ -29,7 +31,34 @@ export class CampaignProcessor extends WorkerHost {
   async process(
     job: Job<CampaignJobData, { success: boolean; messageId?: string; skipped?: boolean; reason?: string }, string>,
   ): Promise<{ success: boolean; messageId?: string; skipped?: boolean; reason?: string }> {
-    const { campaignId, dispatchId, tenantId, customerId, phone, customerName, messageTemplate, mediaUrl } = job.data;
+    const { campaignId, dispatchId, tenantId, customerId, phone, customerName, messageTemplate, mediaUrl, mediaType, isStatus } = job.data;
+
+    if (isStatus) {
+      this.logger.log(`Processing status campaign ${campaignId}`);
+      try {
+        const result = await this.whatsappSender.publishStatus(tenantId, {
+          text: messageTemplate,
+          mediaUrl: mediaUrl || undefined,
+          mediaType: mediaType || undefined,
+          caption: messageTemplate,
+        });
+        
+        await this.prisma.campaign.update({
+          where: { id: campaignId },
+          data: { status: result.success ? 'completed' : 'cancelled' },
+        });
+
+        return { success: result.success, messageId: result.messageId };
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(`Error processing status campaign ${campaignId}: ${message}`);
+        await this.prisma.campaign.update({
+          where: { id: campaignId },
+          data: { status: 'cancelled' },
+        });
+        throw error;
+      }
+    }
 
     this.logger.log(`Processing campaign dispatch ${dispatchId} for phone ${phone}`);
 

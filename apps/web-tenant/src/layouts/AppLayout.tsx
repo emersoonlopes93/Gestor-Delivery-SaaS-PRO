@@ -813,7 +813,9 @@ export function AppLayout() {
 
 
         <main className="flex-1 overflow-auto bg-background">
-          <Outlet />
+          <div key={location.pathname} className="h-full">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

@@ -237,6 +237,21 @@ export interface IWhatsAppProvider {
   ): Promise<string | null>;
 
   /**
+   * Publica conteúdo no Status do WhatsApp (Evolution Go).
+   */
+  publishWhatsAppStatus?(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+    input: {
+      text?: string;
+      mediaUrl?: string;
+      mediaType?: string;
+      caption?: string;
+    },
+  ): Promise<WhatsAppSendResult>;
+
+  /**
    * Faz o parsing de um payload de webhook específico do provider
    */
   parseWebhook(payload: unknown, tenantId: string): WhatsAppWebhookEvent | null;

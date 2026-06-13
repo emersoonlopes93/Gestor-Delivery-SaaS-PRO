@@ -454,6 +454,53 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     }
   }
 
+  async publishWhatsAppStatus(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+    input: {
+      text?: string;
+      mediaUrl?: string;
+      mediaType?: string;
+      caption?: string;
+    },
+  ): Promise<WhatsAppSendResult> {
+    const client = this.buildInstanceClient(apiUrl, apiKey, instanceId);
+
+    try {
+      if (input.mediaUrl) {
+        const mediaBody = {
+          number: 'status@broadcast',
+          mediatype: input.mediaType === 'video' ? 'video' : 'image',
+          mimetype: input.mediaType === 'video' ? 'video/mp4' : 'image/jpeg',
+          caption: input.text || input.caption || '',
+          media: input.mediaUrl,
+        };
+        const { data } = await client.post('/message/sendMedia', mediaBody);
+        return {
+          success: true,
+          messageId: data?.key?.id || data?.id || undefined,
+        };
+      } else if (input.text) {
+        const textBody = {
+          number: 'status@broadcast',
+          text: input.text,
+        };
+        const { data } = await client.post('/message/sendText', textBody);
+        return {
+          success: true,
+          messageId: data?.key?.id || data?.id || undefined,
+        };
+      } else {
+        return { success: false, error: 'No content provided for status' };
+      }
+    } catch (error: unknown) {
+      const message = isAxiosError(error) ? error.response?.data?.message || error.message : (error as Error).message;
+      this.logger.error(`publishWhatsAppStatus failed: ${message}`);
+      return { success: false, error: message };
+    }
+  }
+
   async sendPresence(
     apiUrl: string,
     apiKey: string,

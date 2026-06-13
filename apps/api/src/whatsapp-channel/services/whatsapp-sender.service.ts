@@ -80,6 +80,29 @@ export class WhatsAppSenderService {
     );
   }
 
+  async publishStatus(
+    tenantId: string,
+    input: {
+      text?: string;
+      mediaUrl?: string;
+      mediaType?: string;
+      caption?: string;
+    },
+  ): Promise<WhatsAppSendResult> {
+    const { provider, instance } = await this.resolveProvider(tenantId);
+
+    if (typeof provider.publishWhatsAppStatus !== 'function') {
+      return { success: false, error: 'Provider does not support publishing WhatsApp status' };
+    }
+
+    return provider.publishWhatsAppStatus(
+      instance.apiUrl,
+      instance.apiKey,
+      instance.evolutionInstanceId || instance.instanceName,
+      input,
+    );
+  }
+
   /**
    * Simula presença (digitando...) — best-effort, nunca lança erro.
    */

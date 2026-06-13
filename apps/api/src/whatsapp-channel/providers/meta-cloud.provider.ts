@@ -243,6 +243,22 @@ export class MetaCloudProvider implements IWhatsAppProvider {
     }
   }
 
+  async publishWhatsAppStatus(
+    _apiUrl: string,
+    _apiKey: string,
+    _instanceId: string,
+    _input: {
+      text?: string;
+      mediaUrl?: string;
+      mediaType?: string;
+      caption?: string;
+    },
+  ): Promise<WhatsAppSendResult> {
+    // Meta Cloud API não suporta envio direto para "Status" da mesma forma que o WhatsApp Business App/Web via Evolution Go.
+    return { success: false, error: 'Meta Cloud does not support Status updates' };
+  }
+
+
   async sendPresence(
     _apiUrl: string,
     _apiKey: string,
