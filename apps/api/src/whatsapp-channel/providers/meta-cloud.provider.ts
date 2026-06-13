@@ -278,6 +278,16 @@ export class MetaCloudProvider implements IWhatsAppProvider {
     }
   }
 
+  async getProfilePictureUrl(
+    _apiUrl: string,
+    _apiKey: string,
+    _instanceId: string,
+    _phone: string,
+  ): Promise<string | null> {
+    // Não suportado ou não implementado nativamente pelo Meta Cloud Provider da mesma forma
+    return null;
+  }
+
   parseWebhook(_payload: unknown, _tenantId: string): WhatsAppWebhookEvent | null {
     // Implementação simplificada para Meta Cloud
     return null;

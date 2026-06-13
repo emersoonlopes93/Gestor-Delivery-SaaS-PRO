@@ -460,14 +460,14 @@ export class WhatsAppWebhookController {
       try {
         const instance = await this.prisma.whatsAppInstance.findUnique({
           where: { tenantId },
-          select: { providerType: true, apiUrl: true, apiKey: true, instanceId: true },
+          select: { providerType: true, apiUrl: true, apiKey: true, evolutionInstanceId: true },
         });
-        if (!instance || !instance.apiUrl || !instance.apiKey || !instance.instanceId) return;
+        if (!instance || !instance.apiUrl || !instance.apiKey || !instance.evolutionInstanceId) return;
 
         const provider = this.providerRegistry.getProvider(instance.providerType);
         if (typeof provider.getProfilePictureUrl !== 'function') return;
 
-        const url = await provider.getProfilePictureUrl(instance.apiUrl, instance.apiKey, instance.instanceId, phone);
+        const url = await provider.getProfilePictureUrl(instance.apiUrl, instance.apiKey, instance.evolutionInstanceId, phone);
         if (url) {
           await this.prisma.customer.update({
             where: { id: customerId },

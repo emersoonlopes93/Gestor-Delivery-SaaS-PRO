@@ -348,7 +348,7 @@ export function AppLayout() {
         </header>
 
         <main className="flex-1 overflow-y-auto bg-background/50">
-          <div className="animate-in fade-in duration-500 p-4 md:p-8">
+          <div key={location.pathname} className="animate-in fade-in duration-500 p-4 md:p-8">
             <Outlet />
           </div>
         </main>

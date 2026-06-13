@@ -5,7 +5,7 @@ import { AuthSessionStatus, AuthSubjectType } from '@prisma/client';
 import { AuthSessionService } from './auth-session.service';
 
 describe('AuthSessionService', () => {
-  let mockPrismaService: Record<string, unknown>;
+  let mockPrismaService: any;
   let service: AuthSessionService;
 
   beforeEach(() => {
@@ -20,7 +20,7 @@ describe('AuthSessionService', () => {
       $transaction: jest.fn((callback: Function) => callback(mockPrismaService)),
     };
     service = new AuthSessionService(
-      (mockPrismaService as unknown) as PrismaService,
+      (mockPrismaService as unknown) as any,
       new JwtService(),
       { get: jest.fn((key: string, fallback?: string) => ({
         JWT_REFRESH_SECRET: 'test-refresh-secret',
