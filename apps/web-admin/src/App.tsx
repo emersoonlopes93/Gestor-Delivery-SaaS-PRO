@@ -12,6 +12,7 @@ import { AuditLogsPage } from './features/audit/AuditLogsPage';
 import { FranchiseDashboard } from './features/franchise/FranchiseDashboard';
 import IntegrationsPage from './features/integrations/pages/IntegrationsPage';
 import { GlobalMediaLibraryPage } from './features/media/GlobalMediaLibraryPage';
+import { HealthPage } from './features/operations/health/HealthPage';
 import { AuthLayout } from './layouts/AuthLayout';
 import { AppLayout } from './layouts/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -83,6 +84,16 @@ export function App() {
             element={
               <PermissionGate permission="saas.ai.read">
                 <GlobalAiAgentConfigPage />
+              </PermissionGate>
+            }
+          />
+
+          {/* Health / Operations */}
+          <Route
+            path="/health"
+            element={
+              <PermissionGate permission="saas.tenants.read">
+                <HealthPage />
               </PermissionGate>
             }
           />
