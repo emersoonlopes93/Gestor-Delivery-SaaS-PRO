@@ -1,4 +1,5 @@
-import { Controller, Get, Param, NotFoundException, Query } from '@nestjs/common';
+import { Controller, Get, Param, NotFoundException, Query, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { StorefrontService } from './storefront.service';
 import { Public } from '../common/decorators';
@@ -29,5 +30,17 @@ export class StorefrontController {
     @Query('date') date?: string,
   ) {
     return this.storefrontService.getAvailableSlots(slug, date);
+  }
+
+  @Get(':slug/manifest')
+  @Public()
+  @Throttle({ public: { limit: 120, ttl: 60 } })
+  async getManifest(
+    @Param('slug') slug: string,
+    @Res() res: Response,
+  ) {
+    const manifest = await this.storefrontService.getStorefrontManifest(slug);
+    res.setHeader('Content-Type', 'application/manifest+json');
+    return res.json(manifest);
   }
 }

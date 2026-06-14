@@ -466,4 +466,56 @@ export class StorefrontService {
 
     return this.schedulingService.getAvailableTimeSlots(targetDate, tenant.id);
   }
+
+  async getStorefrontManifest(slug: string): Promise<Record<string, unknown>> {
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { slug, status: 'active' },
+      select: { name: true },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Loja inativa ou não encontrada.');
+    }
+
+    const shortName = tenant.name.substring(0, 12);
+
+    return {
+      "id": `/${slug}`,
+      "name": `Gestor Delivery (${slug})`,
+      "short_name": shortName,
+      "description": "Cardapio, pedidos, carteira, fidelidade e tracking em tempo real.",
+      "start_url": `/${slug}`,
+      "scope": `/${slug}`,
+      "display": "standalone",
+      "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+      "orientation": "portrait",
+      "background_color": "#ffffff",
+      "theme_color": "#111827",
+      "categories": ["food", "shopping", "business"],
+      "lang": "pt-BR",
+      "icons": [
+        {
+          "src": "/icons/app-icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml",
+          "purpose": "any"
+        },
+        {
+          "src": "/icons/app-maskable.svg",
+          "sizes": "any",
+          "type": "image/svg+xml",
+          "purpose": "maskable"
+        }
+      ],
+      "shortcuts": [
+        {
+          "name": "Meus pedidos",
+          "short_name": "Pedidos",
+          "description": "Abrir historico de pedidos do cliente.",
+          "url": `/${slug}/orders`,
+          "icons": [{ "src": "/icons/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+        }
+      ]
+    };
+  }
 }
