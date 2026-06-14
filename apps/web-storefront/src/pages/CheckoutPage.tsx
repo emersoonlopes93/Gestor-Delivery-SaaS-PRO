@@ -24,6 +24,7 @@ import { CouponInput } from '../components/CouponInput';
 import { CashbackSelector } from '../components/CashbackSelector';
 import { SchedulingSelector } from '../components/SchedulingSelector';
 import { CardPayment } from '../components/CardPayment';
+import { maskPhone, maskCEP, unmask } from '@gestor/utils';
 
 interface MercadoPagoCardFormData {
   token: string;
@@ -257,7 +258,7 @@ export function CheckoutPage() {
 
   // CEP Autocomplete logic
   useEffect(() => {
-    const cleanCep = zipCode.replace(/\D/g, '');
+    const cleanCep = unmask(zipCode);
     if (cleanCep.length === 8) {
       const triggerCepLookup = async () => {
         setIsFetchingCep(true);
@@ -355,7 +356,7 @@ export function CheckoutPage() {
 
       const payload: CreateOrderDTO = {
         customerName: customerName.trim(),
-        customerPhone: customerPhone.trim().replace(/\D/g, ''),
+        customerPhone: unmask(customerPhone.trim()),
         customerEmail: formData.payer?.email || customerEmail.trim() || customer?.email || undefined,
         fulfillmentType,
         items: orderItems,
@@ -377,7 +378,7 @@ export function CheckoutPage() {
           neighborhood,
           city,
           state,
-          zipCode,
+          zipCode: unmask(zipCode),
           reference: reference || undefined,
           lat: lat ?? 0,
           lng: lng ?? 0,
@@ -461,7 +462,7 @@ export function CheckoutPage() {
 
       const payload: CreateOrderDTO = {
         customerName: customerName.trim(),
-        customerPhone: customerPhone.trim().replace(/\D/g, ''),
+        customerPhone: unmask(customerPhone.trim()),
         customerEmail: customerEmail.trim() || customer?.email || undefined,
         fulfillmentType,
         items: orderItems,
@@ -480,7 +481,7 @@ export function CheckoutPage() {
           neighborhood: neighborhood.trim(),
           city: city.trim(),
           state: state.trim(),
-          zipCode: zipCode.replace(/\D/g, ''),
+          zipCode: unmask(zipCode),
           reference: reference?.trim() || undefined,
           lat: lat ?? 0,
           lng: lng ?? 0,
@@ -605,7 +606,7 @@ export function CheckoutPage() {
         <div className="space-y-3">
           <input type="text" placeholder="Seu nome completo" value={customerName} onChange={e => setCustomerName(e.target.value)}
             className="input-premium" />
-          <input type="tel" placeholder="Seu WhatsApp (apenas números)" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+          <input type="tel" placeholder="Seu WhatsApp (apenas números)" value={maskPhone(customerPhone)} onChange={e => setCustomerPhone(e.target.value)}
             className="input-premium" />
           <input type="email" placeholder="Seu e-mail (opcional)" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
             className="input-premium" />
@@ -694,15 +695,8 @@ export function CheckoutPage() {
                   <input 
                     type="text" 
                     placeholder="00000-000" 
-                    value={zipCode} 
-                    onChange={e => {
-                      let val = e.target.value.replace(/\D/g, '');
-                      if (val.length > 8) val = val.substring(0, 8);
-                      if (val.length > 5) {
-                        val = val.substring(0, 5) + '-' + val.substring(5);
-                      }
-                      setZipCode(val);
-                    }}
+                    value={maskCEP(zipCode)} 
+                    onChange={e => setZipCode(e.target.value)}
                     className="input-premium py-2 text-xs" 
                   />
                   {isFetchingCep && (

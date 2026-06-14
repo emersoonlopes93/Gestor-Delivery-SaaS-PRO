@@ -431,6 +431,9 @@ importers:
       '@gestor/types':
         specifier: workspace:*
         version: link:../../packages/types
+      '@gestor/utils':
+        specifier: workspace:^
+        version: link:../../packages/utils
       '@tanstack/react-query':
         specifier: ^5.60.0
         version: 5.100.8(react@18.3.1)

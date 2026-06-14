@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api-client';
 import { useAuthStore } from '../../stores/auth.store';
 import type { TenantLoginResponse } from '@gestor/types';
-import { Mail, Lock, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Loader2, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 /**
  * Login page for tenant users with premium aesthetics.
@@ -11,6 +11,7 @@ import { Mail, Lock, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -39,7 +40,11 @@ export function LoginPage() {
       // Set user in store
       setUser(user);
 
-      navigate('/dashboard');
+      if (!user.onboardingCompletedAt) {
+        navigate('/onboarding');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -110,13 +115,21 @@ export function LoginPage() {
               </div>
               <input
                 id="password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="input-premium pl-12 h-12"
+                className="input-premium pl-12 pr-12 h-12"
                 placeholder="••••••••••••"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
             </div>
           </div>
         </div>

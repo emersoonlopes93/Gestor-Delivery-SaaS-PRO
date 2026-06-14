@@ -15,7 +15,8 @@ export function OnboardingGuard({ children }: OnboardingGuardProps) {
   if (isAuthenticated && user) {
     // If onboarding is not completed, restrict access but allow specific paths
     if (!user.onboardingCompletedAt) {
-      const allowedPaths = ['/onboarding', '/dashboard', '/settings', '/catalog/products'];
+      // Remove '/dashboard' to force users to finish onboarding
+      const allowedPaths = ['/onboarding', '/settings', '/catalog/products'];
       const isAllowed = allowedPaths.some(p => location.pathname === p || location.pathname.startsWith(p + '/'));
       
       if (!isAllowed) {

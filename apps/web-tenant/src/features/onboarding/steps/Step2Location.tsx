@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MapPin, Loader2 } from 'lucide-react';
 import { api } from '../../../lib/api-client';
+import { maskCEP, unmask } from '@gestor/utils';
 
 interface Step2Data {
   zipCode: string;
@@ -73,7 +74,7 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
   };
 
   const handleCepBlur = async () => {
-    const cep = form.zipCode.replace(/\D/g, '');
+    const cep = unmask(form.zipCode);
     if (cep.length !== 8) return;
     setCepLoading(true);
     try {
@@ -102,7 +103,7 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
       const coords = await geocodeNominatim(addressStr);
       const derivedAddress = `${form.street}, ${form.number}${form.complement ? ` - ${form.complement}` : ''}${form.neighborhood ? ` - ${form.neighborhood}` : ''}, ${form.city} - ${form.state}`;
       await api.patch('/tenant/settings', {
-        zipCode: form.zipCode || undefined,
+        zipCode: unmask(form.zipCode) || undefined,
         street: form.street.trim(),
         number: form.number.trim(),
         complement: form.complement.trim() || undefined,
@@ -152,10 +153,10 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
           <div className="relative">
             <input
               type="text"
-              value={form.zipCode}
-              onChange={e => setForm(f => ({ ...f, zipCode: e.target.value.replace(/\D/g, '').slice(0, 8) }))}
+              value={maskCEP(form.zipCode)}
+              onChange={e => setForm(f => ({ ...f, zipCode: e.target.value }))}
               onBlur={handleCepBlur}
-              placeholder="00000000"
+              placeholder="00000-000"
               className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-sm"
             />
             {cepLoading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 animate-spin" />}

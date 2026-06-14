@@ -18,6 +18,7 @@ interface OperatingHourForm {
 import { Clock, Pause, Save, Copy, Calendar, MapPin, Building2, ChefHat } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useNavigate } from 'react-router-dom';
+import { maskPhone, maskCEP, maskCPFCNPJ, unmask } from '@gestor/utils';
 
 async function geocodeNominatim(address: string): Promise<{ lat: number; lng: number } | null> {
   try {
@@ -132,7 +133,7 @@ export function SettingsPage() {
   };
 
   const handleCepBlur = async () => {
-    const cep = settings.zipCode?.replace(/\D/g, '');
+    const cep = unmask(settings.zipCode || '');
     if (cep && cep.length === 8) {
       try {
         const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
@@ -183,7 +184,7 @@ export function SettingsPage() {
         timezone: settings.timezone || undefined,
         currency: settings.currency || undefined,
         language: settings.language || undefined,
-        businessPhone: settings.businessPhone?.trim() || undefined,
+        businessPhone: unmask(settings.businessPhone) || undefined,
         businessEmail: settings.businessEmail?.trim() || undefined,
         address: derivedAddress,
         street: settings.street?.trim() || undefined,
@@ -192,7 +193,7 @@ export function SettingsPage() {
         neighborhood: settings.neighborhood?.trim() || undefined,
         city: settings.city?.trim() || undefined,
         state: settings.state?.trim() || undefined,
-        zipCode: settings.zipCode?.trim() || undefined,
+        zipCode: unmask(settings.zipCode) || undefined,
         lat,
         lng,
         paymentMethods: settings.paymentMethods || undefined,
@@ -201,7 +202,7 @@ export function SettingsPage() {
         bankAgency: settings.bankAgency?.trim() || undefined,
         bankAccount: settings.bankAccount?.trim() || undefined,
         logoUrl: settings.logoUrl?.trim() || undefined,
-        cnpj: settings.cnpj?.trim() || undefined,
+        cnpj: unmask(settings.cnpj) || undefined,
         razaoSocial: settings.razaoSocial?.trim() || undefined,
         inscricaoEstadual: settings.inscricaoEstadual?.trim() || undefined,
         taxRegime: settings.taxRegime || undefined,
@@ -497,9 +498,9 @@ export function SettingsPage() {
                 <div>
                   <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Telefone Comercial</label>
                   <input
-                    type="text"
-                    value={settings.businessPhone || ''}
-                    onChange={e => setSettings({...settings, businessPhone: e.target.value})}
+                    type="tel"
+                    value={maskPhone(settings.businessPhone || '')}
+                    onChange={e => setSettings({...settings, businessPhone: unmask(e.target.value)})}
                     className="input-premium"
                   />
                 </div>
@@ -526,10 +527,10 @@ export function SettingsPage() {
                     <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">CEP</label>
                     <input
                       type="text"
-                      value={settings.zipCode || ''}
-                      onChange={e => setSettings({...settings, zipCode: e.target.value.replace(/\D/g, '').slice(0, 8)})}
+                      value={maskCEP(settings.zipCode || '')}
+                      onChange={e => setSettings({...settings, zipCode: unmask(e.target.value)})}
                       onBlur={handleCepBlur}
-                      placeholder="00000-000"
+                      placeholder="Somente números"
                       className="input-premium"
                     />
                   </div>
@@ -610,13 +611,9 @@ export function SettingsPage() {
                   <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">CNPJ</label>
                   <input
                     type="text"
-                    value={settings.cnpj || ''}
-                    onChange={e => {
-                      const raw = e.target.value.replace(/\D/g, '').slice(0, 14);
-                      const formatted = raw.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-                      setSettings({...settings, cnpj: raw.length > 2 ? formatted : raw});
-                    }}
-                    placeholder="XX.XXX.XXX/XXXX-XX"
+                    value={maskCPFCNPJ(settings.cnpj || '')}
+                    onChange={e => setSettings({...settings, cnpj: unmask(e.target.value)})}
+                    placeholder="Somente números"
                     className="input-premium font-mono tracking-wider"
                   />
                 </div>

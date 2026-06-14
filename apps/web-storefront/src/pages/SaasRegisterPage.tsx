@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Store, User, Phone, Mail, Lock, ArrowRight, CheckCircle } from 'lucide-react';
+import { Store, User, Phone, Mail, Lock, ArrowRight, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { api } from '../lib/api-client';
+import { maskPhone, unmask } from '@gestor/utils';
 
 export function SaasRegisterPage() {
   const [formData, setFormData] = useState({
@@ -10,7 +11,11 @@ export function SaasRegisterPage() {
     phone: '',
     email: '',
     password: '',
+    confirmPassword: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -19,9 +24,23 @@ export function SaasRegisterPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('As senhas não conferem.');
+      setLoading(false);
+      return;
+    }
     
     try {
-      await api.post('/auth/tenant/register', formData);
+      const payload = {
+        ownerName: formData.ownerName,
+        shopName: formData.shopName,
+        email: formData.email,
+        password: formData.password,
+        phone: unmask(formData.phone), // enviar normalizado
+      };
+
+      await api.post('/auth/tenant/register', payload);
       setSuccess(true);
     } catch (err: unknown) {
       const e = err as Error;
@@ -32,7 +51,13 @@ export function SaasRegisterPage() {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    
+    if (name === 'phone') {
+      setFormData({ ...formData, phone: maskPhone(value) });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
   };
 
   if (success) {
@@ -161,13 +186,47 @@ export function SaasRegisterPage() {
                 </div>
                 <input
                   name="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   value={formData.password}
                   onChange={handleChange}
-                  className="appearance-none block w-full pl-10 px-3 py-3 border border-[var(--storefront-border)] rounded-xl shadow-sm placeholder-[var(--storefront-muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--storefront-primary)] sm:text-sm bg-[var(--storefront-background)] text-[var(--storefront-foreground)] focus:bg-[var(--storefront-card)] transition-colors"
-                  placeholder="Minimo 8 caracteres"
+                  className="appearance-none block w-full pl-10 pr-10 px-3 py-3 border border-[var(--storefront-border)] rounded-xl shadow-sm placeholder-[var(--storefront-muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--storefront-primary)] sm:text-sm bg-[var(--storefront-background)] text-[var(--storefront-foreground)] focus:bg-[var(--storefront-card)] transition-colors"
+                  placeholder="Mínimo 8 caracteres"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-[var(--storefront-muted-foreground)] hover:text-[var(--storefront-foreground)] transition-colors focus:outline-none"
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[var(--storefront-foreground)]">Confirmar Senha</label>
+              <div className="mt-1 relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-[var(--storefront-muted-foreground)]" />
+                </div>
+                <input
+                  name="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  required
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className="appearance-none block w-full pl-10 pr-10 px-3 py-3 border border-[var(--storefront-border)] rounded-xl shadow-sm placeholder-[var(--storefront-muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--storefront-primary)] sm:text-sm bg-[var(--storefront-background)] text-[var(--storefront-foreground)] focus:bg-[var(--storefront-card)] transition-colors"
+                  placeholder="Mínimo 8 caracteres"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-[var(--storefront-muted-foreground)] hover:text-[var(--storefront-foreground)] transition-colors focus:outline-none"
+                  aria-label={showConfirmPassword ? "Ocultar senha" : "Mostrar senha"}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
             </div>
 
@@ -186,3 +245,4 @@ export function SaasRegisterPage() {
     </div>
   );
 }
+

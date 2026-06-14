@@ -47,3 +47,73 @@ export function buildPagination(total: number, page: number, pageSize: number) {
 export function generateId(): string {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
+
+// ============================================================================
+// MASKS & FORMATTERS
+// ============================================================================
+
+/**
+ * Removes all non-digit characters from a string.
+ */
+export function unmask(value: string | undefined | null): string {
+  if (!value) return '';
+  return value.replace(/\D/g, '');
+}
+
+/**
+ * Masks a phone number: (00) 0000-0000 or (00) 00000-0000
+ */
+export function maskPhone(value: string | undefined | null): string {
+  const digits = unmask(value);
+  if (!digits) return '';
+
+  if (digits.length <= 10) {
+    return digits
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{4})(\d)/, '$1-$2')
+      .substring(0, 14);
+  }
+  
+  return digits
+    .replace(/(\d{2})(\d)/, '($1) $2')
+    .replace(/(\d{5})(\d)/, '$1-$2')
+    .substring(0, 15);
+}
+
+/**
+ * Masks a CEP: 00000-000
+ */
+export function maskCEP(value: string | undefined | null): string {
+  const digits = unmask(value);
+  if (!digits) return '';
+
+  return digits
+    .replace(/(\d{5})(\d)/, '$1-$2')
+    .substring(0, 9);
+}
+
+/**
+ * Masks a CPF (000.000.000-00) or CNPJ (00.000.000/0000-00) dynamically.
+ */
+export function maskCPFCNPJ(value: string | undefined | null): string {
+  const digits = unmask(value);
+  if (!digits) return '';
+
+  if (digits.length <= 11) {
+    // CPF
+    return digits
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+      .substring(0, 14);
+  }
+  
+  // CNPJ
+  return digits
+    .replace(/(\d{2})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1/$2')
+    .replace(/(\d{4})(\d{1,2})$/, '$1-$2')
+    .substring(0, 18);
+}
+
