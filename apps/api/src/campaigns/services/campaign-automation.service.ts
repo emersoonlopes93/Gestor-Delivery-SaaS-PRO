@@ -84,6 +84,30 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
     });
   }
 
+  async getFeedbackMetrics(tenantId: string) {
+    const feedbacks = await this.prisma.orderFeedback.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      include: {
+        order: { select: { orderNumber: true } },
+        customer: { select: { name: true, phone: true } },
+      },
+    });
+
+    const total = await this.prisma.orderFeedback.count({ where: { tenantId } });
+    const aggregations = await this.prisma.orderFeedback.aggregate({
+      where: { tenantId },
+      _avg: { rating: true },
+    });
+
+    return {
+      feedbacks,
+      total,
+      averageRating: aggregations._avg.rating || 0,
+    };
+  }
+
   async getReuseInventory(tenantId: string) {
     const [recoveryPreview, abandonedCarts, insights, reorderCandidates] = await Promise.all([
       this.recoveryCampaignService.preview(tenantId),
@@ -233,7 +257,7 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
     return result;
   }
 
-  private async getTemplateVariables(tenantId: string, customer: { name: string }, order?: { orderNumber: string, total: import('@prisma/client').Prisma.Decimal | number }, config?: { config: import('@prisma/client').Prisma.JsonValue }) {
+  private async getTemplateVariables(tenantId: string, customer: { name: string }, order?: { orderNumber: string, total: import('@prisma/client').Prisma.Decimal | number, publicTrackingToken?: string }, config?: { config: import('@prisma/client').Prisma.JsonValue }) {
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
     const storeName = tenant?.name || 'nossa loja';
     const menuLink = `https://${tenant?.slug}.gestordelivery.com`;
@@ -246,6 +270,7 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
       '{cupom}': couponCode,
       '{pedido}': order ? `#${order.orderNumber}` : '',
       '{total}': order ? `R$ ${Number(order.total).toFixed(2).replace('.', ',')}` : '',
+      '{link_feedback}': order && order.publicTrackingToken && tenant ? `https://${tenant.slug}.gestordelivery.com/feedback/${order.publicTrackingToken}` : '',
     };
   }
 
@@ -274,6 +299,7 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
           status: { in: ['completed'] },
           customerId: { not: null },
           updatedAt: { gte: limitWindow, lte: limitDate },
+          OrderFeedback: null,
         },
         include: { customer: true },
       });

@@ -63,6 +63,12 @@ export class CampaignsController {
     };
   }
 
+  @Get('automations/feedbacks')
+  @Permissions('crm.read')
+  async feedbacks(@Request() req: AuthenticatedRequest) {
+    return this.campaignAutomationService.getFeedbackMetrics(req.user.tenantId);
+  }
+
   @Get('automations/config')
   @Permissions('crm.read')
   async getAutomationConfigs(@Request() req: AuthenticatedRequest) {

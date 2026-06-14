@@ -1,6 +1,7 @@
 {
   "rewrites": [
     { "source": "/api/:path*", "destination": "https://sudo-suspend-web-service-gestor-delivery.onrender.com/api/:path*" },
+    { "source": "/manifest/:slug.webmanifest", "destination": "https://sudo-suspend-web-service-gestor-delivery.onrender.com/public/storefront/:slug/manifest" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

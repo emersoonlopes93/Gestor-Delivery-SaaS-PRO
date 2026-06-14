@@ -1,18 +1,15 @@
 import { useEffect } from 'react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3333';
-
 export function useDynamicManifest(tenantSlug?: string) {
   useEffect(() => {
-    if (!tenantSlug) return;
-
     // Find the manifest link tag
     let manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement;
     
-    const manifestUrl = `${API_URL}/public/storefront/${tenantSlug}/manifest`;
+    // We proxy /manifest/:slug.webmanifest to the backend via vercel.json
+    // or intercept it locally via Vite plugin.
+    const manifestUrl = tenantSlug ? `/manifest/${tenantSlug}.webmanifest` : `/manifest.webmanifest`;
 
-    // Se a tag existir e já estiver apontando para o arquivo dinâmico correto, não faz nada
-    if (manifestLink && manifestLink.href === manifestUrl) {
+    if (manifestLink && manifestLink.href.includes(manifestUrl)) {
       return;
     }
 

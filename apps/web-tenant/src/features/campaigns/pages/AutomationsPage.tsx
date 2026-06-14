@@ -65,6 +65,23 @@ type InsightsPayload = {
   insights: Array<{ type: string; severity: 'info' | 'success' | 'warning'; message: string; value?: number }>;
 };
 
+type FeedbackPayload = {
+  id: string;
+  rating: number;
+  comment?: string;
+  publicReviewClicked: boolean;
+  clickedChannel?: string;
+  createdAt: string;
+  order?: { orderNumber: string };
+  customer?: { name: string; phone: string };
+};
+
+type FeedbackMetricsPayload = {
+  feedbacks: FeedbackPayload[];
+  total: number;
+  averageRating: number;
+};
+
 function formatCurrency(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -142,6 +159,14 @@ export function AutomationsPage() {
     queryFn: async () => {
       const res = await api.get<InsightsPayload>('/analytics/insights');
       return res.success ? res.data : { insights: [] };
+    },
+  });
+
+  const { data: feedbacksData } = useQuery({
+    queryKey: ['automation-feedbacks'],
+    queryFn: async () => {
+      const res = await api.get<FeedbackMetricsPayload>('/campaigns/automations/feedbacks');
+      return res.success ? res.data : null;
     },
   });
 
@@ -338,14 +363,59 @@ export function AutomationsPage() {
             onSave={saveMutation.mutate}
             defaultTemplate="Olá {nome}, recebemos seu pedido {pedido}! O que achou? Avalie nossa loja!"
             extraConfigUI={(config: Record<string, unknown>, setConfig: (c: Record<string, unknown>) => void) => (
-              <div>
-                <label className="text-sm font-medium">Aguardar (horas)</label>
-                <input
-                  type="number"
-                  className="w-full mt-1 p-2 border rounded-md text-sm"
-                  value={config.delayHours as number ?? 2}
-                  onChange={(e) => setConfig({ ...config, delayHours: Number(e.target.value) })}
-                />
+              <div className="flex flex-col gap-4 mt-2">
+                <div>
+                  <label className="text-sm font-medium">Aguardar (horas)</label>
+                  <input
+                    type="number"
+                    className="w-full mt-1 p-2 border rounded-md text-sm"
+                    value={config.delayHours as number ?? 2}
+                    onChange={(e) => setConfig({ ...config, delayHours: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="pt-3 border-t border-border">
+                  <h4 className="text-sm font-semibold mb-2">Links para Avaliação Pública (Notas 4 e 5)</h4>
+                  <div className="space-y-2">
+                    <input
+                      type="url"
+                      placeholder="URL Google Meu Negócio"
+                      className="w-full p-2 border rounded-md text-sm"
+                      value={(config.googleReviewUrl as string) || ''}
+                      onChange={(e) => setConfig({ ...config, googleReviewUrl: e.target.value })}
+                    />
+                    <input
+                      type="url"
+                      placeholder="URL Instagram"
+                      className="w-full p-2 border rounded-md text-sm"
+                      value={(config.instagramUrl as string) || ''}
+                      onChange={(e) => setConfig({ ...config, instagramUrl: e.target.value })}
+                    />
+                    <input
+                      type="url"
+                      placeholder="URL Facebook"
+                      className="w-full p-2 border rounded-md text-sm"
+                      value={(config.facebookUrl as string) || ''}
+                      onChange={(e) => setConfig({ ...config, facebookUrl: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="pt-3 border-t border-border">
+                  <h4 className="text-sm font-semibold mb-2">Mensagens da Tela de Agradecimento</h4>
+                  <div className="space-y-2">
+                    <textarea
+                      placeholder="Mensagem para notas baixas (1 a 3)"
+                      className="w-full p-2 border rounded-md text-sm min-h-[60px]"
+                      value={(config.lowRatingMessage as string) || ''}
+                      onChange={(e) => setConfig({ ...config, lowRatingMessage: e.target.value })}
+                    />
+                    <textarea
+                      placeholder="Mensagem para notas altas (4 a 5)"
+                      className="w-full p-2 border rounded-md text-sm min-h-[60px]"
+                      value={(config.highRatingMessage as string) || ''}
+                      onChange={(e) => setConfig({ ...config, highRatingMessage: e.target.value })}
+                    />
+                  </div>
+                </div>
               </div>
             )}
           />
@@ -444,6 +514,57 @@ export function AutomationsPage() {
           ))}
         </div>
       </Card>
+
+      {feedbacksData && (
+        <div className="pt-6 border-t border-border">
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="text-xl font-bold">Feedbacks Recentes</h2>
+            <StatusBadge status="info">Média {feedbacksData.averageRating.toFixed(1)} / 5.0 ({feedbacksData.total} avaliações)</StatusBadge>
+          </div>
+          {feedbacksData.feedbacks.length > 0 ? (
+            <Card className="p-0 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-muted text-muted-foreground uppercase text-xs">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Data</th>
+                      <th className="px-4 py-3 font-semibold">Pedido</th>
+                      <th className="px-4 py-3 font-semibold">Cliente</th>
+                      <th className="px-4 py-3 font-semibold">Nota</th>
+                      <th className="px-4 py-3 font-semibold">Comentário</th>
+                      <th className="px-4 py-3 font-semibold">Avaliação Pública</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {feedbacksData.feedbacks.map((fb: FeedbackPayload) => (
+                      <tr key={fb.id} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{new Date(fb.createdAt).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 font-medium">#{fb.order?.orderNumber}</td>
+                        <td className="px-4 py-3">{fb.customer?.name || 'Cliente Oculto'}</td>
+                        <td className="px-4 py-3">
+                          <StatusBadge status={fb.rating >= 4 ? 'success' : fb.rating === 3 ? 'warning' : 'error'}>{fb.rating} Estrelas</StatusBadge>
+                        </td>
+                        <td className="px-4 py-3 max-w-[200px] truncate" title={fb.comment}>{fb.comment || '-'}</td>
+                        <td className="px-4 py-3">
+                          {fb.publicReviewClicked ? (
+                            <StatusBadge status="success">Clicou ({fb.clickedChannel})</StatusBadge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          ) : (
+            <Card className="text-center py-8">
+              <p className="text-muted-foreground">Nenhum feedback recebido ainda.</p>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   );
 }
