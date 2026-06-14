@@ -17,7 +17,9 @@ WORKDIR /app
 FROM base AS dependencies
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json turbo.json* ./
 COPY packages/ ./packages/
-COPY apps/api/package.json apps/api/
+COPY apps/ ./apps/
+# Limpar arquivos não essenciais para manter o cache de dependências rápido
+RUN find packages apps -type f -not -name "package.json" -not -name "tsconfig.json" -delete
 
 RUN pnpm install --frozen-lockfile
 
@@ -29,15 +31,19 @@ COPY . .
 # Gerar Prisma Client
 RUN pnpm --filter @gestor/api prisma:generate
 
-# Buildar apenas a API
-RUN pnpm --filter @gestor/api build
+# Buildar a API e todas as suas dependências internas
+RUN pnpm --filter @gestor/api... build
 
 # Stage 4: Runner
 FROM base AS runner
 WORKDIR /app
 
-# Copiar node_modules e artefatos da API
+# Copiar pacotes internos construídos
+COPY --from=builder /app/packages ./packages
+
+# Copiar node_modules globais e do app
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
 COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
