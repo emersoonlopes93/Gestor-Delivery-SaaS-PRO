@@ -1,9 +1,12 @@
+# Stage 1: Base
 FROM node:20-slim AS base
 
+# Instalar libs necessárias para Prisma e node-gyp
 RUN apt-get update -y && \
-    apt-get install -y openssl ca-certificates && \
+    apt-get install -y openssl ca-certificates python3 make g++ && \
     rm -rf /var/lib/apt/lists/*
 
+# Configurar pnpm via corepack
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
@@ -15,18 +18,25 @@ FROM base AS dependencies
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json turbo.json* ./
 COPY packages/ ./packages/
 COPY apps/api/package.json apps/api/
+
 RUN pnpm install --frozen-lockfile
 
 # Stage 3: Build API
 FROM dependencies AS builder
 WORKDIR /app
 COPY . .
+
+# Gerar Prisma Client
 RUN pnpm --filter @gestor/api prisma:generate
+
+# Buildar apenas a API
 RUN pnpm --filter @gestor/api build
 
 # Stage 4: Runner
 FROM base AS runner
 WORKDIR /app
+
+# Copiar node_modules e artefatos da API
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
@@ -36,6 +46,7 @@ COPY --from=builder /app/apps/api/docker-entrypoint.sh ./apps/api/docker-entrypo
 ENV NODE_ENV=production
 EXPOSE 3333
 
+# Instalar Prisma CLI global para migrations
 RUN npm i -g prisma
 RUN chmod +x ./apps/api/docker-entrypoint.sh
 
