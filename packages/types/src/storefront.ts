@@ -139,7 +139,7 @@ export interface StorefrontCategoryPayload {
   slug: string;
   order: number;
   templateType?: string; // Added for compatibility
-  templateConfig?: any;
+  templateConfig?: Record<string, unknown>;
   type?: 'category' | 'featured' | 'promotions' | 'new' | 'combos';
   isVirtual?: boolean;
   products: StorefrontProductPayload[];

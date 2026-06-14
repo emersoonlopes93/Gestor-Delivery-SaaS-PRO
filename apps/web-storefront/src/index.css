@@ -96,6 +96,15 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* Animação de entrada do banner iOS PWA */
+  @keyframes slide-up {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  .animate-slide-up {
+    animation: slide-up 0.35s cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
 }
 
 @layer components {

@@ -8,7 +8,8 @@ import {
   StorefrontCategoryPayload, 
   StorefrontComboPayload, 
   StorefrontProductPayload,
-  StorefrontCustomizationPayload
+  StorefrontCustomizationPayload,
+  ProductBadge,
 } from '@gestor/types';
 import { 
   normalizeStorefrontTheme,
@@ -274,7 +275,7 @@ export class StorefrontService {
             };
           })
           .map((p) => {
-            const badges: any[] = [];
+            const badges: ProductBadge[] = [];
             
             // Promo badge
             if (p.compareAtPrice && p.compareAtPrice > p.basePrice) {
@@ -388,7 +389,7 @@ export class StorefrontService {
         };
       })
       .map((c) => {
-        const badges: any[] = [];
+        const badges: ProductBadge[] = [];
         badges.push({ id: 'combo', label: 'Combo', variant: 'neutral', priority: 4 });
         if (tenant.settings?.cashbackEnabled && (tenant.settings?.cashbackPercent ?? 0) > 0) {
           badges.push({ id: 'cashback', label: 'Cashback', variant: 'success', priority: 5 });
