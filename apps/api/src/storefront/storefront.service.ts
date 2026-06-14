@@ -470,52 +470,81 @@ export class StorefrontService {
   async getStorefrontManifest(slug: string): Promise<Record<string, unknown>> {
     const tenant = await this.prisma.tenant.findFirst({
       where: { slug, status: 'active' },
-      select: { name: true },
+      select: { name: true, settings: { select: { logoUrl: true } } },
     });
 
     if (!tenant) {
       throw new NotFoundException('Loja inativa ou não encontrada.');
     }
 
-    const shortName = tenant.name.substring(0, 12);
+    const tenantName = tenant.name;
+    const shortName = tenantName.substring(0, 12);
+    const rawLogoUrl = tenant.settings?.logoUrl ?? null;
+
+    // Base URL do frontend para garantir que ícones relativos se tornem absolutos.
+    // O manifest é servido pela API mas o scope é o frontend; ícones relativos
+    // são resolvidos em relação ao scope, portanto precisam ser absolutos quando
+    // apontam para recursos da API (uploads).
+    const frontendBase = (process.env.FRONTEND_URL ?? '').replace(/\/$/, '');
+
+    // Normaliza a URL da logo para absoluta
+    let absoluteLogoUrl: string | null = null;
+    if (rawLogoUrl) {
+      absoluteLogoUrl = rawLogoUrl.startsWith('http')
+        ? rawLogoUrl
+        : `${frontendBase}${rawLogoUrl}`;
+    }
+
+    // Ícones: se a loja tem logo, usa ela como ícone principal.
+    // Sempre inclui os ícones SVG genéricos como fallback.
+    const icons: Record<string, unknown>[] = [];
+
+    if (absoluteLogoUrl) {
+      const ext = absoluteLogoUrl.split('.').pop()?.split('?')[0]?.toLowerCase() ?? '';
+      const mimeMap: Record<string, string> = {
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        webp: 'image/webp',
+      };
+      const mimeType = mimeMap[ext] ?? 'image/png';
+      icons.push(
+        { src: absoluteLogoUrl, sizes: '192x192', type: mimeType, purpose: 'any' },
+        { src: absoluteLogoUrl, sizes: '512x512', type: mimeType, purpose: 'maskable' },
+      );
+    }
+
+    // Fallback SVG genérico sempre presente (ícones públicos do frontend)
+    const svgBase = frontendBase || '';
+    icons.push(
+      { src: `${svgBase}/icons/app-icon.svg`, sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+      { src: `${svgBase}/icons/app-maskable.svg`, sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
+    );
 
     return {
-      "id": `/${slug}`,
-      "name": `Gestor Delivery (${slug})`,
-      "short_name": shortName,
-      "description": "Cardapio, pedidos, carteira, fidelidade e tracking em tempo real.",
-      "start_url": `/${slug}`,
-      "scope": `/${slug}`,
-      "display": "standalone",
-      "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
-      "orientation": "portrait",
-      "background_color": "#ffffff",
-      "theme_color": "#111827",
-      "categories": ["food", "shopping", "business"],
-      "lang": "pt-BR",
-      "icons": [
+      id: `/${slug}`,
+      name: tenantName,
+      short_name: shortName,
+      description: 'Cardapio, pedidos, carteira, fidelidade e tracking em tempo real.',
+      start_url: `/${slug}`,
+      scope: `/${slug}`,
+      display: 'standalone',
+      display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
+      orientation: 'portrait',
+      background_color: '#ffffff',
+      theme_color: '#111827',
+      categories: ['food', 'shopping', 'business'],
+      lang: 'pt-BR',
+      icons,
+      shortcuts: [
         {
-          "src": "/icons/app-icon.svg",
-          "sizes": "any",
-          "type": "image/svg+xml",
-          "purpose": "any"
+          name: 'Meus pedidos',
+          short_name: 'Pedidos',
+          description: 'Abrir historico de pedidos do cliente.',
+          url: `/${slug}/orders`,
+          icons: [{ src: '/icons/app-icon.svg', sizes: 'any', type: 'image/svg+xml' }],
         },
-        {
-          "src": "/icons/app-maskable.svg",
-          "sizes": "any",
-          "type": "image/svg+xml",
-          "purpose": "maskable"
-        }
       ],
-      "shortcuts": [
-        {
-          "name": "Meus pedidos",
-          "short_name": "Pedidos",
-          "description": "Abrir historico de pedidos do cliente.",
-          "url": `/${slug}/orders`,
-          "icons": [{ "src": "/icons/app-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
-        }
-      ]
     };
   }
 }
