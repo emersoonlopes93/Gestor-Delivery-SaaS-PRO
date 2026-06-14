@@ -450,7 +450,7 @@ export function StorefrontPage() {
                       price: product.basePrice,
                       compareAtPrice: product.compareAtPrice,
                       isAvailable: product.isAvailable,
-                      badges: product.badges as any,
+                      badges: product.badges,
                     }}
                     layout={effectiveProductLayout}
                     imageMode={layoutSettings.productImageMode}
