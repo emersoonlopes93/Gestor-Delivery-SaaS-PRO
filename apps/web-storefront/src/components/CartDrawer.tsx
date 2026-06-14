@@ -32,6 +32,7 @@ export function CartDrawer({ onClose, upsells, minimumOrderValue }: CartDrawerPr
       complementGroups: [],
       upsellLinks: [],
       upsells: [],
+      badges: [],
     };
     addItem({
       product: virtualProduct,

@@ -18,6 +18,8 @@ import {
   Wallet,
   AlertCircle,
   ClipboardList,
+  Calendar,
+  Coins,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { ProductDetailsModal } from '../components/ProductDetailsModal';
