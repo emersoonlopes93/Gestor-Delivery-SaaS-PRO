@@ -33,17 +33,17 @@ export function GoalsPage() {
   );
 
   return (
-    <div className="p-6 space-y-8 bg-gray-50 dark:bg-gray-900/50 min-h-screen">
+    <div className="p-6 space-y-8 bg-background min-h-screen">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Metas e Desempenho</h1>
-          <p className="text-gray-500 dark:text-gray-400">Defina objetivos e acompanhe o crescimento da sua loja.</p>
+          <h1 className="text-2xl font-bold text-foreground">Metas e Desempenho</h1>
+          <p className="text-muted-foreground">Defina objetivos e acompanhe o crescimento da sua loja.</p>
         </div>
         
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors shadow-sm"
+          className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-all shadow-sm"
         >
           <Plus size={20} /> Nova Meta
         </button>
@@ -51,17 +51,17 @@ export function GoalsPage() {
 
       {/* Goals Dashboard Area */}
       {goals?.length === 0 ? (
-        <div className="bg-white dark:bg-gray-900 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-2xl p-12 text-center">
-          <div className="bg-primary-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Target className="text-primary-600" size={32} />
+        <div className="bg-card border-2 border-dashed border-border rounded-2xl p-12 text-center">
+          <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Target className="text-primary" size={32} />
           </div>
-          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">Nenhuma meta definida</h3>
-          <p className="text-gray-500 dark:text-gray-400 max-w-sm mx-auto mt-2">
+          <h3 className="text-lg font-bold text-foreground">Nenhuma meta definida</h3>
+          <p className="text-muted-foreground max-w-sm mx-auto mt-2">
             Comece definindo objetivos de faturamento, volume de pedidos ou eficiência para motivar sua equipe.
           </p>
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="mt-6 text-primary-600 font-bold hover:underline"
+            className="mt-6 text-primary font-bold hover:underline"
           >
             Criar minha primeira meta
           </button>
@@ -92,19 +92,19 @@ function GoalListItem({ goal, onDelete }: { goal: GoalDTO, onDelete: () => void 
   const isRevenue = goal.type === GoalType.REVENUE;
   const progressColor = goal.progressPercentage >= 100 
     ? 'bg-green-500' 
-    : goal.trend === 'behind' ? 'bg-red-500' : 'bg-primary-500';
+    : goal.trend === 'behind' ? 'bg-red-500' : 'bg-primary';
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden hover:border-primary-200 transition-all">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden hover:border-primary/50 transition-all">
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-4">
-            <div className={`p-3 rounded-lg ${goal.progressPercentage >= 100 ? 'bg-green-50' : 'bg-primary-50' }`}>
-              <Target size={24} className={goal.progressPercentage >= 100 ? 'text-green-600' : 'text-primary-600'} />
+            <div className={`p-3 rounded-lg ${goal.progressPercentage >= 100 ? 'bg-green-500/10' : 'bg-primary/10' }`}>
+              <Target size={24} className={goal.progressPercentage >= 100 ? 'text-green-600 dark:text-green-400' : 'text-primary'} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">{goal.name}</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-3">
+              <h3 className="text-lg font-bold text-foreground">{goal.name}</h3>
+              <p className="text-sm text-muted-foreground flex items-center gap-3">
                 <span className="flex items-center gap-1"><Calendar size={14} /> {new Date(goal.startDate).toLocaleDateString()} - {new Date(goal.endDate).toLocaleDateString()}</span>
                 {goal.responsibleId && <span className="flex items-center gap-1"><User size={14} /> {goal.responsibleId}</span>}
               </p>
@@ -114,13 +114,13 @@ function GoalListItem({ goal, onDelete }: { goal: GoalDTO, onDelete: () => void 
           <div className="flex items-center gap-3">
              <div className="text-right">
               <span className={`text-xs font-bold uppercase px-2 py-1 rounded-full ${
-                goal.trend === 'on_track' ? 'bg-green-100 text-green-700' :
-                goal.trend === 'at_risk' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                goal.trend === 'on_track' ? 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400' :
+                goal.trend === 'at_risk' ? 'bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400' : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-400'
               }`}>
                 {goal.trend === 'on_track' ? 'No Prazo' : goal.trend === 'at_risk' ? 'Em Risco' : 'Atrasado'}
               </span>
             </div>
-            <button onClick={onDelete} className="p-2 text-gray-400 hover:text-red-600 transition-colors">
+            <button onClick={onDelete} className="p-2 text-muted-foreground hover:text-destructive transition-colors">
               <Trash2 size={18} />
             </button>
           </div>
@@ -129,12 +129,12 @@ function GoalListItem({ goal, onDelete }: { goal: GoalDTO, onDelete: () => void 
         {/* Progress Bar Area */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-gray-700 dark:text-gray-300">Progresso: {goal.progressPercentage.toFixed(1)}%</span>
-            <span className="text-gray-500 dark:text-gray-400 font-medium">
+            <span className="font-medium text-foreground">Progresso: {goal.progressPercentage.toFixed(1)}%</span>
+            <span className="text-muted-foreground font-medium">
               {isRevenue ? `R$ ${goal.currentValue.toLocaleString()}` : goal.currentValue} / {isRevenue ? `R$ ${goal.targetValue.toLocaleString()}` : goal.targetValue}
             </span>
           </div>
-          <div className="w-full bg-gray-100 h-3 rounded-full overflow-hidden">
+          <div className="w-full bg-muted h-3 rounded-full overflow-hidden">
             <div 
               className={`h-full transition-all duration-1000 ${progressColor}`} 
               style={{ width: `${Math.min(goal.progressPercentage, 100)}%` }}
@@ -144,13 +144,13 @@ function GoalListItem({ goal, onDelete }: { goal: GoalDTO, onDelete: () => void 
 
         {/* Subgoals (Simplified) */}
         {goal.subGoals && goal.subGoals.length > 0 && (
-          <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-800">
-            <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Desdobramentos ({goal.subGoals.length})</p>
+          <div className="mt-6 pt-6 border-t border-border">
+            <p className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-4">Desdobramentos ({goal.subGoals.length})</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {goal.subGoals.map(sg => (
-                <div key={sg.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800">
-                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{sg.name}</span>
-                   <span className="text-sm font-bold text-primary-600">{sg.progressPercentage.toFixed(0)}%</span>
+                <div key={sg.id} className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border">
+                   <span className="text-sm font-medium text-foreground">{sg.name}</span>
+                   <span className="text-sm font-bold text-primary">{sg.progressPercentage.toFixed(0)}%</span>
                 </div>
               ))}
             </div>

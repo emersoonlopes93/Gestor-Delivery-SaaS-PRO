@@ -126,7 +126,7 @@ export function QrCodesPage() {
               href={publicUrl} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="w-full bg-card hover:bg-card text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-xl shadow-gray-900/20"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-xl shadow-primary/20"
             >
                Testar Cardápio Online
                <ExternalLink size={14} />

@@ -121,15 +121,15 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden transform transition-all animate-in zoom-in-95 duration-300">
-        <div className="px-8 py-5 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50/80">
+      <div className="bg-card rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden transform transition-all animate-in zoom-in-95 duration-300 border border-border">
+        <div className="px-8 py-5 border-b border-border flex justify-between items-center bg-muted/50">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+            <h2 className="text-xl font-bold text-foreground">
               {editingIngredient ? 'Refatorar Insumo' : 'Novo Insumo Mestre'}
             </h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Defina a unidade base para precisão na ficha técnica.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Defina a unidade base para precisão na ficha técnica.</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-600 dark:text-gray-400 transition-all">
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-all">
             <span className="text-2xl leading-none">&times;</span>
           </button>
         </div>
@@ -138,38 +138,38 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
           {/* BLOCO A - DADOS DO INSUMO */}
           <div className="space-y-5">
             <div className="flex items-center gap-2 mb-2">
-              <div className="w-1 h-5 bg-primary-500 rounded-full"></div>
-              <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Bloco A — Dados do Insumo</h3>
+              <div className="w-1 h-5 bg-primary rounded-full"></div>
+              <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Bloco A — Dados do Insumo</h3>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Nome do Insumo *</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase">Nome do Insumo *</label>
                 <input
                   type="text"
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all"
+                  className="w-full px-4 py-2.5 rounded-xl border border-input focus:ring-2 focus:ring-primary focus:border-transparent outline-none bg-input-bg text-foreground transition-all"
                   placeholder="Ex: Açúcar Refinado, Farinha de Trigo"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">SKU / Categoria</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase">SKU / Categoria</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={formData.sku}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    className="w-1/2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 focus:ring-2 focus:ring-primary-500 outline-none font-mono text-sm"
+                    className="w-1/2 px-4 py-2.5 rounded-xl border border-input focus:ring-2 focus:ring-primary outline-none bg-input-bg text-foreground font-mono text-sm"
                     placeholder="Código"
                   />
                   <input
                     type="text"
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-1/2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 focus:ring-2 focus:ring-primary-500 outline-none text-sm"
+                    className="w-1/2 px-4 py-2.5 rounded-xl border border-input focus:ring-2 focus:ring-primary outline-none bg-input-bg text-foreground text-sm"
                     placeholder="Ex: Secos"
                   />
                 </div>
@@ -178,51 +178,51 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Unidade Base (Consumo) *</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase">Unidade Base (Consumo) *</label>
                 <select
                   value={formData.unit}
                   onChange={(e) => setFormData({ ...formData, unit: e.target.value as UnitType })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 focus:ring-2 focus:ring-primary-500 outline-none appearance-none bg-white dark:bg-gray-900 cursor-pointer"
+                  className="w-full px-4 py-2.5 rounded-xl border border-input focus:ring-2 focus:ring-primary outline-none appearance-none bg-input-bg text-foreground cursor-pointer"
                 >
                   {unitOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                 </select>
-                <p className="text-[10px] text-gray-400">Usada na ficha técnica (Ex: g, ml)</p>
+                <p className="text-[10px] text-muted-foreground">Parâmetro da ficha técnica (Ex: g, ml)</p>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Fator de Conversão</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase">Fator de Conversão</label>
                 <input
                   type="number"
                   step="0.0001"
                   value={formData.conversionFactor}
                   onChange={(e) => setFormData({ ...formData, conversionFactor: Number(e.target.value) })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 focus:ring-2 focus:ring-primary-500 outline-none text-sm"
+                  className="w-full px-4 py-2.5 rounded-xl border border-input focus:ring-2 focus:ring-primary outline-none bg-input-bg text-foreground text-sm"
                 />
-                <p className="text-[10px] text-gray-400">Ex: 1000 se base=g e compra=kg</p>
+                <p className="text-[10px] text-muted-foreground">Ex: 1000 se base=g e compra=kg</p>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase">Estoque Mínimo</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase">Estoque Mínimo</label>
                 <input
                   type="number"
                   step="0.01"
                   value={formData.minStock}
                   onChange={(e) => setFormData({ ...formData, minStock: Number(e.target.value) })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-800 focus:ring-2 focus:ring-primary-500 outline-none"
+                  className="w-full px-4 py-2.5 rounded-xl border border-input focus:ring-2 focus:ring-primary outline-none bg-input-bg text-foreground"
                 />
               </div>
             </div>
           </div>
 
-          <hr className="my-8 border-gray-100 dark:border-gray-800" />
+          <hr className="my-8 border-border" />
 
           {/* BLOCO B - COMPRA INICIAL / ENTRADA INICIAL */}
           {!editingIngredient && (
             <div className="space-y-5">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-1 h-5 bg-emerald-500 rounded-full"></div>
-                  <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider">Bloco B — Entrada de Estoque</h3>
+                  <div className="w-1 h-5 bg-green-500 rounded-full"></div>
+                  <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Bloco B — Entrada de Estoque</h3>
                 </div>
                 <label className="inline-flex items-center cursor-pointer">
                   <input 
@@ -231,16 +231,16 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
                     checked={formData.initialPurchaseActive}
                     onChange={(e) => setFormData({ ...formData, initialPurchaseActive: e.target.checked })}
                   />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white dark:bg-gray-900 after:border-gray-300 dark:border-gray-700 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                  <span className="ml-3 text-sm font-medium text-gray-600 dark:text-gray-400">Lançar compra agora</span>
+                  <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                  <span className="ml-3 text-sm font-medium text-muted-foreground">Lançar compra agora</span>
                 </label>
               </div>
 
               {formData.initialPurchaseActive && (
-                <div className="bg-emerald-50/50 p-6 rounded-2xl border border-emerald-100 space-y-5 animate-in slide-in-from-top-2 duration-300">
+                <div className="bg-green-500/10 p-6 rounded-2xl border border-green-500/20 space-y-5 animate-in slide-in-from-top-2 duration-300">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-emerald-800 uppercase">Quantidade Comprada</label>
+                      <label className="text-xs font-bold text-green-700 dark:text-green-400 uppercase">Quantidade Comprada</label>
                       <input
                         type="number"
                         step="0.01"
@@ -250,26 +250,26 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
                           ...formData, 
                           initialPurchase: { ...formData.initialPurchase!, quantity: Number(e.target.value) } 
                         })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-emerald-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+                        className="w-full px-4 py-2.5 rounded-xl border border-green-500/20 focus:ring-2 focus:ring-green-500 outline-none bg-input-bg text-foreground"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-emerald-800 uppercase">Unidade da Compra</label>
+                      <label className="text-xs font-bold text-green-700 dark:text-green-400 uppercase">Unidade da Compra</label>
                       <select
                         value={formData.initialPurchase?.unit}
                         onChange={(e) => setFormData({ 
                           ...formData, 
                           initialPurchase: { ...formData.initialPurchase!, unit: e.target.value as UnitType } 
                         })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-emerald-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white dark:bg-gray-900 cursor-pointer"
+                        className="w-full px-4 py-2.5 rounded-xl border border-green-500/20 focus:ring-2 focus:ring-green-500 outline-none bg-input-bg text-foreground cursor-pointer"
                       >
                         {unitOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                       </select>
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-emerald-800 uppercase">Custo Total Pago (R$)</label>
+                      <label className="text-xs font-bold text-green-700 dark:text-green-400 uppercase">Custo Total Pago (R$)</label>
                       <input
                         type="number"
                         step="0.01"
@@ -279,7 +279,7 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
                           ...formData, 
                           initialPurchase: { ...formData.initialPurchase!, totalCost: Number(e.target.value) } 
                         })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-emerald-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+                        className="w-full px-4 py-2.5 rounded-xl border border-green-500/20 focus:ring-2 focus:ring-green-500 outline-none bg-input-bg text-foreground"
                         placeholder="0,00"
                       />
                     </div>
@@ -287,18 +287,18 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
 
                   {/* BLOCO C - RESULTADO AUTOMÁTICO */}
                   {calculatedValues && (
-                    <div className="bg-white dark:bg-gray-900/80 p-4 rounded-xl border border-emerald-100 flex flex-wrap gap-6 justify-between items-center">
+                    <div className="bg-card p-4 rounded-xl border border-green-500/20 flex flex-wrap gap-6 justify-between items-center">
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider">Custo p/ Unidade Base ({formData.unit})</span>
-                        <span className="text-lg font-black text-emerald-700">R$ {calculatedValues.costPerBaseUnit.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Custo p/ Unidade Base ({formData.unit})</span>
+                        <span className="text-lg font-black text-green-600 dark:text-green-400">R$ {calculatedValues.costPerBaseUnit.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider">Custo p/ Unidade Compra ({formData.initialPurchase?.unit})</span>
-                        <span className="text-sm font-bold text-gray-700 dark:text-gray-300">R$ {calculatedValues.costPerPurchaseUnit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Custo p/ Unidade Compra ({formData.initialPurchase?.unit})</span>
+                        <span className="text-sm font-bold text-foreground">R$ {calculatedValues.costPerPurchaseUnit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider">Estoque Inicial Total</span>
-                        <span className="text-lg font-black text-emerald-700">{calculatedValues.quantityBase} <span className="text-sm font-medium">{formData.unit}</span></span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Estoque Inicial Total</span>
+                        <span className="text-lg font-black text-green-600 dark:text-green-400">{calculatedValues.quantityBase} <span className="text-sm font-medium">{formData.unit}</span></span>
                       </div>
                     </div>
                   )}
@@ -308,9 +308,9 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
           )}
 
           {editingIngredient && (
-            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-center gap-3">
-              <span className="text-xl text-blue-500">ℹ️</span>
-              <p className="text-sm text-blue-700">
+            <div className="bg-primary/10 p-4 rounded-xl border border-primary/20 flex items-center gap-3">
+              <span className="text-xl text-primary">ℹ️</span>
+              <p className="text-sm text-primary">
                 O custo atual deste insumo é de <strong>R$ {editingIngredient.currentCost.toLocaleString('pt-BR', { minimumFractionDigits: 4 })}</strong> por <strong>{editingIngredient.unit}</strong>. 
                 Para atualizar o estoque e custo, use o módulo de Compras.
               </p>
@@ -321,14 +321,14 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-6 py-3 rounded-xl border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 font-bold hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 transition-all uppercase tracking-wide text-sm"
+              className="flex-1 px-6 py-3 rounded-xl border border-border text-muted-foreground font-bold hover:bg-muted transition-all uppercase tracking-wide text-sm"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 px-6 py-3 rounded-xl bg-primary-600 text-white font-bold hover:bg-primary-700 shadow-lg shadow-primary-200 transition-all disabled:opacity-50 uppercase tracking-wide text-sm"
+              className="flex-1 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:opacity-90 transition-all disabled:opacity-50 uppercase tracking-wide text-sm"
             >
               {isSubmitting ? 'Processando...' : (editingIngredient ? 'Salvar Alterações' : 'Finalizar Cadastro')}
             </button>

@@ -87,21 +87,21 @@ export function PublicFeedbackPage() {
   }
 
   return (
-    <div className="px-4 py-8 max-w-lg mx-auto min-h-screen flex flex-col">
+    <div className="px-4 py-8 max-w-lg mx-auto min-h-screen flex flex-col bg-[var(--storefront-background)] text-[var(--storefront-foreground)]">
       <header className="flex items-center gap-3 mb-8">
-        <button onClick={() => navigate(`/${tenantSlug}`)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-          <ArrowLeft className="w-5 h-5 text-gray-700" />
+        <button onClick={() => navigate(`/${tenantSlug}`)} className="p-2 hover:bg-[var(--storefront-muted)] rounded-xl transition-colors">
+          <ArrowLeft className="w-5 h-5 text-[var(--storefront-foreground)]" />
         </button>
         <div>
-          <h1 className="text-lg font-black text-gray-900 tracking-tight">Avalie seu pedido</h1>
-          <p className="text-sm text-gray-500">{info.storeName} • #{info.orderNumber}</p>
+          <h1 className="text-lg font-black text-[var(--storefront-foreground)] tracking-tight">Avalie seu pedido</h1>
+          <p className="text-sm text-[var(--storefront-muted-foreground)]">{info.storeName} • #{info.orderNumber}</p>
         </div>
       </header>
 
       {!submitted ? (
         <div className="flex-1">
-          <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm mb-6 flex flex-col items-center">
-            <h2 className="text-xl font-semibold mb-6 text-center">Como foi sua experiência?</h2>
+          <div className="bg-[var(--storefront-card)] border border-[var(--storefront-border)] rounded-3xl p-6 shadow-sm mb-6 flex flex-col items-center">
+            <h2 className="text-xl font-semibold mb-6 text-center text-[var(--storefront-foreground)]">Como foi sua experiência?</h2>
             
             <div className="flex items-center justify-center gap-2 mb-8">
               {[1, 2, 3, 4, 5].map((star) => (
@@ -126,11 +126,11 @@ export function PublicFeedbackPage() {
 
             {rating > 0 && (
               <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                <label className="block text-sm font-medium text-[var(--storefront-foreground)] mb-2 flex items-center gap-2">
                   <MessageSquare className="w-4 h-4" /> Deixe um comentário (opcional)
                 </label>
                 <textarea
-                  className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all resize-none bg-gray-50 mb-4"
+                  className="w-full border border-[var(--storefront-border)] rounded-xl p-3 text-sm focus:ring-2 focus:ring-[var(--storefront-primary)] focus:border-transparent outline-none transition-all resize-none bg-[var(--storefront-muted)] text-[var(--storefront-foreground)] mb-4"
                   rows={4}
                   placeholder={rating >= 4 ? "O que você mais gostou?" : "O que podemos melhorar?"}
                   value={comment}
@@ -138,7 +138,7 @@ export function PublicFeedbackPage() {
                 />
                 
                 <button
-                  className="w-full bg-primary text-primary-foreground font-bold rounded-xl py-4 flex items-center justify-center gap-2 transition-all hover:brightness-110 disabled:opacity-50"
+                  className="w-full bg-[var(--storefront-primary)] text-[var(--storefront-primary-foreground)] font-bold rounded-xl py-4 flex items-center justify-center gap-2 transition-all hover:brightness-110 disabled:opacity-50"
                   onClick={() => submitMutation.mutate()}
                   disabled={submitMutation.isPending}
                 >
@@ -150,53 +150,53 @@ export function PublicFeedbackPage() {
         </div>
       ) : (
         <div className="flex-1 animate-in zoom-in-95 fade-in duration-500">
-          <div className="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm text-center">
+          <div className="bg-[var(--storefront-card)] border border-[var(--storefront-border)] rounded-3xl p-8 shadow-sm text-center">
             <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-3">Muito obrigado!</h2>
+            <h2 className="text-2xl font-bold mb-3 text-[var(--storefront-foreground)]">Muito obrigado!</h2>
             
             {rating <= 3 ? (
-              <p className="text-gray-600 mb-6">
+              <p className="text-[var(--storefront-muted-foreground)] mb-6">
                 {info.lowRatingMessage || "Sentimos muito que sua experiência não tenha sido perfeita. Recebemos seu feedback e nossa equipe já foi avisada para melhorar."}
               </p>
             ) : (
-              <p className="text-gray-600 mb-6">
+              <p className="text-[var(--storefront-muted-foreground)] mb-6">
                 {info.highRatingMessage || "Ficamos muito felizes que você gostou! Sua avaliação é muito importante para nós."}
               </p>
             )}
 
             {rating >= 4 && (info.googleReviewUrl || info.facebookUrl || info.instagramUrl) && (
               <div className="mt-8 space-y-4">
-                <div className="text-sm font-medium text-gray-500 uppercase tracking-widest mb-4 border-b pb-2">
+                <div className="text-sm font-medium text-[var(--storefront-muted-foreground)] uppercase tracking-widest mb-4 border-b border-[var(--storefront-border)] pb-2">
                   Ajude mais pessoas a nos encontrarem
                 </div>
                 
                 {info.googleReviewUrl && (
                   <button
                     onClick={() => handleLinkClick('google', info.googleReviewUrl!)}
-                    className="w-full border-2 border-gray-100 hover:border-gray-200 bg-white text-gray-800 font-semibold rounded-xl py-3 px-4 flex items-center justify-between transition-colors group"
+                    className="w-full border-2 border-[var(--storefront-border)] hover:border-[var(--storefront-primary)] bg-[var(--storefront-card)] text-[var(--storefront-foreground)] font-semibold rounded-xl py-3 px-4 flex items-center justify-between transition-colors group"
                   >
                     <span>Avaliar no Google</span>
-                    <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+                    <ExternalLink className="w-4 h-4 text-[var(--storefront-muted-foreground)] group-hover:text-[var(--storefront-foreground)]" />
                   </button>
                 )}
                 
                 {info.instagramUrl && (
                   <button
                     onClick={() => handleLinkClick('instagram', info.instagramUrl!)}
-                    className="w-full border-2 border-gray-100 hover:border-gray-200 bg-white text-gray-800 font-semibold rounded-xl py-3 px-4 flex items-center justify-between transition-colors group"
+                    className="w-full border-2 border-[var(--storefront-border)] hover:border-[var(--storefront-primary)] bg-[var(--storefront-card)] text-[var(--storefront-foreground)] font-semibold rounded-xl py-3 px-4 flex items-center justify-between transition-colors group"
                   >
                     <span>Seguir no Instagram</span>
-                    <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+                    <ExternalLink className="w-4 h-4 text-[var(--storefront-muted-foreground)] group-hover:text-[var(--storefront-foreground)]" />
                   </button>
                 )}
 
                 {info.facebookUrl && (
                   <button
                     onClick={() => handleLinkClick('facebook', info.facebookUrl!)}
-                    className="w-full border-2 border-gray-100 hover:border-gray-200 bg-white text-gray-800 font-semibold rounded-xl py-3 px-4 flex items-center justify-between transition-colors group"
+                    className="w-full border-2 border-[var(--storefront-border)] hover:border-[var(--storefront-primary)] bg-[var(--storefront-card)] text-[var(--storefront-foreground)] font-semibold rounded-xl py-3 px-4 flex items-center justify-between transition-colors group"
                   >
                     <span>Seguir no Facebook</span>
-                    <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+                    <ExternalLink className="w-4 h-4 text-[var(--storefront-muted-foreground)] group-hover:text-[var(--storefront-foreground)]" />
                   </button>
                 )}
               </div>
@@ -204,7 +204,7 @@ export function PublicFeedbackPage() {
             
             <button
               onClick={() => navigate(`/${tenantSlug}`)}
-              className="mt-8 text-primary font-medium hover:underline"
+              className="mt-8 text-[var(--storefront-primary)] font-medium hover:underline"
             >
               Voltar para o cardápio
             </button>

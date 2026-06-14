@@ -133,45 +133,45 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-card rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-border">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+        <div className="flex items-center justify-between p-6 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary-500/10 rounded-lg">
-              <Megaphone className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Megaphone className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Nova Campanha</h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Passo {currentStep} de 4</p>
+              <h2 className="text-xl font-semibold text-foreground">Nova Campanha</h2>
+              <p className="text-sm text-muted-foreground">Passo {currentStep} de 4</p>
             </div>
           </div>
           <button
             onClick={() => { resetForm(); onClose(); }}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
 
         {/* Progress Bar */}
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+        <div className="px-6 py-4 border-b border-border flex-shrink-0">
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 1 ? 'bg-primary-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>1</div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 1 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>1</div>
               <span className="hidden sm:inline">Template</span>
-              <div className="w-4 border-t border-gray-300 dark:border-gray-600 mx-2"></div>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 2 ? 'bg-primary-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>2</div>
+              <div className="w-4 border-t border-border mx-2"></div>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>2</div>
               <span className="hidden sm:inline">Mensagem</span>
-              <div className="w-4 border-t border-gray-300 dark:border-gray-600 mx-2"></div>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 3 ? 'bg-primary-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>3</div>
+              <div className="w-4 border-t border-border mx-2"></div>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 3 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>3</div>
               <span className="hidden sm:inline">Público</span>
-              <div className="w-4 border-t border-gray-300 dark:border-gray-600 mx-2"></div>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 4 ? 'bg-primary-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>4</div>
+              <div className="w-4 border-t border-border mx-2"></div>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 4 ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>4</div>
               <span className="hidden sm:inline">Revisão</span>
             </div>
           </div>
-          <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <div className="h-full bg-primary-600 transition-all duration-300" style={{ width: `${(currentStep / 4) * 100}%` }} />
+          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+            <div className="h-full bg-primary transition-all duration-300" style={{ width: `${(currentStep / 4) * 100}%` }} />
           </div>
         </div>
 
@@ -181,34 +181,34 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
           {currentStep === 1 && (
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo de Campanha *</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Tipo de Campanha *</label>
                 <div className="grid grid-cols-2 gap-4">
                   <div 
                     onClick={() => updateFormData('type', 'whatsapp_message')}
                     className={`p-4 border rounded-xl cursor-pointer transition-all ${
                       (!formData.type || formData.type === 'whatsapp_message')
-                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 ring-2 ring-primary-500/20'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-700'
+                        ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                        : 'border-border hover:border-primary/50'
                     }`}
                   >
-                    <h4 className="font-semibold text-gray-900 dark:text-white">Mensagem Privada</h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Dispara para a caixa de entrada dos clientes.</p>
+                    <h4 className="font-semibold text-foreground">Mensagem Privada</h4>
+                    <p className="text-sm text-muted-foreground mt-1">Dispara para a caixa de entrada dos clientes.</p>
                   </div>
                   <div 
                     onClick={() => updateFormData('type', 'whatsapp_status')}
                     className={`p-4 border rounded-xl cursor-pointer transition-all ${
                       formData.type === 'whatsapp_status'
-                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 ring-2 ring-primary-500/20'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-700'
+                        ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                        : 'border-border hover:border-primary/50'
                     }`}
                   >
-                    <h4 className="font-semibold text-gray-900 dark:text-white">Status do WhatsApp</h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Publica na aba de Status (Stories).</p>
+                    <h4 className="font-semibold text-foreground">Status do WhatsApp</h4>
+                    <p className="text-sm text-muted-foreground mt-1">Publica na aba de Status (Stories).</p>
                   </div>
                 </div>
               </div>
 
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mt-6">Escolha um Template Prático</h3>
+              <h3 className="text-lg font-medium text-foreground mt-6">Escolha um Template Prático</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {(formData.type === 'whatsapp_status' ? CAMPAIGN_STATUS_TEMPLATES : CAMPAIGN_TEMPLATES).map(template => (
                   <div 
@@ -216,27 +216,27 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
                     onClick={() => handleTemplateSelect(template.id)}
                     className={`p-4 border rounded-xl cursor-pointer transition-all ${
                       formData.name === template.name
-                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 ring-2 ring-primary-500/20'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-700'
+                        ? 'border-primary bg-primary/10 ring-2 ring-primary/20'
+                        : 'border-border hover:border-primary/50'
                     }`}
                   >
-                    <h4 className="font-semibold text-gray-900 dark:text-white">{template.name}</h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{template.description}</p>
-                    <span className="inline-block mt-3 text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 px-2 py-1 rounded">
+                    <h4 className="font-semibold text-foreground">{template.name}</h4>
+                    <p className="text-sm text-muted-foreground mt-1">{template.description}</p>
+                    <span className="inline-block mt-3 text-xs font-medium bg-muted text-muted-foreground px-2 py-1 rounded">
                       {template.category}
                     </span>
                   </div>
                 ))}
               </div>
 
-              <div className="pt-4 border-t border-gray-200 dark:border-gray-800">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nome Personalizado da Campanha *</label>
+              <div className="pt-4 border-t border-border">
+                <label className="block text-sm font-medium text-foreground mb-2">Nome Personalizado da Campanha *</label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => updateFormData('name', e.target.value)}
                   placeholder="Nome interno da campanha..."
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 dark:bg-gray-800 dark:text-white"
+                  className="w-full px-4 py-2 border border-input rounded-lg focus:ring-primary bg-input-bg text-foreground"
                 />
               </div>
             </div>
@@ -246,9 +246,9 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
           {currentStep === 2 && (
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Corpo da Mensagem *</label>
-                <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg mb-2">
-                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                <label className="block text-sm font-medium text-foreground mb-2">Corpo da Mensagem *</label>
+                <div className="bg-muted p-3 rounded-lg mb-2">
+                  <p className="text-xs text-muted-foreground">
                     <strong>Variáveis:</strong> {'{nome}'}, {'{link_cardapio}'}, {'{cupom}'}, {'{pedido}'}, {'{total}'}
                   </p>
                 </div>
@@ -257,19 +257,19 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
                   onChange={(e) => updateFormData('messageTemplate', e.target.value)}
                   placeholder="Olá {nome}..."
                   rows={8}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 dark:bg-gray-800 dark:text-white font-mono text-sm"
+                  className="w-full px-4 py-2 border border-input rounded-lg focus:ring-primary bg-input-bg text-foreground font-mono text-sm"
                 />
-                <p className="text-xs text-gray-500 mt-1">A mensagem de Opt-out ("responder SAIR") será adicionada automaticamente ao final, caso você não inclua.</p>
+                <p className="text-xs text-muted-foreground mt-1">A mensagem de Opt-out ("responder SAIR") será adicionada automaticamente ao final, caso você não inclua.</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">URL de Mídia / Imagem (opcional)</label>
+                <label className="block text-sm font-medium text-foreground mb-2">URL de Mídia / Imagem (opcional)</label>
                 <input
                   type="url"
                   value={formData.mediaUrl || ''}
                   onChange={(e) => updateFormData('mediaUrl', e.target.value)}
                   placeholder="https://exemplo.com/imagem.jpg"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 dark:bg-gray-800 dark:text-white"
+                  className="w-full px-4 py-2 border border-input rounded-lg focus:ring-primary bg-input-bg text-foreground"
                 />
               </div>
             </div>
@@ -279,76 +279,76 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
           {currentStep === 3 && (
             <div className="space-y-6">
               {formData.type === 'whatsapp_status' ? (
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                <div className="bg-primary/10 p-4 rounded-lg">
+                  <p className="text-sm text-primary">
                     <strong>Status do WhatsApp:</strong> Esta campanha será publicada diretamente no seu Status (Stories) do WhatsApp. Não há filtros de público, pois o WhatsApp exibe o Status para todos os seus contatos salvos (dependendo das configurações de privacidade do seu aparelho).
                   </p>
                 </div>
               ) : (
                 <>
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <div className="bg-primary/10 p-4 rounded-lg">
+                    <p className="text-sm text-primary">
                       Filtre para quem você quer enviar. Se não preencher nada, a campanha irá para <strong>todos os clientes</strong> (que não pediram para sair).
                     </p>
                   </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mínimo de pedidos</label>
+                  <label className="block text-sm font-medium text-foreground mb-2">Mínimo de pedidos</label>
                   <input
                     type="number"
                     value={formData.segmentRules.minOrders || ''}
                     onChange={(e) => updateSegmentRules('minOrders', e.target.value ? parseInt(e.target.value) : undefined)}
                     placeholder="Ex: 1"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 dark:bg-gray-800 dark:text-white"
+                    className="w-full px-4 py-2 border border-input rounded-lg focus:ring-primary bg-input-bg text-foreground"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Máximo de pedidos</label>
+                  <label className="block text-sm font-medium text-foreground mb-2">Máximo de pedidos</label>
                   <input
                     type="number"
                     value={formData.segmentRules.maxOrders || ''}
                     onChange={(e) => updateSegmentRules('maxOrders', e.target.value ? parseInt(e.target.value) : undefined)}
                     placeholder="Ex: 5"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 dark:bg-gray-800 dark:text-white"
+                    className="w-full px-4 py-2 border border-input rounded-lg focus:ring-primary bg-input-bg text-foreground"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Valor mínimo gasto (R$)</label>
+                  <label className="block text-sm font-medium text-foreground mb-2">Valor mínimo gasto (R$)</label>
                   <input
                     type="number"
                     value={formData.segmentRules.minSpent || ''}
                     onChange={(e) => updateSegmentRules('minSpent', e.target.value ? parseFloat(e.target.value) : undefined)}
                     placeholder="Ex: 100.00"
                     step="0.01"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 dark:bg-gray-800 dark:text-white"
+                    className="w-full px-4 py-2 border border-input rounded-lg focus:ring-primary bg-input-bg text-foreground"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Inativo há mais de X dias</label>
+                  <label className="block text-sm font-medium text-foreground mb-2">Inativo há mais de X dias</label>
                   <input
                     type="number"
                     value={formData.segmentRules.daysSinceLastOrder || ''}
                     onChange={(e) => updateSegmentRules('daysSinceLastOrder', e.target.value ? parseInt(e.target.value) : undefined)}
                     placeholder="Ex: 30"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 dark:bg-gray-800 dark:text-white"
+                    className="w-full px-4 py-2 border border-input rounded-lg focus:ring-primary bg-input-bg text-foreground"
                   />
                 </div>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Limite Máximo de Disparos (Segurança)</label>
+                <label className="block text-sm font-medium text-foreground mb-2">Limite Máximo de Disparos (Segurança)</label>
                 <input
                   type="number"
                   value={formData.maxDispatches}
                   onChange={(e) => updateFormData('maxDispatches', parseInt(e.target.value))}
                   placeholder="1000"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-primary-500 dark:bg-gray-800 dark:text-white"
+                  className="w-full px-4 py-2 border border-input rounded-lg focus:ring-primary bg-input-bg text-foreground"
                 />
-                <p className="text-xs text-gray-500 mt-1">Corta a audiência se exceder esse limite de segurança.</p>
+                <p className="text-xs text-muted-foreground mt-1">Corta a audiência se exceder esse limite de segurança.</p>
               </div>
               </>
               )}
@@ -360,39 +360,39 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
             <div className="space-y-6">
               {isEstimating ? (
                 <div className="flex items-center justify-center p-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-                  <span className="ml-3 text-gray-500">Calculando audiência...</span>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  <span className="ml-3 text-muted-foreground">Calculando audiência...</span>
                 </div>
               ) : (
                 <>
-                  <div className="bg-gray-50 dark:bg-gray-800 p-5 rounded-xl border border-gray-200 dark:border-gray-700">
-                    <h4 className="font-semibold text-gray-900 dark:text-white text-lg mb-4">Resumo do Disparo</h4>
+                  <div className="bg-muted p-5 rounded-xl border border-border">
+                    <h4 className="font-semibold text-foreground text-lg mb-4">Resumo do Disparo</h4>
                     <div className="space-y-3">
-                      <div className="flex justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
-                        <span className="text-gray-600 dark:text-gray-400">Campanha:</span>
-                        <span className="font-medium text-gray-900 dark:text-white">{formData.name}</span>
+                      <div className="flex justify-between border-b border-border pb-2">
+                        <span className="text-muted-foreground">Campanha:</span>
+                        <span className="font-medium text-foreground">{formData.name}</span>
                       </div>
-                      <div className="flex justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
-                        <span className="text-gray-600 dark:text-gray-400">Audiência Estimada:</span>
-                        <span className="font-bold text-primary-600 dark:text-primary-400">
+                      <div className="flex justify-between border-b border-border pb-2">
+                        <span className="text-muted-foreground">Audiência Estimada:</span>
+                        <span className="font-bold text-primary">
                           {formData.type === 'whatsapp_status' ? 'Todos os contatos' : (estimatedAudience !== null ? `${estimatedAudience} contatos` : 'Desconhecido')}
                         </span>
                       </div>
                       {formData.type !== 'whatsapp_status' && (
-                        <div className="flex justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
-                          <span className="text-gray-600 dark:text-gray-400">Limite de Segurança:</span>
-                          <span className="font-medium text-gray-900 dark:text-white">{formData.maxDispatches} disparos</span>
+                        <div className="flex justify-between border-b border-border pb-2">
+                          <span className="text-muted-foreground">Limite de Segurança:</span>
+                          <span className="font-medium text-foreground">{formData.maxDispatches} disparos</span>
                         </div>
                       )}
                     </div>
                   </div>
 
                   {formData.type !== 'whatsapp_status' && (
-                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-xl flex gap-3">
-                      <AlertTriangle className="w-6 h-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
+                    <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-xl flex gap-3">
+                      <AlertTriangle className="w-6 h-6 text-amber-500 flex-shrink-0" />
                       <div>
-                        <h5 className="font-medium text-yellow-800 dark:text-yellow-300">Atenção ao Risco de Spam</h5>
-                        <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
+                        <h5 className="font-medium text-amber-800 dark:text-amber-300">Atenção ao Risco de Spam</h5>
+                        <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
                           Disparos em massa podem causar bloqueio do seu número de WhatsApp se muitos clientes denunciarem. O sistema possui um atraso de segurança (Jitter) entre as mensagens para simular envio humano.
                         </p>
                       </div>
@@ -400,7 +400,7 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
                   )}
 
                   {isLargeAudience && formData.type !== 'whatsapp_status' && (
-                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 rounded-xl">
+                    <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-xl">
                       <label className="block text-sm font-medium text-red-800 dark:text-red-300 mb-2">
                         Como a audiência estimada é maior que 50 contatos, digite <strong>ENVIAR</strong> para confirmar.
                       </label>
@@ -409,7 +409,7 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
                         value={confirmationText}
                         onChange={(e) => setConfirmationText(e.target.value)}
                         placeholder="ENVIAR"
-                        className="w-full px-4 py-2 border border-red-300 dark:border-red-600 rounded-lg focus:ring-red-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                        className="w-full px-4 py-2 border border-red-500/30 rounded-lg focus:ring-red-500 bg-input-bg text-foreground"
                       />
                     </div>
                   )}
@@ -420,11 +420,11 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200 dark:border-gray-800 flex-shrink-0">
+        <div className="flex items-center justify-between p-6 border-t border-border flex-shrink-0">
           <button
             onClick={prevStep}
             disabled={currentStep === 1}
-            className="flex items-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />
             Anterior
@@ -435,7 +435,7 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
               <button
                 onClick={nextStep}
                 disabled={(currentStep === 1 && !formData.name) || (currentStep === 2 && !formData.messageTemplate)}
-                className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Próximo
                 <ChevronRight className="w-4 h-4" />
@@ -444,7 +444,7 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
               <button
                 onClick={handleSubmit}
                 disabled={!canSubmit}
-                className="flex items-center gap-2 px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-2 px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {createMutation.isPending ? 'Agendando...' : 'Confirmar Envio'}
               </button>

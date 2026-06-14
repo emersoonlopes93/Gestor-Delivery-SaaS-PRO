@@ -79,19 +79,19 @@ export function InventoryCountPage() {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto text-left">
+    <div className="p-6 max-w-7xl mx-auto text-left bg-background min-h-screen">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight flex items-center gap-3">
-            <ClipboardList className="h-8 w-8 text-primary-600" />
+          <h1 className="text-3xl font-bold text-foreground tracking-tight flex items-center gap-3">
+            <ClipboardList className="h-8 w-8 text-primary" />
             Inventário Físico
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Realize a contagem física e ajuste seu estoque teórico.</p>
+          <p className="text-muted-foreground mt-1">Realize a contagem física e ajuste seu estoque teórico.</p>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={loadIngredients}
-            className="p-2.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+            className="p-2.5 text-muted-foreground hover:bg-muted rounded-xl transition-colors"
             title="Atualizar estoque teórico"
           >
             <RefreshCcw className="h-5 w-5" />
@@ -99,10 +99,10 @@ export function InventoryCountPage() {
           <button
             onClick={handleSubmit}
             disabled={isSubmitting || ingredients.length === 0}
-            className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-primary-500/25 flex items-center gap-2 disabled:opacity-50"
+            className="bg-primary hover:opacity-90 text-primary-foreground px-6 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-primary/20 flex items-center gap-2 disabled:opacity-50"
           >
             {isSubmitting ? (
-              <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <div className="h-5 w-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
             ) : (
               <Save className="h-5 w-5" />
             )}
@@ -112,30 +112,30 @@ export function InventoryCountPage() {
       </div>
 
       {success && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-100 rounded-2xl flex items-center gap-3 text-green-700 animate-in fade-in slide-in-from-top-2">
+        <div className="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-2xl flex items-center gap-3 text-green-600 dark:text-green-400 animate-in fade-in slide-in-from-top-2">
           <CheckCircle2 className="h-5 w-5" />
           <span className="font-semibold">Inventário processado com sucesso! O estoque foi ajustado.</span>
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+      <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gray-50 dark:bg-gray-900/50/50">
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Insumo</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Unidade</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Sistema (Teórico)</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-48">Contagem Física</th>
-                <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-right">Diferença</th>
+              <tr className="bg-muted/50">
+                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Insumo</th>
+                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Unidade</th>
+                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Sistema (Teórico)</th>
+                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider w-48">Contagem Física</th>
+                <th className="px-6 py-4 text-xs font-bold text-muted-foreground uppercase tracking-wider text-right">Diferença</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            <tbody className="divide-y divide-border">
               {isLoading ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center">
                     <div className="flex justify-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     </div>
                   </td>
                 </tr>
@@ -144,14 +144,14 @@ export function InventoryCountPage() {
                 const hasDiff = diff !== 0;
 
                 return (
-                  <tr key={item.ingredientId} className="hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50/50 transition-colors">
+                  <tr key={item.ingredientId} className="hover:bg-muted/50 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="font-semibold text-gray-900 dark:text-gray-100">{item.name}</div>
+                      <div className="font-semibold text-foreground">{item.name}</div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                    <td className="px-6 py-4 text-sm text-muted-foreground">
                       {unitLabels[item.unit]}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                    <td className="px-6 py-4 text-sm text-muted-foreground">
                       {item.theoreticalStock} <span className="text-[10px] uppercase">{item.unit}</span>
                     </td>
                     <td className="px-6 py-4">
@@ -160,19 +160,19 @@ export function InventoryCountPage() {
                         step="any"
                         value={item.physicalStock}
                         onChange={(e) => handleStockChange(item.ingredientId, e.target.value)}
-                        className={`w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all font-bold ${
-                          hasDiff ? 'border-amber-200 bg-amber-50/30' : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900'
+                        className={`w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-bold ${
+                          hasDiff ? 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'border-input bg-input-bg text-foreground'
                         }`}
                       />
                     </td>
                     <td className="px-6 py-4 text-right">
                       {hasDiff ? (
-                        <div className={`flex items-center justify-end gap-1.5 text-sm font-bold ${diff > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <div className={`flex items-center justify-end gap-1.5 text-sm font-bold ${diff > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                           {diff > 0 ? '+' : ''}{diff.toFixed(4)}
                           <AlertTriangle className="h-3.5 w-3.5" />
                         </div>
                       ) : (
-                        <span className="text-gray-300 text-sm">Sem ajuste</span>
+                        <span className="text-muted-foreground/45 text-sm">Sem ajuste</span>
                       )}
                     </td>
                   </tr>
@@ -180,7 +180,7 @@ export function InventoryCountPage() {
               })}
               {!isLoading && countItems.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
+                  <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
                     Nenhum insumo encontrado para inventário.
                   </td>
                 </tr>
@@ -190,13 +190,13 @@ export function InventoryCountPage() {
         </div>
       </div>
 
-      <div className="mt-8 bg-amber-50 border border-amber-100 rounded-2xl p-6 flex flex-col md:flex-row items-center gap-4">
-        <div className="p-3 bg-white dark:bg-gray-900 rounded-xl shadow-sm">
+      <div className="mt-8 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-6 flex flex-col md:flex-row items-center gap-4">
+        <div className="p-3 bg-card rounded-xl shadow-sm border border-border">
           <AlertTriangle className="h-6 w-6 text-amber-500" />
         </div>
         <div className="flex-1 text-center md:text-left">
-          <h4 className="font-bold text-amber-900">Atenção ao finalizar</h4>
-          <p className="text-sm text-amber-800">
+          <h4 className="font-bold text-amber-800 dark:text-amber-300">Atenção ao finalizar</h4>
+          <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
             Ao salvar esta contagem, o sistema irá gerar movimentos de ajuste automáticos para cada item que apresentar diferença. 
             Isso afetará diretamente o relatório de CMV e perdas do período.
           </p>

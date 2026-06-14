@@ -98,12 +98,12 @@ export function PublicTrackingPage() {
   const statusLabel = (s: string) => s.replace(/_/g, ' ');
 
   return (
-    <div className="px-4 py-6 max-w-lg mx-auto">
+    <div className="px-4 py-6 max-w-lg mx-auto bg-[var(--storefront-background)] min-h-screen text-[var(--storefront-foreground)]">
       <header className="flex items-center gap-3 mb-6">
-        <button onClick={() => navigate(`/${tenantSlug}`)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-          <ArrowLeft className="w-5 h-5 text-gray-700" />
+        <button onClick={() => navigate(`/${tenantSlug}`)} className="p-2 hover:bg-[var(--storefront-muted)] rounded-xl transition-colors">
+          <ArrowLeft className="w-5 h-5 text-[var(--storefront-foreground)]" />
         </button>
-        <h1 className="text-lg font-black text-gray-900 uppercase tracking-tight">Tracking do Pedido</h1>
+        <h1 className="text-lg font-black text-[var(--storefront-foreground)] uppercase tracking-tight">Tracking do Pedido</h1>
       </header>
 
       {!token ? (
@@ -111,7 +111,7 @@ export function PublicTrackingPage() {
       ) : null}
 
       {query.isLoading ? (
-        <div className="flex items-center gap-2 text-gray-600 text-sm">
+        <div className="flex items-center gap-2 text-[var(--storefront-muted-foreground)] text-sm">
           <Loader2 className="w-4 h-4 animate-spin" />
           Carregando tracking...
         </div>
@@ -123,29 +123,29 @@ export function PublicTrackingPage() {
 
       {query.data ? (
         <>
-          <section className="bg-gray-50 rounded-2xl p-4 mb-4 border border-gray-100 space-y-2">
-            <div className="text-sm text-gray-600">
-              Pedido: <strong className="text-gray-900">{query.data.orderId}</strong>
+          <section className="bg-[var(--storefront-muted)] rounded-2xl p-4 mb-4 border border-[var(--storefront-border)] space-y-2">
+            <div className="text-sm text-[var(--storefront-muted-foreground)]">
+              Pedido: <strong className="text-[var(--storefront-foreground)]">{query.data.orderId}</strong>
             </div>
-            <div className="text-sm text-gray-600">
-              Status: <strong className="text-gray-900 uppercase">{statusLabel(query.data.status)}</strong>
+            <div className="text-sm text-[var(--storefront-muted-foreground)]">
+              Status: <strong className="text-[var(--storefront-foreground)] uppercase">{statusLabel(query.data.status)}</strong>
             </div>
-            <div className="text-sm text-gray-600 flex items-center gap-2">
+            <div className="text-sm text-[var(--storefront-muted-foreground)] flex items-center gap-2">
               <Truck className="w-4 h-4" />
               Entregador:{' '}
-              <strong className="text-gray-900">{query.data.driver ? query.data.driver.name : 'Ainda não atribuído'}</strong>
+              <strong className="text-[var(--storefront-foreground)]">{query.data.driver ? query.data.driver.name : 'Ainda não atribuído'}</strong>
             </div>
           </section>
 
-          <section className="bg-white rounded-2xl p-4 border border-gray-100 overflow-hidden">
+          <section className="bg-[var(--storefront-card)] rounded-2xl p-4 border border-[var(--storefront-border)] overflow-hidden">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-black text-gray-700 uppercase tracking-widest flex items-center gap-2">
+              <h2 className="text-sm font-black text-[var(--storefront-foreground)] uppercase tracking-widest flex items-center gap-2">
                 <MapPin className="w-4 h-4" /> Localização
               </h2>
-              <div className="text-xs text-gray-500">Atualiza a cada 5s</div>
+              <div className="text-xs text-[var(--storefront-muted-foreground)]">Atualiza a cada 5s</div>
             </div>
 
-            <div className="h-[340px] w-full rounded-xl overflow-hidden border border-gray-100">
+            <div className="h-[340px] w-full rounded-xl overflow-hidden border border-[var(--storefront-border)]">
               <MapContainer center={center} zoom={15} style={{ height: '100%', width: '100%' }}>
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -159,7 +159,7 @@ export function PublicTrackingPage() {
                         <div className="font-semibold">Entregador</div>
                         <div>{query.data.driver ? query.data.driver.name : 'Em rota'}</div>
                         {query.data.driverLocation.lastLocationAt ? (
-                          <div className="text-gray-600">Atualizado: {new Date(query.data.driverLocation.lastLocationAt).toLocaleString()}</div>
+                          <div className="text-[var(--storefront-muted-foreground)]">Atualizado: {new Date(query.data.driverLocation.lastLocationAt).toLocaleString()}</div>
                         ) : null}
                       </div>
                     </Popup>
@@ -169,7 +169,7 @@ export function PublicTrackingPage() {
             </div>
 
             {!query.data.driverLocation ? (
-              <div className="mt-3 text-xs text-gray-500">
+              <div className="mt-3 text-xs text-[var(--storefront-muted-foreground)]">
                 Localização do entregador ainda não disponível.
               </div>
             ) : null}
