@@ -49,12 +49,13 @@ export function ProductGridCard({
 
       <div className="flex flex-col flex-1 p-4">
         <div className="flex flex-wrap gap-1 mb-2">
-          {showBadges && product.badges?.map((badge, idx) => (
-            <StorefrontBadge key={idx} variant="primary">{badge}</StorefrontBadge>
-          ))}
-          {!product.isAvailable && (
-            <StorefrontBadge variant="secondary">Indisponível</StorefrontBadge>
-          )}
+          {showBadges && product.badges?.map((badge, idx) => {
+            // map variant to StorefrontBadge variant if needed
+            let badgeVariant: 'primary' | 'secondary' | 'outline' = 'primary';
+            if (badge.variant === 'danger') badgeVariant = 'secondary';
+            if (badge.variant === 'neutral') badgeVariant = 'outline';
+            return <StorefrontBadge key={idx} variant={badgeVariant}>{badge.label}</StorefrontBadge>;
+          })}
         </div>
 
         <h3 className="font-bold text-[var(--storefront-foreground)] line-clamp-2 mb-1 group-hover:text-[var(--storefront-primary)] transition-colors">

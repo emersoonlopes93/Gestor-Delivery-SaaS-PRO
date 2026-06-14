@@ -437,6 +437,7 @@ model TenantSettings {
   storefrontThemeJson  Json? @map("storefront_theme_json")
   storefrontLayoutJson Json? @map("storefront_layout_json")
 
+  minimumOrderValue    Decimal?               @map("minimum_order_value") @db.Decimal(10, 2)
   fractionalPricingRule FractionalPricingRule? @map("fractional_pricing_rule")
   tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -696,6 +697,7 @@ model Product {
   shortDescription      String?                   @map("short_description")
   longDescription       String?                   @map("long_description")
   basePrice             Decimal                   @map("base_price") @db.Decimal(10, 2)
+  compareAtPrice        Decimal?                  @map("compare_at_price") @db.Decimal(10, 2)
   image                 String?
   mediaAssetId          String?                   @map("media_asset_id")
   isActive              Boolean                   @default(true) @map("is_active")

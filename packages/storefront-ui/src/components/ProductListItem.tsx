@@ -22,9 +22,12 @@ export function ProductListItem({
     >
       <div className="flex-1 min-w-0 flex flex-col justify-center">
         <div className="flex flex-wrap gap-1 mb-1">
-          {showBadges && product.badges?.map((badge, idx) => (
-            <StorefrontBadge key={idx} variant="primary">{badge}</StorefrontBadge>
-          ))}
+          {showBadges && product.badges?.map((badge, idx) => {
+            let badgeVariant: 'primary' | 'secondary' | 'outline' = 'primary';
+            if (badge.variant === 'danger') badgeVariant = 'secondary';
+            if (badge.variant === 'neutral') badgeVariant = 'outline';
+            return <StorefrontBadge key={idx} variant={badgeVariant}>{badge.label}</StorefrontBadge>;
+          })}
         </div>
 
         <h3 className="font-bold text-[var(--storefront-foreground)] truncate group-hover:text-[var(--storefront-primary)] transition-colors">

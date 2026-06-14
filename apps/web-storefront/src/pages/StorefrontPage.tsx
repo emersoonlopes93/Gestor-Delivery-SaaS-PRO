@@ -339,8 +339,31 @@ export function StorefrontPage() {
             });
           }
         }}
-        className="-mx-4 mb-8"
+        className="-mx-4 mb-6"
       />
+
+      {/* Banners */}
+      <div className="flex flex-col gap-3 mb-8">
+        {data.tenant.scheduling?.enabled && (
+          <div className="bg-blue-50 text-blue-800 px-4 py-3 rounded-[var(--storefront-radius)] flex items-center gap-3 border border-blue-100">
+            <Calendar className="w-5 h-5 flex-shrink-0 text-blue-500" />
+            <div className="flex-1">
+              <p className="font-bold text-sm">Agendamento Disponível</p>
+              <p className="text-xs opacity-90 mt-0.5">Faça seu pedido agora e escolha o melhor horário para receber.</p>
+            </div>
+          </div>
+        )}
+
+        {data.tenant.cashback?.enabled && data.tenant.cashback.percent > 0 && (
+          <div className="bg-green-50 text-green-800 px-4 py-3 rounded-[var(--storefront-radius)] flex items-center gap-3 border border-green-100">
+            <Coins className="w-5 h-5 flex-shrink-0 text-green-500" />
+            <div className="flex-1">
+              <p className="font-bold text-sm">Ganhe {data.tenant.cashback.percent}% de Cashback</p>
+              <p className="text-xs opacity-90 mt-0.5">Parte do valor das suas compras volta para você usar depois.</p>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="space-y-12 mt-4">
         {/* Combos Section */}
@@ -396,42 +419,48 @@ export function StorefrontPage() {
         )}
 
         {/* Categories Sections */}
-        {categories.map((category) => (
-          <section key={category.id} id={category.slug}>
-            <h2 className="text-lg font-bold text-[var(--storefront-foreground)] mb-4 flex items-center gap-2">
-              <span className="w-1 h-6 bg-[var(--storefront-primary)] rounded-full" />
-              {category.name}
-            </h2>
-            
-            <div className={cn(
-              'grid gap-3 sm:gap-4',
-              effectiveProductLayout === 'grid' && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
-              effectiveProductLayout === 'square' && 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4',
-              effectiveProductLayout === 'compact' && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
-              effectiveProductLayout === 'list' && 'grid-cols-1',
-              effectiveProductLayout === 'premium-card' && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
-            )}>
-              {category.products.map((product) => (
-                <ProductRenderer
-                  key={product.id}
-                  product={{
-                    id: product.id,
-                    name: product.name,
-                    description: product.shortDescription,
-                    imageUrl: product.image,
-                    price: product.basePrice,
-                    isAvailable: product.isAvailable,
-                  }}
-                  layout={effectiveProductLayout}
-                  imageMode={layoutSettings.productImageMode}
-                  showDescription={layoutSettings.showProductDescription}
-                  showBadges={layoutSettings.showBadges}
-                  onSelectProduct={() => setSelectedProduct(product)}
-                />
-              ))}
-            </div>
-          </section>
-        ))}
+        {categories.map((category) => {
+          const bgStyle = category.templateConfig?.backgroundColor ? { backgroundColor: category.templateConfig.backgroundColor } : undefined;
+
+          return (
+            <section key={category.id} id={category.slug} style={bgStyle} className={cn(bgStyle && "-mx-4 px-4 py-6 rounded-none", "scroll-m-20")}>
+              <h2 className="text-lg font-bold text-[var(--storefront-foreground)] mb-4 flex items-center gap-2">
+                <span className="w-1 h-6 bg-[var(--storefront-primary)] rounded-full" />
+                {category.name}
+              </h2>
+              
+              <div className={cn(
+                'grid gap-3 sm:gap-4',
+                effectiveProductLayout === 'grid' && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+                effectiveProductLayout === 'square' && 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4',
+                effectiveProductLayout === 'compact' && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+                effectiveProductLayout === 'list' && 'grid-cols-1',
+                effectiveProductLayout === 'premium-card' && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+              )}>
+                {category.products.map((product) => (
+                  <ProductRenderer
+                    key={product.id}
+                    product={{
+                      id: product.id,
+                      name: product.name,
+                      description: product.shortDescription,
+                      imageUrl: product.image,
+                      price: product.basePrice,
+                      compareAtPrice: product.compareAtPrice,
+                      isAvailable: product.isAvailable,
+                      badges: product.badges as any,
+                    }}
+                    layout={effectiveProductLayout}
+                    imageMode={layoutSettings.productImageMode}
+                    showDescription={layoutSettings.showProductDescription}
+                    showBadges={layoutSettings.showBadges}
+                    onSelectProduct={() => setSelectedProduct(product)}
+                  />
+                ))}
+              </div>
+            </section>
+          );
+        })}
 
         {combos.length === 0 && categories.length === 0 && (
           <StorefrontEmptyState 
@@ -464,6 +493,7 @@ export function StorefrontPage() {
         <CartDrawer 
           onClose={() => setIsCartOpen(false)} 
           upsells={data?.upsells} 
+          minimumOrderValue={data?.tenant.minimumOrderValue}
         />
       )}
 

@@ -40,10 +40,9 @@ export function ProductCompactCard({
 
       <div className="flex flex-col items-end gap-1">
         {showBadges && product.badges?.[0] && (
-          <StorefrontBadge variant="primary">{product.badges[0]}</StorefrontBadge>
-        )}
-        {!product.isAvailable && (
-          <StorefrontBadge variant="secondary">Off</StorefrontBadge>
+          <StorefrontBadge variant={product.badges[0].variant === 'danger' ? 'secondary' : product.badges[0].variant === 'neutral' ? 'outline' : 'primary'}>
+            {product.badges[0].label}
+          </StorefrontBadge>
         )}
       </div>
     </div>

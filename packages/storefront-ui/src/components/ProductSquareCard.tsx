@@ -36,9 +36,12 @@ export function ProductSquareCard({
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-3">
         <div className="flex flex-wrap gap-1 mb-1">
-          {showBadges && product.badges?.map((badge, idx) => (
-            <StorefrontBadge key={idx} variant="primary" className="bg-white text-black border-none">{badge}</StorefrontBadge>
-          ))}
+          {showBadges && product.badges?.map((badge, idx) => {
+            let badgeVariant: 'primary' | 'secondary' | 'outline' = 'primary';
+            if (badge.variant === 'danger') badgeVariant = 'secondary';
+            if (badge.variant === 'neutral') badgeVariant = 'outline';
+            return <StorefrontBadge key={idx} variant={badgeVariant}>{badge.label}</StorefrontBadge>;
+          })}
         </div>
 
         <h3 className="font-bold text-white text-sm line-clamp-2 leading-tight">

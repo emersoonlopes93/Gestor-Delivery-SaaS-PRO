@@ -7,5 +7,5 @@ export type StorefrontProduct = {
   compareAtPrice?: number | null;
   categoryName?: string | null;
   isAvailable?: boolean;
-  badges?: string[];
+  badges?: Array<{ id: string; label: string; variant: 'success' | 'danger' | 'warning' | 'info' | 'neutral' }>;
 };

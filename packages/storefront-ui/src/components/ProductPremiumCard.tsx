@@ -34,9 +34,12 @@ export function ProductPremiumCard({
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
           
           <div className="absolute bottom-3 left-3 flex flex-wrap gap-1">
-            {showBadges && product.badges?.map((badge, idx) => (
-              <StorefrontBadge key={idx} variant="primary" className="shadow-lg">{badge}</StorefrontBadge>
-            ))}
+            {showBadges && product.badges?.map((badge, idx) => {
+              let badgeVariant: 'primary' | 'secondary' | 'outline' = 'primary';
+              if (badge.variant === 'danger') badgeVariant = 'secondary';
+              if (badge.variant === 'neutral') badgeVariant = 'outline';
+              return <StorefrontBadge key={idx} variant={badgeVariant}>{badge.label}</StorefrontBadge>;
+            })}
           </div>
         </div>
       ) : (

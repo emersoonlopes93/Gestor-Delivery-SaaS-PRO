@@ -191,6 +191,7 @@ export class StorefrontService {
         slug: cat.slug,
         order: cat.order ?? 0,
         templateType: cat.templateType,
+        templateConfig: cat.templateConfig,
         products: cat.products
           .map((p) => {
             const canSell = availabilityMap.get(p.id) ?? true;
@@ -205,11 +206,13 @@ export class StorefrontService {
               description: p.longDescription,
               longDescription: p.longDescription,
               basePrice: Number(p.basePrice),
+              compareAtPrice: p.compareAtPrice ? Number(p.compareAtPrice) : null,
               image: image.imageUrl,
               imageUrl: image.imageUrl,
               imageAltText: image.imageAltText,
               imageSource: image.imageSource,
               isAvailable,
+              badges: [], // Populated below
 
               optionGroupLinks: (p.optionGroupLinks || []).map((ol) => ({
                 id: ol.id,
@@ -269,6 +272,43 @@ export class StorefrontService {
                 },
               })),
             };
+          })
+          .map((p) => {
+            const badges: any[] = [];
+            
+            // Promo badge
+            if (p.compareAtPrice && p.compareAtPrice > p.basePrice) {
+              badges.push({ id: 'promotion', label: 'Promoção', variant: 'success', priority: 1 });
+            }
+            // New badge (created in last 30 days)
+            const origProd = cat.products.find(op => op.id === p.id);
+            if (origProd && origProd.createdAt) {
+              const isNew = (new Date().getTime() - new Date(origProd.createdAt).getTime()) < 30 * 24 * 60 * 60 * 1000;
+              if (isNew) {
+                badges.push({ id: 'new', label: 'Novidade', variant: 'info', priority: 2 });
+              }
+            }
+            // Featured
+            if (origProd?.isFeatured) {
+              badges.push({ id: 'featured', label: 'Destaque', variant: 'warning', priority: 3 });
+            }
+            // Combo
+            if (p.type === 'combo') {
+              badges.push({ id: 'combo', label: 'Combo', variant: 'neutral', priority: 4 });
+            }
+            // Cashback
+            if (tenant.settings?.cashbackEnabled && (tenant.settings?.cashbackPercent ?? 0) > 0) {
+              badges.push({ id: 'cashback', label: 'Cashback', variant: 'success', priority: 5 });
+            }
+            // Unavailable
+            if (!p.isAvailable) {
+              badges.push({ id: 'unavailable', label: 'Indisponível', variant: 'danger', priority: 0 });
+            }
+
+            badges.sort((a, b) => a.priority - b.priority);
+            p.badges = badges;
+
+            return p;
           })
           .filter((p) => p.isAvailable) as StorefrontProductPayload[],
       }))
@@ -347,6 +387,18 @@ export class StorefrontService {
             : [],
         };
       })
+      .map((c) => {
+        const badges: any[] = [];
+        badges.push({ id: 'combo', label: 'Combo', variant: 'neutral', priority: 4 });
+        if (tenant.settings?.cashbackEnabled && (tenant.settings?.cashbackPercent ?? 0) > 0) {
+          badges.push({ id: 'cashback', label: 'Cashback', variant: 'success', priority: 5 });
+        }
+        if (!c.isAvailable) {
+          badges.push({ id: 'unavailable', label: 'Indisponível', variant: 'danger', priority: 0 });
+        }
+        badges.sort((a, b) => a.priority - b.priority);
+        return { ...c, badges };
+      })
       .filter((c) => c.isAvailable);
 
     const storeStatus = await this.availabilityService.getStoreStatus(tenant.id);
@@ -376,7 +428,69 @@ export class StorefrontService {
         lat: tenant.settings.lat || undefined,
         lng: tenant.settings.lng || undefined,
       } : undefined,
+      minimumOrderValue: tenant.settings?.minimumOrderValue ? Number(tenant.settings.minimumOrderValue) : null,
+      cashback: tenant.settings?.cashbackEnabled ? {
+        enabled: tenant.settings.cashbackEnabled,
+        percent: Number(tenant.settings.cashbackPercent || 0),
+      } : undefined,
+      scheduling: {
+        enabled: true // Tenant supports scheduling by default if scheduling module is used
+      }
     };
+
+    // Build virtual sections
+    const virtualSections: StorefrontCategoryPayload[] = [];
+    const allProducts = categories.flatMap(c => c.products);
+
+    // 1. Featured (Destaques da Loja)
+    const featuredProducts = allProducts.filter(p => p.badges.some(b => b.id === 'featured'));
+    if (featuredProducts.length > 0) {
+      virtualSections.push({
+        id: 'virtual-featured',
+        name: 'Destaques da Loja',
+        slug: 'destaques',
+        order: -3,
+        type: 'featured',
+        isVirtual: true,
+        products: featuredProducts
+      });
+    }
+
+    // 2. Promotions
+    const promoProducts = allProducts.filter(p => p.badges.some(b => b.id === 'promotion'));
+    if (promoProducts.length > 0) {
+      virtualSections.push({
+        id: 'virtual-promotions',
+        name: 'Promoções do Dia',
+        slug: 'promocoes',
+        order: -2,
+        type: 'promotions',
+        isVirtual: true,
+        products: promoProducts
+      });
+    }
+
+    // 3. New
+    const newProducts = allProducts.filter(p => p.badges.some(b => b.id === 'new'));
+    if (newProducts.length > 0) {
+      virtualSections.push({
+        id: 'virtual-new',
+        name: 'Novidades',
+        slug: 'novidades',
+        order: -1,
+        type: 'new',
+        isVirtual: true,
+        products: newProducts
+      });
+    }
+
+    // Adjust categories type
+    categories.forEach(c => {
+      c.type = 'category';
+      c.isVirtual = false;
+    });
+
+    const finalCategories = [...virtualSections, ...categories];
 
     // 4. Global Upsells
     const globalUpsellRows = await this.prisma.upsell.findMany({
@@ -426,7 +540,7 @@ export class StorefrontService {
 
     const payload: StorefrontPayload = {
       tenant: tenantInfo,
-      categories,
+      categories: finalCategories,
       combos,
       upsells: globalUpsells,
       customization,

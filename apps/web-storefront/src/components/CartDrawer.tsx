@@ -6,9 +6,10 @@ import { StorefrontUpsellPayload, StorefrontUpsellItemPayload, StorefrontProduct
 interface CartDrawerProps {
   onClose: () => void;
   upsells?: StorefrontUpsellPayload[];
+  minimumOrderValue?: number | null;
 }
 
-export function CartDrawer({ onClose, upsells }: CartDrawerProps) {
+export function CartDrawer({ onClose, upsells, minimumOrderValue }: CartDrawerProps) {
   const { items, subtotal, addItem, removeItem, updateQuantity } = useCartStore();
   const navigate = useNavigate();
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
@@ -201,13 +202,20 @@ export function CartDrawer({ onClose, upsells }: CartDrawerProps) {
             </div>
           </div>
 
-          <button
-            onClick={handleCheckout}
-            className="w-full h-14 bg-primary-600 text-white rounded-2xl shadow-xl shadow-primary-100 flex items-center justify-center gap-3 font-bold uppercase tracking-widest text-sm hover:bg-primary-700 active:scale-[0.98] transition-all"
-          >
-            Finalizar Pedido
-            <ChevronRight className="w-5 h-5" />
-          </button>
+          {minimumOrderValue && subtotal < minimumOrderValue ? (
+            <div className="w-full h-14 bg-gray-100 text-gray-500 rounded-2xl flex flex-col items-center justify-center cursor-not-allowed">
+              <span className="font-bold text-sm uppercase">Falta {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(minimumOrderValue - subtotal)}</span>
+              <span className="text-[10px]">Pedido mínimo: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(minimumOrderValue)}</span>
+            </div>
+          ) : (
+            <button
+              onClick={handleCheckout}
+              className="w-full h-14 bg-[var(--storefront-primary)] text-[var(--storefront-primary-foreground)] rounded-2xl shadow-xl flex items-center justify-center gap-3 font-bold uppercase tracking-widest text-sm hover:opacity-90 active:scale-[0.98] transition-all"
+            >
+              Finalizar Pedido
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          )}
         </div>
       </div>
     </div>

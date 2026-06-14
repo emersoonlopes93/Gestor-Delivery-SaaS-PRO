@@ -22,6 +22,14 @@ export interface StorefrontTenantInfo {
     lat?: number;
     lng?: number;
   };
+  minimumOrderValue?: number | null;
+  cashback?: {
+    enabled: boolean;
+    percent: number;
+  };
+  scheduling?: {
+    enabled: boolean;
+  };
 }
 
 import { PriceImpactType } from './catalog';
@@ -89,6 +97,13 @@ export interface StorefrontComplementGroupLinkPayload {
   order: number;
 }
 
+export interface ProductBadge {
+  id: string;
+  label: string;
+  variant: 'success' | 'danger' | 'warning' | 'info' | 'neutral';
+  priority: number;
+}
+
 export interface StorefrontProductPayload {
   id: string;
   name: string;
@@ -113,6 +128,9 @@ export interface StorefrontProductPayload {
     upsell: StorefrontUpsellPayload;
   }>;
   upsells?: StorefrontUpsellPayload[]; // Legacy support
+
+  badges: ProductBadge[];
+  compareAtPrice?: number | null;
 }
 
 export interface StorefrontCategoryPayload {
@@ -121,6 +139,9 @@ export interface StorefrontCategoryPayload {
   slug: string;
   order: number;
   templateType?: string; // Added for compatibility
+  templateConfig?: any;
+  type?: 'category' | 'featured' | 'promotions' | 'new' | 'combos';
+  isVirtual?: boolean;
   products: StorefrontProductPayload[];
 }
 

@@ -78,7 +78,7 @@ export class CheckoutValidatorService {
     const [settings, operatingHours] = await Promise.all([
       this.prisma.tenantSettings.findUnique({
         where: { tenantId },
-        select: { isStorePaused: true, storePauseReason: true, timezone: true },
+        select: { isStorePaused: true, storePauseReason: true, timezone: true, minimumOrderValue: true },
       }),
       this.prisma.tenantOperatingHours.findMany({
         where: { tenantId },
@@ -220,6 +220,11 @@ export class CheckoutValidatorService {
 
     // 6. Validar pagamento
     this.validatePayment(options?.payment, finalTotal);
+
+    // 7. Validate minimum order value
+    if (settings?.minimumOrderValue && itemsSubtotal < Number(settings.minimumOrderValue)) {
+      throw new BadRequestException(`O valor mínimo do pedido é de R$ ${Number(settings.minimumOrderValue).toFixed(2).replace('.', ',')}.`);
+    }
 
     return { 
       tenantId, 
