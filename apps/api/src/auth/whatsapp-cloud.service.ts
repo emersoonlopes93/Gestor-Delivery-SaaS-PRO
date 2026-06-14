@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { WhatsAppSenderService } from '../whatsapp-channel/services/whatsapp-sender.service';
 import { PrismaService } from '../database/prisma.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class WhatsAppCloudService {
@@ -9,6 +10,7 @@ export class WhatsAppCloudService {
   constructor(
     private readonly whatsappSender: WhatsAppSenderService,
     private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
   ) {}
 
   private normalizeBrazilToE164(cleanPhoneDigits: string): string {
@@ -27,7 +29,10 @@ export class WhatsAppCloudService {
     }
 
     const to = this.normalizeBrazilToE164(toPhoneDigits);
-    const bodyText = `Seu código de acesso é: ${code}`;
+    const template = this.configService.get<string>('WHATSAPP_OTP_MESSAGE_TEMPLATE') || 'Seu código de acesso é: {CODE}';
+    
+    // Suporta tanto o padrão novo {CODE} quanto o antigo {{CODE}} se alguém tiver forçado via .env manual
+    const bodyText = template.replace(/\{\{?CODE\}?\}/g, code);
 
     const result = await this.whatsappSender.sendText(tenantId, {
       to,

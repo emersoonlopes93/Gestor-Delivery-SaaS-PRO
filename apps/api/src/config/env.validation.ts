@@ -24,7 +24,7 @@ const baseEnvSchema = z.object({
   WHATSAPP_CLOUD_ACCESS_TOKEN: z.string().default(''),
   WHATSAPP_CLOUD_PHONE_NUMBER_ID: z.string().default(''),
   WHATSAPP_CLOUD_GRAPH_API_VERSION: z.string().default('v19.0'),
-  WHATSAPP_OTP_MESSAGE_TEMPLATE: z.string().default('Seu código de acesso é: {{CODE}}'),
+  WHATSAPP_OTP_MESSAGE_TEMPLATE: z.string().default('Seu código de acesso é: {CODE}'),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().default(''),
 
   // Web Push (VAPID)
