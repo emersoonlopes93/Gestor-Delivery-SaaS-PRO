@@ -1,4 +1,4 @@
-import { BillingPlanV2 } from '../admin-billing-api';
+import { BillingPlanV2, BillingRevenueTier } from '../admin-billing-api';
 import { BillingPlanFormState, BillingTierForm, shortId } from '../types';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { ArrowDown, ArrowUp, Layers3, Loader2, Plus, Save, Trash2 } from 'lucide-react';
@@ -13,13 +13,13 @@ function planToForm(plan: BillingPlanV2): BillingPlanFormState {
     allowAllModules: plan.allowAllModules,
     isActive: plan.isActive,
     isPublic: plan.isPublic,
-    tiers: plan.revenueTiers.map((tier: { id?: string; minRevenue: string; maxRevenue: string | null; price: string; label?: string }) => ({
+    tiers: plan.revenueTiers.map((tier: BillingRevenueTier) => ({
       rowId: tier.id || shortId(tier.id),
       id: tier.id,
-      minRevenue: tier.minRevenue,
-      maxRevenue: tier.maxRevenue,
-      price: tier.price,
-      label: tier.label,
+      minRevenue: String(tier.minRevenue),
+      maxRevenue: tier.maxRevenue ? String(tier.maxRevenue) : null,
+      price: String(tier.price),
+      label: tier.label ?? null,
     })),
   };
 }

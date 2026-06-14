@@ -79,7 +79,7 @@ export class CampaignsController {
     return this.campaignAutomationService.saveAutomationConfig(req.user.tenantId, type, {
       enabled: body.enabled,
       messageTemplate: body.messageTemplate,
-      config: (body.config || {}) as unknown as import('@prisma/client').Prisma.InputJsonValue,
+      config: (body.config || {}) as import('@prisma/client').Prisma.InputJsonObject,
     });
   }
 

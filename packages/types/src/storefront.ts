@@ -11,6 +11,7 @@ export interface StorefrontTenantInfo {
   primaryColor?: string | null;
   paymentMethods?: string[];
   mercadoPagoPublicKey?: string | null;
+  whatsappNumber?: string | null;
   address?: {
     street: string;
     number: string;

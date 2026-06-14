@@ -1,12 +1,16 @@
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { CheckCircle, ArrowLeft, Clock, MapPin, FileText, Package } from 'lucide-react';
-import type { OrderResponseDTO } from '@gestor/types';
+import { CheckCircle, ArrowLeft, Clock, MapPin, FileText, Package, MessageCircle } from 'lucide-react';
+import type { OrderResponseDTO, StorefrontPayload } from '@gestor/types';
+import { useQueryClient } from '@tanstack/react-query';
 
 export function OrderConfirmationPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const order = (location.state as { order?: OrderResponseDTO })?.order;
+  const storefront = queryClient.getQueryData<StorefrontPayload>(['storefront', tenantSlug]);
+  const whatsappNumber = storefront?.tenant?.whatsappNumber;
 
   if (!order) {
     return (
@@ -119,6 +123,18 @@ export function OrderConfirmationPage() {
           Acompanhar entrega em tempo real
         </button>
       ) : null}
+
+      {whatsappNumber && (
+        <a
+          href={`https://wa.me/${whatsappNumber.replace(/\D/g, '')}?text=Ol%C3%A1%2C%20acabei%20de%20fazer%20o%20pedido%20%23${order.orderNumber}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full flex items-center justify-center gap-2 h-14 bg-[#25D366] text-white rounded-2xl font-black uppercase tracking-widest text-sm hover:bg-[#128C7E] transition-colors mb-4"
+        >
+          <MessageCircle className="w-5 h-5" />
+          Avisar loja no WhatsApp
+        </a>
+      )}
 
       {/* Back to menu */}
       <button

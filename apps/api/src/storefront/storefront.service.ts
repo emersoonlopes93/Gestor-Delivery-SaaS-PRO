@@ -351,6 +351,11 @@ export class StorefrontService {
 
     const storeStatus = await this.availabilityService.getStoreStatus(tenant.id);
 
+    const waInstance = await this.prisma.whatsAppInstance.findFirst({
+      where: { tenantId: tenant.id, status: 'connected' },
+      select: { phoneNumber: true },
+    });
+
     const tenantInfo = {
       id: tenant.id,
       name: tenant.name,
@@ -360,6 +365,7 @@ export class StorefrontService {
       statusMessage: storeStatus.message,
       nextOpenAt: storeStatus.nextOpenAt,
       paymentMethods: (tenant.settings?.paymentMethods as string[]) || [],
+      whatsappNumber: waInstance?.phoneNumber || tenant.settings?.businessPhone || null,
       address: tenant.settings ? {
         street: tenant.settings.street || '',
         number: tenant.settings.number || '',
