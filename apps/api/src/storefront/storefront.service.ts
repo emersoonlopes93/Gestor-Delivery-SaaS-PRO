@@ -192,7 +192,9 @@ export class StorefrontService {
         slug: cat.slug,
         order: cat.order ?? 0,
         templateType: cat.templateType,
-        templateConfig: cat.templateConfig,
+        templateConfig: (cat.templateConfig !== null && typeof cat.templateConfig === 'object' && !Array.isArray(cat.templateConfig))
+          ? (cat.templateConfig as Record<string, unknown>)
+          : undefined,
         products: cat.products
           .map((p) => {
             const canSell = availabilityMap.get(p.id) ?? true;

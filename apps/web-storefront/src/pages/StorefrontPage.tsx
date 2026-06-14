@@ -422,7 +422,8 @@ export function StorefrontPage() {
 
         {/* Categories Sections */}
         {categories.map((category) => {
-          const bgStyle = category.templateConfig?.backgroundColor ? { backgroundColor: category.templateConfig.backgroundColor } : undefined;
+          const rawBg = category.templateConfig?.backgroundColor;
+          const bgStyle = typeof rawBg === 'string' ? { backgroundColor: rawBg } : undefined;
 
           return (
             <section key={category.id} id={category.slug} style={bgStyle} className={cn(bgStyle && "-mx-4 px-4 py-6 rounded-none", "scroll-m-20")}>
