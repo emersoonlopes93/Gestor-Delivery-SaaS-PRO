@@ -12,6 +12,9 @@ import { TenantStatus, TenantDefaultRole } from '@gestor/core';
 import type { TenantJwtPayload } from '@gestor/types';
 import { AuthSessionService } from './auth-session.service';
 import { AuthSubjectType } from '@prisma/client';
+import { MailService } from '../mail/mail.service';
+import { ConfigService } from '@nestjs/config';
+import * as crypto from 'crypto';
 
 type RequestSessionContext = {
   userAgent?: string;
@@ -36,6 +39,8 @@ export class TenantAuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly authSessionService: AuthSessionService,
+    private readonly mailService: MailService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -550,25 +555,64 @@ export class TenantAuthService {
     const normalizedEmail = email.toLowerCase();
     this.logger.debug(`Password reset requested for email: ${normalizedEmail}`);
 
-    // Find user by email
     const user = await this.prisma.tenantUser.findFirst({
       where: { email: normalizedEmail },
       include: { tenant: true },
     });
 
-    // Always return success to prevent email enumeration
-    // But only send email if user exists
     if (user) {
-      // TODO: Implement actual email sending logic
-      // For now, just log that we would send an email
-      this.logger.log(`Password reset email would be sent to: ${normalizedEmail} (tenant: ${user.tenant.slug})`);
-      
-      // Here you would typically:
-      // 1. Generate a reset token
-      // 2. Save it to the database with expiration
-      // 3. Send email with reset link
+      // Generate a secure reset token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const tokenExpires = new Date();
+      tokenExpires.setHours(tokenExpires.getHours() + 1); // 1 hour expiration
+
+      // Save token to db
+      await this.prisma.tenantUser.update({
+        where: { id: user.id },
+        data: {
+          passwordResetToken: resetToken,
+          passwordResetExpires: tokenExpires,
+        },
+      });
+
+      const frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:3000');
+      const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
+
+      await this.mailService.sendPasswordResetEmail(normalizedEmail, resetLink);
     }
 
     return { message: 'Se o e-mail existir em nosso sistema, você receberá instruções para redefinir sua senha.' };
+  }
+
+  /**
+   * Reset the password using the token sent via email
+   */
+  async resetPassword(token: string, newPassword: string) {
+    const user = await this.prisma.tenantUser.findFirst({
+      where: {
+        passwordResetToken: token,
+        passwordResetExpires: {
+          gt: new Date(),
+        },
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Token de redefinição de senha inválido ou expirado.');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+
+    await this.prisma.tenantUser.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
+    });
+
+    return { message: 'Senha redefinida com sucesso. Você já pode fazer login com sua nova senha.' };
   }
 }

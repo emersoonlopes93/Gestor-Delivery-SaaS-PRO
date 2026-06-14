@@ -41,7 +41,9 @@ import { WhatsAppChannelModule } from './whatsapp-channel/whatsapp-channel.modul
 import { AiAgentModule } from './ai-agent/ai-agent.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { ChatModule } from './chat/chat.module';
+import { ChatModule } from './chat/chat.module';
 import { getApiEnvFilePaths, loadApiEnvFiles } from './config/env-paths';
+import { MailModule } from './mail/mail.module';
 
 loadApiEnvFiles();
 
@@ -257,6 +259,7 @@ if (process.env.REDIS_ENABLED === 'false') {
     AiAgentModule,
     CampaignsModule,
     ChatModule,
+    MailModule,
   ],
   providers: [
     {

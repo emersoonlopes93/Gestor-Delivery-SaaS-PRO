@@ -60,6 +60,7 @@ export class PrismaService
         'MediaCategory',
         'AuthSession',
         'ExternalWebhookEvent',
+        'BillingRuleVersion',
       ];
 
       const model = params.model ?? '';
@@ -92,7 +93,7 @@ export class PrismaService
         // Achata chaves compostas no where (ex: tenantId_phone: { tenantId, phone } -> { tenantId, phone })
         for (const key of Object.keys(where)) {
           const val = where[key];
-          if (val && typeof val === 'object' && !Array.isArray(val)) {
+          if (key.includes('_') && val && typeof val === 'object' && !Array.isArray(val)) {
             const valKeys = Object.keys(val);
             const isPrismaFilter = valKeys.some(k => ['equals', 'in', 'not', 'notIn', 'lt', 'lte', 'gt', 'gte', 'contains', 'startsWith', 'endsWith', 'mode'].includes(k));
             if (!isPrismaFilter) {
@@ -117,7 +118,7 @@ export class PrismaService
         // Achata chaves compostas no where para operações de escrita também
         for (const key of Object.keys(where)) {
           const val = where[key];
-          if (val && typeof val === 'object' && !Array.isArray(val)) {
+          if (key.includes('_') && val && typeof val === 'object' && !Array.isArray(val)) {
             const valKeys = Object.keys(val);
             const isPrismaFilter = valKeys.some(k => ['equals', 'in', 'not', 'notIn', 'lt', 'lte', 'gt', 'gte', 'contains', 'startsWith', 'endsWith', 'mode'].includes(k));
             if (!isPrismaFilter) {

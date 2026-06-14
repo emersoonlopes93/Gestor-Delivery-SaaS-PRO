@@ -20,6 +20,14 @@ const baseEnvSchema = z.object({
   SWAGGER_ENABLED: z.enum(['true', 'false']).default('false'),
   SWAGGER_PATH: z.string().min(1).default('/docs'),
 
+  // Email & Security
+  SMTP_HOST: z.string().default(''),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_USER: z.string().default(''),
+  SMTP_PASS: z.string().default(''),
+  SMTP_FROM: z.string().default('noreply@gestorpro.com.br'),
+  FRONTEND_URL: z.string().default('http://localhost:3000'),
+
   // WhatsApp Cloud API (Customer OTP + Notifications)
   WHATSAPP_CLOUD_ACCESS_TOKEN: z.string().default(''),
   WHATSAPP_CLOUD_PHONE_NUMBER_ID: z.string().default(''),
