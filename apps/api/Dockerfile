@@ -1,23 +1,44 @@
-FROM node:20-alpine
+FROM node:20-slim AS base
+
+RUN apt-get update -y && \
+    apt-get install -y openssl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 
 WORKDIR /app
 
-COPY pnpm-lock.yaml package.json ./
+# Stage 2: Dependencies
+FROM base AS dependencies
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json turbo.json* ./
+COPY packages/ ./packages/
 COPY apps/api/package.json apps/api/
+RUN pnpm install --frozen-lockfile
 
-RUN npm install -g pnpm
-
-# Instala dependências do workspace e garante prisma CLI
-RUN pnpm install --frozen-lockfile --prod=false && pnpm add -w prisma
-
+# Stage 3: Build API
+FROM dependencies AS builder
+WORKDIR /app
 COPY . .
-
-# Gera Prisma Client
-RUN npx prisma generate --schema=apps/api/prisma/schema.prisma
-
-# Build da API
+RUN pnpm --filter @gestor/api prisma:generate
 RUN pnpm --filter @gestor/api build
 
+# Stage 4: Runner
+FROM base AS runner
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
+COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
+COPY --from=builder /app/apps/api/docker-entrypoint.sh ./apps/api/docker-entrypoint.sh
+
+ENV NODE_ENV=production
 EXPOSE 3333
 
-CMD ["sh", "-c", "pnpm --filter @gestor/api prisma:migrate:deploy && pnpm --filter @gestor/api start:prod"]
+RUN npm i -g prisma
+RUN chmod +x ./apps/api/docker-entrypoint.sh
+
+WORKDIR /app/apps/api
+ENTRYPOINT ["./docker-entrypoint.sh"]
+CMD ["pnpm", "start:api"]
