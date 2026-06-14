@@ -180,6 +180,7 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
       image: item.image || '',
       type: 'simple',
       isAvailable: true,
+      badges: [],
       optionGroupLinks: [],
       complementGroups: [],
       upsellLinks: [],

@@ -115,6 +115,7 @@ export function ComboDetailsModal({ combo, isStoreClosed, onClose }: ComboDetail
       basePrice: combo.basePrice,
       image: combo.image || '',
       isAvailable: combo.isAvailable,
+      badges: [],
       optionGroupLinks: [],
       complementGroups: [],
       upsellLinks: [],
