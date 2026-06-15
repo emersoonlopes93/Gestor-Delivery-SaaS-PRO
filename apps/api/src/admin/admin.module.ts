@@ -25,6 +25,8 @@ import { AiAgentModule } from '../ai-agent/ai-agent.module';
 import { AdminDebugAiAgentController } from '../ai-agent/controllers/admin-debug-ai-agent.controller';
 import { AdminAiAgentController } from './ai-agent/admin-ai-agent.controller';
 import { AiAgentPlanPresetService } from './ai-agent/ai-agent-plan-preset.service';
+import { AdminBaseMediaController } from './base-media/admin-base-media.controller';
+import { AdminBaseMediaService } from './base-media/admin-base-media.service';
 
 @Module({
   imports: [
@@ -46,6 +48,7 @@ import { AiAgentPlanPresetService } from './ai-agent/ai-agent-plan-preset.servic
     AdminDashboardController,
     AdminDebugAiAgentController,
     AdminAiAgentController,
+    AdminBaseMediaController,
   ],
   providers: [
     AdminAuthService, 
@@ -58,6 +61,7 @@ import { AiAgentPlanPresetService } from './ai-agent/ai-agent-plan-preset.servic
     SystemConfigService,
     AdminDashboardService,
     AiAgentPlanPresetService,
+    AdminBaseMediaService,
   ],
   exports: [AdminAuthService, AdminRbacService, AdminModulesModule],
 })

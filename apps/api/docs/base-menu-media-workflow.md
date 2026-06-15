@@ -53,11 +53,32 @@ Flags uteis:
 
 Por padrao, as imagens entram como `scope='system_gallery'`, `tenantId=null`, `isSystem=true` e `publicationStatus='draft'`.
 
-## 4. Revisar no SaaS Admin
+## 4. Validar manifesto
 
-As imagens importadas como draft devem ser revisadas no Banco Global. Publique somente as aprovadas.
+Antes de importar ou publicar em lote, valide o manifesto:
 
-## 5. Importar Cardapio Base
+```bash
+pnpm -C apps/api media:validate-base-manifest
+```
+
+O comando verifica duplicidade de lookup, slug e filename, consistencia com os templates do Cardapio Base, tags obrigatorias, metadata e nomes de arquivos.
+
+## 5. Revisar no SaaS Admin
+
+Abra `SaaS Admin > Galeria Base`.
+
+Recursos disponiveis:
+
+- filtros por categoria, status e tag
+- busca por produto, lookup e categoria
+- publicacao/despublicacao/arquivamento individual
+- publicacao/despublicacao/arquivamento em lote
+- detalhe com prompt, negative prompt, metadata e historico
+- substituicao de imagem mantendo lookup, categoria e produto
+
+As imagens importadas como draft devem ser revisadas. Publique somente as aprovadas.
+
+## 6. Importar Cardapio Base
 
 Depois de publicadas, o fluxo de Importar Cardapio Base continua usando o matching automatico existente por `mediaLookupKey`, `tagsJson`, categoria e biblioteca global.
 

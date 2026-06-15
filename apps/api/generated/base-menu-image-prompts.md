@@ -256,9 +256,9 @@ sem texto, sem logotipo, sem marca d agua, sem embalagem de marca, sem pessoas, 
 
 ## Açaí / Bebidas / Água Mineral
 
-- Arquivo: `agua_mineral.webp`
-- Lookup: `lookup:agua_mineral`
-- Tags: `lookup:agua_mineral`, `tag:bebida`, `tag:agua`, `segment:acai`, `category:bebidas`, `source:menu_import_base`
+- Arquivo: `acai_agua_mineral.webp`
+- Lookup: `lookup:acai_agua_mineral`
+- Tags: `lookup:acai_agua_mineral`, `tag:bebida`, `tag:agua`, `segment:acai`, `category:bebidas`, `source:menu_import_base`
 
 Prompt:
 
@@ -270,9 +270,9 @@ sem texto, sem logotipo, sem marca d agua, sem embalagem de marca, sem pessoas, 
 
 ## Açaí / Bebidas / Refrigerante Lata
 
-- Arquivo: `refrigerante_lata.webp`
-- Lookup: `lookup:refrigerante_lata`
-- Tags: `lookup:refrigerante_lata`, `tag:bebida`, `tag:refrigerante`, `segment:acai`, `category:bebidas`, `source:menu_import_base`
+- Arquivo: `acai_refrigerante_lata.webp`
+- Lookup: `lookup:acai_refrigerante_lata`
+- Tags: `lookup:acai_refrigerante_lata`, `tag:bebida`, `tag:refrigerante`, `segment:acai`, `category:bebidas`, `source:menu_import_base`
 
 Prompt:
 
@@ -284,9 +284,9 @@ sem texto, sem logotipo, sem marca d agua, sem embalagem de marca, sem pessoas, 
 
 ## Açaí / Bebidas / Suco Natural
 
-- Arquivo: `suco_natural.webp`
-- Lookup: `lookup:suco_natural`
-- Tags: `lookup:suco_natural`, `tag:bebida`, `tag:suco`, `segment:acai`, `category:bebidas`, `source:menu_import_base`
+- Arquivo: `acai_suco_natural.webp`
+- Lookup: `lookup:acai_suco_natural`
+- Tags: `lookup:acai_suco_natural`, `tag:bebida`, `tag:suco`, `segment:acai`, `category:bebidas`, `source:menu_import_base`
 
 Prompt:
 
@@ -550,9 +550,9 @@ sem texto, sem logotipo, sem marca d agua, sem embalagem de marca, sem pessoas, 
 
 ## Padaria & Cafeteria / Bebidas / Refrigerante Lata
 
-- Arquivo: `refrigerante_lata.webp`
-- Lookup: `lookup:refrigerante_lata`
-- Tags: `lookup:refrigerante_lata`, `tag:bebida`, `tag:refrigerante`, `segment:padaria-cafeteria`, `category:bebidas`, `source:menu_import_base`
+- Arquivo: `padaria_refrigerante_lata.webp`
+- Lookup: `lookup:padaria_refrigerante_lata`
+- Tags: `lookup:padaria_refrigerante_lata`, `tag:bebida`, `tag:refrigerante`, `segment:padaria-cafeteria`, `category:bebidas`, `source:menu_import_base`
 
 Prompt:
 
@@ -564,9 +564,9 @@ sem texto, sem logotipo, sem marca d agua, sem embalagem de marca, sem pessoas, 
 
 ## Padaria & Cafeteria / Bebidas / Água Mineral
 
-- Arquivo: `agua_mineral.webp`
-- Lookup: `lookup:agua_mineral`
-- Tags: `lookup:agua_mineral`, `tag:bebida`, `tag:agua`, `segment:padaria-cafeteria`, `category:bebidas`, `source:menu_import_base`
+- Arquivo: `padaria_agua_mineral.webp`
+- Lookup: `lookup:padaria_agua_mineral`
+- Tags: `lookup:padaria_agua_mineral`, `tag:bebida`, `tag:agua`, `segment:padaria-cafeteria`, `category:bebidas`, `source:menu_import_base`
 
 Prompt:
 
