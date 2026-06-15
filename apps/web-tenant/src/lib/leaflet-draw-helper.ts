@@ -1,6 +1,13 @@
 import L from 'leaflet';
 import 'leaflet-draw';
 
+// Monkey patch para o bug do leaflet-draw com Leaflet 1.8+ onde o polígono fecha prematuramente.
+// Ocorre porque pointer events disparam touch e mouse ao mesmo tempo em alguns ambientes, 
+// causando adição dupla de vértices que o leaflet-draw interpreta como duplo clique (finalizar).
+if (typeof window !== 'undefined' && (window as any).L && (window as any).L.Draw && (window as any).L.Draw.Polyline) {
+  (window as any).L.Draw.Polyline.prototype._onTouch = L.Util.falseFn;
+}
+
 /**
  * Helper para inicializar controles e ferramentas do Leaflet Draw sem usar casts duplos
  * ou tipagens 'any' no código dos componentes.

@@ -1,9 +1,10 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Circle, MapContainer, Marker, Polygon, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import { Circle, CircleMarker, MapContainer, Marker, Polygon, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet-draw';
 import {
   AlertCircle,
+  ArrowLeft,
   Ban,
   CheckCircle,
   Crosshair,
@@ -18,7 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api-client';
-import { createPolygonDrawer } from '@/lib/leaflet-draw-helper';
+// Import removido: createPolygonDrawer não é mais necessário
 import type { LatLngExpression } from 'leaflet';
 import { Tenant } from '@gestor/types';
 
@@ -289,16 +290,15 @@ const SimulationClickLayer = memo(function SimulationClickLayer(props: {
   return null;
 });
 
-const ZoneDrawLayer = memo(function ZoneDrawLayer(props: {
-  mode: DrawMode;
+const ZoneEditLayer = memo(function ZoneEditLayer(props: {
+  enabled: boolean;
   color: string;
   seedPolygon: PolygonCoordinates | null;
   onPolygonChange: (coords: PolygonCoordinates | null) => void;
 }) {
-  const { mode, color, seedPolygon, onPolygonChange } = props;
+  const { enabled, color, seedPolygon, onPolygonChange } = props;
   const map = useMap();
   const featureGroupRef = useRef<L.FeatureGroup | null>(null);
-  const drawRef = useRef<L.Draw.Polygon | null>(null);
 
   const clearLayers = useCallback(() => {
     if (!featureGroupRef.current) return;
@@ -376,25 +376,22 @@ const ZoneDrawLayer = memo(function ZoneDrawLayer(props: {
         polygon: false,
       },
     });
-
     map.addControl(editControl);
 
     return () => {
-      map.off(L.Draw.Event.CREATED, handleCreated);
       map.off(L.Draw.Event.EDITED, handleEdited);
       map.off(L.Draw.Event.DELETED, handleDeleted);
       map.removeControl(editControl);
       map.removeLayer(fg);
       featureGroupRef.current = null;
-      drawRef.current = null;
     };
-  }, [color, map, onPolygonChange]);
+  }, [color, map, onPolygonChange, enabled]);
 
   useEffect(() => {
     if (!featureGroupRef.current) return;
     clearLayers();
 
-    if (!seedPolygon || seedPolygon.length < 3) return;
+    if (!enabled || !seedPolygon || seedPolygon.length < 3) return;
     const seeded = ensureRingClosed(seedPolygon);
     const poly = new L.Polygon(coordsToLatLngs(seeded), {
       color,
@@ -403,38 +400,81 @@ const ZoneDrawLayer = memo(function ZoneDrawLayer(props: {
       weight: 3,
     });
     featureGroupRef.current.addLayer(poly);
-  }, [clearLayers, color, seedPolygon]);
-
-  useEffect(() => {
-    if (mode !== 'drawing') {
-      if (drawRef.current) {
-        drawRef.current.disable();
-        drawRef.current = null;
-      }
-      return;
-    }
-
-    const drawer = createPolygonDrawer(map, {
-      allowIntersection: false,
-      showArea: true,
-      shapeOptions: {
-        color,
-        fillColor: color,
-        fillOpacity: 0.12,
-        weight: 3,
-      },
-    });
-
-    drawRef.current = drawer;
-    drawer.enable();
-
-    return () => {
-      drawer.disable();
-      if (drawRef.current === drawer) drawRef.current = null;
-    };
-  }, [color, map, mode]);
+  }, [clearLayers, color, seedPolygon, enabled]);
 
   return null;
+});
+
+const ManualDrawLayer = memo(function ManualDrawLayer(props: {
+  enabled: boolean;
+  points: L.LatLng[];
+  setPoints: React.Dispatch<React.SetStateAction<L.LatLng[]>>;
+  color: string;
+}) {
+  const map = useMap();
+  const [mousePos, setMousePos] = useState<L.LatLng | null>(null);
+
+  useMapEvents({
+    click: (e) => {
+      if (!props.enabled) return;
+      props.setPoints((prev) => [...prev, e.latlng]);
+    },
+    mousemove: (e) => {
+      if (!props.enabled) return;
+      setMousePos(e.latlng);
+    },
+    mouseout: () => {
+      if (!props.enabled) return;
+      setMousePos(null);
+    }
+  });
+
+  useEffect(() => {
+    const el = map.getContainer();
+    if (props.enabled) {
+      el.style.cursor = 'crosshair';
+    } else {
+      el.style.cursor = '';
+      setMousePos(null);
+    }
+    return () => {
+      el.style.cursor = '';
+    };
+  }, [props.enabled, map]);
+
+  if (!props.enabled) return null;
+
+  const currentPositions = [...props.points];
+  if (mousePos) {
+    currentPositions.push(mousePos);
+  }
+
+  return (
+    <>
+      {props.points.map((p, i) => (
+        <CircleMarker
+          key={i}
+          center={p}
+          radius={5}
+          pathOptions={{ color: props.color, fillColor: '#fff', fillOpacity: 1, weight: 2 }}
+        />
+      ))}
+      
+      {currentPositions.length >= 2 && (
+        <Polygon
+          positions={currentPositions}
+          pathOptions={{
+            color: props.color,
+            weight: 2,
+            dashArray: '5, 5',
+            fillColor: currentPositions.length >= 3 ? props.color : 'transparent',
+            fillOpacity: currentPositions.length >= 3 ? 0.12 : 0,
+            interactive: false,
+          }}
+        />
+      )}
+    </>
+  );
 });
 
 async function geocodeNominatim(address: string): Promise<{ lat: number; lng: number } | null> {
@@ -475,6 +515,8 @@ export function DeliveryZonesPageRefactored() {
   const [hasDefaultCoords, setHasDefaultCoords] = useState(false);
   const isMobile = useIsMobile();
   const [showMobileMap, setShowMobileMap] = useState(false);
+
+  const [draftPolygonPoints, setDraftPolygonPoints] = useState<L.LatLng[]>([]);
   const [coverageDraft, setCoverageDraft] = useState({
     isDeliveryEnabled: true,
     storeLat: -23.55052,
@@ -694,7 +736,7 @@ export function DeliveryZonesPageRefactored() {
 
   const openNewZone = useCallback(() => {
     resetZoneForm();
-    setEditorOpen(true);
+    setEditorOpen(false);
     setDrawMode('drawing');
   }, [resetZoneForm]);
 
@@ -705,7 +747,11 @@ export function DeliveryZonesPageRefactored() {
 
   const handlePolygonChange = useCallback((coords: PolygonCoordinates | null) => {
     setZoneForm((z) => ({ ...z, polygonCoordinates: coords }));
-  }, []);
+    if (coords && coords.length >= 3 && drawMode === 'drawing') {
+      setEditorOpen(true);
+      setDrawMode('idle');
+    }
+  }, [drawMode]);
 
   const handleDeleteZone = useCallback(
     async (z: DeliveryRateRule) => {
@@ -991,7 +1037,7 @@ export function DeliveryZonesPageRefactored() {
           <div className="text-sm text-muted-foreground mt-0.5">
             {drawMode === 'drawing'
               ? 'Desenhe no mapa e depois ajuste os detalhes.'
-              : 'Ajuste os detalhes e salve.'}
+              : 'Essas regras têm prioridade sobre faixas de distância.'}
           </div>
         </div>
         <button
@@ -1276,14 +1322,15 @@ export function DeliveryZonesPageRefactored() {
           {!isMobile && (
             <button
               type="button"
-              onClick={() => setDrawMode((m) => (m === 'drawing' ? 'idle' : 'drawing'))}
-              className={'h-12 flex-1 rounded-xl text-sm font-black transition-all inline-flex items-center justify-center gap-2 ' +
-                (drawMode === 'drawing'
-                  ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400'
-                  : 'bg-primary-50 text-primary-700 hover:bg-primary-100 dark:bg-primary-500/10 dark:text-primary-400')}
+              onClick={() => {
+                setDrawMode('drawing');
+                setEditorOpen(false);
+                setDraftPolygonPoints([]);
+              }}
+              className="h-12 px-4 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 text-sm font-bold flex flex-1 items-center justify-center gap-2 transition-colors"
             >
-              {drawMode === 'drawing' ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
-              {drawMode === 'drawing' ? 'Parar desenho' : 'Editar área'}
+              <Pencil className="h-4 w-4" />
+              Refazer desenho
             </button>
           )}
 
@@ -1320,13 +1367,80 @@ export function DeliveryZonesPageRefactored() {
     );
   }
 
-  const renderDesktopContent = () => (
-    <div className="h-full flex overflow-hidden bg-muted/50">
-      <div className="w-[420px] shrink-0 h-full border-r border-border bg-card flex flex-col z-10 shadow-sm relative">
+  const renderLeftPanelContent = () => {
+    if (drawMode === 'drawing') {
+      return (
+        <div className="flex flex-col h-full bg-card">
+          <div className="p-6 pb-4 border-b border-border shrink-0">
+            <button 
+              type="button"
+              onClick={() => { setDrawMode('idle'); setEditorOpen(false); setDraftPolygonPoints([]); }} 
+              className="p-2 -ml-2 mb-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="text-sm font-bold">Voltar</span>
+            </button>
+            <h2 className="text-xl font-black text-foreground">Desenhando nova zona</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Clique no mapa para adicionar pontos. Use Concluir área quando terminar.
+            </p>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="bg-muted p-4 rounded-xl text-center border border-border">
+              <Crosshair className="h-8 w-8 text-primary mx-auto mb-2 animate-pulse" />
+              <div className="font-black text-lg">{draftPolygonPoints.length}</div>
+              <div className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Pontos marcados</div>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setDraftPolygonPoints((prev) => prev.slice(0, -1))}
+                disabled={draftPolygonPoints.length === 0}
+                className="w-full h-10 rounded-xl bg-card border border-input text-sm font-bold hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                Desfazer ponto
+              </button>
+              <button
+                type="button"
+                onClick={() => setDraftPolygonPoints([])}
+                disabled={draftPolygonPoints.length === 0}
+                className="w-full h-10 rounded-xl bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400 text-sm font-bold hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors disabled:opacity-50"
+              >
+                Limpar
+              </button>
+            </div>
+          </div>
+          <div className="mt-auto p-4 border-t border-border shrink-0">
+            <button
+              onClick={() => {
+                if (draftPolygonPoints.length >= 3) {
+                  handlePolygonChange(latLngsToCoords(draftPolygonPoints));
+                  setDrawMode('idle');
+                  setEditorOpen(true);
+                  setDraftPolygonPoints([]);
+                }
+              }}
+              disabled={draftPolygonPoints.length < 3}
+              className="w-full h-12 rounded-xl bg-status-success text-white text-sm font-black hover:bg-status-success/90 transition-all shadow-md disabled:opacity-50"
+            >
+              Concluir área
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (editorOpen) {
+      return renderEditorForm();
+    }
+
+    return (
+      <div className="flex flex-col h-full bg-card">
         <div className="p-6 pb-4 border-b border-border shrink-0">
           <h1 className="text-2xl font-black text-foreground">Zonas de Entrega</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Configure seu mapa de entregas.
+            Desenhe áreas específicas para cobrar taxas diferentes por região.
           </p>
         </div>
 
@@ -1337,7 +1451,7 @@ export function DeliveryZonesPageRefactored() {
               <div>
                 <div className="text-sm font-black">Endereço não configurado</div>
                 <div className="text-xs font-medium mt-0.5 opacity-90">
-                  O mapa está usando coordenadas padrão. Configure a origem real da sua loja nas Configurações Gerais para que o raio funcione a partir de você.
+                  O mapa está usando coordenadas padrão. Configure a origem real.
                 </div>
               </div>
             </div>
@@ -1538,6 +1652,14 @@ export function DeliveryZonesPageRefactored() {
           </div>
         </div>
       </div>
+    );
+  };
+
+  const renderDesktopContent = () => (
+    <div className="h-full flex overflow-hidden bg-muted/50 relative">
+      <div className="w-[360px] max-w-[380px] shrink-0 h-full border-r border-border flex flex-col z-10 shadow-sm relative overflow-hidden bg-card">
+        {renderLeftPanelContent()}
+      </div>
 
       <div className="flex-1 min-w-0 h-full bg-muted/50 relative" style={{ isolation: 'isolate' }}>
         <div className="absolute inset-0">
@@ -1707,22 +1829,20 @@ export function DeliveryZonesPageRefactored() {
                 />
               );
             })}
-            <ZoneDrawLayer
-              mode={drawMode}
+            <ZoneEditLayer
+              enabled={editorOpen && drawMode !== 'drawing'}
               color={zoneForm.color}
               seedPolygon={editorOpen ? zoneForm.polygonCoordinates : null}
               onPolygonChange={handlePolygonChange}
             />
+            <ManualDrawLayer
+              enabled={drawMode === 'drawing'}
+              points={draftPolygonPoints}
+              setPoints={setDraftPolygonPoints}
+              color={zoneForm.color}
+            />
           </MapContainer>
         </div>
-
-        {editorOpen && (
-          <div
-            className="absolute top-0 right-0 h-full w-[400px] bg-card shadow-2xl z-[2000] border-l border-input flex flex-col transition-transform"
-          >
-            {renderEditorForm()}
-          </div>
-        )}
 
         <div className="hidden lg:block absolute bottom-6 right-6 z-[1000]">
           <div className="bg-white/95 dark:bg-slate-950/95 text-slate-950 dark:text-white border border-slate-200 dark:border-white/15 rounded-2xl shadow-xl dark:shadow-2xl backdrop-blur-md absolute bottom-0 right-0 min-w-[180px] p-4 space-y-3">
