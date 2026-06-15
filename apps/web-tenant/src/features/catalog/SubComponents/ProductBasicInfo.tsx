@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Images } from 'lucide-react';
+
 import { ProductCategory, CatalogProductType, CreateProductDto } from '@gestor/types';
 import { ImagePickerModal } from '../../../components/ImagePickerModal';
 import CreatableSelect from 'react-select/creatable';
@@ -26,10 +26,7 @@ export const ProductBasicInfo: React.FC = () => {
 
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
 
-  const selectedMediaAsset = useMemo(() => {
-    if (!productForm.mediaAssetId) return null;
-    return { id: productForm.mediaAssetId };
-  }, [productForm.mediaAssetId]);
+
 
   return (
     <section className="space-y-6">
@@ -190,7 +187,7 @@ export const ProductBasicInfo: React.FC = () => {
                   </div>
                 </button>
                 <div className="flex-1">
-                  <p className="text-xs text-muted-foreground font-medium mb-2">Clique no quadro para escolher uma imagem do banco ou fazer upload.</p>
+                  <p className="text-xs text-muted-foreground font-medium mb-2">Escolha uma imagem da sua biblioteca ou envie uma nova.</p>
                   <button
                     type="button"
                     onClick={() => { setImageFile(null); setImagePreviewUrl(null); setProductForm({ ...productForm, image: '', mediaAssetId: '' }); }}
@@ -202,39 +199,7 @@ export const ProductBasicInfo: React.FC = () => {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-border bg-muted/30 p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Images className="h-4 w-4 text-primary" />
-                <span className="text-xs font-black uppercase tracking-wider text-foreground">Banco de Imagens</span>
-              </div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => setIsImagePickerOpen(true)}
-                  className="px-4 py-2.5 rounded-lg bg-primary text-primary-foreground font-black uppercase text-[10px] hover:bg-primary/90 transition-colors"
-                >
-                  Selecionar Imagem
-                </button>
-                {selectedMediaAsset && productForm.mediaAssetId ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setImageFile(null);
-                      setImagePreviewUrl(null);
-                      setProductForm({ ...productForm, image: '', mediaAssetId: '' });
-                    }}
-                    className="px-4 py-2.5 rounded-lg bg-destructive/10 text-destructive font-black uppercase text-[10px] hover:bg-destructive/20 transition-colors"
-                  >
-                    Remover da Biblioteca
-                  </button>
-                ) : null}
-              </div>
-              {selectedMediaAsset && productForm.mediaAssetId ? (
-                <p className="text-[10px] font-bold text-muted-foreground">
-                  Imagem da biblioteca selecionada: {productForm.mediaAssetId}
-                </p>
-              ) : null}
-            </div>
+
 
             <div>
               <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Resumo / Descrição Curta</label>

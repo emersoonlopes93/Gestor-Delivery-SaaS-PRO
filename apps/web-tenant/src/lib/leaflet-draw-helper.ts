@@ -15,9 +15,10 @@ type LWithDraw = typeof L & {
 };
 
 if (typeof window !== 'undefined' && 'L' in window) {
-  const win = window as Window & { L?: LWithDraw };
-  if (win.L?.Draw?.Polyline) {
-    win.L.Draw.Polyline.prototype._onTouch = L.Util.falseFn;
+  const win = window as Window & { L?: unknown };
+  const leaf = win.L as LWithDraw | undefined;
+  if (leaf?.Draw?.Polyline) {
+    leaf.Draw.Polyline.prototype._onTouch = L.Util.falseFn;
   }
 }
 
