@@ -173,6 +173,10 @@ export class AdminMediaController {
       publicationStatus: 'draft',
       tags: tagsList,
       description: `Prompt: ${body.prompt}`,
+      metadata: {
+        source: 'admin_ai_generate',
+        prompt: body.prompt,
+      },
     };
 
     return this.media.uploadSystemAsset(uploadedFile, metadata, req.user.sub);

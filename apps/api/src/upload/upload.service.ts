@@ -25,6 +25,7 @@ export interface CreateMediaAssetInput {
   createdByUserId?: string | null;
   publicationStatus?: 'draft' | 'published' | 'unpublished';
   tagsJson?: Prisma.InputJsonValue;
+  metadataJson?: Prisma.InputJsonValue;
 }
 
 @Injectable()
@@ -40,7 +41,7 @@ export class UploadService {
   ) {}
 
   async createMediaAsset(input: CreateMediaAssetInput) {
-    const { tenantId, scope, file, category, categoryId, altText, tagsJson } = input;
+    const { tenantId, scope, file, category, categoryId, altText, tagsJson, metadataJson } = input;
 
     if (scope !== 'system_gallery' && !tenantId) {
       throw new BadRequestException('Upload tenant exige tenantId.');
@@ -104,6 +105,7 @@ export class UploadService {
           checksum,
           altText,
           tagsJson: tagsJson as Prisma.InputJsonValue,
+          metadataJson: metadataJson as Prisma.InputJsonValue,
           isSystem: scope === 'system_gallery',
           status: 'active',
           publicationStatus: input.publicationStatus ?? 'published',

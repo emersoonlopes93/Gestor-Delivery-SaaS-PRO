@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 
 import { ProductCategory, CatalogProductType, CreateProductDto } from '@gestor/types';
 import { ImagePickerModal } from '../../../components/ImagePickerModal';

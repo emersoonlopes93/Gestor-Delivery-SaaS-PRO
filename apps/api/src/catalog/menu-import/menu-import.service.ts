@@ -358,6 +358,12 @@ export class MenuImportService {
       'Porções',
       'Mercado',
       'Açaí',
+      'Padaria',
+      'Cafés',
+      'Salgados',
+      'Doces e Bolos',
+      'Complementos',
+      'Combos',
       'Japonesa',
       'Lanches',
     ];
