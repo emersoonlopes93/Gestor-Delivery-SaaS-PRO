@@ -352,6 +352,26 @@ export class BusinessIntelligenceService {
     };
   }
 
+  async getStorefrontBestSellers(tenantId: string, daysBack = 30, limit = 6): Promise<string[]> {
+    const cacheKey = `bi:storefront:best-sellers:${tenantId}:${daysBack}d:${limit}`;
+    const ttlMs = 15 * 60 * 1000; // 15 minutos para cache da vitrine
+    return this.cached(
+      cacheKey,
+      async () => {
+        const end = new Date();
+        const start = this.addDays(end, -daysBack);
+        const range = { startDate: this.startOfDay(start).toISOString(), endDate: this.endOfDay(end).toISOString() };
+
+        const profitability = await this.getProductProfitability(tenantId, range);
+        return profitability
+          .sort((a, b) => b.quantity - a.quantity)
+          .slice(0, limit)
+          .map((item) => item.id);
+      },
+      ttlMs
+    );
+  }
+
   private async getProductProfitability(tenantId: string, range: DateRange): Promise<ProductProfitability[]> {
     const orders = await this.prisma.order.findMany({
       where: { tenantId, status: 'completed', createdAt: this.toDateFilter(range) },
@@ -424,11 +444,11 @@ export class BusinessIntelligenceService {
     });
   }
 
-  private async cached<T>(key: string, factory: () => Promise<T>): Promise<T> {
+  private async cached<T>(key: string, factory: () => Promise<T>, ttlMs = this.ttlMs): Promise<T> {
     const cached = this.cache.get(key);
     if (cached && cached.expiresAt > Date.now()) return cached.value as T;
     const value = await factory();
-    this.cache.set(key, { value, expiresAt: Date.now() + this.ttlMs });
+    this.cache.set(key, { value, expiresAt: Date.now() + ttlMs });
     return value;
   }
 

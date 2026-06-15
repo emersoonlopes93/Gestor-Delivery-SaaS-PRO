@@ -21,6 +21,7 @@ import { UpsellsService } from '../catalog/upsells.service';
 import { MediaLibraryService } from '../upload/media-library.service';
 
 import { SchedulingService } from '../scheduling/scheduling.service';
+import { BusinessIntelligenceService } from '../analytics/business-intelligence.service';
 
 @Injectable()
 export class StorefrontService {
@@ -30,6 +31,7 @@ export class StorefrontService {
     private readonly upsellsService: UpsellsService,
     private readonly mediaLibrary: MediaLibraryService,
     private readonly schedulingService: SchedulingService,
+    private readonly biService: BusinessIntelligenceService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
@@ -441,12 +443,36 @@ export class StorefrontService {
       }
     };
 
+    const bestSellerIds = await this.biService.getStorefrontBestSellers(tenant.id);
+
     // Build virtual sections
     const virtualSections: StorefrontCategoryPayload[] = [];
     const allProducts = categories.flatMap(c => c.products);
 
+    const uniqueProductsMap = new Map<string, StorefrontProductPayload>();
+    for (const p of allProducts) {
+      if (!uniqueProductsMap.has(p.id)) uniqueProductsMap.set(p.id, p);
+    }
+
+    // 0. Best Sellers (Mais Pedidos)
+    const bestSellerProducts = bestSellerIds
+      .map(id => uniqueProductsMap.get(id))
+      .filter((p): p is StorefrontProductPayload => p !== undefined && p.isAvailable);
+
+    if (bestSellerProducts.length > 0) {
+      virtualSections.push({
+        id: 'best_sellers',
+        name: 'Mais Pedidos',
+        slug: 'mais-pedidos',
+        order: -4,
+        type: 'best_sellers',
+        isVirtual: true,
+        products: bestSellerProducts
+      });
+    }
+
     // 1. Featured (Destaques da Loja)
-    const featuredProducts = allProducts.filter(p => p.badges.some(b => b.id === 'featured'));
+    const featuredProducts = Array.from(uniqueProductsMap.values()).filter(p => p.badges.some(b => b.id === 'featured'));
     if (featuredProducts.length > 0) {
       virtualSections.push({
         id: 'virtual-featured',
@@ -460,7 +486,7 @@ export class StorefrontService {
     }
 
     // 2. Promotions
-    const promoProducts = allProducts.filter(p => p.badges.some(b => b.id === 'promotion'));
+    const promoProducts = Array.from(uniqueProductsMap.values()).filter(p => p.badges.some(b => b.id === 'promotion'));
     if (promoProducts.length > 0) {
       virtualSections.push({
         id: 'virtual-promotions',
@@ -474,7 +500,7 @@ export class StorefrontService {
     }
 
     // 3. New
-    const newProducts = allProducts.filter(p => p.badges.some(b => b.id === 'new'));
+    const newProducts = Array.from(uniqueProductsMap.values()).filter(p => p.badges.some(b => b.id === 'new'));
     if (newProducts.length > 0) {
       virtualSections.push({
         id: 'virtual-new',
