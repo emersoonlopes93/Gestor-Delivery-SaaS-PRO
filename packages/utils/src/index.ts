@@ -117,3 +117,32 @@ export function maskCPFCNPJ(value: string | undefined | null): string {
     .substring(0, 18);
 }
 
+/**
+ * Masks a currency value: 10 -> "R$ 0,10" | 100 -> "R$ 1,00"
+ * Returns string formatted as BRL currency.
+ */
+export function maskCurrency(value: string | number | undefined | null): string {
+  if (value === undefined || value === null) return '';
+  const stringValue = String(value);
+  const digits = unmask(stringValue);
+  if (!digits) return '';
+
+  const amount = parseInt(digits, 10) / 100;
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+  }).format(amount);
+}
+
+/**
+ * Unmasks a currency string to a pure number (float).
+ * "R$ 1,00" -> 1.00
+ */
+export function unmaskCurrency(value: string | undefined | null): number {
+  if (!value) return 0;
+  const digits = unmask(value);
+  if (!digits) return 0;
+  return parseInt(digits, 10) / 100;
+}
+

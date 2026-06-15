@@ -568,56 +568,39 @@ export function ProductsPage() {
           </div>
 
           {/* Linha 2: Filtros de Tipo, Status e Categoria */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 -mx-3 px-3 sm:mx-0 sm:px-0">
-              {[
-                { id: 'all', label: 'Todos' },
-                { id: 'simple', label: 'Individuais' },
-                { id: 'configurable', label: 'Personalizados' },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setTypeFilter(t.id as ProductTypeFilter)}
-                  className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
-                    typeFilter === t.id
-                      ? 'bg-primary text-primary-foreground border border-primary shadow-sm'
-                      : 'bg-card border border-border text-foreground hover:bg-muted'
-                  }`}
-                >
-                  {t.label}
-                </button>
+          <div className="grid grid-cols-2 md:flex md:flex-wrap items-center gap-2">
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as ProductTypeFilter)}
+              className="h-8 pl-2 pr-6 bg-card text-foreground border border-input text-[10px] font-black uppercase tracking-widest focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-inset hover:bg-muted rounded-lg cursor-pointer transition-all"
+            >
+              <option value="all">Tipos</option>
+              <option value="simple">Individuais</option>
+              <option value="configurable">Personalizados</option>
+            </select>
+
+            <select
+              value={selectedCategoryId ?? ''}
+              onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : null)}
+              className="h-8 pl-2 pr-6 bg-card text-foreground border border-input text-[10px] font-black uppercase tracking-widest focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-inset hover:bg-muted rounded-lg cursor-pointer transition-all"
+            >
+              <option value="">Categorias</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
-            </div>
+              <option value="__uncategorized__">Sem categoria</option>
+            </select>
 
-            <div
-              className="h-5 w-px hidden lg:block"
-              style={{ background: 'var(--border-default)' }}
-            />
-
-            <div className="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto no-scrollbar pb-1">
-              <select
-                value={selectedCategoryId ?? ''}
-                onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : null)}
-                className="h-8 pl-2 pr-6 bg-card text-foreground border border-input text-[10px] font-black uppercase tracking-widest focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-inset hover:bg-muted rounded-lg cursor-pointer transition-all"
-              >
-                <option value="">Categorias</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-                <option value="__uncategorized__">Sem categoria</option>
-              </select>
-
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as ProductStatusFilter)}
-                className="h-8 pl-2 pr-6 bg-card text-foreground border border-input text-[10px] font-black uppercase tracking-widest focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-inset hover:bg-muted rounded-lg cursor-pointer transition-all"
-              >
-                <option value="all">Status</option>
-                <option value="active">Ativos</option>
-                <option value="paused">Pausados</option>
-                <option value="sold_out">Esgotados</option>
-              </select>
-            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as ProductStatusFilter)}
+              className="h-8 pl-2 pr-6 bg-card text-foreground border border-input text-[10px] font-black uppercase tracking-widest focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-inset hover:bg-muted rounded-lg cursor-pointer transition-all col-span-2 md:col-span-1"
+            >
+              <option value="all">Status</option>
+              <option value="active">Ativos</option>
+              <option value="paused">Pausados</option>
+              <option value="sold_out">Esgotados</option>
+            </select>
           </div>
         </div>
       </div>

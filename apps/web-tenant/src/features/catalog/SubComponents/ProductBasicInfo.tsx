@@ -7,6 +7,7 @@ import { api } from '../../../lib/api-client';
 import { useFormContext } from 'react-hook-form';
 import { useCatalogEditor } from '../CatalogEditorContext';
 import { CatalogProductFormState } from '../CatalogEditorTypes';
+import { maskCurrency, unmaskCurrency } from '@gestor/utils';
 
 export const ProductBasicInfo: React.FC = () => {
   const { isComboMode, isNew, handleSaveProduct, savingStates, onOpenRecipe, product, goNextWizardStep, isComboWizard } = useCatalogEditor();
@@ -52,20 +53,19 @@ export const ProductBasicInfo: React.FC = () => {
                 <div>
                   <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Preço Base *</label>
                   <input
-                    type="number"
-                    step="0.01"
-                    value={productForm.basePrice}
-                    onChange={(e) => setProductForm({ ...productForm, basePrice: Number(e.target.value) })}
+                    type="text"
+                    value={maskCurrency(productForm.basePrice)}
+                    onChange={(e) => setProductForm({ ...productForm, basePrice: unmaskCurrency(e.target.value) })}
                     className="input-premium"
+                    placeholder="R$ 0,00"
                   />
                 </div>
               ) : (
                 <div>
                   <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Preço Final do Combo</label>
                   <input
-                    type="number"
-                    step="0.01"
-                    value={Number(bundleSummary?.finalPrice ?? productForm.basePrice ?? 0)}
+                    type="text"
+                    value={maskCurrency(Number(bundleSummary?.finalPrice ?? productForm.basePrice ?? 0))}
                     disabled
                     className="input-premium opacity-70 cursor-not-allowed"
                   />
@@ -87,12 +87,11 @@ export const ProductBasicInfo: React.FC = () => {
                   )}
                 </div>
                 <input
-                  type="number"
-                  step="0.01"
-                  value={productForm.costPrice}
-                  onChange={(e) => setProductForm({ ...productForm, costPrice: Number(e.target.value) })}
+                  type="text"
+                  value={maskCurrency(productForm.costPrice)}
+                  onChange={(e) => setProductForm({ ...productForm, costPrice: unmaskCurrency(e.target.value) })}
                   className="input-premium border-status-warning/30"
-                  placeholder="Ex: 2.50"
+                  placeholder="R$ 0,00"
                 />
                 <p className="text-[10px] text-status-warning mt-1 font-bold">Usado para cálculo de lucro se não houver ficha técnica.</p>
               </div>
@@ -333,20 +332,18 @@ export const ProductBasicInfo: React.FC = () => {
                           {size.name}
                         </label>
                         <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-base">R$</span>
                           <input
-                            type="number"
-                            step="0.01"
-                            value={Reflect.get(pizzaPrices, size.id) || ''}
+                            type="text"
+                            value={maskCurrency(Reflect.get(pizzaPrices, size.id) || 0)}
                             onChange={(e) => {
                               const nextPrices = { ...pizzaPrices };
                               if (size.id !== '__proto__' && size.id !== 'constructor') {
-                                Reflect.set(nextPrices, size.id, Number(e.target.value));
+                                Reflect.set(nextPrices, size.id, unmaskCurrency(e.target.value));
                               }
                               setPizzaPrices(nextPrices);
                             }}
-                            className="w-full pl-12 pr-4 py-3.5 bg-card text-foreground border border-input rounded-xl outline-none text-base font-black focus:ring-2 focus:ring-primary transition-all placeholder:text-muted-foreground"
-                            placeholder={productForm.basePrice.toString()}
+                            className="w-full px-4 py-3.5 bg-card text-foreground border border-input rounded-xl outline-none text-base font-black focus:ring-2 focus:ring-primary transition-all placeholder:text-muted-foreground text-center"
+                            placeholder="R$ 0,00"
                           />
                         </div>
                       </div>
