@@ -13,6 +13,7 @@ import { FranchiseDashboard } from './features/franchise/FranchiseDashboard';
 import IntegrationsPage from './features/integrations/pages/IntegrationsPage';
 import { GlobalMediaLibraryPage } from './features/media/GlobalMediaLibraryPage';
 import { BaseMediaLibraryPage } from './features/base-media/BaseMediaLibraryPage';
+import { BaseMenusPage } from './features/base-menus/BaseMenusPage';
 import { HealthPage } from './features/operations/health/HealthPage';
 import { AuthLayout } from './layouts/AuthLayout';
 import { AppLayout } from './layouts/AppLayout';
@@ -143,6 +144,22 @@ export function App() {
             element={
               <PermissionGate permission="saas.settings.read">
                 <GlobalMediaLibraryPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="/base-menus"
+            element={
+              <PermissionGate permission="saas.base_menu.read">
+                <BaseMenusPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="/base-menus/:id"
+            element={
+              <PermissionGate permission="saas.base_menu.read">
+                <BaseMenusPage />
               </PermissionGate>
             }
           />

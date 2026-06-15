@@ -21,6 +21,12 @@ export class AdminBaseMenuController {
     return this.baseMenus.listVersions(id);
   }
 
+  @Get(':id/import-logs')
+  @RequireAdminPermissions('saas.base_menu.read')
+  listImportLogs(@Param('id') id: string) {
+    return this.baseMenus.listImportLogs(id);
+  }
+
   @Get(':id')
   @RequireAdminPermissions('saas.base_menu.read')
   get(@Param('id') id: string) {

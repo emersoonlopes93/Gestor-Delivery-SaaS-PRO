@@ -20,6 +20,7 @@ import { SystemConfigService } from './services/system-config.service';
 import { AdminDashboardService } from './dashboard/admin-dashboard.service';
 import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
+import { UploadModule } from '../upload/upload.module';
 import { AdminModulesModule } from './modules/admin-modules.module';
 import { AiAgentModule } from '../ai-agent/ai-agent.module';
 import { AdminDebugAiAgentController } from '../ai-agent/controllers/admin-debug-ai-agent.controller';
@@ -34,6 +35,7 @@ import { AdminBaseMenuService } from './base-menu/admin-base-menu.service';
   imports: [
     AuthModule,
     BillingModule,
+    UploadModule,
     AdminModulesModule,
     forwardRef(() => AiAgentModule),
   ],

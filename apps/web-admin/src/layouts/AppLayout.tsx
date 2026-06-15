@@ -19,6 +19,7 @@ import {
   Bot,
   Images,
   LibraryBig,
+  BookOpenCheck,
   Activity
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -86,6 +87,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
       { id: 'health', label: 'Saúde dos Tenants', to: '/health', icon: Activity, permission: 'saas.tenants.read' },
       { id: 'integrations', label: 'Marketplace & IA', to: '/integrations', icon: Puzzle, permission: 'saas.settings.read', featureFlag: 'VITE_FEATURE_ADMIN_INTEGRATIONS' },
       { id: 'media', label: 'Biblioteca Global', to: '/media', icon: Images, permission: 'saas.settings.read' },
+      { id: 'base-menus', label: 'Cardápios Base', to: '/base-menus', icon: BookOpenCheck, permission: 'saas.base_menu.read' },
       { id: 'base-media', label: 'Galeria Base', to: '/base-media', icon: LibraryBig, permission: 'saas.base_media.read' },
       { id: 'ai-global', label: 'Agente IA Global', to: '/ai-agent/global', icon: Bot, permission: 'saas.ai.read', featureFlag: 'VITE_FEATURE_AI_AGENT' },
     ],
