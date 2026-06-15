@@ -29,10 +29,10 @@ import { ProductSkeleton, ComboSkeleton } from '../components/ProductSkeleton';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { LoginModal } from '../components/LoginModal';
 import { Link } from 'react-router-dom';
-import { 
-  StorefrontButton, 
-  ProductRenderer, 
-  CategoryNavigation, 
+import {
+  StorefrontButton,
+  ProductRenderer,
+  CategoryNavigation,
   StorefrontEmptyState,
   cn
 } from '@gestor/storefront-ui';
@@ -60,7 +60,7 @@ export function StorefrontPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const [searchParams] = useSearchParams();
   const tableIdParam = searchParams.get('tableId');
-  
+
   const setTenantId = useCartStore(s => s.setTenantId);
   const setTableId = useCartStore(s => s.setTableId);
   const cartSubtotal = useCartStore(s => s.subtotal);
@@ -184,12 +184,12 @@ export function StorefrontPage() {
 
   // Use real settings from backend, with local override for testing in DEV
   // Backend now guarantees normalization, but we add a safety layer here too.
-  const effectiveProductLayout = (import.meta.env.DEV && productLayout !== 'grid') 
-    ? productLayout 
+  const effectiveProductLayout = (import.meta.env.DEV && productLayout !== 'grid')
+    ? productLayout
     : (layoutSettings.productLayout || 'grid') as StorefrontProductLayout;
 
   return (
-    <div 
+    <div
       className="px-4 py-6"
     >
       {/* Store Header */}
@@ -214,14 +214,14 @@ export function StorefrontPage() {
         <div className="ml-auto flex items-center gap-2">
           {isLoggedIn ? (
             <div className="flex items-center gap-3">
-               <Link 
+              <Link
                 to={`/${tenantSlug}/orders`}
                 className="p-2 text-[var(--storefront-muted-foreground)] hover:text-[var(--storefront-primary)] transition-colors"
                 title="Meus Pedidos"
               >
                 <ClipboardList className="w-6 h-6" />
               </Link>
-              <Link 
+              <Link
                 to={`/${tenantSlug}/profile`}
                 className="p-2 text-[var(--storefront-muted-foreground)] hover:text-[var(--storefront-primary)] transition-colors"
                 title="Meu Perfil"
@@ -232,7 +232,7 @@ export function StorefrontPage() {
                 <p className="text-xs text-[var(--storefront-muted-foreground)]">Olá,</p>
                 <p className="text-sm font-bold text-[var(--storefront-foreground)]">{customer?.name}</p>
               </div>
-              <button 
+              <button
                 onClick={logout}
                 className="p-2 text-[var(--storefront-muted-foreground)] hover:text-red-500 transition-colors"
                 title="Sair"
@@ -241,7 +241,7 @@ export function StorefrontPage() {
               </button>
             </div>
           ) : (
-            <StorefrontButton 
+            <StorefrontButton
               variant="outline"
               size="sm"
               onClick={() => setIsLoginOpen(true)}
@@ -310,8 +310,8 @@ export function StorefrontPage() {
                 onClick={() => setProductLayout(layout)}
                 className={cn(
                   'px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tight transition-all',
-                  productLayout === layout 
-                    ? 'bg-[var(--storefront-primary)] text-[var(--storefront-primary-foreground)]' 
+                  productLayout === layout
+                    ? 'bg-[var(--storefront-primary)] text-[var(--storefront-primary-foreground)]'
                     : 'bg-white text-gray-500 border border-gray-200 hover:border-gray-300'
                 )}
               >
@@ -323,7 +323,7 @@ export function StorefrontPage() {
       )}
 
       {/* Categories Navigation */}
-      <CategoryNavigation 
+      <CategoryNavigation
         categories={categories}
         layout={layoutSettings.categoryLayout || 'tabs'}
         onCategoryClick={(slug) => {
@@ -406,9 +406,9 @@ export function StorefrontPage() {
                     </div>
                   </div>
                   {combo.image && (
-                    <img 
-                      src={combo.image} 
-                      alt={combo.name} 
+                    <img
+                      src={combo.image}
+                      alt={combo.name}
                       className="w-24 h-24 rounded-[var(--storefront-radius)] object-cover"
                       loading="lazy"
                       decoding="async"
@@ -423,32 +423,20 @@ export function StorefrontPage() {
         {/* Categories Sections */}
         {categories.map((category) => {
           const rawBg = category.templateConfig?.backgroundColor;
-          const bgStyle = typeof rawBg === 'string' ? { 
-            backgroundColor: rawBg,
-            boxShadow: `0 0 0 100vmax ${rawBg}`,
-            clipPath: 'inset(0 -100vmax)'
-          } : undefined;
+          const bgStyle = typeof rawBg === 'string' ? { backgroundColor: rawBg } : undefined;
 
           return (
-            <section 
-              key={category.id} 
-              id={category.slug} 
-              style={bgStyle} 
-              className={cn(
-                bgStyle ? "py-6 my-6 relative z-10" : "pt-2", 
-                "scroll-m-20"
-              )}
-            >
-              <h2 
+            <section key={category.id} id={category.slug} style={bgStyle} className={cn(bgStyle && "-mx-4 px-4 py-6 rounded-none", "scroll-m-20")}>
+              <h2
                 className="text-lg font-black uppercase tracking-wider text-[var(--storefront-primary-foreground)] bg-[var(--storefront-primary)] mb-6 py-3 flex items-center shadow-sm"
-                style={{ 
-                  boxShadow: '0 0 0 100vmax var(--storefront-primary)', 
-                  clipPath: 'inset(0 -100vmax)' 
+                style={{
+                  boxShadow: '0 0 0 100vmax var(--storefront-primary)',
+                  clipPath: 'inset(0 -100vmax)'
                 }}
               >
                 {category.name}
               </h2>
-              
+
               <div className={cn(
                 'grid gap-3 sm:gap-4',
                 effectiveProductLayout === 'grid' && 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
@@ -483,7 +471,7 @@ export function StorefrontPage() {
         })}
 
         {combos.length === 0 && categories.length === 0 && (
-          <StorefrontEmptyState 
+          <StorefrontEmptyState
             title="Nenhum item disponível"
             description="Nenhum item disponível para este canal no momento."
             icon={<ShoppingBag className="w-12 h-12" />}
@@ -493,16 +481,16 @@ export function StorefrontPage() {
 
       {/* Modals & Drawer */}
       {selectedProduct && (
-        <ProductDetailsModal 
-          product={selectedProduct} 
+        <ProductDetailsModal
+          product={selectedProduct}
           isStoreClosed={!data.tenant.isOpen}
-          onClose={() => setSelectedProduct(null)} 
+          onClose={() => setSelectedProduct(null)}
         />
       )}
 
       {/* selectedCombo Modal */}
       {selectedCombo && (
-        <ComboDetailsModal 
+        <ComboDetailsModal
           combo={selectedCombo}
           isStoreClosed={!data.tenant.isOpen}
           onClose={() => setSelectedCombo(null)}
@@ -510,23 +498,23 @@ export function StorefrontPage() {
       )}
 
       {isCartOpen && (
-        <CartDrawer 
-          onClose={() => setIsCartOpen(false)} 
-          upsells={data?.upsells} 
+        <CartDrawer
+          onClose={() => setIsCartOpen(false)}
+          upsells={data?.upsells}
           minimumOrderValue={data?.tenant.minimumOrderValue}
         />
       )}
 
-      <LoginModal 
-        isOpen={isLoginOpen} 
-        onClose={() => setIsLoginOpen(false)} 
-        tenantSlug={tenantSlug!} 
+      <LoginModal
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
+        tenantSlug={tenantSlug!}
       />
 
       {/* Floating Cart Button */}
       {cartItemsCount > 0 && !isCartOpen && tenant.isOpen && (
         <div className="fixed bottom-6 left-0 right-0 px-4 pointer-events-none z-40">
-          <button 
+          <button
             onClick={() => setIsCartOpen(true)}
             className="w-full max-w-lg mx-auto h-14 bg-primary-600 text-white rounded-2xl shadow-xl shadow-primary-200 flex items-center justify-between px-6 pointer-events-auto active:scale-95 transition-transform animate-in fade-in slide-in-from-bottom-5 duration-300"
           >
