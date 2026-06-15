@@ -427,7 +427,7 @@ export function StorefrontPage() {
           const bgStyle = typeof rawBg === 'string' ? { backgroundColor: rawBg } : undefined;
 
           return (
-            <section key={category.id} id={category.slug} style={bgStyle} className={cn(bgStyle && "-mx-4 px-4 py-6 rounded-none", "scroll-m-20")}>
+            <section key={category.id} id={category.slug} style={bgStyle} className={cn(bgStyle && "p-4 sm:p-6 rounded-2xl", "scroll-m-20")}>
               <h2
                 className="text-lg font-black uppercase tracking-wider text-[var(--storefront-primary-foreground)] bg-[var(--storefront-primary)] mb-6 px-4 py-3 rounded-xl flex items-center shadow-sm"
               >

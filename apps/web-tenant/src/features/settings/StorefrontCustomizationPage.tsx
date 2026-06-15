@@ -917,7 +917,9 @@ export function StorefrontCustomizationPage() {
                 className="relative w-[285px] h-[570px] bg-slate-950 rounded-[40px] border-[10px] border-slate-900 shadow-2xl flex flex-col overflow-hidden ring-4 ring-slate-800/10 dark:ring-slate-700/10 ring-offset-2 dark:ring-offset-slate-950 transition-all duration-500"
                 style={{
                   '--preview-primary': primaryHex,
+                  '--preview-primary-foreground': '#ffffff',
                   '--storefront-primary': primaryHex,
+                  '--storefront-primary-foreground': '#ffffff',
                   '--storefront-primary-5': primary5,
                   '--storefront-primary-10': primary10,
                   '--preview-radius': 

@@ -461,8 +461,21 @@ async function geocodeNominatim(address: string): Promise<{ lat: number; lng: nu
   return null;
 }
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 1024);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  return isMobile;
+}
+
 export function DeliveryZonesPageRefactored() {
   const [coverage, setCoverage] = useState<CoverageConfig | null>(null);
+  const [hasDefaultCoords, setHasDefaultCoords] = useState(false);
+  const isMobile = useIsMobile();
   const [coverageDraft, setCoverageDraft] = useState({
     isDeliveryEnabled: true,
     storeLat: -23.55052,
@@ -590,24 +603,30 @@ export function DeliveryZonesPageRefactored() {
         const settings = tenantRes.data.settings;
         if (settings) {
           const isDefaultCoords = Math.abs(fetchedLat - (-23.55052)) < 0.0001 && Math.abs(fetchedLng - (-46.633308)) < 0.0001;
+          let updatedToRealCoords = false;
 
           if (typeof settings.lat === 'number' && typeof settings.lng === 'number') {
             setCoverageDraft((d) => ({ ...d, storeLat: settings.lat ?? 0, storeLng: settings.lng ?? 0 }));
             setFitToStoreSeq((v) => v + 1);
+            updatedToRealCoords = true;
           } else if (hasConfig && !isDefaultCoords) {
             setFitToStoreSeq((v) => v + 1);
+            updatedToRealCoords = true;
           } else if (settings.street && settings.number && settings.city) {
             const addressStr = `${settings.street}, ${settings.number}, ${settings.neighborhood || ''}, ${settings.city} - ${settings.state || ''}, Brasil`;
             const coords = await geocodeNominatim(addressStr);
             if (coords) {
               setCoverageDraft((d) => ({ ...d, storeLat: coords.lat, storeLng: coords.lng }));
               setFitToStoreSeq((v) => v + 1);
+              updatedToRealCoords = true;
             } else {
-              setToast('Aviso: Não foi possível geocodificar o endereço. Mapa não centralizado com precisão.');
+              setToast('Aviso: Não foi possível geocodificar o endereço. Edite o endereço da loja nas Configurações.');
             }
           } else {
             setToast('Aviso: Configure o endereço com precisão em Configurações para centralizar o mapa.');
           }
+
+          setHasDefaultCoords(!updatedToRealCoords);
         }
       }
 
@@ -907,6 +926,17 @@ export function DeliveryZonesPageRefactored() {
 
   const renderEditorForm = () => (
     <div className="flex flex-col h-full bg-card">
+      {isMobile && (
+        <div className="p-4 shrink-0 bg-blue-50/50 border-b border-blue-200">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+            <div className="text-sm text-blue-900">
+              <strong className="block font-black mb-1">Modo Simplificado</strong>
+              Edição avançada de formato e desenho disponível apenas no Computador.
+            </div>
+          </div>
+        </div>
+      )}
       <div className="p-4 border-b border-border flex items-start justify-between gap-3 shrink-0">
         <div className="min-w-0">
           <div className="text-lg font-black text-foreground">
@@ -1253,6 +1283,17 @@ export function DeliveryZonesPageRefactored() {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {hasDefaultCoords && (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-xl flex items-start gap-3 shadow-sm">
+              <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+              <div>
+                <div className="text-sm font-black">Endereço não configurado</div>
+                <div className="text-xs font-medium mt-0.5 opacity-90">
+                  O mapa está usando coordenadas padrão. Configure a origem real da sua loja nas Configurações Gerais para que o raio funcione a partir de você.
+                </div>
+              </div>
+            </div>
+          )}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -1672,6 +1713,10 @@ export function DeliveryZonesPageRefactored() {
           zoom={14}
           className={"h-full w-full " + (simulationOn ? 'cursor-crosshair' : '')}
           style={{ height: 'calc(100vh - 64px)' }}
+          dragging={!isMobile}
+          touchZoom={!isMobile}
+          scrollWheelZoom={!isMobile}
+          doubleClickZoom={!isMobile}
         >
           <MapImperative storePosition={storePosition} fitToStoreSeq={fitToStoreSeq} />
           <MapRefSync mapRef={mapRef} />
@@ -1726,7 +1771,7 @@ export function DeliveryZonesPageRefactored() {
               />
             );
           })}
-          {editorOpen && (
+          {editorOpen && !isMobile && (
             <ZoneDrawLayer
               mode={drawMode}
               color={zoneForm.color}
@@ -1778,6 +1823,17 @@ export function DeliveryZonesPageRefactored() {
             <div className="mb-4">
               <h2 className="text-xl font-black text-foreground">Zonas de Entrega</h2>
             </div>
+            {hasDefaultCoords && (
+              <div className="mb-4 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-xl flex items-start gap-3 shadow-sm">
+                <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-sm font-black">Origem não configurada</div>
+                  <div className="text-xs font-medium mt-0.5 opacity-90">
+                    O mapa usa coordenadas padrão. Edite a loja nas Configurações Gerais.
+                  </div>
+                </div>
+              </div>
+            )}
 
             {visibleZones.length === 0 ? (
               <div className="text-center py-8">
