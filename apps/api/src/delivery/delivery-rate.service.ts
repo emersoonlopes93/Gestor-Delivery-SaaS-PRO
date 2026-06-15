@@ -162,6 +162,18 @@ export class DeliveryRateService {
     const storeLat = typeof settings?.lat === 'number' ? settings.lat : Number(cfg.storeLat);
     const storeLng = typeof settings?.lng === 'number' ? settings.lng : Number(cfg.storeLng);
 
+    // Proteção contra fallback estático da Praça da Sé
+    if (Math.abs(storeLat - (-23.55052)) < 0.00001 && Math.abs(storeLng - (-46.633308)) < 0.00001) {
+      return {
+        canDeliver: false,
+        matchedStrategy: 'delivery_disabled',
+        matchedZoneId: null,
+        fee: 0,
+        distanceKm: null,
+        reason: 'Configure o endereço da loja para calcular corretamente as taxas de entrega.',
+      };
+    }
+
     const distanceKm =
       typeof input.distanceKm === 'number' && Number.isFinite(input.distanceKm)
         ? input.distanceKm
@@ -175,7 +187,7 @@ export class DeliveryRateService {
       where: {
         tenantId: input.tenantId,
         isActive: true,
-        type: 'polygon',
+        type: { in: ['polygon', 'distance'] },
       },
       include: {
         distanceTiers: {
@@ -208,12 +220,10 @@ export class DeliveryRateService {
       }
     }
 
-    // 2) Custom zones
+    // 2) Custom zones (Polygons)
     for (const z of zones) {
-      const blocks =
-        z.blocksDelivery === true ||
-        z.zoneKind === 'blocked_zone';
-      if (blocks) continue;
+      if (z.blocksDelivery === true || z.zoneKind === 'blocked_zone') continue;
+      if (z.type !== 'polygon') continue;
 
       const poly = this.getPolygonForRule(z);
       if (!poly || poly.length < 3) continue;
@@ -286,7 +296,39 @@ export class DeliveryRateService {
       };
     }
 
-    // 3) Base radius
+    // 3) Global Distance Rules
+    for (const z of zones) {
+      if (z.blocksDelivery === true || z.zoneKind === 'blocked_zone') continue;
+      if (z.type !== 'distance') continue;
+      
+      const pricingMode = z.pricingMode;
+
+      if (pricingMode === 'tiers') {
+        // Enforce maxRadiusKm protection
+        if (cfg.maxRadiusKm != null && distanceKm > Number(cfg.maxRadiusKm)) {
+          continue; // Cannot apply global distance tier if beyond maxRadiusKm
+        }
+
+        const tier = (z.distanceTiers || []).find((t) => {
+          const min = Number(t.minDistanceKm);
+          const max = Number(t.maxDistanceKm);
+          return distanceKm >= min && distanceKm <= max;
+        });
+
+        if (tier) {
+          return {
+            canDeliver: true,
+            matchedStrategy: 'custom_zone_tiers',
+            matchedZoneId: z.id,
+            fee: Number(tier.fee),
+            distanceKm,
+            reason: `Taxa por faixa de distância (${Number(tier.minDistanceKm).toFixed(1)} a ${Number(tier.maxDistanceKm).toFixed(1)} km)`,
+          };
+        }
+      }
+    }
+
+    // 4) Base radius
     if (insideRadius) {
       const feeRaw = Number(cfg.defaultPricePerKm) * distanceKm;
       const fee = this.clampFee(feeRaw, {
@@ -677,21 +719,24 @@ export class DeliveryRateService {
       ruleData.rate = data.rate;
     } else if (data.type === 'distance') {
       if (
-        (data.minDistanceKm == null && data.minKm == null) ||
+        data.pricingMode !== 'tiers' &&
+        ((data.minDistanceKm == null && data.minKm == null) ||
         (data.maxDistanceKm == null && data.maxKm == null) ||
-        data.ratePerKm == null
+        data.ratePerKm == null)
       ) {
         throw new NotFoundException(
           'Para regra de distância, informe minDistanceKm/maxDistanceKm (ou minKm/maxKm) e ratePerKm',
         );
       }
 
-      ruleData.minKm = data.minKm ?? data.minDistanceKm;
-      ruleData.maxKm = data.maxKm ?? data.maxDistanceKm;
-      ruleData.ratePerKm = data.ratePerKm;
+      if (data.pricingMode !== 'tiers') {
+        ruleData.minKm = data.minKm ?? data.minDistanceKm;
+        ruleData.maxKm = data.maxKm ?? data.maxDistanceKm;
+        ruleData.ratePerKm = data.ratePerKm;
 
-      ruleData.minDistanceKm = data.minDistanceKm ?? data.minKm;
-      ruleData.maxDistanceKm = data.maxDistanceKm ?? data.maxKm;
+        ruleData.minDistanceKm = data.minDistanceKm ?? data.minKm;
+        ruleData.maxDistanceKm = data.maxDistanceKm ?? data.maxKm;
+      }
     } else if (data.type === 'fixed') {
       if (data.fixedRate == null) {
         throw new NotFoundException('Para regra fixa, informe fixedRate');
@@ -747,7 +792,32 @@ export class DeliveryRateService {
       ruleId = created.id;
     }
 
-    if (data.type === 'polygon' && ruleId && data.distanceTiers) {
+    if ((data.type === 'polygon' || data.type === 'distance') && ruleId && data.distanceTiers) {
+      if (data.distanceTiers.length > 0) {
+        // Validação de tiers
+        const sortedTiers = [...data.distanceTiers].sort((a, b) => Number(a.minDistanceKm) - Number(b.minDistanceKm));
+        
+        for (let i = 0; i < sortedTiers.length; i++) {
+          const t = sortedTiers[i];
+          if (t.minDistanceKm < 0) {
+            throw new UnprocessableEntityException('A distância mínima não pode ser negativa.');
+          }
+          if (t.fee < 0) {
+            throw new UnprocessableEntityException('A taxa de entrega não pode ser negativa.');
+          }
+          if (t.maxDistanceKm <= t.minDistanceKm) {
+            throw new UnprocessableEntityException(`A distância máxima (${t.maxDistanceKm}km) deve ser maior que a mínima (${t.minDistanceKm}km).`);
+          }
+          
+          if (i > 0) {
+            const prev = sortedTiers[i - 1];
+            if (t.minDistanceKm < prev.maxDistanceKm) {
+              throw new UnprocessableEntityException(`Sobreposição detectada: a faixa de ${t.minDistanceKm} a ${t.maxDistanceKm}km sobrepõe a faixa anterior de ${prev.minDistanceKm} a ${prev.maxDistanceKm}km.`);
+            }
+          }
+        }
+      }
+
       // Limpa faixas existentes e recria
       await this.prisma.deliveryRateDistanceTier.deleteMany({
         where: { deliveryRateRuleId: ruleId },

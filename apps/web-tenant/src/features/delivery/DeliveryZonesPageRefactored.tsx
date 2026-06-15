@@ -486,6 +486,8 @@ export function DeliveryZonesPageRefactored() {
   });
 
   const [zones, setZones] = useState<DeliveryRateRule[]>([]);
+  const [globalDistanceRule, setGlobalDistanceRule] = useState<DeliveryRateRule | null>(null);
+  const [distanceTiersDraft, setDistanceTiersDraft] = useState<Array<{ id?: string; minDistanceKm: string; maxDistanceKm: string; fee: string }>>([]);
 
   const [loading, setLoading] = useState(true);
   const [savingCoverage, setSavingCoverage] = useState(false);
@@ -591,10 +593,19 @@ export function DeliveryZonesPageRefactored() {
       if (rulesRes.success) {
         const all = rulesRes.data ?? [];
         const zs = all.filter((r) => r.type === 'polygon');
+        const ds = all.filter((r) => r.type === 'distance');
 
         setZones(zs.sort((a, b) => a.priority - b.priority));
 
         if (zs.length > 0 && !selectedZoneId) setSelectedZoneId(zs[0].id);
+
+        const dRule = ds.find((r) => r.pricingMode === 'tiers');
+        setGlobalDistanceRule(dRule || null);
+        if (dRule?.distanceTiers) {
+           setDistanceTiersDraft(dRule.distanceTiers);
+        } else {
+           setDistanceTiersDraft([]);
+        }
       }
 
       const tenantRes = await api.get<Tenant>('/tenant/me');
@@ -713,6 +724,42 @@ export function DeliveryZonesPageRefactored() {
     },
     [fetchAll, selectedZoneId],
   );
+
+  const handleSaveDistanceTiers = useCallback(async () => {
+    setSavingZone(true);
+    setError(null);
+    try {
+      const payload = {
+        type: 'distance' as const,
+        isActive: true,
+        priority: 500,
+        isFallback: false,
+        pricingMode: 'tiers' as const,
+        distanceTiers: distanceTiersDraft.map((t, idx) => ({
+          id: t.id,
+          minDistanceKm: Number(t.minDistanceKm),
+          maxDistanceKm: Number(t.maxDistanceKm),
+          fee: Number(t.fee),
+          sortOrder: idx
+        })),
+        name: 'Faixas de Distância Globais',
+      };
+
+      if (globalDistanceRule?.id) {
+        await api.put(`/delivery/rates/${globalDistanceRule.id}`, payload);
+        setToast('Faixas atualizadas');
+      } else {
+        await api.post('/delivery/rates', payload);
+        setToast('Faixas criadas');
+      }
+      await fetchAll();
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'Erro ao salvar faixas';
+      setError(msg);
+    } finally {
+      setSavingZone(false);
+    }
+  }, [fetchAll, distanceTiersDraft, globalDistanceRule]);
 
   const handleSaveZone = useCallback(async () => {
     setSavingZone(true);
@@ -1884,6 +1931,110 @@ export function DeliveryZonesPageRefactored() {
             </div>
           </div>
         )}
+
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <h3 className="text-lg font-black text-foreground">Entrega por distância</h3>
+            <p className="text-sm text-muted-foreground">Use faixas para cobrar valores diferentes conforme a distância.</p>
+          </div>
+          
+          <div className="p-5 rounded-xl border border-input bg-card shadow-sm space-y-4">
+            {distanceTiersDraft.length === 0 ? (
+              <div className="p-4 rounded-xl border border-dashed border-input bg-muted/30 text-center">
+                <div className="text-sm font-semibold mb-1">Nenhuma faixa configurada.</div>
+                <div className="text-xs text-muted-foreground">Você pode usar a taxa padrão acima ou adicionar faixas por KM aqui.</div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {distanceTiersDraft.map((tier, idx) => (
+                  <div key={idx} className="flex flex-col gap-2 p-3 rounded-lg border border-input bg-muted/20">
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="number" 
+                        min={0} 
+                        step={0.1} 
+                        value={tier.minDistanceKm} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          setDistanceTiersDraft(draft => draft.map((t, i) => i === idx ? { ...t, minDistanceKm: val } : t));
+                        }} 
+                        className="w-20 h-9 px-2 text-sm rounded-lg border border-input bg-card" 
+                        placeholder="De (km)"
+                      />
+                      <span className="text-sm text-muted-foreground">a</span>
+                      <input 
+                        type="number" 
+                        min={0} 
+                        step={0.1} 
+                        value={tier.maxDistanceKm} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          setDistanceTiersDraft(draft => draft.map((t, i) => i === idx ? { ...t, maxDistanceKm: val } : t));
+                        }} 
+                        className="w-20 h-9 px-2 text-sm rounded-lg border border-input bg-card" 
+                        placeholder="Até (km)"
+                      />
+                      <span className="text-sm text-muted-foreground">km</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">R$</span>
+                        <input 
+                          type="number" 
+                          min={0} 
+                          step={0.01} 
+                          value={tier.fee} 
+                          onChange={e => {
+                            const val = e.target.value;
+                            setDistanceTiersDraft(draft => draft.map((t, i) => i === idx ? { ...t, fee: val } : t));
+                          }} 
+                          className="w-full h-9 pl-8 pr-3 text-sm rounded-lg border border-input bg-card" 
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDistanceTiersDraft(draft => draft.filter((_, i) => i !== idx))}
+                        className="p-2 rounded-lg text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {Number(tier.maxDistanceKm) <= Number(tier.minDistanceKm) && (
+                      <div className="text-xs font-semibold text-red-500">A distância final deve ser maior que a inicial.</div>
+                    )}
+                    {idx > 0 && Number(tier.minDistanceKm) < Number(distanceTiersDraft[idx-1].maxDistanceKm) && (
+                      <div className="text-xs font-semibold text-yellow-600">Esta faixa cruza com a faixa anterior.</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <button
+              type="button"
+              onClick={() => {
+                const last = distanceTiersDraft[distanceTiersDraft.length - 1];
+                const nextMin = last ? Number(last.maxDistanceKm) : 0;
+                const nextMax = nextMin + 5;
+                setDistanceTiersDraft(draft => [...draft, { minDistanceKm: String(nextMin), maxDistanceKm: String(nextMax), fee: '0' }]);
+              }}
+              className="w-full h-9 rounded-lg border border-dashed border-input hover:bg-muted text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+            >
+              <Plus className="h-4 w-4" /> Adicionar faixa
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSaveDistanceTiers}
+              disabled={savingZone}
+              className="w-full h-11 rounded-xl bg-card border border-border text-foreground hover:bg-muted text-sm font-black flex items-center justify-center shadow-sm disabled:opacity-70 transition-all mt-4"
+            >
+              {savingZone ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+              Salvar Faixas
+            </button>
+          </div>
+        </div>
 
         <div className="space-y-4">
           <div className="flex items-center justify-between">
