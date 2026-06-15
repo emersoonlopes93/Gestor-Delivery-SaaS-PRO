@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { CategoriesController } from './categories/categories.controller';
 import { CategoriesService } from './categories/categories.service';
 import { ProductsController } from './products/products.controller';
@@ -28,7 +28,7 @@ import { MenuImportService } from './menu-import/menu-import.service';
 import { MenuImportController } from './menu-import/menu-import.controller';
 
 @Module({
-  imports: [DatabaseModule, RbacModule, UploadModule],
+  imports: [DatabaseModule, RbacModule, forwardRef(() => UploadModule)],
   controllers: [
     CategoriesController,
     ProductsController,
