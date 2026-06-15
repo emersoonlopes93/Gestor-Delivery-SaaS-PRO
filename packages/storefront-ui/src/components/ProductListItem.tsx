@@ -1,5 +1,6 @@
 import { ProductCardProps } from './ProductGridCard';
 import { StorefrontBadge } from './StorefrontBadge';
+import { ImageOff } from 'lucide-react';
 import { cn } from '../cn';
 
 export function ProductListItem({
@@ -57,7 +58,7 @@ export function ProductListItem({
         </div>
       </div>
 
-      {hasImage && (
+      {hasImage ? (
         <div className="w-24 h-24 flex-shrink-0 rounded-[var(--storefront-radius)] overflow-hidden bg-[var(--storefront-muted)]">
           <img 
             src={product.imageUrl!} 
@@ -68,7 +69,11 @@ export function ProductListItem({
             )}
           />
         </div>
-      )}
+      ) : imageMode !== 'hidden' ? (
+        <div className="w-24 h-24 flex-shrink-0 rounded-[var(--storefront-radius)] overflow-hidden bg-[var(--storefront-muted)] flex items-center justify-center">
+          <ImageOff className="w-8 h-8 text-[var(--storefront-muted-foreground)] opacity-50" />
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { ProductCardProps } from './ProductGridCard';
 import { StorefrontBadge } from './StorefrontBadge';
+import { ImageOff } from 'lucide-react';
 import { cn } from '../cn';
 
 export function ProductCompactCard({
@@ -19,7 +20,7 @@ export function ProductCompactCard({
         !product.isAvailable && 'opacity-60 grayscale'
       )}
     >
-      {hasImage && (
+      {hasImage ? (
         <div className="w-12 h-12 flex-shrink-0 rounded-[calc(var(--storefront-radius)-4px)] overflow-hidden bg-[var(--storefront-muted)]">
           <img 
             src={product.imageUrl!} 
@@ -27,7 +28,11 @@ export function ProductCompactCard({
             className="w-full h-full object-cover"
           />
         </div>
-      )}
+      ) : imageMode !== 'hidden' ? (
+        <div className="w-12 h-12 flex-shrink-0 rounded-[calc(var(--storefront-radius)-4px)] overflow-hidden bg-[var(--storefront-muted)] flex items-center justify-center">
+          <ImageOff className="w-5 h-5 text-[var(--storefront-muted-foreground)] opacity-50" />
+        </div>
+      ) : null}
 
       <div className="flex-1 min-w-0">
         <h3 className="font-bold text-sm text-[var(--storefront-foreground)] truncate group-hover:text-[var(--storefront-primary)] transition-colors leading-tight">

@@ -1,5 +1,6 @@
 import { StorefrontProduct } from '../types';
 import { StorefrontButton } from './StorefrontButton';
+import { ImageOff } from 'lucide-react';
 import { StorefrontBadge } from './StorefrontBadge';
 import { cn } from '../cn';
 
@@ -41,11 +42,11 @@ export function ProductGridCard({
             )}
           />
         </div>
-      ) : (
+      ) : imageMode !== 'hidden' ? (
         <div className="aspect-video w-full flex items-center justify-center bg-[var(--storefront-muted)]">
-          <span className="text-[var(--storefront-muted-foreground)] text-xs font-medium">Sem imagem</span>
+          <ImageOff className="w-8 h-8 text-[var(--storefront-muted-foreground)] opacity-50" />
         </div>
-      )}
+      ) : null}
 
       <div className="flex flex-col flex-1 p-4">
         <div className="flex flex-wrap gap-1 mb-2">

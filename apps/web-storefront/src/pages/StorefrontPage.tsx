@@ -423,10 +423,22 @@ export function StorefrontPage() {
         {/* Categories Sections */}
         {categories.map((category) => {
           const rawBg = category.templateConfig?.backgroundColor;
-          const bgStyle = typeof rawBg === 'string' ? { backgroundColor: rawBg } : undefined;
+          const bgStyle = typeof rawBg === 'string' ? { 
+            backgroundColor: rawBg,
+            boxShadow: `0 0 0 100vmax ${rawBg}`,
+            clipPath: 'inset(0 -100vmax)'
+          } : undefined;
 
           return (
-            <section key={category.id} id={category.slug} style={bgStyle} className={cn(bgStyle && "-mx-4 px-4 py-6 rounded-none", "scroll-m-20")}>
+            <section 
+              key={category.id} 
+              id={category.slug} 
+              style={bgStyle} 
+              className={cn(
+                bgStyle ? "py-6 my-6 relative z-10" : "pt-2", 
+                "scroll-m-20"
+              )}
+            >
               <h2 className="text-lg font-bold text-[var(--storefront-foreground)] mb-4 flex items-center gap-2">
                 <span className="w-1 h-6 bg-[var(--storefront-primary)] rounded-full" />
                 {category.name}
