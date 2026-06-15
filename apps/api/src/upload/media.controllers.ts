@@ -12,6 +12,8 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -124,6 +126,7 @@ const imageUploadInterceptor = FileInterceptor('file', {
 export class AdminMediaController {
   constructor(
     private readonly media: MediaLibraryService,
+    @Inject(forwardRef(() => OpenAiImageProvider))
     private readonly aiImageProvider: OpenAiImageProvider,
   ) {}
 
