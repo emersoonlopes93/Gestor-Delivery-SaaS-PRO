@@ -112,6 +112,7 @@ model Tenant {
   whatsappInstance            WhatsAppInstance?
   marketingAutomations        MarketingAutomation[]
   OrderFeedback               OrderFeedback[]
+  baseMenuImportLogs          BaseMenuImportLog[]
 
   @@map("tenants")
 }
@@ -662,6 +663,109 @@ model AdminUserRole {
 
   @@unique([userId, roleId])
   @@map("admin_user_roles")
+}
+
+model BaseMenuTemplate {
+  id                        String                    @id @default(uuid())
+  slug                      String                    @unique @db.VarChar(80)
+  name                      String                    @db.VarChar(140)
+  description               String?                   @db.Text
+  segment                   String                    @db.VarChar(80)
+  icon                      String?                   @db.VarChar(20)
+  status                    BaseMenuPublicationStatus @default(draft)
+  currentPublishedVersionId String?                   @unique @map("current_published_version_id")
+  metadataJson              Json?                     @map("metadata_json")
+  createdAt                 DateTime                  @default(now()) @map("created_at")
+  updatedAt                 DateTime                  @updatedAt @map("updated_at")
+  currentPublishedVersion   BaseMenuTemplateVersion?  @relation("CurrentBaseMenuVersion", fields: [currentPublishedVersionId], references: [id], onDelete: SetNull)
+  versions                  BaseMenuTemplateVersion[] @relation("BaseMenuTemplateVersions")
+  importLogs                BaseMenuImportLog[]
+
+  @@index([status])
+  @@index([segment])
+  @@map("base_menu_templates")
+}
+
+model BaseMenuTemplateVersion {
+  id                  String                    @id @default(uuid())
+  templateId          String                    @map("template_id")
+  versionNumber       Int                       @map("version_number")
+  status              BaseMenuPublicationStatus @default(draft)
+  publishedAt         DateTime?                 @map("published_at")
+  metadataJson        Json?                     @map("metadata_json")
+  createdAt           DateTime                  @default(now()) @map("created_at")
+  updatedAt           DateTime                  @updatedAt @map("updated_at")
+  template            BaseMenuTemplate          @relation("BaseMenuTemplateVersions", fields: [templateId], references: [id], onDelete: Cascade)
+  currentForTemplates BaseMenuTemplate[]        @relation("CurrentBaseMenuVersion")
+  categories          BaseMenuCategory[]
+  importLogs          BaseMenuImportLog[]
+
+  @@unique([templateId, versionNumber])
+  @@index([templateId, status])
+  @@map("base_menu_template_versions")
+}
+
+model BaseMenuCategory {
+  id           String                  @id @default(uuid())
+  versionId    String                  @map("version_id")
+  slug         String                  @db.VarChar(100)
+  name         String                  @db.VarChar(140)
+  description  String?                 @db.Text
+  sortOrder    Int                     @default(0) @map("sort_order")
+  metadataJson Json?                   @map("metadata_json")
+  createdAt    DateTime                @default(now()) @map("created_at")
+  updatedAt    DateTime                @updatedAt @map("updated_at")
+  version      BaseMenuTemplateVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  products     BaseMenuProduct[]
+
+  @@unique([versionId, slug])
+  @@index([versionId, sortOrder])
+  @@map("base_menu_categories")
+}
+
+model BaseMenuProduct {
+  id             String           @id @default(uuid())
+  categoryId     String           @map("category_id")
+  slug           String           @db.VarChar(120)
+  name           String           @db.VarChar(180)
+  description    String?          @db.Text
+  basePrice      Decimal          @default(0) @map("base_price") @db.Decimal(10, 2)
+  compareAtPrice Decimal?         @map("compare_at_price") @db.Decimal(10, 2)
+  sortOrder      Int              @default(0) @map("sort_order")
+  mediaLookupKey String?          @map("media_lookup_key") @db.VarChar(160)
+  searchTagsJson Json             @default("[]") @map("search_tags_json")
+  metadataJson   Json?            @map("metadata_json")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  category       BaseMenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, slug])
+  @@index([categoryId, sortOrder])
+  @@index([mediaLookupKey])
+  @@map("base_menu_products")
+}
+
+model BaseMenuImportLog {
+  id                String               @id @default(uuid())
+  tenantId          String               @map("tenant_id")
+  templateId        String               @map("template_id")
+  versionId         String               @map("version_id")
+  status            BaseMenuImportStatus
+  categoriesCreated Int                  @default(0) @map("categories_created")
+  productsCreated   Int                  @default(0) @map("products_created")
+  categoriesSkipped Int                  @default(0) @map("categories_skipped")
+  productsSkipped   Int                  @default(0) @map("products_skipped")
+  metadataJson      Json?                @map("metadata_json")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  tenant            Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  template          BaseMenuTemplate     @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  version           BaseMenuTemplateVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([templateId])
+  @@index([versionId])
+  @@index([status])
+  @@map("base_menu_import_logs")
 }
 
 model ProductCategory {
@@ -2566,6 +2670,18 @@ enum CatalogSalesChannel {
   storefront_delivery
   storefront_pickup
   pos
+}
+
+enum BaseMenuPublicationStatus {
+  draft
+  published
+  archived
+}
+
+enum BaseMenuImportStatus {
+  success
+  partial
+  failed
 }
 
 enum UpsellType {

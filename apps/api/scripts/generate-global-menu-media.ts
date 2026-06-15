@@ -1,10 +1,10 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { Prisma } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 import { slugify } from '@gestor/utils';
-import { MENU_TEMPLATES, type ProductTemplate } from '../src/catalog/menu-import/menu-templates.data';
+import { loadPublishedBaseMenuMediaItems, type BaseMenuMediaItem } from './base-menu-db-source';
 
 type PublicationStatus = 'draft' | 'published';
 
@@ -24,7 +24,10 @@ type GenerationItem = {
   templateId: string;
   templateName: string;
   categoryName: string;
-  product: ProductTemplate & {
+  product: {
+    name: string;
+    shortDescription: string;
+    searchTags: string[];
     mediaLookupKey: string;
     mediaCategory: string;
     mediaPrompt: string;
@@ -53,7 +56,7 @@ const NEGATIVE_PROMPT =
 
 async function main(): Promise<void> {
   const options = parseCliOptions(process.argv.slice(2));
-  const items = collectGenerationItems(options);
+  const items = await collectGenerationItems(options);
 
   if (!options.dryRun && !options.exportManifest && !options.executeAiGeneration) {
     throw new Error(
@@ -259,31 +262,34 @@ function toMarkdown(entries: ManifestEntry[]): string {
   return `${lines.join('\n')}\n`;
 }
 
-function collectGenerationItems(options: CliOptions): GenerationItem[] {
-  const items: GenerationItem[] = [];
+async function collectGenerationItems(options: CliOptions): Promise<GenerationItem[]> {
+  const prisma = new PrismaClient();
+  try {
+    const dbItems = await loadPublishedBaseMenuMediaItems(prisma, options.templateIds);
+    const items = dbItems
+      .filter((item): item is BaseMenuMediaItem & { mediaPrompt: string } => typeof item.mediaPrompt === 'string' && item.mediaPrompt.trim().length > 0)
+      .map((item) => ({
+        templateId: item.templateId,
+        templateName: item.templateName,
+        categoryName: item.categoryName,
+        product: {
+          name: item.productName,
+          shortDescription: item.shortDescription,
+          searchTags: item.searchTags,
+          mediaLookupKey: item.mediaLookupKey,
+          mediaCategory: item.mediaCategory,
+          mediaPrompt: item.mediaPrompt,
+        },
+      }));
 
-  for (const template of MENU_TEMPLATES) {
-    if (!options.templateIds.has(template.id)) continue;
-
-    for (const category of template.categories) {
-      for (const product of category.products) {
-        if (!product.mediaLookupKey || !product.mediaPrompt) continue;
-        items.push({
-          templateId: template.id,
-          templateName: template.name,
-          categoryName: category.name,
-          product: {
-            ...product,
-            mediaLookupKey: product.mediaLookupKey,
-            mediaCategory: product.mediaCategory ?? category.name,
-            mediaPrompt: product.mediaPrompt,
-          },
-        });
-      }
+    if (items.length === 0) {
+      throw new Error('Nenhum produto publicado com prompt de midia encontrado no banco. Rode pnpm -C apps/api base-menu:seed antes deste comando.');
     }
-  }
 
-  return options.limit === null ? items : items.slice(0, options.limit);
+    return options.limit === null ? items : items.slice(0, options.limit);
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 function parseCliOptions(args: string[]): CliOptions {

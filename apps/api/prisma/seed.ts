@@ -9,6 +9,7 @@ import {
 } from '@gestor/core';
 import { TenantDefaultRole, AdminDefaultRole } from '@gestor/core';
 import { seedDemoAiAgentAccess } from '../src/seed/demo-ai-agent.seed';
+import { seedBaseMenuTemplates } from '../src/catalog/menu-import/base-menu-bootstrap';
 
 const prisma = new PrismaClient();
 
@@ -306,6 +307,14 @@ async function seedAiPlanPresets() {
   }
 
   console.log(`   ✅ ${presets.length} AI plan presets seeded (basic / pro / premium)`);
+}
+
+async function seedBaseMenus() {
+  console.log('Seeding base menu templates...');
+  const summary = await seedBaseMenuTemplates(prisma);
+  console.log(
+    `   Base menus: ${summary.templates} templates, ${summary.versions} versions, ${summary.categories} categories, ${summary.products} products`,
+  );
 }
 
 async function seedDemoTenant() {
@@ -710,6 +719,7 @@ async function main() {
   await seedSystemConfig();
   await seedBillingFoundation();
   await seedAiPlanPresets();
+  await seedBaseMenus();
   await seedDemoTenant();
   await seedDineInTables();
 

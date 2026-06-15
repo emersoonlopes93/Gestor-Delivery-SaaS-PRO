@@ -147,6 +147,7 @@ export const ADMIN_PERMISSIONS = {
   'saas.onboarding.manage': 'Manage tenant onboarding',
   'saas.ai.read': 'View global AI agent prompt and tools',
   'saas.ai.manage': 'Manage global AI agent prompt',
+  'saas.base_menu.read': 'View base menu templates',
   'saas.base_media.read': 'View base menu media gallery',
   'saas.base_media.manage': 'Manage base menu media gallery',
   'saas.settings.read': 'View system settings',
@@ -246,6 +247,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
     'saas.tenants.read',
     'saas.support.access',
     'saas.audit.read',
+    'saas.base_menu.read',
     'saas.base_media.read',
   ],
   financial: [
@@ -270,6 +272,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
     'saas.modules.manage',
     'saas.metrics.read',
     'saas.audit.read',
+    'saas.base_menu.read',
     'saas.base_media.read',
     'saas.base_media.manage',
   ],
@@ -279,6 +282,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
     'saas.metrics.read',
     'saas.billing.read',
     'saas.billing.audit',
+    'saas.base_menu.read',
     'saas.base_media.read',
   ],
 };

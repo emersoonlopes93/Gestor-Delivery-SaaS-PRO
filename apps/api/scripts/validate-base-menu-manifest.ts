@@ -1,7 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { PrismaClient } from '@prisma/client';
 import { slugify } from '@gestor/utils';
-import { MENU_TEMPLATES } from '../src/catalog/menu-import/menu-templates.data';
+import { loadPublishedBaseMenuMediaItems } from './base-menu-db-source';
 
 type ManifestEntry = {
   segment: string;
@@ -28,10 +29,10 @@ type TemplateProductIndex = {
 const allowedExtensions = new Set(['.webp', '.png', '.jpg', '.jpeg']);
 const fileNamePattern = /^[a-z0-9][a-z0-9_-]*\.(webp|png|jpg|jpeg)$/;
 
-function main(): void {
+async function main(): Promise<void> {
   const manifestPath = path.resolve(process.cwd(), readArg(process.argv.slice(2), '--manifest') ?? path.join('generated', 'base-menu-image-manifest.json'));
   const entries = readManifest(manifestPath);
-  const productIndex = buildTemplateProductIndex();
+  const productIndex = await buildTemplateProductIndex(new Set(entries.map((entry) => entry.segment)));
   const errors: string[] = [];
   const warnings: string[] = [];
 
@@ -123,19 +124,22 @@ function validateEntries(entries: ManifestEntry[], productIndex: TemplateProduct
   }
 }
 
-function buildTemplateProductIndex(): TemplateProductIndex[] {
-  return MENU_TEMPLATES.flatMap((template) =>
-    template.categories.flatMap((category) =>
-      category.products
-        .filter((product) => Boolean(product.mediaLookupKey))
-        .map((product) => ({
-          segment: template.id,
-          category: category.name,
-          productName: product.name,
-          mediaLookupKey: product.mediaLookupKey ?? '',
-        }))
-    )
-  );
+async function buildTemplateProductIndex(templateIds: Set<string>): Promise<TemplateProductIndex[]> {
+  const prisma = new PrismaClient();
+  try {
+    const items = await loadPublishedBaseMenuMediaItems(prisma, templateIds);
+    if (items.length === 0) {
+      throw new Error('Nenhum produto publicado com mediaLookupKey encontrado no banco. Rode pnpm -C apps/api base-menu:seed antes de validar o manifesto.');
+    }
+    return items.map((item) => ({
+      segment: item.templateId,
+      category: item.categoryName,
+      productName: item.productName,
+      mediaLookupKey: item.mediaLookupKey,
+    }));
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 function reportDuplicates(values: string[], label: string, errors: string[]): void {
@@ -193,4 +197,8 @@ function readArg(args: string[], name: string): string | null {
   return null;
 }
 
-main();
+main().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`Falha ao validar manifesto: ${message}`);
+  process.exitCode = 1;
+});

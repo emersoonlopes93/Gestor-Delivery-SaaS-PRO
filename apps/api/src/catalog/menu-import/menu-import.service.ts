@@ -4,14 +4,50 @@ import { TenantContextService } from '../../common/context/tenant-context.servic
 import { ProductsService } from '../products/products.service';
 import { CategoriesService } from '../categories/categories.service';
 import { MediaLibraryService } from '../../upload/media-library.service';
-import {
-  getTemplateById,
-  getTemplateBySegment,
-  listTemplatesSummary,
-  type MenuTemplate,
-  type CategoryTemplate,
-  type ProductTemplate,
-} from './menu-templates.data';
+
+type ProductTemplate = {
+  name: string;
+  shortDescription: string;
+  basePrice: number;
+  searchTags: string[];
+  mediaLookupKey?: string;
+};
+
+type CategoryTemplate = {
+  name: string;
+  order: number;
+  products: ProductTemplate[];
+};
+
+type MenuTemplate = {
+  id: string;
+  name: string;
+  description: string;
+  businessSegment: string;
+  businessSegments?: string[];
+  emoji: string;
+  categories: CategoryTemplate[];
+};
+
+type MenuTemplateSummary = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  businessSegment: string;
+  businessSegments?: string[];
+  segment: string;
+  emoji: string;
+  icon: string;
+  totalCategories: number;
+  totalProducts: number;
+};
+
+type LoadedBaseMenuTemplate = MenuTemplate & {
+  templateDbId: string;
+  versionDbId: string;
+  versionNumber: number;
+};
 
 export interface MenuImportOptions {
   /** Se true, pula produtos/categorias já existentes. Se false, retorna erro de conflito. Padrão: true */
@@ -53,22 +89,57 @@ export class MenuImportService {
   /**
    * Lista todos os templates disponíveis com metadados (sem produtos detalhados).
    */
-  listTemplates() {
-    return listTemplatesSummary();
+  async listTemplates(): Promise<MenuTemplateSummary[]> {
+    const templates = await this.prisma.baseMenuTemplate.findMany({
+      where: {
+        status: 'published',
+        currentPublishedVersionId: { not: null },
+      },
+      include: {
+        currentPublishedVersion: {
+          include: {
+            categories: {
+              include: { products: true },
+            },
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return templates
+      .filter((template) => template.currentPublishedVersion?.status === 'published')
+      .map((template) => {
+        const categories = template.currentPublishedVersion?.categories ?? [];
+        return {
+          id: template.slug,
+          slug: template.slug,
+          name: template.name,
+          description: template.description ?? '',
+          businessSegment: template.segment,
+          businessSegments: extractBusinessSegments(template.metadataJson, template.segment),
+          segment: template.segment,
+          emoji: template.icon ?? '',
+          icon: template.icon ?? '',
+          totalCategories: categories.length,
+          totalProducts: categories.reduce((sum, category) => sum + category.products.length, 0),
+        };
+      });
   }
 
   /**
    * Retorna um template completo por ID.
    */
-  getTemplate(id: string): MenuTemplate | null {
-    return getTemplateById(id) ?? null;
+  async getTemplate(id: string): Promise<MenuTemplate | null> {
+    const template = await this.loadPublishedTemplate(id);
+    return template ? stripInternalTemplateFields(template) : null;
   }
 
   /**
    * Detecta o template recomendado para o tenant atual
    * com base em tenant.settings.businessCategory.
    */
-  async detectRecommendedTemplate(): Promise<ReturnType<typeof listTemplatesSummary>[number] | null> {
+  async detectRecommendedTemplate(): Promise<MenuTemplateSummary | null> {
     const tenantId = this.tenantContext.getTenantId();
     if (!tenantId) return null;
 
@@ -77,16 +148,18 @@ export class MenuImportService {
       select: { settings: true },
     });
 
-    const settings = tenant?.settings as Record<string, unknown> | null;
-    const segment = settings?.businessCategory as string | undefined;
+    const segment = extractBusinessCategory(tenant?.settings);
 
     if (!segment) return null;
 
-    const template = getTemplateBySegment(segment);
-    if (!template) return null;
-
-    const summaries = listTemplatesSummary();
-    return summaries.find((s) => s.id === template.id) ?? null;
+    const normalized = segment.toLowerCase().trim();
+    const summaries = await this.listTemplates();
+    return summaries.find((summary) => (
+      summary.businessSegment.toLowerCase() === normalized ||
+      summary.id.toLowerCase() === normalized ||
+      summary.slug.toLowerCase() === normalized ||
+      (summary.businessSegments ?? []).some((segment) => segment.toLowerCase() === normalized)
+    )) ?? null;
   }
 
   /**
@@ -104,7 +177,7 @@ export class MenuImportService {
     }
 
     const skipExisting = options.skipExisting ?? true;
-    const template = getTemplateById(templateId);
+    const template = await this.loadPublishedTemplate(templateId);
 
     if (!template) {
       throw new Error(`Template "${templateId}" não encontrado`);
@@ -112,7 +185,7 @@ export class MenuImportService {
 
     const result: MenuImportResult = {
       success: false,
-      templateId,
+      templateId: template.id,
       categoriesCreated: 0,
       categoriesSkipped: 0,
       productsCreated: 0,
@@ -122,7 +195,7 @@ export class MenuImportService {
       errors: [],
     };
 
-    this.logger.log(`menu_import_start tenantId=${tenantId} templateId=${templateId}`);
+    this.logger.log(`menu_import_start tenantId=${tenantId} templateId=${template.id} version=${template.versionNumber}`);
 
     // Garantir que as categorias de mídia globais existam
     await this.ensureGlobalCategoriesExist();
@@ -210,16 +283,17 @@ export class MenuImportService {
     // Telemetria exigida pela especificação
     const imagesMissing = totalProducts - result.imagesLinked;
     this.logger.log(
-      `menu_import_images_found tenantId=${tenantId} templateId=${templateId} count=${result.imagesLinked}`,
+      `menu_import_images_found tenantId=${tenantId} templateId=${template.id} count=${result.imagesLinked}`,
     );
     this.logger.log(
-      `menu_import_images_missing tenantId=${tenantId} templateId=${templateId} count=${imagesMissing}`,
+      `menu_import_images_missing tenantId=${tenantId} templateId=${template.id} count=${imagesMissing}`,
     );
     this.logger.log(
       `menu_import_telemetry ` +
         JSON.stringify({
           tenantId,
-          template: templateId,
+          template: template.id,
+          version: template.versionNumber,
           products: totalProducts,
           imagesMatched: result.imagesLinked,
           imagesMissing,
@@ -227,15 +301,114 @@ export class MenuImportService {
     );
 
     this.logger.log(
-      `menu_import_completed tenantId=${tenantId} templateId=${templateId} ` +
+      `menu_import_completed tenantId=${tenantId} templateId=${template.id} version=${template.versionNumber} ` +
         `categories=${result.categoriesCreated} products=${result.productsCreated} ` +
         `images=${result.imagesLinked} durationMs=${result.durationMs}`,
     );
+
+    await this.createImportLog(tenantId, template, result, totalProducts, imagesMissing);
 
     return result;
   }
 
   // ─── Private helpers ────────────────────────────────────────────────────────
+
+  private async loadPublishedTemplate(identifier: string): Promise<LoadedBaseMenuTemplate | null> {
+    const template = await this.prisma.baseMenuTemplate.findFirst({
+      where: {
+        status: 'published',
+        OR: [{ id: identifier }, { slug: identifier }],
+      },
+      include: {
+        currentPublishedVersion: {
+          include: {
+            categories: {
+              include: { products: true },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        },
+        versions: {
+          where: { status: 'published' },
+          include: {
+            categories: {
+              include: { products: true },
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+          orderBy: { versionNumber: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!template) return null;
+
+    const version = template.currentPublishedVersion?.status === 'published'
+      ? template.currentPublishedVersion
+      : template.versions[0];
+
+    if (!version || version.status !== 'published') return null;
+
+    return {
+      templateDbId: template.id,
+      versionDbId: version.id,
+      versionNumber: version.versionNumber,
+      id: template.slug,
+      name: template.name,
+      description: template.description ?? '',
+      businessSegment: template.segment,
+      businessSegments: extractBusinessSegments(template.metadataJson, template.segment),
+      emoji: template.icon ?? '',
+      categories: version.categories.map((category) => ({
+        name: category.name,
+        order: category.sortOrder,
+        products: category.products
+          .sort((left, right) => left.sortOrder - right.sortOrder)
+          .map((product) => ({
+            name: product.name,
+            shortDescription: product.description ?? '',
+            basePrice: Number(product.basePrice),
+            searchTags: extractStringArray(product.searchTagsJson),
+            mediaLookupKey: product.mediaLookupKey ?? undefined,
+          })),
+      })),
+    };
+  }
+
+  private async createImportLog(
+    tenantId: string,
+    template: LoadedBaseMenuTemplate,
+    result: MenuImportResult,
+    totalProducts: number,
+    imagesMissing: number,
+  ): Promise<void> {
+    const status = result.errors.length === 0
+      ? 'success'
+      : (result.productsCreated > 0 || result.categoriesCreated > 0 ? 'partial' : 'failed');
+
+    await this.prisma.baseMenuImportLog.create({
+      data: {
+        tenantId,
+        templateId: template.templateDbId,
+        versionId: template.versionDbId,
+        status,
+        categoriesCreated: result.categoriesCreated,
+        productsCreated: result.productsCreated,
+        categoriesSkipped: result.categoriesSkipped,
+        productsSkipped: result.productsSkipped,
+        metadataJson: {
+          templateSlug: template.id,
+          versionNumber: template.versionNumber,
+          durationMs: result.durationMs,
+          imagesLinked: result.imagesLinked,
+          imagesMissing,
+          totalProducts,
+          errors: result.errors,
+        },
+      },
+    });
+  }
 
   private async importCategory(
     tenantId: string,
@@ -534,4 +707,34 @@ export class MenuImportService {
 
     return null;
   }
+}
+
+function stripInternalTemplateFields(template: LoadedBaseMenuTemplate): MenuTemplate {
+  return {
+    id: template.id,
+    name: template.name,
+    description: template.description,
+    businessSegment: template.businessSegment,
+    businessSegments: template.businessSegments,
+    emoji: template.emoji,
+    categories: template.categories,
+  };
+}
+
+function extractStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string');
+}
+
+function extractBusinessSegments(metadata: unknown, fallback: string): string[] {
+  if (!metadata || typeof metadata !== 'object') return [fallback];
+  const candidate = (metadata as Record<string, unknown>).businessSegments;
+  const segments = extractStringArray(candidate);
+  return segments.length > 0 ? segments : [fallback];
+}
+
+function extractBusinessCategory(settings: unknown): string | undefined {
+  if (!settings || typeof settings !== 'object') return undefined;
+  const candidate = (settings as Record<string, unknown>).businessCategory;
+  return typeof candidate === 'string' && candidate.trim() ? candidate : undefined;
 }
