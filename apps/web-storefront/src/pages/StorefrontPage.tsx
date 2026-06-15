@@ -371,8 +371,9 @@ export function StorefrontPage() {
         {/* Combos Section */}
         {combos.length > 0 && (
           <section id="combos">
-            <h2 className="text-lg font-bold text-[var(--storefront-foreground)] mb-4 flex items-center gap-2">
-              <span className="w-1 h-6 bg-[var(--storefront-primary)] rounded-full" />
+            <h2
+              className="text-lg font-black uppercase tracking-wider text-[var(--storefront-primary-foreground)] bg-[var(--storefront-primary)] mb-6 px-4 py-3 rounded-xl flex items-center shadow-sm"
+            >
               COMBOS ESPECIAIS
             </h2>
             <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2 xl:grid-cols-3">
@@ -428,11 +429,7 @@ export function StorefrontPage() {
           return (
             <section key={category.id} id={category.slug} style={bgStyle} className={cn(bgStyle && "-mx-4 px-4 py-6 rounded-none", "scroll-m-20")}>
               <h2
-                className="text-lg font-black uppercase tracking-wider text-[var(--storefront-primary-foreground)] bg-[var(--storefront-primary)] mb-6 py-3 flex items-center shadow-sm"
-                style={{
-                  boxShadow: '0 0 0 100vmax var(--storefront-primary)',
-                  clipPath: 'inset(0 -100vmax)'
-                }}
+                className="text-lg font-black uppercase tracking-wider text-[var(--storefront-primary-foreground)] bg-[var(--storefront-primary)] mb-6 px-4 py-3 rounded-xl flex items-center shadow-sm"
               >
                 {category.name}
               </h2>

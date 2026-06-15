@@ -1030,8 +1030,7 @@ export function StorefrontCustomizationPage() {
                       {/* Combos Especiais */}
                       {displayCombos.length > 0 && (
                         <div className="space-y-2">
-                          <h3 className="text-[9px] font-black text-foreground flex items-center gap-1 uppercase tracking-wider text-left">
-                            <span className="w-0.5 h-3.5 rounded bg-[var(--preview-primary)] inline-block" />
+                          <h3 className="text-[9px] font-black text-white bg-[var(--preview-primary)] mb-2 px-2 py-1.5 rounded flex items-center shadow-sm uppercase tracking-wider text-left">
                             Combos Especiais
                           </h3>
                           <div className="flex flex-col gap-2">
@@ -1065,8 +1064,7 @@ export function StorefrontCustomizationPage() {
                       {/* Categorias e Produtos */}
                       {displayCategories.map((category) => (
                         <div key={category.id} className="space-y-2.5">
-                          <h3 className="text-[9px] font-black text-foreground flex items-center gap-1 uppercase tracking-wider text-left">
-                            <span className="w-0.5 h-3.5 rounded bg-[var(--preview-primary)] inline-block" />
+                          <h3 className="text-[9px] font-black text-white bg-[var(--preview-primary)] mb-2 px-2 py-1.5 rounded flex items-center shadow-sm uppercase tracking-wider text-left">
                             {category.name}
                           </h3>
                           
