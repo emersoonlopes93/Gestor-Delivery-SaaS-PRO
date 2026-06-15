@@ -278,13 +278,38 @@ export function ImagePickerModal({
             ) : filteredAssets.length === 0 ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-center text-muted-foreground">
-                  <p className="text-sm font-bold">Nenhuma imagem encontrada.</p>
                   {activeTab === 'mine' ? (
-                    <p className="text-xs mt-1">Comece fazendo upload de uma imagem acima.</p>
+                    <>
+                      <p className="text-sm font-bold">Nenhuma imagem encontrada.</p>
+                      <p className="text-xs mt-1">Comece fazendo upload de uma imagem acima.</p>
+                    </>
+                  ) : globalAssets.length === 0 ? (
+                    <div className="mt-2 space-y-3">
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                        <Search className="w-5 h-5 text-primary" />
+                      </div>
+                      <p className="text-sm font-black text-foreground">Banco de imagens em preparação</p>
+                      <p className="text-xs text-muted-foreground">
+                        Em breve, imagens curadas de alta qualidade estarão disponíveis aqui.
+                      </p>
+                      <button
+                        onClick={() => {
+                          setActiveTab('mine');
+                          setSearchQuery('');
+                          setSelectedCategory('');
+                        }}
+                        className="mt-4 inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-black uppercase tracking-wider text-primary-foreground hover:bg-primary/90 transition-colors"
+                      >
+                        Usar Minhas Imagens
+                      </button>
+                    </div>
                   ) : (
-                    <p className="text-xs mt-1">
-                      Nenhuma imagem publicada nesta categoria.
-                    </p>
+                    <>
+                      <p className="text-sm font-bold">Nenhuma imagem encontrada.</p>
+                      <p className="text-xs mt-1">
+                        Tente mudar a categoria ou limpar sua busca.
+                      </p>
+                    </>
                   )}
                 </div>
               </div>
