@@ -25,6 +25,7 @@ import { AdminPermissionsGuard } from '../admin/rbac/admin-permissions.guard';
 import { CurrentTenant, RequireAdminPermissions, RequirePermissions } from '../common/decorators';
 import type { AdminJwtPayload, TenantJwtPayload } from '@gestor/types';
 import { MediaLibraryService, MediaListFilters, MediaMetadataInput, MediaScope } from './media-library.service';
+import { OpenAiImageProvider } from '../ai-agent/providers/openai-image.provider';
 
 type FileFilterCallback = (error: Error | null, acceptFile: boolean) => void;
 
@@ -74,6 +75,22 @@ class MediaMetadataDto {
   publicationStatus?: 'draft' | 'published' | 'unpublished';
 }
 
+class AiGenerateDto {
+  @IsString()
+  prompt!: string;
+
+  @IsString()
+  title!: string;
+
+  @IsString()
+  @IsOptional()
+  categoryId?: string;
+
+  @IsString()
+  @IsOptional()
+  tags?: string;
+}
+
 class MediaCategoryDto {
   @IsString()
   name!: string;
@@ -105,7 +122,58 @@ const imageUploadInterceptor = FileInterceptor('file', {
 @Controller('admin/media')
 @UseGuards(AdminAuthGuard, AdminPermissionsGuard)
 export class AdminMediaController {
-  constructor(private readonly media: MediaLibraryService) {}
+  constructor(
+    private readonly media: MediaLibraryService,
+    private readonly aiImageProvider: OpenAiImageProvider,
+  ) {}
+
+  @Post('ai-generate')
+  @Throttle({ public: { limit: 10, ttl: 60 } })
+  @RequireAdminPermissions('saas.settings.manage')
+  async aiGenerateGlobal(
+    @Request() req: ExpressRequest & { user: AdminJwtPayload },
+    @Body() body: AiGenerateDto,
+  ) {
+    const isAvailable = await this.aiImageProvider.isAvailable();
+    if (!isAvailable) {
+      throw new BadRequestException('A integracao com a OpenAI para imagens nao esta configurada.');
+    }
+
+    const result = await this.aiImageProvider.generateImage({
+      prompt: body.prompt,
+      n: 1,
+      size: '1024x1024',
+      response_format: 'b64_json',
+    });
+
+    if (result.error || !result.data[0]?.b64_json) {
+      throw new BadRequestException(`Falha na geracao de imagem: ${result.error?.message || 'Nenhum dado retornado.'}`);
+    }
+
+    const buffer = Buffer.from(result.data[0].b64_json, 'base64');
+    const safeTitle = body.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    
+    const uploadedFile: UploadedImage = {
+      buffer,
+      originalname: `ai_generated_${safeTitle}.png`,
+      mimetype: 'image/png',
+      size: buffer.length,
+    };
+
+    let tagsList = parseTags(body.tags) || [];
+    tagsList.push('ai_generated');
+
+    const metadata: MediaMetadataInput = {
+      title: body.title,
+      altText: body.title,
+      categoryId: body.categoryId,
+      publicationStatus: 'draft',
+      tags: tagsList,
+      description: `Prompt: ${body.prompt}`,
+    };
+
+    return this.media.uploadSystemAsset(uploadedFile, metadata, req.user.sub);
+  }
 
   @Post('gallery/upload')
   @Throttle({ public: { limit: 20, ttl: 60 } })

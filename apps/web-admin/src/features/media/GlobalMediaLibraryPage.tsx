@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Folder, Image, RefreshCw, Search, Trash2, UploadCloud, Edit2 } from 'lucide-react';
+import { Folder, Image, RefreshCw, Search, Trash2, UploadCloud, Edit2, Sparkles } from 'lucide-react';
 import { api } from '../../lib/api-client';
 
 type MediaAsset = {
@@ -49,6 +49,14 @@ export function GlobalMediaLibraryPage() {
   const [editStatus, setEditStatus] = useState<'published' | 'draft'>('published');
   const [editTags, setEditTags] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // AI Generation
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiProduct, setAiProduct] = useState('');
+  const [aiSegment, setAiSegment] = useState('');
+  const [aiCategory, setAiCategory] = useState('');
+  const [aiPrompt, setAiPrompt] = useState('Imagem comercial genérica e apetitosa de {produto}, fotografia de comida profissional, fundo limpo, iluminação natural, sem texto, sem logotipo, sem marca, alta qualidade.');
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
   async function loadCategories() {
     try {
@@ -198,6 +206,33 @@ export function GlobalMediaLibraryPage() {
     }
   }
 
+  async function handleGenerateAi() {
+    if (!aiProduct || !aiPrompt) return;
+    setIsGeneratingAi(true);
+    try {
+      const finalPrompt = aiPrompt.replace('{produto}', aiProduct);
+      let tags = `lookup:${aiProduct.replace(/[^a-z0-9]/gi, '_').toLowerCase()}, tag:${aiProduct.split(' ')[0].toLowerCase()}`;
+      if (aiSegment) tags += `, segment:${aiSegment.toLowerCase()}`;
+      
+      await api.post('/admin/media/ai-generate', {
+        title: aiProduct,
+        prompt: finalPrompt,
+        categoryId: aiCategory || undefined,
+        tags: tags,
+      });
+      setShowAiModal(false);
+      setAiProduct('');
+      await loadAssets();
+    } catch (err) {
+      console.error('Failed to generate image', err);
+      const e = err as { response?: { data?: { message?: string } } };
+      const errorMessage = e?.response?.data?.message || 'Falha ao gerar a imagem com IA.';
+      alert(errorMessage);
+    } finally {
+      setIsGeneratingAi(false);
+    }
+  }
+
   useEffect(() => {
     void loadAssets();
     void loadCategories();
@@ -211,6 +246,14 @@ export function GlobalMediaLibraryPage() {
           <p className="text-sm font-bold text-muted-foreground mt-1">Imagens comerciais publicadas aqui ficam disponíveis para todos os tenants em seus Cardápios Bases.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowAiModal(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary/10 border border-primary/20 px-4 py-2 text-sm font-black text-primary hover:bg-primary/20 transition-colors"
+          >
+            <Sparkles className="h-4 w-4" />
+            Gerar com IA
+          </button>
           <button
             type="button"
             onClick={() => setShowCategoriesModal(true)}
@@ -597,6 +640,110 @@ export function GlobalMediaLibraryPage() {
                   Salvar Imagem
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Gerador de IA */}
+      {showAiModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border rounded-2xl max-w-lg w-full p-6 shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-4 border-b border-border">
+              <h2 className="text-lg font-black text-foreground flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Gerar Imagem com IA
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowAiModal(false)}
+                className="text-muted-foreground hover:text-foreground font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-6 space-y-4 pr-1">
+              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl mb-2">
+                <p className="text-xs text-amber-600 font-bold">
+                  ⚠️ Imagens geradas entram como <b>Rascunho</b> e precisam ser publicadas manualmente para aparecerem aos tenants. O processo leva cerca de 15 segundos.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-black uppercase text-muted-foreground">Produto (Ex: Pizza Calabresa)</label>
+                <input
+                  value={aiProduct}
+                  onChange={(e) => setAiProduct(e.target.value)}
+                  className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-ring text-foreground"
+                  placeholder="Nome do produto principal *"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black uppercase text-muted-foreground">Segmento (Opcional)</label>
+                  <input
+                    value={aiSegment}
+                    onChange={(e) => setAiSegment(e.target.value)}
+                    className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-ring text-foreground"
+                    placeholder="Ex: Pizzaria"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black uppercase text-muted-foreground">Categoria Visual</label>
+                  <select
+                    value={aiCategory}
+                    onChange={(e) => setAiCategory(e.target.value)}
+                    className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Nenhuma</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-black uppercase text-muted-foreground">Prompt Automático (Editável)</label>
+                <textarea
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  className="w-full h-24 p-3 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-ring text-foreground resize-none"
+                  placeholder="Instruções para a inteligência artificial..."
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-border flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowAiModal(false)}
+                className="rounded-xl border border-input px-5 py-2 text-sm font-black text-foreground hover:bg-muted"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleGenerateAi}
+                disabled={!aiProduct || !aiPrompt || isGeneratingAi}
+                className="rounded-xl bg-primary px-5 py-2 text-sm font-black text-primary-foreground flex items-center gap-2 hover:brightness-110 disabled:opacity-60"
+              >
+                {isGeneratingAi ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Gerando (~15s)...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Gerar e Salvar
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

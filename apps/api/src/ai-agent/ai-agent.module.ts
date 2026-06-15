@@ -1,4 +1,4 @@
-﻿import { Module, forwardRef } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { RbacModule } from '../rbac/rbac.module';
 import { WhatsAppChannelModule } from '../whatsapp-channel/whatsapp-channel.module';
@@ -13,6 +13,7 @@ import { AdminModulesModule } from '../admin/modules/admin-modules.module';
 import { UpsellRecommendationEngine } from '../campaigns/services/upsell-recommendation.engine';
 
 import { OpenAiProvider } from './providers/openai.provider';
+import { OpenAiImageProvider } from './providers/openai-image.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { GoogleAiProvider } from './providers/google-ai.provider';
 import { AI_PROVIDER } from './interfaces/ai-provider.interface';
@@ -36,17 +37,18 @@ import { AiProviderConfigService } from './services/ai-provider-config.service';
     forwardRef(() => WhatsAppChannelModule), // para enviar as mensagens de volta
     forwardRef(() => CatalogModule),         // para as tools lerem produtos
     forwardRef(() => OrdersModule),          // para as tools criarem pedidos
-    forwardRef(() => StorefrontModule),      // para checkout e validaÃ§Ã£o
+    forwardRef(() => StorefrontModule),      // para checkout e validação
     forwardRef(() => DeliveryModule),        // para calcular taxas de entrega
     forwardRef(() => PromotionsModule),      // para cashback e cupons
     forwardRef(() => SchedulingModule),      // para agendamentos
-    AdminModulesModule,                      // para verificar permissÃµes de mÃ³dulo
+    AdminModulesModule,                      // para verificar permissões de módulo
   ],
   controllers: [AiAgentController],
   providers: [
     AiProviderConfigService,
     AiConfigDiagnosticsService,
     OpenAiProvider,
+    OpenAiImageProvider,
     AnthropicProvider,
     GoogleAiProvider,
     AiProviderRegistryService,
@@ -68,6 +70,7 @@ import { AiProviderConfigService } from './services/ai-provider-config.service';
     AiOrchestratorService,
     AiProviderRegistryService,
     AiProviderConfigService,
+    OpenAiImageProvider,
   ],
 })
 export class AiAgentModule {}
