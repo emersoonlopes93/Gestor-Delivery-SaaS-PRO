@@ -199,3 +199,26 @@ As specs automatizadas cobrem os fluxos minimos de hardening:
 - preservar customizacoes administrativas quando o seed roda depois de uma v2 publicada.
 
 Fluxos com tenant real devem ser validados em ambiente controlado usando tenant teste: tenant novo importa a versao publicada atual; tenant antigo permanece com a copia independente ja importada; `BaseMenuImportLog.versionId` aponta para a versao usada no import.
+
+## Seguranca operacional do editor
+
+O editor do SaaS Admin usa confirmacoes fortes para acoes de maior impacto:
+
+- publicar draft exige revisar resumo de impacto e digitar `PUBLICAR`;
+- descartar draft exige revisar aviso de perda de alteracoes e digitar `DESCARTAR`;
+- a publicacao fica bloqueada quando ha erros estruturais;
+- warnings nao bloqueiam publicacao, mas aparecem no painel de validacao e no modal.
+
+Erros bloqueantes incluem template sem categorias/produtos, categoria invalida, produto sem nome, preco invalido e slug invalido ou duplicado.
+
+Warnings incluem produtos sem imagem publicada, imagem apenas fallback, imagem apenas draft/arquivada, ausencia de `mediaLookupKey`, ausencia de tags, descricao vazia e preco sugerido zero.
+
+Descartar draft arquiva a versao `draft`; nao apaga a versao publicada atual, nao altera `currentPublishedVersionId`, nao altera tenants e registra audit log `base_menu.draft.discard`.
+
+Publicacao com warnings registra os warnings no metadata do audit log `base_menu.draft.publish`. Tentativa de publicacao bloqueada por erro registra `base_menu.draft.publish_blocked`.
+
+Versoes antigas permanecem como historico. Restaurar versao antiga, rollback automatico e sync para tenants ficam fora do escopo desta fase.
+
+A Galeria Base continua sendo o lugar de gestao de imagens. O editor apenas diagnostica cobertura; ele nao faz upload, substituicao ou geracao de imagem.
+
+Tenants novos passam a importar a nova versao somente apos publicacao. Tenants que ja importaram versoes antigas nao sao alterados automaticamente, e cardapios reais de lojas nao sao editados por este fluxo.

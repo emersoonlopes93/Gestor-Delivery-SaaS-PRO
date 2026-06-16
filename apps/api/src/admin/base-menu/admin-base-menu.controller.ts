@@ -53,6 +53,12 @@ export class AdminBaseMenuController {
     return this.baseMenus.publishDraft(id, { id: adminId, ip: req.ip });
   }
 
+  @Post(':id/discard-draft')
+  @RequireAdminPermissions('saas.base_menu.manage')
+  discardDraft(@Param('id') id: string, @CurrentUser('sub') adminId: string, @Request() req: ExpressRequest & { user: AdminJwtPayload }) {
+    return this.baseMenus.discardDraft(id, { id: adminId, ip: req.ip });
+  }
+
   @Patch(':id')
   @RequireAdminPermissions('saas.base_menu.manage')
   updateTemplate(@Param('id') id: string, @Body() body: UpdateTemplateBody, @CurrentUser('sub') adminId: string, @Request() req: ExpressRequest & { user: AdminJwtPayload }) {

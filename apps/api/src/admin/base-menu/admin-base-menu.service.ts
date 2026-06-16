@@ -14,7 +14,9 @@ type BaseMenuAdminAction =
   | 'base_menu.product.create'
   | 'base_menu.product.update'
   | 'base_menu.product.delete'
-  | 'base_menu.draft.publish';
+  | 'base_menu.draft.publish'
+  | 'base_menu.draft.publish_blocked'
+  | 'base_menu.draft.discard';
 
 type AdminActor = {
   id: string | null;
@@ -256,16 +258,49 @@ export class AdminBaseMenuService {
       where: {
         OR: [{ id: idOrSlug }, { slug: idOrSlug }],
       },
-      select: { id: true },
+      select: { id: true, currentPublishedVersionId: true },
     });
 
     if (!template) {
       throw new NotFoundException('Template base nao encontrado.');
     }
 
-    return this.prisma.baseMenuTemplateVersion.findMany({
+    const versions = await this.prisma.baseMenuTemplateVersion.findMany({
       where: { templateId: template.id },
+      include: {
+        categories: {
+          include: { products: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
       orderBy: { versionNumber: 'desc' },
+    });
+
+    const products = versions.flatMap((version) => version.categories.flatMap((category) => category.products));
+    const coverage = await this.resolveImageCoverage(products);
+
+    return versions.map((version) => {
+      const versionProducts = version.categories.flatMap((category) => category.products);
+      const linkedImages = versionProducts.filter((product) => ['linked_exact', 'linked_tag', 'linked_fallback'].includes(coverage.get(product.id)?.status ?? '')).length;
+      const fallbackImages = versionProducts.filter((product) => coverage.get(product.id)?.status === 'linked_fallback').length;
+      return {
+        id: version.id,
+        templateId: version.templateId,
+        versionNumber: version.versionNumber,
+        status: version.status,
+        publishedAt: version.publishedAt,
+        metadataJson: version.metadataJson,
+        createdAt: version.createdAt,
+        updatedAt: version.updatedAt,
+        isCurrentPublished: version.id === template.currentPublishedVersionId,
+        totals: {
+          categories: version.categories.length,
+          products: versionProducts.length,
+          linkedImages,
+          missingImages: versionProducts.length - linkedImages,
+          fallbackImages,
+        },
+      };
     });
   }
 
@@ -568,6 +603,14 @@ export class AdminBaseMenuService {
 
     const validation = await this.validateDraftVersion(template, draft);
     if (validation.errors.length > 0) {
+      await this.prisma.$transaction(async (tx) => {
+        await this.audit(tx, 'base_menu.draft.publish_blocked', actor, {
+          templateId: template.id,
+          versionId: draft.id,
+          versionNumber: draft.versionNumber,
+          validation,
+        });
+      });
       throw new BadRequestException({ message: 'Draft possui erros bloqueantes.', validation });
     }
 
@@ -597,6 +640,50 @@ export class AdminBaseMenuService {
     });
 
     return { published, validation };
+  }
+
+  async discardDraft(idOrSlug: string, actor: AdminActor) {
+    const template = await this.findTemplateOrThrow(idOrSlug);
+    const draft = await this.prisma.baseMenuTemplateVersion.findFirst({
+      where: { templateId: template.id, status: 'draft' },
+      include: {
+        categories: {
+          include: { products: true },
+        },
+      },
+      orderBy: { versionNumber: 'desc' },
+    });
+    if (!draft) throw new NotFoundException('Draft aberto nao encontrado para este template.');
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const archived = await tx.baseMenuTemplateVersion.update({
+        where: { id: draft.id },
+        data: {
+          status: 'archived',
+          metadataJson: mergeJsonObject(draft.metadataJson, {
+            discardedAt: new Date().toISOString(),
+            discardedByAdminId: actor.id,
+          }),
+        },
+      });
+      await this.audit(tx, 'base_menu.draft.discard', actor, {
+        templateId: template.id,
+        versionId: draft.id,
+        versionNumber: draft.versionNumber,
+        currentPublishedVersionId: template.currentPublishedVersionId,
+        totals: {
+          categories: draft.categories.length,
+          products: draft.categories.reduce((sum, category) => sum + category.products.length, 0),
+        },
+      });
+      return archived;
+    });
+
+    return {
+      discarded: true,
+      version: result,
+      currentPublishedVersionId: template.currentPublishedVersionId,
+    };
   }
 
   async listImportLogs(idOrSlug: string) {
@@ -751,6 +838,9 @@ export class AdminBaseMenuService {
         productSlugs.add(product.slug);
         if (product.basePrice.lessThan(0)) errors.push(`Produto "${product.name}" com preco invalido.`);
         if (product.compareAtPrice && product.compareAtPrice.lessThan(product.basePrice)) errors.push(`Produto "${product.name}" com preco comparativo menor que preco base.`);
+        if (product.basePrice.equals(0)) warnings.push(`Produto "${product.name}" com preco sugerido zero.`);
+        if (!product.description?.trim()) warnings.push(`Produto "${product.name}" sem descricao.`);
+        if (!product.mediaLookupKey?.trim()) warnings.push(`Produto "${product.name}" sem mediaLookupKey.`);
         if (extractStringArray(product.searchTagsJson).length === 0) warnings.push(`Produto "${product.name}" sem tags de busca.`);
       }
     }

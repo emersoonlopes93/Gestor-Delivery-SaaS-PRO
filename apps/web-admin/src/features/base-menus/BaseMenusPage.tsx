@@ -24,7 +24,7 @@ import { useAdminPermissions } from '../../hooks/use-admin-auth';
 type PublicationStatus = 'draft' | 'published' | 'archived';
 type ImageStatus = 'linked_exact' | 'linked_tag' | 'linked_fallback' | 'missing_lookup' | 'no_published_asset' | 'draft_only';
 type ImportStatus = 'success' | 'partial' | 'failed';
-type TabId = 'products' | 'images' | 'imports' | 'metadata';
+type TabId = 'products' | 'images' | 'versions' | 'imports' | 'metadata';
 
 type BaseMenuVersionSummary = {
   id: string;
@@ -32,6 +32,20 @@ type BaseMenuVersionSummary = {
   status: PublicationStatus;
   publishedAt: string | null;
   createdAt: string;
+};
+
+type BaseMenuVersionDetail = BaseMenuVersionSummary & {
+  templateId?: string;
+  metadataJson?: Record<string, unknown> | null;
+  updatedAt?: string;
+  isCurrentPublished?: boolean;
+  totals?: {
+    categories: number;
+    products: number;
+    linkedImages: number;
+    missingImages: number;
+    fallbackImages: number;
+  };
 };
 
 type BaseMenuListItem = {
@@ -119,7 +133,7 @@ type BaseMenuDetail = {
     totalProductsWithoutImage: number;
   };
   categories: BaseMenuCategory[];
-  versions: Array<BaseMenuVersionSummary & { metadataJson?: Record<string, unknown> | null; updatedAt?: string }>;
+  versions: BaseMenuVersionDetail[];
 };
 
 type DraftValidation = {
@@ -148,6 +162,11 @@ type BaseMenuDraft = {
   };
   validation: DraftValidation;
   categories: BaseMenuCategory[];
+};
+
+type DraftActionModalState = {
+  draft: BaseMenuDraft;
+  mode: 'publish' | 'discard';
 };
 
 type ImportLog = {
@@ -181,6 +200,7 @@ const imageStatusLabels: Record<ImageStatus, string> = {
 const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'products', label: 'Categorias e produtos' },
   { id: 'images', label: 'Imagens' },
+  { id: 'versions', label: 'Versoes' },
   { id: 'imports', label: 'Importações' },
   { id: 'metadata', label: 'Metadados' },
 ];
@@ -374,16 +394,6 @@ function DraftActionButton({ item, onDone }: { item: BaseMenuListItem; onDone: (
   );
 }
 
-async function publishDraft(idOrSlug: string, onDone: () => void | Promise<void>) {
-  if (!window.confirm('Publicar este draft como nova versao published? Tenants novos passarao a importar esta versao, mas menus ja importados nao mudam.')) return;
-  try {
-    await api.post(`/admin/base-menus/${idOrSlug}/publish-draft`);
-    await onDone();
-  } catch (err) {
-    window.alert(errorMessage(err));
-  }
-}
-
 function BaseMenuDraftEditor({ id }: { id: string }) {
   const navigate = useNavigate();
   const { has } = useAdminPermissions();
@@ -391,6 +401,7 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
   const [draft, setDraft] = useState<BaseMenuDraft | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [modal, setModal] = useState<DraftActionModalState | null>(null);
 
   async function loadDraft() {
     setLoading(true);
@@ -431,7 +442,7 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
       </button>
 
       <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-900">
-        Editando draft v{draft.version.versionNumber}. Tenants so verao esta versao apos publicacao. Publicar nao altera cardapios ja importados.
+        Voce esta editando uma versao draft. Tenants so verao esta versao apos publicacao. Cardapios ja importados por tenants nao serao alterados. A Galeria Base continua sendo o local para publicar ou substituir imagens.
       </section>
 
       <section className="rounded-xl border border-border bg-card p-5">
@@ -446,16 +457,22 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
               Galeria Base
             </Link>
             {canManage ? (
-              <button onClick={() => void publishDraft(draft.template.slug, loadDraft)} disabled={draft.validation.errors.length > 0} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700 disabled:opacity-50">
-                <Send className="h-4 w-4" />
-                Publicar draft
-              </button>
+              <>
+                <button onClick={() => setModal({ draft, mode: 'discard' })} className="inline-flex items-center justify-center gap-2 rounded-xl border border-destructive/30 bg-background px-4 py-2 text-sm font-black text-destructive hover:bg-destructive/10">
+                  <Trash2 className="h-4 w-4" />
+                  Descartar draft
+                </button>
+                <button onClick={() => setModal({ draft, mode: 'publish' })} disabled={draft.validation.errors.length > 0} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700 disabled:opacity-50">
+                  <Send className="h-4 w-4" />
+                  Revisar e publicar
+                </button>
+              </>
             ) : null}
           </div>
         </div>
       </section>
 
-      <PublishSummary validation={draft.validation} />
+      <DraftValidationPanel validation={draft.validation} />
 
       {canManage ? <TemplateForm draft={draft} onSaved={loadDraft} /> : <ReadOnlyNotice />}
 
@@ -474,6 +491,17 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
           </div>
         ))}
       </section>
+
+      {modal ? (
+        <DraftActionModal
+          state={modal}
+          onClose={() => setModal(null)}
+          onDone={() => {
+            setModal(null);
+            navigate(`/base-menus/${draft.template.slug}`);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -484,6 +512,7 @@ function BaseMenuDetailView({ id }: { id: string }) {
   const canManage = has('saas.base_menu.manage');
   const [detail, setDetail] = useState<BaseMenuDetail | null>(null);
   const [logs, setLogs] = useState<ImportLog[]>([]);
+  const [versions, setVersions] = useState<BaseMenuVersionDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabId>('products');
@@ -492,12 +521,14 @@ function BaseMenuDetailView({ id }: { id: string }) {
     setLoading(true);
     setError(null);
     try {
-      const [detailResponse, logsResponse] = await Promise.all([
+      const [detailResponse, logsResponse, versionsResponse] = await Promise.all([
         api.get<BaseMenuDetail>(`/admin/base-menus/${id}`),
         api.get<ImportLog[]>(`/admin/base-menus/${id}/import-logs`),
+        api.get<BaseMenuVersionDetail[]>(`/admin/base-menus/${id}/versions`),
       ]);
       setDetail(detailResponse.data);
       setLogs(logsResponse.data);
+      setVersions(versionsResponse.data);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -583,10 +614,10 @@ function BaseMenuDetailView({ id }: { id: string }) {
                   updatedAt: detail.template.updatedAt,
                 }} onDone={loadDetail} />
                 {detail.draftVersion ? (
-                  <button onClick={() => void publishDraft(detail.template.slug, loadDetail)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700">
+                  <Link to={`/base-menus/${detail.template.slug}/draft`} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700">
                     <Send className="h-4 w-4" />
-                    Publicar draft
-                  </button>
+                    Revisar/Publicar draft
+                  </Link>
                 ) : null}
               </>
             ) : null}
@@ -633,6 +664,7 @@ function BaseMenuDetailView({ id }: { id: string }) {
 
       {tab === 'products' ? <ProductsTab categories={detail.categories} /> : null}
       {tab === 'images' ? <ImagesTab groups={imageGroups} /> : null}
+      {tab === 'versions' ? <VersionsTab versions={versions} currentVersionId={detail.currentPublishedVersion?.id ?? null} /> : null}
       {tab === 'imports' ? <ImportsTab logs={logs} /> : null}
       {tab === 'metadata' ? <MetadataTab detail={detail} /> : null}
     </div>
@@ -670,6 +702,138 @@ function PublishSummary({ validation }: { validation: DraftValidation }) {
         </div>
       </div>
     </section>
+  );
+}
+
+function DraftValidationPanel({ validation }: { validation: DraftValidation }) {
+  const status = validation.errors.length > 0
+    ? { label: 'Bloqueado por erros', tone: 'danger' as const }
+    : validation.warnings.length > 0
+      ? { label: 'Publicavel com avisos', tone: 'warning' as const }
+      : { label: 'Pronto para publicar', tone: 'success' as const };
+  const linkedImages = validation.imageSummary.linkedExact + validation.imageSummary.linkedTag + validation.imageSummary.linkedFallback;
+  const missingImages = validation.imageSummary.noPublishedAsset + validation.imageSummary.missingLookup + validation.imageSummary.draftOnly;
+
+  return (
+    <section className="grid gap-3 lg:grid-cols-[1fr_1fr_1.5fr]">
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="text-[11px] font-black uppercase text-muted-foreground">Status geral</p>
+        <p className={`mt-2 text-lg font-black ${status.tone === 'danger' ? 'text-destructive' : status.tone === 'warning' ? 'text-amber-600' : 'text-emerald-600'}`}>{status.label}</p>
+        <p className="mt-2 text-xs font-bold text-muted-foreground">Produtos sem imagem nao bloqueiam publicacao, mas aparecerao com placeholder no tenant.</p>
+      </div>
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="text-[11px] font-black uppercase text-muted-foreground">Impacto do draft</p>
+        <p className="mt-2 text-sm font-black text-foreground">{validation.totals.categories} categorias - {validation.totals.products} produtos</p>
+        <p className="mt-1 text-xs font-bold text-muted-foreground">A v{validation.publishingVersionNumber} sera oficial apenas para futuras importacoes.</p>
+      </div>
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="text-[11px] font-black uppercase text-muted-foreground">Imagens</p>
+        <p className="mt-2 text-sm font-black text-foreground">{linkedImages} com imagem - {missingImages} sem imagem pronta - {validation.imageSummary.linkedFallback} fallback</p>
+        <p className="mt-1 text-xs font-bold text-muted-foreground">A Galeria Base continua sendo o local para publicar/substituir imagens.</p>
+      </div>
+      <ValidationList title="Erros bloqueantes" items={validation.errors} emptyText="Nenhum erro bloqueante." tone="danger" />
+      <ValidationList title="Warnings" items={validation.warnings} emptyText="Nenhum aviso." tone="warning" wide />
+    </section>
+  );
+}
+
+function ValidationList({ title, items, emptyText, tone, wide }: { title: string; items: string[]; emptyText: string; tone: 'danger' | 'warning'; wide?: boolean }) {
+  const color = tone === 'danger' ? 'text-destructive' : 'text-amber-600';
+  return (
+    <div className={`rounded-xl border border-border bg-card p-4 ${wide ? 'lg:col-span-2' : ''}`}>
+      <p className="text-[11px] font-black uppercase text-muted-foreground">{title}</p>
+      {items.length === 0 ? (
+        <p className="mt-2 text-sm font-bold text-muted-foreground">{emptyText}</p>
+      ) : (
+        <div className="mt-2 max-h-44 space-y-1 overflow-auto text-xs font-bold">
+          {items.map((item) => <p key={item} className={color}>- {item}</p>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DraftActionModal({ state, onClose, onDone }: { state: DraftActionModalState; onClose: () => void; onDone: () => void }) {
+  const [confirmation, setConfirmation] = useState('');
+  const [busy, setBusy] = useState(false);
+  const isPublish = state.mode === 'publish';
+  const expected = isPublish ? 'PUBLICAR' : 'DESCARTAR';
+  const validation = state.draft.validation;
+  const linkedImages = validation.imageSummary.linkedExact + validation.imageSummary.linkedTag + validation.imageSummary.linkedFallback;
+  const missingImages = validation.imageSummary.noPublishedAsset + validation.imageSummary.missingLookup + validation.imageSummary.draftOnly;
+  const canSubmit = confirmation.trim().toUpperCase() === expected && (!isPublish || validation.errors.length === 0);
+
+  async function submit() {
+    if (!canSubmit) return;
+    setBusy(true);
+    try {
+      if (isPublish) {
+        await api.post(`/admin/base-menus/${state.draft.template.slug}/publish-draft`);
+      } else {
+        await api.post(`/admin/base-menus/${state.draft.template.slug}/discard-draft`);
+      }
+      onDone();
+    } catch (err) {
+      window.alert(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <section className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-xl border border-border bg-card p-5 shadow-xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-black uppercase text-muted-foreground">{isPublish ? 'Confirmar publicacao' : 'Confirmar descarte'}</p>
+            <h2 className="mt-1 text-xl font-black text-foreground">{state.draft.template.name}</h2>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">{state.draft.template.slug} - draft v{state.draft.version.versionNumber}</p>
+          </div>
+          <button onClick={onClose} className="rounded-xl border border-border px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Fechar</button>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <Kpi label="Categorias" value={validation.totals.categories} />
+          <Kpi label="Produtos" value={validation.totals.products} />
+          <Kpi label="Sem imagem" value={missingImages} tone={missingImages > 0 ? 'warning' : 'success'} />
+        </div>
+
+        <div className="mt-4 rounded-xl border border-border bg-background p-4 text-sm font-bold text-muted-foreground">
+          {isPublish ? (
+            <>
+              <p>Tenants novos passarao a importar esta nova versao.</p>
+              <p>Tenants que ja importaram versoes antigas nao serao alterados.</p>
+              <p>Esta acao nao edita cardapios reais de lojas.</p>
+              <p>Imagens fallback: {validation.imageSummary.linkedFallback}. Imagens prontas: {linkedImages}.</p>
+            </>
+          ) : (
+            <>
+              <p>Todas as alteracoes desta versao draft serao perdidas.</p>
+              <p>A versao publicada atual continuara ativa.</p>
+              <p>Esta acao nao altera tenants nem cardapios reais de lojas.</p>
+            </>
+          )}
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <ValidationList title="Erros bloqueantes" items={validation.errors} emptyText="Nenhum erro bloqueante." tone="danger" />
+          <ValidationList title="Warnings" items={validation.warnings} emptyText="Nenhum aviso." tone="warning" />
+        </div>
+
+        <label className="mt-4 block">
+          <span className="text-[11px] font-black uppercase text-muted-foreground">Digite {expected} para confirmar</span>
+          <input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="mt-1 h-11 w-full rounded-xl border border-input bg-background px-3 font-mono text-sm outline-none focus:ring-2 focus:ring-ring" />
+        </label>
+
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          <button onClick={onClose} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">Cancelar</button>
+          <button onClick={() => void submit()} disabled={!canSubmit || busy} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black text-white disabled:opacity-50 ${isPublish ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-destructive hover:bg-destructive/90'}`}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : isPublish ? <Send className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+            {isPublish ? 'Publicar draft' : 'Descartar draft'}
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -871,6 +1035,46 @@ async function deleteProduct(draft: BaseMenuDraft, product: BaseMenuProduct, onS
   } catch (err) {
     window.alert(errorMessage(err));
   }
+}
+
+function VersionsTab({ versions, currentVersionId }: { versions: BaseMenuVersionDetail[]; currentVersionId: string | null }) {
+  return (
+    <section className="space-y-4">
+      <div className="rounded-xl border border-border bg-card p-4 text-sm font-bold text-muted-foreground">
+        Versoes antigas ficam como historico. Restaurar versao antiga sera um fluxo futuro.
+      </div>
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        <div className="grid grid-cols-[100px_150px_150px_130px_130px_150px_180px] gap-3 border-b border-border px-4 py-3 text-[11px] font-black uppercase text-muted-foreground">
+          <span>Versao</span>
+          <span>Status</span>
+          <span>Publicacao</span>
+          <span>Categorias</span>
+          <span>Produtos</span>
+          <span>Cobertura</span>
+          <span>Observacao</span>
+        </div>
+        {versions.map((version) => {
+          const isCurrent = version.id === currentVersionId || version.isCurrentPublished;
+          const totals = version.totals ?? { categories: 0, products: 0, linkedImages: 0, missingImages: 0, fallbackImages: 0 };
+          return (
+            <article key={version.id} className="grid grid-cols-[100px_150px_150px_130px_130px_150px_180px] gap-3 border-b border-border px-4 py-4 last:border-b-0">
+              <span className="text-sm font-black text-foreground">v{version.versionNumber}</span>
+              <div className="flex flex-wrap gap-1">
+                <StatusPill status={version.status} />
+                {isCurrent ? <span className="inline-flex h-8 items-center rounded-xl bg-emerald-500/10 px-3 text-xs font-black text-emerald-600">current</span> : null}
+              </div>
+              <span className="text-xs font-bold text-muted-foreground">{formatDate(version.publishedAt)}</span>
+              <span className="text-sm font-black text-foreground">{totals.categories}</span>
+              <span className="text-sm font-black text-foreground">{totals.products}</span>
+              <CoverageBadge linked={totals.linkedImages} total={totals.products} />
+              <span className="text-xs font-bold text-muted-foreground">{totals.fallbackImages} fallback</span>
+            </article>
+          );
+        })}
+        {versions.length === 0 ? <TableMessage icon={<ListChecks className="h-8 w-8" />} text="Nenhuma versao encontrada." /> : null}
+      </div>
+    </section>
+  );
 }
 
 function ProductsTab({ categories }: { categories: BaseMenuCategory[] }) {

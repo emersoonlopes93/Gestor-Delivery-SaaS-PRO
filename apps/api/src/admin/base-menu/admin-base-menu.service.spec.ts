@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AdminBaseMenuService } from './admin-base-menu.service';
 
@@ -210,5 +210,83 @@ describe('AdminBaseMenuService draft/published flow', () => {
       data: { status: 'published', currentPublishedVersionId: 'version-2' },
     });
     expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+
+  it('does not publish draft with blocking validation errors', async () => {
+    const prisma = makePrisma();
+    const service = new AdminBaseMenuService(prisma as never);
+    prisma.baseMenuTemplate.findFirst.mockResolvedValue(template);
+    prisma.baseMenuTemplateVersion.findFirst.mockResolvedValue({
+      ...draftVersion,
+      categories: [],
+    });
+
+    await expect(service.publishDraft('acai', actor)).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.baseMenuTemplateVersion.updateMany).not.toHaveBeenCalled();
+    expect(prisma.baseMenuTemplate.update).not.toHaveBeenCalled();
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: 'base_menu.draft.publish_blocked' }),
+    }));
+  });
+
+  it('publishes draft with warnings and stores warnings in audit metadata', async () => {
+    const prisma = makePrisma();
+    const service = new AdminBaseMenuService(prisma as never);
+    prisma.baseMenuTemplate.findFirst.mockResolvedValue(template);
+    prisma.baseMenuTemplateVersion.findFirst.mockResolvedValue({
+      ...draftVersion,
+      categories: [
+        {
+          ...draftVersion.categories[0],
+          products: [
+            {
+              ...draftVersion.categories[0].products[0],
+              description: '',
+              mediaLookupKey: null,
+              searchTagsJson: [],
+            },
+          ],
+        },
+      ],
+    });
+    prisma.baseMenuTemplateVersion.update.mockResolvedValue({ ...draftVersion, status: 'published', publishedAt: new Date('2026-06-03T00:00:00.000Z') });
+
+    const result = await service.publishDraft('acai', actor);
+
+    expect(result.validation.errors).toHaveLength(0);
+    expect(result.validation.warnings.length).toBeGreaterThan(0);
+    expect(prisma.baseMenuTemplate.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ currentPublishedVersionId: 'version-2' }),
+    }));
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        action: 'base_menu.draft.publish',
+        details: expect.objectContaining({
+          validation: expect.objectContaining({
+            warnings: expect.arrayContaining([expect.stringContaining('sem descricao')]),
+          }),
+        }),
+      }),
+    }));
+  });
+
+  it('discards draft without changing the current published version', async () => {
+    const prisma = makePrisma();
+    const service = new AdminBaseMenuService(prisma as never);
+    prisma.baseMenuTemplate.findFirst.mockResolvedValue(template);
+    prisma.baseMenuTemplateVersion.findFirst.mockResolvedValue(draftVersion);
+    prisma.baseMenuTemplateVersion.update.mockResolvedValue({ ...draftVersion, status: 'archived' });
+
+    const result = await service.discardDraft('acai', actor);
+
+    expect(result.currentPublishedVersionId).toBe('version-1');
+    expect(prisma.baseMenuTemplateVersion.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'version-2' },
+      data: expect.objectContaining({ status: 'archived' }),
+    }));
+    expect(prisma.baseMenuTemplate.update).not.toHaveBeenCalled();
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: 'base_menu.draft.discard' }),
+    }));
   });
 });
