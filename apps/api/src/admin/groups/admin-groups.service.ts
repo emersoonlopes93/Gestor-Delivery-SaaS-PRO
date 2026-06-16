@@ -76,4 +76,14 @@ export class AdminGroupsService {
       data: { businessGroupId: groupId },
     });
   }
+
+  /**
+   * Remove a tenant from a business group.
+   */
+  async removeTenantFromGroup(tenantId: string) {
+    return this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { businessGroupId: null },
+    });
+  }
 }

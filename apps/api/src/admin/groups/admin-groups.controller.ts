@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Delete, UseGuards } from '@nestjs/common';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
 import { AdminPermissionsGuard } from '../rbac/admin-permissions.guard';
 import { RequireAdminPermissions } from '../../common/decorators';
@@ -31,5 +31,11 @@ export class AdminGroupsController {
   @RequireAdminPermissions('saas.tenants.update')
   async addTenant(@Param('id') id: string, @Body() data: { tenantId: string }) {
     return this.groupsService.addTenantToGroup(id, data.tenantId);
+  }
+
+  @Delete('tenants/:tenantId')
+  @RequireAdminPermissions('saas.tenants.update')
+  async removeTenant(@Param('tenantId') tenantId: string) {
+    return this.groupsService.removeTenantFromGroup(tenantId);
   }
 }
