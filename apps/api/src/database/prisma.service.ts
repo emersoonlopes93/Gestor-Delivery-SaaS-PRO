@@ -61,6 +61,10 @@ export class PrismaService
         'AuthSession',
         'ExternalWebhookEvent',
         'BillingRuleVersion',
+        'BaseMenuTemplate',
+        'BaseMenuTemplateVersion',
+        'BaseMenuCategory',
+        'BaseMenuProduct',
       ];
 
       const model = params.model ?? '';

@@ -250,14 +250,23 @@ export class MediaLibraryService {
       });
     }
 
-    return this.prisma.mediaCategory.upsert({
-      where: { tenantId_scope_slug: { tenantId, scope, slug } },
-      update: {
-        name: input.name,
-        description: input.description ?? undefined,
-        isActive: input.isActive ?? true,
-      },
-      create: {
+    const existingBySlug = await this.prisma.mediaCategory.findFirst({
+      where: { tenantId, scope, slug },
+    });
+
+    if (existingBySlug) {
+      return this.prisma.mediaCategory.update({
+        where: { id: existingBySlug.id },
+        data: {
+          name: input.name,
+          description: input.description ?? undefined,
+          isActive: input.isActive ?? true,
+        },
+      });
+    }
+
+    return this.prisma.mediaCategory.create({
+      data: {
         tenantId,
         scope,
         name: input.name,
