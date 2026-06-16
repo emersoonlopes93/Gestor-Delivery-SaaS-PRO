@@ -26,18 +26,16 @@ describe('AuthSessionService', () => {
         updateMany: jest.fn(),
         findMany: jest.fn(),
       },
-      $transaction: jest.fn((callback: Function) => callback(mockPrismaService)),
+      $transaction: jest.fn((callback: (tx: typeof mockPrismaService) => unknown) => callback(mockPrismaService)),
     };
-    const mockConfig: Partial<ConfigService> = {
-      get: jest.fn((key: string, fallback?: string) => ({
-        JWT_REFRESH_SECRET: 'test-refresh-secret',
-        JWT_REFRESH_EXPIRES_IN: '7d',
-      }[key] ?? fallback))
-    };
+    const mockConfig = new ConfigService({
+      JWT_REFRESH_SECRET: 'test-refresh-secret',
+      JWT_REFRESH_EXPIRES_IN: '7d',
+    });
     service = new AuthSessionService(
       mockPrismaService as never,
       new JwtService(),
-      mockConfig as ConfigService,
+      mockConfig,
     );
   });
 

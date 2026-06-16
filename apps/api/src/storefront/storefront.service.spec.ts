@@ -5,6 +5,7 @@ import { AvailabilityService } from '../catalog/publication/availability.service
 import { UpsellsService } from '../catalog/upsells.service';
 import { MediaLibraryService } from '../upload/media-library.service';
 import { SchedulingService } from '../scheduling/scheduling.service';
+import { BusinessIntelligenceService } from '../analytics/business-intelligence.service';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { DateTime } from 'luxon';
 
@@ -52,6 +53,12 @@ describe('StorefrontService', () => {
         {
           provide: SchedulingService,
           useValue: schedulingServiceMocks,
+        },
+        {
+          provide: BusinessIntelligenceService,
+          useValue: {
+            getStorefrontBestSellers: jest.fn().mockResolvedValue([]),
+          },
         },
         {
           provide: CACHE_MANAGER,

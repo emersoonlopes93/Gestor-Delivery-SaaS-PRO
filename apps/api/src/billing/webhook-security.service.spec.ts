@@ -9,12 +9,18 @@ function mockRequest(body: string, headers: Record<string, string>): Request {
   const lowerHeaders = Object.fromEntries(
     Object.entries(headers).map(([key, value]) => [key.toLowerCase(), value]),
   );
-  const req: Partial<Request> = {
-    ip: '127.0.0.1',
-    rawBody: Buffer.from(body),
-    get: (name: string) => lowerHeaders[name.toLowerCase()],
-  };
-  return req as Request;
+
+  function getHeader(name: 'set-cookie'): string[] | undefined;
+  function getHeader(name: string): string | undefined;
+  function getHeader(name: string): string | string[] | undefined {
+    return lowerHeaders[name.toLowerCase()];
+  }
+
+  const req = {} as Request & { rawBody: Buffer };
+  Object.defineProperty(req, 'ip', { value: '127.0.0.1' });
+  req.rawBody = Buffer.from(body);
+  req.get = getHeader;
+  return req;
 }
 
 describe('WebhookSecurityService', () => {
@@ -35,16 +41,14 @@ describe('WebhookSecurityService', () => {
         update: jest.fn(),
       },
     };
-    const mockConfig: Partial<ConfigService> = {
-      get: jest.fn((key: string, fallback?: string) => ({
-        ASAAS_WEBHOOK_HMAC_SECRET: 'webhook-secret',
-        WEBHOOK_REPLAY_WINDOW_SECONDS: '300',
-        NODE_ENV: 'production',
-      }[key] ?? fallback))
-    };
+    const mockConfig = new ConfigService({
+      ASAAS_WEBHOOK_HMAC_SECRET: 'webhook-secret',
+      WEBHOOK_REPLAY_WINDOW_SECONDS: '300',
+      NODE_ENV: 'production',
+    });
     service = new WebhookSecurityService(
       mockPrisma as never,
-      mockConfig as ConfigService,
+      mockConfig,
     );
   });
 
