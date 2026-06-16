@@ -77,6 +77,10 @@ export class MenuImportController {
     const options: MenuImportOptions = {
       skipExisting: dto.skipExisting ?? true,
     };
-    return this.menuImportService.importTemplate(dto.templateId, options);
+    const result = await this.menuImportService.importTemplate(dto.templateId, options);
+    return {
+      success: true,
+      data: result,
+    };
   }
 }
