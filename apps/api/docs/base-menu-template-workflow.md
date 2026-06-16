@@ -198,6 +198,8 @@ As specs automatizadas cobrem os fluxos minimos de hardening:
 - criar bootstrap em banco vazio;
 - preservar customizacoes administrativas quando o seed roda depois de uma v2 publicada.
 
+No frontend do SaaS Admin, a cobertura minima valida RBAC visual, aba de versoes, bloqueio de publicacao por erro, publicacao com warnings apos confirmacao forte e descarte de draft apos confirmacao forte.
+
 Fluxos com tenant real devem ser validados em ambiente controlado usando tenant teste: tenant novo importa a versao publicada atual; tenant antigo permanece com a copia independente ja importada; `BaseMenuImportLog.versionId` aponta para a versao usada no import.
 
 ## Seguranca operacional do editor

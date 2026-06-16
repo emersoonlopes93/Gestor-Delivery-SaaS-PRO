@@ -387,7 +387,7 @@ function DraftActionButton({ item, onDone }: { item: BaseMenuListItem; onDone: (
   }
 
   return (
-    <button onClick={() => void createOrContinue()} disabled={busy} className="inline-flex h-9 items-center justify-center gap-1 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground disabled:opacity-60">
+    <button aria-label={item.draftVersion ? 'Continuar edicao' : 'Criar draft'} onClick={() => void createOrContinue()} disabled={busy} className="inline-flex h-9 items-center justify-center gap-1 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground disabled:opacity-60">
       {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
       {item.draftVersion ? 'Continuar edicao' : 'Criar draft'}
     </button>
@@ -458,11 +458,11 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
             </Link>
             {canManage ? (
               <>
-                <button onClick={() => setModal({ draft, mode: 'discard' })} className="inline-flex items-center justify-center gap-2 rounded-xl border border-destructive/30 bg-background px-4 py-2 text-sm font-black text-destructive hover:bg-destructive/10">
+                <button aria-label="Descartar draft" onClick={() => setModal({ draft, mode: 'discard' })} className="inline-flex items-center justify-center gap-2 rounded-xl border border-destructive/30 bg-background px-4 py-2 text-sm font-black text-destructive hover:bg-destructive/10">
                   <Trash2 className="h-4 w-4" />
                   Descartar draft
                 </button>
-                <button onClick={() => setModal({ draft, mode: 'publish' })} disabled={draft.validation.errors.length > 0} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700 disabled:opacity-50">
+                <button aria-label="Publicar draft" onClick={() => setModal({ draft, mode: 'publish' })} disabled={draft.validation.errors.length > 0} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700 disabled:opacity-50">
                   <Send className="h-4 w-4" />
                   Revisar e publicar
                 </button>
@@ -827,7 +827,7 @@ function DraftActionModal({ state, onClose, onDone }: { state: DraftActionModalS
 
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button onClick={onClose} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">Cancelar</button>
-          <button onClick={() => void submit()} disabled={!canSubmit || busy} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black text-white disabled:opacity-50 ${isPublish ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-destructive hover:bg-destructive/90'}`}>
+          <button aria-label={isPublish ? 'Confirmar publicacao do draft' : 'Confirmar descarte do draft'} onClick={() => void submit()} disabled={!canSubmit || busy} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black text-white disabled:opacity-50 ${isPublish ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-destructive hover:bg-destructive/90'}`}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : isPublish ? <Send className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
             {isPublish ? 'Publicar draft' : 'Descartar draft'}
           </button>
