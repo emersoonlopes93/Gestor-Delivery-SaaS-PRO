@@ -166,7 +166,7 @@ export function BaseMediaLibraryPage() {
       </div>
 
       <section className="rounded-2xl border border-border bg-card p-4">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_180px_170px_180px_auto]">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[1fr_180px_170px_180px_auto]">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -210,46 +210,50 @@ export function BaseMediaLibraryPage() {
       ) : null}
 
       <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[1fr_420px]">
-        <section className="overflow-hidden rounded-2xl border border-border bg-card">
-          <div className="grid grid-cols-[42px_84px_1fr_150px_120px_90px_110px] gap-3 border-b border-border px-4 py-3 text-[11px] font-black uppercase text-muted-foreground">
-            <span />
-            <span>Preview</span>
-            <span>Produto</span>
-            <span>Categoria</span>
-            <span>Status</span>
-            <span>Uso</span>
-            <span>Ações</span>
-          </div>
-          {items.map((item) => (
-            <article key={item.id} className="grid grid-cols-[42px_84px_1fr_150px_120px_90px_110px] gap-3 border-b border-border px-4 py-3 last:border-b-0">
-              <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggleSelected(item.id)} className="mt-8 h-4 w-4" />
-              <img src={item.publicUrl} alt={item.altText ?? item.productName ?? 'Imagem'} className="h-20 w-20 rounded-xl object-cover bg-muted" />
-              <div className="min-w-0 py-1">
-                <p className="truncate text-sm font-black text-foreground">{item.productName ?? item.title ?? 'Sem nome'}</p>
-                <p className="truncate font-mono text-[11px] text-muted-foreground">{item.mediaLookupKey}</p>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {item.tagsJson.slice(0, 4).map((entry) => (
-                    <span key={entry} className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">{entry}</span>
-                  ))}
+        <section className="rounded-2xl border border-border bg-card overflow-hidden">
+          <div className="overflow-x-auto">
+            <div className="min-w-[760px]">
+              <div className="grid grid-cols-[42px_84px_1fr_150px_120px_90px_110px] gap-3 border-b border-border px-4 py-3 text-[11px] font-black uppercase text-muted-foreground">
+                <span />
+                <span>Preview</span>
+                <span>Produto</span>
+                <span>Categoria</span>
+                <span>Status</span>
+                <span>Uso</span>
+                <span>Ações</span>
+              </div>
+              {items.map((item) => (
+                <article key={item.id} className="grid grid-cols-[42px_84px_1fr_150px_120px_90px_110px] gap-3 border-b border-border px-4 py-3 last:border-b-0">
+                  <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggleSelected(item.id)} className="mt-8 h-4 w-4" />
+                  <img src={item.publicUrl} alt={item.altText ?? item.productName ?? 'Imagem'} className="h-20 w-20 rounded-xl object-cover bg-muted" />
+                  <div className="min-w-0 py-1">
+                    <p className="truncate text-sm font-black text-foreground">{item.productName ?? item.title ?? 'Sem nome'}</p>
+                    <p className="truncate font-mono text-[11px] text-muted-foreground">{item.mediaLookupKey}</p>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {item.tagsJson.slice(0, 4).map((entry) => (
+                        <span key={entry} className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">{entry}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="py-1 text-sm font-bold text-foreground">{item.categoryName ?? item.category ?? '-'}</div>
+                  <StatusPill status={item.publicationStatus} />
+                  <div className="py-1 text-sm font-black text-foreground">{item.usage_count}</div>
+                  <div className="flex items-start gap-2 py-1">
+                    <button onClick={() => loadDetail(item.id)} className="rounded-lg bg-muted p-2 text-foreground hover:bg-primary hover:text-primary-foreground" title="Detalhes">
+                      <Eye className="h-4 w-4" />
+                    </button>
+                    {canManage ? <ActionButtons item={item} onAction={action} /> : null}
+                  </div>
+                </article>
+              ))}
+              {items.length === 0 ? (
+                <div className="p-10 text-center text-muted-foreground">
+                  <Image className="mx-auto mb-3 h-10 w-10 opacity-50" />
+                  <p className="text-sm font-bold">Nenhuma imagem base encontrada.</p>
                 </div>
-              </div>
-              <div className="py-1 text-sm font-bold text-foreground">{item.categoryName ?? item.category ?? '-'}</div>
-              <StatusPill status={item.publicationStatus} />
-              <div className="py-1 text-sm font-black text-foreground">{item.usage_count}</div>
-              <div className="flex items-start gap-2 py-1">
-                <button onClick={() => loadDetail(item.id)} className="rounded-lg bg-muted p-2 text-foreground hover:bg-primary hover:text-primary-foreground" title="Detalhes">
-                  <Eye className="h-4 w-4" />
-                </button>
-                {canManage ? <ActionButtons item={item} onAction={action} /> : null}
-              </div>
-            </article>
-          ))}
-          {items.length === 0 ? (
-            <div className="p-10 text-center text-muted-foreground">
-              <Image className="mx-auto mb-3 h-10 w-10 opacity-50" />
-              <p className="text-sm font-bold">Nenhuma imagem base encontrada.</p>
+              ) : null}
             </div>
-          ) : null}
+          </div>
         </section>
 
         <aside className="rounded-2xl border border-border bg-card p-5">

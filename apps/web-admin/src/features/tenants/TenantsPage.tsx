@@ -104,8 +104,8 @@ export function TenantsPage() {
         </div>
       </div>
 
-      <div className="hidden md:block bg-card rounded-xl border border-border overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="hidden md:block bg-card rounded-xl border border-border overflow-x-auto">
+        <table className="w-full min-w-[800px] text-sm">
           <thead className="bg-muted/50 border-b border-border">
             <tr>
               <th className="text-left px-6 py-3 font-semibold text-foreground">Nome</th>

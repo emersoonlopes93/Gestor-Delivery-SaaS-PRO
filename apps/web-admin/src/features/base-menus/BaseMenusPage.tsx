@@ -299,7 +299,7 @@ function BaseMenuListView() {
         </p>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         <Kpi label="Templates" value={kpis.total} />
         <Kpi label="Publicados" value={kpis.published} tone="success" />
         <Kpi label="Drafts" value={kpis.draft} tone="warning" />
@@ -309,7 +309,7 @@ function BaseMenuListView() {
       </section>
 
       <section className="rounded-xl border border-border bg-card p-4">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_170px_180px_210px]">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-[1fr_170px_180px_210px]">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -329,47 +329,51 @@ function BaseMenuListView() {
             <option value="">Todos segmentos</option>
             {segments.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
-          <label className="flex h-10 items-center gap-2 rounded-xl border border-input bg-background px-3 text-sm font-bold text-foreground">
+          <label className="flex h-10 items-center gap-2 rounded-xl border border-input bg-background px-3 text-sm font-bold text-foreground whitespace-nowrap">
             <input type="checkbox" checked={onlyImageIssues} onChange={(event) => setOnlyImageIssues(event.target.checked)} />
             com pendência de imagem
           </label>
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-xl border border-border bg-card">
-        <div className="grid grid-cols-[1.4fr_130px_120px_110px_110px_120px_150px_220px] gap-3 border-b border-border px-4 py-3 text-[11px] font-black uppercase text-muted-foreground">
-          <span>Nome</span>
-          <span>Segmento</span>
-          <span>Status</span>
-          <span>Versão</span>
-          <span>Categorias</span>
-          <span>Produtos</span>
-          <span>Cobertura</span>
-          <span>Ação</span>
+      <section className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <div className="min-w-[980px]">
+            <div className="grid grid-cols-[1.4fr_130px_120px_110px_110px_120px_150px_220px] gap-3 border-b border-border px-4 py-3 text-[11px] font-black uppercase text-muted-foreground">
+              <span>Nome</span>
+              <span>Segmento</span>
+              <span>Status</span>
+              <span>Versão</span>
+              <span>Categorias</span>
+              <span>Produtos</span>
+              <span>Cobertura</span>
+              <span>Ação</span>
+            </div>
+            {loading ? <TableMessage icon={<Loader2 className="h-8 w-8 animate-spin" />} text="Carregando modelos..." /> : null}
+            {!loading && error ? <TableMessage icon={<AlertTriangle className="h-8 w-8" />} text={error} /> : null}
+            {!loading && !error && filtered.length === 0 ? <TableMessage icon={<BookOpenCheck className="h-8 w-8" />} text="Nenhum modelo encontrado." /> : null}
+            {!loading && !error ? filtered.map((item) => (
+              <article key={item.id} className="grid grid-cols-[1.4fr_130px_120px_110px_110px_120px_150px_220px] gap-3 border-b border-border px-4 py-4 last:border-b-0">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black text-foreground">{item.icon ? `${item.icon} ` : ''}{item.name}</p>
+                  <p className="truncate font-mono text-[11px] text-muted-foreground">{item.slug}</p>
+                </div>
+                <span className="py-1 text-sm font-bold text-foreground">{item.segment}</span>
+                <StatusPill status={item.status} />
+                <span className="py-1 text-sm font-black text-foreground">{item.currentPublishedVersion ? `v${item.currentPublishedVersion.versionNumber}` : '-'}</span>
+                <span className="py-1 text-sm font-black text-foreground">{item.totalCategories}</span>
+                <span className="py-1 text-sm font-black text-foreground">{item.totalProducts}</span>
+                <CoverageBadge linked={item.totalProductsWithPublishedGlobalImage} total={item.totalProducts} />
+                <div className="flex flex-wrap gap-2">
+                  <Link to={`/base-menus/${item.slug}`} className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-xs font-black text-foreground hover:bg-muted">
+                    Ver detalhes
+                  </Link>
+                  {canManage ? <DraftActionButton item={item} onDone={loadItems} /> : null}
+                </div>
+              </article>
+            )) : null}
+          </div>
         </div>
-        {loading ? <TableMessage icon={<Loader2 className="h-8 w-8 animate-spin" />} text="Carregando modelos..." /> : null}
-        {!loading && error ? <TableMessage icon={<AlertTriangle className="h-8 w-8" />} text={error} /> : null}
-        {!loading && !error && filtered.length === 0 ? <TableMessage icon={<BookOpenCheck className="h-8 w-8" />} text="Nenhum modelo encontrado." /> : null}
-        {!loading && !error ? filtered.map((item) => (
-          <article key={item.id} className="grid grid-cols-[1.4fr_130px_120px_110px_110px_120px_150px_220px] gap-3 border-b border-border px-4 py-4 last:border-b-0">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-black text-foreground">{item.icon ? `${item.icon} ` : ''}{item.name}</p>
-              <p className="truncate font-mono text-[11px] text-muted-foreground">{item.slug}</p>
-            </div>
-            <span className="py-1 text-sm font-bold text-foreground">{item.segment}</span>
-            <StatusPill status={item.status} />
-            <span className="py-1 text-sm font-black text-foreground">{item.currentPublishedVersion ? `v${item.currentPublishedVersion.versionNumber}` : '-'}</span>
-            <span className="py-1 text-sm font-black text-foreground">{item.totalCategories}</span>
-            <span className="py-1 text-sm font-black text-foreground">{item.totalProducts}</span>
-            <CoverageBadge linked={item.totalProductsWithPublishedGlobalImage} total={item.totalProducts} />
-            <div className="flex flex-wrap gap-2">
-              <Link to={`/base-menus/${item.slug}`} className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-xs font-black text-foreground hover:bg-muted">
-                Ver detalhes
-              </Link>
-              {canManage ? <DraftActionButton item={item} onDone={loadItems} /> : null}
-            </div>
-          </article>
-        )) : null}
       </section>
 
       {createOpen ? <CreateTemplateModal onClose={() => setCreateOpen(false)} onDone={loadItems} /> : null}
