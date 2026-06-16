@@ -18,6 +18,7 @@
         "media:import-generated-base": "ts-node -r tsconfig-paths/register scripts/import-generated-base-media.ts",
         "media:validate-base-manifest": "ts-node -r tsconfig-paths/register scripts/validate-base-menu-manifest.ts",
         "base-menu:seed": "ts-node -r tsconfig-paths/register scripts/seed-base-menu-templates.ts",
+        "base-menu:apply-options-curation": "ts-node -r tsconfig-paths/register scripts/apply-base-menu-options-curation.ts",
         "smoke:combos": "ts-node scripts/smoke-test-combos.ts",
         "smoke:delivery-rate": "ts-node scripts/smoke-test-delivery-rate.ts",
         "smoke:inventory": "ts-node scripts/smoke-test-inventory.ts",

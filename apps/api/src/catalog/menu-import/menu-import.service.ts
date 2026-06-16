@@ -1,9 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import { TenantContextService } from '../../common/context/tenant-context.service';
 import { ProductsService } from '../products/products.service';
 import { CategoriesService } from '../categories/categories.service';
 import { MediaLibraryService } from '../../upload/media-library.service';
+import {
+  ParsedBaseMenuOptionGroup,
+  ParsedBaseMenuOptionItem,
+  normalizeBaseMenuOptionSlug,
+  parseBaseMenuProductOptionGroups,
+} from './base-menu-options.parser';
 
 type ProductTemplate = {
   name: string;
@@ -11,6 +18,7 @@ type ProductTemplate = {
   basePrice: number;
   searchTags: string[];
   mediaLookupKey?: string;
+  metadataJson?: unknown;
 };
 
 type CategoryTemplate = {
@@ -64,6 +72,14 @@ export interface MenuImportResult {
   imagesLinked: number;
   durationMs: number;
   errors: string[];
+  optionGroupsCreated: number;
+  optionGroupsReused: number;
+  optionItemsCreated: number;
+  optionItemsReused: number;
+  productOptionLinksCreated: number;
+  productOptionLinksSkipped: number;
+  optionImportWarnings: string[];
+  optionImportErrors: string[];
   productMatches: Array<{
     baseProductName: string;
     mediaLookupKey?: string;
@@ -200,6 +216,14 @@ export class MenuImportService {
       imagesLinked: 0,
       durationMs: 0,
       errors: [],
+      optionGroupsCreated: 0,
+      optionGroupsReused: 0,
+      optionItemsCreated: 0,
+      optionItemsReused: 0,
+      productOptionLinksCreated: 0,
+      productOptionLinksSkipped: 0,
+      optionImportWarnings: [],
+      optionImportErrors: [],
       productMatches: [],
     };
 
@@ -379,6 +403,7 @@ export class MenuImportService {
             basePrice: Number(product.basePrice),
             searchTags: extractStringArray(product.searchTagsJson),
             mediaLookupKey: product.mediaLookupKey ?? undefined,
+            metadataJson: product.metadataJson,
           })),
       })),
     };
@@ -414,6 +439,14 @@ export class MenuImportService {
           totalProducts,
           errors: result.errors,
           productMatches: result.productMatches,
+          optionGroupsCreated: result.optionGroupsCreated,
+          optionGroupsReused: result.optionGroupsReused,
+          optionItemsCreated: result.optionItemsCreated,
+          optionItemsReused: result.optionItemsReused,
+          productOptionLinksCreated: result.productOptionLinksCreated,
+          productOptionLinksSkipped: result.productOptionLinksSkipped,
+          optionImportWarnings: result.optionImportWarnings,
+          optionImportErrors: result.optionImportErrors,
         },
       },
     });
@@ -495,8 +528,13 @@ export class MenuImportService {
 
     if (existing) {
       result.productsSkipped++;
+      if (!skipExisting) {
+        throw new Error(`Produto ja existe no tenant: ${productTemplate.name}`);
+      }
       return;
     }
+
+    const optionGroups = this.parseProductOptionGroupsForImport(productTemplate, result);
 
     // Buscar imagem na biblioteca global ou do tenant indexados em memória
     const matchResult = this.findBestMatchingImageInMemory(
@@ -520,7 +558,7 @@ export class MenuImportService {
     });
 
     // Criar produto via ProductsService oficial
-    await this.productsService.create({
+    const product = await this.productsService.create({
       name: productTemplate.name,
       shortDescription: productTemplate.shortDescription,
       basePrice: productTemplate.basePrice,
@@ -533,6 +571,144 @@ export class MenuImportService {
     });
 
     result.productsCreated++;
+    await this.importProductOptionGroups(
+      tenantId,
+      product.id,
+      optionGroups,
+      result,
+    );
+  }
+
+  private parseProductOptionGroupsForImport(
+    productTemplate: ProductTemplate,
+    result: MenuImportResult,
+  ): ParsedBaseMenuOptionGroup[] {
+    try {
+      return parseBaseMenuProductOptionGroups(productTemplate.metadataJson);
+    } catch (error) {
+      const message = `Produto "${productTemplate.name}": ${error instanceof Error ? error.message : String(error)}`;
+      result.optionImportErrors.push(message);
+      throw new Error(`opcionais invalidos: ${message}`);
+    }
+  }
+
+  private async importProductOptionGroups(
+    tenantId: string,
+    productId: string,
+    optionGroups: ParsedBaseMenuOptionGroup[],
+    result: MenuImportResult,
+  ): Promise<void> {
+    for (const group of optionGroups) {
+      const optionGroup = await this.createOrReuseOptionGroup(tenantId, group, result);
+      for (const item of group.items) {
+        await this.createOrReuseOptionItem(tenantId, optionGroup.id, item, result);
+      }
+      await this.createOrSkipProductOptionLink(tenantId, productId, optionGroup.id, group, result);
+    }
+  }
+
+  private async createOrReuseOptionGroup(
+    tenantId: string,
+    group: ParsedBaseMenuOptionGroup,
+    result: MenuImportResult,
+  ): Promise<{ id: string }> {
+    const existingGroups = await this.prisma.tenantClient.optionGroup.findMany({
+      where: { tenantId },
+      select: { id: true, name: true },
+    });
+    const existing = existingGroups.find((item) => normalizeBaseMenuOptionSlug(item.name) === group.slug);
+    if (existing) {
+      result.optionGroupsReused++;
+      return { id: existing.id };
+    }
+
+    const created = await this.prisma.tenantClient.optionGroup.create({
+      data: {
+        tenantId,
+        name: group.name,
+        description: group.description,
+        selectionType: group.selectionType,
+        isRequired: group.isRequired,
+        minSelect: group.minSelect,
+        maxSelect: group.maxSelect,
+        isActive: true,
+        order: group.order,
+      } satisfies Prisma.OptionGroupUncheckedCreateInput,
+      select: { id: true },
+    });
+    result.optionGroupsCreated++;
+    this.logger.log(`menu_import_option_group_created tenantId=${tenantId} name="${group.name}"`);
+    return created;
+  }
+
+  private async createOrReuseOptionItem(
+    tenantId: string,
+    optionGroupId: string,
+    item: ParsedBaseMenuOptionItem,
+    result: MenuImportResult,
+  ): Promise<{ id: string }> {
+    const existingItems = await this.prisma.tenantClient.optionItem.findMany({
+      where: { tenantId, optionGroupId },
+      select: { id: true, name: true },
+    });
+    const existing = existingItems.find((candidate) => normalizeBaseMenuOptionSlug(candidate.name) === item.slug);
+    if (existing) {
+      result.optionItemsReused++;
+      return { id: existing.id };
+    }
+
+    const created = await this.prisma.tenantClient.optionItem.create({
+      data: {
+        tenantId,
+        optionGroupId,
+        name: item.name,
+        description: item.description,
+        isActive: true,
+        order: item.order,
+        priceImpactType: item.priceImpactType,
+        priceImpactValue: item.priceImpactValue,
+        allowQuantity: item.allowQuantity,
+        minQty: item.minQty,
+        maxQty: item.maxQty,
+      } satisfies Prisma.OptionItemUncheckedCreateInput,
+      select: { id: true },
+    });
+    result.optionItemsCreated++;
+    this.logger.log(`menu_import_option_item_created tenantId=${tenantId} optionGroupId=${optionGroupId} name="${item.name}"`);
+    return created;
+  }
+
+  private async createOrSkipProductOptionLink(
+    tenantId: string,
+    productId: string,
+    optionGroupId: string,
+    group: ParsedBaseMenuOptionGroup,
+    result: MenuImportResult,
+  ): Promise<void> {
+    const existing = await this.prisma.tenantClient.productOptionGroupLink.findUnique({
+      where: { productId_optionGroupId: { productId, optionGroupId } },
+      select: { id: true },
+    });
+    if (existing) {
+      result.productOptionLinksSkipped++;
+      return;
+    }
+
+    await this.prisma.tenantClient.productOptionGroupLink.create({
+      data: {
+        tenantId,
+        productId,
+        optionGroupId,
+        order: group.order,
+        overrideName: group.overrideName,
+        overrideDescription: group.overrideDescription,
+        overrideIsRequired: group.overrideIsRequired,
+        overrideMinSelect: group.overrideMinSelect,
+        overrideMaxSelect: group.overrideMaxSelect,
+        pricingAxis: group.pricingAxis,
+      } satisfies Prisma.ProductOptionGroupLinkUncheckedCreateInput,
+    });
+    result.productOptionLinksCreated++;
   }
 
   /**

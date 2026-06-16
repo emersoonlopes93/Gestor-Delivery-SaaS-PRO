@@ -1,5 +1,7 @@
 # Base Menu Template Workflow
 
+Complementos/opcionais de produtos base usam `BaseMenuProduct.metadataJson.optionGroups` e sao importados para `OptionGroup`, `OptionItem` e `ProductOptionGroupLink` reais do tenant. O fluxo completo da P7.2 esta em [base-menu-options-import-workflow.md](./base-menu-options-import-workflow.md).
+
 ## Fonte oficial
 
 Os Cardapios Base passam a ter o banco de dados como fonte oficial.
