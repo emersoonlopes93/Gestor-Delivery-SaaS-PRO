@@ -2,9 +2,11 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   AlertTriangle,
+  Archive,
   ArrowLeft,
   BookOpenCheck,
   CheckCircle2,
+  Copy,
   ExternalLink,
   FileJson,
   ImageOff,
@@ -17,6 +19,7 @@ import {
   Search,
   Send,
   Trash2,
+  Undo2,
 } from 'lucide-react';
 import { api, ApiError } from '../../lib/api-client';
 import { useAdminPermissions } from '../../hooks/use-admin-auth';
@@ -222,6 +225,7 @@ function BaseMenuListView() {
   const [status, setStatus] = useState('');
   const [segment, setSegment] = useState('');
   const [onlyImageIssues, setOnlyImageIssues] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
   async function loadItems() {
     setLoading(true);
@@ -280,6 +284,12 @@ function BaseMenuListView() {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Atualizar
           </button>
+          {canManage ? (
+            <button onClick={() => setCreateOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700">
+              <Plus className="h-4 w-4" />
+              Novo Cardápio
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -361,6 +371,8 @@ function BaseMenuListView() {
           </article>
         )) : null}
       </section>
+
+      {createOpen ? <CreateTemplateModal onClose={() => setCreateOpen(false)} onDone={loadItems} /> : null}
     </div>
   );
 }
@@ -516,6 +528,8 @@ function BaseMenuDetailView({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabId>('products');
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
 
   async function loadDetail() {
     setLoading(true);
@@ -619,6 +633,21 @@ function BaseMenuDetailView({ id }: { id: string }) {
                     Revisar/Publicar draft
                   </Link>
                 ) : null}
+                <button aria-label="Duplicar cardápio" onClick={() => setDuplicateOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">
+                  <Copy className="h-4 w-4" />
+                  Duplicar
+                </button>
+                {detail.template.status === 'archived' ? (
+                  <button aria-label="Restaurar cardápio" onClick={() => void handleRestore()} disabled={actionBusy} className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">
+                    <Undo2 className="h-4 w-4" />
+                    Restaurar
+                  </button>
+                ) : (
+                  <button aria-label="Arquivar cardápio" onClick={() => void handleArchive()} disabled={actionBusy} className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-destructive hover:bg-muted">
+                    <Archive className="h-4 w-4" />
+                    Arquivar
+                  </button>
+                )}
               </>
             ) : null}
             <button onClick={loadDetail} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground">
@@ -667,8 +696,46 @@ function BaseMenuDetailView({ id }: { id: string }) {
       {tab === 'versions' ? <VersionsTab versions={versions} currentVersionId={detail.currentPublishedVersion?.id ?? null} /> : null}
       {tab === 'imports' ? <ImportsTab logs={logs} /> : null}
       {tab === 'metadata' ? <MetadataTab detail={detail} /> : null}
+
+      {duplicateOpen && canManage ? (
+        <DuplicateTemplateModal
+          sourceTemplateId={detail.template.id}
+          sourceTemplateName={detail.template.name}
+          onClose={() => setDuplicateOpen(false)}
+          onDone={(newSlug) => {
+            setDuplicateOpen(false);
+            navigate(`/base-menus/${newSlug}`);
+          }}
+        />
+      ) : null}
     </div>
   );
+
+  async function handleArchive() {
+    if (!window.confirm('Tem certeza que deseja arquivar este cardápio base? Ele deixará de aparecer para novos tenants.')) return;
+    setActionBusy(true);
+    try {
+      await api.post(`/admin/base-menus/${detail!.template.slug}/archive`);
+      await loadDetail();
+    } catch (err) {
+      window.alert(errorMessage(err));
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function handleRestore() {
+    if (!window.confirm('Tem certeza que deseja restaurar este cardápio base?')) return;
+    setActionBusy(true);
+    try {
+      await api.post(`/admin/base-menus/${detail!.template.slug}/restore`);
+      await loadDetail();
+    } catch (err) {
+      window.alert(errorMessage(err));
+    } finally {
+      setActionBusy(false);
+    }
+  }
 }
 
 function ReadOnlyNotice() {
@@ -1281,4 +1348,98 @@ function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   if (error instanceof Error) return error.message;
   return 'Falha ao carregar dados.';
+}
+
+function CreateTemplateModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [segment, setSegment] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const response = await api.post<{ template: { slug: string } }>('/admin/base-menus', {
+        name,
+        slug: slug.trim() || undefined,
+        segment: segment.trim() || undefined,
+      });
+      await onDone();
+      navigate(`/base-menus/${response.data.template.slug}/draft`);
+      onClose();
+    } catch (err) {
+      window.alert(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <form onSubmit={(event) => void submit(event)} className="w-full max-w-md overflow-hidden rounded-xl bg-card shadow-xl">
+        <div className="border-b border-border p-5">
+          <h2 className="text-xl font-black text-foreground">Novo Cardápio Base</h2>
+          <p className="mt-1 text-sm font-bold text-muted-foreground">Cria um rascunho em branco.</p>
+        </div>
+        <div className="space-y-4 p-5">
+          <Field label="Nome" value={name} onChange={setName} />
+          <Field label="Slug (opcional)" value={slug} onChange={setSlug} />
+          <Field label="Segmento (ex: acai)" value={segment} onChange={setSegment} />
+        </div>
+        <div className="flex gap-2 border-t border-border bg-muted/40 p-5">
+          <button type="button" onClick={onClose} disabled={busy} className="flex-1 rounded-xl border border-border bg-background py-2 text-sm font-black text-foreground hover:bg-muted disabled:opacity-50">Cancelar</button>
+          <button type="submit" disabled={busy || !name.trim()} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-2 text-sm font-black text-primary-foreground disabled:opacity-50">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            Criar
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function DuplicateTemplateModal({ sourceTemplateId, sourceTemplateName, onClose, onDone }: { sourceTemplateId: string; sourceTemplateName: string; onClose: () => void; onDone: (slug: string) => void }) {
+  const [name, setName] = useState(`${sourceTemplateName} (Cópia)`);
+  const [slug, setSlug] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const response = await api.post<{ template: { slug: string } }>(`/admin/base-menus/${sourceTemplateId}/duplicate`, {
+        name,
+        slug: slug.trim() || undefined,
+      });
+      onDone(response.data.template.slug);
+    } catch (err) {
+      window.alert(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <form onSubmit={(event) => void submit(event)} className="w-full max-w-md overflow-hidden rounded-xl bg-card shadow-xl">
+        <div className="border-b border-border p-5">
+          <h2 className="text-xl font-black text-foreground">Duplicar Cardápio Base</h2>
+          <p className="mt-1 text-sm font-bold text-muted-foreground">Isso criará uma cópia independente de todas as categorias e produtos.</p>
+        </div>
+        <div className="space-y-4 p-5">
+          <Field label="Novo Nome" value={name} onChange={setName} />
+          <Field label="Novo Slug (opcional)" value={slug} onChange={setSlug} />
+        </div>
+        <div className="flex gap-2 border-t border-border bg-muted/40 p-5">
+          <button type="button" onClick={onClose} disabled={busy} className="flex-1 rounded-xl border border-border bg-background py-2 text-sm font-black text-foreground hover:bg-muted disabled:opacity-50">Cancelar</button>
+          <button type="submit" disabled={busy || !name.trim()} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-2 text-sm font-black text-primary-foreground disabled:opacity-50">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
+            Duplicar
+          </button>
+        </div>
+      </form>
+    </div>
+  );
 }

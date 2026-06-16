@@ -16,11 +16,30 @@ type BaseMenuAdminAction =
   | 'base_menu.product.delete'
   | 'base_menu.draft.publish'
   | 'base_menu.draft.publish_blocked'
-  | 'base_menu.draft.discard';
+  | 'base_menu.draft.discard'
+  | 'base_menu.template.create'
+  | 'base_menu.template.duplicate'
+  | 'base_menu.template.archive'
+  | 'base_menu.template.restore';
 
 type AdminActor = {
   id: string | null;
   ip?: string;
+};
+
+export type CreateTemplateBody = {
+  name: unknown;
+  slug?: unknown;
+  description?: unknown;
+  segment?: unknown;
+  icon?: unknown;
+  metadataJson?: unknown;
+};
+
+export type DuplicateTemplateBody = {
+  name: unknown;
+  slug?: unknown;
+  description?: unknown;
 };
 
 export type UpdateTemplateBody = {
@@ -408,6 +427,189 @@ export class AdminBaseMenuService {
     });
 
     return this.getDraft(draft.templateId);
+  }
+
+  async createTemplate(body: CreateTemplateBody, actor: AdminActor) {
+    const name = requiredString(body.name, 'name', 140);
+    const slug = normalizeSlug(typeof body.slug === 'string' && body.slug.trim() ? body.slug : name);
+    const segment = typeof body.segment === 'string' && body.segment.trim() ? normalizeSlug(body.segment) : 'geral';
+
+    const existing = await this.prisma.baseMenuTemplate.findFirst({ where: { slug } });
+    if (existing) {
+      throw new ConflictException('Já existe um Cardápio Base com este slug.');
+    }
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const template = await tx.baseMenuTemplate.create({
+        data: {
+          slug,
+          name,
+          description: optionalString(body.description, 'description'),
+          segment,
+          icon: optionalString(body.icon, 'icon', 20),
+          status: 'draft',
+          metadataJson: jsonObjectOrNull(body.metadataJson),
+        },
+      });
+
+      const draft = await tx.baseMenuTemplateVersion.create({
+        data: {
+          templateId: template.id,
+          versionNumber: 1,
+          status: 'draft',
+          metadataJson: template.metadataJson,
+        },
+      });
+
+      await this.audit(tx, 'base_menu.template.create', actor, {
+        templateId: template.id,
+        versionId: draft.id,
+        after: template,
+      });
+
+      return template;
+    });
+
+    return this.getDraft(created.id);
+  }
+
+  async duplicateTemplate(idOrSlug: string, body: DuplicateTemplateBody, actor: AdminActor) {
+    const sourceTemplate = await this.findTemplateOrThrow(idOrSlug);
+    const sourceVersion = await this.prisma.baseMenuTemplateVersion.findFirst({
+      where: {
+        templateId: sourceTemplate.id,
+        status: sourceTemplate.currentPublishedVersionId ? 'published' : 'draft',
+      },
+      include: {
+        categories: {
+          include: { products: true },
+        },
+      },
+      orderBy: { versionNumber: 'desc' },
+    });
+
+    if (!sourceVersion) {
+      throw new BadRequestException('Template origem não possui uma versão válida para duplicar.');
+    }
+
+    const name = requiredString(body.name, 'name', 140);
+    const slug = normalizeSlug(typeof body.slug === 'string' && body.slug.trim() ? body.slug : name);
+
+    const existing = await this.prisma.baseMenuTemplate.findFirst({ where: { slug } });
+    if (existing) {
+      throw new ConflictException('Já existe um Cardápio Base com este slug.');
+    }
+
+    const duplicated = await this.prisma.$transaction(async (tx) => {
+      const template = await tx.baseMenuTemplate.create({
+        data: {
+          slug,
+          name,
+          description: optionalString(body.description, 'description') ?? sourceTemplate.description,
+          segment: sourceTemplate.segment,
+          icon: sourceTemplate.icon,
+          status: 'draft',
+          metadataJson: sourceTemplate.metadataJson === null ? Prisma.JsonNull : sourceTemplate.metadataJson,
+        },
+      });
+
+      const draft = await tx.baseMenuTemplateVersion.create({
+        data: {
+          templateId: template.id,
+          versionNumber: 1,
+          status: 'draft',
+          metadataJson: sourceVersion.metadataJson === null ? Prisma.JsonNull : sourceVersion.metadataJson,
+        },
+      });
+
+      for (const category of sourceVersion.categories) {
+        const createdCategory = await tx.baseMenuCategory.create({
+          data: {
+            versionId: draft.id,
+            slug: category.slug,
+            name: category.name,
+            description: category.description,
+            sortOrder: category.sortOrder,
+            metadataJson: category.metadataJson === null ? Prisma.JsonNull : category.metadataJson,
+          },
+        });
+
+        for (const product of category.products) {
+          await tx.baseMenuProduct.create({
+            data: {
+              categoryId: createdCategory.id,
+              slug: product.slug,
+              name: product.name,
+              description: product.description,
+              basePrice: product.basePrice,
+              compareAtPrice: product.compareAtPrice,
+              sortOrder: product.sortOrder,
+              mediaLookupKey: product.mediaLookupKey,
+              searchTagsJson: product.searchTagsJson === null ? Prisma.JsonNull : product.searchTagsJson,
+              metadataJson: product.metadataJson === null ? Prisma.JsonNull : product.metadataJson,
+            },
+          });
+        }
+      }
+
+      await this.audit(tx, 'base_menu.template.duplicate', actor, {
+        templateId: template.id,
+        versionId: draft.id,
+        sourceTemplateId: sourceTemplate.id,
+        sourceVersionId: sourceVersion.id,
+      });
+
+      return template;
+    });
+
+    return this.getDraft(duplicated.id);
+  }
+
+  async archiveTemplate(idOrSlug: string, actor: AdminActor) {
+    const template = await this.findTemplateOrThrow(idOrSlug);
+    
+    if (template.status === 'archived') {
+      return { archived: true, status: 'archived' };
+    }
+
+    const archived = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.baseMenuTemplate.update({
+        where: { id: template.id },
+        data: { status: 'archived' },
+      });
+      await this.audit(tx, 'base_menu.template.archive', actor, {
+        templateId: template.id,
+        beforeStatus: template.status,
+      });
+      return result;
+    });
+
+    return archived;
+  }
+
+  async restoreTemplate(idOrSlug: string, actor: AdminActor) {
+    const template = await this.findTemplateOrThrow(idOrSlug);
+    
+    if (template.status !== 'archived') {
+      throw new BadRequestException('Apenas templates arquivados podem ser restaurados.');
+    }
+
+    const nextStatus = template.currentPublishedVersionId ? 'published' : 'draft';
+
+    const restored = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.baseMenuTemplate.update({
+        where: { id: template.id },
+        data: { status: nextStatus },
+      });
+      await this.audit(tx, 'base_menu.template.restore', actor, {
+        templateId: template.id,
+        beforeStatus: template.status,
+        afterStatus: nextStatus,
+      });
+      return result;
+    });
+
+    return restored;
   }
 
   async updateTemplate(idOrSlug: string, body: UpdateTemplateBody, actor: AdminActor) {

@@ -140,6 +140,10 @@ GET /admin/base-menus/:id/draft/validation
 Endpoints de gestao:
 
 ```text
+POST   /admin/base-menus
+POST   /admin/base-menus/:id/duplicate
+POST   /admin/base-menus/:id/archive
+POST   /admin/base-menus/:id/restore
 PATCH  /admin/base-menus/:id
 POST   /admin/base-menus/:id/draft-version
 POST   /admin/base-menus/:id/publish-draft
@@ -176,10 +180,9 @@ As acoes administrativas registram audit log com usuario admin quando disponivel
 Fora do escopo desta fase:
 
 - opcionais/complementos avancados;
-- criacao completa de template do zero;
-- duplicacao ou exclusao definitiva de template;
+- exclusao definitiva de template (apenas arquivamento é suportado);
 - comparacao visual entre versoes;
-- rollback automatico;
+- rollback automatico para versão anterior;
 - importacao para tenant pelo SaaS Admin;
 - geracao de imagens por IA;
 - sincronizacao automatica para tenants.
@@ -194,6 +197,9 @@ As specs automatizadas cobrem os fluxos minimos de hardening:
 - bloquear edicao de versao published;
 - publicar draft e atualizar `currentPublishedVersionId`;
 - arquivar a versao publicada anterior;
+- criar novo template como rascunho;
+- duplicar template existente copiando seus produtos para um novo rascunho;
+- arquivar e restaurar templates;
 - validar RBAC de `saas.base_menu.read` e `saas.base_menu.manage`;
 - criar bootstrap em banco vazio;
 - preservar customizacoes administrativas quando o seed roda depois de uma v2 publicada.

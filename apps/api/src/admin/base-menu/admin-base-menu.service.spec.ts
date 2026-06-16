@@ -85,6 +85,7 @@ describe('AdminBaseMenuService draft/published flow', () => {
       baseMenuTemplate: {
         findFirst: jest.fn(),
         update: jest.fn(),
+        create: jest.fn(),
       },
       baseMenuTemplateVersion: {
         findFirst: jest.fn(),
@@ -287,6 +288,100 @@ describe('AdminBaseMenuService draft/published flow', () => {
     expect(prisma.baseMenuTemplate.update).not.toHaveBeenCalled();
     expect(prisma.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ action: 'base_menu.draft.discard' }),
+    }));
+  });
+  it('creates a new template as draft', async () => {
+    const prisma = makePrisma();
+    const service = new AdminBaseMenuService(prisma as never);
+    prisma.baseMenuTemplate.findFirst.mockImplementation(async ({ where }) => {
+      if (where?.slug === 'novo-menu') return null;
+      if (where?.OR?.[0]?.id === 'new-template' || where?.OR?.[1]?.slug === 'new-template') return { ...template, id: 'new-template', status: 'draft' };
+      return template;
+    });
+    prisma.baseMenuTemplate.create.mockResolvedValue({ ...template, id: 'new-template', status: 'draft' });
+    prisma.baseMenuTemplateVersion.create.mockResolvedValue({ ...draftVersion, templateId: 'new-template' });
+    prisma.baseMenuTemplateVersion.findFirst.mockResolvedValue({ ...draftVersion, templateId: 'new-template' });
+
+    await service.createTemplate({ name: 'Novo Menu', slug: 'novo-menu' }, actor);
+
+    expect(prisma.baseMenuTemplate.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ name: 'Novo Menu', slug: 'novo-menu', status: 'draft' }),
+    }));
+    expect(prisma.baseMenuTemplateVersion.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ templateId: 'new-template', versionNumber: 1, status: 'draft' }),
+    }));
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: 'base_menu.template.create' }),
+    }));
+  });
+
+  it('duplicates an existing template and its products to a new draft template', async () => {
+    const prisma = makePrisma();
+    const service = new AdminBaseMenuService(prisma as never);
+    
+    // source template
+    prisma.baseMenuTemplate.findFirst.mockImplementation(async ({ where }) => {
+      if (where?.slug === 'acai-copia') return null;
+      if (where?.OR?.[0]?.id === 'new-dup-template' || where?.OR?.[1]?.slug === 'new-dup-template') return { ...template, id: 'new-dup-template', status: 'draft' };
+      if (where?.OR?.[0]?.id === 'acai' || where?.OR?.[1]?.slug === 'acai') return { ...template, id: 'source-template', currentPublishedVersionId: 'version-1' };
+      return template;
+    });
+      
+    prisma.baseMenuTemplateVersion.findFirst.mockResolvedValueOnce({ 
+      ...publishedVersion, 
+      templateId: 'source-template',
+      categories: [publishedCategory]
+    });
+    
+    prisma.baseMenuTemplate.create.mockResolvedValue({ ...template, id: 'new-dup-template', status: 'draft' });
+    prisma.baseMenuTemplateVersion.create.mockResolvedValue({ ...draftVersion, id: 'new-dup-version', templateId: 'new-dup-template' });
+    prisma.baseMenuCategory.create.mockResolvedValue({ ...publishedCategory, id: 'new-dup-category' });
+    prisma.baseMenuTemplateVersion.findFirst.mockResolvedValueOnce({ ...draftVersion, templateId: 'new-dup-template' }); // for getDraft
+
+    await service.duplicateTemplate('acai', { name: 'Acai Copia', slug: 'acai-copia' }, actor);
+
+    expect(prisma.baseMenuTemplate.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ name: 'Acai Copia', slug: 'acai-copia', status: 'draft' }),
+    }));
+    expect(prisma.baseMenuProduct.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ categoryId: 'new-dup-category', slug: 'acai-300ml' }),
+    }));
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: 'base_menu.template.duplicate' }),
+    }));
+  });
+
+  it('archives a template', async () => {
+    const prisma = makePrisma();
+    const service = new AdminBaseMenuService(prisma as never);
+    prisma.baseMenuTemplate.findFirst.mockResolvedValue(template);
+    prisma.baseMenuTemplate.update.mockResolvedValue({ ...template, status: 'archived' });
+
+    await service.archiveTemplate('acai', actor);
+
+    expect(prisma.baseMenuTemplate.update).toHaveBeenCalledWith({
+      where: { id: 'template-1' },
+      data: { status: 'archived' },
+    });
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: 'base_menu.template.archive' }),
+    }));
+  });
+
+  it('restores an archived template back to its correct status', async () => {
+    const prisma = makePrisma();
+    const service = new AdminBaseMenuService(prisma as never);
+    prisma.baseMenuTemplate.findFirst.mockResolvedValue({ ...template, status: 'archived' });
+    prisma.baseMenuTemplate.update.mockResolvedValue({ ...template, status: 'published' });
+
+    await service.restoreTemplate('acai', actor);
+
+    expect(prisma.baseMenuTemplate.update).toHaveBeenCalledWith({
+      where: { id: 'template-1' },
+      data: { status: 'published' },
+    });
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ action: 'base_menu.template.restore' }),
     }));
   });
 });

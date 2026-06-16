@@ -324,4 +324,76 @@ describe('BaseMenusPage RBAC and draft safety', () => {
 
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/base-menus/acai/discard-draft'));
   });
+
+  it('allows creating a new template from list view', async () => {
+    setPermissions(['saas.base_menu.read', 'saas.base_menu.manage']);
+    mockApi(makeDraft(), false);
+    vi.mocked(api.post).mockResolvedValue(ok({ template: { slug: 'novo-menu' } }) as ApiResponse<{ template: { slug: string } }>);
+
+    renderPage('/base-menus');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Novo Cardápio' }));
+    
+    const nameInput = screen.getByLabelText(/Nome/);
+    await userEvent.type(nameInput, 'Novo Menu');
+    
+    const slugInput = screen.getByLabelText(/Slug/);
+    await userEvent.type(slugInput, 'novo-menu');
+    
+    await userEvent.click(screen.getByRole('button', { name: 'Criar' }));
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/base-menus', expect.objectContaining({ name: 'Novo Menu', slug: 'novo-menu' })));
+  });
+
+  it('allows duplicating a template from detail view', async () => {
+    setPermissions(['saas.base_menu.read', 'saas.base_menu.manage']);
+    mockApi(makeDraft(), false);
+    vi.mocked(api.post).mockResolvedValue(ok({ template: { slug: 'acai-copia' } }) as ApiResponse<{ template: { slug: string } }>);
+
+    renderPage('/base-menus/acai');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Duplicar cardápio' }));
+    
+    const nameInput = screen.getByLabelText(/Novo Nome/);
+    await userEvent.clear(nameInput);
+    await userEvent.type(nameInput, 'Acai Copia');
+    
+    await userEvent.click(screen.getByRole('button', { name: 'Duplicar' }));
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/base-menus/template-1/duplicate', expect.objectContaining({ name: 'Acai Copia' })));
+  });
+
+  it('allows archiving and restoring a template from detail view', async () => {
+    setPermissions(['saas.base_menu.read', 'saas.base_menu.manage']);
+    const detail = makeDetail(false);
+    
+    // First render as published
+    vi.mocked(api.get).mockImplementation(<T,>(endpoint: string): Promise<ApiResponse<T>> => {
+      if (endpoint === '/admin/base-menus/acai') return Promise.resolve(ok(detail) as ApiResponse<T>);
+      return Promise.resolve(ok([]) as ApiResponse<T>);
+    });
+    vi.mocked(api.post).mockResolvedValue(ok({}) as ApiResponse<unknown>);
+    
+    // Auto confirm for window.confirm
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    const { unmount } = renderPage('/base-menus/acai');
+    
+    await userEvent.click(await screen.findByRole('button', { name: 'Arquivar cardápio' }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/base-menus/acai/archive'));
+
+    unmount();
+
+    // Now render as archived
+    const archivedDetail = { ...detail, template: { ...detail.template, status: 'archived' as const } };
+    vi.mocked(api.get).mockImplementation(<T,>(endpoint: string): Promise<ApiResponse<T>> => {
+      if (endpoint === '/admin/base-menus/acai') return Promise.resolve(ok(archivedDetail) as ApiResponse<T>);
+      return Promise.resolve(ok([]) as ApiResponse<T>);
+    });
+
+    renderPage('/base-menus/acai');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Restaurar cardápio' }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/base-menus/acai/restore'));
+  });
 });

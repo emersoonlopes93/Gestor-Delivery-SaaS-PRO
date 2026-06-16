@@ -4,7 +4,7 @@ import type { AdminJwtPayload } from '@gestor/types';
 import { CurrentUser, RequireAdminPermissions } from '../../common/decorators';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
 import { AdminPermissionsGuard } from '../rbac/admin-permissions.guard';
-import { AdminBaseMenuService, CategoryBody, ProductBody, UpdateTemplateBody } from './admin-base-menu.service';
+import { AdminBaseMenuService, CategoryBody, CreateTemplateBody, DuplicateTemplateBody, ProductBody, UpdateTemplateBody } from './admin-base-menu.service';
 
 @Controller('admin/base-menus')
 @UseGuards(AdminAuthGuard, AdminPermissionsGuard)
@@ -15,6 +15,30 @@ export class AdminBaseMenuController {
   @RequireAdminPermissions('saas.base_menu.read')
   list() {
     return this.baseMenus.list();
+  }
+
+  @Post()
+  @RequireAdminPermissions('saas.base_menu.manage')
+  createTemplate(@Body() body: CreateTemplateBody, @CurrentUser('sub') adminId: string, @Request() req: ExpressRequest & { user: AdminJwtPayload }) {
+    return this.baseMenus.createTemplate(body, { id: adminId, ip: req.ip });
+  }
+
+  @Post(':id/duplicate')
+  @RequireAdminPermissions('saas.base_menu.manage')
+  duplicateTemplate(@Param('id') id: string, @Body() body: DuplicateTemplateBody, @CurrentUser('sub') adminId: string, @Request() req: ExpressRequest & { user: AdminJwtPayload }) {
+    return this.baseMenus.duplicateTemplate(id, body, { id: adminId, ip: req.ip });
+  }
+
+  @Post(':id/archive')
+  @RequireAdminPermissions('saas.base_menu.manage')
+  archiveTemplate(@Param('id') id: string, @CurrentUser('sub') adminId: string, @Request() req: ExpressRequest & { user: AdminJwtPayload }) {
+    return this.baseMenus.archiveTemplate(id, { id: adminId, ip: req.ip });
+  }
+
+  @Post(':id/restore')
+  @RequireAdminPermissions('saas.base_menu.manage')
+  restoreTemplate(@Param('id') id: string, @CurrentUser('sub') adminId: string, @Request() req: ExpressRequest & { user: AdminJwtPayload }) {
+    return this.baseMenus.restoreTemplate(id, { id: adminId, ip: req.ip });
   }
 
   @Get(':id/versions')
