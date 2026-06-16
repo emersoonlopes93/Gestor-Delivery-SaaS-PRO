@@ -375,58 +375,69 @@ export class AdminBaseMenuService {
 
     const nextVersionNumber = Math.max(...template.versions.map((version) => version.versionNumber), 0) + 1;
 
-    const draft = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.baseMenuTemplateVersion.create({
-        data: {
-          templateId: template.id,
-          versionNumber: nextVersionNumber,
-          status: 'draft',
-          metadataJson: published.metadataJson === null ? Prisma.JsonNull : published.metadataJson,
-        },
-      });
-
-      for (const category of published.categories) {
-        const createdCategory = await tx.baseMenuCategory.create({
+    try {
+      const draft = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.baseMenuTemplateVersion.create({
           data: {
-            versionId: created.id,
-            slug: category.slug,
-            name: category.name,
-            description: category.description,
-            sortOrder: category.sortOrder,
-            metadataJson: category.metadataJson === null ? Prisma.JsonNull : category.metadataJson,
+            templateId: template.id,
+            versionNumber: nextVersionNumber,
+            status: 'draft',
+            metadataJson: published.metadataJson === null ? Prisma.JsonNull : published.metadataJson,
           },
         });
 
-        for (const product of category.products) {
-          await tx.baseMenuProduct.create({
+        for (const category of published.categories) {
+          const createdCategory = await tx.baseMenuCategory.create({
             data: {
-              categoryId: createdCategory.id,
-              slug: product.slug,
-              name: product.name,
-              description: product.description,
-              basePrice: product.basePrice,
-              compareAtPrice: product.compareAtPrice,
-              sortOrder: product.sortOrder,
-              mediaLookupKey: product.mediaLookupKey,
-              searchTagsJson: product.searchTagsJson,
-              metadataJson: product.metadataJson === null ? Prisma.JsonNull : product.metadataJson,
+              versionId: created.id,
+              slug: category.slug,
+              name: category.name,
+              description: category.description,
+              sortOrder: category.sortOrder,
+              metadataJson: category.metadataJson === null ? Prisma.JsonNull : category.metadataJson,
             },
           });
-        }
-      }
 
-      await this.audit(tx, 'base_menu.draft.create', actor, {
-        templateId: template.id,
-        versionId: created.id,
-        fromVersionId: published.id,
-        fromVersionNumber: published.versionNumber,
-        versionNumber: created.versionNumber,
+          for (const product of category.products) {
+            await tx.baseMenuProduct.create({
+              data: {
+                categoryId: createdCategory.id,
+                slug: product.slug,
+                name: product.name,
+                description: product.description,
+                basePrice: product.basePrice,
+                compareAtPrice: product.compareAtPrice,
+                sortOrder: product.sortOrder,
+                mediaLookupKey: product.mediaLookupKey,
+                searchTagsJson: product.searchTagsJson,
+                metadataJson: product.metadataJson === null ? Prisma.JsonNull : product.metadataJson,
+              },
+            });
+          }
+        }
+
+        await this.audit(tx, 'base_menu.draft.create', actor, {
+          templateId: template.id,
+          versionId: created.id,
+          fromVersionId: published.id,
+          fromVersionNumber: published.versionNumber,
+          versionNumber: created.versionNumber,
+        });
+
+        return created;
       });
 
-      return created;
-    });
-
-    return this.getDraft(draft.templateId);
+      return this.getDraft(draft.templateId);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        try {
+          return await this.getDraft(template.id);
+        } catch (getDraftError) {
+          throw error;
+        }
+      }
+      throw error;
+    }
   }
 
   async createTemplate(body: CreateTemplateBody, actor: AdminActor) {
