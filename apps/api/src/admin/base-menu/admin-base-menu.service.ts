@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 
-type ImageCoverageStatus = 'linked' | 'missing_lookup' | 'no_published_asset' | 'draft_only';
+type ImageCoverageStatus = 'linked_exact' | 'linked_tag' | 'linked_fallback' | 'missing_lookup' | 'no_published_asset' | 'draft_only';
 
 type BaseMenuMediaMatch = {
   id: string;
@@ -65,7 +65,7 @@ export class AdminBaseMenuService {
       const categories = template.currentPublishedVersion?.categories ?? [];
       const templateProducts = categories.flatMap((category) => category.products);
       const totalProductsWithMediaLookupKey = templateProducts.filter((product) => Boolean(product.mediaLookupKey)).length;
-      const totalProductsWithPublishedGlobalImage = templateProducts.filter((product) => coverage.get(product.id)?.status === 'linked').length;
+      const totalProductsWithPublishedGlobalImage = templateProducts.filter((product) => ['linked_exact', 'linked_tag', 'linked_fallback'].includes(coverage.get(product.id)?.status ?? '')).length;
       const totalProductsWithoutImage = templateProducts.length - totalProductsWithPublishedGlobalImage;
       return {
         id: template.id,
@@ -129,7 +129,7 @@ export class AdminBaseMenuService {
     const categories = version?.categories ?? [];
     const products = categories.flatMap((category) => category.products);
     const coverage = await this.resolveImageCoverage(products);
-    const totalProductsWithPublishedGlobalImage = products.filter((product) => coverage.get(product.id)?.status === 'linked').length;
+    const totalProductsWithPublishedGlobalImage = products.filter((product) => ['linked_exact', 'linked_tag', 'linked_fallback'].includes(coverage.get(product.id)?.status ?? '')).length;
 
     return {
       template: {
@@ -252,16 +252,14 @@ export class AdminBaseMenuService {
   }
 
   private async resolveImageCoverage(products: BaseMenuProductForCoverage[]): Promise<Map<string, ProductImageCoverage>> {
-    const lookups = Array.from(new Set(products.map((product) => product.mediaLookupKey).filter((lookup): lookup is string => Boolean(lookup))));
     const coverage = new Map<string, ProductImageCoverage>();
 
     for (const product of products) {
-      if (!product.mediaLookupKey) {
+      const productTags = extractStringArray(product.searchTagsJson);
+      if (!product.mediaLookupKey && productTags.length === 0) {
         coverage.set(product.id, { status: 'missing_lookup', asset: null });
       }
     }
-
-    if (lookups.length === 0) return coverage;
 
     const assets = await this.prisma.mediaAsset.findMany({
       where: {
@@ -271,11 +269,6 @@ export class AdminBaseMenuService {
         isActive: true,
         status: 'active',
         deletedAt: null,
-        OR: lookups.flatMap((lookup) => ([
-          { tagsJson: { array_contains: [lookup] } },
-          { metadataJson: { path: ['mediaLookupKey'], equals: lookup } },
-          { filename: { contains: lookup.replace(/^lookup:/, ''), mode: 'insensitive' as const } },
-        ])),
       },
       select: {
         id: true,
@@ -292,45 +285,68 @@ export class AdminBaseMenuService {
       orderBy: { createdAt: 'desc' },
     });
 
-    for (const product of products) {
-      if (!product.mediaLookupKey) continue;
+    const priority = { exact_lookup: 4, lookup_tag: 3, specific_tag: 2, category_fallback: 1, none: 0 };
 
-      const matches = assets.filter((asset) => assetMatchesProduct(asset, product));
-      const published = matches.find((asset) => asset.publicationStatus === 'published') ?? null;
-      if (published) {
-        coverage.set(product.id, { status: 'linked', asset: published });
-        continue;
+    for (const product of products) {
+      if (coverage.has(product.id)) continue;
+
+      let bestMatch: BaseMenuMediaMatch | null = null;
+      let bestStrategy: keyof typeof priority = 'none';
+
+      for (const asset of assets) {
+         const strategy = getAssetMatchStrategy(asset, product);
+         if (strategy !== 'none') {
+             if (priority[strategy] > priority[bestStrategy]) {
+                bestStrategy = strategy;
+                bestMatch = asset;
+             }
+         }
       }
 
-      coverage.set(product.id, {
-        status: matches.length > 0 ? 'draft_only' : 'no_published_asset',
-        asset: null,
-      });
+      if (bestMatch) {
+         if (bestMatch.publicationStatus === 'published') {
+            let status: ImageCoverageStatus = 'linked_fallback';
+            if (bestStrategy === 'exact_lookup') status = 'linked_exact';
+            if (bestStrategy === 'lookup_tag' || bestStrategy === 'specific_tag') status = 'linked_tag';
+            coverage.set(product.id, { status, asset: bestMatch });
+         } else {
+            coverage.set(product.id, { status: 'draft_only', asset: null });
+         }
+      } else {
+         coverage.set(product.id, { status: 'no_published_asset', asset: null });
+      }
     }
 
     return coverage;
   }
 }
 
-function assetMatchesProduct(asset: BaseMenuMediaMatch, product: BaseMenuProductForCoverage): boolean {
-  const lookup = product.mediaLookupKey;
-  if (!lookup) return false;
-
+function getAssetMatchStrategy(asset: BaseMenuMediaMatch, product: BaseMenuProductForCoverage): 'exact_lookup' | 'lookup_tag' | 'specific_tag' | 'category_fallback' | 'none' {
   const tags = extractStringArray(asset.tagsJson);
-  if (tags.includes(lookup)) return true;
+  
+  // 1. exact_lookup
+  const lookup = product.mediaLookupKey;
+  if (lookup && tags.includes(lookup)) return 'exact_lookup';
 
-  const metadata = asRecord(asset.metadataJson);
-  if (metadata.mediaLookupKey === lookup) return true;
-
-  const lookupFileName = lookup.replace(/^lookup:/, '').toLowerCase();
-  if (asset.filename.toLowerCase().includes(lookupFileName)) return true;
-
+  // 2. lookup_tag
   const productTags = extractStringArray(product.searchTagsJson);
-  if (productTags.length > 0 && productTags.every((tag) => tags.includes(tag))) return true;
+  const lookupTags = productTags.filter(t => t.startsWith('lookup:'));
+  for (const tag of lookupTags) {
+    if (tags.includes(tag)) return 'lookup_tag';
+  }
 
+  // 3. specific_tag
+  if (productTags.length > 0 && productTags.every((tag) => tags.includes(tag))) return 'specific_tag';
+
+  // 4. category_fallback
   const productMetadata = asRecord(product.metadataJson);
   const mediaCategory = productMetadata.mediaCategory;
-  return typeof mediaCategory === 'string' && asset.category?.toLowerCase() === mediaCategory.toLowerCase();
+  if (typeof mediaCategory === 'string') {
+     if (asset.category?.toLowerCase() === mediaCategory.toLowerCase()) return 'category_fallback';
+     if (tags.some(t => t.toLowerCase() === `category:${mediaCategory.toLowerCase().replace(/ /g, '_')}`)) return 'category_fallback';
+  }
+
+  return 'none';
 }
 
 function formatMediaAsset(asset: BaseMenuMediaMatch) {

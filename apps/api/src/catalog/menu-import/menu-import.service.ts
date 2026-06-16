@@ -64,6 +64,13 @@ export interface MenuImportResult {
   imagesLinked: number;
   durationMs: number;
   errors: string[];
+  productMatches: Array<{
+    baseProductName: string;
+    mediaLookupKey?: string;
+    matchedMediaAssetId?: string;
+    matchStrategy: 'exact_lookup' | 'lookup_tag' | 'specific_tag' | 'category_fallback' | 'tenant_library_fallback' | 'none';
+    matchConfidence: 'high' | 'medium' | 'low' | 'none';
+  }>;
 }
 
 export interface MenuImportCategoryResult {
@@ -193,6 +200,7 @@ export class MenuImportService {
       imagesLinked: 0,
       durationMs: 0,
       errors: [],
+      productMatches: [],
     };
 
     this.logger.log(`menu_import_start tenantId=${tenantId} templateId=${template.id} version=${template.versionNumber}`);
@@ -405,6 +413,7 @@ export class MenuImportService {
           imagesMissing,
           totalProducts,
           errors: result.errors,
+          productMatches: result.productMatches,
         },
       },
     });
@@ -490,7 +499,7 @@ export class MenuImportService {
     }
 
     // Buscar imagem na biblioteca global ou do tenant indexados em memória
-    const mediaAssetId = this.findBestMatchingImageInMemory(
+    const matchResult = this.findBestMatchingImageInMemory(
       productTemplate.mediaLookupKey,
       productTemplate.searchTags,
       categoryName,
@@ -498,9 +507,17 @@ export class MenuImportService {
       tenantAssets,
     );
 
-    if (mediaAssetId) {
+    if (matchResult.id) {
       result.imagesLinked++;
     }
+
+    result.productMatches.push({
+      baseProductName: productTemplate.name,
+      mediaLookupKey: productTemplate.mediaLookupKey,
+      matchedMediaAssetId: matchResult.id || undefined,
+      matchStrategy: matchResult.strategy,
+      matchConfidence: matchResult.confidence,
+    });
 
     // Criar produto via ProductsService oficial
     await this.productsService.create({
@@ -512,7 +529,7 @@ export class MenuImportService {
       isAvailable: true,
       sellableOnline: true,
       type: 'simple',
-      ...(mediaAssetId ? { mediaAssetId } : {}),
+      ...(matchResult.id ? { mediaAssetId: matchResult.id } : {}),
     });
 
     result.productsCreated++;
@@ -569,12 +586,6 @@ export class MenuImportService {
     }
   }
 
-  /**
-   * Realiza a busca em memória da melhor imagem correspondente usando a precedência:
-   * 1. mediaLookupKey
-   * 2. searchTags (todas devem corresponder)
-   * 3. categoria (nome da categoria da mídia ou correspondência de termo no asset)
-   */
   private findBestMatchingImageInMemory(
     mediaLookupKey: string | undefined,
     searchTags: string[],
@@ -597,115 +608,85 @@ export class MenuImportService {
       tagsJson: unknown;
       category: string | null;
     }>,
-  ): string | null {
-    // Helper para verificar correspondência com uma chave/tag individual
-    const matchesKey = (
-      asset: {
-        title: string | null;
-        altText: string | null;
-        originalName: string | null;
-        filename: string;
-        tagsJson: unknown;
-      },
-      key: string,
-    ) => {
-      const normalizedKey = key.toLowerCase().trim();
-      const normalizedKeyWithSpaces = normalizedKey.replace(/[-_]/g, ' ');
+  ): {
+    id: string | null;
+    strategy: 'exact_lookup' | 'lookup_tag' | 'specific_tag' | 'category_fallback' | 'tenant_library_fallback' | 'none';
+    confidence: 'high' | 'medium' | 'low' | 'none';
+  } {
+    const getTags = (asset: { tagsJson: unknown }) =>
+      Array.isArray(asset.tagsJson) ? (asset.tagsJson as string[]) : [];
 
-      const title = asset.title?.toLowerCase() || '';
-      const altText = asset.altText?.toLowerCase() || '';
-      const originalName = asset.originalName?.toLowerCase() || '';
-      const filename = asset.filename?.toLowerCase() || '';
-      const tags = Array.isArray(asset.tagsJson)
-        ? (asset.tagsJson as string[]).map((t) => String(t).toLowerCase())
-        : [];
-
-      return (
-        title.includes(normalizedKey) ||
-        title.includes(normalizedKeyWithSpaces) ||
-        altText.includes(normalizedKey) ||
-        altText.includes(normalizedKeyWithSpaces) ||
-        originalName.includes(normalizedKey) ||
-        originalName.includes(normalizedKeyWithSpaces) ||
-        filename.includes(normalizedKey) ||
-        filename.includes(normalizedKeyWithSpaces) ||
-        tags.includes(normalizedKey) ||
-        tags.includes(normalizedKeyWithSpaces)
-      );
-    };
-
-    // Helper para verificar se o asset tem todas as tags requisitadas
-    const matchesAllTags = (
-      asset: {
-        title: string | null;
-        altText: string | null;
-        originalName: string | null;
-        filename: string;
-        tagsJson: unknown;
-      },
-      tags: string[],
-    ) => {
-      if (!tags.length) return false;
-      return tags.every((tag) => matchesKey(asset, tag));
-    };
-
-    // Helper para correspondência por categoria
-    const matchesCategory = (
-      asset: {
-        title: string | null;
-        altText: string | null;
-        originalName: string | null;
-        filename: string;
-        tagsJson: unknown;
-        category: string | null;
-      },
-      catName: string,
-    ) => {
-      const normalizedCat = catName.toLowerCase().trim();
-      const assetCategory = asset.category?.toLowerCase() || '';
-      if (assetCategory === normalizedCat) return true;
-      return matchesKey(asset, catName);
-    };
+    const hasExactTag = (asset: { tagsJson: unknown }, expectedTag: string) =>
+      getTags(asset).includes(expectedTag);
 
     // ── 1. BUSCA NA BIBLIOTECA GLOBAL (SYSTEM GALLERY) ──
-    // Prioridade 1.1: mediaLookupKey
+
+    // Prioridade 1: exact_lookup via mediaLookupKey (Alta confiança)
     if (mediaLookupKey) {
-      const match = systemAssets.find((asset) => matchesKey(asset, mediaLookupKey));
-      if (match) return match.id;
+      const match = systemAssets.find((asset) => hasExactTag(asset, mediaLookupKey));
+      if (match) return { id: match.id, strategy: 'exact_lookup', confidence: 'high' };
     }
 
-    // Prioridade 1.2: searchTags
+    // Prioridade 2: lookup_tag (Alta confiança)
+    // Se alguma das searchTags começar com 'lookup:', tenta achar correspondência exata
     if (searchTags && searchTags.length > 0) {
-      const match = systemAssets.find((asset) => matchesAllTags(asset, searchTags));
-      if (match) return match.id;
+      const lookupTags = searchTags.filter((t) => t.startsWith('lookup:'));
+      for (const tag of lookupTags) {
+        const match = systemAssets.find((asset) => hasExactTag(asset, tag));
+        if (match) return { id: match.id, strategy: 'lookup_tag', confidence: 'high' };
+      }
     }
 
-    // Prioridade 1.3: Categoria
+    // Prioridade 3: specific_tag (Média confiança)
+    // Se o asset tiver todas as tags requisitadas
+    if (searchTags && searchTags.length > 0) {
+      const match = systemAssets.find((asset) => {
+        const assetTags = getTags(asset);
+        // Exige que o asset possua TODAS as searchTags explicitamente (sem includes frouxo)
+        return searchTags.every((t) => assetTags.includes(t));
+      });
+      if (match) return { id: match.id, strategy: 'specific_tag', confidence: 'medium' };
+    }
+
+    // Prioridade 4: category_fallback (Baixa confiança)
+    // Pega qualquer imagem da system_gallery cuja category ou tag coincida estritamente com a categoria pedida
     if (categoryName) {
-      const match = systemAssets.find((asset) => matchesCategory(asset, categoryName));
-      if (match) return match.id;
+      const normalizedCat = categoryName.toLowerCase().trim();
+      const match = systemAssets.find((asset) => {
+        const assetCategory = asset.category?.toLowerCase() || '';
+        if (assetCategory === normalizedCat) return true;
+        const tagCategoryMatch = getTags(asset).some(t => t.toLowerCase().trim() === `category:${normalizedCat.replace(/ /g, '_')}`);
+        return tagCategoryMatch;
+      });
+      if (match) return { id: match.id, strategy: 'category_fallback', confidence: 'low' };
     }
 
     // ── 2. FALLBACK NA BIBLIOTECA DO TENANT (TENANT LIBRARY) ──
-    // Prioridade 2.1: mediaLookupKey
+
+    // Na library do tenant, repetimos a busca restrita
     if (mediaLookupKey) {
-      const match = tenantAssets.find((asset) => matchesKey(asset, mediaLookupKey));
-      if (match) return match.id;
+      const match = tenantAssets.find((asset) => hasExactTag(asset, mediaLookupKey));
+      if (match) return { id: match.id, strategy: 'tenant_library_fallback', confidence: 'medium' };
     }
 
-    // Prioridade 2.2: searchTags
     if (searchTags && searchTags.length > 0) {
-      const match = tenantAssets.find((asset) => matchesAllTags(asset, searchTags));
-      if (match) return match.id;
+      const match = tenantAssets.find((asset) => {
+        const assetTags = getTags(asset);
+        return searchTags.every((t) => assetTags.includes(t));
+      });
+      if (match) return { id: match.id, strategy: 'tenant_library_fallback', confidence: 'medium' };
     }
 
-    // Prioridade 2.3: Categoria
     if (categoryName) {
-      const match = tenantAssets.find((asset) => matchesCategory(asset, categoryName));
-      if (match) return match.id;
+      const normalizedCat = categoryName.toLowerCase().trim();
+      const match = tenantAssets.find((asset) => {
+        const assetCategory = asset.category?.toLowerCase() || '';
+        return assetCategory === normalizedCat;
+      });
+      if (match) return { id: match.id, strategy: 'tenant_library_fallback', confidence: 'low' };
     }
 
-    return null;
+    return { id: null, strategy: 'none', confidence: 'none' };
   }
 }
 
