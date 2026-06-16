@@ -38,6 +38,7 @@
         "smoke:billing-asaas-sandbox": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-asaas-sandbox.ts",
         "migrate:tenant-billing-v2": "ts-node -r tsconfig-paths/register scripts/migrate-tenant-billing-v2.ts",
         "diagnose:env": "ts-node -r tsconfig-paths/register scripts/diagnose-env.ts",
+        "rbac:diagnose": "ts-node -r tsconfig-paths/register scripts/diagnose-rbac.ts",
         "check:billing-db": "ts-node -r tsconfig-paths/register scripts/check-billing-db.ts",
         "smoke:logistics": "ts-node -r tsconfig-paths/register scripts/smoke-test-logistics-flow.ts",
         "smoke:all": "pnpm smoke:auth && pnpm smoke:combos && pnpm smoke:delivery-rate && pnpm smoke:inventory && pnpm smoke:orders",

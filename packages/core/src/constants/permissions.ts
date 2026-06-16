@@ -153,6 +153,8 @@ export const ADMIN_PERMISSIONS = {
   'saas.base_media.manage': 'Manage base menu media gallery',
   'saas.settings.read': 'View system settings',
   'saas.settings.manage': 'Manage system settings',
+  'saas.franchise.read': 'View franchise dashboard and groups',
+  'saas.franchise.manage': 'Manage franchise operations',
 } as const;
 
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;
@@ -250,6 +252,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
     'saas.audit.read',
     'saas.base_menu.read',
     'saas.base_media.read',
+    'saas.franchise.read',
   ],
   financial: [
     'saas.tenants.read',
@@ -277,6 +280,8 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
     'saas.base_menu.manage',
     'saas.base_media.read',
     'saas.base_media.manage',
+    'saas.franchise.read',
+    'saas.franchise.manage',
   ],
   auditor: [
     'saas.tenants.read',
@@ -286,5 +291,6 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
     'saas.billing.audit',
     'saas.base_menu.read',
     'saas.base_media.read',
+    'saas.franchise.read',
   ],
 };

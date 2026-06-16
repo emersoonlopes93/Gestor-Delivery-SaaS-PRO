@@ -385,6 +385,8 @@ async function seedDemoTenant() {
         street: 'Av. Paulista',
         number: '1000',
         neighborhood: 'Bela Vista',
+
+
         city: 'São Paulo',
         state: 'SP',
         zipCode: '01310-100',
@@ -480,8 +482,8 @@ async function seedDemoTenant() {
       });
     }
 
-    console.log(`   ? Demo tenant created: ${tenant.name}`);
-    console.log(`   ? Tenant owner: ${ownerEmail}`);
+    console.log(`   👤 Demo tenant created: ${tenant.name}`);
+    console.log(`   👤 Tenant owner: ${ownerEmail}`);
 
     // Create default delivery coverage config
     await prisma.deliveryCoverageConfig.upsert({
@@ -501,26 +503,20 @@ async function seedDemoTenant() {
 
     // Create default tenant operating hours (08:00 to 22:00 for Sun-Sat)
     for (let day = 0; day <= 6; day++) {
-      await prisma.tenantOperatingHours.upsert({
-        where: {
-          tenantId_dayOfWeek: {
+      const existingHours = await prisma.tenantOperatingHours.findFirst({
+        where: { tenantId: tenant.id, dayOfWeek: day }
+      });
+      if (!existingHours) {
+        await prisma.tenantOperatingHours.create({
+          data: {
             tenantId: tenant.id,
             dayOfWeek: day,
-          },
-        },
-        update: {
-          isOpen: true,
-          openTime: '08:00',
-          closeTime: '22:00',
-        },
-        create: {
-          tenantId: tenant.id,
-          dayOfWeek: day,
-          isOpen: true,
-          openTime: '08:00',
-          closeTime: '22:00',
-        },
-      });
+            isOpen: true,
+            openTime: '08:00',
+            closeTime: '22:00',
+          }
+        });
+      }
     }
 
     // Create delivery rate rules
@@ -561,35 +557,8 @@ async function seedDemoTenant() {
       },
     });
 
-    // Create complement group (ProductComplementGroup)
-    const group = await prisma.productComplementGroup.upsert({
-      where: { id: 'demo-group-id' },
-      update: {},
-      create: {
-        id: 'demo-group-id',
-        tenantId: tenant.id,
-        name: 'Escolha a Borda',
-        minSelect: 1,
-        maxSelect: 1,
-        isRequired: true,
-      },
-    });
-
-    // Create complement items (ProductComplementItem)
-    await prisma.productComplementItem.upsert({
-      where: { id: 'demo-item-catupiry' },
-      update: {},
-      create: {
-        id: 'demo-item-catupiry',
-        tenantId: tenant.id,
-        groupId: group.id,
-        name: 'Catupiry',
-        additionalPrice: 5.0,
-      },
-    });
-
     // Create product
-    const product = await prisma.product.upsert({
+    await prisma.product.upsert({
       where: { tenantId_slug: { tenantId: tenant.id, slug: 'pizza-de-calabresa' } },
       update: {},
       create: {
@@ -600,23 +569,6 @@ async function seedDemoTenant() {
         basePrice: 45.0,
         isAvailable: true,
         sellableOnline: true,
-      },
-    });
-
-    // Link product to complement group (ProductComplementGroupLink)
-    await prisma.productComplementGroupLink.upsert({
-      where: {
-        productId_complementGroupId: {
-          productId: product.id,
-          complementGroupId: group.id,
-        },
-      },
-      update: {},
-      create: {
-        tenantId: tenant.id,
-        productId: product.id,
-        complementGroupId: group.id,
-        order: 0,
       },
     });
 
@@ -646,48 +598,7 @@ async function seedDemoTenant() {
       },
     });
 
-    // Create combo (ProductCombo)
-    const combo = await prisma.productCombo.upsert({
-      where: { tenantId_slug: { tenantId: tenant.id, slug: 'combo-casal' } },
-      update: {},
-      create: {
-        tenantId: tenant.id,
-        name: 'Combo Casal',
-        slug: 'combo-casal',
-        basePrice: 85.0,
-        isActive: true,
-      },
-    });
-
-    // Create combo block (ProductComboBlock)
-    const block = await prisma.productComboBlock.upsert({
-      where: { id: 'demo-block-id' },
-      update: {},
-      create: {
-        id: 'demo-block-id',
-        tenantId: tenant.id,
-        comboId: combo.id,
-        name: 'Escolha seu sabor',
-        minSelect: 1,
-        maxSelect: 1,
-        order: 0,
-      },
-    });
-
-    // Link product to combo block (ProductComboBlockItem)
-    await prisma.productComboBlockItem.upsert({
-      where: { blockId_productId: { blockId: block.id, productId: product.id } },
-      update: {},
-      create: {
-        tenantId: tenant.id,
-        blockId: block.id,
-        productId: product.id,
-        additionalPrice: 0,
-        order: 0,
-      },
-    });
-
-    console.log(`   ✅ Catalog data seeded for ${TENANT_SLUG}`);
+    console.log('   ✅ Catalog data seeded');
   } catch (err) {
     console.error('❌ Error inside seedDemoTenant:', err);
     throw err;
