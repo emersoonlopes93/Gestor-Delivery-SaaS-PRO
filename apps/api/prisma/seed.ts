@@ -312,8 +312,16 @@ async function seedAiPlanPresets() {
 async function seedBaseMenus() {
   console.log('Seeding base menu templates...');
   const summary = await seedBaseMenuTemplates(prisma);
+  for (const message of summary.messages) {
+    console.log(`   ${message}`);
+  }
+  for (const warning of summary.warnings) {
+    console.warn(`   ${warning}`);
+  }
   console.log(
-    `   Base menus: ${summary.templates} templates, ${summary.versions} versions, ${summary.categories} categories, ${summary.products} products`,
+    `   Base menus: ${summary.templatesCreated} created, ${summary.templatesPreserved} preserved, ` +
+      `${summary.versionsCreated} versions created, ${summary.versionsOverwritten} versions overwritten, ` +
+      `${summary.productsOverwritten} products overwritten`,
   );
 }
 

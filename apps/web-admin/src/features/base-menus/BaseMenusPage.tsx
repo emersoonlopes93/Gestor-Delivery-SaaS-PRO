@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -11,13 +11,18 @@ import {
   Images,
   ListChecks,
   Loader2,
+  Plus,
   RefreshCw,
+  Save,
   Search,
+  Send,
+  Trash2,
 } from 'lucide-react';
 import { api, ApiError } from '../../lib/api-client';
+import { useAdminPermissions } from '../../hooks/use-admin-auth';
 
 type PublicationStatus = 'draft' | 'published' | 'archived';
-type ImageStatus = 'linked' | 'missing_lookup' | 'no_published_asset' | 'draft_only';
+type ImageStatus = 'linked_exact' | 'linked_tag' | 'linked_fallback' | 'missing_lookup' | 'no_published_asset' | 'draft_only';
 type ImportStatus = 'success' | 'partial' | 'failed';
 type TabId = 'products' | 'images' | 'imports' | 'metadata';
 
@@ -38,6 +43,7 @@ type BaseMenuListItem = {
   icon: string | null;
   status: PublicationStatus;
   currentPublishedVersion: BaseMenuVersionSummary | null;
+  draftVersion: BaseMenuVersionSummary | null;
   totalCategories: number;
   totalProducts: number;
   totalProductsWithMediaLookupKey: number;
@@ -101,6 +107,10 @@ type BaseMenuDetail = {
     metadataJson: Record<string, unknown> | null;
     updatedAt: string;
   }) | null;
+  draftVersion: (BaseMenuVersionSummary & {
+    metadataJson: Record<string, unknown> | null;
+    updatedAt: string;
+  }) | null;
   totals: {
     totalCategories: number;
     totalProducts: number;
@@ -110,6 +120,34 @@ type BaseMenuDetail = {
   };
   categories: BaseMenuCategory[];
   versions: Array<BaseMenuVersionSummary & { metadataJson?: Record<string, unknown> | null; updatedAt?: string }>;
+};
+
+type DraftValidation = {
+  errors: string[];
+  warnings: string[];
+  totals: { categories: number; products: number };
+  imageSummary: {
+    linkedExact: number;
+    linkedTag: number;
+    linkedFallback: number;
+    missingLookup: number;
+    noPublishedAsset: number;
+    draftOnly: number;
+  };
+  replacingVersionId: string | null;
+  publishingVersionId: string;
+  publishingVersionNumber: number;
+};
+
+type BaseMenuDraft = {
+  template: BaseMenuDetail['template'] & { currentPublishedVersionId: string | null };
+  version: BaseMenuVersionSummary & {
+    templateId: string;
+    metadataJson: Record<string, unknown> | null;
+    updatedAt: string;
+  };
+  validation: DraftValidation;
+  categories: BaseMenuCategory[];
 };
 
 type ImportLog = {
@@ -132,7 +170,9 @@ const statusLabels: Record<PublicationStatus, string> = {
 };
 
 const imageStatusLabels: Record<ImageStatus, string> = {
-  linked: 'Imagem publicada',
+  linked_exact: 'Imagem exata',
+  linked_tag: 'Imagem por tag',
+  linked_fallback: 'Imagem fallback',
   missing_lookup: 'Sem lookup',
   no_published_asset: 'Sem imagem publicada',
   draft_only: 'Somente draft/arquivada',
@@ -147,10 +187,14 @@ const tabs: Array<{ id: TabId; label: string }> = [
 
 export function BaseMenusPage() {
   const { id } = useParams();
-  return id ? <BaseMenuDetailView id={id} /> : <BaseMenuListView />;
+  const location = useLocation();
+  if (!id) return <BaseMenuListView />;
+  return location.pathname.endsWith('/draft') ? <BaseMenuDraftEditor id={id} /> : <BaseMenuDetailView id={id} />;
 }
 
 function BaseMenuListView() {
+  const { has } = useAdminPermissions();
+  const canManage = has('saas.base_menu.manage');
   const [items, setItems] = useState<BaseMenuListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -263,7 +307,7 @@ function BaseMenuListView() {
       </section>
 
       <section className="overflow-hidden rounded-xl border border-border bg-card">
-        <div className="grid grid-cols-[1.4fr_130px_120px_110px_110px_160px_150px_120px] gap-3 border-b border-border px-4 py-3 text-[11px] font-black uppercase text-muted-foreground">
+        <div className="grid grid-cols-[1.4fr_130px_120px_110px_110px_120px_150px_220px] gap-3 border-b border-border px-4 py-3 text-[11px] font-black uppercase text-muted-foreground">
           <span>Nome</span>
           <span>Segmento</span>
           <span>Status</span>
@@ -277,7 +321,7 @@ function BaseMenuListView() {
         {!loading && error ? <TableMessage icon={<AlertTriangle className="h-8 w-8" />} text={error} /> : null}
         {!loading && !error && filtered.length === 0 ? <TableMessage icon={<BookOpenCheck className="h-8 w-8" />} text="Nenhum modelo encontrado." /> : null}
         {!loading && !error ? filtered.map((item) => (
-          <article key={item.id} className="grid grid-cols-[1.4fr_130px_120px_110px_110px_160px_150px_120px] gap-3 border-b border-border px-4 py-4 last:border-b-0">
+          <article key={item.id} className="grid grid-cols-[1.4fr_130px_120px_110px_110px_120px_150px_220px] gap-3 border-b border-border px-4 py-4 last:border-b-0">
             <div className="min-w-0">
               <p className="truncate text-sm font-black text-foreground">{item.icon ? `${item.icon} ` : ''}{item.name}</p>
               <p className="truncate font-mono text-[11px] text-muted-foreground">{item.slug}</p>
@@ -288,9 +332,12 @@ function BaseMenuListView() {
             <span className="py-1 text-sm font-black text-foreground">{item.totalCategories}</span>
             <span className="py-1 text-sm font-black text-foreground">{item.totalProducts}</span>
             <CoverageBadge linked={item.totalProductsWithPublishedGlobalImage} total={item.totalProducts} />
-            <Link to={`/base-menus/${item.slug}`} className="inline-flex h-9 items-center justify-center rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground">
-              Ver detalhes
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link to={`/base-menus/${item.slug}`} className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-xs font-black text-foreground hover:bg-muted">
+                Ver detalhes
+              </Link>
+              {canManage ? <DraftActionButton item={item} onDone={loadItems} /> : null}
+            </div>
           </article>
         )) : null}
       </section>
@@ -298,8 +345,143 @@ function BaseMenuListView() {
   );
 }
 
+function DraftActionButton({ item, onDone }: { item: BaseMenuListItem; onDone: () => void | Promise<void> }) {
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+
+  async function createOrContinue() {
+    if (item.draftVersion) {
+      navigate(`/base-menus/${item.slug}/draft`);
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post<BaseMenuDraft>(`/admin/base-menus/${item.slug}/draft-version`);
+      await onDone();
+      navigate(`/base-menus/${item.slug}/draft`);
+    } catch (err) {
+      window.alert(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button onClick={() => void createOrContinue()} disabled={busy} className="inline-flex h-9 items-center justify-center gap-1 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground disabled:opacity-60">
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+      {item.draftVersion ? 'Continuar edicao' : 'Criar draft'}
+    </button>
+  );
+}
+
+async function publishDraft(idOrSlug: string, onDone: () => void | Promise<void>) {
+  if (!window.confirm('Publicar este draft como nova versao published? Tenants novos passarao a importar esta versao, mas menus ja importados nao mudam.')) return;
+  try {
+    await api.post(`/admin/base-menus/${idOrSlug}/publish-draft`);
+    await onDone();
+  } catch (err) {
+    window.alert(errorMessage(err));
+  }
+}
+
+function BaseMenuDraftEditor({ id }: { id: string }) {
+  const navigate = useNavigate();
+  const { has } = useAdminPermissions();
+  const canManage = has('saas.base_menu.manage');
+  const [draft, setDraft] = useState<BaseMenuDraft | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  async function loadDraft() {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.get<BaseMenuDraft>(`/admin/base-menus/${id}/draft`);
+      setDraft(response.data);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadDraft();
+  }, [id]);
+
+  if (loading) return <div className="flex min-h-[480px] items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando draft...</div>;
+
+  if (error || !draft) {
+    return (
+      <div className="space-y-4">
+        <button onClick={() => navigate(`/base-menus/${id}`)} className="inline-flex items-center gap-2 text-sm font-black text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" />
+          Voltar
+        </button>
+        <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-sm font-bold text-destructive">{error ?? 'Draft nao encontrado.'}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <button onClick={() => navigate(`/base-menus/${draft.template.slug}`)} className="inline-flex items-center gap-2 text-sm font-black text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="h-4 w-4" />
+        Voltar para detalhes
+      </button>
+
+      <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-900">
+        Editando draft v{draft.version.versionNumber}. Tenants so verao esta versao apos publicacao. Publicar nao altera cardapios ja importados.
+      </section>
+
+      <section className="rounded-xl border border-border bg-card p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div>
+            <h1 className="text-2xl font-black text-foreground">{draft.template.icon ? `${draft.template.icon} ` : ''}{draft.template.name}</h1>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">Publicada atual: {draft.template.currentPublishedVersionId ?? '-'} · Draft: v{draft.version.versionNumber}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link to="/base-media" className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">
+              <ExternalLink className="h-4 w-4" />
+              Galeria Base
+            </Link>
+            {canManage ? (
+              <button onClick={() => void publishDraft(draft.template.slug, loadDraft)} disabled={draft.validation.errors.length > 0} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700 disabled:opacity-50">
+                <Send className="h-4 w-4" />
+                Publicar draft
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      <PublishSummary validation={draft.validation} />
+
+      {canManage ? <TemplateForm draft={draft} onSaved={loadDraft} /> : <ReadOnlyNotice />}
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-black text-foreground">Categorias e produtos</h2>
+          {canManage ? <CategoryCreateForm draft={draft} onSaved={loadDraft} /> : null}
+        </div>
+        {draft.categories.map((category) => (
+          <div key={category.id} className="overflow-hidden rounded-xl border border-border bg-card">
+            <CategoryEditor draft={draft} category={category} canManage={canManage} onSaved={loadDraft} />
+            <div className="divide-y divide-border">
+              {category.products.map((product) => <ProductEditor key={product.id} draft={draft} product={product} canManage={canManage} onSaved={loadDraft} />)}
+            </div>
+            {canManage ? <ProductCreateForm draft={draft} category={category} onSaved={loadDraft} /> : null}
+          </div>
+        ))}
+      </section>
+    </div>
+  );
+}
+
 function BaseMenuDetailView({ id }: { id: string }) {
   const navigate = useNavigate();
+  const { has } = useAdminPermissions();
+  const canManage = has('saas.base_menu.manage');
   const [detail, setDetail] = useState<BaseMenuDetail | null>(null);
   const [logs, setLogs] = useState<ImportLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -329,7 +511,7 @@ function BaseMenuDetailView({ id }: { id: string }) {
 
   const products = useMemo(() => detail?.categories.flatMap((category) => category.products) ?? [], [detail]);
   const imageGroups = useMemo(() => ({
-    linked: products.filter((product) => product.imageStatus === 'linked'),
+    linked: products.filter((product) => ['linked_exact', 'linked_tag', 'linked_fallback'].includes(product.imageStatus)),
     draftOnly: products.filter((product) => product.imageStatus === 'draft_only'),
     noAsset: products.filter((product) => product.imageStatus === 'no_published_asset'),
     noLookup: products.filter((product) => product.imageStatus === 'missing_lookup'),
@@ -379,10 +561,52 @@ function BaseMenuDetailView({ id }: { id: string }) {
               <ExternalLink className="h-4 w-4" />
               Abrir Galeria Base
             </Link>
+            {canManage ? (
+              <>
+                <DraftActionButton item={{
+                  id: detail.template.id,
+                  slug: detail.template.slug,
+                  name: detail.template.name,
+                  description: detail.template.description,
+                  segment: detail.template.segment,
+                  icon: detail.template.icon,
+                  status: detail.template.status,
+                  currentPublishedVersion: detail.currentPublishedVersion,
+                  draftVersion: detail.draftVersion,
+                  totalCategories: detail.totals.totalCategories,
+                  totalProducts: detail.totals.totalProducts,
+                  totalProductsWithMediaLookupKey: detail.totals.totalProductsWithMediaLookupKey,
+                  totalProductsWithPublishedGlobalImage: detail.totals.totalProductsWithPublishedGlobalImage,
+                  totalProductsWithoutImage: detail.totals.totalProductsWithoutImage,
+                  lastPublishedAt: detail.currentPublishedVersion?.publishedAt ?? null,
+                  createdAt: detail.template.createdAt,
+                  updatedAt: detail.template.updatedAt,
+                }} onDone={loadDetail} />
+                {detail.draftVersion ? (
+                  <button onClick={() => void publishDraft(detail.template.slug, loadDetail)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700">
+                    <Send className="h-4 w-4" />
+                    Publicar draft
+                  </button>
+                ) : null}
+              </>
+            ) : null}
             <button onClick={loadDetail} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground">
               <RefreshCw className="h-4 w-4" />
               Atualizar
             </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-border bg-card p-4">
+        <div className="grid gap-3 md:grid-cols-2">
+          <div>
+            <p className="text-[11px] font-black uppercase text-muted-foreground">VersÃ£o publicada atual</p>
+            <p className="mt-1 text-sm font-black text-foreground">{detail.currentPublishedVersion ? `v${detail.currentPublishedVersion.versionNumber}` : 'Nenhuma'}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-black uppercase text-muted-foreground">Draft em ediÃ§Ã£o</p>
+            <p className="mt-1 text-sm font-black text-foreground">{detail.draftVersion ? `v${detail.draftVersion.versionNumber}` : 'Sem draft aberto'}</p>
           </div>
         </div>
       </section>
@@ -413,6 +637,240 @@ function BaseMenuDetailView({ id }: { id: string }) {
       {tab === 'metadata' ? <MetadataTab detail={detail} /> : null}
     </div>
   );
+}
+
+function ReadOnlyNotice() {
+  return (
+    <section className="rounded-xl border border-border bg-card p-4 text-sm font-bold text-muted-foreground">
+      Seu usuario possui apenas leitura. A edicao do draft exige saas.base_menu.manage.
+    </section>
+  );
+}
+
+function PublishSummary({ validation }: { validation: DraftValidation }) {
+  return (
+    <section className="grid gap-3 lg:grid-cols-[1fr_1fr_1.4fr]">
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="text-[11px] font-black uppercase text-muted-foreground">Resumo</p>
+        <p className="mt-2 text-sm font-black text-foreground">{validation.totals.categories} categorias · {validation.totals.products} produtos</p>
+        <p className="mt-1 text-xs font-bold text-muted-foreground">Sera publicada a v{validation.publishingVersionNumber}</p>
+      </div>
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="text-[11px] font-black uppercase text-muted-foreground">Imagens</p>
+        <p className="mt-2 text-sm font-black text-foreground">{validation.imageSummary.linkedExact + validation.imageSummary.linkedTag + validation.imageSummary.linkedFallback} com imagem</p>
+        <p className="mt-1 text-xs font-bold text-muted-foreground">{validation.imageSummary.noPublishedAsset + validation.imageSummary.missingLookup + validation.imageSummary.draftOnly} pendencias</p>
+      </div>
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="text-[11px] font-black uppercase text-muted-foreground">Validacao antes de publicar</p>
+        <p className={`mt-2 text-sm font-black ${validation.errors.length > 0 ? 'text-destructive' : 'text-emerald-600'}`}>
+          {validation.errors.length} erros · {validation.warnings.length} avisos
+        </p>
+        <div className="mt-2 max-h-24 overflow-auto text-xs font-bold text-muted-foreground">
+          {[...validation.errors, ...validation.warnings].slice(0, 8).map((item) => <p key={item}>• {item}</p>)}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TemplateForm({ draft, onSaved }: { draft: BaseMenuDraft; onSaved: () => void | Promise<void> }) {
+  const [name, setName] = useState(draft.template.name);
+  const [description, setDescription] = useState(draft.template.description ?? '');
+  const [segment, setSegment] = useState(draft.template.segment);
+  const [icon, setIcon] = useState(draft.template.icon ?? '');
+  const [saving, setSaving] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await api.patch(`/admin/base-menus/${draft.template.slug}`, { name, description, segment, icon });
+      await onSaved();
+    } catch (err) {
+      window.alert(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={(event) => void submit(event)} className="rounded-xl border border-border bg-card p-4">
+      <div className="grid gap-3 lg:grid-cols-[1fr_1fr_120px]">
+        <Field label="Nome" value={name} onChange={setName} />
+        <Field label="Segmento" value={segment} onChange={setSegment} />
+        <Field label="Icone" value={icon} onChange={setIcon} />
+      </div>
+      <div className="mt-3">
+        <Field label="Descricao" value={description} onChange={setDescription} />
+      </div>
+      <button disabled={saving} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground disabled:opacity-60">
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+        Salvar template
+      </button>
+    </form>
+  );
+}
+
+function CategoryCreateForm({ draft, onSaved }: { draft: BaseMenuDraft; onSaved: () => void | Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [sortOrder, setSortOrder] = useState('0');
+  if (!open) return <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground"><Plus className="h-4 w-4" /> Categoria</button>;
+  return (
+    <form onSubmit={(event) => void submitCategoryCreate(event, draft, name, sortOrder, onSaved, () => { setName(''); setOpen(false); })} className="flex flex-wrap items-end gap-2">
+      <Field label="Nova categoria" value={name} onChange={setName} />
+      <Field label="Ordem" value={sortOrder} onChange={setSortOrder} type="number" />
+      <button className="h-10 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground">Criar</button>
+    </form>
+  );
+}
+
+function CategoryEditor({ draft, category, canManage, onSaved }: { draft: BaseMenuDraft; category: BaseMenuCategory; canManage: boolean; onSaved: () => void | Promise<void> }) {
+  const [name, setName] = useState(category.name);
+  const [description, setDescription] = useState(category.description ?? '');
+  const [sortOrder, setSortOrder] = useState(String(category.sortOrder));
+
+  return (
+    <form onSubmit={(event) => void submitCategoryUpdate(event, draft, category, { name, description, sortOrder }, onSaved)} className="border-b border-border px-4 py-3">
+      <div className="grid gap-3 lg:grid-cols-[1fr_1fr_100px_190px]">
+        <Field label="Categoria" value={name} onChange={setName} disabled={!canManage} />
+        <Field label="Descricao" value={description} onChange={setDescription} disabled={!canManage} />
+        <Field label="Ordem" value={sortOrder} onChange={setSortOrder} type="number" disabled={!canManage} />
+        <div className="flex items-end gap-2">
+          <button disabled={!canManage} className="h-10 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground disabled:opacity-50">Salvar</button>
+          <button type="button" disabled={!canManage} onClick={() => void deleteCategory(draft, category, onSaved)} className="inline-flex h-10 items-center rounded-xl border border-destructive/30 px-3 text-destructive disabled:opacity-50"><Trash2 className="h-4 w-4" /></button>
+        </div>
+      </div>
+    </form>
+  );
+}
+
+function ProductCreateForm({ draft, category, onSaved }: { draft: BaseMenuDraft; category: BaseMenuCategory; onSaved: () => void | Promise<void> }) {
+  const [name, setName] = useState('');
+  const [basePrice, setBasePrice] = useState('0');
+  return (
+    <form onSubmit={(event) => void submitProductCreate(event, draft, category, name, basePrice, onSaved, () => setName(''))} className="flex flex-wrap items-end gap-2 border-t border-border p-4">
+      <Field label="Novo produto" value={name} onChange={setName} />
+      <Field label="Preco" value={basePrice} onChange={setBasePrice} type="number" step="0.01" />
+      <button className="h-10 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground">Criar produto</button>
+    </form>
+  );
+}
+
+function ProductEditor({ draft, product, canManage, onSaved }: { draft: BaseMenuDraft; product: BaseMenuProduct; canManage: boolean; onSaved: () => void | Promise<void> }) {
+  const [name, setName] = useState(product.name);
+  const [description, setDescription] = useState(product.description ?? '');
+  const [basePrice, setBasePrice] = useState(String(product.basePrice));
+  const [compareAtPrice, setCompareAtPrice] = useState(product.compareAtPrice === null ? '' : String(product.compareAtPrice));
+  const [mediaLookupKey, setMediaLookupKey] = useState(product.mediaLookupKey ?? '');
+  const [tags, setTags] = useState(product.searchTagsJson.join(', '));
+  const [sortOrder, setSortOrder] = useState(String(product.sortOrder));
+
+  return (
+    <form onSubmit={(event) => void submitProductUpdate(event, draft, product, { name, description, basePrice, compareAtPrice, mediaLookupKey, tags, sortOrder }, onSaved)} className="grid gap-3 px-4 py-4 lg:grid-cols-[72px_1fr_140px_160px_150px]">
+      <div>
+        {product.publishedGlobalImage ? <img src={product.publishedGlobalImage.publicUrl} alt={product.publishedGlobalImage.altText ?? product.name} className="h-16 w-16 rounded-xl bg-muted object-cover" /> : <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-muted text-muted-foreground"><ImageOff className="h-6 w-6" /></div>}
+      </div>
+      <div className="grid gap-2">
+        <Field label="Produto" value={name} onChange={setName} disabled={!canManage} />
+        <Field label="Descricao" value={description} onChange={setDescription} disabled={!canManage} />
+        <Field label="Tags" value={tags} onChange={setTags} disabled={!canManage} />
+      </div>
+      <div className="grid gap-2">
+        <Field label="Preco" value={basePrice} onChange={setBasePrice} type="number" step="0.01" disabled={!canManage} />
+        <Field label="Compare" value={compareAtPrice} onChange={setCompareAtPrice} type="number" step="0.01" disabled={!canManage} />
+      </div>
+      <div className="grid gap-2">
+        <Field label="Lookup" value={mediaLookupKey} onChange={setMediaLookupKey} disabled={!canManage} />
+        <Field label="Ordem" value={sortOrder} onChange={setSortOrder} type="number" disabled={!canManage} />
+      </div>
+      <div className="flex flex-col gap-2">
+        <ImageStatusBadge status={product.imageStatus} />
+        <button disabled={!canManage} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground disabled:opacity-50"><Save className="h-4 w-4" /> Salvar</button>
+        <button type="button" disabled={!canManage} onClick={() => void deleteProduct(draft, product, onSaved)} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-destructive/30 px-3 text-xs font-black text-destructive disabled:opacity-50"><Trash2 className="h-4 w-4" /> Remover</button>
+      </div>
+    </form>
+  );
+}
+
+function Field({ label, value, onChange, type = 'text', step, disabled }: { label: string; value: string; onChange: (value: string) => void; type?: string; step?: string; disabled?: boolean }) {
+  return (
+    <label className="block">
+      <span className="text-[11px] font-black uppercase text-muted-foreground">{label}</span>
+      <input value={value} onChange={(event) => onChange(event.target.value)} type={type} step={step} disabled={disabled} className="mt-1 h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-60" />
+    </label>
+  );
+}
+
+async function submitCategoryCreate(event: FormEvent, draft: BaseMenuDraft, name: string, sortOrder: string, onSaved: () => void | Promise<void>, afterSaved: () => void) {
+  event.preventDefault();
+  try {
+    await api.post(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/categories`, { name, sortOrder: Number(sortOrder) });
+    afterSaved();
+    await onSaved();
+  } catch (err) {
+    window.alert(errorMessage(err));
+  }
+}
+
+async function submitCategoryUpdate(event: FormEvent, draft: BaseMenuDraft, category: BaseMenuCategory, values: { name: string; description: string; sortOrder: string }, onSaved: () => void | Promise<void>) {
+  event.preventDefault();
+  try {
+    await api.patch(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/categories/${category.id}`, { name: values.name, description: values.description, sortOrder: Number(values.sortOrder) });
+    await onSaved();
+  } catch (err) {
+    window.alert(errorMessage(err));
+  }
+}
+
+async function submitProductCreate(event: FormEvent, draft: BaseMenuDraft, category: BaseMenuCategory, name: string, basePrice: string, onSaved: () => void | Promise<void>, afterSaved: () => void) {
+  event.preventDefault();
+  try {
+    await api.post(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/categories/${category.id}/products`, { name, basePrice: Number(basePrice) });
+    afterSaved();
+    await onSaved();
+  } catch (err) {
+    window.alert(errorMessage(err));
+  }
+}
+
+async function submitProductUpdate(event: FormEvent, draft: BaseMenuDraft, product: BaseMenuProduct, values: { name: string; description: string; basePrice: string; compareAtPrice: string; mediaLookupKey: string; tags: string; sortOrder: string }, onSaved: () => void | Promise<void>) {
+  event.preventDefault();
+  try {
+    await api.patch(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/products/${product.id}`, {
+      name: values.name,
+      description: values.description,
+      basePrice: Number(values.basePrice),
+      compareAtPrice: values.compareAtPrice.trim() ? Number(values.compareAtPrice) : null,
+      mediaLookupKey: values.mediaLookupKey.trim() || null,
+      searchTagsJson: values.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+      sortOrder: Number(values.sortOrder),
+    });
+    await onSaved();
+  } catch (err) {
+    window.alert(errorMessage(err));
+  }
+}
+
+async function deleteCategory(draft: BaseMenuDraft, category: BaseMenuCategory, onSaved: () => void | Promise<void>) {
+  const force = category.products.length > 0;
+  if (!window.confirm(force ? 'Remover categoria e seus produtos apenas deste draft?' : 'Remover categoria deste draft?')) return;
+  try {
+    await api.delete(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/categories/${category.id}${force ? '?force=true' : ''}`);
+    await onSaved();
+  } catch (err) {
+    window.alert(errorMessage(err));
+  }
+}
+
+async function deleteProduct(draft: BaseMenuDraft, product: BaseMenuProduct, onSaved: () => void | Promise<void>) {
+  if (!window.confirm('Remover produto apenas deste draft?')) return;
+  try {
+    await api.delete(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/products/${product.id}`);
+    await onSaved();
+  } catch (err) {
+    window.alert(errorMessage(err));
+  }
 }
 
 function ProductsTab({ categories }: { categories: BaseMenuCategory[] }) {
@@ -466,7 +924,7 @@ function ProductRow({ product }: { product: BaseMenuProduct }) {
 function ImagesTab({ groups }: { groups: { linked: BaseMenuProduct[]; draftOnly: BaseMenuProduct[]; noAsset: BaseMenuProduct[]; noLookup: BaseMenuProduct[] } }) {
   return (
     <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-      <ImageGroup title="Com imagem publicada" products={groups.linked} status="linked" />
+      <ImageGroup title="Com imagem publicada" products={groups.linked} status="linked_exact" />
       <ImageGroup title="Somente draft/arquivada" products={groups.draftOnly} status="draft_only" />
       <ImageGroup title="Sem imagem publicada" products={groups.noAsset} status="no_published_asset" />
       <ImageGroup title="Sem lookup" products={groups.noLookup} status="missing_lookup" />
@@ -583,14 +1041,15 @@ function CoverageBadge({ linked, total }: { linked: number; total: number }) {
 }
 
 function ImageStatusBadge({ status, compact }: { status: ImageStatus; compact?: boolean }) {
-  const color = status === 'linked'
+  const isLinked = ['linked_exact', 'linked_tag', 'linked_fallback'].includes(status);
+  const color = isLinked
     ? 'bg-emerald-500/10 text-emerald-600'
     : status === 'draft_only'
       ? 'bg-amber-500/10 text-amber-600'
       : 'bg-destructive/10 text-destructive';
   return (
     <span className={`inline-flex h-8 items-center justify-center rounded-xl px-3 text-xs font-black ${color}`}>
-      {status === 'linked' ? <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> : <AlertTriangle className="mr-1 h-3.5 w-3.5" />}
+      {isLinked ? <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> : <AlertTriangle className="mr-1 h-3.5 w-3.5" />}
       {compact ? imageStatusLabels[status].replace(' publicada', '') : imageStatusLabels[status]}
     </span>
   );

@@ -1,0 +1,214 @@
+import { ForbiddenException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { AdminBaseMenuService } from './admin-base-menu.service';
+
+const actor = { id: 'admin-1', ip: '127.0.0.1' };
+const publishedProduct = {
+  id: 'product-v1',
+  categoryId: 'category-v1',
+  slug: 'acai-300ml',
+  name: 'Acai 300ml',
+  description: 'Original',
+  basePrice: new Prisma.Decimal(15),
+  compareAtPrice: null,
+  sortOrder: 1,
+  mediaLookupKey: 'lookup:acai-300',
+  searchTagsJson: ['lookup:acai-300'],
+  metadataJson: { mediaCategory: 'acai' },
+  createdAt: new Date('2026-06-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-06-01T00:00:00.000Z'),
+};
+const publishedCategory = {
+  id: 'category-v1',
+  versionId: 'version-1',
+  slug: 'tamanhos',
+  name: 'Tamanhos',
+  description: null,
+  sortOrder: 1,
+  metadataJson: null,
+  createdAt: new Date('2026-06-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-06-01T00:00:00.000Z'),
+  products: [publishedProduct],
+};
+const publishedVersion = {
+  id: 'version-1',
+  templateId: 'template-1',
+  versionNumber: 1,
+  status: 'published',
+  publishedAt: new Date('2026-06-01T00:00:00.000Z'),
+  metadataJson: null,
+  createdAt: new Date('2026-06-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-06-01T00:00:00.000Z'),
+  categories: [publishedCategory],
+};
+const draftVersion = {
+  id: 'version-2',
+  templateId: 'template-1',
+  versionNumber: 2,
+  status: 'draft',
+  publishedAt: null,
+  metadataJson: null,
+  createdAt: new Date('2026-06-02T00:00:00.000Z'),
+  updatedAt: new Date('2026-06-02T00:00:00.000Z'),
+  categories: [
+    {
+      ...publishedCategory,
+      id: 'category-v2',
+      versionId: 'version-2',
+      products: [
+        {
+          ...publishedProduct,
+          id: 'product-v2',
+          categoryId: 'category-v2',
+        },
+      ],
+    },
+  ],
+};
+const template = {
+  id: 'template-1',
+  slug: 'acai',
+  name: 'Acai',
+  description: 'Template',
+  segment: 'acai',
+  icon: 'A',
+  status: 'published',
+  currentPublishedVersionId: 'version-1',
+  metadataJson: null,
+  createdAt: new Date('2026-06-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-06-01T00:00:00.000Z'),
+};
+
+describe('AdminBaseMenuService draft/published flow', () => {
+  const makePrisma = () => {
+    const prisma = {
+      baseMenuTemplate: {
+        findFirst: jest.fn(),
+        update: jest.fn(),
+      },
+      baseMenuTemplateVersion: {
+        findFirst: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      baseMenuCategory: {
+        create: jest.fn(),
+        findFirst: jest.fn(),
+      },
+      baseMenuProduct: {
+        create: jest.fn(),
+        findFirst: jest.fn(),
+        update: jest.fn(),
+      },
+      mediaAsset: {
+        findMany: jest.fn(),
+      },
+      tenant: {
+        upsert: jest.fn(),
+      },
+      auditLog: {
+        create: jest.fn(),
+      },
+      $transaction: jest.fn(),
+    };
+    prisma.$transaction.mockImplementation((callback: (tx: typeof prisma) => Promise<unknown>) => callback(prisma));
+    prisma.tenant.upsert.mockResolvedValue({ id: 'platform-audit' });
+    prisma.auditLog.create.mockResolvedValue({ id: 'audit-1' });
+    prisma.mediaAsset.findMany.mockResolvedValue([]);
+    return prisma;
+  };
+
+  it('creates a draft from published without moving currentPublishedVersionId', async () => {
+    const prisma = makePrisma();
+    const service = new AdminBaseMenuService(prisma as never);
+    prisma.baseMenuTemplate.findFirst
+      .mockResolvedValueOnce({
+        ...template,
+        currentPublishedVersion: publishedVersion,
+        versions: [publishedVersion],
+      })
+      .mockResolvedValueOnce(template);
+    prisma.baseMenuTemplateVersion.create.mockResolvedValue({ ...draftVersion, categories: undefined });
+    prisma.baseMenuCategory.create.mockResolvedValue({ ...publishedCategory, id: 'category-v2' });
+    prisma.baseMenuTemplateVersion.findFirst.mockResolvedValue(draftVersion);
+
+    await service.createDraftVersion('acai', actor);
+
+    expect(prisma.baseMenuTemplateVersion.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ templateId: 'template-1', versionNumber: 2, status: 'draft' }),
+    }));
+    expect(prisma.baseMenuProduct.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ name: 'Acai 300ml', categoryId: 'category-v2' }),
+    }));
+    expect(prisma.baseMenuTemplate.update).not.toHaveBeenCalled();
+  });
+
+  it('returns an existing draft instead of creating another one', async () => {
+    const prisma = makePrisma();
+    const service = new AdminBaseMenuService(prisma as never);
+    prisma.baseMenuTemplate.findFirst
+      .mockResolvedValueOnce({
+        ...template,
+        currentPublishedVersion: publishedVersion,
+        versions: [draftVersion, publishedVersion],
+      })
+      .mockResolvedValueOnce(template);
+    prisma.baseMenuTemplateVersion.findFirst.mockResolvedValue(draftVersion);
+
+    const result = await service.createDraftVersion('acai', actor);
+
+    expect(result.version.id).toBe('version-2');
+    expect(prisma.baseMenuTemplateVersion.create).not.toHaveBeenCalled();
+  });
+
+  it('updates only a product in draft', async () => {
+    const prisma = makePrisma();
+    const service = new AdminBaseMenuService(prisma as never);
+    prisma.baseMenuTemplate.findFirst.mockResolvedValue(template);
+    prisma.baseMenuTemplateVersion.findFirst.mockResolvedValue({ ...draftVersion, categories: undefined });
+    prisma.baseMenuProduct.findFirst.mockResolvedValue(draftVersion.categories[0].products[0]);
+    prisma.baseMenuProduct.update.mockImplementation(({ data }) => Promise.resolve({
+      ...draftVersion.categories[0].products[0],
+      ...data,
+    }));
+
+    await service.updateProduct('acai', 'version-2', 'product-v2', { name: 'Acai 300ml Especial', basePrice: 19 }, actor);
+
+    expect(prisma.baseMenuProduct.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'product-v2' },
+      data: expect.objectContaining({ name: 'Acai 300ml Especial' }),
+    }));
+    expect(prisma.baseMenuTemplate.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks product updates on published versions', async () => {
+    const prisma = makePrisma();
+    const service = new AdminBaseMenuService(prisma as never);
+    prisma.baseMenuTemplate.findFirst.mockResolvedValue(template);
+    prisma.baseMenuTemplateVersion.findFirst.mockResolvedValue({ ...publishedVersion, categories: undefined });
+
+    await expect(service.updateProduct('acai', 'version-1', 'product-v1', { name: 'Nao pode' }, actor)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.baseMenuProduct.update).not.toHaveBeenCalled();
+  });
+
+  it('publishes draft, archives previous published version and updates currentPublishedVersionId', async () => {
+    const prisma = makePrisma();
+    const service = new AdminBaseMenuService(prisma as never);
+    prisma.baseMenuTemplate.findFirst.mockResolvedValue(template);
+    prisma.baseMenuTemplateVersion.findFirst.mockResolvedValue(draftVersion);
+    prisma.baseMenuTemplateVersion.update.mockResolvedValue({ ...draftVersion, status: 'published', publishedAt: new Date('2026-06-03T00:00:00.000Z') });
+
+    await service.publishDraft('acai', actor);
+
+    expect(prisma.baseMenuTemplateVersion.updateMany).toHaveBeenCalledWith({
+      where: { templateId: 'template-1', status: 'published', id: { not: 'version-2' } },
+      data: { status: 'archived' },
+    });
+    expect(prisma.baseMenuTemplate.update).toHaveBeenCalledWith({
+      where: { id: 'template-1' },
+      data: { status: 'published', currentPublishedVersionId: 'version-2' },
+    });
+    expect(prisma.auditLog.create).toHaveBeenCalled();
+  });
+});

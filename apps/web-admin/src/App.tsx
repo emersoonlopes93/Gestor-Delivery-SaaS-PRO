@@ -164,6 +164,14 @@ export function App() {
             }
           />
           <Route
+            path="/base-menus/:id/draft"
+            element={
+              <PermissionGate permission="saas.base_menu.read">
+                <BaseMenusPage />
+              </PermissionGate>
+            }
+          />
+          <Route
             path="/base-media"
             element={
               <PermissionGate permission="saas.base_media.read">

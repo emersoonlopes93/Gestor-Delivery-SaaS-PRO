@@ -9,8 +9,24 @@ async function main() {
 
   const summary = await seedBaseMenuTemplates(prisma);
 
+  for (const message of summary.messages) {
+    console.log(message);
+  }
+  for (const warning of summary.warnings) {
+    console.warn(warning);
+  }
+
   console.log(
-    `Base menu templates seeded: ${summary.templates} templates, ${summary.versions} versions, ${summary.categories} categories, ${summary.products} products.`,
+    [
+      `Base menu bootstrap complete:`,
+      `${summary.templatesCreated} templates criados`,
+      `${summary.templatesPreserved} templates preservados`,
+      `${summary.versionsCreated} versoes criadas`,
+      `${summary.versionsOverwritten} versoes sobrescritas`,
+      `${summary.productsOverwritten} produtos sobrescritos`,
+      `${summary.categories} categorias criadas`,
+      `${summary.products} produtos criados`,
+    ].join(' | '),
   );
 }
 
