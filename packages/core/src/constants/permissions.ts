@@ -19,27 +19,7 @@ export const TENANT_PERMISSIONS = {
   'catalog.update': 'Update catalog items',
   'catalog.delete': 'Delete catalog items',
   'catalog.publish': 'Publish catalog items',
-// ============================================================
-// Tenant Permissions — Granular permissions per module/action
-// ============================================================
 
-export const TENANT_PERMISSIONS = {
-  // Orders module
-  'orders.read': 'View orders',
-  'orders.create': 'Create orders',
-  'orders.update': 'Update orders',
-  'orders.update_status': 'Update order status',
-  'orders.cancel': 'Cancel orders',
-  'orders.view_timeline': 'View order timeline',
-  'orders.use_kanban': 'Use operational kanban',
-  'orders.use_kds': 'Use kitchen display system',
-
-  // Catalog module
-  'catalog.read': 'View catalog',
-  'catalog.create': 'Create catalog items',
-  'catalog.update': 'Update catalog items',
-  'catalog.delete': 'Delete catalog items',
-  'catalog.publish': 'Publish catalog items',
   'catalog.manage_products': 'Manage catalog products',
   'catalog.manage_option_groups': 'Manage catalog option groups',
   'catalog.bulk_edit': 'Bulk edit catalog',

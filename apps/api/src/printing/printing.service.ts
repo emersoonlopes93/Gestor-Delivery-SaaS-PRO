@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { DatabaseService } from '../../database/database.service';
+import { PrismaService } from '../database/prisma.service';
 import { PrintJobStatus, PrintType } from '@prisma/client';
 import { PrinterService as LegacyPrinterService } from '../pos/printer.service';
 
@@ -8,7 +8,7 @@ export class PrintingService {
   private readonly logger = new Logger(PrintingService.name);
 
   constructor(
-    private readonly db: DatabaseService,
+    private readonly db: PrismaService,
     private readonly legacyPrinter: LegacyPrinterService,
   ) {}
 
@@ -34,6 +34,22 @@ export class PrintingService {
         name: data.name,
         slug: data.slug,
         autoPrintEnabled: data.autoPrintEnabled,
+      },
+    });
+  }
+
+  async getDevices(tenantId: string) {
+    return this.db.printerDevice.findMany({
+      where: { tenantId },
+      include: { station: true },
+    });
+  }
+
+  async createDevice(tenantId: string, data: { stationId: string; name: string; connectionType: string; address?: string; vendor?: string; model?: string; paperWidth?: number; isDefault?: boolean }) {
+    return this.db.printerDevice.create({
+      data: {
+        tenantId,
+        ...data,
       },
     });
   }
@@ -160,6 +176,29 @@ export class PrintingService {
         type,
         content,
         idempotencyKey,
+        status: PrintJobStatus.pending,
+      },
+    });
+  }
+
+  async createTestJob(tenantId: string, stationSlug: string, deviceName: string) {
+    const content = `GESTOR PRO
+TESTE DE IMPRESSAO
+
+Estacao: ${stationSlug}
+Dispositivo: ${deviceName}
+Data: ${new Date().toLocaleString('pt-BR')}
+
+Bluetooth OK
+--- FIM DO TESTE ---`;
+
+    return this.db.printJob.create({
+      data: {
+        tenantId,
+        orderId: 'TEST',
+        station: stationSlug,
+        type: PrintType.summary,
+        content,
         status: PrintJobStatus.pending,
       },
     });

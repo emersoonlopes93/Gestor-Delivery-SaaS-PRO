@@ -1,8 +1,8 @@
 import { Controller, Get, Post, Body, Param, UseGuards, Req, Put } from '@nestjs/common';
 import { PrintingService } from './printing.service';
-import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
-import { RequirePermissions } from '../../common/decorators';
-import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
+import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
+import { RequirePermissions } from '../common/decorators';
+import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { CreatePrinterDeviceDto, AckSpoolerJobDto, FailSpoolerJobDto } from './dto/printing.dto';
 
 @Controller('printing')
@@ -22,10 +22,28 @@ export class PrintingController {
     return this.printingService.getStations(req.tenantId);
   }
 
+  @Get('devices')
+  @RequirePermissions('printing.manage')
+  async getDevices(@Req() req: any) {
+    return this.printingService.getDevices(req.tenantId);
+  }
+
+  @Post('devices')
+  @RequirePermissions('printing.manage')
+  async createDevice(@Req() req: any, @Body() body: CreatePrinterDeviceDto) {
+    return this.printingService.createDevice(req.tenantId, body);
+  }
+
   @Post('jobs/:id/reprint')
   @RequirePermissions('printing.reprint')
   async reprintJob(@Req() req: any, @Param('id') id: string) {
     return this.printingService.reprintJob(req.tenantId, id);
+  }
+
+  @Post('test')
+  @RequirePermissions('printing.manage')
+  async createTestJob(@Req() req: any, @Body() body: { stationSlug: string, deviceName: string }) {
+    return this.printingService.createTestJob(req.tenantId, body.stationSlug, body.deviceName);
   }
 
   // Spooler Endpoints (Used by the Android App)
