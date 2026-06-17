@@ -547,6 +547,7 @@ export class KdsService {
             station,
             type: PrismaPrintType.kitchen,
             content,
+            idempotencyKey: `auto_print_${orderId}_${PrismaPrintType.kitchen}_${station}`,
             status: PrismaPrintJobStatus.pending,
           },
         }));

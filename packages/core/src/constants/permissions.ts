@@ -19,6 +19,27 @@ export const TENANT_PERMISSIONS = {
   'catalog.update': 'Update catalog items',
   'catalog.delete': 'Delete catalog items',
   'catalog.publish': 'Publish catalog items',
+// ============================================================
+// Tenant Permissions — Granular permissions per module/action
+// ============================================================
+
+export const TENANT_PERMISSIONS = {
+  // Orders module
+  'orders.read': 'View orders',
+  'orders.create': 'Create orders',
+  'orders.update': 'Update orders',
+  'orders.update_status': 'Update order status',
+  'orders.cancel': 'Cancel orders',
+  'orders.view_timeline': 'View order timeline',
+  'orders.use_kanban': 'Use operational kanban',
+  'orders.use_kds': 'Use kitchen display system',
+
+  // Catalog module
+  'catalog.read': 'View catalog',
+  'catalog.create': 'Create catalog items',
+  'catalog.update': 'Update catalog items',
+  'catalog.delete': 'Delete catalog items',
+  'catalog.publish': 'Publish catalog items',
   'catalog.manage_products': 'Manage catalog products',
   'catalog.manage_option_groups': 'Manage catalog option groups',
   'catalog.bulk_edit': 'Bulk edit catalog',
@@ -28,6 +49,12 @@ export const TENANT_PERMISSIONS = {
   // KDS module
   'kds.use': 'Use kitchen display',
   'kds.manage': 'Manage KDS settings',
+
+  // Printing module
+  'printing.read': 'View print jobs and stations',
+  'printing.manage': 'Manage print stations and devices',
+  'printing.print': 'Allow device to pull spooler jobs',
+  'printing.reprint': 'Reprint jobs',
 
   // Cash module
   'cash.read': 'View cash sessions and movements',
@@ -170,6 +197,7 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
     'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.cancel', 'orders.view_timeline', 'orders.use_kanban', 'orders.use_kds',
     'catalog.read', 'catalog.create', 'catalog.update', 'catalog.publish', 'catalog.manage_products', 'catalog.manage_option_groups', 'catalog.bulk_edit', 'catalog.manage_complements', 'catalog.manage_combos',
     'kds.use', 'kds.manage',
+    'printing.read', 'printing.manage', 'printing.print', 'printing.reprint',
     'cash.read', 'cash.open', 'cash.close', 'cash.add_supply', 'cash.add_withdrawal', 'cash.manage',
     'pos.read', 'pos.create_sale', 'pos.apply_discount',
     'reports.read', 'reports.view_costs', 'reports.view_margin', 'reports.export',

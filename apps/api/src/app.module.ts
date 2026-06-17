@@ -43,6 +43,7 @@ import { CampaignsModule } from './campaigns/campaigns.module';
 import { ChatModule } from './chat/chat.module';
 import { getApiEnvFilePaths, loadApiEnvFiles } from './config/env-paths';
 import { MailModule } from './mail/mail.module';
+import { PrintingModule } from './printing/printing.module';
 
 loadApiEnvFiles();
 
@@ -259,6 +260,7 @@ if (process.env.REDIS_ENABLED === 'false') {
     CampaignsModule,
     ChatModule,
     MailModule,
+    PrintingModule,
   ],
   providers: [
     {
