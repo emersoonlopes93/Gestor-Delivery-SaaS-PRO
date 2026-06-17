@@ -72,7 +72,7 @@ export function DashboardPage() {
           hasProducts: prodRes.success && prodRes.data.length > 0,
         });
 
-        if (user?.roles.includes('admin') || user?.roles.includes('owner') || user?.permissions.includes('reports.read')) {
+        if (user?.roles?.includes('admin') || user?.roles?.includes('owner') || user?.permissions?.includes('reports.read')) {
           try {
             const dashboardRes = await api.get<DashboardStatsDTO>(
               `/analytics/dashboard?startDate=${encodeURIComponent(start.toISOString())}&endDate=${encodeURIComponent(end.toISOString())}`,
