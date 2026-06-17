@@ -7,6 +7,7 @@ type Props = {
 type State = {
   hasError: boolean;
   error?: unknown;
+  errorInfo?: React.ErrorInfo;
 };
 
 export class ErrorBoundary extends React.Component<Props, State> {
@@ -16,8 +17,20 @@ export class ErrorBoundary extends React.Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: unknown) {
-    console.error('UI_ERROR_BOUNDARY', error);
+  componentDidCatch(error: unknown, errorInfo: React.ErrorInfo) {
+    // Log detalhado do erro para debugging em desenvolvimento/Capacitor
+    console.error('=== UI_ERROR_BOUNDARY ===');
+    console.error('Error:', error);
+    console.error('Error Message:', error instanceof Error ? error.message : 'Unknown error');
+    console.error('Error Stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error('Component Stack:', errorInfo.componentStack);
+    console.error('========================');
+
+    // Log adicional para Capacitor/Android
+    if (typeof window !== 'undefined' && (window as any).Capacitor) {
+      console.error('Capacitor Platform:', (window as any).Capacitor.getPlatform());
+      console.error('Current URL:', window.location.href);
+    }
   }
 
   render() {
