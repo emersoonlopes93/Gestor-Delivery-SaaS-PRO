@@ -1,6 +1,26 @@
 import type { ApiResponse, ApiErrorResponse } from '@gestor/types';
 
-const API_BASE = '/api/v1';
+/**
+ * URL base da API.
+ * Prioridade (primeira encontrada vence):
+ *   1. VITE_API_URL        — variável padrão do projeto (definida em .env / .env.local)
+ *   2. VITE_API_BASE_URL   — alias alternativo (compatibilidade / futuros .env)
+ *   3. '/api/v1'           — fallback APENAS para dev local com proxy Vite ativo
+ *
+ * ATENÇÃO: o proxy Vite só funciona no navegador local.
+ * Para builds Android via Capacitor, VITE_API_URL DEVE ser uma URL absoluta HTTPS.
+ * Exemplo: VITE_API_URL=https://sua-api.onrender.com/api/v1
+ */
+const API_BASE = (
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  '/api/v1'
+).replace(/\/$/, '');
+
+if (import.meta.env.DEV) {
+  // Log seguro: exibe apenas a URL base, nunca tokens, senhas ou payloads.
+  console.info('[api-client] API_BASE:', API_BASE);
+}
 
 function isAuthEndpoint(endpoint: string): boolean {
   return (
@@ -78,12 +98,12 @@ async function apiFetch<T>(
     // Refresh failed — clear local auth and redirect
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
-    
+
     // Redirect to login with a flag to show the expired message
     if (typeof window !== 'undefined') {
       window.location.href = '/login?expired=1';
     }
-    
+
     throw new ApiError(401, 'Session expired');
   }
 
