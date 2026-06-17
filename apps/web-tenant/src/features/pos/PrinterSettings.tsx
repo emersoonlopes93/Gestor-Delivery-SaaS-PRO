@@ -7,7 +7,7 @@ import {
   useCreateDevice,
   useTestPrint
 } from '../../hooks/usePrinting';
-import { scanBluetoothDevices, printTicketViaBluetooth, isNativeAndroid } from '../../lib/bluetooth';
+import { requestBluetoothPermissions, scanBluetoothDevices, printTicketViaBluetooth, isNativeAndroid } from '../../lib/bluetooth';
 import { EscPosBuilder } from '../../lib/escpos58';
 
 interface PrintJobDTO {
@@ -22,7 +22,9 @@ export function PrinterSettings() {
   const [isSpoolerRunning, setIsSpoolerRunning] = useState(false);
   const [pollingInterval, setPollingInterval] = useState<number>(3000);
   const [isScanning, setIsScanning] = useState(false);
-  const [btDevices, setBtDevices] = useState<{name: string, address: string}[]>([]);
+  const [pairedDevices, setPairedDevices] = useState<{name: string, address: string}[]>([]);
+  const [bluetoothError, setBluetoothError] = useState('');
+  const [lastBluetoothAction, setLastBluetoothAction] = useState('');
   const isNative = isNativeAndroid();
 
   const { data: stations = [] } = usePrintingStations();
@@ -51,6 +53,7 @@ export function PrinterSettings() {
   };
 
   const handleScanBluetooth = async () => {
+    return handleScanBluetoothWithFeedback();
     if (!isNative) {
       addLog('Escaneamento Bluetooth só funciona no App nativo Android.');
       return;
@@ -59,10 +62,53 @@ export function PrinterSettings() {
     addLog('Buscando dispositivos pareados...');
     try {
       const result = await scanBluetoothDevices();
-      setBtDevices(result);
+      setPairedDevices(result);
       addLog(`Encontrado(s) ${result.length} dispositivo(s).`);
     } catch (e) {
       addLog('Erro ao buscar dispositivos Bluetooth.');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleScanBluetoothWithFeedback = async () => {
+    setBluetoothError('');
+    setPairedDevices([]);
+    setLastBluetoothAction('Iniciando busca Bluetooth');
+
+    if (!isNative) {
+      const message = 'Bluetooth SPP só funciona no app Android.';
+      setBluetoothError(message);
+      setLastBluetoothAction(message);
+      addLog(message);
+      return;
+    }
+
+    setIsScanning(true);
+
+    try {
+      setLastBluetoothAction('Solicitando permissões Bluetooth...');
+      addLog('Solicitando permissões Bluetooth...');
+      await requestBluetoothPermissions();
+
+      setLastBluetoothAction('Buscando dispositivos pareados...');
+      addLog('Buscando dispositivos pareados...');
+      const result = await scanBluetoothDevices();
+      setPairedDevices(result);
+
+      if (result.length === 0) {
+        const message = 'Nenhum dispositivo pareado encontrado. Pareie a impressora nas configurações do Android primeiro.';
+        setLastBluetoothAction(message);
+        addLog(message);
+      } else {
+        setLastBluetoothAction(`Encontrado(s) ${result.length} dispositivo(s) pareado(s).`);
+        addLog(`Encontrado(s) ${result.length} dispositivo(s).`);
+      }
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Erro ao buscar dispositivos Bluetooth.';
+      setBluetoothError(message);
+      setLastBluetoothAction('Erro ao buscar dispositivos Bluetooth.');
+      addLog(`Erro ao buscar dispositivos Bluetooth: ${message}`);
     } finally {
       setIsScanning(false);
     }
@@ -308,13 +354,32 @@ export function PrinterSettings() {
               <button 
                 onClick={handleScanBluetooth}
                 disabled={isScanning}
-                className="w-full py-3 bg-primary text-white font-bold rounded-xl shadow mb-4"
+                className="w-full py-3 bg-primary text-white font-bold rounded-xl shadow mb-4 disabled:opacity-70 disabled:cursor-wait"
               >
                 {isScanning ? 'Buscando...' : 'Buscar Bluetooth Pareados'}
               </button>
+
+              <div className="mb-4 rounded-xl border border-border bg-muted/40 p-3 text-xs">
+                <p className="font-black uppercase tracking-widest text-muted-foreground">Última ação</p>
+                <p className="mt-1 font-bold text-foreground">
+                  {lastBluetoothAction || 'Aguardando busca Bluetooth.'}
+                </p>
+              </div>
+
+              {bluetoothError ? (
+                <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm font-bold text-destructive">
+                  {bluetoothError}
+                </div>
+              ) : null}
               
               <div className="space-y-2">
-                {btDevices.map(bt => (
+                {!isScanning && pairedDevices.length === 0 && lastBluetoothAction.includes('Nenhum dispositivo') ? (
+                  <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm font-bold text-muted-foreground">
+                    Nenhum dispositivo pareado encontrado. Pareie a Goldensky nas configurações Bluetooth do Android e tente novamente.
+                  </div>
+                ) : null}
+
+                {pairedDevices.map(bt => (
                   <div key={bt.address} className="flex items-center justify-between p-3 border border-border dark:border-border800 rounded-lg">
                     <div>
                       <p className="text-sm font-bold">{bt.name}</p>

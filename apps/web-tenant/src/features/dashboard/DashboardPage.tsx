@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CreditCard, Loader2, Package, TrendingUp, Receipt, AlertTriangle } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../../stores/auth.store';
 import { api } from '../../lib/api-client';
-import { TenantSettings, TenantOperatingHours, ProductCategory, Product, DashboardStatsDTO } from '@gestor/types';
+import { Tenant, TenantSettings, TenantOperatingHours, ProductCategory, Product, DashboardStatsDTO } from '@gestor/types';
 import { SetupWizard } from './SetupWizard';
 
 type DecimalLike = string | number;
@@ -41,65 +42,112 @@ function billingSourceLabel(source: TenantBillingState['source'] | undefined): s
 export function DashboardPage() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [settings, setSettings] = useState<TenantSettings | null>(null);
   const [operatingHours, setOperatingHours] = useState<TenantOperatingHours[]>([]);
   const [stats, setStats] = useState({ hasCategories: false, hasProducts: false });
   const [dashboardStats, setDashboardStats] = useState<DashboardStatsDTO | null>(null);
   const [billingState, setBillingState] = useState<TenantBillingState | null>(null);
   const [billingUsage, setBillingUsage] = useState<BillingUsagePreview | null>(null);
+  const [setupLoading, setSetupLoading] = useState(true);
+  const [dashboardStatsLoading, setDashboardStatsLoading] = useState(false);
+  const [billingLoading, setBillingLoading] = useState(false);
+
+  const { data: tenantData } = useQuery({
+    queryKey: ['tenant-settings'],
+    queryFn: async () => {
+      const res = await api.get<Tenant & { settings: TenantSettings, operatingHours: TenantOperatingHours[] }>('/tenant/me');
+      return res.data;
+    },
+    staleTime: 1000 * 60 * 5,
+    retry: 1,
+  });
 
   useEffect(() => {
-    async function loadOnboardingData() {
-      try {
-        const end = new Date();
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
+    let cancelled = false;
 
-        const [meRes, hoursRes, catRes, prodRes, billingStateRes] = await Promise.all([
-          api.get<{ settings: TenantSettings }>('/tenant/me'),
-          api.get<TenantOperatingHours[]>('/tenant/operating-hours'),
-          api.get<ProductCategory[]>('/catalog/categories'),
-          api.get<Product[]>('/catalog/products'),
-          api.get<TenantBillingState>('/billing/state'),
-        ]);
+    async function loadSetupData() {
+      setSetupLoading(true);
+      const [hoursRes, catRes, prodRes] = await Promise.allSettled([
+        api.get<TenantOperatingHours[]>('/tenant/operating-hours'),
+        api.get<ProductCategory[]>('/catalog/categories'),
+        api.get<Product[]>('/catalog/products'),
+      ]);
 
-        if (meRes.success) setSettings(meRes.data.settings);
-        if (billingStateRes.success) setBillingState(billingStateRes.data);
-        if (hoursRes.success) setOperatingHours(hoursRes.data);
-        setStats({
-          hasCategories: catRes.success && catRes.data.length > 0,
-          hasProducts: prodRes.success && prodRes.data.length > 0,
-        });
+      if (cancelled) return;
 
-        if (user?.roles?.includes('admin') || user?.roles?.includes('owner') || user?.permissions?.includes('reports.read')) {
-          try {
-            const dashboardRes = await api.get<DashboardStatsDTO>(
-              `/analytics/dashboard?startDate=${encodeURIComponent(start.toISOString())}&endDate=${encodeURIComponent(end.toISOString())}`,
-            );
-            if (dashboardRes.success) setDashboardStats(dashboardRes.data);
-          } catch {
-            setDashboardStats(null);
-          }
-        } else {
-          setDashboardStats(null);
-        }
+      if (hoursRes.status === 'fulfilled' && hoursRes.value.success) {
+        setOperatingHours(hoursRes.value.data);
+      }
 
-        try {
-          const usageRes = await api.get<BillingUsagePreview>('/billing/usage-preview');
-          if (usageRes.success) setBillingUsage(usageRes.data);
-        } catch {
-          setBillingUsage(null);
-        }
-      } catch {
+      setStats({
+        hasCategories: catRes.status === 'fulfilled' && catRes.value.success && catRes.value.data.length > 0,
+        hasProducts: prodRes.status === 'fulfilled' && prodRes.value.success && prodRes.value.data.length > 0,
+      });
+      setSetupLoading(false);
+    }
+
+    void loadSetupData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDashboardStats() {
+      if (!(user?.roles?.includes('admin') || user?.roles?.includes('owner') || user?.permissions?.includes('reports.read'))) {
         setDashboardStats(null);
+        return;
+      }
+
+      setDashboardStatsLoading(true);
+      const end = new Date();
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+
+      try {
+        const dashboardRes = await api.get<DashboardStatsDTO>(
+          `/analytics/dashboard?startDate=${encodeURIComponent(start.toISOString())}&endDate=${encodeURIComponent(end.toISOString())}`,
+        );
+        if (!cancelled) setDashboardStats(dashboardRes.success ? dashboardRes.data : null);
+      } catch {
+        if (!cancelled) setDashboardStats(null);
       } finally {
-        setLoading(false);
+        if (!cancelled) setDashboardStatsLoading(false);
       }
     }
 
-    void loadOnboardingData();
-  }, [user]);
+    void loadDashboardStats();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.permissions, user?.roles]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBillingData() {
+      setBillingLoading(true);
+      const [stateRes, usageRes] = await Promise.allSettled([
+        api.get<TenantBillingState>('/billing/state'),
+        api.get<BillingUsagePreview>('/billing/usage-preview'),
+      ]);
+
+      if (cancelled) return;
+
+      setBillingState(stateRes.status === 'fulfilled' && stateRes.value.success ? stateRes.value.data : null);
+      setBillingUsage(usageRes.status === 'fulfilled' && usageRes.value.success ? usageRes.value.data : null);
+      setBillingLoading(false);
+    }
+
+    void loadBillingData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const summaryCards = [
     {
@@ -133,25 +181,26 @@ export function DashboardPage() {
         </p>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-20">
-          <Loader2 className="h-8 w-8 text-primary-600 animate-spin" />
+      {setupLoading ? (
+        <div className="card-premium p-5 mb-8 flex items-center gap-3 text-sm font-bold text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin text-primary-600" />
+          Carregando checklist inicial...
         </div>
       ) : (
-        <>
           <SetupWizard
-            settings={settings}
+            settings={tenantData?.settings ?? null}
             operatingHours={operatingHours}
             hasCategories={stats.hasCategories}
             hasProducts={stats.hasProducts}
           />
+      )}
 
           <div className="card-premium p-6 mb-8">
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-5">
               <div>
                 <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest">Plano atual</h2>
                 <p className="mt-2 text-xl font-black text-gray-900 dark:text-gray-100">
-                  {billingState?.plan?.name ?? billingSourceLabel(billingState?.source)}
+                  {billingLoading ? 'Carregando plano...' : billingState?.plan?.name ?? billingSourceLabel(billingState?.source)}
                 </p>
                 <p className="mt-1 text-xs font-bold text-gray-500 dark:text-gray-400">
                   Resumo de cobrança. Ajustes operacionais da loja continuam no checklist acima.
@@ -170,16 +219,16 @@ export function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
               <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl">
                 <span className="block text-[10px] font-black text-gray-400 uppercase mb-1">Status</span>
-                <span className="font-bold text-gray-700 dark:text-gray-300">{billingState?.subscriptionStatus ?? 'Indefinido'}</span>
+                <span className="font-bold text-gray-700 dark:text-gray-300">{billingLoading ? 'Carregando' : billingState?.subscriptionStatus ?? 'Indefinido'}</span>
               </div>
               <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl">
                 <span className="block text-[10px] font-black text-gray-400 uppercase mb-1">Faturamento apurado</span>
-                <span className="font-bold text-gray-700 dark:text-gray-300">{billingUsage ? formatCurrency(billingUsage.billableAmount) : 'Calculando'}</span>
+                <span className="font-bold text-gray-700 dark:text-gray-300">{billingLoading ? 'Calculando' : billingUsage ? formatCurrency(billingUsage.billableAmount) : 'Indisponível'}</span>
               </div>
               <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl">
                 <span className="block text-[10px] font-black text-gray-400 uppercase mb-1">Mensalidade estimada</span>
                 <span className="font-bold text-gray-700 dark:text-gray-300">
-                  {billingUsage?.rating ? formatCurrency(billingUsage.rating.currentMonthlyPrice) : 'Sem estimativa'}
+                  {billingLoading ? 'Calculando' : billingUsage?.rating ? formatCurrency(billingUsage.rating.currentMonthlyPrice) : 'Sem estimativa'}
                 </span>
               </div>
             </div>
@@ -198,7 +247,9 @@ export function DashboardPage() {
                 <div className="flex items-center justify-between mb-2">
                   <card.icon className="h-6 w-6 text-primary-600 dark:text-primary-300" />
                 </div>
-                <p className="text-2xl font-black text-gray-900 dark:text-gray-100">{card.value}</p>
+                <p className="text-2xl font-black text-gray-900 dark:text-gray-100">
+                  {dashboardStatsLoading ? <Loader2 className="h-5 w-5 animate-spin text-primary-600" /> : card.value}
+                </p>
                 <p className="text-xs font-black text-gray-400 uppercase tracking-widest mt-1">{card.label}</p>
               </div>
             ))}
@@ -229,8 +280,6 @@ export function DashboardPage() {
               </div>
             </div>
           </div>
-        </>
-      )}
     </div>
   );
 }

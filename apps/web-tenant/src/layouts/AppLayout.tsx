@@ -583,7 +583,7 @@ export function AppLayout() {
 
 
   return (
-    <div className="min-h-screen flex transition-colors" style={{ backgroundColor: 'var(--surface-page)' }}>
+    <div className="app-shell min-h-screen flex transition-colors" style={{ backgroundColor: 'var(--surface-page)' }}>
       <Toaster
         position="top-right"
         toastOptions={{
@@ -603,7 +603,7 @@ export function AppLayout() {
       ) : null}
 
       <aside
-        className={`fixed z-50 inset-y-0 left-0 flex flex-col transition-[transform,width,background-color] duration-200 ease-out md:static md:translate-x-0 ${
+        className={`tenant-sidebar fixed z-50 inset-y-0 left-0 flex flex-col transition-[transform,width,background-color] duration-200 ease-out md:static md:translate-x-0 ${
           collapsed ? 'w-[72px]' : 'w-64'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
         style={{ backgroundColor: 'var(--surface-base)', borderRight: '1px solid var(--border-default)' }}
@@ -731,7 +731,7 @@ export function AppLayout() {
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <header className="hidden md:flex sticky top-0 z-30 backdrop-blur-xl" style={{ backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
+        <header className="desktop-header hidden md:flex sticky top-0 z-30 backdrop-blur-xl" style={{ backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
           <div className="h-16 px-6 flex items-center gap-4 w-full">
             <button
               type="button"
@@ -796,7 +796,7 @@ export function AppLayout() {
           </div>
         </header>
 
-        <header className="md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors" style={{ backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
+        <header className="mobile-header md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors" style={{ backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
           <div className="h-14 px-4 flex items-center justify-between">
             <button
               type="button"
@@ -823,7 +823,7 @@ export function AppLayout() {
         </header>
 
 
-        <main className="flex-1 overflow-auto bg-background">
+        <main className="app-main flex-1 overflow-auto bg-background">
           <div key={location.pathname} className="h-full">
             <Outlet />
           </div>

@@ -13,14 +13,28 @@ import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Set;
 import java.util.UUID;
 
-@CapacitorPlugin(name = "BluetoothPrinter")
+@CapacitorPlugin(
+    name = "BluetoothPrinter",
+    permissions = {
+        @Permission(
+            alias = "bluetooth",
+            strings = {
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_SCAN
+            }
+        )
+    }
+)
 public class BluetoothPrinterPlugin extends Plugin {
 
     private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
@@ -38,6 +52,32 @@ public class BluetoothPrinterPlugin extends Plugin {
             return ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
         }
         return true;
+    }
+
+    @PluginMethod
+    public void requestBluetoothPermissions(PluginCall call) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            JSObject ret = new JSObject();
+            ret.put("granted", true);
+            call.resolve(ret);
+            return;
+        }
+
+        if (getPermissionState("bluetooth") == PermissionState.GRANTED) {
+            JSObject ret = new JSObject();
+            ret.put("granted", true);
+            call.resolve(ret);
+            return;
+        }
+
+        requestPermissionForAlias("bluetooth", call, "bluetoothPermsCallback");
+    }
+
+    @PermissionCallback
+    private void bluetoothPermsCallback(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("granted", getPermissionState("bluetooth") == PermissionState.GRANTED);
+        call.resolve(ret);
     }
 
     @PluginMethod

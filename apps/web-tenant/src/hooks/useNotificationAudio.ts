@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import toast from 'react-hot-toast';
+import { requestNotificationPermission, showWebNotification } from '../lib/notification-support';
 
 /** Sons disponíveis (devem existir em public/sounds/) */
 export const AVAILABLE_SOUNDS = [
@@ -111,9 +112,9 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
     
     const socket = io(`${socketUrl}/orders`, {
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 3,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
+      reconnectionDelayMax: 4000,
     });
 
     socket.on('connect', () => {
@@ -144,12 +145,10 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
         style: { fontWeight: 'bold', maxWidth: '340px' },
       });
 
-      if (Notification.permission === 'granted') {
-        new Notification(`Novo Pedido ${data.order.orderNumber}`, {
-          body: `Cliente: ${data.order.customerName}\nTotal: ${totalFmt}`,
-          icon: '/favicon.ico',
-        });
-      }
+      showWebNotification(`Novo Pedido ${data.order.orderNumber}`, {
+        body: `Cliente: ${data.order.customerName}\nTotal: ${totalFmt}`,
+        icon: '/favicon.ico',
+      });
     });
 
     socket.on('orderCancelled', (data: { orderNumber?: string }) => {
@@ -178,13 +177,11 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
         style: { fontWeight: 'bold' },
       });
 
-      if (Notification.permission === 'granted') {
-        new Notification('Transferência de Atendimento', {
-          body: `${data.customerName || 'Cliente'} aguardando atendimento humano.\nSessão: #${data.sessionId}`,
-          icon: '/favicon.ico',
-          tag: `handoff-${data.sessionId}`,
-        });
-      }
+      showWebNotification('Transferência de Atendimento', {
+        body: `${data.customerName || 'Cliente'} aguardando atendimento humano.\nSessão: #${data.sessionId}`,
+        icon: '/favicon.ico',
+        tag: `handoff-${data.sessionId}`,
+      });
     });
 
     // Order Ready: Order marked as ready for pickup/delivery
@@ -202,13 +199,11 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
         style: { fontWeight: 'bold' },
       });
 
-      if (Notification.permission === 'granted') {
-        new Notification(`Pedido #${data.orderNumber} Pronto`, {
-          body: `${data.customerName || 'Cliente'} — Pedido está pronto ${fulfillmentText}`,
-          icon: '/favicon.ico',
-          tag: `ready-${data.orderNumber}`,
-        });
-      }
+      showWebNotification(`Pedido #${data.orderNumber} Pronto`, {
+        body: `${data.customerName || 'Cliente'} — Pedido está pronto ${fulfillmentText}`,
+        icon: '/favicon.ico',
+        tag: `ready-${data.orderNumber}`,
+      });
     });
 
     socketRef.current = socket;
@@ -223,9 +218,7 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
   }, [tenantId, settings.enabled]);
 
   const requestPermission = useCallback(() => {
-    if (typeof Notification !== 'undefined') {
-      Notification.requestPermission();
-    }
+    requestNotificationPermission();
   }, []);
 
   /** Testa o som de novo pedido com o volume e som actuais */

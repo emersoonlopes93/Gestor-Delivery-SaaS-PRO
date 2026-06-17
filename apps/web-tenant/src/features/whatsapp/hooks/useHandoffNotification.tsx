@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import type { ChatSession } from '@gestor/types';
 import { api } from '../../../lib/api-client';
+import { showWebNotification } from '../../../lib/notification-support';
 import { Tenant, TenantSettings } from '@gestor/types';
 
 /**
@@ -69,14 +70,12 @@ export function useHandoffNotification(enabled: boolean = true) {
           style: { fontWeight: 'bold' },
         });
 
-        // Show browser notification if permitted
-        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          new Notification('Transferência para Atendimento Humano', {
-            body: `${session.displayName || 'Cliente'} foi transferido para um agente humano.`,
-            icon: '/favicon.ico',
-            tag: `handoff-${session.id}`,
-          });
-        }
+        // Show browser notification if the optional Web Notification API exists.
+        showWebNotification('Transferência para Atendimento Humano', {
+          body: `${session.displayName || 'Cliente'} foi transferido para um agente humano.`,
+          icon: '/favicon.ico',
+          tag: `handoff-${session.id}`,
+        });
       }
 
       // If handoff was deactivated, clear notified state so future handoffs can notify again

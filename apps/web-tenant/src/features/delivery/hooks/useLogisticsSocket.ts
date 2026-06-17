@@ -16,7 +16,9 @@ export function useLogisticsSocket(tenantId: string | undefined) {
     const socketUrl = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
     const socket = io(`${socketUrl}/orders`, {
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 3,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 4000,
     });
 
     const refresh = () => invalidateLogisticsQueries(queryClient);
