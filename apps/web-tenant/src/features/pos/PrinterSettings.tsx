@@ -159,17 +159,19 @@ export function PrinterSettings() {
             // Sucesso - envia ACK
             await api.post(`/printing/spooler/${job.id}/ack`, { printerDeviceId: device.id });
             addLog(`Job #${job.id} impresso e finalizado (ACK).`);
-          } catch (printErr: any) {
-            addLog(`Falha na impressora física: ${printErr.message || 'Erro'}`);
+          } catch (printErr: unknown) {
+            const msg = printErr instanceof Error ? printErr.message : 'Erro';
+            addLog(`Falha na impressora física: ${msg}`);
             // Falha - envia FAIL
             await api.post(`/printing/spooler/${job.id}/fail`, { 
               printerDeviceId: device.id, 
-              errorMessage: printErr.message || 'Erro desconhecido' 
+              errorMessage: msg,
             });
           }
         }
-      } catch (err: any) {
-        if (err.response?.status !== 404) {
+      } catch (err: unknown) {
+        const res = err as { response?: { status?: number } };
+        if (res.response?.status !== 404) {
           console.error(err);
         }
       }
