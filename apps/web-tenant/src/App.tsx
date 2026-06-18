@@ -35,6 +35,7 @@ import { NotificationSettings } from './features/settings/NotificationSettings';
 import { StorefrontCustomizationPage } from './features/settings/StorefrontCustomizationPage';
 import { SchedulingSettingsPage } from './features/settings/SchedulingSettingsPage';
 import { MenuImportPage } from './features/settings/MenuImportPage';
+import { IntegrationsPage } from './features/settings/IntegrationsPage';
 
 // CRM & Promotions
 import { CustomersListPage } from './features/crm/CustomersListPage';
@@ -439,6 +440,14 @@ export function App() {
           element={
             <PermissionGate permission="settings.manage">
               <StorefrontCustomizationPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/settings/integrations"
+          element={
+            <PermissionGate permission="settings.manage">
+              <IntegrationsPage />
             </PermissionGate>
           }
         />

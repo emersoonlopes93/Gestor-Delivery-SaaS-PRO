@@ -16,9 +16,9 @@ export type OfficialSourceChannel = (typeof OFFICIAL_SOURCE_CHANNELS)[number];
 export type SourceChannel = OfficialSourceChannel | 'storefront';
 
 export const SOURCE_CHANNEL_LABELS: Record<SourceChannel, string> = {
-  direct_online: 'Cardapio Online',
-  storefront: 'Cardapio Online',
-  pos: 'Balcao / PDV',
+  direct_online: 'Cardápio Online',
+  storefront: 'Cardápio Online',
+  pos: 'Balcão / PDV',
   manual: 'Manual',
   whatsapp_ai: 'WhatsApp IA',
   marketplace_ifood: 'iFood',
@@ -26,7 +26,7 @@ export const SOURCE_CHANNEL_LABELS: Record<SourceChannel, string> = {
   marketplace_ubereats: 'Uber Eats',
   marketplace_99food: '99Food',
   marketplace_ketta: 'Ketta',
-  marketplace_ze_delivery: 'Ze Delivery',
+  marketplace_ze_delivery: 'Zé Delivery',
 };
 
 export function normalizeSourceChannel(channel?: string | null): SourceChannel {
