@@ -369,6 +369,7 @@ export function CheckoutPage() {
           issuerId: formData.issuer_id,
           installments: formData.installments,
         },
+        sourceChannel: 'direct_online',
         couponCode: appliedCoupon || undefined,
         useCashbackAmount: usedCashback || undefined,
         deliveryAddress: fulfillmentType === 'delivery' ? {
@@ -472,6 +473,7 @@ export function CheckoutPage() {
           ...payment,
           changeFor: payment.method === 'cash' ? payment.changeFor || undefined : undefined,
         },
+        sourceChannel: 'direct_online',
         couponCode: appliedCoupon || undefined,
         useCashbackAmount: usedCashback || undefined,
         deliveryAddress: fulfillmentType === 'delivery' ? {

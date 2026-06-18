@@ -38,9 +38,16 @@ type UpdateBillingSettingsBody = {
   includeDeliveryFeeByDefault?: boolean;
   includeServiceFeeByDefault?: boolean;
   countStorefrontOrders?: boolean;
+  countDirectOnlineOrders?: boolean;
   countPosOrders?: boolean;
   countWhatsappAiOrders?: boolean;
   countManualOrders?: boolean;
+  countMarketplaceIfoodOrders?: boolean;
+  countMarketplaceRappiOrders?: boolean;
+  countMarketplaceUbereatsOrders?: boolean;
+  countMarketplace99foodOrders?: boolean;
+  countMarketplaceKettaOrders?: boolean;
+  countMarketplaceZeDeliveryOrders?: boolean;
   countConfirmedOrders?: boolean;
   countCompletedOrders?: boolean;
   excludeCancelledOrders?: boolean;
@@ -278,9 +285,16 @@ export class AdminBillingController {
         ...(body.includeDeliveryFeeByDefault !== undefined ? { includeDeliveryFeeByDefault: this.requireBoolean(body.includeDeliveryFeeByDefault, 'includeDeliveryFeeByDefault') } : {}),
         ...(body.includeServiceFeeByDefault !== undefined ? { includeServiceFeeByDefault: this.requireBoolean(body.includeServiceFeeByDefault, 'includeServiceFeeByDefault') } : {}),
         ...(body.countStorefrontOrders !== undefined ? { countStorefrontOrders: this.requireBoolean(body.countStorefrontOrders, 'countStorefrontOrders') } : {}),
+        ...(body.countDirectOnlineOrders !== undefined ? { countDirectOnlineOrders: this.requireBoolean(body.countDirectOnlineOrders, 'countDirectOnlineOrders') } : {}),
         ...(body.countPosOrders !== undefined ? { countPosOrders: this.requireBoolean(body.countPosOrders, 'countPosOrders') } : {}),
         ...(body.countWhatsappAiOrders !== undefined ? { countWhatsappAiOrders: this.requireBoolean(body.countWhatsappAiOrders, 'countWhatsappAiOrders') } : {}),
         ...(body.countManualOrders !== undefined ? { countManualOrders: this.requireBoolean(body.countManualOrders, 'countManualOrders') } : {}),
+        ...(body.countMarketplaceIfoodOrders !== undefined ? { countMarketplaceIfoodOrders: this.requireBoolean(body.countMarketplaceIfoodOrders, 'countMarketplaceIfoodOrders') } : {}),
+        ...(body.countMarketplaceRappiOrders !== undefined ? { countMarketplaceRappiOrders: this.requireBoolean(body.countMarketplaceRappiOrders, 'countMarketplaceRappiOrders') } : {}),
+        ...(body.countMarketplaceUbereatsOrders !== undefined ? { countMarketplaceUbereatsOrders: this.requireBoolean(body.countMarketplaceUbereatsOrders, 'countMarketplaceUbereatsOrders') } : {}),
+        ...(body.countMarketplace99foodOrders !== undefined ? { countMarketplace99foodOrders: this.requireBoolean(body.countMarketplace99foodOrders, 'countMarketplace99foodOrders') } : {}),
+        ...(body.countMarketplaceKettaOrders !== undefined ? { countMarketplaceKettaOrders: this.requireBoolean(body.countMarketplaceKettaOrders, 'countMarketplaceKettaOrders') } : {}),
+        ...(body.countMarketplaceZeDeliveryOrders !== undefined ? { countMarketplaceZeDeliveryOrders: this.requireBoolean(body.countMarketplaceZeDeliveryOrders, 'countMarketplaceZeDeliveryOrders') } : {}),
         ...(body.countConfirmedOrders !== undefined ? { countConfirmedOrders: this.requireBoolean(body.countConfirmedOrders, 'countConfirmedOrders') } : {}),
         ...(body.countCompletedOrders !== undefined ? { countCompletedOrders: this.requireBoolean(body.countCompletedOrders, 'countCompletedOrders') } : {}),
         ...(body.excludeCancelledOrders !== undefined ? { excludeCancelledOrders: this.requireBoolean(body.excludeCancelledOrders, 'excludeCancelledOrders') } : {}),

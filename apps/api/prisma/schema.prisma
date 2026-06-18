@@ -104,6 +104,9 @@ model Tenant {
   settings                    TenantSettings?
   mediaAssets                 MediaAsset[]
   mediaCategories             MediaCategory[]
+  marketplaceConnections      MarketplaceConnection[]
+  marketplaceEventInboxes     MarketplaceEventInbox[]
+  marketplaceOrders           MarketplaceOrder[]
   users                       TenantUser[]
   businessGroup               BusinessGroup?               @relation(fields: [businessGroupId], references: [id])
   timeSlots                   TimeSlot[]
@@ -926,7 +929,7 @@ model Order {
   deliveryFee         Decimal                      @default(0) @map("delivery_fee") @db.Decimal(10, 2)
   serviceFee          Decimal                      @default(0) @map("service_fee") @db.Decimal(10, 2)
   total               Decimal                      @db.Decimal(10, 2)
-  sourceChannel       String                       @default("storefront") @map("source_channel") @db.VarChar(30)
+  sourceChannel       String                       @default("direct_online") @map("source_channel") @db.VarChar(40)
   idempotencyKey      String                       @map("idempotency_key") @db.VarChar(100)
   notes               String?
   createdAt           DateTime                     @default(now()) @map("created_at")
@@ -967,6 +970,7 @@ model Order {
   scheduledOrders     ScheduledOrder[]
   stockMovements      StockMovement[]
   revenueEvents       RevenueEvent[]
+  marketplaceOrders   MarketplaceOrder[]
   OrderFeedback       OrderFeedback?
 
   @@unique([tenantId, idempotencyKey])
@@ -1466,9 +1470,16 @@ model BillingSettings {
   includeDeliveryFeeByDefault      Boolean  @default(false) @map("include_delivery_fee_by_default")
   includeServiceFeeByDefault       Boolean  @default(false) @map("include_service_fee_by_default")
   countStorefrontOrders            Boolean  @default(true) @map("count_storefront_orders")
+  countDirectOnlineOrders          Boolean  @default(true) @map("count_direct_online_orders")
   countPosOrders                   Boolean  @default(true) @map("count_pos_orders")
   countWhatsappAiOrders            Boolean  @default(true) @map("count_whatsapp_ai_orders")
   countManualOrders                Boolean  @default(false) @map("count_manual_orders")
+  countMarketplaceIfoodOrders      Boolean  @default(false) @map("count_marketplace_ifood_orders")
+  countMarketplaceRappiOrders      Boolean  @default(false) @map("count_marketplace_rappi_orders")
+  countMarketplaceUbereatsOrders   Boolean  @default(false) @map("count_marketplace_ubereats_orders")
+  countMarketplace99foodOrders     Boolean  @default(false) @map("count_marketplace_99food_orders")
+  countMarketplaceKettaOrders      Boolean  @default(false) @map("count_marketplace_ketta_orders")
+  countMarketplaceZeDeliveryOrders Boolean  @default(false) @map("count_marketplace_ze_delivery_orders")
   countConfirmedOrders             Boolean  @default(true) @map("count_confirmed_orders")
   countCompletedOrders             Boolean  @default(true) @map("count_completed_orders")
   excludeCancelledOrders           Boolean  @default(true) @map("exclude_cancelled_orders")
@@ -1480,6 +1491,89 @@ model BillingSettings {
   updatedAt                        DateTime @updatedAt @map("updated_at")
 
   @@map("billing_settings")
+}
+
+model MarketplaceConnection {
+  id                 String                        @id @default(uuid())
+  tenantId           String                        @map("tenant_id")
+  provider           MarketplaceProvider
+  status             MarketplaceConnectionStatus   @default(DISCONNECTED)
+  externalMerchantId String?                       @map("external_merchant_id") @db.VarChar(120)
+  externalStoreId    String?                       @map("external_store_id") @db.VarChar(120)
+  displayName        String?                       @map("display_name") @db.VarChar(160)
+  authType           String?                       @map("auth_type") @db.VarChar(40)
+  accessTokenEnc     String?                       @map("access_token_enc")
+  refreshTokenEnc    String?                       @map("refresh_token_enc")
+  tokenExpiresAt     DateTime?                     @map("token_expires_at")
+  scopesJson         Json?                         @map("scopes_json")
+  settingsJson       Json?                         @map("settings_json")
+  lastSyncAt         DateTime?                     @map("last_sync_at")
+  createdAt          DateTime                      @default(now()) @map("created_at")
+  updatedAt          DateTime                      @updatedAt @map("updated_at")
+  tenant             Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  events             MarketplaceEventInbox[]
+  orders             MarketplaceOrder[]
+
+  @@index([tenantId, provider])
+  @@unique([tenantId, provider])
+  @@unique([provider, externalMerchantId])
+  @@unique([provider, externalStoreId])
+  @@map("marketplace_connections")
+}
+
+model MarketplaceEventInbox {
+  id                 String                  @id @default(uuid())
+  provider           MarketplaceProvider
+  eventId            String?                 @map("event_id") @db.VarChar(180)
+  tenantId           String?                 @map("tenant_id")
+  connectionId       String?                 @map("connection_id")
+  externalMerchantId String?                 @map("external_merchant_id") @db.VarChar(120)
+  externalStoreId    String?                 @map("external_store_id") @db.VarChar(120)
+  externalOrderId    String?                 @map("external_order_id") @db.VarChar(120)
+  topic              String?                 @db.VarChar(120)
+  status             MarketplaceEventStatus  @default(RECEIVED)
+  payloadHash        String                  @map("payload_hash") @db.VarChar(128)
+  dedupeKey          String                  @map("dedupe_key") @db.VarChar(220)
+  rawPayload         Json                    @map("raw_payload")
+  headersJson        Json?                   @map("headers_json")
+  attempts           Int                     @default(0)
+  lastError          String?                 @map("last_error")
+  receivedAt         DateTime                @default(now()) @map("received_at")
+  processedAt        DateTime?               @map("processed_at")
+  tenant             Tenant?                 @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  connection         MarketplaceConnection?  @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, dedupeKey])
+  @@index([provider, externalOrderId])
+  @@index([tenantId, status])
+  @@index([status, receivedAt])
+  @@map("marketplace_event_inbox")
+}
+
+model MarketplaceOrder {
+  id                String                 @id @default(uuid())
+  tenantId          String                 @map("tenant_id")
+  connectionId      String                 @map("connection_id")
+  provider          MarketplaceProvider
+  externalOrderId   String                 @map("external_order_id") @db.VarChar(120)
+  externalDisplayId String?                @map("external_display_id") @db.VarChar(120)
+  internalOrderId   String?                @map("internal_order_id")
+  statusExternal    String?                @map("status_external") @db.VarChar(60)
+  statusInternal    String?                @map("status_internal") @db.VarChar(60)
+  rawPayload        Json                   @map("raw_payload")
+  normalizedPayload Json?                  @map("normalized_payload")
+  importedAt        DateTime?              @map("imported_at")
+  lastSyncedAt      DateTime?              @map("last_synced_at")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection        MarketplaceConnection  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  internalOrder     Order?                 @relation(fields: [internalOrderId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, provider, externalOrderId])
+  @@index([internalOrderId])
+  @@index([connectionId])
+  @@map("marketplace_orders")
 }
 
 model PaymentTransaction {
@@ -2878,6 +2972,34 @@ enum RevenueEventType {
 enum RevenueEventStatus {
   posted
   voided
+}
+
+enum MarketplaceProvider {
+  IFOOD
+  UBER_EATS
+  RAPPI
+  FOOD_99
+  KETTA
+  ZE_DELIVERY
+  OTHER
+}
+
+enum MarketplaceConnectionStatus {
+  DISCONNECTED
+  CONNECTED
+  TOKEN_EXPIRED
+  ERROR
+  PAUSED
+}
+
+enum MarketplaceEventStatus {
+  RECEIVED
+  QUEUED
+  PROCESSING
+  PROCESSED
+  DUPLICATE
+  FAILED
+  IGNORED
 }
 
 enum PaymentAttemptStatus {

@@ -1,6 +1,6 @@
 import { memo, useEffect, useState, useCallback } from 'react';
 import { X, RefreshCw } from 'lucide-react';
-import type { OrderResponseDTO, OrderStatus, UpdateOrderStatusDTO, DriverDTO } from '@gestor/types';
+import { SOURCE_CHANNEL_LABELS, type OrderResponseDTO, type OrderStatus, type UpdateOrderStatusDTO, type DriverDTO } from '@gestor/types';
 import { api, ApiError } from '@/lib/api-client';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderCustomerSection } from './OrderCustomerSection';
@@ -179,7 +179,7 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
             </div>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                {order ? `Canal: ${order.sourceChannel}` : 'Carregando...'}
+                {order ? `Canal: ${SOURCE_CHANNEL_LABELS[order.sourceChannel as keyof typeof SOURCE_CHANNEL_LABELS] || order.sourceChannel}` : 'Carregando...'}
               </span>
               {isValidating && (
                 <span className="flex items-center gap-1 text-[10px] font-black text-primary-500 uppercase animate-pulse">

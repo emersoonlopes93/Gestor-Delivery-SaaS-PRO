@@ -38,6 +38,7 @@ import { generatePublicTrackingToken } from '../common/utils/tracking-token.util
 import { OrdersGateway } from './orders.gateway';
 import { KdsService } from '../kds/kds.service';
 import { RevenueLedgerService } from '../billing/revenue-ledger.service';
+import { MarketplaceStatusSyncService } from '../marketplace/services/marketplace-status-sync.service';
 
 @Injectable()
 export class OrdersService {
@@ -74,6 +75,8 @@ export class OrdersService {
     private readonly ordersGateway: OrdersGateway,
     private readonly kdsService: KdsService,
     private readonly revenueLedgerService: RevenueLedgerService,
+    @Inject(forwardRef(() => MarketplaceStatusSyncService))
+    private readonly marketplaceStatusSyncService: MarketplaceStatusSyncService,
   ) {}
 
   async createOrder(slug: string, dto: CreateOrderDTO): Promise<OrderResponseDTO> {
@@ -175,7 +178,7 @@ export class OrdersService {
             deliveryFee,
             serviceFee: 0,
             total: finalTotal,
-            sourceChannel: dto.sourceChannel || 'storefront',
+            sourceChannel: dto.sourceChannel || 'direct_online',
             idempotencyKey: dto.idempotencyKey,
             notes: dto.notes || null,
             customerId,
@@ -247,7 +250,7 @@ export class OrdersService {
             orderId: newOrder.id,
             tenantId,
             status: 'pending',
-            note: `Pedido recebido via ${dto.sourceChannel || 'storefront'}.`,
+            note: `Pedido recebido via ${dto.sourceChannel || 'direct_online'}.`,
           },
         });
 
@@ -855,6 +858,16 @@ export class OrdersService {
         this.loyaltyService.awardForOrder(tenantId, orderId).catch((e) => this.logger.error(`Error awarding loyalty: ${e.message}`)),
       ]);
     }
+
+    await this.marketplaceStatusSyncService.handleInternalStatusChanged({
+      tenantId,
+      orderId,
+      status: nextStatus,
+      reason: dto.note ?? null,
+    }).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Unknown marketplace status sync error';
+      this.logger.warn(`Marketplace status sync failed for order ${orderId}: ${message}`);
+    });
 
     return updated;
   }

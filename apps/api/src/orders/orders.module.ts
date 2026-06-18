@@ -17,6 +17,7 @@ import { SchedulingModule } from '../scheduling/scheduling.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { KdsModule } from '../kds/kds.module';
 import { BillingDomainModule } from '../billing/billing-domain.module';
+import { MarketplaceModule } from '../marketplace/marketplace.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { BillingDomainModule } from '../billing/billing-domain.module';
     forwardRef(() => NotificationsModule),
     KdsModule,
     BillingDomainModule,
+    forwardRef(() => MarketplaceModule),
   ],
   controllers: [OrdersController, PublicOrdersController],
   providers: [OrdersService, CheckoutValidatorService, OrdersGateway],

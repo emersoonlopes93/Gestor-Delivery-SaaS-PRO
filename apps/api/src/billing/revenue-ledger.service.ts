@@ -8,6 +8,7 @@ import {
 } from '@prisma/client';
 import { createHash } from 'crypto';
 import { PrismaService } from '../database/prisma.service';
+import { billingSourceChannelsFor, canonicalSourceChannel } from '../common/source-channel.util';
 
 const ZERO = new Prisma.Decimal(0);
 const DEFAULT_LEDGER_EVENT_TYPES: RevenueEventType[] = [
@@ -79,7 +80,7 @@ export class RevenueLedgerService {
           tenantId: input.tenantId,
           orderId: input.orderId,
           idempotencyKey: `order:${input.orderId}:status:${input.orderStatus}:compensation`,
-          source: input.sourceChannel ?? 'orders',
+          source: String(canonicalSourceChannel(input.sourceChannel ?? 'orders')),
           type: eventType,
           amount: compensation.gt(ZERO) ? compensation.negated() : ZERO,
           occurredAt,
@@ -100,7 +101,7 @@ export class RevenueLedgerService {
         tenantId: input.tenantId,
         orderId: input.orderId,
         idempotencyKey: `order:${input.orderId}:status:${input.orderStatus}`,
-        source: input.sourceChannel ?? 'orders',
+        source: String(canonicalSourceChannel(input.sourceChannel ?? 'orders')),
         type: eventType,
         amount,
         occurredAt,
@@ -255,7 +256,12 @@ export class RevenueLedgerService {
         name: 'Default revenue ledger rule',
         description: 'Conta eventos completed e ajustes para billing por faturamento.',
         includedOrderStatuses: [OrderStatus.completed],
-        includedChannels: ['storefront', 'pos', 'whatsapp_ai', 'manual'],
+        includedChannels: [
+          ...billingSourceChannelsFor('direct_online'),
+          'pos',
+          'whatsapp_ai',
+          'manual',
+        ],
         revenueEventTypes: DEFAULT_LEDGER_EVENT_TYPES,
         tierConfig: {},
         effectiveFrom: new Date(Date.UTC(2026, 5, 10, 0, 0, 0, 0)),

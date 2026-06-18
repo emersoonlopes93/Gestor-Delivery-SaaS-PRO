@@ -97,6 +97,7 @@ export * from './cash';
 export { OpenCashSessionDTO, CloseCashSessionDTO, CreateCashMovementDTO } from './cash';
 
 export * from './pos';
+export * from './source-channel';
 export { CreatePosOrderDTO, PosFulfillmentType } from './pos';
 
 export { UpdateCustomerDTO } from './customer';

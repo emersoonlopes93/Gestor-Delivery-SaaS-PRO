@@ -7,6 +7,7 @@ import {
   OrderStatus,
   Prisma,
 } from '@prisma/client';
+import { billingSourceChannelsFor } from '../common/source-channel.util';
 import { BillingSettingsService } from './billing-settings.service';
 import { BillingRatingService } from './billing-rating.service';
 import { RevenueLedgerService } from './revenue-ledger.service';
@@ -276,14 +277,22 @@ export class BillingUsageService {
   }
 
   private resolveIncludedChannels(settings: BillingSettings): string[] {
-    const channels: string[] = [];
+    const channels = new Set<string>();
 
-    if (settings.countStorefrontOrders) channels.push('storefront');
-    if (settings.countPosOrders) channels.push('pos');
-    if (settings.countWhatsappAiOrders) channels.push('whatsapp_ai');
-    if (settings.countManualOrders) channels.push('manual');
+    if (settings.countStorefrontOrders || settings.countDirectOnlineOrders) {
+      for (const channel of billingSourceChannelsFor('direct_online')) channels.add(channel);
+    }
+    if (settings.countPosOrders) channels.add('pos');
+    if (settings.countWhatsappAiOrders) channels.add('whatsapp_ai');
+    if (settings.countManualOrders) channels.add('manual');
+    if (settings.countMarketplaceIfoodOrders) channels.add('marketplace_ifood');
+    if (settings.countMarketplaceRappiOrders) channels.add('marketplace_rappi');
+    if (settings.countMarketplaceUbereatsOrders) channels.add('marketplace_ubereats');
+    if (settings.countMarketplace99foodOrders) channels.add('marketplace_99food');
+    if (settings.countMarketplaceKettaOrders) channels.add('marketplace_ketta');
+    if (settings.countMarketplaceZeDeliveryOrders) channels.add('marketplace_ze_delivery');
 
-    return channels;
+    return Array.from(channels);
   }
 
   private resolveIncludedStatuses(settings: BillingSettings): OrderStatus[] {
