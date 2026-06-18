@@ -1,4 +1,4 @@
-﻿-- CreateEnum
+-- CreateEnum
 CREATE TYPE "MarketplaceProvider" AS ENUM ('IFOOD', 'UBER_EATS', 'RAPPI', 'FOOD_99', 'KETTA', 'ZE_DELIVERY', 'OTHER');
 
 -- CreateEnum
