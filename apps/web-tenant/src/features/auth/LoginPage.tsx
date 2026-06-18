@@ -57,7 +57,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="card-premium p-8 shadow-2xl border-none bg-card/80 backdrop-blur-xl">
+    <div className="card-premium p-6 sm:p-8 shadow-2xl border border-border bg-card/95 backdrop-blur-xl">
       <form onSubmit={handleSubmit} className="space-y-6">
         {isExpired && !error && (
           <div className="alert-warning p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -137,7 +137,7 @@ export function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed text-sm uppercase tracking-[0.2em] font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group relative overflow-hidden disabled:pointer-events-none"
+          className="w-full h-12 rounded-lg border border-primary/30 bg-primary px-4 text-sm font-black uppercase tracking-[0.18em] text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-80 disabled:cursor-not-allowed disabled:shadow-none group relative overflow-hidden"
         >
           <span className={`flex items-center justify-center gap-2 transition-all ${loading ? 'opacity-0 scale-90' : 'opacity-100 scale-100'}`}>
             Acessar Painel

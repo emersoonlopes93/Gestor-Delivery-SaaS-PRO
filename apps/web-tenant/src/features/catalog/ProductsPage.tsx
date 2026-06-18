@@ -580,15 +580,6 @@ export function ProductsPage() {
 
         <div className="flex items-center gap-2 w-full md:w-auto">
           <button
-            onClick={() => navigate('/catalog/simulation')}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 h-10 px-4 text-xs font-black uppercase tracking-wider rounded-2xl border border-border bg-card text-foreground hover:bg-muted transition-colors shadow-sm"
-            type="button"
-          >
-            <Search size={14} className="hidden sm:block" />
-            <span>Simulador</span>
-          </button>
-
-          <button
             onClick={() => navigate('/catalog/products/new/v2')}
             className="flex-1 md:flex-none flex items-center justify-center gap-2 h-10 px-4 text-xs font-black uppercase tracking-wider rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
             type="button"

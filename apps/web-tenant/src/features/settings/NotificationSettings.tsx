@@ -154,23 +154,23 @@ export function NotificationSettings() {
   );
 
   return (
-    <div className="p-8 max-w-4xl mx-auto animate-in fade-in duration-500">
-      <header className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-black text-foreground flex items-center gap-3">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto animate-in fade-in duration-500">
+      <header className="mb-6 sm:mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-black text-foreground flex items-center gap-3">
             <div className="p-2 bg-emerald-600 rounded-xl text-white shadow-lg shadow-emerald-600/20">
               <MessageSquare className="w-6 h-6" />
             </div>
             Notificações WhatsApp
           </h1>
-          <p className="text-muted-foreground  mt-1 font-medium">
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 font-medium">
             Configure o envio automático de mensagens de status para seus clientes.
           </p>
         </div>
         <button
           onClick={handleSave}
           disabled={mutation.isPending}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 px-8 py-3 rounded-2xl flex items-center gap-2 shadow-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed font-semibold transition-colors"
+          className="w-full lg:w-auto min-w-[180px] justify-center bg-primary text-primary-foreground hover:bg-primary/90 px-5 sm:px-8 py-3 rounded-2xl flex items-center gap-2 shadow-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed font-semibold transition-colors"
         >
           {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           {mutation.isPending ? 'Salvando...' : 'Salvar Alterações'}
@@ -179,43 +179,45 @@ export function NotificationSettings() {
 
       <div className="space-y-8">
         {/* Toggle Principal */}
-        <section className="bg-card rounded-3xl border border-border p-8 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex gap-4">
+        <section className="bg-card rounded-3xl border border-border p-4 sm:p-6 lg:p-8 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-4 min-w-0">
               <div className={`p-3 rounded-2xl transition-colors ${enabled ? 'bg-status-success/10 text-status-success' : 'bg-muted text-muted-foreground'}`}>
                 <Bell className="w-6 h-6" />
               </div>
-              <div>
-                <h2 className="text-lg font-black text-foreground">Status das Notificações</h2>
-                <p className="text-sm text-muted-foreground font-medium">Ative para enviar mensagens automaticamente conforme o pedido avança.</p>
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-lg font-black text-foreground">Status das Notificações</h2>
+                <p className="text-sm text-muted-foreground font-medium leading-relaxed">Ative para enviar mensagens automaticamente conforme o pedido avança.</p>
               </div>
             </div>
             <button
               onClick={() => setEnabled(!enabled)}
-              className={`w-14 h-8 rounded-full border transition-colors duration-300 relative ${enabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
+              className={`w-full sm:w-20 h-12 sm:h-8 rounded-2xl sm:rounded-full border transition-colors duration-300 relative shrink-0 ${enabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
             >
-              <div className={`absolute top-[3px] w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${enabled ? 'right-1' : 'left-1'}`} />
+              <div className={`absolute top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${enabled ? 'right-1' : 'left-1'}`} />
+              <span className="sr-only">{enabled ? 'Notificações ativadas' : 'Notificações desativadas'}</span>
             </button>
           </div>
         </section>
 
         {/* Notificações Sonoras */}
-        <section className="bg-card rounded-3xl border border-border p-8 shadow-sm">
-           <div className="flex items-center justify-between mb-8">
-            <div className="flex gap-4">
+        <section className="bg-card rounded-3xl border border-border p-4 sm:p-6 lg:p-8 shadow-sm">
+           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6 sm:mb-8">
+            <div className="flex items-start gap-4 min-w-0">
               <div className={`p-3 rounded-2xl transition-colors ${audioEnabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
                 {audioEnabled ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
               </div>
-              <div>
-                <h2 className="text-lg font-black text-foreground">Alertas Sonoros</h2>
-                <p className="text-sm text-muted-foreground font-medium">Toque um som sempre que um novo pedido chegar.</p>
+              <div className="min-w-0">
+                <h2 className="text-base sm:text-lg font-black text-foreground">Alertas Sonoros</h2>
+                <p className="text-sm text-muted-foreground font-medium leading-relaxed">Toque um som sempre que um novo pedido chegar.</p>
               </div>
             </div>
             <button
               onClick={() => setAudioEnabled(!audioEnabled)}
-              className={`w-14 h-8 rounded-full border transition-colors duration-300 relative ${audioEnabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
+              className={`w-full sm:w-20 h-12 sm:h-8 rounded-2xl sm:rounded-full border transition-colors duration-300 relative shrink-0 ${audioEnabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
             >
-              <div className={`absolute top-[3px] w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${audioEnabled ? 'right-1' : 'left-1'}`} />
+              <div className={`absolute top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${audioEnabled ? 'right-1' : 'left-1'}`} />
+              <span className="sr-only">{audioEnabled ? 'Alertas sonoros ativados' : 'Alertas sonoros desativados'}</span>
             </button>
           </div>
 
@@ -238,11 +240,11 @@ export function NotificationSettings() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-foreground">Som de Novo Pedido</label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <select
                     value={newOrderSound}
                     onChange={(e) => setNewOrderSound(e.target.value)}
-                    className="input-premium flex-1"
+                    className="input-premium flex-1 min-w-0"
                   >
                     {AVAILABLE_SOUNDS.map((s) => (
                       <option key={s.value} value={s.value}>{s.label}</option>
@@ -252,7 +254,7 @@ export function NotificationSettings() {
                     type="button"
                     onClick={handleTestNewOrder}
                     title="Testar som de novo pedido"
-                    className="flex items-center gap-1.5 px-3 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
+                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-3 sm:py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
                   >
                     <Play className="w-3.5 h-3.5" />
                     Testar
@@ -262,11 +264,11 @@ export function NotificationSettings() {
 
               <div className="space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-foreground">Som de Cancelamento</label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <select
                     value={cancellationSound}
                     onChange={(e) => setCancellationSound(e.target.value)}
-                    className="input-premium flex-1"
+                    className="input-premium flex-1 min-w-0"
                   >
                     {AVAILABLE_SOUNDS.map((s) => (
                       <option key={s.value} value={s.value}>{s.label}</option>
@@ -276,7 +278,7 @@ export function NotificationSettings() {
                     type="button"
                     onClick={handleTestCancellation}
                     title="Testar som de cancelamento"
-                    className="flex items-center gap-1.5 px-3 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
+                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-3 sm:py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
                   >
                     <Play className="w-3.5 h-3.5" />
                     Testar
@@ -286,11 +288,11 @@ export function NotificationSettings() {
 
               <div className="space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-foreground">Som de Transferência (IA→Agente)</label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <select
                     value={handoffSound}
                     onChange={(e) => setHandoffSound(e.target.value)}
-                    className="input-premium flex-1"
+                    className="input-premium flex-1 min-w-0"
                   >
                     {AVAILABLE_SOUNDS.map((s) => (
                       <option key={s.value} value={s.value}>{s.label}</option>
@@ -300,7 +302,7 @@ export function NotificationSettings() {
                     type="button"
                     onClick={handleTestHandoff}
                     title="Testar som de transferência"
-                    className="flex items-center gap-1.5 px-3 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
+                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-3 sm:py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
                   >
                     <Play className="w-3.5 h-3.5" />
                     Testar
@@ -310,11 +312,11 @@ export function NotificationSettings() {
 
               <div className="space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-foreground">Som de Pedido Pronto</label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <select
                     value={readySound}
                     onChange={(e) => setReadySound(e.target.value)}
-                    className="input-premium flex-1"
+                    className="input-premium flex-1 min-w-0"
                   >
                     {AVAILABLE_SOUNDS.map((s) => (
                       <option key={s.value} value={s.value}>{s.label}</option>
@@ -324,7 +326,7 @@ export function NotificationSettings() {
                     type="button"
                     onClick={handleTestReady}
                     title="Testar som de pedido pronto"
-                    className="flex items-center gap-1.5 px-3 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
+                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-3 sm:py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
                   >
                     <Play className="w-3.5 h-3.5" />
                     Testar
