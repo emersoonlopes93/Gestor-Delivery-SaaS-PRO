@@ -13,6 +13,8 @@ import { DriverSelectionModal } from './components/DriverSelectionModal';
 import { EditOrderModal } from './components/EditOrderModal';
 import { OrderPrintTemplate } from './components/OrderPrintTemplate';
 import { useOrderNotifications } from './hooks/useOrderNotifications';
+import { printTicketViaPrimaryBluetooth } from '../../lib/bluetooth';
+import { Capacitor } from '@capacitor/core';
 import toast from 'react-hot-toast';
 
 /* ─── Kanban columns spec ───────────────────────────────────── */
@@ -120,12 +122,23 @@ export function OperationBoardPage() {
     setIsPrinting(true);
     try {
       const loadToastId = toast.loading('Carregando dados para impressão...');
-      const res = await api.get<OrderResponseDTO>(`/orders/${orderId}`);
+      const [orderRes, printRes] = await Promise.all([
+        api.get<OrderResponseDTO>(`/orders/${orderId}`),
+        api.get<{ content: string }>(`/pos/sales/${orderId}/print?type=customer`),
+      ]);
       toast.dismiss(loadToastId);
 
-      if (res.data) {
-        setOrderToPrint(res.data);
+      if (orderRes.data) {
+        setOrderToPrint(orderRes.data);
         await api.post(`/orders/${orderId}/print-log`);
+        const content = printRes.data?.content || '';
+        if (Capacitor.isNativePlatform() && content.trim()) {
+          await printTicketViaPrimaryBluetooth(content);
+          setIsPrinting(false);
+          setOrderToPrint(null);
+          toast.success('Impressão enviada para a Bluetooth principal.');
+          return;
+        }
         setTimeout(() => {
           window.print();
           setIsPrinting(false);

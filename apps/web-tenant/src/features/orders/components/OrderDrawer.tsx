@@ -13,6 +13,8 @@ import { OrderActionsBar } from './OrderActionsBar';
 import { OrderPrintTemplate } from './OrderPrintTemplate';
 import { EditOrderModal } from './EditOrderModal';
 import { DriverSelectionModal } from './DriverSelectionModal';
+import { Capacitor } from '@capacitor/core';
+import { printTicketViaPrimaryBluetooth } from '../../../lib/bluetooth';
 import toast from 'react-hot-toast';
 
 export interface OrderDrawerProps {
@@ -121,7 +123,15 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
     if (!order) return;
     setIsPrinting(true);
     try {
+      const printRes = await api.get<{ content: string }>(`/pos/sales/${order.id}/print?type=customer`);
       await api.post(`/orders/${order.id}/print-log`);
+      if (Capacitor.isNativePlatform() && printRes.data?.content) {
+        await printTicketViaPrimaryBluetooth(printRes.data.content);
+        setIsPrinting(false);
+        toast.success('Impressão enviada para a Bluetooth principal.');
+        fetchDetail(true);
+        return;
+      }
       setTimeout(() => {
         window.print();
         setIsPrinting(false);

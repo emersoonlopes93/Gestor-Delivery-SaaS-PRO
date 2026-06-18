@@ -1,4 +1,5 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { api } from './api-client';
 
 const BLUETOOTH_PLUGIN_NAME = 'BluetoothPrinter';
 
@@ -103,6 +104,34 @@ export const printTicketViaBluetooth = async (macAddress: string, content: strin
     return true;
   } catch (error) {
     console.error('[BluetoothPrinter] Falha ao imprimir', {
+      ...getBluetoothPluginDiagnostics(),
+      error,
+    });
+    throw error;
+  }
+};
+
+export const printTicketViaPrimaryBluetooth = async (content: string) => {
+  assertBluetoothPluginAvailable();
+
+  try {
+    const res = await api.get<Array<{
+      id: string;
+      name: string;
+      address?: string | null;
+      isPrimary?: boolean;
+      isActive?: boolean;
+    }>>('/printing/devices');
+
+    const primary = (res.data || []).find((device) => device.isPrimary && device.isActive && device.address);
+    if (!primary?.address) {
+      throw new Error('Nenhuma impressora principal Bluetooth ativa foi encontrada.');
+    }
+
+    await printTicketViaBluetooth(primary.address, content);
+    return true;
+  } catch (error) {
+    console.error('[BluetoothPrinter] Falha ao imprimir na impressora principal', {
       ...getBluetoothPluginDiagnostics(),
       error,
     });
