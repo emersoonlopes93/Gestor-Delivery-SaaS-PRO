@@ -1,7 +1,7 @@
-import { Capacitor } from '@capacitor/core';
-import { registerPlugin } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 
-// Interface for Bluetooth SPP Plugin (BluetoothSerial/Printer)
+const BLUETOOTH_PLUGIN_NAME = 'BluetoothPrinter';
+
 export interface BluetoothPrinterPlugin {
   requestBluetoothPermissions(): Promise<{ granted: boolean }>;
   connect(options: { address: string }): Promise<{ success: boolean }>;
@@ -10,11 +10,18 @@ export interface BluetoothPrinterPlugin {
   listDevices(): Promise<{ devices: Array<{ name: string; address: string }> }>;
 }
 
-// In a real scenario, this would map to a custom Capacitor plugin 
-// or an existing community plugin like @ionic-native/bluetooth-serial wrapped.
-export const BluetoothPrinter = registerPlugin<BluetoothPrinterPlugin>('BluetoothPrinter');
+export const BluetoothPrinter = registerPlugin<BluetoothPrinterPlugin>(BLUETOOTH_PLUGIN_NAME);
 
 export const isNativeAndroid = () => Capacitor.getPlatform() === 'android';
+
+function getBluetoothPluginDiagnostics() {
+  return {
+    expectedPlugin: BLUETOOTH_PLUGIN_NAME,
+    isNativePlatform: Capacitor.isNativePlatform(),
+    isPluginAvailable: Capacitor.isPluginAvailable(BLUETOOTH_PLUGIN_NAME),
+    platform: Capacitor.getPlatform(),
+  };
+}
 
 function getBluetoothErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
@@ -23,12 +30,16 @@ function getBluetoothErrorMessage(error: unknown): string {
 }
 
 function assertBluetoothPluginAvailable() {
+  const diagnostics = getBluetoothPluginDiagnostics();
+
   if (!isNativeAndroid()) {
-    throw new Error('Bluetooth SPP só funciona no app Android.');
+    console.warn('[BluetoothPrinter] Plugin indisponível', diagnostics);
+    throw new Error(`Bluetooth SPP só funciona no app Android. Diagnóstico: ${JSON.stringify(diagnostics)}`);
   }
 
-  if (!Capacitor.isPluginAvailable('BluetoothPrinter')) {
-    throw new Error('Plugin BluetoothPrinter não disponível no APK. Rode npx cap sync android e gere novo APK.');
+  if (!Capacitor.isPluginAvailable(BLUETOOTH_PLUGIN_NAME)) {
+    console.error('[BluetoothPrinter] Plugin nativo não disponível', diagnostics);
+    throw new Error(`Plugin BluetoothPrinter não disponível no APK. Diagnóstico: ${JSON.stringify(diagnostics)}. Rode npx cap sync android, faça Clean/Rebuild no Android Studio e reinstale o APK.`);
   }
 }
 
@@ -54,7 +65,10 @@ export const scanBluetoothDevices = async () => {
     const result = await BluetoothPrinter.listDevices();
     return result.devices;
   } catch (error) {
-    console.error('Failed to list BT devices:', error);
+    console.error('[BluetoothPrinter] Falha ao listar dispositivos', {
+      ...getBluetoothPluginDiagnostics(),
+      error,
+    });
     throw new Error(getBluetoothErrorMessage(error));
   }
 };
@@ -69,7 +83,10 @@ export const printTicketViaBluetooth = async (macAddress: string, content: strin
     await BluetoothPrinter.disconnect();
     return true;
   } catch (error) {
-    console.error('Print failed:', error);
+    console.error('[BluetoothPrinter] Falha ao imprimir', {
+      ...getBluetoothPluginDiagnostics(),
+      error,
+    });
     throw error;
   }
 };
