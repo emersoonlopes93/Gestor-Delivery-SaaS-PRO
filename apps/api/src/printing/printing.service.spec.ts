@@ -10,7 +10,9 @@ describe('PrintingService print station bootstrap', () => {
       groupBy: jest.fn(),
     },
     printStation: {
-      upsert: jest.fn().mockResolvedValue({}),
+      findFirst: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({}),
+      update: jest.fn().mockResolvedValue({}),
       findMany: jest.fn(),
     },
   });
@@ -41,15 +43,19 @@ describe('PrintingService print station bootstrap', () => {
       where: { tenantId: 'tenant-1', isActive: true, deletedAt: null },
       select: { templateConfig: true },
     });
-    expect(db.printStation.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      where: { tenantId_slug: { tenantId: 'tenant-1', slug: 'cozinha' } },
-      create: expect.objectContaining({ tenantId: 'tenant-1', name: 'Cozinha', slug: 'cozinha' }),
-      update: { isActive: true },
+    expect(db.printStation.findFirst).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-1', slug: 'cozinha' },
+      select: { id: true },
+    });
+    expect(db.printStation.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ tenantId: 'tenant-1', name: 'Cozinha', slug: 'cozinha' }),
     }));
-    expect(db.printStation.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      where: { tenantId_slug: { tenantId: 'tenant-1', slug: 'bebidas' } },
-      create: expect.objectContaining({ tenantId: 'tenant-1', name: 'Bebidas', slug: 'bebidas' }),
-      update: { isActive: true },
+    expect(db.printStation.findFirst).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-1', slug: 'bebidas' },
+      select: { id: true },
+    });
+    expect(db.printStation.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ tenantId: 'tenant-1', name: 'Bebidas', slug: 'bebidas' }),
     }));
   });
 
@@ -63,20 +69,19 @@ describe('PrintingService print station bootstrap', () => {
 
     await makeService(db).ensurePrintStationsForTenant('tenant-1');
 
-    expect(db.printStation.upsert).toHaveBeenCalledTimes(1);
-    expect(db.printStation.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      where: { tenantId_slug: { tenantId: 'tenant-1', slug: 'general' } },
-      create: expect.objectContaining({
+    expect(db.printStation.findFirst).toHaveBeenCalledTimes(1);
+    expect(db.printStation.create).toHaveBeenCalledTimes(1);
+    expect(db.printStation.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
         tenantId: 'tenant-1',
         slug: 'general',
         isActive: true,
         autoPrintEnabled: false,
       }),
-      update: { isActive: true },
     }));
   });
 
-  it('deduplicates repeated KDS stations through the tenant slug upsert key', async () => {
+  it('deduplicates repeated KDS stations before persisting by tenant slug', async () => {
     const db = makeDb();
     db.productCategory.findMany.mockResolvedValue([
       { templateConfig: { station: 'Cozinha' } },
@@ -89,14 +94,17 @@ describe('PrintingService print station bootstrap', () => {
 
     await makeService(db).ensurePrintStationsForTenant('tenant-1');
 
-    expect(db.printStation.upsert).toHaveBeenCalledTimes(1);
-    expect(db.printStation.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      where: { tenantId_slug: { tenantId: 'tenant-1', slug: 'cozinha' } },
-    }));
+    expect(db.printStation.findFirst).toHaveBeenCalledTimes(1);
+    expect(db.printStation.findFirst).toHaveBeenCalledWith({
+      where: { tenantId: 'tenant-1', slug: 'cozinha' },
+      select: { id: true },
+    });
+    expect(db.printStation.create).toHaveBeenCalledTimes(1);
   });
 
-  it('reuses an existing station by upserting and reactivating it', async () => {
+  it('reuses an existing station by tenant slug and reactivates it', async () => {
     const db = makeDb();
+    db.printStation.findFirst.mockResolvedValue({ id: 'station-existing' });
     db.productCategory.findMany.mockResolvedValue([
       { templateConfig: { station: 'Area Fria' } },
     ]);
@@ -107,10 +115,11 @@ describe('PrintingService print station bootstrap', () => {
 
     await makeService(db).ensurePrintStationsForTenant('tenant-1');
 
-    expect(db.printStation.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      where: { tenantId_slug: { tenantId: 'tenant-1', slug: 'area-fria' } },
-      update: { isActive: true },
-    }));
+    expect(db.printStation.update).toHaveBeenCalledWith({
+      where: { id: 'station-existing' },
+      data: { isActive: true },
+    });
+    expect(db.printStation.create).not.toHaveBeenCalled();
   });
 
   it('keeps station discovery and listing scoped to the current tenant', async () => {
@@ -137,9 +146,11 @@ describe('PrintingService print station bootstrap', () => {
     expect(db.printStation.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { tenantId: 'tenant-a' },
     }));
-    for (const call of db.printStation.upsert.mock.calls) {
-      expect(call[0].where.tenantId_slug.tenantId).toBe('tenant-a');
-      expect(call[0].create.tenantId).toBe('tenant-a');
+    for (const call of db.printStation.findFirst.mock.calls) {
+      expect(call[0].where.tenantId).toBe('tenant-a');
+    }
+    for (const call of db.printStation.create.mock.calls) {
+      expect(call[0].data.tenantId).toBe('tenant-a');
     }
   });
 });

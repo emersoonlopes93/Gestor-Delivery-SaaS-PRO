@@ -32,24 +32,34 @@ export class PrintingService {
       : [{ name: 'Geral / Balcão', slug: 'general' }];
 
     for (const candidate of candidates) {
-      await this.db.printStation.upsert({
+      const existingStation = await this.db.printStation.findFirst({
         where: {
-          tenantId_slug: {
-            tenantId,
-            slug: candidate.slug,
-          },
-        },
-        create: {
           tenantId,
-          name: candidate.name,
           slug: candidate.slug,
-          isActive: true,
-          autoPrintEnabled: false,
         },
-        update: {
-          isActive: true,
+        select: {
+          id: true,
         },
       });
+
+      if (existingStation) {
+        await this.db.printStation.update({
+          where: { id: existingStation.id },
+          data: {
+            isActive: true,
+          },
+        });
+      } else {
+        await this.db.printStation.create({
+          data: {
+            tenantId,
+            name: candidate.name,
+            slug: candidate.slug,
+            isActive: true,
+            autoPrintEnabled: false,
+          },
+        });
+      }
     }
 
     return this.db.printStation.findMany({
