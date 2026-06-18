@@ -23,8 +23,8 @@ export const DriverSelectionModal = memo(function DriverSelectionModal({
   const availableDrivers = drivers.filter((d) => d.isActive && d.status !== 'offline');
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-card dark:bg-muted900 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200 border border-border200 dark:border-border800">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 safe-modal bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-card dark:bg-muted900 rounded-3xl shadow-2xl w-full max-w-sm max-h-[calc(100dvh-var(--safe-area-top)-var(--safe-area-bottom)-2rem)] overflow-hidden animate-in zoom-in-95 duration-200 border border-border200 dark:border-border800">
         <header className="px-6 py-5 border-b border-border100 dark:border-border800 flex items-center justify-between bg-muted50/50 dark:bg-muted800/50">
           <div>
             <h2 className="text-lg font-black text-muted-foreground900 dark:text-white tracking-tight">Atribuir Entregador</h2>

@@ -1,8 +1,9 @@
 import { IsString, IsOptional, IsBoolean, IsNumber } from 'class-validator';
 
 export class CreatePrinterDeviceDto {
+  @IsOptional()
   @IsString()
-  stationId: string;
+  stationId?: string | null;
 
   @IsString()
   name: string;
@@ -29,6 +30,22 @@ export class CreatePrinterDeviceDto {
   @IsOptional()
   @IsBoolean()
   isDefault?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isPrimary?: boolean;
+
+  @IsOptional()
+  @IsString()
+  role?: string;
+
+  @IsOptional()
+  @IsString()
+  purpose?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  autoPrintEnabled?: boolean;
 }
 
 export class AckSpoolerJobDto {

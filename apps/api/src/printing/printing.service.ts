@@ -140,11 +140,58 @@ export class PrintingService {
     });
   }
 
-  async createDevice(tenantId: string, data: { stationId: string; name: string; connectionType: string; address?: string; vendor?: string; model?: string; paperWidth?: number; isDefault?: boolean }) {
+  async createDevice(tenantId: string, data: {
+    stationId?: string | null;
+    name: string;
+    connectionType: string;
+    address?: string;
+    vendor?: string;
+    model?: string;
+    paperWidth?: number;
+    isDefault?: boolean;
+    isPrimary?: boolean;
+    role?: string;
+    purpose?: string;
+    autoPrintEnabled?: boolean;
+  }) {
+    const isPrimary = data.isPrimary === true || data.role === 'primary_order';
+    const role = isPrimary ? 'primary_order' : (data.role || 'station');
+    const purpose = isPrimary ? 'main_receipt' : (data.purpose || 'production_ticket');
+
+    if (!isPrimary && !data.stationId) {
+      throw new BadRequestException('Station printer requires stationId');
+    }
+
+    if (isPrimary) {
+      await this.db.printerDevice.updateMany({
+        where: {
+          tenantId,
+          isPrimary: true,
+          isActive: true,
+        },
+        data: {
+          isPrimary: false,
+          isDefault: false,
+          role: 'station',
+        },
+      });
+    }
+
     return this.db.printerDevice.create({
       data: {
         tenantId,
-        ...data,
+        name: data.name,
+        connectionType: data.connectionType,
+        address: data.address,
+        vendor: data.vendor,
+        model: data.model,
+        paperWidth: data.paperWidth,
+        isDefault: data.isDefault ?? isPrimary,
+        isPrimary,
+        role,
+        purpose,
+        autoPrintEnabled: data.autoPrintEnabled ?? true,
+        stationId: isPrimary ? null : data.stationId,
       },
     });
   }
@@ -181,7 +228,13 @@ export class PrintingService {
       throw new NotFoundException('Device not found');
     }
 
-    const stationKeys = Array.from(new Set([device.station.slug, device.station.name].filter(Boolean)));
+    const stationKeys = device.isPrimary
+      ? ['MAIN']
+      : Array.from(new Set([device.station?.slug, device.station?.name].filter(Boolean)));
+
+    if (stationKeys.length === 0) {
+      throw new BadRequestException('Station device has no station configured');
+    }
 
     // Find next pending job
     const job = await this.db.printJob.findFirst({
@@ -276,6 +329,22 @@ export class PrintingService {
         status: PrintJobStatus.pending,
       },
     });
+  }
+
+  async createMainReceiptJobForOrder(tenantId: string, orderId: string, content: string) {
+    const hasPrimaryPrinter = await this.db.printerDevice.findFirst({
+      where: {
+        tenantId,
+        isPrimary: true,
+        isActive: true,
+        autoPrintEnabled: true,
+      },
+      select: { id: true },
+    });
+
+    if (!hasPrimaryPrinter) return null;
+
+    return this.createPrintJobForOrder(tenantId, orderId, 'MAIN', PrintType.customer, content);
   }
 
   async createTestJob(tenantId: string, stationSlug: string, deviceName: string) {

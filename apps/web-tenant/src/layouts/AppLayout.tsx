@@ -49,6 +49,7 @@ import { useNotificationAudio } from '../hooks/useNotificationAudio';
 import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
 import { useLogisticsSocket } from '../features/delivery/hooks/useLogisticsSocket';
 import { Toaster } from 'react-hot-toast';
+import { addNativeNotificationClickListener } from '../lib/native-notifications';
 
 type SidebarItem = {
   id: string;
@@ -580,12 +581,36 @@ export function AppLayout() {
     navigate('/login');
   };
 
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+
+    addNativeNotificationClickListener(() => {
+      navigate('/orders');
+    }).then((handle) => {
+      cleanup = () => {
+        void handle?.remove();
+      };
+    }).catch((err) => {
+      console.warn('[NativeNotifications] Falha ao registrar listener:', err);
+    });
+
+    return () => {
+      cleanup?.();
+    };
+  }, [navigate]);
+
 
 
   return (
     <div className="app-shell min-h-screen flex transition-colors" style={{ backgroundColor: 'var(--surface-page)' }}>
       <Toaster
         position="top-right"
+        containerClassName="safe-x"
+        containerStyle={{
+          top: 'calc(12px + var(--safe-area-top))',
+          right: 'calc(12px + var(--safe-area-right))',
+          left: 'calc(12px + var(--safe-area-left))',
+        }}
         toastOptions={{
           className: 'font-bold text-sm',
           success: {
@@ -599,7 +624,7 @@ export function AppLayout() {
         }}
       />
       {isMobileOpen ? (
-        <div className="fixed inset-0 z-40 bg-black/40 md:hidden" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={closeMobile} />
+        <div className="fixed inset-0 z-40 bg-black/40 md:hidden safe-inset" style={{ backgroundColor: 'rgba(0,0,0,0.4)' }} onClick={closeMobile} />
       ) : null}
 
       <aside
@@ -796,7 +821,7 @@ export function AppLayout() {
           </div>
         </header>
 
-        <header className="mobile-header md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors" style={{ backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
+        <header className="mobile-header md:hidden sticky top-0 z-30 backdrop-blur-xl transition-colors safe-x" style={{ backgroundColor: 'var(--surface-base)', borderBottom: '1px solid var(--border-default)' }}>
           <div className="h-14 px-4 flex items-center justify-between">
             <button
               type="button"
@@ -823,7 +848,7 @@ export function AppLayout() {
         </header>
 
 
-        <main className="app-main flex-1 overflow-auto bg-background">
+        <main className="app-main flex-1 overflow-auto bg-background safe-bottom">
           <div key={location.pathname} className="h-full">
             <Outlet />
           </div>

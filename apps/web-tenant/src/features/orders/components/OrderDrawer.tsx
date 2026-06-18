@@ -145,14 +145,14 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
   return (
     <>
       <div 
-        className={`fixed inset-0 z-50 flex flex-col items-end sm:justify-center transition-all duration-300 ${orderId ? 'visible' : 'invisible'}`}
+        className={`fixed inset-0 z-50 flex flex-col items-end sm:justify-center safe-inset transition-all duration-300 ${orderId ? 'visible' : 'invisible'}`}
       >
         <div 
           className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${orderId ? 'opacity-100' : 'opacity-0'}`} 
           onClick={onClose}
         />
         <div 
-          className={`relative z-50 h-[92%] sm:h-full w-full sm:w-[500px] bg-card shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out ${orderId ? 'translate-y-0 sm:translate-x-0' : 'translate-y-full sm:translate-x-full sm:translate-y-0'} rounded-t-[32px] sm:rounded-t-none border-l border-border`}
+          className={`relative z-50 h-[92%] sm:h-full w-full sm:w-[500px] bg-card shadow-2xl flex flex-col safe-sheet transform transition-transform duration-300 ease-in-out ${orderId ? 'translate-y-0 sm:translate-x-0' : 'translate-y-full sm:translate-x-full sm:translate-y-0'} rounded-t-[32px] sm:rounded-t-none border-l border-border`}
         >
           {/* Mobile Handle */}
           <div className="sm:hidden flex justify-center py-3 shrink-0">

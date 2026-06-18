@@ -32,6 +32,7 @@ export function PrinterSettings() {
   const [logs, setLogs] = useState<string[]>([]);
   const [selectedStation, setSelectedStation] = useState<string>('');
   const [selectedDevice, setSelectedDevice] = useState<string>('');
+  const [printerRole, setPrinterRole] = useState<'primary' | 'station'>('primary');
   const [isSpoolerRunning, setIsSpoolerRunning] = useState(false);
   const [pollingInterval, setPollingInterval] = useState<number>(3000);
   const [isScanning, setIsScanning] = useState(false);
@@ -72,7 +73,7 @@ export function PrinterSettings() {
   }, [stations, devices]);
 
   useEffect(() => {
-    if (stations.length === 0) {
+    if (printerRole === 'station' && stations.length === 0) {
       setStationLoadMessage('');
       return;
     }
@@ -185,8 +186,10 @@ export function PrinterSettings() {
       return;
     }
 
-    const station = stations.find(s => s.slug === selectedStation) ?? stations[0];
-    if (!station) {
+    const station = printerRole === 'station'
+      ? stations.find(s => s.slug === selectedStation) ?? stations[0]
+      : null;
+    if (printerRole === 'station' && !station) {
       const message = 'Nenhuma estação de impressão encontrada. Crie/carregue uma estação antes de salvar a impressora.';
       setBluetoothConnectionError(message);
       setLastBluetoothAction(message);
@@ -219,14 +222,26 @@ export function PrinterSettings() {
         name: btDevice.name,
         address: btDevice.address,
         connectionType: 'BLUETOOTH_SPP',
-        stationId: station.id,
-        isDefault: true,
+        stationId: station?.id ?? null,
+        isDefault: printerRole === 'primary',
+        isPrimary: printerRole === 'primary',
+        role: printerRole === 'primary' ? 'primary_order' : 'station',
+        purpose: printerRole === 'primary' ? 'main_receipt' : 'production_ticket',
+        autoPrintEnabled: true,
       });
       setActivePrinterDevice(savedDevice);
       setSelectedDevice(savedDevice.id);
-      setSelectedStation(station.slug);
-      setLastBluetoothAction('Dispositivo salvo como impressora ativa.');
-      addLog(`Dispositivo ${btDevice.name} salvo como impressora ativa.`);
+      if (station) setSelectedStation(station.slug);
+      setLastBluetoothAction(
+        printerRole === 'primary'
+          ? 'Dispositivo salvo como impressora principal.'
+          : 'Dispositivo salvo como impressora de setor.'
+      );
+      addLog(
+        printerRole === 'primary'
+          ? `Dispositivo ${btDevice.name} salvo como impressora principal.`
+          : `Dispositivo ${btDevice.name} salvo como impressora de setor.`
+      );
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : String(e);
       setBluetoothConnectionError(`Bluetooth conectado, mas falhou ao salvar no servidor: ${message}`);
@@ -301,15 +316,15 @@ export function PrinterSettings() {
   };
 
   const handleTestPrint = async () => {
-    if (!selectedStation || !selectedDevice) {
-      addLog('Selecione estação e dispositivo.');
+    if ((printerRole === 'station' && !selectedStation) || !selectedDevice) {
+      addLog(printerRole === 'station' ? 'Selecione estação e dispositivo.' : 'Selecione a impressora principal.');
       return;
     }
     try {
       const device = devices.find(d => d.id === selectedDevice);
       // Cria job de teste
       await testPrint.mutateAsync({ 
-        stationSlug: selectedStation, 
+        stationSlug: printerRole === 'primary' ? 'MAIN' : selectedStation, 
         deviceName: device?.name || 'Desconhecido' 
       });
       addLog('Job de teste enviado para a nuvem.');
@@ -447,10 +462,41 @@ export function PrinterSettings() {
 
             <div className="space-y-4">
               <div>
+                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Tipo de impressora</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPrinterRole('primary')}
+                    className={`rounded-xl border px-3 py-3 text-left transition-all ${
+                      printerRole === 'primary'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border bg-card text-muted-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    <span className="block text-xs font-black uppercase tracking-widest">Principal</span>
+                    <span className="mt-1 block text-[11px] font-semibold leading-snug">Comanda completa do pedido</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPrinterRole('station')}
+                    className={`rounded-xl border px-3 py-3 text-left transition-all ${
+                      printerRole === 'station'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border bg-card text-muted-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    <span className="block text-xs font-black uppercase tracking-widest">Setor</span>
+                    <span className="mt-1 block text-[11px] font-semibold leading-snug">Ticket de produção</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
                 <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Estação de Trabalho Ativa</label>
                 <select 
                   value={selectedStation}
                   onChange={(e) => setSelectedStation(e.target.value)}
+                  disabled={printerRole === 'primary'}
                   className="w-full bg-card dark:bg-muted900 border border-border dark:border-border700 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                 >
                   <option value="">-- Selecione a Estação --</option>
@@ -492,8 +538,11 @@ export function PrinterSettings() {
                   className="w-full bg-card dark:bg-muted900 border border-border dark:border-border700 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                 >
                   <option value="">-- Nenhum --</option>
-                  {devices.filter(d => !selectedStation || d.stationId === stations.find(s => s.slug === selectedStation)?.id).map(d => (
-                    <option key={d.id} value={d.id}>{d.name} ({d.address})</option>
+                  {devices.filter(d => {
+                    if (printerRole === 'primary') return d.isPrimary;
+                    return !selectedStation || d.stationId === stations.find(s => s.slug === selectedStation)?.id;
+                  }).map(d => (
+                    <option key={d.id} value={d.id}>{d.name} ({d.address}){d.isPrimary ? ' - principal' : ''}</option>
                   ))}
                 </select>
               </div>

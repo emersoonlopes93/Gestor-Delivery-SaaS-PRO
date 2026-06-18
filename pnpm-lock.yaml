@@ -555,6 +555,9 @@ importers:
       '@capacitor/core':
         specifier: ^7.4.4
         version: 7.6.6
+      '@capacitor/local-notifications':
+        specifier: ^7.0.6
+        version: 7.0.6(@capacitor/core@7.6.6)
       '@dnd-kit/core':
         specifier: ^6.1.0
         version: 6.3.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -1651,6 +1654,11 @@ packages:
     resolution: {integrity: sha512-IjryNsqjYTs+YbVeIg/hpwgKtbEIMcUOblr75pdNSuE4bA++CgO2avqQi0cyviUHoaSa7e8L2hqvwNzghfor6g==}
     peerDependencies:
       '@capacitor/core': ^7.6.0
+
+  '@capacitor/local-notifications@7.0.6':
+    resolution: {integrity: sha512-RuZQ9P5aAlw6VU2i0i6g4i1XYZbbeDE9oaBg87gggHaUUscX7b1lltTlC1t11/JCPoyjECnZ/N8xfDNZ26hKhw==}
+    peerDependencies:
+      '@capacitor/core': '>=7.0.0'
 
   '@capacitor/push-notifications@7.0.6':
     resolution: {integrity: sha512-zAhbHpdbc15ImuVGgoFwUZsKI+jjGxy/oO5mgfYKUx8Xl2OskndzhL79PYsCPjyGLbqUR9NRUZJthV9auVT3nw==}
@@ -8243,6 +8251,10 @@ snapshots:
       '@capacitor/synapse': 1.0.4
 
   '@capacitor/ios@7.6.6(@capacitor/core@7.6.6)':
+    dependencies:
+      '@capacitor/core': 7.6.6
+
+  '@capacitor/local-notifications@7.0.6(@capacitor/core@7.6.6)':
     dependencies:
       '@capacitor/core': 7.6.6
 

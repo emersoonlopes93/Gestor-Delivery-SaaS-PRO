@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import toast from 'react-hot-toast';
 import { requestNotificationPermission, showWebNotification } from '../lib/notification-support';
+import { requestNativeNotificationPermission, showNewOrderNotification } from '../lib/native-notifications';
 
 /** Sons disponíveis (devem existir em public/sounds/) */
 export const AVAILABLE_SOUNDS = [
@@ -149,6 +150,14 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
         body: `Cliente: ${data.order.customerName}\nTotal: ${totalFmt}`,
         icon: '/favicon.ico',
       });
+
+      showNewOrderNotification({
+        orderNumber: data.order.orderNumber,
+        customerName: data.order.customerName,
+        total: data.order.total,
+      }).catch((err) => {
+        console.warn('[NativeNotifications] Falha ao exibir notificacao de novo pedido:', err);
+      });
     });
 
     socket.on('orderCancelled', (data: { orderNumber?: string }) => {
@@ -219,6 +228,9 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
 
   const requestPermission = useCallback(() => {
     requestNotificationPermission();
+    requestNativeNotificationPermission().catch((err) => {
+      console.warn('[NativeNotifications] Falha ao solicitar permissao:', err);
+    });
   }, []);
 
   /** Testa o som de novo pedido com o volume e som actuais */

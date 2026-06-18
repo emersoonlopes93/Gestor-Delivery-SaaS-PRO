@@ -17,15 +17,23 @@ export interface PrinterDevice {
   model?: string;
   paperWidth?: number;
   isDefault?: boolean;
-  stationId: string;
+  stationId?: string | null;
+  isPrimary?: boolean;
+  role?: string;
+  purpose?: string;
+  autoPrintEnabled?: boolean;
 }
 
 export interface CreateDevicePayload {
-  stationId: string;
+  stationId?: string | null;
   name: string;
-  connectionType: 'BLUETOOTH_SPP' | 'USB' | 'IP';
+  connectionType: 'BLUETOOTH_SPP' | 'USB' | 'IP' | 'bluetooth_spp_android' | 'usb_bridge_future' | 'network_bridge_future' | 'web_serial_future';
   address?: string;
   isDefault?: boolean;
+  isPrimary?: boolean;
+  role?: string;
+  purpose?: string;
+  autoPrintEnabled?: boolean;
 }
 
 export const usePrintingStations = () => {

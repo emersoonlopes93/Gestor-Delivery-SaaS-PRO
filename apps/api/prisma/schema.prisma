@@ -2037,7 +2037,7 @@ model PrintStation {
 model PrinterDevice {
   id             String       @id @default(uuid())
   tenantId       String       @map("tenant_id")
-  stationId      String       @map("station_id")
+  stationId      String?      @map("station_id")
   name           String       @db.VarChar(100)
   connectionType String       @db.VarChar(50)
   address        String?      @db.VarChar(255)
@@ -2045,16 +2045,22 @@ model PrinterDevice {
   model          String?      @db.VarChar(100)
   paperWidth     Int          @default(58) @map("paper_width")
   isDefault      Boolean      @default(false) @map("is_default")
+  isPrimary      Boolean      @default(false) @map("is_primary")
+  role           String       @default("station") @db.VarChar(40)
+  purpose        String       @default("production_ticket") @db.VarChar(40)
+  autoPrintEnabled Boolean    @default(false) @map("auto_print_enabled")
   isActive       Boolean      @default(true) @map("is_active")
   lastSeenAt     DateTime?    @map("last_seen_at")
   lastError      String?      @map("last_error") @db.Text
   metadata       Json?
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
-  station        PrintStation @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  station        PrintStation? @relation(fields: [stationId], references: [id], onDelete: SetNull)
   tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
+  @@index([tenantId, isPrimary])
+  @@index([tenantId, role])
   @@map("printer_devices")
 }
 

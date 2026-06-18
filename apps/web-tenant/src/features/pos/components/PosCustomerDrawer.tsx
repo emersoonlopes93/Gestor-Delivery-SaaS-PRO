@@ -151,11 +151,11 @@ export function PosCustomerDrawer({
       {/* Backdrop */}
       <div 
         onClick={onClose} 
-        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-300 animate-in fade-in"
+        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm safe-inset transition-opacity duration-300 animate-in fade-in"
       />
       
       {/* Drawer Panel */}
-      <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] bg-card dark:bg-muted900 shadow-2xl border-l border-border200 dark:border-border800 flex flex-col transition-transform duration-300 transform translate-x-0 animate-in slide-in-from-right">
+      <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] bg-card dark:bg-muted900 shadow-2xl border-l border-border200 dark:border-border800 flex flex-col safe-top safe-bottom transition-transform duration-300 transform translate-x-0 animate-in slide-in-from-right">
         
         {/* Header */}
         <div className="shrink-0 px-6 py-4 border-b border-border200 dark:border-border800 flex items-center justify-between bg-card dark:bg-muted900">

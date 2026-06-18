@@ -351,7 +351,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 safe-modal bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
       <div className="bg-card border border-border rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-500">
         <div className="px-8 py-6 border-b border-border flex items-center justify-between">
           <div>

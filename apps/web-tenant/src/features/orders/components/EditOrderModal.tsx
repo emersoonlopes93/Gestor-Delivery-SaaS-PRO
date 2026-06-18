@@ -240,8 +240,8 @@ export const EditOrderModal = memo(function EditOrderModal({ order, onClose, onS
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-card rounded-[32px] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh] border border-border">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 safe-modal bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-card rounded-[32px] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[calc(100dvh-var(--safe-area-top)-var(--safe-area-bottom)-2rem)] border border-border">
         
         <header className="px-8 py-6 border-b border-border flex items-center justify-between bg-muted/50 shrink-0">
           <div>
