@@ -5,6 +5,7 @@ import {
   usePrintingStations, 
   usePrinterDevices, 
   useCreateDevice,
+  useUpdateDevice,
   useTestPrint,
   type PrinterDevice
 } from '../../hooks/usePrinting';
@@ -58,6 +59,7 @@ export function PrinterSettings() {
   } = usePrintingStations();
   const { data: devices = [] } = usePrinterDevices();
   const createDevice = useCreateDevice();
+  const updateDevice = useUpdateDevice();
   const testPrint = useTestPrint();
 
   const spoolerRef = useRef<{ running: boolean }>({ running: false });
@@ -65,12 +67,14 @@ export function PrinterSettings() {
   // Update selected defaults when data loads
   useEffect(() => {
     if (stations.length > 0 && !selectedStation) {
-      setSelectedStation(stations[0].slug);
+      const savedStation = localStorage.getItem('printing.selectedStation');
+      setSelectedStation(savedStation || stations[0].slug);
     }
     if (devices.length > 0 && !selectedDevice) {
-      setSelectedDevice(devices[0].id);
+      const savedDevice = localStorage.getItem('printing.selectedDevice');
+      setSelectedDevice(savedDevice || devices[0].id);
     }
-  }, [stations, devices]);
+  }, [stations, devices, selectedStation, selectedDevice]);
 
   useEffect(() => {
     if (printerRole === 'station' && stations.length === 0) {
@@ -85,6 +89,18 @@ export function PrinterSettings() {
 
     setStationLoadMessage('Estações carregadas a partir dos setores do KDS.');
   }, [stations]);
+
+  useEffect(() => {
+    localStorage.setItem('printing.selectedStation', selectedStation);
+  }, [selectedStation]);
+
+  useEffect(() => {
+    localStorage.setItem('printing.selectedDevice', selectedDevice);
+  }, [selectedDevice]);
+
+  useEffect(() => {
+    localStorage.setItem('printing.printerRole', printerRole);
+  }, [printerRole]);
 
   useEffect(() => {
     spoolerRef.current.running = isSpoolerRunning;
@@ -250,6 +266,61 @@ export function PrinterSettings() {
     } finally {
       setIsSavingDevice(false);
       setIsConnectingBluetooth(false);
+    }
+  };
+
+  const handleSavePrinterConfiguration = async () => {
+    if (!selectedDevice) {
+      addLog('Selecione um dispositivo para salvar.');
+      return;
+    }
+
+    const device = devices.find((d) => d.id === selectedDevice);
+    if (!device) {
+      addLog('Dispositivo selecionado não encontrado.');
+      return;
+    }
+
+    if (printerRole === 'station' && !selectedStation) {
+      addLog('Selecione uma estação para salvar a impressora de setor.');
+      return;
+    }
+
+    const station = printerRole === 'station'
+      ? stations.find((s) => s.slug === selectedStation)
+      : null;
+
+    setIsSavingDevice(true);
+    try {
+      const updated = await updateDevice.mutateAsync({
+        id: device.id,
+        payload: {
+          stationId: station?.id ?? null,
+          isDefault: printerRole === 'primary',
+          isPrimary: printerRole === 'primary',
+          role: printerRole === 'primary' ? 'primary_order' : 'station',
+          purpose: printerRole === 'primary' ? 'main_receipt' : 'production_ticket',
+          autoPrintEnabled: true,
+        },
+      });
+
+      setActivePrinterDevice(updated);
+      setLastBluetoothAction(
+        printerRole === 'primary'
+          ? 'Impressora principal salva.'
+          : 'Impressora de setor salva.'
+      );
+      addLog(
+        printerRole === 'primary'
+          ? `Impressora principal salva: ${updated.name}.`
+          : `Impressora de setor salva: ${updated.name}.`
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setBluetoothConnectionError(`Falha ao salvar configuração: ${message}`);
+      addLog(`Falha ao salvar configuração: ${message}`);
+    } finally {
+      setIsSavingDevice(false);
     }
   };
 
@@ -467,10 +538,10 @@ export function PrinterSettings() {
                   <button
                     type="button"
                     onClick={() => setPrinterRole('primary')}
-                    className={`rounded-xl border px-3 py-3 text-left transition-all ${
+                  className={`rounded-xl border px-3 py-3 text-left transition-all shadow-sm ${
                       printerRole === 'primary'
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border bg-card text-muted-foreground hover:bg-muted/50'
+                        ? 'border-primary bg-card text-foreground ring-1 ring-primary/20'
+                        : 'border-border bg-background text-foreground hover:bg-muted/50'
                     }`}
                   >
                     <span className="block text-xs font-black uppercase tracking-widest">Principal</span>
@@ -479,10 +550,10 @@ export function PrinterSettings() {
                   <button
                     type="button"
                     onClick={() => setPrinterRole('station')}
-                    className={`rounded-xl border px-3 py-3 text-left transition-all ${
+                  className={`rounded-xl border px-3 py-3 text-left transition-all shadow-sm ${
                       printerRole === 'station'
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border bg-card text-muted-foreground hover:bg-muted/50'
+                        ? 'border-primary bg-card text-foreground ring-1 ring-primary/20'
+                        : 'border-border bg-background text-foreground hover:bg-muted/50'
                     }`}
                   >
                     <span className="block text-xs font-black uppercase tracking-widest">Setor</span>
@@ -497,7 +568,7 @@ export function PrinterSettings() {
                   value={selectedStation}
                   onChange={(e) => setSelectedStation(e.target.value)}
                   disabled={printerRole === 'primary'}
-                  className="w-full bg-card dark:bg-muted900 border border-border dark:border-border700 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                  className="w-full bg-background dark:bg-muted900 border border-border dark:border-border700 rounded-xl px-4 py-3 text-sm font-bold text-foreground focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                 >
                   <option value="">-- Selecione a Estação --</option>
                   {stations.map(st => (
@@ -523,7 +594,7 @@ export function PrinterSettings() {
                   <button
                     type="button"
                     onClick={() => refetchStations()}
-                    className="mt-3 w-full rounded-xl border border-dashed border-border px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:bg-muted100 dark:hover:bg-muted800"
+                    className="mt-3 w-full rounded-xl border border-dashed border-border bg-background px-4 py-2 text-xs font-bold text-foreground transition-colors hover:bg-muted100 dark:hover:bg-muted800"
                   >
                     Recarregar estações
                   </button>
@@ -535,7 +606,7 @@ export function PrinterSettings() {
                 <select 
                   value={selectedDevice}
                   onChange={(e) => setSelectedDevice(e.target.value)}
-                  className="w-full bg-card dark:bg-muted900 border border-border dark:border-border700 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                  className="w-full bg-background dark:bg-muted900 border border-border dark:border-border700 rounded-xl px-4 py-3 text-sm font-bold text-foreground focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                 >
                   <option value="">-- Nenhum --</option>
                   {devices.filter(d => {
@@ -550,7 +621,7 @@ export function PrinterSettings() {
               <div className="pt-2">
                 <button
                   onClick={handleTestPrint}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-muted100 dark:bg-muted800 rounded-xl font-bold text-sm hover:bg-muted200 dark:hover:bg-muted700 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-background dark:bg-muted800 border border-border dark:border-border700 rounded-xl font-bold text-sm text-foreground hover:bg-muted100 dark:hover:bg-muted700 transition-colors"
                 >
                   <Printer className="w-4 h-4" /> Testar Impressão na Nuvem
                 </button>
@@ -569,6 +640,15 @@ export function PrinterSettings() {
               </div>
 
               <div className="pt-4">
+                <button
+                  type="button"
+                  onClick={handleSavePrinterConfiguration}
+                  disabled={isSavingDevice || !selectedDevice || (printerRole === 'station' && !selectedStation)}
+                  className="w-full mb-3 flex items-center justify-center gap-2 py-3 rounded-2xl border border-primary/20 bg-primary/10 text-primary font-black uppercase tracking-widest transition-colors hover:bg-primary/15 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isSavingDevice ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  Salvar configuração
+                </button>
                 <button
                   onClick={() => setIsSpoolerRunning(!isSpoolerRunning)}
                   disabled={!isNative}
@@ -594,7 +674,7 @@ export function PrinterSettings() {
               <button 
                 onClick={handleScanBluetooth}
                 disabled={isScanning}
-                className="w-full py-3 bg-primary text-white font-bold rounded-xl shadow mb-4 disabled:opacity-70 disabled:cursor-wait"
+              className="w-full py-3 bg-primary text-primary-foreground font-bold rounded-xl shadow mb-4 disabled:opacity-70 disabled:cursor-wait"
               >
                 {isScanning ? 'Buscando...' : 'Buscar Bluetooth Pareados'}
               </button>

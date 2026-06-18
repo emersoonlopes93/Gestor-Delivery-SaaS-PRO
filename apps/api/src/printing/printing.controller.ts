@@ -13,7 +13,7 @@ import { PrintingService } from './printing.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { RequirePermissions } from '../common/decorators';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
-import { CreatePrinterDeviceDto, AckSpoolerJobDto, FailSpoolerJobDto } from './dto/printing.dto';
+import { CreatePrinterDeviceDto, UpdatePrinterDeviceDto, AckSpoolerJobDto, FailSpoolerJobDto } from './dto/printing.dto';
 
 type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
 
@@ -44,6 +44,16 @@ export class PrintingController {
   @RequirePermissions('settings.manage')
   async createDevice(@Request() req: TenantRequest, @Body() body: CreatePrinterDeviceDto) {
     return this.printingService.createDevice(req.user.tenantId, body);
+  }
+
+  @Post('devices/:id')
+  @RequirePermissions('settings.manage')
+  async updateDevice(
+    @Request() req: TenantRequest,
+    @Param('id') id: string,
+    @Body() body: UpdatePrinterDeviceDto,
+  ) {
+    return this.printingService.updateDevice(req.user.tenantId, id, body);
   }
 
   @Post('jobs/:id/reprint')

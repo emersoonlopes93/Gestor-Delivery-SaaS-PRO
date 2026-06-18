@@ -140,6 +140,58 @@ export class PrintingService {
     });
   }
 
+  async updateDevice(tenantId: string, deviceId: string, data: {
+    stationId?: string | null;
+    name?: string;
+    connectionType?: string;
+    address?: string;
+    vendor?: string;
+    model?: string;
+    paperWidth?: number;
+    isDefault?: boolean;
+    isPrimary?: boolean;
+    role?: string;
+    purpose?: string;
+    autoPrintEnabled?: boolean;
+    isActive?: boolean;
+  }) {
+    const current = await this.db.printerDevice.findFirst({
+      where: { id: deviceId, tenantId },
+      select: { id: true, isPrimary: true },
+    });
+
+    if (!current) {
+      throw new NotFoundException('Device not found');
+    }
+
+    const nextIsPrimary = data.isPrimary ?? current.isPrimary;
+    if (nextIsPrimary) {
+      await this.db.printerDevice.updateMany({
+        where: { tenantId, isPrimary: true, isActive: true },
+        data: { isPrimary: false, isDefault: false, role: 'station' },
+      });
+    }
+
+    return this.db.printerDevice.update({
+      where: { id: deviceId },
+      data: {
+        stationId: data.stationId,
+        name: data.name,
+        connectionType: data.connectionType,
+        address: data.address,
+        vendor: data.vendor,
+        model: data.model,
+        paperWidth: data.paperWidth,
+        isDefault: data.isDefault,
+        isPrimary: data.isPrimary,
+        role: data.role,
+        purpose: data.purpose,
+        autoPrintEnabled: data.autoPrintEnabled,
+        isActive: data.isActive,
+      },
+    });
+  }
+
   async createDevice(tenantId: string, data: {
     stationId?: string | null;
     name: string;

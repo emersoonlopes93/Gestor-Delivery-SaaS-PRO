@@ -22,6 +22,7 @@ export interface PrinterDevice {
   role?: string;
   purpose?: string;
   autoPrintEnabled?: boolean;
+  isActive?: boolean;
 }
 
 export interface CreateDevicePayload {
@@ -61,6 +62,19 @@ export const useCreateDevice = () => {
   return useMutation({
     mutationFn: async (payload: CreateDevicePayload) => {
       const { data } = await api.post<PrinterDevice>('/printing/devices', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['printing-devices'] });
+    },
+  });
+};
+
+export const useUpdateDevice = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, payload }: { id: string; payload: Partial<CreateDevicePayload & PrinterDevice> }) => {
+      const { data } = await api.post<PrinterDevice>(`/printing/devices/${id}`, payload);
       return data;
     },
     onSuccess: () => {
