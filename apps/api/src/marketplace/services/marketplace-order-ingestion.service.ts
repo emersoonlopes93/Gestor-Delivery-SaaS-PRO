@@ -153,15 +153,29 @@ export class MarketplaceOrderIngestionService {
     connectionId: string,
     normalized: NormalizedMarketplaceOrder,
   ) {
-    return this.prisma.marketplaceOrder.upsert({
+    const existing = await this.prisma.marketplaceOrder.findFirst({
       where: {
-        tenantId_provider_externalOrderId: {
-          tenantId,
-          provider: normalized.provider,
-          externalOrderId: normalized.externalOrderId,
-        },
+        tenantId,
+        provider: normalized.provider,
+        externalOrderId: normalized.externalOrderId,
       },
-      create: {
+    });
+
+    if (existing) {
+      return this.prisma.marketplaceOrder.update({
+        where: { id: existing.id },
+        data: {
+          externalDisplayId: normalized.externalDisplayId ?? null,
+          statusExternal: normalized.externalStatus ?? null,
+          rawPayload: normalized.rawPayload as Prisma.InputJsonValue,
+          normalizedPayload: normalized as unknown as Prisma.InputJsonValue,
+          lastSyncedAt: new Date(),
+        },
+      });
+    }
+
+    return this.prisma.marketplaceOrder.create({
+      data: {
         tenantId,
         connectionId,
         provider: normalized.provider,
@@ -171,13 +185,6 @@ export class MarketplaceOrderIngestionService {
         statusInternal: this.resolveInitialStatusValue(connectionId, normalized),
         rawPayload: normalized.rawPayload as Prisma.InputJsonValue,
         normalizedPayload: normalized as unknown as Prisma.InputJsonValue,
-      },
-      update: {
-        externalDisplayId: normalized.externalDisplayId ?? null,
-        statusExternal: normalized.externalStatus ?? null,
-        rawPayload: normalized.rawPayload as Prisma.InputJsonValue,
-        normalizedPayload: normalized as unknown as Prisma.InputJsonValue,
-        lastSyncedAt: new Date(),
       },
     });
   }
