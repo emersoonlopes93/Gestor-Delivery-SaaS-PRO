@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request as ExpressRequest } from 'express';
 import type { TenantJwtPayload } from '@gestor/types';
+import { Prisma } from '@prisma/client';
 import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators';
@@ -79,6 +80,26 @@ export class MarketplaceTenantController {
     });
   }
 
+  @Get('events')
+  @RequirePermissions('settings.manage')
+  async listMarketplaceEvents(
+    @Req() req: TenantRequest,
+    @Query('eventId') eventId?: string,
+    @Query('externalOrderId') externalOrderId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.prisma.marketplaceEventInbox.findMany({
+      where: {
+        tenantId: req.user.tenantId,
+        ...(eventId?.trim() ? { eventId: eventId.trim() } : {}),
+        ...(externalOrderId?.trim() ? { externalOrderId: externalOrderId.trim() } : {}),
+        ...(status?.trim() ? { status: status.trim() as never } : {}),
+      },
+      orderBy: [{ receivedAt: 'desc' }],
+      take: 100,
+    });
+  }
+
   @Post('events/:eventInboxId/reprocess')
   @RequirePermissions('settings.manage')
   async reprocessEvent(@Req() req: TenantRequest, @Param('eventInboxId') eventInboxId: string) {
@@ -91,4 +112,3 @@ export class MarketplaceTenantController {
     return this.ingestionService.reprocessMarketplaceOrder(marketplaceOrderId, req.user.tenantId);
   }
 }
-import { Prisma } from '@prisma/client';

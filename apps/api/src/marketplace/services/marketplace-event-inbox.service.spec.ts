@@ -93,4 +93,20 @@ describe('MarketplaceEventInboxService', () => {
     expect(prisma.marketplaceEventInbox.create).not.toHaveBeenCalled();
     expect(ingestionService.processInboxEvent).not.toHaveBeenCalled();
   });
+
+  it('rejects reprocess when the event does not belong to the tenant', async () => {
+    prisma.marketplaceEventInbox.findFirst.mockResolvedValueOnce(null);
+
+    const service = new MarketplaceEventInboxService(
+      prisma as never,
+      registry as never,
+      connectionService as never,
+      ingestionService as never,
+      undefined,
+    );
+
+    await expect(service.reprocessEventInbox('inbox-1', 'tenant-other')).rejects.toThrow(
+      'Marketplace event inbox not found.',
+    );
+  });
 });

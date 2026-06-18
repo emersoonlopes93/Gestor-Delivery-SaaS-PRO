@@ -13,6 +13,12 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
     rawBody: Buffer | string;
     body: unknown;
   }): Promise<boolean> {
+    const smokeHeader = input.headers['x-marketplace-smoke'];
+    const smokeRequested = (Array.isArray(smokeHeader) ? smokeHeader[0] : smokeHeader)?.toLowerCase() === 'true';
+    if (smokeRequested) {
+      return this.isSmokeModeEnabled();
+    }
+
     const configuredSecret = process.env.MARKETPLACE_IFOOD_WEBHOOK_TOKEN?.trim();
     if (!configuredSecret) return true;
 
@@ -145,5 +151,9 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
       return Number.isFinite(parsed) ? parsed : null;
     }
     return null;
+  }
+
+  private isSmokeModeEnabled(): boolean {
+    return process.env.NODE_ENV !== 'production' || process.env.MARKETPLACE_SMOKE_ENABLED === 'true';
   }
 }

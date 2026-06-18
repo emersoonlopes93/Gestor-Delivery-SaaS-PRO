@@ -74,6 +74,7 @@ export class BillingUsageService {
       tenantId: input.tenantId,
       periodStart: input.periodStart,
       periodEnd: input.periodEnd,
+      includedChannels,
     });
 
     if (ledgerPreview.eventsCount > 0) {

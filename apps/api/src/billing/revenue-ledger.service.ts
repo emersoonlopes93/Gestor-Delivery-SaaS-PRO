@@ -145,6 +145,7 @@ export class RevenueLedgerService {
     tenantId: string;
     periodStart: Date;
     periodEnd: Date;
+    includedChannels?: string[];
     ruleVersionId?: string;
     tx?: Prisma.TransactionClient;
   }): Promise<RevenueLedgerPreview> {
@@ -162,6 +163,7 @@ export class RevenueLedgerService {
       tenantId: input.tenantId,
       status: RevenueEventStatus.posted,
       type: { in: includedEventTypes },
+      ...(input.includedChannels?.length ? { source: { in: input.includedChannels } } : {}),
       occurredAt: {
         gte: input.periodStart,
         lt: input.periodEnd,
@@ -204,6 +206,7 @@ export class RevenueLedgerService {
         tenantId: input.tenantId,
         periodStart: input.periodStart,
         periodEnd: input.periodEnd,
+        includedChannels: input.includedChannels ?? [],
         ruleVersionId: rule.id,
         events,
       }),
@@ -345,6 +348,7 @@ export class RevenueLedgerService {
     tenantId: string;
     periodStart: Date;
     periodEnd: Date;
+    includedChannels: string[];
     ruleVersionId: string;
     events: Array<{ id: string; type: RevenueEventType; amount: Prisma.Decimal; occurredAt: Date }>;
   }): string {
@@ -352,6 +356,7 @@ export class RevenueLedgerService {
       tenantId: input.tenantId,
       periodStart: input.periodStart.toISOString(),
       periodEnd: input.periodEnd.toISOString(),
+      includedChannels: input.includedChannels,
       ruleVersionId: input.ruleVersionId,
       events: input.events.map((event) => ({
         id: event.id,

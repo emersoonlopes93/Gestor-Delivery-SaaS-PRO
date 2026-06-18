@@ -114,6 +114,30 @@ describe('RevenueLedgerService', () => {
     }));
   });
 
+  it('normalizes storefront to direct_online when creating revenue events', async () => {
+    const prisma = makePrisma();
+    prisma.revenueEvent.create.mockImplementation(({ data }) => Promise.resolve({
+      id: 'event-1',
+      ...data,
+    }));
+
+    const service = new RevenueLedgerService(prisma as never);
+    await service.recordOrderStatusEvent({
+      tenantId: 'tenant-1',
+      orderId: 'order-1',
+      orderStatus: OrderStatus.completed,
+      orderTotal: new Prisma.Decimal(42),
+      sourceChannel: 'storefront',
+      occurredAt: new Date('2026-06-10T12:00:00.000Z'),
+    });
+
+    expect(prisma.revenueEvent.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        source: 'direct_online',
+      }),
+    }));
+  });
+
   it('creates a negative compensation when an order is cancelled after positive events', async () => {
     const prisma = makePrisma();
     prisma.revenueEvent.findMany.mockResolvedValue([
