@@ -8,6 +8,7 @@ type SmokeConfig = {
   tenantPassword: string;
   tenantSlug: string;
   cleanup: boolean;
+  allowCleanupExistingIfoodConnection: boolean;
   requestTimeoutMs: number;
   retryAttempts: number;
   retryDelayMs: number;
@@ -20,6 +21,7 @@ type SmokeReport = {
   cleanupStatus: 'pending' | 'skipped' | 'completed' | 'failed';
   runId: string;
   connectionId?: string;
+  driverId?: string;
   eventInboxId?: string;
   marketplaceOrderId?: string;
   internalOrderId?: string;
@@ -29,6 +31,7 @@ type SmokeReport = {
   idempotencyChecks: string[];
   reprocessChecks: string[];
   notes: string[];
+  lastStep?: string;
 };
 
 class HttpSmokeError extends Error {
@@ -76,10 +79,15 @@ function loadConfig(): SmokeConfig {
     tenantPassword: requireEnv('SMOKE_TENANT_PASSWORD'),
     tenantSlug: requireEnv('SMOKE_TENANT_SLUG'),
     cleanup: (process.env.SMOKE_CLEANUP ?? 'true').toLowerCase() !== 'false',
+    allowCleanupExistingIfoodConnection: (process.env.SMOKE_ALLOW_CLEANUP_EXISTING_IFOOD_CONNECTION ?? 'false').toLowerCase() === 'true',
     requestTimeoutMs: readPositiveIntEnv('SMOKE_REQUEST_TIMEOUT_MS', 30000),
     retryAttempts: readPositiveIntEnv('SMOKE_RETRY_ATTEMPTS', 8),
     retryDelayMs: readPositiveIntEnv('SMOKE_RETRY_DELAY_MS', 1500),
   };
+}
+
+function isSmokeTenantSlug(tenantSlug: string): boolean {
+  return tenantSlug.startsWith('smoke-');
 }
 
 function unwrap<T = unknown>(body: unknown): T {
@@ -117,6 +125,16 @@ function getNestedString(value: unknown, path: string): string {
     current = (current as JsonObject)[key];
   }
   assert(typeof current === 'string' && current.length > 0, `${path} must be a string.`);
+  return current;
+}
+
+function getNestedBoolean(value: unknown, path: string): boolean {
+  let current: unknown = value;
+  for (const key of path.split('.')) {
+    assert(current && typeof current === 'object', `${path} is missing.`);
+    current = (current as JsonObject)[key];
+  }
+  assert(typeof current === 'boolean', `${path} must be a boolean.`);
   return current;
 }
 
@@ -227,8 +245,16 @@ async function main() {
   let originalMarketplaceConnection: JsonObject | null = null;
   let smokePassed = false;
   let smokeError: unknown;
+  let lastStep = 'init';
+
+  const setStep = (step: string) => {
+    lastStep = step;
+    report.lastStep = step;
+    console.log(`[smoke] ${step}`);
+  };
 
   try {
+    setStep('admin.login');
     const adminLogin = await anonymous.request<JsonObject>('POST', '/auth/admin/login', {
       email: config.adminEmail,
       password: config.adminPassword,
@@ -236,6 +262,7 @@ async function main() {
     const admin = anonymous.withToken(getNestedString(adminLogin, 'accessToken'));
     report.checks.push('admin login ok');
 
+    setStep('tenant.login');
     const tenantLogin = await anonymous.request<JsonObject>('POST', '/auth/tenant/login', {
       email: config.tenantEmail,
       password: config.tenantPassword,
@@ -244,14 +271,25 @@ async function main() {
     const tenant = anonymous.withToken(getNestedString(tenantLogin, 'accessToken'));
     report.checks.push('tenant login ok');
 
+    setStep('billing.snapshot');
     originalBillingSettings = await admin.request<JsonObject>('GET', '/admin/billing/settings');
     report.notes.push('billing settings snapshot captured');
+    setStep('ifood.status.before');
     originalMarketplaceConnection = await tenant.request<JsonObject | null>('GET', '/marketplaces/ifood/status');
     if (originalMarketplaceConnection?.id) {
-      throw new Error('Refusing smoke: tenant already has an iFood connection configured. Use a dedicated smoke tenant.');
+      if (config.allowCleanupExistingIfoodConnection && isSmokeTenantSlug(config.tenantSlug)) {
+        report.notes.push('existing ifood connection will be cleaned up because tenant is dedicated smoke tenant');
+        setStep('ifood.cleanup.existing');
+        await tenant.request('POST', '/marketplaces/ifood/disconnect', {}, [200, 201]);
+        report.notes.push('existing ifood connection cleaned up for dedicated smoke tenant');
+      } else {
+        throw new Error('Refusing smoke: tenant already has an iFood connection configured. Use a dedicated smoke tenant.');
+      }
+    } else {
+      report.notes.push('no existing ifood connection found');
     }
-    report.notes.push('no existing ifood connection found');
 
+    setStep('ifood.connect.manual');
     const connection = await tenant.request<JsonObject>('POST', '/marketplaces/ifood/connect/manual', {
       externalMerchantId: merchantId,
       externalStoreId: storeId,
@@ -266,6 +304,7 @@ async function main() {
     report.connectionId = getNestedString(connection, 'id');
     report.checks.push('manual marketplace connection created');
 
+    setStep('ifood.status.after');
     const status = await tenant.request<JsonObject>('GET', '/marketplaces/ifood/status');
     assert(getNestedString(status, 'id') === report.connectionId, 'Marketplace status did not return the created connection.');
     report.checks.push('connection status resolved for tenant');
@@ -298,6 +337,7 @@ async function main() {
       },
     };
 
+    setStep('webhook.included');
     const webhookAccepted = await anonymous.request<JsonObject>(
       'POST',
       '/webhooks/marketplaces/ifood',
@@ -308,6 +348,7 @@ async function main() {
     report.eventInboxId = getNestedString(webhookAccepted, 'inboxId');
     report.checks.push('mock webhook accepted');
 
+    setStep('inbox.poll.included');
     const inboxRows = await poll(
       'marketplace event inbox processed',
       () => tenant.request<JsonObject[]>('GET', `/marketplaces/events?eventId=${encodeURIComponent(eventIdIncluded)}`),
@@ -320,6 +361,7 @@ async function main() {
     assert(inbox.externalOrderId === orderIdIncluded, 'Inbox externalOrderId mismatch.');
     report.checks.push('event inbox processed');
 
+    setStep('orders.poll.included');
     const marketplaceOrders = await poll(
       'marketplace order imported',
       () => tenant.request<JsonObject[]>('GET', '/marketplaces/orders'),
@@ -335,22 +377,26 @@ async function main() {
     const tenantId = String(importedMarketplaceOrder.tenantId);
     report.checks.push('marketplace order mapped to internal order');
 
+    setStep('orders.list.tenant');
     const orders = await tenant.request<{ items: JsonObject[]; total: number }>('GET', '/orders?page=1&limit=100');
     const importedOrder = orders.items.find((row) => row.id === report.internalOrderId);
     assert(importedOrder, 'Imported order not found in tenant order list.');
     assert(importedOrder.sourceChannel === 'marketplace_ifood', 'Imported order sourceChannel mismatch.');
     report.checks.push('internal order visible in tenant list');
 
+    setStep('orders.board.tenant');
     const board = await tenant.request<JsonObject[]>('GET', '/orders/operation/board');
     assert(board.some((row) => row.id === report.internalOrderId), 'Imported order not visible on operation board.');
     report.checks.push('internal order visible in kanban board');
 
+    setStep('orders.detail.tenant');
     const fullOrder = await tenant.request<JsonObject>('GET', `/orders/${report.internalOrderId}`);
     assert(fullOrder.sourceChannel === 'marketplace_ifood', 'Full order sourceChannel mismatch.');
     assert(fullOrder.customerName === `Smoke Included ${runId}`, 'Customer import mismatch.');
     assert(Array.isArray(fullOrder.items) && fullOrder.items.length === 1, 'Imported order items mismatch.');
     report.checks.push('internal order detail imported correctly');
 
+    setStep('webhook.duplicate');
     const duplicateWebhook = await anonymous.request<JsonObject>(
       'POST',
       '/webhooks/marketplaces/ifood',
@@ -365,22 +411,63 @@ async function main() {
     assert(sameExternalOrders.length === 1, 'Duplicate webhook created another MarketplaceOrder.');
     report.idempotencyChecks.push('duplicate webhook does not duplicate marketplace order');
 
+    setStep('orders.duplicate-check');
     const ordersAfterDuplicate = await tenant.request<{ items: JsonObject[]; total: number }>('GET', '/orders?page=1&limit=100');
     const sameOrders = ordersAfterDuplicate.items.filter((row) => row.id === report.internalOrderId);
     assert(sameOrders.length === 1, 'Duplicate webhook created another internal order.');
     report.idempotencyChecks.push('duplicate webhook does not duplicate internal order');
 
+    setStep('delivery.ensureSmokeDriver');
+    const drivers = await tenant.request<JsonObject[]>('GET', '/delivery/drivers');
+    const smokeDriverPhone = '5511999988776';
+    const existingSmokeDriver = drivers.find((row) => {
+      const phone = String(row.phone ?? '');
+      const name = String(row.name ?? '');
+      const notes = String(row.notes ?? '');
+      return phone === smokeDriverPhone || name.includes('Smoke Driver') || notes.includes('smokeTest=true');
+    });
+    let driver: JsonObject;
+
+    if (existingSmokeDriver) {
+      driver = existingSmokeDriver;
+      report.notes.push('reused existing smoke driver');
+    } else {
+      driver = await tenant.request<JsonObject>('POST', '/delivery/drivers', {
+        name: `Smoke Driver ${runId}`,
+        phone: smokeDriverPhone,
+        vehicleType: 'motorcycle',
+        notes: 'smokeTest=true',
+      });
+      report.notes.push('created smoke driver');
+    }
+    report.driverId = getNestedString(driver, 'id');
+
+    setStep('delivery.assignSmokeDriver');
+    const assignResponse = await tenant.request<JsonObject>('POST', `/orders/${report.internalOrderId}/assign-driver`, {
+      driverId: report.driverId,
+    });
+    assert(
+      getNestedBoolean(assignResponse, 'success') === true || getNestedString(assignResponse, 'driverId') === report.driverId,
+      'Driver assignment failed.',
+    );
+    report.checks.push('smoke driver assigned to imported order');
+
+    setStep('billing.settings.enable-ifood');
     await admin.request('PUT', '/admin/billing/settings', {
       ...originalBillingSettings,
       countMarketplaceIfoodOrders: true,
     });
 
+    setStep('orders.markOutForDelivery');
     await tenant.request('PATCH', `/orders/${report.internalOrderId}/status`, { status: 'confirmed', note: `smoke ${runId} confirmed` });
     await tenant.request('PATCH', `/orders/${report.internalOrderId}/status`, { status: 'preparing', note: `smoke ${runId} preparing` });
     await tenant.request('PATCH', `/orders/${report.internalOrderId}/status`, { status: 'ready_for_delivery', note: `smoke ${runId} ready` });
     await tenant.request('PATCH', `/orders/${report.internalOrderId}/status`, { status: 'out_for_delivery', note: `smoke ${runId} route` });
+
+    setStep('orders.markCompleted');
     await tenant.request('PATCH', `/orders/${report.internalOrderId}/status`, { status: 'completed', note: `smoke ${runId} completed` });
 
+    setStep('billing.verifyRevenue');
     const revenueEventsIncluded = await poll(
       'revenue event for included marketplace order',
       () => admin.request<JsonObject[]>(
@@ -394,6 +481,7 @@ async function main() {
     assert(revenueEventsIncluded.some((row) => row.orderId === report.internalOrderId), 'RevenueEvent for included marketplace order missing.');
     report.billingChecks.push('included marketplace order generates revenue event only via normal order flow');
 
+    setStep('billing.verifyUsage');
     const usageIncluded = await admin.request<JsonObject>(
       'GET',
       `/admin/billing/usage-preview?tenantId=${encodeURIComponent(tenantId)}&periodStart=${encodeURIComponent(new Date(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1).toISOString())}&periodEnd=${encodeURIComponent(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 1)).toISOString())}`,
@@ -401,6 +489,7 @@ async function main() {
     assert(Number(usageIncluded.ordersCount) >= 1, 'Billing usage did not include marketplace_ifood when enabled.');
     report.billingChecks.push('billing usage includes marketplace_ifood when enabled');
 
+    setStep('billing.settings.disable-ifood');
     await admin.request('PUT', '/admin/billing/settings', {
       ...originalBillingSettings,
       countMarketplaceIfoodOrders: false,
@@ -421,6 +510,7 @@ async function main() {
       },
     };
 
+    setStep('webhook.excluded');
     await anonymous.request(
       'POST',
       '/webhooks/marketplaces/ifood',
@@ -439,12 +529,19 @@ async function main() {
     const excludedMarketplaceOrder = excludedMarketplaceOrders.find((row) => row.externalOrderId === orderIdExcluded) as JsonObject;
     report.internalOrderIdExcluded = getNestedString(excludedMarketplaceOrder, 'internalOrderId');
 
+    setStep('orders.markOutForDelivery.excluded');
     await tenant.request('PATCH', `/orders/${report.internalOrderIdExcluded}/status`, { status: 'confirmed', note: `smoke ${runId} confirmed excluded` });
     await tenant.request('PATCH', `/orders/${report.internalOrderIdExcluded}/status`, { status: 'preparing', note: `smoke ${runId} preparing excluded` });
     await tenant.request('PATCH', `/orders/${report.internalOrderIdExcluded}/status`, { status: 'ready_for_delivery', note: `smoke ${runId} ready excluded` });
+    await tenant.request('POST', `/orders/${report.internalOrderIdExcluded}/assign-driver`, {
+      driverId: report.driverId,
+    });
     await tenant.request('PATCH', `/orders/${report.internalOrderIdExcluded}/status`, { status: 'out_for_delivery', note: `smoke ${runId} route excluded` });
+
+    setStep('orders.markCompleted.excluded');
     await tenant.request('PATCH', `/orders/${report.internalOrderIdExcluded}/status`, { status: 'completed', note: `smoke ${runId} completed excluded` });
 
+    setStep('billing.verifyUsage.excluded');
     const usageExcluded = await admin.request<JsonObject>(
       'GET',
       `/admin/billing/usage-preview?tenantId=${encodeURIComponent(tenantId)}&periodStart=${encodeURIComponent(new Date(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1).toISOString())}&periodEnd=${encodeURIComponent(new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() + 1, 1)).toISOString())}`,
@@ -460,6 +557,7 @@ async function main() {
     assert(excludedRevenueEvents.length > 0, 'Completed excluded marketplace order should still generate RevenueEvent in the normal flow.');
     report.billingChecks.push('disabled marketplace channel still uses normal revenue ledger, but usage preview excludes it');
 
+    setStep('marketplace.reprocess');
     const beforeReprocessCount = revenueEventsAfterExcluded.filter((row) => row.orderId === report.internalOrderId).length;
     await tenant.request('POST', `/marketplaces/events/${report.eventInboxId}/reprocess`, {});
     await sleep(config.retryDelayMs * 2);
@@ -521,6 +619,12 @@ async function main() {
       report: sanitizeForLog(report),
     }, null, 2));
   } else {
+    console.error(JSON.stringify({
+      message: smokeError instanceof Error ? smokeError.message : String(smokeError),
+      name: smokeError instanceof Error ? smokeError.name : typeof smokeError,
+      lastStep,
+      report: sanitizeForLog(report),
+    }, null, 2));
     console.error(sanitizeForLog(smokeError));
     console.error(JSON.stringify({ report: sanitizeForLog(report) }, null, 2));
   }
