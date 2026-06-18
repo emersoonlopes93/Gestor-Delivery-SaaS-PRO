@@ -33,22 +33,23 @@ export class WhatsAppProviderRegistryService {
    * Resolve qual provider usar baseado no tenant e nas configs globais
    */
   async resolveProvider(tenantId: string): Promise<IWhatsAppProvider> {
-    // 1. Verificar se o tenant tem uma instância configurada com um tipo específico
-    const instance = await this.prisma.whatsAppInstance.findUnique({
-      where: { tenantId },
-      select: { providerType: true }
-    });
-
-    if (instance?.providerType) {
-      return this.getProvider(instance.providerType);
-    }
-
-    // 2. Senão, buscar o default global do SystemConfig
     const systemConfig = await this.prisma.systemConfig.findUnique({
       where: { id: 'global' },
       select: { defaultWhatsAppProvider: true }
     });
 
-    return this.getProvider(systemConfig?.defaultWhatsAppProvider || 'evolution_go');
+    const globalProvider = systemConfig?.defaultWhatsAppProvider || 'evolution_go';
+    const instance = await this.prisma.whatsAppInstance.findUnique({
+      where: { tenantId },
+      select: { providerType: true }
+    });
+
+    if (instance?.providerType && instance.providerType !== globalProvider) {
+      this.logger.warn(
+        `Tenant ${tenantId} instance provider=${instance.providerType} differs from global provider=${globalProvider}; using global provider as source of truth.`,
+      );
+    }
+
+    return this.getProvider(globalProvider);
   }
 }

@@ -8,7 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
 import { CustomerService } from '../crm/customer.service';
-import { WhatsAppCloudService } from './whatsapp-cloud.service';
+import { WhatsAppSenderService } from '../whatsapp-channel/services/whatsapp-sender.service';
 import type { CustomerJwtPayload } from '@gestor/types';
 
 @Injectable()
@@ -20,7 +20,7 @@ export class CustomerAuthService {
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
     private readonly customerService: CustomerService,
-    private readonly whatsappCloud: WhatsAppCloudService,
+    private readonly whatsappSender: WhatsAppSenderService,
   ) {}
 
   /**
@@ -69,7 +69,10 @@ export class CustomerAuthService {
     });
 
     try {
-      await this.whatsappCloud.sendOtp(cleanPhone, code);
+      await this.whatsappSender.sendText(tenant.id, {
+        to: this.normalizeBrazilPhone(cleanPhone),
+        text: this.getOtpMessage(code),
+      });
     } catch {
       // Se falhar o envio, remove o OTP criado para evitar "código pendurado" sem entrega.
       await this.prisma.customerOTP.delete({ where: { id: created.id } }).catch(() => undefined);
@@ -158,5 +161,15 @@ export class CustomerAuthService {
         phone: customer.phone,
       },
     };
+  }
+
+  private normalizeBrazilPhone(cleanPhoneDigits: string): string {
+    if (cleanPhoneDigits.startsWith('55')) return cleanPhoneDigits;
+    return `55${cleanPhoneDigits}`;
+  }
+
+  private getOtpMessage(code: string): string {
+    const template = this.config.get<string>('WHATSAPP_OTP_MESSAGE_TEMPLATE') || 'Seu código de acesso é: {CODE}';
+    return template.replace(/\{\{?CODE\}?\}/g, code);
   }
 }
