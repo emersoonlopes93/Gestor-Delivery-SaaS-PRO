@@ -34,10 +34,11 @@ export function PrinterSettings() {
   const [activePrinterDevice, setActivePrinterDevice] = useState<PrinterDevice | null>(null);
   const [isSavingDevice, setIsSavingDevice] = useState(false);
   const [testPrintStatus, setTestPrintStatus] = useState('');
+  const [stationLoadMessage, setStationLoadMessage] = useState('');
   const isNative = isNativeAndroid();
   const { user } = useAuthStore();
 
-  const { data: stations = [] } = usePrintingStations();
+  const { data: stations = [], isLoading: stationsLoading, refetch: refetchStations } = usePrintingStations();
   const { data: devices = [] } = usePrinterDevices();
   const createDevice = useCreateDevice();
   const testPrint = useTestPrint();
@@ -53,6 +54,20 @@ export function PrinterSettings() {
       setSelectedDevice(devices[0].id);
     }
   }, [stations, devices]);
+
+  useEffect(() => {
+    if (stations.length === 0) {
+      setStationLoadMessage('');
+      return;
+    }
+
+    if (stations.length === 1 && stations[0].slug === 'general') {
+      setStationLoadMessage('Estação padrão Geral / Balcão criada.');
+      return;
+    }
+
+    setStationLoadMessage('Estações carregadas a partir dos setores do KDS.');
+  }, [stations]);
 
   useEffect(() => {
     spoolerRef.current.running = isSpoolerRunning;
@@ -130,6 +145,29 @@ export function PrinterSettings() {
     setBluetoothError('');
     setTestPrintStatus('');
     setActivePrinterDevice(null);
+
+    if (stations.length === 0) {
+      setIsConnectingBluetooth(true);
+      setLastBluetoothAction(`Conectando em ${btDevice.name}...`);
+      addLog(`Conectando em ${btDevice.name} (${btDevice.address})...`);
+
+      try {
+        await connectBluetoothPrinter(btDevice.address);
+        setConnectedBluetoothDevice(btDevice);
+        const message = 'Bluetooth conectado. Nenhuma estação de impressão foi carregada; teste local liberado, salvamento para auto-print pendente.';
+        setBluetoothConnectionError(message);
+        setLastBluetoothAction(message);
+        addLog(message);
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : 'Falha ao conectar via Bluetooth.';
+        setBluetoothConnectionError(`Falha ao conectar: ${message}`);
+        setLastBluetoothAction(`Falha ao conectar em ${btDevice.name}.`);
+        addLog(`Falha ao conectar em ${btDevice.name}: ${message}`);
+      } finally {
+        setIsConnectingBluetooth(false);
+      }
+      return;
+    }
 
     const station = stations.find(s => s.slug === selectedStation) ?? stations[0];
     if (!station) {
@@ -404,6 +442,25 @@ export function PrinterSettings() {
                     <option key={st.id} value={st.slug}>{st.name}</option>
                   ))}
                 </select>
+                {stationsLoading && (
+                  <p className="mt-2 text-xs font-medium text-muted-foreground">
+                    Carregando estações de impressão...
+                  </p>
+                )}
+                {stationLoadMessage && (
+                  <p className="mt-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                    {stationLoadMessage}
+                  </p>
+                )}
+                {!stationsLoading && stations.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={() => refetchStations()}
+                    className="mt-3 w-full rounded-xl border border-dashed border-border px-4 py-2 text-xs font-bold text-muted-foreground transition-colors hover:bg-muted100 dark:hover:bg-muted800"
+                  >
+                    Recarregar estações
+                  </button>
+                )}
               </div>
 
               <div>

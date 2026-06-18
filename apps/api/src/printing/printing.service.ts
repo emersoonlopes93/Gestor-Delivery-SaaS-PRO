@@ -1,7 +1,8 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { PrintJobStatus, PrintType } from '@prisma/client';
+import { Prisma, PrintJobStatus, PrintType } from '@prisma/client';
 import { PrinterService as LegacyPrinterService } from '../pos/printer.service';
+import { slugify } from '@gestor/utils';
 
 @Injectable()
 export class PrintingService {
@@ -21,10 +22,94 @@ export class PrintingService {
   }
 
   async getStations(tenantId: string) {
+    return this.ensurePrintStationsForTenant(tenantId);
+  }
+
+  async ensurePrintStationsForTenant(tenantId: string) {
+    const stationCandidates = await this.getKdsStationCandidates(tenantId);
+    const candidates = stationCandidates.length > 0
+      ? stationCandidates
+      : [{ name: 'Geral / Balcão', slug: 'general' }];
+
+    for (const candidate of candidates) {
+      await this.db.printStation.upsert({
+        where: {
+          tenantId_slug: {
+            tenantId,
+            slug: candidate.slug,
+          },
+        },
+        create: {
+          tenantId,
+          name: candidate.name,
+          slug: candidate.slug,
+          isActive: true,
+          autoPrintEnabled: false,
+        },
+        update: {
+          isActive: true,
+        },
+      });
+    }
+
     return this.db.printStation.findMany({
       where: { tenantId },
       include: { devices: true },
+      orderBy: [{ name: 'asc' }],
     });
+  }
+
+  private async getKdsStationCandidates(tenantId: string): Promise<Array<{ name: string; slug: string }>> {
+    const stations = new Map<string, { name: string; slug: string }>();
+
+    const addStation = (rawStation: string | null | undefined) => {
+      const name = rawStation?.trim();
+      if (!name) return;
+
+      const slug = slugify(name);
+      if (!slug) return;
+
+      if (!stations.has(slug)) {
+        stations.set(slug, { name, slug });
+      }
+    };
+
+    const categories = await this.db.productCategory.findMany({
+      where: {
+        tenantId,
+        isActive: true,
+        deletedAt: null,
+      },
+      select: {
+        templateConfig: true,
+      },
+    });
+
+    for (const category of categories) {
+      const config = category.templateConfig;
+      if (config && typeof config === 'object' && !Array.isArray(config)) {
+        const station = (config as Prisma.JsonObject).station;
+        if (typeof station === 'string') {
+          addStation(station);
+        }
+      }
+    }
+
+    const activeJobStations = await this.db.printJob.groupBy({
+      by: ['station'],
+      where: {
+        tenantId,
+        status: {
+          notIn: [PrintJobStatus.completed, PrintJobStatus.failed],
+        },
+      },
+    });
+
+    for (const jobStation of activeJobStations) {
+      addStation(jobStation.station);
+    }
+
+    return Array.from(stations.values());
   }
 
   async createStation(tenantId: string, data: { name: string; slug: string; autoPrintEnabled: boolean }) {
@@ -86,11 +171,13 @@ export class PrintingService {
       throw new NotFoundException('Device not found');
     }
 
+    const stationKeys = Array.from(new Set([device.station.slug, device.station.name].filter(Boolean)));
+
     // Find next pending job
     const job = await this.db.printJob.findFirst({
       where: {
         tenantId,
-        station: device.station.slug,
+        station: { in: stationKeys },
         status: PrintJobStatus.pending,
         lockedAt: null,
       },
