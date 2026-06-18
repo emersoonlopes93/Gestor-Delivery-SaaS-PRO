@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
-import { Printer, RefreshCw, Play, Square, AlertTriangle, Monitor, Plus, Settings } from 'lucide-react';
+import { Printer, RefreshCw, Play, Square, AlertTriangle, Monitor, Plus, Settings, CheckCircle2, Loader2 } from 'lucide-react';
 import { api } from '../../lib/api-client';
 import { 
   usePrintingStations, 
   usePrinterDevices, 
   useCreateDevice,
-  useTestPrint
+  useTestPrint,
+  type PrinterDevice
 } from '../../hooks/usePrinting';
-import { requestBluetoothPermissions, scanBluetoothDevices, printTicketViaBluetooth, isNativeAndroid } from '../../lib/bluetooth';
+import { connectBluetoothPrinter, requestBluetoothPermissions, scanBluetoothDevices, printTicketViaBluetooth, isNativeAndroid } from '../../lib/bluetooth';
 import { EscPosBuilder } from '../../lib/escpos58';
+import { useAuthStore } from '../../stores/auth.store';
 
 interface PrintJobDTO {
   id: string;
@@ -25,7 +27,15 @@ export function PrinterSettings() {
   const [pairedDevices, setPairedDevices] = useState<{name: string, address: string}[]>([]);
   const [bluetoothError, setBluetoothError] = useState('');
   const [lastBluetoothAction, setLastBluetoothAction] = useState('');
+  const [selectedBluetoothDevice, setSelectedBluetoothDevice] = useState<{name: string, address: string} | null>(null);
+  const [connectedBluetoothDevice, setConnectedBluetoothDevice] = useState<{name: string, address: string} | null>(null);
+  const [isConnectingBluetooth, setIsConnectingBluetooth] = useState(false);
+  const [bluetoothConnectionError, setBluetoothConnectionError] = useState('');
+  const [activePrinterDevice, setActivePrinterDevice] = useState<PrinterDevice | null>(null);
+  const [isSavingDevice, setIsSavingDevice] = useState(false);
+  const [testPrintStatus, setTestPrintStatus] = useState('');
   const isNative = isNativeAndroid();
+  const { user } = useAuthStore();
 
   const { data: stations = [] } = usePrintingStations();
   const { data: devices = [] } = usePrinterDevices();
@@ -114,7 +124,110 @@ export function PrinterSettings() {
     }
   };
 
+  const handleAddAndConnectBluetoothDevice = async (btDevice: {name: string, address: string}) => {
+    setSelectedBluetoothDevice(btDevice);
+    setBluetoothConnectionError('');
+    setBluetoothError('');
+    setTestPrintStatus('');
+    setActivePrinterDevice(null);
+
+    const station = stations.find(s => s.slug === selectedStation) ?? stations[0];
+    if (!station) {
+      const message = 'Nenhuma estação de impressão encontrada. Crie/carregue uma estação antes de salvar a impressora.';
+      setBluetoothConnectionError(message);
+      setLastBluetoothAction(message);
+      addLog(message);
+      return;
+    }
+
+    setIsConnectingBluetooth(true);
+    setLastBluetoothAction(`Conectando em ${btDevice.name}...`);
+    addLog(`Conectando em ${btDevice.name} (${btDevice.address})...`);
+
+    try {
+      await connectBluetoothPrinter(btDevice.address);
+      setConnectedBluetoothDevice(btDevice);
+      setLastBluetoothAction(`Conectado em ${btDevice.name}. Salvando dispositivo...`);
+      addLog(`Conectado em ${btDevice.name}.`);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Falha ao conectar via Bluetooth.';
+      setBluetoothConnectionError(`Falha ao conectar: ${message}`);
+      setLastBluetoothAction(`Falha ao conectar em ${btDevice.name}.`);
+      addLog(`Falha ao conectar em ${btDevice.name}: ${message}`);
+      setIsConnectingBluetooth(false);
+      return;
+    }
+
+    setIsSavingDevice(true);
+
+    try {
+      const savedDevice = await createDevice.mutateAsync({
+        name: btDevice.name,
+        address: btDevice.address,
+        connectionType: 'BLUETOOTH_SPP',
+        stationId: station.id,
+        isDefault: true,
+      });
+      setActivePrinterDevice(savedDevice);
+      setSelectedDevice(savedDevice.id);
+      setSelectedStation(station.slug);
+      setLastBluetoothAction('Dispositivo salvo como impressora ativa.');
+      addLog(`Dispositivo ${btDevice.name} salvo como impressora ativa.`);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      setBluetoothConnectionError(`Bluetooth conectado, mas falhou ao salvar no servidor: ${message}`);
+      setLastBluetoothAction('Bluetooth conectado, mas falhou ao salvar no servidor.');
+      addLog(`Falha ao salvar dispositivo: ${message}`);
+    } finally {
+      setIsSavingDevice(false);
+      setIsConnectingBluetooth(false);
+    }
+  };
+
+  const handleLocalBluetoothTestPrint = async () => {
+    const btDevice = connectedBluetoothDevice ?? selectedBluetoothDevice;
+    if (!btDevice) {
+      const message = 'Selecione e conecte uma impressora Bluetooth antes do teste local.';
+      setTestPrintStatus(message);
+      addLog(message);
+      return;
+    }
+
+    setTestPrintStatus(`Imprimindo teste em ${btDevice.name}...`);
+    addLog(`Imprimindo teste local em ${btDevice.name}...`);
+
+    try {
+      const builder = new EscPosBuilder();
+      builder
+        .alignCenter()
+        .boldOn()
+        .textLine('GESTOR PRO')
+        .boldOff()
+        .textLine('TESTE DE IMPRESSAO')
+        .textLine('')
+        .alignLeft()
+        .textLine(`Loja: ${user?.tenant?.name || 'Loja'}`)
+        .textLine(`Dispositivo: ${btDevice.name}`)
+        .textLine(`Data: ${new Date().toLocaleString('pt-BR')}`)
+        .textLine('')
+        .textLine('Bluetooth OK')
+        .feed(3)
+        .cut();
+
+      const payload = builder.build();
+      const payloadStr = String.fromCharCode(...payload);
+      await printTicketViaBluetooth(btDevice.address, payloadStr);
+      setTestPrintStatus('Teste de impressão enviado com sucesso.');
+      addLog('Teste de impressão local enviado com sucesso.');
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Falha no teste de impressão local.';
+      setTestPrintStatus(`Falha no teste: ${message}`);
+      addLog(`Falha no teste de impressão local: ${message}`);
+    }
+  };
+
   const handleCreateDevice = async (btDevice: {name: string, address: string}) => {
+    return handleAddAndConnectBluetoothDevice(btDevice);
     if (!selectedStation) {
       addLog('Selecione uma estação primeiro!');
       return;
@@ -385,15 +498,76 @@ export function PrinterSettings() {
                       <p className="text-sm font-bold">{bt.name}</p>
                       <p className="text-xs text-muted-foreground">{bt.address}</p>
                     </div>
-                    <button 
+                    <button
                       onClick={() => handleCreateDevice(bt)}
-                      className="p-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20"
+                      disabled={isConnectingBluetooth || isSavingDevice}
+                      className="p-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 disabled:opacity-60 disabled:cursor-wait"
+                      title="Adicionar e conectar"
                     >
-                      <Plus className="w-4 h-4" />
+                      {isConnectingBluetooth && selectedBluetoothDevice?.address === bt.address ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Plus className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                 ))}
               </div>
+
+              {(selectedBluetoothDevice || connectedBluetoothDevice || bluetoothConnectionError || testPrintStatus) ? (
+                <div className="mt-4 space-y-3 rounded-xl border border-border bg-muted/30 p-3 text-sm">
+                  {selectedBluetoothDevice ? (
+                    <p className="font-bold text-foreground">
+                      Selecionado: {selectedBluetoothDevice.name} ({selectedBluetoothDevice.address})
+                    </p>
+                  ) : null}
+
+                  {isConnectingBluetooth ? (
+                    <p className="flex items-center gap-2 font-bold text-primary">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Conectando em {selectedBluetoothDevice?.name || 'impressora'}...
+                    </p>
+                  ) : null}
+
+                  {isSavingDevice ? (
+                    <p className="flex items-center gap-2 font-bold text-primary">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Salvando dispositivo...
+                    </p>
+                  ) : null}
+
+                  {connectedBluetoothDevice ? (
+                    <p className="flex items-center gap-2 font-bold text-status-success">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Conectado em {connectedBluetoothDevice.name}
+                    </p>
+                  ) : null}
+
+                  {activePrinterDevice ? (
+                    <p className="font-bold text-status-success">
+                      Dispositivo salvo como impressora ativa.
+                    </p>
+                  ) : null}
+
+                  {bluetoothConnectionError ? (
+                    <p className="font-bold text-destructive">{bluetoothConnectionError}</p>
+                  ) : null}
+
+                  {connectedBluetoothDevice ? (
+                    <button
+                      type="button"
+                      onClick={handleLocalBluetoothTestPrint}
+                      className="w-full rounded-xl bg-status-success px-4 py-3 text-sm font-black uppercase tracking-widest text-white shadow"
+                    >
+                      Imprimir teste
+                    </button>
+                  ) : null}
+
+                  {testPrintStatus ? (
+                    <p className="font-bold text-muted-foreground">{testPrintStatus}</p>
+                  ) : null}
+                </div>
+              ) : null}
             </section>
           )}
         </div>

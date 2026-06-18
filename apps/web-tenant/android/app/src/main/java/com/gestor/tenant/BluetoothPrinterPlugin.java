@@ -6,14 +6,16 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.util.Log;
+
 import androidx.core.app.ActivityCompat;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
-import com.getcapacitor.PermissionState;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
@@ -37,7 +39,9 @@ import java.util.UUID;
 )
 public class BluetoothPrinterPlugin extends Plugin {
 
+    private static final String TAG = "BluetoothPrinter";
     private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothSocket bluetoothSocket;
     private OutputStream outputStream;
@@ -115,8 +119,14 @@ public class BluetoothPrinterPlugin extends Plugin {
     @PluginMethod
     public void connect(PluginCall call) {
         String address = call.getString("address");
-        if (address == null) {
+        if (address == null || address.trim().isEmpty()) {
             call.reject("Endereço MAC não fornecido.");
+            return;
+        }
+        address = address.trim();
+
+        if (bluetoothAdapter == null) {
+            call.reject("Bluetooth não suportado neste dispositivo.");
             return;
         }
 
@@ -125,22 +135,55 @@ public class BluetoothPrinterPlugin extends Plugin {
             return;
         }
 
-        BluetoothDevice device = bluetoothAdapter.getRemoteDevice(address);
-        try {
-            bluetoothSocket = device.createRfcommSocketToServiceRecord(SPP_UUID);
-            bluetoothSocket.connect();
-            outputStream = bluetoothSocket.getOutputStream();
-            JSObject ret = new JSObject();
-            ret.put("success", true);
-            call.resolve(ret);
-        } catch (IOException e) {
-            call.reject("Falha ao conectar: " + e.getMessage());
-            try {
-                if (bluetoothSocket != null) {
-                    bluetoothSocket.close();
-                }
-            } catch (IOException ignored) {}
+        if (!bluetoothAdapter.isEnabled()) {
+            call.reject("Bluetooth está desligado.");
+            return;
         }
+
+        BluetoothDevice foundDevice = null;
+        Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
+        for (BluetoothDevice device : pairedDevices) {
+            if (address.equalsIgnoreCase(device.getAddress())) {
+                foundDevice = device;
+                break;
+            }
+        }
+
+        if (foundDevice == null) {
+            call.reject("Dispositivo Bluetooth pareado não encontrado: " + address);
+            return;
+        }
+
+        final String finalAddress = address;
+        final BluetoothDevice device = foundDevice;
+
+        new Thread(() -> {
+            try {
+                Log.d(TAG, "Conectando em " + device.getName() + " (" + finalAddress + ")");
+                bluetoothAdapter.cancelDiscovery();
+                closeCurrentConnection();
+
+                bluetoothSocket = device.createRfcommSocketToServiceRecord(SPP_UUID);
+                bluetoothSocket.connect();
+                outputStream = bluetoothSocket.getOutputStream();
+
+                JSObject ret = new JSObject();
+                ret.put("success", true);
+                ret.put("connected", true);
+                ret.put("name", device.getName());
+                ret.put("address", finalAddress);
+                Log.d(TAG, "Conectado em " + device.getName() + " (" + finalAddress + ")");
+                call.resolve(ret);
+            } catch (IOException e) {
+                Log.e(TAG, "Falha ao conectar em " + finalAddress, e);
+                closeCurrentConnection();
+                call.reject("Falha ao conectar: " + e.getMessage());
+            } catch (SecurityException e) {
+                Log.e(TAG, "Permissão Bluetooth negada ao conectar", e);
+                closeCurrentConnection();
+                call.reject("Permissão Bluetooth negada ao conectar: " + e.getMessage());
+            }
+        }).start();
     }
 
     @PluginMethod
@@ -157,37 +200,48 @@ public class BluetoothPrinterPlugin extends Plugin {
         }
 
         try {
-            // Conversão dos caracteres ASCII estritos da string para array de bytes
             byte[] bytes = new byte[data.length()];
             for (int i = 0; i < data.length(); i++) {
                 bytes[i] = (byte) data.charAt(i);
             }
             outputStream.write(bytes);
             outputStream.flush();
+
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
         } catch (IOException e) {
+            Log.e(TAG, "Erro ao escrever dados", e);
             call.reject("Erro ao escrever dados: " + e.getMessage());
         }
     }
 
     @PluginMethod
     public void disconnect(PluginCall call) {
+        closeCurrentConnection();
+
+        JSObject ret = new JSObject();
+        ret.put("success", true);
+        call.resolve(ret);
+    }
+
+    private void closeCurrentConnection() {
         try {
             if (outputStream != null) {
                 outputStream.close();
                 outputStream = null;
             }
+        } catch (IOException e) {
+            Log.w(TAG, "Erro ao fechar outputStream", e);
+        }
+
+        try {
             if (bluetoothSocket != null) {
                 bluetoothSocket.close();
                 bluetoothSocket = null;
             }
-            JSObject ret = new JSObject();
-            ret.put("success", true);
-            call.resolve(ret);
         } catch (IOException e) {
-            call.reject("Erro ao desconectar: " + e.getMessage());
+            Log.w(TAG, "Erro ao fechar socket", e);
         }
     }
 }

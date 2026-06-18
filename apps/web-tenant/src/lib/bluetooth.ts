@@ -4,7 +4,7 @@ const BLUETOOTH_PLUGIN_NAME = 'BluetoothPrinter';
 
 export interface BluetoothPrinterPlugin {
   requestBluetoothPermissions(): Promise<{ granted: boolean }>;
-  connect(options: { address: string }): Promise<{ success: boolean }>;
+  connect(options: { address: string }): Promise<{ success: boolean; connected?: boolean; name?: string; address?: string }>;
   disconnect(): Promise<{ success: boolean }>;
   write(options: { data: string }): Promise<{ success: boolean }>;
   listDevices(): Promise<{ devices: Array<{ name: string; address: string }> }>;
@@ -73,12 +73,31 @@ export const scanBluetoothDevices = async () => {
   }
 };
 
-export const printTicketViaBluetooth = async (macAddress: string, content: string) => {
+export const connectBluetoothPrinter = async (address: string) => {
   assertBluetoothPluginAvailable();
 
   try {
     await requestBluetoothPermissions();
-    await BluetoothPrinter.connect({ address: macAddress });
+    const result = await BluetoothPrinter.connect({ address });
+    if (!result.success && !result.connected) {
+      throw new Error('A impressora não confirmou a conexão Bluetooth.');
+    }
+    return result;
+  } catch (error) {
+    console.error('[BluetoothPrinter] Falha ao conectar', {
+      ...getBluetoothPluginDiagnostics(),
+      address,
+      error,
+    });
+    throw error;
+  }
+};
+
+export const printTicketViaBluetooth = async (macAddress: string, content: string) => {
+  assertBluetoothPluginAvailable();
+
+  try {
+    await connectBluetoothPrinter(macAddress);
     await BluetoothPrinter.write({ data: content });
     await BluetoothPrinter.disconnect();
     return true;
