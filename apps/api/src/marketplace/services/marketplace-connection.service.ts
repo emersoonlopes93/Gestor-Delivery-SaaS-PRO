@@ -33,41 +33,35 @@ export class MarketplaceConnectionService {
       settingsJson?: Prisma.InputJsonValue;
     },
   ): Promise<MarketplaceConnection> {
-    return this.prisma.marketplaceConnection.upsert({
-      where: {
-        tenantId_provider: {
-          tenantId,
-          provider,
-        },
+    const data = {
+      tenantId,
+      provider,
+      status: MarketplaceConnectionStatus.CONNECTED,
+      externalMerchantId: input.externalMerchantId?.trim() || null,
+      externalStoreId: input.externalStoreId?.trim() || null,
+      displayName: input.displayName?.trim() || null,
+      authType: input.authType?.trim() || null,
+      accessTokenEnc: input.accessToken?.trim() || null,
+      refreshTokenEnc: input.refreshToken?.trim() || null,
+      settingsJson: input.settingsJson ?? {
+        autoConfirmOrders: false,
+        importAsStatus: 'pending',
       },
-      create: {
-        tenantId,
-        provider,
-        status: MarketplaceConnectionStatus.CONNECTED,
-        externalMerchantId: input.externalMerchantId?.trim() || null,
-        externalStoreId: input.externalStoreId?.trim() || null,
-        displayName: input.displayName?.trim() || null,
-        authType: input.authType?.trim() || null,
-        accessTokenEnc: input.accessToken?.trim() || null,
-        refreshTokenEnc: input.refreshToken?.trim() || null,
-        settingsJson: input.settingsJson ?? {
-          autoConfirmOrders: false,
-          importAsStatus: 'pending',
-        },
-      },
-      update: {
-        status: MarketplaceConnectionStatus.CONNECTED,
-        externalMerchantId: input.externalMerchantId?.trim() || null,
-        externalStoreId: input.externalStoreId?.trim() || null,
-        displayName: input.displayName?.trim() || null,
-        authType: input.authType?.trim() || null,
-        accessTokenEnc: input.accessToken?.trim() || null,
-        refreshTokenEnc: input.refreshToken?.trim() || null,
-        settingsJson: input.settingsJson ?? {
-          autoConfirmOrders: false,
-          importAsStatus: 'pending',
-        },
-      },
+    };
+
+    const existing = await this.prisma.marketplaceConnection.findFirst({
+      where: { tenantId, provider },
+    });
+
+    if (existing) {
+      return this.prisma.marketplaceConnection.update({
+        where: { id: existing.id },
+        data,
+      });
+    }
+
+    return this.prisma.marketplaceConnection.create({
+      data,
     });
   }
 
