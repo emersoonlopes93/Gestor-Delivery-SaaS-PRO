@@ -1,5 +1,10 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "VITE_API_URL",
+    "VITE_GOOGLE_MAPS_KEY",
+    "VITE_TENANT_URL"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
