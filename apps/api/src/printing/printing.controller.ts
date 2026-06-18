@@ -29,19 +29,19 @@ export class PrintingController {
   }
 
   @Get('stations')
-  @RequirePermissions('printing.read')
+  @RequirePermissions('settings.manage')
   async getStations(@Request() req: TenantRequest) {
     return this.printingService.getStations(req.user.tenantId);
   }
 
   @Get('devices')
-  @RequirePermissions('printing.manage')
+  @RequirePermissions('settings.manage')
   async getDevices(@Request() req: TenantRequest) {
     return this.printingService.getDevices(req.user.tenantId);
   }
 
   @Post('devices')
-  @RequirePermissions('printing.manage')
+  @RequirePermissions('settings.manage')
   async createDevice(@Request() req: TenantRequest, @Body() body: CreatePrinterDeviceDto) {
     return this.printingService.createDevice(req.user.tenantId, body);
   }
@@ -53,7 +53,7 @@ export class PrintingController {
   }
 
   @Post('test')
-  @RequirePermissions('printing.manage')
+  @RequirePermissions('settings.manage')
   async createTestJob(
     @Request() req: TenantRequest,
     @Body() body: { stationSlug: string; deviceName: string },

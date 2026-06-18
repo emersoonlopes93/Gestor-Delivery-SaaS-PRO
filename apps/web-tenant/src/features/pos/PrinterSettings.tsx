@@ -17,6 +17,17 @@ interface PrintJobDTO {
   content: string;
 }
 
+function getRequestErrorMessage(error: unknown) {
+  const fallback = error instanceof Error ? error.message : String(error);
+  const response = (error as { response?: { status?: number; data?: { message?: string | string[] } } })?.response;
+  const message = response?.data?.message;
+  const text = Array.isArray(message) ? message.join(', ') : message;
+
+  return response?.status
+    ? `HTTP ${response.status}${text ? ` - ${text}` : ''}`
+    : fallback;
+}
+
 export function PrinterSettings() {
   const [logs, setLogs] = useState<string[]>([]);
   const [selectedStation, setSelectedStation] = useState<string>('');
@@ -38,7 +49,12 @@ export function PrinterSettings() {
   const isNative = isNativeAndroid();
   const { user } = useAuthStore();
 
-  const { data: stations = [], isLoading: stationsLoading, refetch: refetchStations } = usePrintingStations();
+  const {
+    data: stations = [],
+    isLoading: stationsLoading,
+    error: stationsError,
+    refetch: refetchStations,
+  } = usePrintingStations();
   const { data: devices = [] } = usePrinterDevices();
   const createDevice = useCreateDevice();
   const testPrint = useTestPrint();
@@ -451,6 +467,11 @@ export function PrinterSettings() {
                   <p className="mt-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                     {stationLoadMessage}
                   </p>
+                )}
+                {stationsError && (
+                  <div className="mt-3 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs font-bold text-destructive">
+                    Falha ao carregar estações: {getRequestErrorMessage(stationsError)}
+                  </div>
                 )}
                 {!stationsLoading && stations.length === 0 && (
                   <button
