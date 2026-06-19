@@ -56,9 +56,9 @@ export function IntegrationsPage() {
   });
 
   const { data: status, isLoading: loadingStatus, refetch: refetchStatus } = useMarketplaceStatus('ifood');
-  const { data: connections, isLoading: loadingConnections, refetch: refetchConnections } = useMarketplaceConnections();
-  const { data: orders = [], isLoading: loadingOrders, refetch: refetchOrders } = useMarketplaceOrders();
-  const { data: events = [], isLoading: loadingEvents, refetch: refetchEvents } = useMarketplaceEvents();
+  const { data: connections, isLoading: loadingConnections, isError: connectionsError, error: connectionsErrorObj, refetch: refetchConnections } = useMarketplaceConnections();
+  const { data: orders = [], isLoading: loadingOrders, isError: ordersError, error: ordersErrorObj, refetch: refetchOrders } = useMarketplaceOrders();
+  const { data: events = [], isLoading: loadingEvents, isError: eventsError, error: eventsErrorObj, refetch: refetchEvents } = useMarketplaceEvents();
   const { data: billingPreview } = useBillingPreview();
 
   const connectMutation = useConnectMarketplaceManual('ifood');
@@ -112,6 +112,12 @@ export function IntegrationsPage() {
 
   const channelLabel = isBillingEnabled ? 'Incluído no billing' : 'Excluído do billing';
   const channelTone = isBillingEnabled ? 'success' : 'warning';
+  const sections = [
+    { id: 'ifood', label: 'iFood', provider: 'ifood' as const, comingSoon: false },
+    { id: 'rappi', label: 'Rappi', provider: 'rappi' as const, comingSoon: true },
+    { id: 'ubereats', label: 'Uber Eats', provider: 'ubereats' as const, comingSoon: true },
+    { id: '99food', label: '99Food', provider: '99food' as const, comingSoon: true },
+  ];
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
@@ -133,6 +139,17 @@ export function IntegrationsPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <Card className="p-6 xl:col-span-2 space-y-5">
+          {connectionsError || ordersError || eventsError ? (
+            <div className="rounded-2xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+              <div className="font-black">Falha ao carregar marketplace</div>
+              <div className="mt-1 text-sm opacity-90">
+                {(connectionsErrorObj as Error | undefined)?.message ||
+                  (ordersErrorObj as Error | undefined)?.message ||
+                  (eventsErrorObj as Error | undefined)?.message ||
+                  'Não foi possível carregar os dados da integração.'}
+              </div>
+            </div>
+          ) : null}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -285,6 +302,24 @@ export function IntegrationsPage() {
         </Card>
 
         <div className="space-y-6">
+          <Card className="p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <Settings2 className="w-4 h-4 text-primary" />
+              <h3 className="text-sm font-black text-foreground">Providers</h3>
+            </div>
+            <div className="space-y-2">
+              {sections.map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-muted/20 p-3">
+                  <div>
+                    <div className="text-sm font-black text-foreground">{item.label}</div>
+                    <div className="text-xs text-muted-foreground">{item.comingSoon ? 'Em breve' : 'Disponível agora'}</div>
+                  </div>
+                  {item.comingSoon ? <Badge variant="info" size="sm">Em breve</Badge> : <Badge variant="success" size="sm">Ativo</Badge>}
+                </div>
+              ))}
+            </div>
+          </Card>
+
           <Card className="p-5 space-y-3">
             <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4 text-primary" />
