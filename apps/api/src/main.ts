@@ -75,7 +75,7 @@ async function bootstrap() {
   // Swagger
   if (enableSwagger) {
     const swaggerConfig = new DocumentBuilder()
-      .setTitle('Gestor Delivery API')
+      .setTitle('PedeHub API')
       .setDescription('Documentação básica da API')
       .setVersion('0.1.0')
       .addBearerAuth()

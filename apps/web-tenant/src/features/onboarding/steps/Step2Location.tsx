@@ -27,7 +27,7 @@ async function geocodeNominatim(address: string): Promise<{ lat: number; lng: nu
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
     const res = await fetch(url, {
-      headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'Gestor-Delivery-SaaS-PRO-App' },
+      headers: { 'Accept-Language': 'pt-BR', 'User-Agent': 'PedeHub-App' },
     });
     const data = await res.json();
     if (data && data.length > 0) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };

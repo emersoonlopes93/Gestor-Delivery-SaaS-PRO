@@ -111,7 +111,7 @@ export const OrderPrintTemplate = memo(function OrderPrintTemplate({ order }: Or
       <div className="text-center mt-6 text-xs">
         <p>Obrigado pela preferência!</p>
         <div className="border-b border-dashed border-black my-2" />
-        <p>Sistema Gestor Delivery</p>
+        <p>Sistema PedeHub</p>
       </div>
 
       <style>{`

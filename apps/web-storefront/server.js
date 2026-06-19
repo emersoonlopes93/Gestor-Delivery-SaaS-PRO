@@ -22,7 +22,7 @@ app.get('/manifest/:slug.webmanifest', async (req, res) => {
 
   const manifest = {
     "id": `/${slug}`,
-    "name": "Gestor Delivery",
+    "name": "PedeHub",
     "short_name": "Delivery",
     "description": "Cardapio, pedidos, carteira, fidelidade e tracking em tempo real.",
     "start_url": `/${slug}`,
@@ -110,9 +110,9 @@ app.get('/*', async (req, res) => {
       }
 
       if (tenantInfo && tenantInfo.data) {
-        const title = `Pedir em ${tenantInfo.data.name} | Gestor Delivery`;
+        const title = `Pedir em ${tenantInfo.data.name} | PedeHub`;
         const description = `Acesse o cardápio de ${tenantInfo.data.name} e faça seu pedido online.`;
-        const logo = tenantInfo.data.logo || 'https://via.placeholder.com/600x315?text=Gestor+Delivery';
+        const logo = tenantInfo.data.logo || 'https://via.placeholder.com/600x315?text=PedeHub';
 
         const metaTags = `
           <title>${title}</title>
@@ -136,8 +136,8 @@ app.get('/*', async (req, res) => {
         `;
 
         // Substituir as tags padrão do Vite/React pelo conteúdo dinâmico
-        // O index.html original tem <title>Gestor Delivery</title> e um <link rel="manifest" href="/manifest.webmanifest" />
-        html = html.replace('<title>Gestor Delivery</title>', metaTags);
+        // O index.html original tem <title>PedeHub</title> e um <link rel="manifest" href="/manifest.webmanifest" />
+        html = html.replace('<title>PedeHub</title>', metaTags);
         html = html.replace('<link rel="manifest" href="/manifest.webmanifest" />', '');
       }
     } catch (error) {

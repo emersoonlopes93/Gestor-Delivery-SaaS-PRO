@@ -25,7 +25,7 @@ const baseEnvSchema = z.object({
   SMTP_PORT: z.coerce.number().int().positive().default(587),
   SMTP_USER: z.string().default(''),
   SMTP_PASS: z.string().default(''),
-  SMTP_FROM: z.string().default('noreply@gestorpro.com.br'),
+  SMTP_FROM: z.string().default('noreply@pedehub.com.br'),
   FRONTEND_URL: z.string().default('http://localhost:3000'),
 
   // WhatsApp Cloud API (Customer OTP + Notifications)
@@ -38,7 +38,7 @@ const baseEnvSchema = z.object({
   // Web Push (VAPID)
   VAPID_PUBLIC_KEY: z.string().default(''),
   VAPID_PRIVATE_KEY: z.string().default(''),
-  VAPID_SUBJECT: z.string().default('mailto:admin@gestordelivery.com.br'),
+  VAPID_SUBJECT: z.string().default('mailto:admin@pedehub.com.br'),
 
   // Mercado Pago
   MERCADO_PAGO_WEBHOOK_SECRET: z.string().default(''),

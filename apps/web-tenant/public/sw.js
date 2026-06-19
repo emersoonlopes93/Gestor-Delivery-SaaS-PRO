@@ -1,4 +1,4 @@
-// Gestor Delivery — Service Worker: Audio & Push Notifications
+// PedeHub - Service Worker: Audio & Push Notifications
 // This file is placed in /public/sw.js of the web-tenant app
 // Enables background sound playback and push notifications
 
@@ -13,12 +13,12 @@ self.addEventListener('push', (event) => {
   } catch (e) {
     console.warn('[ServiceWorker] Failed to parse push JSON:', e);
     payload = {
-      title: 'Gestor Delivery',
+      title: 'PedeHub',
       body: event.data.text(),
     };
   }
 
-  const title = payload.title || 'Gestor Delivery';
+  const title = payload.title || 'PedeHub';
   const options = {
     body: payload.body || '',
     icon: '/favicon.ico',

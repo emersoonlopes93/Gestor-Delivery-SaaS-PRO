@@ -1,6 +1,6 @@
 {
   "id": "/",
-  "name": "Gestor Delivery",
+  "name": "PedeHub",
   "short_name": "Delivery",
   "description": "Cardapio, pedidos, carteira, fidelidade e tracking em tempo real.",
   "start_url": "/",

@@ -8,8 +8,10 @@ import {
   Save, 
   RefreshCcw,
   AlertCircle,
-  Zap
+  Zap,
+  Badge
 } from 'lucide-react';
+import { APP_NAME_STORAGE_KEY, DEFAULT_APP_NAME, normalizeAppName } from '../../../lib/branding';
 
 const GOOGLE_AI_FREE_MODELS = [
   { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (gratuito)' },
@@ -18,6 +20,7 @@ const GOOGLE_AI_FREE_MODELS = [
 ] as const;
 
 interface SystemConfig {
+  appName: string;
   defaultWhatsAppProvider: 'evolution_go' | 'meta_cloud';
   defaultAiProvider: 'openai' | 'anthropic' | 'google_ai';
   evolutionUrl: string;
@@ -65,6 +68,7 @@ export default function IntegrationsPage() {
       setError(null);
 
       const updatePayload = {
+        appName: normalizeAppName(config.appName),
         defaultWhatsAppProvider: config.defaultWhatsAppProvider,
         defaultAiProvider: config.defaultAiProvider,
         evolutionUrl: config.evolutionUrl,
@@ -78,6 +82,9 @@ export default function IntegrationsPage() {
       const response = await api.patch('/admin/integrations/config', updatePayload);
 
       if (!response.success) throw new Error('Falha ao salvar configurações');
+      const nextAppName = normalizeAppName(config.appName);
+      localStorage.setItem(APP_NAME_STORAGE_KEY, nextAppName);
+      document.title = `${nextAppName} - SaaS Admin`;
       
       showToast('success', 'Configurações salvas com sucesso!');
 
@@ -113,6 +120,26 @@ export default function IntegrationsPage() {
       </header>
 
       <form onSubmit={handleSave} className="space-y-8">
+        <section className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
+          <div className="p-6 border-b border-border bg-muted/30">
+            <div className="flex items-center gap-2">
+              <Badge className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-bold text-foreground">Marca do SaaS</h2>
+            </div>
+          </div>
+
+          <div className="p-8 space-y-2">
+            <label className="text-sm font-semibold text-foreground">Nome do sistema</label>
+            <input
+              placeholder={DEFAULT_APP_NAME}
+              className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
+              value={config?.appName || DEFAULT_APP_NAME}
+              onChange={(e) => setConfig(prev => prev ? { ...prev, appName: e.target.value } : null)}
+            />
+            <p className="text-xs text-muted-foreground">Este nome aparece no SaaS Admin e pode ser trocado futuramente sem alterar o codigo.</p>
+          </div>
+        </section>
+
         {/* WhatsApp Providers */}
         <section className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
           <div className="p-6 border-b border-border bg-muted/30">

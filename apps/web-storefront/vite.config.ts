@@ -12,7 +12,7 @@ function dynamicManifestPlugin() {
           const slug = req.url.replace('/manifest/', '').replace('.webmanifest', '');
           const manifest = {
             id: `/${slug}`,
-            name: `Gestor Delivery (${slug})`,
+            name: `PedeHub (${slug})`,
             short_name: "Delivery",
             description: "Cardapio, pedidos, carteira, fidelidade e tracking em tempo real.",
             start_url: `/${slug}`,

@@ -8,7 +8,7 @@ export function SaasLayout() {
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center">
               <Link to="/" className="text-2xl font-bold text-indigo-600 tracking-tight">
-                Gestor Delivery
+                PedeHub
               </Link>
               <nav className="hidden md:ml-10 md:flex space-x-8">
                 <Link to="/precos" className="text-slate-600 hover:text-indigo-600 font-medium transition-colors">
@@ -35,7 +35,7 @@ export function SaasLayout() {
       <footer className="bg-slate-900 text-slate-400 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
-            <span className="text-xl font-bold text-white tracking-tight">Gestor Delivery PRO</span>
+            <span className="text-xl font-bold text-white tracking-tight">PedeHub</span>
             <p className="mt-4 max-w-sm">
               O sistema definitivo para alavancar seu delivery. Peça via WhatsApp com IA, controle cardápios e fidelize seus clientes.
             </p>
@@ -56,7 +56,7 @@ export function SaasLayout() {
           </div>
         </div>
         <div className="mt-12 pt-8 border-t border-slate-800 text-center text-sm">
-          &copy; {new Date().getFullYear()} Gestor Delivery SaaS PRO. Todos os direitos reservados.
+          &copy; {new Date().getFullYear()} PedeHub. Todos os direitos reservados.
         </div>
       </footer>
     </div>

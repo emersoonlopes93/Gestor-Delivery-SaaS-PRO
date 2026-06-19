@@ -1,4 +1,4 @@
-// Gestor Delivery - PWA shell, offline fallback and Web Push Notifications.
+// PedeHub - PWA shell, offline fallback and Web Push Notifications.
 
 const CACHE_VERSION = 'gestor-storefront-v11';
 const APP_SHELL = [
@@ -72,7 +72,7 @@ self.addEventListener('push', (event) => {
     payload = event.data.json();
   } catch {
     payload = {
-      title: 'Gestor Delivery',
+      title: 'PedeHub',
       body: event.data.text(),
     };
   }
@@ -80,7 +80,7 @@ self.addEventListener('push', (event) => {
   const type = payload.type || payload.data?.type || 'default';
   const tag = payload.tag || type;
   const url = payload.url || payload.data?.url || '/';
-  const title = payload.title || 'Gestor Delivery';
+  const title = payload.title || 'PedeHub';
   const options = {
     body: payload.body || '',
     icon: '/icons/app-icon.svg',

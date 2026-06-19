@@ -2514,6 +2514,7 @@ model QuickReply {
 
 model SystemConfig {
   id                      String               @id @default("global")
+  appName                 String               @default("PedeHub") @map("app_name") @db.VarChar(120)
   defaultWhatsAppProvider WhatsAppProviderType @default(evolution_go) @map("default_whatsapp_provider")
   defaultAiProvider       AiProviderType       @default(openai) @map("default_ai_provider")
   evolutionUrl            String?              @map("evolution_url") @db.VarChar(500)

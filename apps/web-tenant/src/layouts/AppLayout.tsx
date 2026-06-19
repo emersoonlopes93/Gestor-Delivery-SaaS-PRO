@@ -675,11 +675,11 @@ export function AppLayout() {
             {!collapsed ? (
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20 shrink-0 border-2 border-border">
-                  G
+                  P
                 </div>
                 <div className="min-w-0 flex-1">
                   <h1 className="text-sm font-black text-foreground tracking-tight truncate leading-tight flex items-center gap-1.5">
-                    Gestor<span className="text-primary">PRO</span>
+                    PedeHub
                   </h1>
                   <p className="text-[10px] font-black text-muted-foreground mt-1 truncate leading-none uppercase tracking-wider">{user?.tenant?.name || 'Carregando...'}</p>
                   {tenantData?.businessGroup ? (
@@ -719,7 +719,7 @@ export function AppLayout() {
               </div>
             ) : (
               <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20 border-2 border-border">
-                G
+                P
               </div>
             )}
           </div>
@@ -902,7 +902,7 @@ export function AppLayout() {
             </button>
             <div className="min-w-0 text-center">
               <div className="text-sm font-black text-foreground truncate flex items-center justify-center gap-1.5">
-                Gestor<span className="text-primary-600">PRO</span>
+                PedeHub
               </div>
               <div className="text-[10px] font-bold text-muted-foreground truncate uppercase tracking-widest leading-none mt-0.5">{user?.tenant?.name || 'Carregando...'}</div>
             </div>

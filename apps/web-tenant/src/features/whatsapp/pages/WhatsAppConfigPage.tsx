@@ -772,7 +772,7 @@ export function WhatsAppConfigPage() {
             </div>
             <h3 className="text-lg font-bold text-foreground mb-2">Agente IA (Beta)</h3>
             <p className="text-sm text-muted-foreground max-w-sm">
-              O atendimento automático por Inteligência Artificial está disponível em planos avançados do Gestor PRO.
+              O atendimento automático por Inteligência Artificial está disponível em planos avançados do PedeHub.
             </p>
             <div className="mt-4 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[10px] font-black uppercase text-amber-700 tracking-wider">
               Disponível em breve

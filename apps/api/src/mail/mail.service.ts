@@ -34,7 +34,7 @@ export class MailService {
 
     try {
       await this.transporter.sendMail({
-        from: `"Gestor PRO" <${from}>`,
+        from: `"PedeHub" <${from}>`,
         to,
         subject: 'Recuperação de Senha',
         html: `

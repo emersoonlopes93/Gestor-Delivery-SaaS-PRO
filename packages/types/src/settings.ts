@@ -36,6 +36,7 @@ export interface TenantSettingsDTO {
 
 export interface SystemConfigDTO {
   id: string;
+  appName: string;
   defaultWhatsAppProvider: string;
   defaultAiProvider: string;
   maintenanceMode: boolean;

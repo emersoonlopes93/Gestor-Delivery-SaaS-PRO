@@ -483,7 +483,7 @@ async function geocodeNominatim(address: string): Promise<{ lat: number; lng: nu
     const response = await fetch(url, {
       headers: {
         'Accept-Language': 'pt-BR',
-        'User-Agent': 'Gestor-Delivery-SaaS-PRO-App',
+        'User-Agent': 'PedeHub-App',
       },
     });
     const data = await response.json();

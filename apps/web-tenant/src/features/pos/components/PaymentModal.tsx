@@ -204,7 +204,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         onClick={handleCopyPix}
         className="w-full bg-muted50  hover:bg-muted100  border border-border dark:border-border700 rounded-2xl px-4 py-3 flex items-center justify-between text-muted-foreground700 dark:text-muted-foreground300 transition-all font-bold text-sm"
       >
-        <span className="truncate mr-4">pix.gestordelivery...</span>
+        <span className="truncate mr-4">pix.pedehub...</span>
         {pixCopied ? <Check size={20} className="text-primary" /> : <Copy size={20} className="text-muted-foreground" />}
       </button>
 

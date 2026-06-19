@@ -18,11 +18,11 @@ export function AuthLayout() {
         <div className="text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-card shadow-2xl mb-4 border border-border transition-transform hover:scale-105 duration-300">
             <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-2xl shadow-lg shadow-primary/20">
-              G
+              P
             </div>
           </div>
           <h2 className="text-3xl font-black text-foreground tracking-tight">
-            Gestor<span className="text-primary">PRO</span>
+            PedeHub
           </h2>
           <p className="text-muted-foreground font-medium mt-2">
             A inteligência que seu delivery merece.
@@ -36,7 +36,7 @@ export function AuthLayout() {
 
         {/* Footer info */}
         <p className="text-center mt-8 text-xs text-muted-foreground font-bold uppercase tracking-widest animate-in fade-in duration-1000 delay-500 fill-mode-both">
-          &copy; {new Date().getFullYear()} Gestor Delivery SaaS PRO
+          &copy; {new Date().getFullYear()} PedeHub
         </p>
       </div>
     </div>

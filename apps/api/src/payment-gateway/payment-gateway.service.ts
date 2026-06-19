@@ -399,7 +399,7 @@ export class PaymentGatewayService {
     const payload: MercadoPagoPreferenceRequest = {
       items: [
         {
-          title: `Pedido #${order.orderNumber} - Gestor Delivery`,
+          title: `Pedido #${order.orderNumber} - PedeHub`,
           quantity: 1,
           unit_price: Number(order.total),
           currency_id: 'BRL',

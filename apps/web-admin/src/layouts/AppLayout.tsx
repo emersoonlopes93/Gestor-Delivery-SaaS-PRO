@@ -26,6 +26,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeStore } from '../stores/theme.store';
 import { api } from '../lib/api-client';
+import { usePlatformBrand } from '../hooks/use-platform-brand';
 
 type SidebarItem = {
   id: string;
@@ -192,6 +193,7 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
 export function AppLayout() {
   const { user, clearUser } = useAuthStore();
   const { theme, setTheme } = useThemeStore();
+  const { appName, appInitial } = usePlatformBrand();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -257,16 +259,16 @@ export function AppLayout() {
           {!collapsed ? (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20">
-                S
+                {appInitial}
               </div>
               <div className="min-w-0">
-                <h1 className="text-sm font-black text-foreground tracking-tight">SaaS<span className="text-primary">Admin</span></h1>
+                <h1 className="text-sm font-black text-foreground tracking-tight truncate">{appName}</h1>
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{user?.name || 'Carregando...'}</p>
               </div>
             </div>
           ) : (
             <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20">
-              S
+              {appInitial}
             </div>
           )}
         </div>
@@ -340,7 +342,7 @@ export function AppLayout() {
             <Menu size={20} />
           </button>
           <div className="text-center">
-            <div className="text-sm font-black text-foreground uppercase tracking-tight">SaaS<span className="text-primary">Admin</span></div>
+            <div className="text-sm font-black text-foreground uppercase tracking-tight">{appName}</div>
             <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none mt-0.5">Gestão Global</div>
           </div>
           <button

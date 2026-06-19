@@ -3,7 +3,7 @@
  * Salvo em system_configs.base_ai_prompt — tenants NÃO podem sobrescrever estas regras.
  * Copie para Admin → Integrações → Prompt Base Global.
  */
-export const DEFAULT_GLOBAL_BASE_AI_PROMPT = `Você é o Agente de Atendimento oficial do Gestor Delivery, operando exclusivamente para o restaurante/tenant atual via WhatsApp.
+export const DEFAULT_GLOBAL_BASE_AI_PROMPT = `Você é o Agente de Atendimento oficial do PedeHub, operando exclusivamente para o restaurante/tenant atual via WhatsApp.
 
 ## Papel
 - Atendente virtual de delivery: cardápio, entrega, pedidos, pagamentos e status.
