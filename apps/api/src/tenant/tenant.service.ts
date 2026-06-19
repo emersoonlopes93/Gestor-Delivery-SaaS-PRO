@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Logger, Inject } fr
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { PrismaService } from '../database/prisma.service';
-import { TenantStatus } from '@gestor/core';
+import { TenantDefaultRole, TenantStatus } from '@gestor/core';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import type { TenantOperatingHours } from '@gestor/types';
 import { Prisma } from '@prisma/client';
@@ -52,6 +52,58 @@ export class TenantService {
       },
     });
     if (!tenant) throw new NotFoundException('Tenant not found');
+
+    if (tenant.businessGroup) {
+      const ownerUser = await this.prisma.tenantUser.findFirst({
+        where: {
+          tenantId,
+          isActive: true,
+          userRoles: {
+            some: {
+              role: {
+                slug: TenantDefaultRole.TENANT_OWNER,
+              },
+            },
+          },
+        },
+        select: { email: true },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      if (ownerUser) {
+        const relatedTenants = await this.prisma.tenant.findMany({
+          where: {
+            businessGroupId: tenant.businessGroup.id,
+            users: {
+              some: {
+                email: ownerUser.email.toLowerCase(),
+                isActive: true,
+                userRoles: {
+                  some: {
+                    role: {
+                      slug: TenantDefaultRole.TENANT_OWNER,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            status: true,
+          },
+          orderBy: { name: 'asc' },
+        });
+
+        tenant.businessGroup.tenants = relatedTenants;
+        tenant.businessGroup._count = {
+          tenants: relatedTenants.length,
+        };
+      }
+    }
+
     return tenant;
   }
 

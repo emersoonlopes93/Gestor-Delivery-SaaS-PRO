@@ -9,9 +9,9 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../database/prisma.service';
 import { TenantStatus, TenantDefaultRole } from '@gestor/core';
-import type { TenantJwtPayload } from '@gestor/types';
+import type { TenantJwtPayload, TenantUserSession } from '@gestor/types';
 import { AuthSessionService } from './auth-session.service';
-import { AuthSubjectType } from '@prisma/client';
+import { AuthSubjectType, Prisma } from '@prisma/client';
 import { MailService } from '../mail/mail.service';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
@@ -20,6 +20,23 @@ type RequestSessionContext = {
   userAgent?: string;
   ipAddress?: string;
 };
+
+type TenantUserWithRelations = Prisma.TenantUserGetPayload<{
+  include: {
+    tenant: { include: { onboarding: true } };
+    userRoles: {
+      include: {
+        role: {
+          include: {
+            rolePermissions: {
+              include: { permission: true };
+            };
+          };
+        };
+      };
+    };
+  };
+}>;
 
 // Slug generator
 function generateSlug(name: string): string {
@@ -43,6 +60,97 @@ export class TenantAuthService {
     private readonly configService: ConfigService,
   ) {}
 
+  private buildRoles(user: TenantUserWithRelations): string[] {
+    return user.userRoles
+      .map((ur) => ur.role?.slug)
+      .filter((slug): slug is string => typeof slug === 'string');
+  }
+
+  private buildPermissions(user: TenantUserWithRelations): string[] {
+    return Array.from(
+      new Set(
+        user.userRoles.flatMap((ur) =>
+          ur.role ? ur.role.rolePermissions.map((rp) => rp.permission.slug) : [],
+        ),
+      ),
+    );
+  }
+
+  private async findAccessibleTenants(email: string, businessGroupId?: string | null) {
+    if (!businessGroupId) {
+      return [];
+    }
+
+    const users = await this.prisma.tenantUser.findMany({
+      where: {
+        email: email.toLowerCase(),
+        isActive: true,
+        tenant: {
+          businessGroupId,
+        },
+        userRoles: {
+          some: {
+            role: {
+              slug: {
+                in: [TenantDefaultRole.TENANT_OWNER, TenantDefaultRole.TENANT_ADMIN],
+              },
+            },
+          },
+        },
+      },
+      include: {
+        tenant: true,
+        userRoles: {
+          include: {
+            role: true,
+          },
+        },
+      },
+      orderBy: {
+        tenant: {
+          name: 'asc',
+        },
+      },
+    });
+
+    return users.map((user) => ({
+      userId: user.id,
+      tenantId: user.tenantId,
+      roleSlugs: user.userRoles
+        .map((userRole) => userRole.role?.slug)
+        .filter((slug): slug is string => typeof slug === 'string'),
+      tenant: {
+        id: user.tenant.id,
+        name: user.tenant.name,
+        slug: user.tenant.slug,
+        status: String(user.tenant.status),
+      },
+    }));
+  }
+
+  private async buildSessionUser(user: TenantUserWithRelations): Promise<TenantUserSession> {
+    const roles = this.buildRoles(user);
+    const permissions = this.buildPermissions(user);
+    const accessibleTenants = await this.findAccessibleTenants(user.email, user.tenant.businessGroupId);
+
+    return {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      tenantId: user.tenantId,
+      roles,
+      permissions,
+      accessibleTenants,
+      tenant: {
+        id: user.tenant.id,
+        name: user.tenant.name,
+        slug: user.tenant.slug,
+        status: String(user.tenant.status),
+      },
+      onboardingCompletedAt: user.tenant.onboarding?.completedAt?.toISOString() || null,
+    };
+  }
+
   /**
    * Authenticate a tenant user by email + password.
    * Resolves the tenant from the user record.
@@ -52,7 +160,7 @@ export class TenantAuthService {
     this.logger.debug(`Login attempt for email: ${normalizedEmail} (tenantSlug: ${tenantSlug})`);
 
     // Find user — if tenantSlug provided, narrow to that tenant
-    let user;
+    let user: TenantUserWithRelations | null = null;
     if (tenantSlug) {
       const tenant = await this.prisma.tenant.findUnique({
         where: { slug: tenantSlug },
@@ -81,8 +189,7 @@ export class TenantAuthService {
         },
       });
     } else {
-      // Find by email across tenants (first match)
-      user = await this.prisma.tenantUser.findFirst({
+      const users = await this.prisma.tenantUser.findMany({
         where: { email: normalizedEmail },
         include: {
           tenant: { include: { onboarding: true } },
@@ -98,7 +205,31 @@ export class TenantAuthService {
             },
           },
         },
+        orderBy: [
+          { createdAt: 'asc' },
+        ],
       });
+
+      for (const candidate of users) {
+        if (!candidate.isActive) {
+          continue;
+        }
+
+        const tenantStatus = String(candidate.tenant.status);
+        if (
+          tenantStatus !== String(TenantStatus.ACTIVE) &&
+          tenantStatus !== String(TenantStatus.TRIAL) &&
+          tenantStatus !== 'suspended'
+        ) {
+          continue;
+        }
+
+        const passwordValid = await bcrypt.compare(password, candidate.passwordHash);
+        if (passwordValid) {
+          user = candidate;
+          break;
+        }
+      }
     }
 
     if (!user) {
@@ -117,21 +248,11 @@ export class TenantAuthService {
       throw new UnauthorizedException('Tenant is not active');
     }
 
-    const passwordValid = await bcrypt.compare(password, user.passwordHash);
+    const passwordValid = tenantSlug ? await bcrypt.compare(password, user.passwordHash) : true;
     if (!passwordValid) {
       this.logger.warn(`Login failed: Invalid password for user: ${email}`);
       throw new UnauthorizedException('Invalid credentials');
     }
-
-    // Build permissions from roles
-    const roles = user.userRoles.map((ur) => ur.role?.slug).filter(Boolean);
-    const permissions = [
-      ...new Set(
-        user.userRoles.flatMap((ur) =>
-          ur.role?.rolePermissions.map((rp) => rp.permission?.slug) || [],
-        ).filter(Boolean),
-      ),
-    ];
 
     // Generate tokens
     const payload: TenantJwtPayload = {
@@ -140,6 +261,7 @@ export class TenantAuthService {
       type: 'tenant',
       email: user.email,
     };
+    const roles = this.buildRoles(user);
 
     const session = await this.authSessionService.createSession({
       subjectType: AuthSubjectType.tenant,
@@ -151,6 +273,7 @@ export class TenantAuthService {
       context,
     });
     const accessToken = this.jwtService.sign({ ...payload, sid: session.sessionId });
+    const sessionUser = await this.buildSessionUser(user);
 
     this.logger.log(
       `Tenant user logged in: ${normalizedEmail} (tenant: ${user.tenant.slug})`,
@@ -159,21 +282,7 @@ export class TenantAuthService {
     return {
       accessToken,
       refreshToken: session.refreshToken,
-      user: {
-        userId: user.id,
-        email: user.email,
-        name: user.name,
-        tenantId: user.tenantId,
-        roles,
-        permissions,
-        tenant: {
-          id: user.tenant.id,
-          name: user.tenant.name,
-          slug: user.tenant.slug,
-          status: user.tenant.status,
-        },
-        onboardingCompletedAt: user.tenant.onboarding?.completedAt?.toISOString() || null,
-      },
+      user: sessionUser,
     };
   }
 
@@ -189,14 +298,6 @@ export class TenantAuthService {
     context?: RequestSessionContext,
   ) {
     const normalizedEmail = email.toLowerCase();
-    
-    // Validate if user email already exists across the system
-    const existingUser = await this.prisma.tenantUser.findFirst({
-      where: { email: normalizedEmail },
-    });
-    if (existingUser) {
-      throw new UnauthorizedException('E-mail já está em uso.');
-    }
 
     let slug = generateSlug(shopName);
     const existingTenant = await this.prisma.tenant.findUnique({ where: { slug } });
@@ -312,16 +413,6 @@ export class TenantAuthService {
       });
     }, { timeout: 15000 });
 
-    // Build permissions from roles
-    const roles = user.userRoles.map((ur) => ur.role?.slug).filter(Boolean);
-    const permissions = [
-      ...new Set(
-        user.userRoles.flatMap((ur) =>
-          ur.role?.rolePermissions.map((rp) => rp.permission?.slug) || [],
-        ).filter(Boolean),
-      ),
-    ];
-
     // Generate tokens
     const payload: TenantJwtPayload = {
       sub: user.id,
@@ -329,6 +420,7 @@ export class TenantAuthService {
       type: 'tenant',
       email: user.email,
     };
+    const roles = this.buildRoles(user);
 
     const session = await this.authSessionService.createSession({
       subjectType: AuthSubjectType.tenant,
@@ -340,6 +432,7 @@ export class TenantAuthService {
       context,
     });
     const accessToken = this.jwtService.sign({ ...payload, sid: session.sessionId });
+    const sessionUser = await this.buildSessionUser(user);
 
     this.logger.log(
       `New Tenant provisioned: ${slug} by ${normalizedEmail}`,
@@ -348,21 +441,7 @@ export class TenantAuthService {
     return {
       accessToken,
       refreshToken: session.refreshToken,
-      user: {
-        userId: user.id,
-        email: user.email,
-        name: user.name,
-        tenantId: user.tenantId,
-        roles,
-        permissions,
-        tenant: {
-          id: user.tenant.id,
-          name: user.tenant.name,
-          slug: user.tenant.slug,
-          status: user.tenant.status,
-        },
-        onboardingCompletedAt: user.tenant.onboarding?.completedAt?.toISOString() || null,
-      },
+      user: sessionUser,
     };
   }
 
@@ -449,34 +528,99 @@ export class TenantAuthService {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    const roles = user.userRoles
-      .map((ur) => ur.role?.slug)
-      .filter((slug): slug is string => typeof slug === 'string');
+    return this.buildSessionUser(user);
+  }
 
-    const permissions = Array.from(
-      new Set(
-        user.userRoles.flatMap((ur) =>
-          ur.role
-            ? ur.role.rolePermissions.map((rp) => rp.permission.slug)
-            : [],
-        ),
-      ),
-    );
+  async switchTenant(userId: string, targetTenantId: string, context?: RequestSessionContext) {
+    const currentUser = await this.prisma.tenantUser.findUnique({
+      where: { id: userId },
+      include: {
+        tenant: { include: { onboarding: true } },
+        userRoles: {
+          include: {
+            role: {
+              include: {
+                rolePermissions: {
+                  include: { permission: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!currentUser || !currentUser.isActive) {
+      throw new UnauthorizedException('Usuário atual não encontrado ou inativo');
+    }
+
+    if (!currentUser.tenant.businessGroupId) {
+      throw new BadRequestException('Esta conta não está vinculada a uma rede multi-loja');
+    }
+
+    const targetUser = await this.prisma.tenantUser.findFirst({
+      where: {
+        tenantId: targetTenantId,
+        email: currentUser.email.toLowerCase(),
+        isActive: true,
+        tenant: {
+          businessGroupId: currentUser.tenant.businessGroupId,
+        },
+        userRoles: {
+          some: {
+            role: {
+              slug: {
+                in: [TenantDefaultRole.TENANT_OWNER, TenantDefaultRole.TENANT_ADMIN],
+              },
+            },
+          },
+        },
+      },
+      include: {
+        tenant: { include: { onboarding: true } },
+        userRoles: {
+          include: {
+            role: {
+              include: {
+                rolePermissions: {
+                  include: { permission: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!targetUser) {
+      throw new UnauthorizedException('Você não possui acesso a esta loja dentro da rede');
+    }
+
+    const payload: TenantJwtPayload = {
+      sub: targetUser.id,
+      tenantId: targetUser.tenantId,
+      type: 'tenant',
+      email: targetUser.email,
+    };
+
+    const roles = this.buildRoles(targetUser);
+    const session = await this.authSessionService.createSession({
+      subjectType: AuthSubjectType.tenant,
+      subjectId: targetUser.id,
+      tenantId: targetUser.tenantId,
+      userId: targetUser.id,
+      role: roles.join(','),
+      payload,
+      context,
+    });
+
+    const accessToken = this.jwtService.sign({ ...payload, sid: session.sessionId });
+    const sessionUser = await this.buildSessionUser(targetUser);
 
     return {
-      userId: user.id,
-      tenantId: user.tenantId,
-      email: user.email,
-      name: user.name,
-      roles,
-      permissions,
-      tenant: {
-        id: user.tenant.id,
-        name: user.tenant.name,
-        slug: user.tenant.slug,
-        status: user.tenant.status,
-      },
-      onboardingCompletedAt: user.tenant.onboarding?.completedAt?.toISOString() || null,
+      accessToken,
+      refreshToken: session.refreshToken,
+      user: sessionUser,
     };
   }
 
@@ -555,20 +699,18 @@ export class TenantAuthService {
     const normalizedEmail = email.toLowerCase();
     this.logger.debug(`Password reset requested for email: ${normalizedEmail}`);
 
-    const user = await this.prisma.tenantUser.findFirst({
+    const users = await this.prisma.tenantUser.findMany({
       where: { email: normalizedEmail },
-      include: { tenant: true },
     });
 
-    if (user) {
+    if (users.length > 0) {
       // Generate a secure reset token
       const resetToken = crypto.randomBytes(32).toString('hex');
       const tokenExpires = new Date();
       tokenExpires.setHours(tokenExpires.getHours() + 1); // 1 hour expiration
 
-      // Save token to db
-      await this.prisma.tenantUser.update({
-        where: { id: user.id },
+      await this.prisma.tenantUser.updateMany({
+        where: { email: normalizedEmail },
         data: {
           passwordResetToken: resetToken,
           passwordResetExpires: tokenExpires,
@@ -604,8 +746,8 @@ export class TenantAuthService {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(newPassword, salt);
 
-    await this.prisma.tenantUser.update({
-      where: { id: user.id },
+    await this.prisma.tenantUser.updateMany({
+      where: { passwordResetToken: token },
       data: {
         passwordHash,
         passwordResetToken: null,

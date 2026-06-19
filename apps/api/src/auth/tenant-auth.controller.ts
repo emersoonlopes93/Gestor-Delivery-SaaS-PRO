@@ -61,6 +61,12 @@ class ResetPasswordDto {
   password!: string;
 }
 
+class SwitchTenantDto {
+  @IsString()
+  @IsNotEmpty()
+  tenantId!: string;
+}
+
 @Controller('auth/tenant')
 export class TenantAuthController {
   constructor(private readonly authService: TenantAuthService) {}
@@ -111,6 +117,16 @@ export class TenantAuthController {
   @Get('me')
   async me(@CurrentUser('sub') userId: string) {
     return this.authService.getSession(userId);
+  }
+
+  @UseGuards(TenantAuthGuard)
+  @Post('switch-store')
+  async switchStore(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: SwitchTenantDto,
+    @Req() req: Request,
+  ) {
+    return this.authService.switchTenant(userId, dto.tenantId, sessionContext(req));
   }
 
   @UseGuards(TenantAuthGuard)

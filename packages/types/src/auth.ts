@@ -71,8 +71,21 @@ export interface TenantUserSession {
   name: string;
   roles: string[];
   permissions: string[];
+  accessibleTenants?: AccessibleTenantSession[];
   onboardingCompletedAt?: string | null;
   tenant?: {
+    id: string;
+    name: string;
+    slug: string;
+    status: string;
+  };
+}
+
+export interface AccessibleTenantSession {
+  userId: string;
+  tenantId: string;
+  roleSlugs: string[];
+  tenant: {
     id: string;
     name: string;
     slug: string;

@@ -55,21 +55,7 @@ export function DashboardPage() {
     queryKey: ['tenant-settings'],
     queryFn: async () => {
       const res = await api.get<Tenant & { settings: TenantSettings; operatingHours: TenantOperatingHours[]; businessGroup?: BusinessGroupContext | null }>('/tenant/me');
-      return {
-        ...res.data,
-        businessGroup: res.data.businessGroup ?? (
-          res.data.settings?.businessGroupId
-            ? {
-                id: res.data.settings.businessGroupId,
-                name: 'Grupo de Negócios vinculado',
-                createdAt: '',
-                updatedAt: '',
-                tenants: [],
-                _count: { tenants: 1 },
-              }
-            : null
-        ),
-      };
+      return res.data;
     },
     staleTime: 1000 * 60 * 5,
     retry: 1,

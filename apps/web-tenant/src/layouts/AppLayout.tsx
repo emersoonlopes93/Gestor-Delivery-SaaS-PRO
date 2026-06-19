@@ -46,7 +46,7 @@ import { useAuthStore } from '../stores/auth.store';
 import { useThemeStore } from '../stores/theme.store';
 import { api } from '../lib/api-client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { BusinessGroupContext, Tenant, TenantSettings, TenantOperatingHours } from '@gestor/types';
+import type { BusinessGroupContext, Tenant, TenantLoginResponse, TenantSettings, TenantOperatingHours } from '@gestor/types';
 import { useNotificationAudio } from '../hooks/useNotificationAudio';
 import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
 import { useLogisticsSocket } from '../features/delivery/hooks/useLogisticsSocket';
@@ -338,7 +338,7 @@ function SidebarGroupView(props: {
  * Main app layout with sidebar navigation for authenticated pages.
  */
 export function AppLayout() {
-  const { user, clearUser } = useAuthStore();
+  const { user, clearUser, setUser } = useAuthStore();
   const { theme, setTheme, initializeTheme } = useThemeStore();
   const navigate = useNavigate();
   const location = useLocation();
@@ -351,31 +351,19 @@ export function AppLayout() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [desktopSearch, setDesktopSearch] = useState('');
   const [storefrontBaseUrl, setStorefrontBaseUrl] = useState('');
+  const [selectedTenantId, setSelectedTenantId] = useState('');
 
   const { data: tenantData } = useQuery({
     queryKey: ['tenant-settings'],
     queryFn: async () => {
       const res = await api.get<Tenant & { settings: TenantSettings; operatingHours: TenantOperatingHours[]; businessGroup?: BusinessGroupContext | null }>('/tenant/me');
-      return {
-        ...res.data,
-        businessGroup: res.data.businessGroup ?? (
-          res.data.settings?.businessGroupId
-            ? {
-                id: res.data.settings.businessGroupId,
-                name: 'Grupo de Negócios vinculado',
-                createdAt: '',
-                updatedAt: '',
-                tenants: [],
-                _count: { tenants: 1 },
-              }
-            : null
-        ),
-      };
+      return res.data;
     },
     staleTime: 1000 * 60 * 5,
   });
 
   const queryClient = useQueryClient();
+  const accessibleStores = user?.accessibleTenants ?? [];
   const toggleStoreMutation = useMutation({
     mutationFn: async (isPaused: boolean) => {
       const res = await api.patch<unknown>('/tenant/store-pause', { 
@@ -391,6 +379,25 @@ export function AppLayout() {
       console.error('Erro ao alterar status:', err);
       alert('Erro ao alterar status da loja.');
     }
+  });
+
+  const switchStoreMutation = useMutation({
+    mutationFn: async (tenantId: string) => {
+      const res = await api.post<TenantLoginResponse>('/auth/tenant/switch-store', { tenantId });
+      return res.data;
+    },
+    onSuccess: (data) => {
+      localStorage.setItem('accessToken', data.accessToken);
+      localStorage.setItem('refreshToken', data.refreshToken);
+      setUser(data.user);
+      setSelectedTenantId(data.user.tenantId);
+      void queryClient.invalidateQueries();
+      navigate('/dashboard');
+    },
+    onError: (err) => {
+      console.error('Erro ao trocar loja:', err);
+      alert('Não foi possível trocar de loja nesta rede.');
+    },
   });
 
   const storeStatus = useMemo((): 'open' | 'closed' | 'paused' => {
@@ -453,6 +460,13 @@ export function AppLayout() {
 
   const handleToggleStore = () => {
     toggleStoreMutation.mutate(storeStatus !== 'paused');
+  };
+
+  const handleSwitchStore = () => {
+    if (!selectedTenantId || selectedTenantId === user?.tenantId) {
+      return;
+    }
+    switchStoreMutation.mutate(selectedTenantId);
   };
 
   // Audio Notifications Integration
@@ -582,6 +596,10 @@ export function AppLayout() {
   }, [location.pathname]);
 
   useEffect(() => {
+    setSelectedTenantId(user?.tenantId ?? '');
+  }, [user?.tenantId]);
+
+  useEffect(() => {
     if (!isMobileOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setIsMobileOpen(false);
@@ -670,6 +688,30 @@ export function AppLayout() {
                       <span className="text-muted-foreground font-bold normal-case tracking-normal">
                         {tenantData.businessGroup._count?.tenants ?? tenantData.businessGroup.tenants?.length ?? 0} lojas
                       </span>
+                    </div>
+                  ) : null}
+                  {accessibleStores.length > 1 ? (
+                    <div className="mt-3 flex items-center gap-2">
+                      <select
+                        value={selectedTenantId}
+                        onChange={(e) => setSelectedTenantId(e.target.value)}
+                        disabled={switchStoreMutation.isPending}
+                        className="min-w-0 flex-1 rounded-xl border border-border bg-card px-3 py-2 text-[11px] font-bold text-foreground outline-none"
+                      >
+                        {accessibleStores.map((store) => (
+                          <option key={store.tenantId} value={store.tenantId}>
+                            {store.tenant.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={handleSwitchStore}
+                        disabled={switchStoreMutation.isPending || !selectedTenantId || selectedTenantId === user?.tenantId}
+                        className="shrink-0 rounded-xl border border-border bg-card px-3 py-2 text-[10px] font-black uppercase tracking-widest text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {switchStoreMutation.isPending ? 'Trocando' : 'Abrir'}
+                      </button>
                     </div>
                   ) : null}
                 </div>

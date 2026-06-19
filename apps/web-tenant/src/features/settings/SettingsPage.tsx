@@ -104,20 +104,7 @@ export function SettingsPage() {
             businessGroupId: response.data.businessGroupId
           });
         }
-        setBusinessGroup(
-          response.data.businessGroup ?? (
-            response.data.businessGroupId
-              ? {
-                  id: response.data.businessGroupId,
-                  name: 'Grupo de Negócios vinculado',
-                  createdAt: '',
-                  updatedAt: '',
-                  tenants: [],
-                  _count: { tenants: 1 },
-                }
-              : null
-          )
-        );
+        setBusinessGroup(response.data.businessGroup ?? null);
       }
     } catch (error) {
       console.error('Erro ao carregar configurações:', error);
