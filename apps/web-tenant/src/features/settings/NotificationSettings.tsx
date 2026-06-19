@@ -192,9 +192,9 @@ export function NotificationSettings() {
             </div>
             <button
               onClick={() => setEnabled(!enabled)}
-              className={`w-full sm:w-20 h-12 sm:h-8 rounded-2xl sm:rounded-full border transition-colors duration-300 relative shrink-0 ${enabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
+              className={`w-14 h-8 rounded-full border transition-colors duration-300 relative shrink-0 ${enabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
             >
-              <div className={`absolute top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${enabled ? 'right-1' : 'left-1'}`} />
+              <div className={`absolute top-[3px] w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${enabled ? 'right-1' : 'left-1'}`} />
               <span className="sr-only">{enabled ? 'Notificações ativadas' : 'Notificações desativadas'}</span>
             </button>
           </div>
@@ -214,9 +214,9 @@ export function NotificationSettings() {
             </div>
             <button
               onClick={() => setAudioEnabled(!audioEnabled)}
-              className={`w-full sm:w-20 h-12 sm:h-8 rounded-2xl sm:rounded-full border transition-colors duration-300 relative shrink-0 ${audioEnabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
+              className={`w-14 h-8 rounded-full border transition-colors duration-300 relative shrink-0 ${audioEnabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
             >
-              <div className={`absolute top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${audioEnabled ? 'right-1' : 'left-1'}`} />
+              <div className={`absolute top-[3px] w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${audioEnabled ? 'right-1' : 'left-1'}`} />
               <span className="sr-only">{audioEnabled ? 'Alertas sonoros ativados' : 'Alertas sonoros desativados'}</span>
             </button>
           </div>
@@ -350,7 +350,7 @@ export function NotificationSettings() {
               </div>
               <button
                 onClick={() => setBrowserNotificationsEnabled(!browserNotificationsEnabled)}
-                className={`w-14 h-8 rounded-full border transition-colors duration-300 relative ${browserNotificationsEnabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
+                className={`w-14 h-8 rounded-full border transition-colors duration-300 relative shrink-0 ${browserNotificationsEnabled ? 'bg-primary border-primary' : 'bg-muted border-border'}`}
               >
                 <div className={`absolute top-[3px] w-6 h-6 rounded-full bg-white shadow-sm transition-all duration-300 ${browserNotificationsEnabled ? 'right-1' : 'left-1'}`} />
               </button>

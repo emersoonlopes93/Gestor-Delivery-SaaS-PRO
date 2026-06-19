@@ -98,7 +98,7 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
   useEffect(() => { readyUrlRef.current = readyUrl; }, [readyUrl]);
 
   useEffect(() => {
-    if (!tenantId || !settings.enabled) {
+    if (!tenantId) {
       if (socketRef.current) {
         console.log('[Websocket] Disconnecting orders namespace');
         socketRef.current.disconnect();
