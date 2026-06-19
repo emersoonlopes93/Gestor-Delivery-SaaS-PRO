@@ -12,8 +12,28 @@ export interface Tenant {
   slug: string;
   status: TenantStatus;
   settings?: TenantSettings;
+  businessGroup?: BusinessGroupContext | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface BusinessGroupTenantSummary {
+  id: string;
+  name: string;
+  slug: string;
+  status: TenantStatus;
+}
+
+export interface BusinessGroupContext {
+  id: string;
+  name: string;
+  ownerId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  tenants?: BusinessGroupTenantSummary[];
+  _count?: {
+    tenants: number;
+  };
 }
 
 export interface TenantSettings {

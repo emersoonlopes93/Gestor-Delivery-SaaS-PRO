@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
-import { Tenant, TenantSettings } from '@gestor/types';
+import { BusinessGroupContext, Tenant, TenantSettings } from '@gestor/types';
 
 
 
@@ -51,6 +51,7 @@ export function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'address' | 'finance' | 'hours'>('overview');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [businessGroup, setBusinessGroup] = useState<BusinessGroupContext | null>(null);
   const [settings, setSettings] = useState<Partial<TenantSettings>>({
     timezone: 'America/Sao_Paulo',
     currency: 'BRL',
@@ -103,6 +104,20 @@ export function SettingsPage() {
             businessGroupId: response.data.businessGroupId
           });
         }
+        setBusinessGroup(
+          response.data.businessGroup ?? (
+            response.data.businessGroupId
+              ? {
+                  id: response.data.businessGroupId,
+                  name: 'Grupo de Negócios vinculado',
+                  createdAt: '',
+                  updatedAt: '',
+                  tenants: [],
+                  _count: { tenants: 1 },
+                }
+              : null
+          )
+        );
       }
     } catch (error) {
       console.error('Erro ao carregar configurações:', error);
@@ -377,19 +392,18 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto text-left space-y-8">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto text-left space-y-6 lg:space-y-8">
       <PageHeader
         title="Configurações da Loja"
         description="Gerencie o funcionamento e informações do seu estabelecimento."
       />
 
-      {/* Card rápido: Importar Cardápio Base */}
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         {[
-          { id: 'overview', label: 'Loja', icon: Store },
-          { id: 'address', label: 'Endereço', icon: MapPin },
-          { id: 'finance', label: 'Fiscal & Pagamento', icon: Wallet },
-          { id: 'hours', label: 'Horários', icon: Clock },
+          { id: 'overview', label: 'Loja', subtitle: 'Identidade e ações rápidas', icon: Store },
+          { id: 'address', label: 'Endereço', subtitle: 'CEP, rua e complemento', icon: MapPin },
+          { id: 'finance', label: 'Fiscal & Pagamento', subtitle: 'Dados fiscais e recebimentos', icon: Wallet },
+          { id: 'hours', label: 'Horários', subtitle: 'Agenda semanal e turnos', icon: Clock },
         ].map((tab) => {
           const active = activeTab === tab.id;
           const Icon = tab.icon;
@@ -398,90 +412,145 @@ export function SettingsPage() {
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-bold transition-colors shrink-0 ${
+              className={`group w-full rounded-2xl border p-4 text-left transition-all min-h-[92px] ${
                 active
-                  ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                  : 'bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted'
+                  ? 'bg-primary/10 text-primary border-primary/30 shadow-sm ring-1 ring-primary/20'
+                  : 'bg-card text-muted-foreground border-border hover:text-foreground hover:border-primary/20 hover:bg-muted/50'
               }`}
             >
-              <Icon className="w-4 h-4" />
-              {tab.label}
+              <div className="flex items-start gap-3">
+                <div
+                  className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                    active ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground group-hover:bg-primary/10 group-hover:text-primary'
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-black leading-tight truncate">{tab.label}</div>
+                  <div className={`mt-1 text-xs leading-snug ${active ? 'text-primary/80' : 'text-muted-foreground'}`}>
+                    {tab.subtitle}
+                  </div>
+                </div>
+              </div>
             </button>
           );
         })}
       </div>
 
-      <div className={`bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5 ${isOverviewTab ? '' : 'hidden'}`}>
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
-              <ChefHat className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <div className="font-black text-slate-900 dark:text-white text-sm">Importar Cardápio Base</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Adicione categorias e produtos pré-definidos para o seu segmento em segundos
+      <div className={`grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.95fr)] ${isOverviewTab ? '' : 'hidden'}`}>
+        <div className="bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
+                <ChefHat className="w-5 h-5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-black text-slate-900 dark:text-white text-sm">Importar Cardápio Base</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 max-w-xl">
+                  Adicione categorias e produtos pré-definidos para o seu segmento em segundos.
+                </div>
               </div>
             </div>
-          </div>
-          <button
-            onClick={() => navigate('/settings/menu-import')}
-            className="shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl transition-all shadow-md shadow-indigo-500/20 text-sm"
-          >
-            Importar →
-          </button>
-        </div>
-      </div>
-
-      {settings.businessGroupId && isOverviewTab && (
-        <div className="bg-indigo-600 rounded-2xl shadow-lg p-5 text-white flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="bg-card/20 p-2.5 rounded-xl">
-              <Building2 className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="text-xs font-black uppercase tracking-widest text-indigo-200">Plano Corporativo</div>
-              <p className="font-bold">Esta unidade faz parte de um <span className="text-indigo-100 italic">Grupo de Negócios</span>.</p>
-            </div>
-          </div>
-          <div className="hidden md:block bg-card/10 px-4 py-2 rounded-lg border border-white/20 text-xs font-bold">
-            Multi-unidade Ativado
-          </div>
-        </div>
-      )}
-
-      {/* Pausa Manual */}
-      <div className={`bg-card rounded-2xl shadow-sm border p-6 transition-all ${settings.isStorePaused ? 'border-status-warning/20 bg-status-warning/5 dark:border-status-warning/30 dark:bg-status-warning/5' : 'border-border'} ${isOverviewTab ? '' : 'hidden'}`}>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-start gap-4">
-            <div className={`p-3 rounded-xl ${settings.isStorePaused ? 'bg-status-warning/10 text-status-warning' : 'bg-status-success/10 text-status-success'}`}>
-              <Pause className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-foreground">Pausa Temporária</h2>
-              <p className="text-sm text-muted-foreground font-medium">Use isso para fechar a loja imediatamente, independente dos horários.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            {settings.isStorePaused && (
-              <input
-                type="text"
-                placeholder="Motivo da pausa (opcional)"
-                value={settings.storePauseReason || ''}
-                onChange={(e) => setSettings({ ...settings, storePauseReason: e.target.value })}
-                className="input-premium border-status-warning/20 dark:border-status-warning/30 focus:border-status-warning w-64 !py-2"
-              />
-            )}
             <button
-              onClick={handleTogglePause}
-              className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm ${
-                settings.isStorePaused 
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
-                  : 'bg-status-warning text-slate-950 hover:bg-status-warning/90'
-              }`}
+              onClick={() => navigate('/settings/menu-import')}
+              className="shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl transition-all shadow-md shadow-indigo-500/20 text-sm"
             >
-              {settings.isStorePaused ? '▶️ Reabrir Loja' : '⏸️ Pausar Agora'}
+              Importar →
             </button>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {businessGroup && (
+            <div className="bg-indigo-600 rounded-2xl shadow-lg p-5 text-white">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-4 min-w-0">
+                  <div className="bg-card/20 p-2.5 rounded-xl shrink-0">
+                    <Building2 className="w-6 h-6" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-black uppercase tracking-widest text-indigo-200">Plano Corporativo</div>
+                    <p className="font-black text-base leading-snug mt-1 truncate">{businessGroup.name}</p>
+                    <p className="font-medium text-indigo-100/90 text-sm mt-2 leading-snug">
+                      Esta unidade faz parte de um grupo multi-unidades e compartilha contexto operacional com a rede.
+                    </p>
+                  </div>
+                </div>
+                <div className="hidden xl:flex shrink-0 items-center gap-2 bg-card/10 px-4 py-2 rounded-lg border border-white/20 text-xs font-bold">
+                  <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-300" />
+                  {businessGroup._count?.tenants ?? businessGroup.tenants?.length ?? 0} lojas
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-card/10 rounded-xl px-4 py-3 border border-white/10">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Unidades vinculadas</div>
+                  <div className="mt-1 text-sm font-bold">{businessGroup._count?.tenants ?? businessGroup.tenants?.length ?? 0} unidade(s)</div>
+                </div>
+                <div className="bg-card/10 rounded-xl px-4 py-3 border border-white/10">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Gerenciamento</div>
+                  <div className="mt-1 text-sm font-bold">Feito pelo painel administrativo</div>
+                </div>
+              </div>
+
+              {businessGroup.tenants && businessGroup.tenants.length > 0 && (
+                <div className="mt-4">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-2">Lojas da rede</div>
+                  <div className="flex flex-wrap gap-2">
+                    {businessGroup.tenants.slice(0, 4).map((tenant) => (
+                      <span key={tenant.id} className="inline-flex items-center gap-2 rounded-full bg-card/10 px-3 py-1.5 text-xs font-bold border border-white/10">
+                        <span className={`h-1.5 w-1.5 rounded-full ${tenant.status === 'active' ? 'bg-emerald-300' : 'bg-amber-300'}`} />
+                        {tenant.name}
+                      </span>
+                    ))}
+                    {businessGroup.tenants.length > 4 && (
+                      <span className="inline-flex items-center rounded-full bg-card/10 px-3 py-1.5 text-xs font-bold border border-white/10">
+                        +{businessGroup.tenants.length - 4}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className={`bg-card rounded-2xl shadow-sm border p-5 transition-all ${settings.isStorePaused ? 'border-status-warning/20 bg-status-warning/5 dark:border-status-warning/30 dark:bg-status-warning/5' : 'border-border'}`}>
+            <div className="flex items-start gap-4">
+              <div className={`p-3 rounded-xl ${settings.isStorePaused ? 'bg-status-warning/10 text-status-warning' : 'bg-status-success/10 text-status-success'}`}>
+                <Pause className="w-5 h-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-base font-bold text-foreground">Pausa temporária</h2>
+                  <span className={`text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${settings.isStorePaused ? 'bg-status-warning/10 text-status-warning' : 'bg-status-success/10 text-status-success'}`}>
+                    {settings.isStorePaused ? 'Pausada' : 'Ativa'}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground font-medium mt-2">Feche a loja imediatamente sem mexer nos horários.</p>
+              </div>
+            </div>
+            <div className="mt-4 space-y-3">
+              {settings.isStorePaused && (
+                <input
+                  type="text"
+                  placeholder="Motivo da pausa (opcional)"
+                  value={settings.storePauseReason || ''}
+                  onChange={(e) => setSettings({ ...settings, storePauseReason: e.target.value })}
+                  className="input-premium border-status-warning/20 dark:border-status-warning/30 focus:border-status-warning !py-2"
+                />
+              )}
+              <button
+                onClick={handleTogglePause}
+                className={`w-full px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm ${
+                  settings.isStorePaused 
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
+                    : 'bg-status-warning text-slate-950 hover:bg-status-warning/90'
+                }`}
+              >
+                {settings.isStorePaused ? 'Reabrir loja' : 'Pausar agora'}
+              </button>
+            </div>
           </div>
         </div>
       </div>

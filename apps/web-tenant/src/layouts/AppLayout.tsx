@@ -27,6 +27,7 @@ import {
   CornerDownRight,
   Moon,
   Sun,
+  Building2,
   LogOut,
   Globe,
   QrCode,
@@ -45,7 +46,7 @@ import { useAuthStore } from '../stores/auth.store';
 import { useThemeStore } from '../stores/theme.store';
 import { api } from '../lib/api-client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Tenant, TenantSettings, TenantOperatingHours } from '@gestor/types';
+import type { BusinessGroupContext, Tenant, TenantSettings, TenantOperatingHours } from '@gestor/types';
 import { useNotificationAudio } from '../hooks/useNotificationAudio';
 import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
 import { useLogisticsSocket } from '../features/delivery/hooks/useLogisticsSocket';
@@ -354,8 +355,22 @@ export function AppLayout() {
   const { data: tenantData } = useQuery({
     queryKey: ['tenant-settings'],
     queryFn: async () => {
-      const res = await api.get<Tenant & { settings: TenantSettings, operatingHours: TenantOperatingHours[] }>('/tenant/me');
-      return res.data;
+      const res = await api.get<Tenant & { settings: TenantSettings; operatingHours: TenantOperatingHours[]; businessGroup?: BusinessGroupContext | null }>('/tenant/me');
+      return {
+        ...res.data,
+        businessGroup: res.data.businessGroup ?? (
+          res.data.settings?.businessGroupId
+            ? {
+                id: res.data.settings.businessGroupId,
+                name: 'Grupo de Negócios vinculado',
+                createdAt: '',
+                updatedAt: '',
+                tenants: [],
+                _count: { tenants: 1 },
+              }
+            : null
+        ),
+      };
     },
     staleTime: 1000 * 60 * 5,
   });
@@ -648,6 +663,15 @@ export function AppLayout() {
                     Gestor<span className="text-primary">PRO</span>
                   </h1>
                   <p className="text-[10px] font-black text-muted-foreground mt-1 truncate leading-none uppercase tracking-wider">{user?.tenant?.name || 'Carregando...'}</p>
+                  {tenantData?.businessGroup ? (
+                    <div className="mt-2 inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-muted px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-foreground">
+                      <Building2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span className="truncate">{tenantData.businessGroup.name}</span>
+                      <span className="text-muted-foreground font-bold normal-case tracking-normal">
+                        {tenantData.businessGroup._count?.tenants ?? tenantData.businessGroup.tenants?.length ?? 0} lojas
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             ) : (

@@ -4,7 +4,7 @@ import { CreditCard, Loader2, Package, TrendingUp, Receipt, AlertTriangle } from
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../../stores/auth.store';
 import { api } from '../../lib/api-client';
-import { Tenant, TenantSettings, TenantOperatingHours, ProductCategory, Product, DashboardStatsDTO } from '@gestor/types';
+import { BusinessGroupContext, Tenant, TenantSettings, TenantOperatingHours, ProductCategory, Product, DashboardStatsDTO } from '@gestor/types';
 import { SetupWizard } from './SetupWizard';
 
 type DecimalLike = string | number;
@@ -54,8 +54,22 @@ export function DashboardPage() {
   const { data: tenantData } = useQuery({
     queryKey: ['tenant-settings'],
     queryFn: async () => {
-      const res = await api.get<Tenant & { settings: TenantSettings, operatingHours: TenantOperatingHours[] }>('/tenant/me');
-      return res.data;
+      const res = await api.get<Tenant & { settings: TenantSettings; operatingHours: TenantOperatingHours[]; businessGroup?: BusinessGroupContext | null }>('/tenant/me');
+      return {
+        ...res.data,
+        businessGroup: res.data.businessGroup ?? (
+          res.data.settings?.businessGroupId
+            ? {
+                id: res.data.settings.businessGroupId,
+                name: 'Grupo de Negócios vinculado',
+                createdAt: '',
+                updatedAt: '',
+                tenants: [],
+                _count: { tenants: 1 },
+              }
+            : null
+        ),
+      };
     },
     staleTime: 1000 * 60 * 5,
     retry: 1,
@@ -194,6 +208,28 @@ export function DashboardPage() {
             hasProducts={stats.hasProducts}
           />
       )}
+
+      {tenantData?.businessGroup ? (
+        <div className="card-premium p-5 mb-8 border border-indigo-200 dark:border-indigo-800 bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-950/20 dark:to-violet-950/20">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500 dark:text-indigo-300">Grupo de Negócios</p>
+              <h2 className="mt-1 text-xl font-black text-gray-900 dark:text-gray-100 truncate">{tenantData.businessGroup.name}</h2>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                Esta loja opera em uma rede multi-unidades. O vínculo é gerenciado no painel administrativo.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <div className="bg-white/70 dark:bg-gray-900/60 rounded-xl px-4 py-3 border border-white/50 dark:border-gray-800">
+                <span className="block text-[10px] font-black uppercase tracking-widest text-gray-400">Lojas na rede</span>
+                <span className="block mt-1 font-black text-gray-900 dark:text-gray-100">
+                  {tenantData.businessGroup._count?.tenants ?? tenantData.businessGroup.tenants?.length ?? 0}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
           <div className="card-premium p-6 mb-8">
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-5">
