@@ -19,6 +19,28 @@ export type OrderStatus =
 
 export type FulfillmentType = 'delivery' | 'pickup' | 'dine_in' | 'table';
 
+export const FULFILLMENT_TYPE_LABELS: Record<FulfillmentType, string> = {
+  delivery: 'Entrega',
+  pickup: 'Retirada no Balcão',
+  dine_in: 'Salão',
+  table: 'Mesa',
+};
+
+export function formatFulfillmentTypeLabel(value?: string | null): string {
+  switch (value) {
+    case 'delivery':
+      return FULFILLMENT_TYPE_LABELS.delivery;
+    case 'pickup':
+      return FULFILLMENT_TYPE_LABELS.pickup;
+    case 'dine_in':
+      return FULFILLMENT_TYPE_LABELS.dine_in;
+    case 'table':
+      return FULFILLMENT_TYPE_LABELS.table;
+    default:
+      return 'Outro';
+  }
+}
+
 export type OrderLineType = 'product' | 'combo';
 
 export class PaymentInput {

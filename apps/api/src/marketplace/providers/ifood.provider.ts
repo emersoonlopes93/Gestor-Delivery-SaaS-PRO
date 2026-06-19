@@ -89,7 +89,9 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
       externalOrderId: this.readString(order, ['id', 'orderId', 'order_id']) ?? 'unknown-order',
       externalDisplayId: this.readString(order, ['displayId', 'display_id']),
       externalStatus: this.readString(order, ['status']),
-      fulfillmentType: (this.readString(order, ['fulfillmentType']) ?? 'delivery') === 'pickup' ? 'pickup' : 'delivery',
+      fulfillmentType: this.normalizeFulfillmentType(
+        this.readString(order, ['fulfillmentType', 'fulfillment_type', 'serviceType', 'service_type']),
+      ),
       customerName: this.readString(customer, ['name']) ?? 'Cliente Marketplace',
       customerPhone: this.readString(customer, ['phone', 'phoneNumber']) ?? '00000000000',
       customerEmail: this.readString(customer, ['email']),
@@ -151,6 +153,25 @@ export class IfoodProvider implements MarketplaceProviderAdapter {
       return Number.isFinite(parsed) ? parsed : null;
     }
     return null;
+  }
+
+  private normalizeFulfillmentType(value: string | null): 'delivery' | 'pickup' {
+    if (!value) return 'delivery';
+
+    const normalized = value.trim().toLowerCase();
+    const compact = normalized.replace(/[^a-z0-9]/g, '');
+    if (
+      compact.includes('pickup') ||
+      compact.includes('takeaway') ||
+      compact.includes('takeout') ||
+      compact.includes('retirada') ||
+      compact.includes('balcao') ||
+      compact.includes('counter')
+    ) {
+      return 'pickup';
+    }
+
+    return 'delivery';
   }
 
   private isSmokeModeEnabled(): boolean {

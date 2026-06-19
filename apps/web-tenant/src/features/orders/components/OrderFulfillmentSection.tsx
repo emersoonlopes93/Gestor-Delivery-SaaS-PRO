@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { MapPin, Navigation } from 'lucide-react';
-import type { DeliveryAddressDTO } from '@gestor/types';
+import { formatFulfillmentTypeLabel, type DeliveryAddressDTO } from '@gestor/types';
 
 interface OrderFulfillmentSectionProps {
   fulfillmentType: string;
@@ -8,12 +8,11 @@ interface OrderFulfillmentSectionProps {
   tableNumber?: string | null;
 }
 
-export const OrderFulfillmentSection = memo(function OrderFulfillmentSection({ 
-  fulfillmentType, 
+export const OrderFulfillmentSection = memo(function OrderFulfillmentSection({
+  fulfillmentType,
   deliveryAddress,
-  tableNumber 
+  tableNumber,
 }: OrderFulfillmentSectionProps) {
-  
   const handleOpenMap = () => {
     if (deliveryAddress) {
       const addr = `${deliveryAddress.street}, ${deliveryAddress.number}, ${deliveryAddress.city}`;
@@ -24,9 +23,9 @@ export const OrderFulfillmentSection = memo(function OrderFulfillmentSection({
   return (
     <section>
       <h3 className="text-[11px] font-black uppercase tracking-wider text-muted-foreground mb-3">
-        {fulfillmentType === 'delivery' ? 'Entrega' : fulfillmentType === 'pickup' ? 'Retirada' : 'Mesa'}
+        {formatFulfillmentTypeLabel(fulfillmentType)}
       </h3>
-      
+
       {fulfillmentType === 'delivery' && deliveryAddress ? (
         <div className="bg-background p-4 rounded-2xl border border-border flex items-start gap-3">
           <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center shrink-0">
@@ -38,7 +37,7 @@ export const OrderFulfillmentSection = memo(function OrderFulfillmentSection({
                 {deliveryAddress.street}, {deliveryAddress.number}
                 {deliveryAddress.complement && ` - ${deliveryAddress.complement}`}
               </p>
-              <button 
+              <button
                 onClick={handleOpenMap}
                 className="p-1.5 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors shrink-0"
                 title="Abrir no Mapa"
@@ -66,7 +65,17 @@ export const OrderFulfillmentSection = memo(function OrderFulfillmentSection({
             <p className="text-xs text-muted-foreground">Consumo no local</p>
           </div>
         </div>
-      ) : (
+      ) : fulfillmentType === 'table' && tableNumber ? (
+        <div className="bg-background p-4 rounded-2xl border border-border flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
+            <span className="text-lg font-black text-blue-600 dark:text-blue-400">#</span>
+          </div>
+          <div>
+            <p className="text-sm font-bold text-foreground">Mesa {tableNumber}</p>
+            <p className="text-xs text-muted-foreground">Consumo no local</p>
+          </div>
+        </div>
+      ) : fulfillmentType === 'pickup' ? (
         <div className="bg-background p-4 rounded-2xl border border-border flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
             <span className="text-lg font-black text-amber-600 dark:text-amber-400">🏪</span>
@@ -74,6 +83,16 @@ export const OrderFulfillmentSection = memo(function OrderFulfillmentSection({
           <div>
             <p className="text-sm font-bold text-foreground">Retirada no Balcão</p>
             <p className="text-xs text-muted-foreground">O cliente virá buscar</p>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-background p-4 rounded-2xl border border-border flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
+            <span className="text-lg font-black text-amber-600 dark:text-amber-400">🏪</span>
+          </div>
+          <div>
+            <p className="text-sm font-bold text-foreground">Tipo de atendimento não identificado</p>
+            <p className="text-xs text-muted-foreground">Verifique o pedido na origem</p>
           </div>
         </div>
       )}

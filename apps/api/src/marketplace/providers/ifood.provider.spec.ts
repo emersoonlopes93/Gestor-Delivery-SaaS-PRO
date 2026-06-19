@@ -79,4 +79,38 @@ describe('IfoodProvider', () => {
     expect(normalized.items[0].totalPrice).toBe(60);
     expect(normalized.fulfillmentType).toBe('delivery');
   });
+
+  it('maps pickup-like fulfillment aliases to pickup', async () => {
+    const normalized = await provider.normalizeOrder({
+      connection: {
+        id: 'conn-1',
+        tenantId: 'tenant-1',
+        provider: MarketplaceProvider.IFOOD,
+        status: MarketplaceConnectionStatus.CONNECTED,
+        externalMerchantId: 'merchant-1',
+        externalStoreId: 'store-1',
+        displayName: 'Loja iFood',
+        authType: null,
+        accessTokenEnc: null,
+        refreshTokenEnc: null,
+        tokenExpiresAt: null,
+        scopesJson: null,
+        settingsJson: { importAsStatus: 'pending' },
+        lastSyncAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      externalOrder: {
+        id: 'ext-order-2',
+        fulfillmentType: 'takeaway',
+        customer: {
+          name: 'Joao',
+          phone: '5511988888888',
+        },
+        items: [],
+      },
+    });
+
+    expect(normalized.fulfillmentType).toBe('pickup');
+  });
 });

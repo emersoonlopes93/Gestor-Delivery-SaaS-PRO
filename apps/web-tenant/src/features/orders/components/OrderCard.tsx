@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Clock, ArrowRight, User, Printer, Eye, Edit2, FileText, DollarSign, ShoppingBag, MapPin } from 'lucide-react';
-import { SOURCE_CHANNEL_LABELS, type OrderBoardItemDTO, type OrderStatus } from '@gestor/types';
+import { SOURCE_CHANNEL_LABELS, formatFulfillmentTypeLabel, type OrderBoardItemDTO, type OrderStatus } from '@gestor/types';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -135,7 +135,7 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
           <p className="text-muted-foreground flex items-center gap-1.5 font-bold text-[10px] uppercase tracking-wider">
             <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
             <span>
-              {order.fulfillmentType === 'delivery' ? '📦 Entrega' : order.isScheduled ? '📅 Agendado' : '🏪 Retirada'}
+              {formatFulfillmentTypeLabel(order.fulfillmentType)}{order.isScheduled ? ' · Agendado' : ''}
             </span>
             <span>·</span>
             <span>

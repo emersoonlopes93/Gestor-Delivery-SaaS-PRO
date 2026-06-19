@@ -66,6 +66,11 @@ export type {
   OrderDispatchItemDTO,
 } from './order';
 
+export {
+  FULFILLMENT_TYPE_LABELS,
+  formatFulfillmentTypeLabel,
+} from './order';
+
 export { 
   ORDER_STATUS_TRANSITIONS, 
   DeliveryAddressDTO, 

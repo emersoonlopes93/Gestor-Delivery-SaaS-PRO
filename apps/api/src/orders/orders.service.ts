@@ -34,6 +34,7 @@ import type {
   PizzaCompositionDTO,
 } from '@gestor/types';
 import { ORDER_STATUS_TRANSITIONS, UpdateOrderStatusDTO } from '@gestor/types';
+import type { FulfillmentType } from '@gestor/types';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
 import { OrdersGateway } from './orders.gateway';
 import { KdsService } from '../kds/kds.service';
@@ -56,8 +57,8 @@ export class OrdersService {
     return map[p];
   }
 
-  private mapFulfillmentType(f: string | null): 'delivery' | 'pickup' {
-    if (f === 'pickup') return 'pickup';
+  private mapFulfillmentType(f: string | null): FulfillmentType {
+    if (f === 'pickup' || f === 'dine_in' || f === 'table' || f === 'delivery') return f;
     return 'delivery';
   }
 
@@ -549,7 +550,7 @@ export class OrdersService {
         id: o.id,
         orderNumber: o.orderNumber,
         status: o.status as OrderStatus,
-        fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+          fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
         customerName: o.customerName,
         customerPhone: o.customerPhone,
         total: Number(o.total),
@@ -591,7 +592,7 @@ export class OrdersService {
       id: o.id,
       orderNumber: o.orderNumber,
       status: o.status as OrderStatus,
-      fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+      fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
       customerName: o.customerName,
       total: Number(o.total),
       itemCount: o.items.reduce((sum, i) => sum + i.quantity, 0),
@@ -629,7 +630,7 @@ export class OrdersService {
       id: o.id,
       orderNumber: o.orderNumber,
       status: o.status as OrderStatus,
-      fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+      fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
       notes: o.notes,
       items: o.items.map((i) => ({
         id: i.id,
@@ -1145,7 +1146,7 @@ export class OrdersService {
       orderNumber: o.orderNumber,
       customerName: o.customerName,
       customerPhone: o.customerPhone ?? undefined,
-      fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+      fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
       status: o.status as OrderStatus,
       deliveryAddress: o.deliveryAddress
         ? {
@@ -1226,7 +1227,7 @@ export class OrdersService {
 
     if (!order) throw new NotFoundException('Pedido não encontrado.');
 
-    if (driverId && order.fulfillmentType !== 'delivery') {
+    if (order.fulfillmentType !== 'delivery') {
       throw new BadRequestException('Somente pedidos de entrega podem receber entregador.');
     }
 

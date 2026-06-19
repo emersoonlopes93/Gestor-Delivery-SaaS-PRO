@@ -243,11 +243,12 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
 
               {/* Entregador (se for entrega) */}
               {order.fulfillmentType === 'delivery' && (
-                <OrderDriverSection 
-                  driverId={order.deliveryDriverId}
-                  driverName={order.deliveryDriverName}
-                  driverPhone={order.deliveryDriverPhone}
-                  driverStatus={order.deliveryDriverStatus}
+              <OrderDriverSection 
+                fulfillmentType={order.fulfillmentType}
+                driverId={order.deliveryDriverId}
+                driverName={order.deliveryDriverName}
+                driverPhone={order.deliveryDriverPhone}
+                driverStatus={order.deliveryDriverStatus}
                   onAssignDriver={async () => {
                     await fetchDrivers();
                     setIsDriverModalOpen(true);
