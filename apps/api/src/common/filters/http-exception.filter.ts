@@ -110,6 +110,18 @@ export class HttpExceptionFilter implements ExceptionFilter {
         ...(tenantId ? { tenantId } : {}),
         ...(userId ? { userId } : {}),
       });
+    } else if (status === HttpStatus.NOT_FOUND) {
+      this.logger.log({
+        message: 'http_exception',
+        statusCode: status,
+        code,
+        errorMessage: message,
+        method: request.method,
+        path: request.url,
+        ...(requestId ? { requestId } : {}),
+        ...(tenantId ? { tenantId } : {}),
+        ...(userId ? { userId } : {}),
+      });
     } else {
       this.logger.warn({
         message: 'http_exception',

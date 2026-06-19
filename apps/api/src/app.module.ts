@@ -44,6 +44,7 @@ import { ChatModule } from './chat/chat.module';
 import { getApiEnvFilePaths, loadApiEnvFiles } from './config/env-paths';
 import { MailModule } from './mail/mail.module';
 import { PrintingModule } from './printing/printing.module';
+import { AppController } from './app.controller';
 import { MarketplaceModule } from './marketplace/marketplace.module';
 
 loadApiEnvFiles();
@@ -103,6 +104,7 @@ if (process.env.REDIS_ENABLED === 'false') {
 }
 
 @Module({
+  controllers: [AppController],
   imports: [
     // Configuration - loads env files from absolute, cwd-independent paths.
     ConfigModule.forRoot({
