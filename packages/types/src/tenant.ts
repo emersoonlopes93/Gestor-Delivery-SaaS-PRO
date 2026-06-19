@@ -11,23 +11,29 @@ export interface Tenant {
   name: string;
   slug: string;
   status: TenantStatus;
+  businessGroupId?: string | null;
+  businessGroupRole?: BusinessGroupRole | null;
   settings?: TenantSettings;
   businessGroup?: BusinessGroupContext | null;
   createdAt: string;
   updatedAt: string;
 }
 
+export type BusinessGroupRole = 'headquarters' | 'branch';
+
 export interface BusinessGroupTenantSummary {
   id: string;
   name: string;
   slug: string;
   status: TenantStatus;
+  businessGroupRole?: BusinessGroupRole | null;
 }
 
 export interface BusinessGroupContext {
   id: string;
   name: string;
   ownerId?: string | null;
+  headquartersTenantId?: string | null;
   createdAt: string;
   updatedAt: string;
   tenants?: BusinessGroupTenantSummary[];
@@ -49,7 +55,7 @@ export interface TenantNetworkStoreSummary {
 export interface TenantNetworkContext {
   groupId: string | null;
   groupName: string;
-  role: 'headquarters' | 'branch';
+  role: BusinessGroupRole;
   ownerEmail: string;
   currentTenantId: string;
   stores: TenantNetworkStoreSummary[];
@@ -102,7 +108,6 @@ export interface TenantSettings {
   taxRegime?: string;
   standardCfop?: string;
   standardNcm?: string;
-
   businessGroupId?: string | null;
 
   isStorePaused: boolean;

@@ -9,12 +9,14 @@ datasource db {
 }
 
 model BusinessGroup {
-  id        String   @id @default(uuid())
-  name      String   @db.VarChar(100)
-  ownerId   String?  @map("owner_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  tenants   Tenant[]
+  id                   String   @id @default(uuid())
+  name                 String   @db.VarChar(100)
+  ownerId              String?  @map("owner_id")
+  headquartersTenantId String?  @unique @map("headquarters_tenant_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  tenants              Tenant[] @relation("TenantBusinessGroupMembers")
+  headquartersTenant   Tenant?  @relation("BusinessGroupHeadquarters", fields: [headquartersTenantId], references: [id], onDelete: SetNull)
 
   @@map("business_groups")
 }
@@ -22,6 +24,7 @@ model BusinessGroup {
 model Tenant {
   id                          String                       @id @default(uuid())
   businessGroupId             String?                      @map("business_group_id")
+  businessGroupRole           BusinessGroupTenantRole?     @map("business_group_role")
   name                        String                       @db.VarChar(100)
   slug                        String                       @unique @db.VarChar(60)
   status                      TenantStatus                 @default(active)
@@ -108,7 +111,8 @@ model Tenant {
   marketplaceEventInboxes     MarketplaceEventInbox[]
   marketplaceOrders           MarketplaceOrder[]
   users                       TenantUser[]
-  businessGroup               BusinessGroup?               @relation(fields: [businessGroupId], references: [id])
+  businessGroup               BusinessGroup?               @relation("TenantBusinessGroupMembers", fields: [businessGroupId], references: [id])
+  headquartersForGroup        BusinessGroup?               @relation("BusinessGroupHeadquarters")
   timeSlots                   TimeSlot[]
   schedulingSettings          SchedulingSettings?
   schedulingWindows           SchedulingWindow[]
@@ -2741,6 +2745,11 @@ enum TenantStatus {
   inactive
   suspended
   trial
+}
+
+enum BusinessGroupTenantRole {
+  headquarters
+  branch
 }
 
 enum AuthSubjectType {

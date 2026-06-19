@@ -119,6 +119,7 @@ export class TenantAuthService {
       roleSlugs: user.userRoles
         .map((userRole) => userRole.role?.slug)
         .filter((slug): slug is string => typeof slug === 'string'),
+      businessGroupRole: user.tenant.businessGroupRole,
       tenant: {
         id: user.tenant.id,
         name: user.tenant.name,

@@ -93,17 +93,16 @@ export class AdminGroupsService {
   }
 
   private async resolveGroupOwnerEmail(groupId: string): Promise<string | null> {
-    const firstTenant = await this.prisma.tenant.findFirst({
-      where: { businessGroupId: groupId },
-      select: { id: true },
-      orderBy: { createdAt: 'asc' },
+    const group = await this.prisma.businessGroup.findUnique({
+      where: { id: groupId },
+      select: { headquartersTenantId: true },
     });
 
-    if (!firstTenant) {
+    if (!group?.headquartersTenantId) {
       return null;
     }
 
-    const owner = await this.findTenantOwner(firstTenant.id);
+    const owner = await this.findTenantOwner(group.headquartersTenantId);
     return owner?.email.toLowerCase() ?? null;
   }
 
@@ -114,7 +113,7 @@ export class AdminGroupsService {
     const [group, tenant, tenantOwner, groupOwnerEmail] = await Promise.all([
       this.prisma.businessGroup.findUnique({
         where: { id: groupId },
-        select: { id: true, ownerId: true },
+        select: { id: true, ownerId: true, headquartersTenantId: true },
       }),
       this.prisma.tenant.findUnique({
         where: { id: tenantId },
@@ -153,9 +152,21 @@ export class AdminGroupsService {
         });
       }
 
+      const tenantRole = group.headquartersTenantId ? 'branch' : 'headquarters';
+
+      if (!group.headquartersTenantId) {
+        await tx.businessGroup.update({
+          where: { id: groupId },
+          data: { headquartersTenantId: tenantId },
+        });
+      }
+
       return tx.tenant.update({
         where: { id: tenantId },
-        data: { businessGroupId: groupId },
+        data: {
+          businessGroupId: groupId,
+          businessGroupRole: tenantRole,
+        },
       });
     });
   }
@@ -164,9 +175,57 @@ export class AdminGroupsService {
    * Remove a tenant from a business group.
    */
   async removeTenantFromGroup(tenantId: string) {
-    return this.prisma.tenant.update({
+    const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      data: { businessGroupId: null },
+      select: {
+        id: true,
+        businessGroupId: true,
+        businessGroupRole: true,
+      },
+    });
+
+    if (!tenant?.businessGroupId) {
+      throw new NotFoundException('Loja nao vinculada a nenhuma rede');
+    }
+
+    const replacementTenant =
+      tenant.businessGroupRole === 'headquarters'
+        ? await this.prisma.tenant.findFirst({
+            where: {
+              businessGroupId: tenant.businessGroupId,
+              id: { not: tenantId },
+            },
+            select: { id: true },
+            orderBy: { createdAt: 'asc' },
+          })
+        : null;
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.tenant.update({
+        where: { id: tenantId },
+        data: {
+          businessGroupId: null,
+          businessGroupRole: null,
+        },
+      });
+
+      if (tenant.businessGroupRole !== 'headquarters') {
+        return { success: true };
+      }
+
+      await tx.businessGroup.update({
+        where: { id: tenant.businessGroupId! },
+        data: { headquartersTenantId: replacementTenant?.id ?? null },
+      });
+
+      if (replacementTenant) {
+        await tx.tenant.update({
+          where: { id: replacementTenant.id },
+          data: { businessGroupRole: 'headquarters' },
+        });
+      }
+
+      return { success: true };
     });
   }
 }

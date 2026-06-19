@@ -4,7 +4,7 @@ import { Cache } from 'cache-manager';
 import { PrismaService } from '../database/prisma.service';
 import { TenantDefaultRole, TenantStatus } from '@gestor/core';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
-import type { CreateBranchRequest, TenantNetworkContext, TenantOperatingHours } from '@gestor/types';
+import type { BusinessGroupRole, CreateBranchRequest, TenantNetworkContext, TenantOperatingHours } from '@gestor/types';
 import { Prisma } from '@prisma/client';
 import { 
   getStorefrontPresetById,
@@ -53,6 +53,7 @@ export class TenantService {
         name: true,
         slug: true,
         businessGroupId: true,
+        businessGroupRole: true,
         settings: {
           select: {
             city: true,
@@ -94,7 +95,7 @@ export class TenantService {
             name: true,
             slug: true,
             status: true,
-            createdAt: true,
+            businessGroupRole: true,
             settings: {
               select: {
                 city: true,
@@ -110,7 +111,7 @@ export class TenantService {
             name: tenant.name,
             slug: tenant.slug,
             status: TenantStatus.ACTIVE,
-            createdAt: new Date(),
+            businessGroupRole: 'headquarters' as const,
             settings: {
               city: tenant.settings?.city ?? null,
               state: tenant.settings?.state ?? null,
@@ -118,18 +119,24 @@ export class TenantService {
           },
         ];
 
-    const headquartersTenantId = stores[0]?.id ?? tenant.id;
     const group = tenant.businessGroupId
       ? await this.prisma.businessGroup.findUnique({
           where: { id: tenant.businessGroupId },
-          select: { id: true, name: true },
+          select: { id: true, name: true, headquartersTenantId: true },
         })
       : null;
+
+    const resolvedHeadquartersTenantId =
+      group?.headquartersTenantId ??
+      stores.find((store) => store.businessGroupRole === 'headquarters')?.id ??
+      tenant.id;
+    const resolvedRole: BusinessGroupRole =
+      tenant.businessGroupRole === 'branch' ? 'branch' : 'headquarters';
 
     return {
       groupId: group?.id ?? null,
       groupName: group?.name ?? `${tenant.name} Rede`,
-      role: tenant.id === headquartersTenantId ? 'headquarters' : 'branch',
+      role: resolvedRole,
       ownerEmail: ownerUser.email,
       currentTenantId: tenant.id,
       stores: stores.map((store) => ({
@@ -137,7 +144,8 @@ export class TenantService {
         name: store.name,
         slug: store.slug,
         status: store.status,
-        isHeadquarters: store.id === headquartersTenantId,
+        isHeadquarters:
+          store.businessGroupRole === 'headquarters' || store.id === resolvedHeadquartersTenantId,
         city: store.settings?.city ?? null,
         state: store.settings?.state ?? null,
       })),
@@ -164,6 +172,7 @@ export class TenantService {
                 name: true,
                 slug: true,
                 status: true,
+                businessGroupRole: true,
               },
               orderBy: {
                 name: 'asc',
@@ -215,6 +224,7 @@ export class TenantService {
             name: true,
             slug: true,
             status: true,
+            businessGroupRole: true,
           },
           orderBy: { name: 'asc' },
         });
@@ -264,11 +274,16 @@ export class TenantService {
         slug: true,
         status: true,
         businessGroupId: true,
+        businessGroupRole: true,
       },
     });
 
     if (!currentTenant) {
       throw new NotFoundException('Tenant not found');
+    }
+
+    if (currentTenant.businessGroupId && currentTenant.businessGroupRole === 'branch') {
+      throw new ForbiddenException('Somente a matriz pode criar novas filiais');
     }
 
     const ownerUser = await this.findOwnerUser(tenantId);
@@ -309,6 +324,7 @@ export class TenantService {
           data: {
             name: `${currentTenant.name} Rede`,
             ownerId: ownerUser.id,
+            headquartersTenantId: tenantId,
           },
         });
 
@@ -316,7 +332,10 @@ export class TenantService {
 
         await tx.tenant.update({
           where: { id: tenantId },
-          data: { businessGroupId },
+          data: {
+            businessGroupId,
+            businessGroupRole: 'headquarters',
+          },
         });
       }
 
@@ -326,6 +345,7 @@ export class TenantService {
           slug: sanitizedSlugBase,
           status: currentTenant.status,
           businessGroupId,
+          businessGroupRole: 'branch',
           onboarding: {
             create: {
               stepBasicInfo: false,

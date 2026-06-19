@@ -2,6 +2,8 @@
 // Auth Types — Shared between frontend and backend
 // ============================================================
 
+import type { BusinessGroupRole } from './tenant';
+
 /** JWT payload for tenant users */
 export interface TenantJwtPayload {
   sub: string;        // userId
@@ -85,6 +87,7 @@ export interface AccessibleTenantSession {
   userId: string;
   tenantId: string;
   roleSlugs: string[];
+  businessGroupRole?: BusinessGroupRole | null;
   tenant: {
     id: string;
     name: string;
