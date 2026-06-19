@@ -154,36 +154,36 @@ export function NotificationSettings() {
   );
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto animate-in fade-in duration-500">
-      <header className="mb-6 sm:mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="p-3 sm:p-6 lg:p-8 max-w-5xl mx-auto animate-in fade-in duration-500">
+      <header className="mb-4 sm:mb-8 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <h1 className="text-xl sm:text-2xl font-black text-foreground flex items-center gap-3">
+          <h1 className="text-lg sm:text-2xl font-black text-foreground flex items-center gap-2 sm:gap-3">
             <div className="p-2 bg-emerald-600 rounded-xl text-white shadow-lg shadow-emerald-600/20">
               <MessageSquare className="w-6 h-6" />
             </div>
             Notificações WhatsApp
           </h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1 font-medium">
+          <p className="text-xs sm:text-base text-muted-foreground mt-1 font-medium leading-relaxed">
             Configure o envio automático de mensagens de status para seus clientes.
           </p>
         </div>
         <button
           onClick={handleSave}
           disabled={mutation.isPending}
-          className="w-full lg:w-auto min-w-[180px] justify-center bg-primary text-primary-foreground hover:bg-primary/90 px-5 sm:px-8 py-3 rounded-2xl flex items-center gap-2 shadow-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed font-semibold transition-colors"
+          className="w-full lg:w-auto min-w-[160px] justify-center bg-primary text-primary-foreground hover:bg-primary/90 px-4 sm:px-8 py-2.5 sm:py-3 rounded-2xl flex items-center gap-2 shadow-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed font-semibold transition-colors"
         >
           {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           {mutation.isPending ? 'Salvando...' : 'Salvar Alterações'}
         </button>
       </header>
 
-      <div className="space-y-8">
+      <div className="space-y-6 sm:space-y-8">
         {/* Toggle Principal */}
-        <section className="bg-card rounded-3xl border border-border p-4 sm:p-6 lg:p-8 shadow-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-4 min-w-0">
-              <div className={`p-3 rounded-2xl transition-colors ${enabled ? 'bg-status-success/10 text-status-success' : 'bg-muted text-muted-foreground'}`}>
-                <Bell className="w-6 h-6" />
+        <section className="bg-card rounded-3xl border border-border p-3 sm:p-6 lg:p-8 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className={`p-2.5 rounded-2xl transition-colors ${enabled ? 'bg-status-success/10 text-status-success' : 'bg-muted text-muted-foreground'}`}>
+                <Bell className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               <div className="min-w-0">
                 <h2 className="text-base sm:text-lg font-black text-foreground">Status das Notificações</h2>
@@ -201,11 +201,11 @@ export function NotificationSettings() {
         </section>
 
         {/* Notificações Sonoras */}
-        <section className="bg-card rounded-3xl border border-border p-4 sm:p-6 lg:p-8 shadow-sm">
-           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6 sm:mb-8">
-            <div className="flex items-start gap-4 min-w-0">
-              <div className={`p-3 rounded-2xl transition-colors ${audioEnabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                {audioEnabled ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
+        <section className="bg-card rounded-3xl border border-border p-3 sm:p-6 lg:p-8 shadow-sm">
+           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-8">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className={`p-2.5 rounded-2xl transition-colors ${audioEnabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                {audioEnabled ? <Volume2 className="w-5 h-5 sm:w-6 sm:h-6" /> : <VolumeX className="w-5 h-5 sm:w-6 sm:h-6" />}
               </div>
               <div className="min-w-0">
                 <h2 className="text-base sm:text-lg font-black text-foreground">Alertas Sonoros</h2>
@@ -221,8 +221,8 @@ export function NotificationSettings() {
             </button>
           </div>
 
-          <div className={`space-y-6 transition-opacity ${audioEnabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
-            <div className="flex flex-col gap-2">
+          <div className={`space-y-4 sm:space-y-6 transition-opacity ${audioEnabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+            <div className="flex flex-col gap-1.5 sm:gap-2">
               <div className="flex justify-between items-center">
                 <label className="text-xs font-black uppercase tracking-widest text-foreground">Volume do Alerta</label>
                 <span className="text-xs font-bold text-foreground">{Math.round(volume * 100)}%</span>
@@ -237,8 +237,8 @@ export function NotificationSettings() {
             </div>
 
             {/* Seletor de som — Novo Pedido */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              <div className="space-y-1.5 sm:space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-foreground">Som de Novo Pedido</label>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <select
@@ -254,7 +254,7 @@ export function NotificationSettings() {
                     type="button"
                     onClick={handleTestNewOrder}
                     title="Testar som de novo pedido"
-                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-3 sm:py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
+                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-2.5 py-2.5 sm:px-3 sm:py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
                   >
                     <Play className="w-3.5 h-3.5" />
                     Testar
@@ -262,7 +262,7 @@ export function NotificationSettings() {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5 sm:space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-foreground">Som de Cancelamento</label>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <select
@@ -278,7 +278,7 @@ export function NotificationSettings() {
                     type="button"
                     onClick={handleTestCancellation}
                     title="Testar som de cancelamento"
-                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-3 sm:py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
+                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-2.5 py-2.5 sm:px-3 sm:py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
                   >
                     <Play className="w-3.5 h-3.5" />
                     Testar
@@ -286,7 +286,7 @@ export function NotificationSettings() {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5 sm:space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-foreground">Som de Transferência (IA→Agente)</label>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <select
@@ -302,7 +302,7 @@ export function NotificationSettings() {
                     type="button"
                     onClick={handleTestHandoff}
                     title="Testar som de transferência"
-                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-3 sm:py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
+                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-2.5 py-2.5 sm:px-3 sm:py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
                   >
                     <Play className="w-3.5 h-3.5" />
                     Testar
@@ -310,7 +310,7 @@ export function NotificationSettings() {
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5 sm:space-y-2">
                 <label className="text-xs font-black uppercase tracking-widest text-foreground">Som de Pedido Pronto</label>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <select
@@ -326,7 +326,7 @@ export function NotificationSettings() {
                     type="button"
                     onClick={handleTestReady}
                     title="Testar som de pedido pronto"
-                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-3 sm:py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
+                    className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-2.5 py-2.5 sm:px-3 sm:py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl font-bold text-xs hover:bg-primary/20 transition-all active:scale-95 animate-pulse"
                   >
                     <Play className="w-3.5 h-3.5" />
                     Testar
@@ -337,15 +337,15 @@ export function NotificationSettings() {
           </div>
 
           {/* Browser Notifications */}
-          <div className="border-t border-border pt-6 mt-6">
-            <div className="flex items-center justify-between">
-              <div className="flex gap-4">
-                <div className={`p-3 rounded-2xl transition-colors ${browserNotificationsEnabled ? 'bg-blue-600/10 text-blue-600' : 'bg-muted text-muted-foreground'}`}>
-                  <Smartphone className="w-6 h-6" />
+          <div className="border-t border-border pt-4 sm:pt-6 mt-4 sm:mt-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex gap-3 sm:gap-4">
+                <div className={`p-2.5 rounded-2xl transition-colors ${browserNotificationsEnabled ? 'bg-blue-600/10 text-blue-600' : 'bg-muted text-muted-foreground'}`}>
+                  <Smartphone className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-foreground">Notificações do Navegador</h3>
-                  <p className="text-xs text-muted-foreground font-medium">Receba alertas mesmo em outras abas ou com o navegador minimizado</p>
+                  <p className="text-[11px] sm:text-xs text-muted-foreground font-medium leading-relaxed">Receba alertas mesmo em outras abas ou com o navegador minimizado</p>
                 </div>
               </div>
               <button
@@ -360,20 +360,20 @@ export function NotificationSettings() {
 
         {/* Templates */}
         <section className={`transition-opacity duration-300 ${enabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
-          <div className="flex items-center gap-2 mb-6">
+          <div className="flex items-center gap-2 mb-4 sm:mb-6">
             <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground">Personalização de Mensagens</h2>
             <div className="h-px flex-1 bg-muted" />
           </div>
 
-          <div className="grid gap-6">
+          <div className="grid gap-4 sm:gap-6">
             {Object.entries(templates).map(([status, content]) => (
-              <div key={status} className="bg-card rounded-3xl border border-border p-6 shadow-sm hover:border-emerald-500/30 transition-all">
-                <div className="flex items-center justify-between mb-4">
+              <div key={status} className="bg-card rounded-3xl border border-border p-4 sm:p-6 shadow-sm hover:border-emerald-500/30 transition-all">
+                <div className="flex items-center justify-between mb-3 sm:mb-4 gap-3">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-status-success" />
                     <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">{status.replace(/_/g, ' ')}</span>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap justify-end">
                      <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-1 rounded">{"{{orderNumber}}"}</span>
                      <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-1 rounded">{"{{restaurantName}}"}</span>
                   </div>
@@ -381,7 +381,7 @@ export function NotificationSettings() {
                 <textarea
                   value={content}
                   onChange={(e) => setTemplates(prev => ({ ...prev, [status]: e.target.value }))}
-                  className="w-full bg-muted/50 border border-border rounded-2xl p-4 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[100px]"
+                  className="w-full bg-muted/50 border border-border rounded-2xl p-3 sm:p-4 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[88px] sm:min-h-[100px]"
                   placeholder="Digite a mensagem..."
                 />
               </div>
@@ -390,9 +390,9 @@ export function NotificationSettings() {
         </section>
 
         {/* Info Box */}
-        <div className="bg-primary/5 border border-primary/20 p-6 rounded-3xl flex gap-4 text-foreground">
-          <Info className="w-6 h-6 text-primary-600 shrink-0" />
-          <div className="text-sm text-primary-800 dark:text-primary-400 leading-relaxed font-medium">
+        <div className="bg-primary/5 border border-primary/20 p-4 sm:p-6 rounded-3xl flex gap-3 sm:gap-4 text-foreground">
+          <Info className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600 shrink-0 mt-0.5" />
+          <div className="text-xs sm:text-sm text-primary-800 dark:text-primary-400 leading-relaxed font-medium">
             <strong>Como funciona?</strong> As variáveis em chaves duplas como <code>{"{{orderNumber}}"}</code> serão substituídas automaticamente pelos dados reais do pedido antes do envio. Certifique-se de que sua instância de WhatsApp está conectada para que os disparos ocorram.
           </div>
         </div>
