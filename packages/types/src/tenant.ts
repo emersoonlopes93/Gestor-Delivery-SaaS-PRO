@@ -36,6 +36,30 @@ export interface BusinessGroupContext {
   };
 }
 
+export interface TenantNetworkStoreSummary {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  isHeadquarters: boolean;
+  city?: string | null;
+  state?: string | null;
+}
+
+export interface TenantNetworkContext {
+  groupId: string | null;
+  groupName: string;
+  role: 'headquarters' | 'branch';
+  ownerEmail: string;
+  currentTenantId: string;
+  stores: TenantNetworkStoreSummary[];
+}
+
+export interface CreateBranchRequest {
+  name: string;
+  slug?: string;
+}
+
 export interface TenantSettings {
   id: string;
   tenantId: string;

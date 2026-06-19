@@ -1,10 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException, Logger, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, Inject, ForbiddenException, ConflictException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { PrismaService } from '../database/prisma.service';
 import { TenantDefaultRole, TenantStatus } from '@gestor/core';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
-import type { TenantOperatingHours } from '@gestor/types';
+import type { CreateBranchRequest, TenantNetworkContext, TenantOperatingHours } from '@gestor/types';
 import { Prisma } from '@prisma/client';
 import { 
   getStorefrontPresetById,
@@ -21,6 +21,128 @@ export class TenantService {
     private readonly prisma: PrismaService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
+
+  private async findOwnerUser(tenantId: string) {
+    return this.prisma.tenantUser.findFirst({
+      where: {
+        tenantId,
+        isActive: true,
+        userRoles: {
+          some: {
+            role: {
+              slug: TenantDefaultRole.TENANT_OWNER,
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        passwordHash: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  private async buildNetworkContextInternal(tenantId: string): Promise<TenantNetworkContext> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        businessGroupId: true,
+        settings: {
+          select: {
+            city: true,
+            state: true,
+          },
+        },
+      },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    const ownerUser = await this.findOwnerUser(tenantId);
+    if (!ownerUser) {
+      throw new BadRequestException('A loja precisa ter um dono ativo configurado para usar rede de lojas');
+    }
+
+    const stores = tenant.businessGroupId
+      ? await this.prisma.tenant.findMany({
+          where: {
+            businessGroupId: tenant.businessGroupId,
+            users: {
+              some: {
+                email: ownerUser.email.toLowerCase(),
+                isActive: true,
+                userRoles: {
+                  some: {
+                    role: {
+                      slug: TenantDefaultRole.TENANT_OWNER,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            status: true,
+            createdAt: true,
+            settings: {
+              select: {
+                city: true,
+                state: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        })
+      : [
+          {
+            id: tenant.id,
+            name: tenant.name,
+            slug: tenant.slug,
+            status: TenantStatus.ACTIVE,
+            createdAt: new Date(),
+            settings: {
+              city: tenant.settings?.city ?? null,
+              state: tenant.settings?.state ?? null,
+            },
+          },
+        ];
+
+    const headquartersTenantId = stores[0]?.id ?? tenant.id;
+    const group = tenant.businessGroupId
+      ? await this.prisma.businessGroup.findUnique({
+          where: { id: tenant.businessGroupId },
+          select: { id: true, name: true },
+        })
+      : null;
+
+    return {
+      groupId: group?.id ?? null,
+      groupName: group?.name ?? `${tenant.name} Rede`,
+      role: tenant.id === headquartersTenantId ? 'headquarters' : 'branch',
+      ownerEmail: ownerUser.email,
+      currentTenantId: tenant.id,
+      stores: stores.map((store) => ({
+        id: store.id,
+        name: store.name,
+        slug: store.slug,
+        status: store.status,
+        isHeadquarters: store.id === headquartersTenantId,
+        city: store.settings?.city ?? null,
+        state: store.settings?.state ?? null,
+      })),
+    };
+  }
 
   /**
    * Find a tenant by ID.
@@ -105,6 +227,191 @@ export class TenantService {
     }
 
     return tenant;
+  }
+
+  async getNetworkContext(tenantId: string) {
+    return this.buildNetworkContextInternal(tenantId);
+  }
+
+  async createBranch(tenantId: string, currentUserId: string, dto: CreateBranchRequest) {
+    const currentUser = await this.prisma.tenantUser.findFirst({
+      where: {
+        id: currentUserId,
+        tenantId,
+        isActive: true,
+        userRoles: {
+          some: {
+            role: {
+              slug: TenantDefaultRole.TENANT_OWNER,
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!currentUser) {
+      throw new ForbiddenException('Apenas a conta dona da matriz pode criar filiais');
+    }
+
+    const currentTenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        status: true,
+        businessGroupId: true,
+      },
+    });
+
+    if (!currentTenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    const ownerUser = await this.findOwnerUser(tenantId);
+    if (!ownerUser) {
+      throw new BadRequestException('A loja precisa ter um dono ativo para criar filiais');
+    }
+
+    const sanitizedName = dto.name.trim();
+    if (!sanitizedName) {
+      throw new BadRequestException('Nome da filial é obrigatório');
+    }
+
+    const sanitizedSlugBase = (dto.slug?.trim() || sanitizedName)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
+
+    if (!sanitizedSlugBase) {
+      throw new BadRequestException('Slug inválido para a filial');
+    }
+
+    const existingTenant = await this.prisma.tenant.findUnique({
+      where: { slug: sanitizedSlugBase },
+      select: { id: true },
+    });
+
+    if (existingTenant) {
+      throw new ConflictException('Já existe uma loja com este slug');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      let businessGroupId = currentTenant.businessGroupId;
+
+      if (!businessGroupId) {
+        const createdGroup = await tx.businessGroup.create({
+          data: {
+            name: `${currentTenant.name} Rede`,
+            ownerId: ownerUser.id,
+          },
+        });
+
+        businessGroupId = createdGroup.id;
+
+        await tx.tenant.update({
+          where: { id: tenantId },
+          data: { businessGroupId },
+        });
+      }
+
+      const createdTenant = await tx.tenant.create({
+        data: {
+          name: sanitizedName,
+          slug: sanitizedSlugBase,
+          status: currentTenant.status,
+          businessGroupId,
+          onboarding: {
+            create: {
+              stepBasicInfo: false,
+              stepOperatingHours: false,
+              stepLogo: false,
+              stepAddress: false,
+              stepDelivery: false,
+              stepPayments: false,
+              stepWhatsapp: false,
+              stepMenu: false,
+              stepCatalog: false,
+              stepFirstOrder: false,
+            },
+          },
+          settings: {
+            create: {},
+          },
+          aiAgentConfig: {
+            create: {
+              isEnabled: false,
+              useGlobalDefaults: true,
+              humanInterventionEnabled: true,
+              humanInterventionMinutes: 15,
+              resumeAutomatically: true,
+            },
+          },
+          schedulingSettings: {
+            create: {
+              enabled: false,
+              maximumAdvanceDays: 7,
+              timezone: 'America/Sao_Paulo',
+            },
+          },
+        },
+      });
+
+      const createdUser = await tx.tenantUser.create({
+        data: {
+          tenantId: createdTenant.id,
+          email: ownerUser.email.toLowerCase(),
+          name: ownerUser.name,
+          passwordHash: ownerUser.passwordHash,
+          isActive: true,
+        },
+      });
+
+      let ownerRole = await tx.tenantRole.findFirst({
+        where: {
+          tenantId: createdTenant.id,
+          slug: TenantDefaultRole.TENANT_OWNER,
+        },
+      });
+
+      if (!ownerRole) {
+        ownerRole = await tx.tenantRole.create({
+          data: {
+            tenantId: createdTenant.id,
+            name: 'Dono',
+            slug: TenantDefaultRole.TENANT_OWNER,
+            isSystem: true,
+          },
+        });
+
+        const allPermissions = await tx.tenantPermission.findMany({
+          select: { id: true },
+        });
+
+        if (allPermissions.length > 0) {
+          await tx.tenantRolePermission.createMany({
+            data: allPermissions.map((permission) => ({
+              roleId: ownerRole.id,
+              permissionId: permission.id,
+            })),
+          });
+        }
+      }
+
+      await tx.tenantUserRole.create({
+        data: {
+          userId: createdUser.id,
+          roleId: ownerRole.id,
+        },
+      });
+    });
+
+    return this.buildNetworkContextInternal(tenantId);
   }
 
   /**

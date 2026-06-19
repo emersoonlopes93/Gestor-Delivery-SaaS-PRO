@@ -189,6 +189,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
     label: 'Sistema',
     items: [
       { id: 'settings', label: 'Configurações', to: '/settings', icon: Settings, permission: 'settings.manage' },
+      { id: 'settings-network', label: 'Rede de Lojas', to: '/settings/network', icon: Building2, permission: 'settings.manage' },
       { id: 'settings-integrations', label: 'Integrações', to: '/settings/integrations', icon: Link2, permission: 'settings.manage', match: (p) => p === '/settings/integrations' },
       { id: 'settings-storefront', label: 'Personalizar Vitrine', to: '/settings/storefront', icon: Palette, permission: 'settings.manage' },
       { id: 'settings-scheduling', label: 'Agendamentos', to: '/settings/scheduling', icon: CalendarClock, permission: 'settings.manage' },

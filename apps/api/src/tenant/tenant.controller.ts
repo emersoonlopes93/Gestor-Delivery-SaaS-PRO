@@ -1,12 +1,12 @@
 import { Controller, Get, Patch, Post, Body, UseGuards, Logger } from '@nestjs/common';
 import { TenantService } from './tenant.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
-import { CurrentTenant, RequirePermissions } from '../common/decorators';
+import { CurrentTenant, CurrentUser, RequirePermissions } from '../common/decorators';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { OnboardingService } from './onboarding.service';
 import { ReadinessScoreService } from './readiness-score.service';
-import { UpdateOperatingHoursRequest, UpdateStorePauseRequest, StorefrontCustomizationPayload } from '@gestor/types';
+import { CreateBranchRequest, UpdateOperatingHoursRequest, UpdateStorePauseRequest, StorefrontCustomizationPayload } from '@gestor/types';
 
 @Controller('tenant')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -24,6 +24,12 @@ export class TenantController {
   @RequirePermissions('dashboard.view')
   async getCurrentTenant(@CurrentTenant() tenantId: string) {
     return this.tenantService.findById(tenantId);
+  }
+
+  @Get('network')
+  @RequirePermissions('dashboard.view')
+  async getNetworkContext(@CurrentTenant() tenantId: string) {
+    return this.tenantService.getNetworkContext(tenantId);
   }
 
   /**
@@ -48,6 +54,16 @@ export class TenantController {
     @Body() dto: UpdateTenantSettingsDto,
   ) {
     return this.tenantService.updateSettings(tenantId, dto);
+  }
+
+  @Post('network/branches')
+  @RequirePermissions('settings.manage')
+  async createBranch(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @Body() body: CreateBranchRequest,
+  ) {
+    return this.tenantService.createBranch(tenantId, userId, body);
   }
 
   /**
