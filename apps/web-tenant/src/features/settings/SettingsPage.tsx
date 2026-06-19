@@ -15,7 +15,7 @@ interface OperatingHourForm {
   closeTime?: string;
 }
 
-import { Clock, Pause, Save, Copy, Calendar, MapPin, Building2, ChefHat } from 'lucide-react';
+import { Clock, Pause, Save, Copy, Calendar, MapPin, Building2, ChefHat, Wallet, Store } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useNavigate } from 'react-router-dom';
 import { maskPhone, maskCEP, maskCPFCNPJ, unmask } from '@gestor/utils';
@@ -48,6 +48,7 @@ const DAY_NAMES = [
 
 export function SettingsPage() {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'overview' | 'address' | 'finance' | 'hours'>('overview');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<Partial<TenantSettings>>({
@@ -361,6 +362,12 @@ export function SettingsPage() {
     setHours(newHours);
   };
 
+  const isOverviewTab = activeTab === 'overview';
+  const isAddressTab = activeTab === 'address';
+  const isFinanceTab = activeTab === 'finance';
+  const isHoursTab = activeTab === 'hours';
+  const showMainColumn = !isHoursTab;
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -377,7 +384,34 @@ export function SettingsPage() {
       />
 
       {/* Card rápido: Importar Cardápio Base */}
-      <div className="bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5">
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        {[
+          { id: 'overview', label: 'Loja', icon: Store },
+          { id: 'address', label: 'Endereço', icon: MapPin },
+          { id: 'finance', label: 'Fiscal & Pagamento', icon: Wallet },
+          { id: 'hours', label: 'Horários', icon: Clock },
+        ].map((tab) => {
+          const active = activeTab === tab.id;
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id as typeof activeTab)}
+              className={`inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-bold transition-colors shrink-0 ${
+                active
+                  ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                  : 'bg-card text-muted-foreground border-border hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className={`bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5 ${isOverviewTab ? '' : 'hidden'}`}>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
@@ -399,7 +433,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      {settings.businessGroupId && (
+      {settings.businessGroupId && isOverviewTab && (
         <div className="bg-indigo-600 rounded-2xl shadow-lg p-5 text-white flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="bg-card/20 p-2.5 rounded-xl">
@@ -417,7 +451,7 @@ export function SettingsPage() {
       )}
 
       {/* Pausa Manual */}
-      <div className={`bg-card rounded-2xl shadow-sm border p-6 transition-all ${settings.isStorePaused ? 'border-status-warning/20 bg-status-warning/5 dark:border-status-warning/30 dark:bg-status-warning/5' : 'border-border'}`}>
+      <div className={`bg-card rounded-2xl shadow-sm border p-6 transition-all ${settings.isStorePaused ? 'border-status-warning/20 bg-status-warning/5 dark:border-status-warning/30 dark:bg-status-warning/5' : 'border-border'} ${isOverviewTab ? '' : 'hidden'}`}>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start gap-4">
             <div className={`p-3 rounded-xl ${settings.isStorePaused ? 'bg-status-warning/10 text-status-warning' : 'bg-status-success/10 text-status-success'}`}>
@@ -454,9 +488,9 @@ export function SettingsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Coluna da Esquerda: Dados Básicos */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className={`${showMainColumn ? 'lg:col-span-2' : 'hidden'} space-y-6`}>
           <form onSubmit={handleSaveSettings} className="space-y-6">
-            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isOverviewTab ? '' : 'hidden'}`}>
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-primary/10 text-primary rounded-lg text-sm">🏪</span>
                 Identidade e Contato
@@ -516,7 +550,7 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isAddressTab ? '' : 'hidden'}`}>
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-primary/10 text-primary rounded-lg text-sm"><MapPin className="w-4 h-4" /></span>
                 Endereço da Loja
@@ -601,7 +635,7 @@ export function SettingsPage() {
                               </div>
             </div>
 
-            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isFinanceTab ? '' : 'hidden'}`}>
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-purple-500/10 text-purple-500 rounded-lg text-sm"><Building2 className="w-4 h-4" /></span>
                 Dados Fiscais & Integração
@@ -676,7 +710,7 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isFinanceTab ? '' : 'hidden'}`}>
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-status-success/10 text-status-success rounded-lg text-sm">💰</span>
                 Configuração de Pagamento
@@ -755,7 +789,7 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isFinanceTab ? '' : 'hidden'}`}>
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-status-warning/10 text-status-warning rounded-lg text-sm">🌍</span>
                 Configurações Regionais
@@ -786,7 +820,7 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex justify-end">
+            <div className={`${showMainColumn ? 'flex justify-end' : 'hidden'}`}>
               <button
                 type="submit"
                 disabled={saving}
@@ -799,7 +833,7 @@ export function SettingsPage() {
         </div>
 
         {/* Coluna da Direita: Horários */}
-        <div className="space-y-6">
+        <div className={`${isHoursTab ? 'lg:col-span-3' : 'hidden'} space-y-6`}>
           <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
