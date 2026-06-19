@@ -12,11 +12,42 @@ function getErrorMessage(error: unknown) {
 function configureUnsignedSecurity() {
   if (securityConfigured) return;
 
-  // Sem certificado configurado, o QZ Tray mostra a janela de autorização.
-  // A assinatura/certificado pode ser plugada depois para modo silencioso completo.
-  qz.security.setCertificatePromise((resolve) => resolve());
-  qz.security.setSignatureAlgorithm('SHA512');
-  qz.security.setSignaturePromise(() => (resolve) => resolve());
+  const certificatePem = import.meta.env.VITE_QZ_CERTIFICATE_PEM?.trim();
+  const signatureEndpoint = import.meta.env.VITE_QZ_SIGNATURE_ENDPOINT?.trim();
+
+  // Se não houver certificado/assinatura configurados, deixamos o QZ Tray usar
+  // seu fluxo padrão de autorização. O modo "vazio" fazia a integração parecer
+  // silenciosa mesmo quando o browser ainda não tinha sido autorizado.
+  if (certificatePem) {
+    qz.security.setCertificatePromise((resolve) => resolve(certificatePem));
+    qz.security.setSignatureAlgorithm('SHA512');
+
+    if (signatureEndpoint) {
+      qz.security.setSignaturePromise((dataToSign) => async (resolve, reject) => {
+        try {
+          const response = await fetch(signatureEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dataToSign }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const payload = (await response.json()) as { signature?: string };
+          if (!payload.signature) {
+            throw new Error('Assinatura ausente na resposta.');
+          }
+
+          resolve(payload.signature);
+        } catch (error) {
+          reject(error);
+        }
+      });
+    }
+  }
+
   securityConfigured = true;
 }
 
