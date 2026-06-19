@@ -14,6 +14,7 @@ import { BillingGatewayMode, PaymentProvider, Prisma } from '@prisma/client';
 import { TenantBillingResolverService } from '../../billing/tenant-billing-resolver.service';
 import { normalizeSeededRevenueTierLabel } from '../../billing/revenue-tier-label';
 import { RevenueLedgerService } from '../../billing/revenue-ledger.service';
+import { BillingAddonService } from '../../billing/billing-addon.service';
 
 type BillingRevenueTierInput = {
   id?: string;
@@ -35,6 +36,23 @@ type UpdateBillingPlanV2Body = {
 };
 
 type UpdateBillingSettingsBody = {
+  freeTierRevenueLimit?: string | number;
+  maxMonthlyCharge?: string | number;
+  trialProEnabled?: boolean;
+  trialProDays?: number;
+  trialRequiresPaymentMethod?: boolean;
+  trialIncludesAi?: boolean;
+  trialIncludesIfood?: boolean;
+  trialIncludesAdvancedReports?: boolean;
+  trialAutoConvertToBilling?: boolean;
+  aiAddonEnabled?: boolean;
+  aiAddonPrice?: string | number;
+  aiFreeTrialMessages?: number;
+  aiIncludedForPaidTenants?: boolean;
+  aiIncludedMonthlyMessages?: number;
+  aiHardLimitMonthlyMessages?: number;
+  countMarketplaceOrdersDefault?: boolean;
+  partnerLinksJson?: Prisma.InputJsonValue;
   includeDeliveryFeeByDefault?: boolean;
   includeServiceFeeByDefault?: boolean;
   countStorefrontOrders?: boolean;
@@ -66,6 +84,8 @@ type NormalizedBillingRevenueTier = {
   sortOrder: number;
 };
 
+const ZERO = new Prisma.Decimal(0);
+
 @Controller('admin/billing')
 @UseGuards(AdminAuthGuard, AdminPermissionsGuard)
 export class AdminBillingController {
@@ -79,6 +99,7 @@ export class AdminBillingController {
     private readonly billingPaymentGatewayService: BillingPaymentGatewayService,
     private readonly tenantBillingResolver: TenantBillingResolverService,
     private readonly revenueLedgerService: RevenueLedgerService,
+    private readonly billingAddonService: BillingAddonService,
   ) {}
 
   @Get('plans')
@@ -272,38 +293,107 @@ export class AdminBillingController {
   @Get('settings')
   @RequireAdminPermissions('saas.billing.read')
   async getBillingSettings() {
-    return this.billingSettingsService.ensureDefaultSettings();
+    const settings = await this.billingSettingsService.ensureDefaultSettings();
+    const [plan, addon] = await Promise.all([
+      this.tenantBillingResolver.getDefaultBillingPlan(),
+      this.billingAddonService.ensureAiAddonDefinition(),
+    ]);
+    return this.buildBillingSettingsResponse(settings, plan, addon);
   }
 
   @Put('settings')
   @RequireAdminPermissions('saas.billing.manage')
   async updateBillingSettings(@Body() body: UpdateBillingSettingsBody) {
     const current = await this.billingSettingsService.ensureDefaultSettings();
-    return this.prisma.billingSettings.update({
-      where: { id: current.id },
-      data: {
-        ...(body.includeDeliveryFeeByDefault !== undefined ? { includeDeliveryFeeByDefault: this.requireBoolean(body.includeDeliveryFeeByDefault, 'includeDeliveryFeeByDefault') } : {}),
-        ...(body.includeServiceFeeByDefault !== undefined ? { includeServiceFeeByDefault: this.requireBoolean(body.includeServiceFeeByDefault, 'includeServiceFeeByDefault') } : {}),
-        ...(body.countStorefrontOrders !== undefined ? { countStorefrontOrders: this.requireBoolean(body.countStorefrontOrders, 'countStorefrontOrders') } : {}),
-        ...(body.countDirectOnlineOrders !== undefined ? { countDirectOnlineOrders: this.requireBoolean(body.countDirectOnlineOrders, 'countDirectOnlineOrders') } : {}),
-        ...(body.countPosOrders !== undefined ? { countPosOrders: this.requireBoolean(body.countPosOrders, 'countPosOrders') } : {}),
-        ...(body.countWhatsappAiOrders !== undefined ? { countWhatsappAiOrders: this.requireBoolean(body.countWhatsappAiOrders, 'countWhatsappAiOrders') } : {}),
-        ...(body.countManualOrders !== undefined ? { countManualOrders: this.requireBoolean(body.countManualOrders, 'countManualOrders') } : {}),
-        ...(body.countMarketplaceIfoodOrders !== undefined ? { countMarketplaceIfoodOrders: this.requireBoolean(body.countMarketplaceIfoodOrders, 'countMarketplaceIfoodOrders') } : {}),
-        ...(body.countMarketplaceRappiOrders !== undefined ? { countMarketplaceRappiOrders: this.requireBoolean(body.countMarketplaceRappiOrders, 'countMarketplaceRappiOrders') } : {}),
-        ...(body.countMarketplaceUbereatsOrders !== undefined ? { countMarketplaceUbereatsOrders: this.requireBoolean(body.countMarketplaceUbereatsOrders, 'countMarketplaceUbereatsOrders') } : {}),
-        ...(body.countMarketplace99foodOrders !== undefined ? { countMarketplace99foodOrders: this.requireBoolean(body.countMarketplace99foodOrders, 'countMarketplace99foodOrders') } : {}),
-        ...(body.countMarketplaceKettaOrders !== undefined ? { countMarketplaceKettaOrders: this.requireBoolean(body.countMarketplaceKettaOrders, 'countMarketplaceKettaOrders') } : {}),
-        ...(body.countMarketplaceZeDeliveryOrders !== undefined ? { countMarketplaceZeDeliveryOrders: this.requireBoolean(body.countMarketplaceZeDeliveryOrders, 'countMarketplaceZeDeliveryOrders') } : {}),
-        ...(body.countConfirmedOrders !== undefined ? { countConfirmedOrders: this.requireBoolean(body.countConfirmedOrders, 'countConfirmedOrders') } : {}),
-        ...(body.countCompletedOrders !== undefined ? { countCompletedOrders: this.requireBoolean(body.countCompletedOrders, 'countCompletedOrders') } : {}),
-        ...(body.excludeCancelledOrders !== undefined ? { excludeCancelledOrders: this.requireBoolean(body.excludeCancelledOrders, 'excludeCancelledOrders') } : {}),
-        ...(body.discountReducesRevenue !== undefined ? { discountReducesRevenue: this.requireBoolean(body.discountReducesRevenue, 'discountReducesRevenue') } : {}),
-        ...(body.defaultGracePeriodDays !== undefined ? { defaultGracePeriodDays: this.parseIntegerRange(body.defaultGracePeriodDays, 'defaultGracePeriodDays', 0, 365) } : {}),
-        ...(body.defaultTrialDays !== undefined ? { defaultTrialDays: this.parseIntegerRange(body.defaultTrialDays, 'defaultTrialDays', 0, 365) } : {}),
-        ...(body.requirePaymentMethodForPaidPlans !== undefined ? { requirePaymentMethodForPaidPlans: this.requireBoolean(body.requirePaymentMethodForPaidPlans, 'requirePaymentMethodForPaidPlans') } : {}),
-      },
+    const plan = await this.tenantBillingResolver.getDefaultBillingPlan();
+
+    const [updatedSettings] = await this.prisma.$transaction(async (tx) => {
+      if (body.trialProDays !== undefined || body.trialRequiresPaymentMethod !== undefined || body.freeTierRevenueLimit !== undefined || body.maxMonthlyCharge !== undefined) {
+        const planUpdate: Prisma.BillingPlanUpdateInput = {};
+        if (body.trialProDays !== undefined) planUpdate.trialDays = this.parseIntegerRange(body.trialProDays, 'trialProDays', 0, 365);
+        if (body.trialRequiresPaymentMethod !== undefined) planUpdate.requiresPaymentMethod = this.requireBoolean(body.trialRequiresPaymentMethod, 'trialRequiresPaymentMethod');
+
+        if (body.freeTierRevenueLimit !== undefined || body.maxMonthlyCharge !== undefined) {
+          const existingTiers = await tx.billingRevenueTier.findMany({
+            where: { planId: plan.id },
+            orderBy: [{ sortOrder: 'asc' }],
+          });
+          const freeTierLimit = body.freeTierRevenueLimit !== undefined
+            ? this.parseDecimal(body.freeTierRevenueLimit, 'freeTierRevenueLimit')
+            : new Prisma.Decimal(existingTiers[0]?.maxRevenue ?? 1500);
+          const maxMonthlyCharge = body.maxMonthlyCharge !== undefined
+            ? this.parseDecimal(body.maxMonthlyCharge, 'maxMonthlyCharge')
+            : existingTiers.reduce((highest, tier) => new Prisma.Decimal(tier.price).gt(highest) ? new Prisma.Decimal(tier.price) : highest, ZERO);
+          if (existingTiers.length >= 4) {
+            await tx.billingRevenueTier.update({ where: { id: existingTiers[0].id }, data: { maxRevenue: freeTierLimit, price: ZERO } });
+            await tx.billingRevenueTier.update({ where: { id: existingTiers[1].id }, data: { minRevenue: freeTierLimit.plus(0.01) } });
+            const topTier = existingTiers[existingTiers.length - 1];
+            await tx.billingRevenueTier.update({ where: { id: topTier.id }, data: { price: maxMonthlyCharge } });
+          }
+        }
+
+        if (Object.keys(planUpdate).length) {
+          await tx.billingPlan.update({ where: { id: plan.id }, data: planUpdate });
+        }
+      }
+
+      if (body.aiAddonEnabled !== undefined || body.aiAddonPrice !== undefined) {
+        const addon = await this.billingAddonService.ensureAiAddonDefinition(tx);
+        await tx.billingModuleAddon.update({
+          where: { id: addon.id },
+          data: {
+            ...(body.aiAddonEnabled !== undefined ? { isActive: this.requireBoolean(body.aiAddonEnabled, 'aiAddonEnabled') } : {}),
+            ...(body.aiAddonPrice !== undefined ? { price: this.parseDecimal(body.aiAddonPrice, 'aiAddonPrice') } : {}),
+          },
+        });
+      }
+
+      const updated = await tx.billingSettings.update({
+        where: { id: current.id },
+        data: {
+          ...(body.includeDeliveryFeeByDefault !== undefined ? { includeDeliveryFeeByDefault: this.requireBoolean(body.includeDeliveryFeeByDefault, 'includeDeliveryFeeByDefault') } : {}),
+          ...(body.includeServiceFeeByDefault !== undefined ? { includeServiceFeeByDefault: this.requireBoolean(body.includeServiceFeeByDefault, 'includeServiceFeeByDefault') } : {}),
+          ...(body.countStorefrontOrders !== undefined ? { countStorefrontOrders: this.requireBoolean(body.countStorefrontOrders, 'countStorefrontOrders') } : {}),
+          ...(body.countDirectOnlineOrders !== undefined ? { countDirectOnlineOrders: this.requireBoolean(body.countDirectOnlineOrders, 'countDirectOnlineOrders') } : {}),
+          ...(body.countPosOrders !== undefined ? { countPosOrders: this.requireBoolean(body.countPosOrders, 'countPosOrders') } : {}),
+          ...(body.countWhatsappAiOrders !== undefined ? { countWhatsappAiOrders: this.requireBoolean(body.countWhatsappAiOrders, 'countWhatsappAiOrders') } : {}),
+          ...(body.countManualOrders !== undefined ? { countManualOrders: this.requireBoolean(body.countManualOrders, 'countManualOrders') } : {}),
+          ...(body.countMarketplaceIfoodOrders !== undefined ? { countMarketplaceIfoodOrders: this.requireBoolean(body.countMarketplaceIfoodOrders, 'countMarketplaceIfoodOrders') } : {}),
+          ...(body.countMarketplaceOrdersDefault !== undefined ? { countMarketplaceIfoodOrders: this.requireBoolean(body.countMarketplaceOrdersDefault, 'countMarketplaceOrdersDefault') } : {}),
+          ...(body.countMarketplaceRappiOrders !== undefined ? { countMarketplaceRappiOrders: this.requireBoolean(body.countMarketplaceRappiOrders, 'countMarketplaceRappiOrders') } : {}),
+          ...(body.countMarketplaceUbereatsOrders !== undefined ? { countMarketplaceUbereatsOrders: this.requireBoolean(body.countMarketplaceUbereatsOrders, 'countMarketplaceUbereatsOrders') } : {}),
+          ...(body.countMarketplace99foodOrders !== undefined ? { countMarketplace99foodOrders: this.requireBoolean(body.countMarketplace99foodOrders, 'countMarketplace99foodOrders') } : {}),
+          ...(body.countMarketplaceKettaOrders !== undefined ? { countMarketplaceKettaOrders: this.requireBoolean(body.countMarketplaceKettaOrders, 'countMarketplaceKettaOrders') } : {}),
+          ...(body.countMarketplaceZeDeliveryOrders !== undefined ? { countMarketplaceZeDeliveryOrders: this.requireBoolean(body.countMarketplaceZeDeliveryOrders, 'countMarketplaceZeDeliveryOrders') } : {}),
+          ...(body.countConfirmedOrders !== undefined ? { countConfirmedOrders: this.requireBoolean(body.countConfirmedOrders, 'countConfirmedOrders') } : {}),
+          ...(body.countCompletedOrders !== undefined ? { countCompletedOrders: this.requireBoolean(body.countCompletedOrders, 'countCompletedOrders') } : {}),
+          ...(body.excludeCancelledOrders !== undefined ? { excludeCancelledOrders: this.requireBoolean(body.excludeCancelledOrders, 'excludeCancelledOrders') } : {}),
+          ...(body.discountReducesRevenue !== undefined ? { discountReducesRevenue: this.requireBoolean(body.discountReducesRevenue, 'discountReducesRevenue') } : {}),
+          ...(body.defaultGracePeriodDays !== undefined ? { defaultGracePeriodDays: this.parseIntegerRange(body.defaultGracePeriodDays, 'defaultGracePeriodDays', 0, 365) } : {}),
+          ...(body.defaultTrialDays !== undefined ? { defaultTrialDays: this.parseIntegerRange(body.defaultTrialDays, 'defaultTrialDays', 0, 365) } : {}),
+          ...(body.requirePaymentMethodForPaidPlans !== undefined ? { requirePaymentMethodForPaidPlans: this.requireBoolean(body.requirePaymentMethodForPaidPlans, 'requirePaymentMethodForPaidPlans') } : {}),
+          ...(body.trialProEnabled !== undefined ? { trialProEnabled: this.requireBoolean(body.trialProEnabled, 'trialProEnabled') } : {}),
+          ...(body.trialIncludesAi !== undefined ? { trialIncludesAi: this.requireBoolean(body.trialIncludesAi, 'trialIncludesAi') } : {}),
+          ...(body.trialIncludesIfood !== undefined ? { trialIncludesIfood: this.requireBoolean(body.trialIncludesIfood, 'trialIncludesIfood') } : {}),
+          ...(body.trialIncludesAdvancedReports !== undefined ? { trialIncludesAdvancedReports: this.requireBoolean(body.trialIncludesAdvancedReports, 'trialIncludesAdvancedReports') } : {}),
+          ...(body.trialAutoConvertToBilling !== undefined ? { trialAutoConvertToBilling: this.requireBoolean(body.trialAutoConvertToBilling, 'trialAutoConvertToBilling') } : {}),
+          ...(body.aiIncludedForPaidTenants !== undefined ? { aiIncludedForPaidTenants: this.requireBoolean(body.aiIncludedForPaidTenants, 'aiIncludedForPaidTenants') } : {}),
+          ...(body.aiIncludedMonthlyMessages !== undefined ? { aiIncludedMonthlyMessages: this.parseIntegerRange(body.aiIncludedMonthlyMessages, 'aiIncludedMonthlyMessages', 0, 1000000) } : {}),
+          ...(body.aiFreeTrialMessages !== undefined ? { aiFreeTrialMessages: this.parseIntegerRange(body.aiFreeTrialMessages, 'aiFreeTrialMessages', 0, 1000000) } : {}),
+          ...(body.aiHardLimitMonthlyMessages !== undefined ? { aiHardLimitMonthlyMessages: this.parseIntegerRange(body.aiHardLimitMonthlyMessages, 'aiHardLimitMonthlyMessages', 1, 1000000) } : {}),
+          ...(body.partnerLinksJson !== undefined ? { partnerLinksJson: body.partnerLinksJson } : {}),
+        },
+      });
+
+      return [updated];
     });
+
+    const [nextPlan, nextAddon] = await Promise.all([
+      this.tenantBillingResolver.getDefaultBillingPlan(),
+      this.billingAddonService.ensureAiAddonDefinition(),
+    ]);
+
+    return this.buildBillingSettingsResponse(updatedSettings, nextPlan, nextAddon);
   }
 
   @Get('payment-config')
@@ -630,6 +720,47 @@ export class AdminBillingController {
     });
   }
 
+  @Post('tenants/:tenantId/trial-pro/activate')
+  @RequireAdminPermissions('saas.billing.manage')
+  async activateTrialProAssisted(@Param('tenantId') tenantId: string) {
+    const settings = await this.billingSettingsService.ensureDefaultSettings();
+    if (!settings.trialProEnabled) {
+      throw new BadRequestException('Trial Pro desativado no SaaS Admin.');
+    }
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true },
+    });
+    if (!tenant) {
+      throw new NotFoundException('Tenant nao encontrado.');
+    }
+
+    const plan = await this.tenantBillingResolver.getDefaultBillingPlan();
+    const subscription = await this.tenantBillingResolver.getOrCreateTenantBillingSubscription(tenantId, plan.id);
+    const now = new Date();
+    const trialEndsAt = new Date(now);
+    trialEndsAt.setDate(trialEndsAt.getDate() + Math.max(0, plan.trialDays));
+
+    await this.prisma.tenantBillingSubscription.update({
+      where: { id: subscription.id },
+      data: {
+        status: 'trialing',
+        trialStartedAt: now,
+        trialEndsAt,
+        requiresPaymentMethod: false,
+      },
+    });
+
+    return {
+      tenantId,
+      activationMode: 'assisted_admin',
+      trialEndsAt,
+      autoConvertEnabled: settings.trialAutoConvertToBilling,
+      state: await this.tenantBillingResolver.getTenantBillingState(tenantId),
+    };
+  }
+
   @Post('usage-snapshots')
   @RequireAdminPermissions('saas.billing.manage')
   async createUsageSnapshot(
@@ -903,6 +1034,31 @@ export class AdminBillingController {
       return 'grace_period_expired_not_enforced';
     }
     return subscription.status;
+  }
+
+  private buildBillingSettingsResponse(
+    settings: Awaited<ReturnType<BillingSettingsService['ensureDefaultSettings']>>,
+    plan: Awaited<ReturnType<TenantBillingResolverService['getDefaultBillingPlan']>>,
+    addon: Awaited<ReturnType<BillingAddonService['ensureAiAddonDefinition']>>,
+  ) {
+    const freeTier = [...plan.revenueTiers]
+      .sort((left, right) => left.sortOrder - right.sortOrder)
+      .find((tier) => new Prisma.Decimal(tier.price).eq(ZERO));
+    const maxMonthlyCharge = plan.revenueTiers.reduce(
+      (highest, tier) => new Prisma.Decimal(tier.price).gt(highest) ? new Prisma.Decimal(tier.price) : highest,
+      ZERO,
+    );
+
+    return {
+      ...settings,
+      freeTierRevenueLimit: freeTier?.maxRevenue ?? 0,
+      maxMonthlyCharge,
+      trialProDays: plan.trialDays,
+      trialRequiresPaymentMethod: plan.requiresPaymentMethod,
+      aiAddonEnabled: addon.isActive,
+      aiAddonPrice: addon.price,
+      countMarketplaceOrdersDefault: settings.countMarketplaceIfoodOrders,
+    };
   }
 }
 

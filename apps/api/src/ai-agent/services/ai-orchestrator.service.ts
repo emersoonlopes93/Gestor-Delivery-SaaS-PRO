@@ -16,6 +16,7 @@ import {
 } from '../constants/global-base-prompt';
 import type { AgentSessionContext } from './agent-tools.service';
 import { AvailabilityService } from '../../catalog/publication/availability.service';
+import { BillingEntitlementsService } from '../../billing/billing-entitlements.service';
 import {
   buildStoreStatusPromptBlock,
   resolveStoreOperationalStatus,
@@ -63,6 +64,7 @@ export class AiOrchestratorService {
     private readonly prisma: PrismaService,
     private readonly adminModulesService: AdminModulesService,
     private readonly availabilityService: AvailabilityService,
+    private readonly billingEntitlementsService: BillingEntitlementsService,
   ) {}
 
   private async applyDeterministicDraftCapture(sessionId: string, content: string): Promise<void> {
@@ -302,6 +304,15 @@ export class AiOrchestratorService {
     );
     if (!hasModuleAccess) {
       AiFlowLogger.ignored('ai_module_disabled', flowTrace);
+      return;
+    }
+
+    const entitlements = await this.billingEntitlementsService.resolveTenantEntitlements(tenantId);
+    if (!entitlements.flags.canUseAiAgent) {
+      AiFlowLogger.ignored('ai_entitlement_blocked', flowTrace, {
+        commercialStatus: entitlements.commercialStatus,
+        remaining: entitlements.ai.remainingThisMonth,
+      });
       return;
     }
 

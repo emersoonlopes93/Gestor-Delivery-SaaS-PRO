@@ -11,6 +11,7 @@ import { PromotionsModule } from '../promotions/promotions.module';
 import { SchedulingModule } from '../scheduling/scheduling.module';
 import { AdminModulesModule } from '../admin/modules/admin-modules.module';
 import { UpsellRecommendationEngine } from '../campaigns/services/upsell-recommendation.engine';
+import { BillingDomainModule } from '../billing/billing-domain.module';
 
 import { OpenAiProvider } from './providers/openai.provider';
 import { OpenAiImageProvider } from './providers/openai-image.provider';
@@ -42,6 +43,7 @@ import { AiProviderConfigService } from './services/ai-provider-config.service';
     forwardRef(() => PromotionsModule),      // para cashback e cupons
     forwardRef(() => SchedulingModule),      // para agendamentos
     AdminModulesModule,                      // para verificar permissões de módulo
+    BillingDomainModule,
   ],
   controllers: [AiAgentController],
   providers: [

@@ -15,6 +15,7 @@ import { PrismaService } from '../database/prisma.service';
 import { BillingPaymentGatewayService, BillingPaymentRuntimeConfig } from './billing-payment-gateway.service';
 import { BillingUsagePreview, BillingUsageService } from './billing-usage.service';
 import { TenantBillingResolverService, TenantBillingStateSource } from './tenant-billing-resolver.service';
+import { BillingEntitlementsService, BillingPartnerLink, TenantFeatureEntitlements } from './billing-entitlements.service';
 
 type BillingPlanForPortal = Prisma.BillingPlanGetPayload<{
   include: {
@@ -58,6 +59,8 @@ export type TenantBillingOverview = {
   paymentModeInfo: TenantBillingPortalPaymentModeInfo;
   source: TenantBillingStateSource;
   warning: string | null;
+  entitlements: TenantFeatureEntitlements;
+  partners: BillingPartnerLink[];
 };
 
 @Injectable()
@@ -67,11 +70,14 @@ export class TenantBillingPortalService {
     private readonly tenantBillingResolver: TenantBillingResolverService,
     private readonly billingUsageService: BillingUsageService,
     private readonly billingPaymentGatewayService: BillingPaymentGatewayService,
+    private readonly billingEntitlementsService: BillingEntitlementsService,
   ) {}
 
   async getMyBillingOverview(tenantId: string): Promise<TenantBillingOverview> {
     const state = await this.tenantBillingResolver.getTenantBillingState(tenantId);
     const paymentModeInfo = this.buildPaymentModeInfo();
+    const entitlements = await this.billingEntitlementsService.resolveTenantEntitlements(tenantId);
+    const partners = this.billingEntitlementsService.getPartnerLinks(entitlements.settings);
 
     if (!state.subscription || !state.plan) {
       return {
@@ -87,6 +93,8 @@ export class TenantBillingPortalService {
         paymentModeInfo,
         source: state.source,
         warning: this.resolvePortalWarning(state.source, state.subscription?.requiresPaymentMethod ?? false),
+        entitlements,
+        partners,
       };
     }
 
@@ -112,6 +120,8 @@ export class TenantBillingPortalService {
       paymentModeInfo,
       source: state.source,
       warning: this.resolvePortalWarning(state.source, state.subscription.requiresPaymentMethod),
+      entitlements,
+      partners,
     };
   }
 

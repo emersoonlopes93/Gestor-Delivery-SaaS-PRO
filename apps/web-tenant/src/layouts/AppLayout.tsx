@@ -4,6 +4,7 @@ import { hasPermission } from '@gestor/auth';
 import {
   BarChart3,
   BookOpen,
+  Handshake,
   Box,
   ChartLine,
   ChefHat,
@@ -100,6 +101,14 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
         icon: CreditCard,
         permission: 'billing.read',
         match: (p) => p === '/billing',
+      },
+      {
+        id: 'billing-partners',
+        label: 'Beneficios',
+        to: '/partners',
+        icon: Handshake,
+        permission: 'billing.read',
+        match: (p) => p === '/partners',
       },
     ],
   },

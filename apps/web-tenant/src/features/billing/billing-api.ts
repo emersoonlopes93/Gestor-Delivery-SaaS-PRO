@@ -184,10 +184,64 @@ export type TenantBillingOverview = {
   };
   source: TenantBillingSource;
   warning: string | null;
+  entitlements: {
+    commercialStatus: string;
+    billableRevenue: DecimalLike;
+    estimatedBasePrice: DecimalLike;
+    addonsAmount: DecimalLike;
+    estimatedTotalPrice: DecimalLike;
+    activeAddons: Array<{
+      id: string;
+      addonKey: string;
+      status: string;
+      price: DecimalLike;
+      cancelAtCycleEnd: boolean;
+      billingAddon?: { name: string | null } | null;
+    }>;
+    ai: {
+      canUse: boolean;
+      source: string;
+      monthlyLimit: number;
+      usedThisMonth: number;
+      remainingThisMonth: number;
+    };
+    flags: {
+      canUseAiAgent: boolean;
+      canUseIfoodIntegration: boolean;
+      canUseAdvancedReports: boolean;
+      canUseCampaigns: boolean;
+      canUseCustomDomain: boolean;
+      canUsePrioritySupport: boolean;
+    };
+    channelsIncludedInBilling: string[];
+    trialAvailable: boolean;
+  };
+  partners: Array<{
+    key: string;
+    title: string;
+    description: string;
+    ctaLabel: string;
+    url: string;
+  }>;
 };
 
 export async function getTenantBillingOverview(): Promise<TenantBillingOverview> {
   const response = await api.get<TenantBillingOverview>('/billing/me');
+  return response.data;
+}
+
+export async function startTrialPro(): Promise<TenantBillingOverview> {
+  const response = await api.post<TenantBillingOverview>('/billing/trial-pro/start');
+  return response.data;
+}
+
+export async function activateAiAddon(): Promise<TenantBillingOverview> {
+  const response = await api.post<TenantBillingOverview>('/billing/addons/ai-agent/activate');
+  return response.data;
+}
+
+export async function cancelAiAddon(): Promise<TenantBillingOverview> {
+  const response = await api.post<TenantBillingOverview>('/billing/addons/ai-agent/cancel');
   return response.data;
 }
 

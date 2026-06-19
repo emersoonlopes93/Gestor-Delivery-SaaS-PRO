@@ -17,6 +17,8 @@ import { AsaasBillingPaymentProvider } from './asaas-billing-payment.provider';
 import { TenantBillingResolverService } from './tenant-billing-resolver.service';
 import { TenantBillingPortalService } from './tenant-billing-portal.service';
 import { RevenueLedgerService } from './revenue-ledger.service';
+import { BillingAddonService } from './billing-addon.service';
+import { BillingEntitlementsService } from './billing-entitlements.service';
 
 @Module({
   providers: [
@@ -38,6 +40,8 @@ import { RevenueLedgerService } from './revenue-ledger.service';
     TenantBillingResolverService,
     TenantBillingPortalService,
     RevenueLedgerService,
+    BillingAddonService,
+    BillingEntitlementsService,
   ],
   exports: [
     BillingPlansService,
@@ -52,6 +56,8 @@ import { RevenueLedgerService } from './revenue-ledger.service';
     TenantBillingResolverService,
     TenantBillingPortalService,
     RevenueLedgerService,
+    BillingAddonService,
+    BillingEntitlementsService,
   ],
 })
 export class BillingDomainModule {}

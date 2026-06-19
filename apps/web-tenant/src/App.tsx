@@ -4,6 +4,7 @@ import { LoginPage } from './features/auth/LoginPage';
 import { ForgotPasswordPage } from './features/auth/ForgotPasswordPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { BillingPage } from './features/billing/BillingPage';
+import { PartnersPage } from './features/billing/PartnersPage';
 import { AuthLayout } from './layouts/AuthLayout';
 import { AppLayout } from './layouts/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -87,6 +88,14 @@ export function App() {
           element={
             <PermissionGate permission="billing.read">
               <BillingPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/partners"
+          element={
+            <PermissionGate permission="billing.read">
+              <PartnersPage />
             </PermissionGate>
           }
         />
