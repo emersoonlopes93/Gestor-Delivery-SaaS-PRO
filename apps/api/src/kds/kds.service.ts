@@ -529,7 +529,7 @@ export class KdsService {
           createdAt: order.createdAt.toISOString(),
           updatedAt: order.updatedAt.toISOString(),
         };
-        const content = await this.printerService.formatTicket(mainReceiptOrder, PrintType.customer);
+        const content = await this.printerService.formatTicket(mainReceiptOrder, 'customer');
 
         jobs.push(this.prisma.printJob.create({
           data: {
@@ -611,7 +611,7 @@ export class KdsService {
           updatedAt: order.updatedAt.toISOString(),
         };
 
-        const content = await this.printerService.formatTicket(pseudoOrder, PrintType.kitchen, station);
+        const content = await this.printerService.formatTicket(pseudoOrder, 'kitchen', station);
 
         jobs.push(this.prisma.printJob.create({
           data: {

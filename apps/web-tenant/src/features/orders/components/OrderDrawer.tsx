@@ -15,6 +15,7 @@ import { EditOrderModal } from './EditOrderModal';
 import { DriverSelectionModal } from './DriverSelectionModal';
 import { Capacitor } from '@capacitor/core';
 import { printTicketViaPrimaryBluetooth } from '../../../lib/bluetooth';
+import { printThermalText } from '../../../lib/thermal-print';
 import toast from 'react-hot-toast';
 
 export interface OrderDrawerProps {
@@ -128,20 +129,16 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
       if (Capacitor.isNativePlatform() && printRes.data?.content) {
         await printTicketViaPrimaryBluetooth(printRes.data.content);
         setIsPrinting(false);
-        toast.success('Impressão enviada para a Bluetooth principal.');
+        toast.success('Impressao enviada para a Bluetooth principal.');
         fetchDetail(true);
         return;
       }
-      setTimeout(() => {
-        window.print();
-        setIsPrinting(false);
-        toast.success('Imprimindo...');
-        fetchDetail(true);
-      }, 100);
+      printThermalText(printRes.data.content, { title: `Pedido #${order.orderNumber}`, paperWidthMm: 58 });
+      setIsPrinting(false);
+      toast.success('Imprimindo...');
+      fetchDetail(true);
     } catch (err) {
-      console.error('[OrderDrawer] Erro ao registrar impressão:', err);
-      // Ainda tenta imprimir mesmo se falhar o log
-      window.print();
+      console.error('[OrderDrawer] Erro ao registrar impressao:', err);
       setIsPrinting(false);
     }
   };

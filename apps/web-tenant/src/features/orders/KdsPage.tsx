@@ -5,6 +5,7 @@ import {
   PrintJobStatus,
 } from '@gestor/types';
 import { api } from '@/lib/api-client';
+import { printThermalText } from '@/lib/thermal-print';
 
 interface KdsPrintJobsResponse {
   items: KdsPrintJobDTO[];
@@ -266,41 +267,7 @@ export function KdsPage() {
   };
 
   const handlePrint = (content: string) => {
-    const printWindow = window.open('', '_blank', 'width=300,height=600');
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Imprimir Ticket</title>
-          <style>
-            @page { margin: 0; }
-            body { 
-              font-family: 'Courier New', Courier, monospace; 
-              font-size: 12px; 
-              padding: 10px;
-              width: 80mm;
-              margin: 0;
-            }
-            pre { 
-              white-space: pre-wrap; 
-              word-wrap: break-word;
-              margin: 0;
-            }
-          </style>
-        </head>
-        <body>
-          <pre>${content}</pre>
-          <script>
-            window.onload = () => {
-              window.print();
-              setTimeout(() => window.close(), 100);
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    printThermalText(content, { title: 'Imprimir Ticket', paperWidthMm: 58 });
   };
 
   return (

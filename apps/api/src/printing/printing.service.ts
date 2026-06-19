@@ -288,13 +288,23 @@ export class PrintingService {
       throw new BadRequestException('Station device has no station configured');
     }
 
-    // Find next pending job
+    const staleLockCutoff = new Date(Date.now() - 5 * 60 * 1000);
+
+    // Find next pending job, or recover a stale lock left by a crashed/interrupted app.
     const job = await this.db.printJob.findFirst({
       where: {
         tenantId,
         station: { in: stationKeys },
-        status: PrintJobStatus.pending,
-        lockedAt: null,
+        OR: [
+          {
+            status: PrintJobStatus.pending,
+            lockedAt: null,
+          },
+          {
+            status: PrintJobStatus.printing,
+            lockedAt: { lt: staleLockCutoff },
+          },
+        ],
       },
       orderBy: { createdAt: 'asc' },
     });

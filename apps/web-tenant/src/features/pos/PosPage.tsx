@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '@/lib/api-client';
+import { printThermalText } from '@/lib/thermal-print';
 import { useActiveSession } from '../cash/hooks/useCashSession';
 import { useCreatePosSale, type PosCreateSalePayload } from './hooks/usePosSale';
 import { useDraftSale } from './hooks/useDraftSale';
@@ -196,27 +197,10 @@ export default function PosPage() {
     try {
       const res = await api.get<{ content: string }>(`/pos/sales/${orderId}/print?type=${type}`);
       if (res.success && res.data.content) {
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-          printWindow.document.write(`
-            <html>
-              <head>
-                <style>
-                  @media print { margin: 0; }
-                  pre { font-family: 'Courier New', Courier, monospace; font-size: 12px; white-space: pre-wrap; }
-                </style>
-              </head>
-              <body><pre>${res.data.content}</pre></body>
-            </html>
-          `);
-          printWindow.document.close();
-          printWindow.focus();
-          // Small delay for document rendering
-          setTimeout(() => {
-            printWindow.print();
-            printWindow.close();
-          }, 250);
-        }
+        printThermalText(res.data.content, {
+          title: type === 'customer' ? 'Imprimir Cupom' : 'Imprimir Cozinha',
+          paperWidthMm: 58,
+        });
       }
     } catch (err) {
       // Falha de impressão não deve bloquear o PDV.

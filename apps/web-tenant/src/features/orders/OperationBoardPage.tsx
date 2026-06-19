@@ -14,6 +14,7 @@ import { EditOrderModal } from './components/EditOrderModal';
 import { OrderPrintTemplate } from './components/OrderPrintTemplate';
 import { useOrderNotifications } from './hooks/useOrderNotifications';
 import { printTicketViaPrimaryBluetooth } from '../../lib/bluetooth';
+import { printThermalText } from '../../lib/thermal-print';
 import { Capacitor } from '@capacitor/core';
 import toast from 'react-hot-toast';
 
@@ -139,12 +140,10 @@ export function OperationBoardPage() {
           toast.success('Impressão enviada para a Bluetooth principal.');
           return;
         }
-        setTimeout(() => {
-          window.print();
-          setIsPrinting(false);
-          setOrderToPrint(null);
-          toast.success('Imprimindo ticket...');
-        }, 300);
+        printThermalText(content, { title: `Pedido #${orderRes.data.orderNumber}`, paperWidthMm: 58 });
+        setIsPrinting(false);
+        setOrderToPrint(null);
+        toast.success('Imprimindo ticket...');
       } else {
         throw new Error('Pedido não encontrado');
       }
