@@ -28,7 +28,7 @@ export interface PrinterDevice {
 export interface CreateDevicePayload {
   stationId?: string | null;
   name: string;
-  connectionType: 'BLUETOOTH_SPP' | 'USB' | 'IP' | 'bluetooth_spp_android' | 'usb_bridge_future' | 'network_bridge_future' | 'web_serial_future';
+  connectionType: 'BLUETOOTH_SPP' | 'QZ_TRAY' | 'USB' | 'IP' | 'bluetooth_spp_android' | 'usb_bridge_future' | 'network_bridge_future' | 'web_serial_future';
   address?: string;
   isDefault?: boolean;
   isPrimary?: boolean;

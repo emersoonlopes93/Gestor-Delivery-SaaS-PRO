@@ -11,6 +11,7 @@ import {
 } from '../../hooks/usePrinting';
 import { connectBluetoothPrinter, requestBluetoothPermissions, scanBluetoothDevices, printTicketViaBluetooth, isNativeAndroid } from '../../lib/bluetooth';
 import { EscPosBuilder } from '../../lib/escpos58';
+import { connectQzTray, listQzPrinters, printTextViaQz } from '../../lib/qz-tray-client';
 import { useAuthStore } from '../../stores/auth.store';
 
 interface PrintJobDTO {
@@ -48,6 +49,11 @@ export function PrinterSettings() {
   const [isSavingDevice, setIsSavingDevice] = useState(false);
   const [testPrintStatus, setTestPrintStatus] = useState('');
   const [stationLoadMessage, setStationLoadMessage] = useState('');
+  const [autoPrintEnabled, setAutoPrintEnabled] = useState(false);
+  const [qzPrinterNames, setQzPrinterNames] = useState<string[]>([]);
+  const [isQzConnecting, setIsQzConnecting] = useState(false);
+  const [qzStatus, setQzStatus] = useState('');
+  const [qzError, setQzError] = useState('');
   const isNative = isNativeAndroid();
   const { user } = useAuthStore();
 
@@ -61,6 +67,11 @@ export function PrinterSettings() {
   const createDevice = useCreateDevice();
   const updateDevice = useUpdateDevice();
   const testPrint = useTestPrint();
+  const selectedPrinterDevice = devices.find((device) => device.id === selectedDevice);
+  const selectedDeviceCanAutoPrint =
+    !!selectedPrinterDevice?.autoPrintEnabled &&
+    ((isNative && selectedPrinterDevice.connectionType === 'BLUETOOTH_SPP') ||
+      (!isNative && selectedPrinterDevice.connectionType === 'QZ_TRAY'));
 
   const spoolerRef = useRef<{ running: boolean }>({ running: false });
 
@@ -101,6 +112,12 @@ export function PrinterSettings() {
   useEffect(() => {
     localStorage.setItem('printing.printerRole', printerRole);
   }, [printerRole]);
+
+  useEffect(() => {
+    if (selectedPrinterDevice) {
+      setAutoPrintEnabled(selectedPrinterDevice.autoPrintEnabled === true);
+    }
+  }, [selectedPrinterDevice]);
 
   useEffect(() => {
     spoolerRef.current.running = isSpoolerRunning;
@@ -243,7 +260,7 @@ export function PrinterSettings() {
         isPrimary: printerRole === 'primary',
         role: printerRole === 'primary' ? 'primary_order' : 'station',
         purpose: printerRole === 'primary' ? 'main_receipt' : 'production_ticket',
-        autoPrintEnabled: true,
+        autoPrintEnabled,
       });
       setActivePrinterDevice(savedDevice);
       setSelectedDevice(savedDevice.id);
@@ -300,7 +317,7 @@ export function PrinterSettings() {
           isPrimary: printerRole === 'primary',
           role: printerRole === 'primary' ? 'primary_order' : 'station',
           purpose: printerRole === 'primary' ? 'main_receipt' : 'production_ticket',
-          autoPrintEnabled: true,
+          autoPrintEnabled,
         },
       });
 
@@ -321,6 +338,101 @@ export function PrinterSettings() {
       addLog(`Falha ao salvar configuração: ${message}`);
     } finally {
       setIsSavingDevice(false);
+    }
+  };
+
+  const handleConnectQzTray = async () => {
+    setQzError('');
+    setQzStatus('Conectando ao QZ Tray...');
+    setIsQzConnecting(true);
+
+    try {
+      await connectQzTray();
+      setQzStatus('QZ Tray conectado. Buscando impressoras do Windows...');
+      const printers = await listQzPrinters();
+      setQzPrinterNames(printers);
+      setQzStatus(printers.length > 0 ? `Encontrada(s) ${printers.length} impressora(s).` : 'QZ conectado, mas nenhuma impressora foi retornada.');
+      addLog(`QZ Tray conectado. Impressoras encontradas: ${printers.length}.`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setQzError(message);
+      setQzStatus('Falha ao conectar/listar impressoras via QZ Tray.');
+      addLog(`Falha no QZ Tray: ${message}`);
+    } finally {
+      setIsQzConnecting(false);
+    }
+  };
+
+  const handleAddQzPrinter = async (printerName: string) => {
+    setQzError('');
+    setQzStatus(`Salvando impressora ${printerName}...`);
+
+    const station = printerRole === 'station'
+      ? stations.find(s => s.slug === selectedStation) ?? stations[0]
+      : null;
+    if (printerRole === 'station' && !station) {
+      const message = 'Selecione uma estacao antes de salvar a impressora QZ de setor.';
+      setQzError(message);
+      addLog(message);
+      return;
+    }
+
+    setIsSavingDevice(true);
+    try {
+      const savedDevice = await createDevice.mutateAsync({
+        name: printerName,
+        address: printerName,
+        connectionType: 'QZ_TRAY',
+        stationId: station?.id ?? null,
+        isDefault: printerRole === 'primary',
+        isPrimary: printerRole === 'primary',
+        role: printerRole === 'primary' ? 'primary_order' : 'station',
+        purpose: printerRole === 'primary' ? 'main_receipt' : 'production_ticket',
+        autoPrintEnabled,
+      });
+      setActivePrinterDevice(savedDevice);
+      setSelectedDevice(savedDevice.id);
+      if (station) setSelectedStation(station.slug);
+      setQzStatus(`Impressora QZ salva: ${printerName}.`);
+      addLog(`Impressora QZ salva: ${printerName}.`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setQzError(`Falha ao salvar impressora QZ: ${message}`);
+      addLog(`Falha ao salvar impressora QZ: ${message}`);
+    } finally {
+      setIsSavingDevice(false);
+    }
+  };
+
+  const handleLocalQzTestPrint = async (printerName?: string | null) => {
+    const targetPrinter = printerName || selectedPrinterDevice?.address || selectedPrinterDevice?.name;
+    if (!targetPrinter) {
+      const message = 'Selecione uma impressora QZ antes do teste.';
+      setTestPrintStatus(message);
+      addLog(message);
+      return;
+    }
+
+    setTestPrintStatus(`Imprimindo teste via QZ em ${targetPrinter}...`);
+    addLog(`Imprimindo teste QZ em ${targetPrinter}...`);
+
+    try {
+      await printTextViaQz(targetPrinter, [
+        'GESTOR PRO',
+        'TESTE DE IMPRESSAO QZ',
+        '',
+        `Loja: ${user?.tenant?.name || 'Loja'}`,
+        `Impressora: ${targetPrinter}`,
+        `Data: ${new Date().toLocaleString('pt-BR')}`,
+        '',
+        'QZ TRAY OK',
+      ].join('\n'));
+      setTestPrintStatus('Teste QZ enviado com sucesso.');
+      addLog('Teste QZ enviado com sucesso.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setTestPrintStatus(`Falha no teste QZ: ${message}`);
+      addLog(`Falha no teste QZ: ${message}`);
     }
   };
 
@@ -407,18 +519,12 @@ export function PrinterSettings() {
     }
   };
 
-  // Lógica do Spooler Local (Android Real)
+  // Spooler local: Android usa Bluetooth SPP; navegador/Windows usa QZ Tray.
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const poll = async () => {
       if (!spoolerRef.current.running) return;
-
-      if (!isNative) {
-        // Modo browser
-        timeoutId = setTimeout(poll, pollingInterval);
-        return;
-      }
 
       if (!selectedDevice) {
         addLog('Erro: Nenhum dispositivo selecionado para o spooler.');
@@ -428,7 +534,28 @@ export function PrinterSettings() {
 
       const device = devices.find(d => d.id === selectedDevice);
       if (!device || !device.address) {
-        addLog('Erro: Dispositivo inválido ou sem endereço MAC.');
+        addLog('Erro: Dispositivo invalido ou sem endereco de impressora.');
+        setIsSpoolerRunning(false);
+        return;
+      }
+
+      if (!device.autoPrintEnabled) {
+        addLog('Auto-Print esta desativado para este dispositivo.');
+        setIsSpoolerRunning(false);
+        return;
+      }
+
+      const isBluetoothDevice = device.connectionType === 'BLUETOOTH_SPP';
+      const isQzDevice = device.connectionType === 'QZ_TRAY';
+
+      if (isBluetoothDevice && !isNative) {
+        addLog('Esta impressora Bluetooth so imprime automaticamente no app Android.');
+        setIsSpoolerRunning(false);
+        return;
+      }
+
+      if (!isBluetoothDevice && !isQzDevice) {
+        addLog(`Tipo de impressora sem spooler local: ${device.connectionType}.`);
         setIsSpoolerRunning(false);
         return;
       }
@@ -439,31 +566,26 @@ export function PrinterSettings() {
 
         if (job && job.id) {
           addLog(`Job #${job.id} recebido. Tentando imprimir...`);
-          
-          try {
-            // Conversão de texto para ESC/POS Uint8Array formatado.
-            // Para simplificar a ponte, se o plugin Bluetooth write() recebe string,
-            // podemos mandar a string ou encodar como Base64.
-            // Assumimos que o bluetooth.ts e o plugin Java aceitam bytes via array/base64 ou texto limpo.
-            const builder = new EscPosBuilder();
-            builder.alignCenter().boldOn().textLine("--- TICKET ---").boldOff().alignLeft();
-            builder.textLine(job.content).feed(3).cut();
-            const payload = builder.build();
-            // A interface atual printTicketViaBluetooth pede string. No Android real, o plugin deverá ler os bytes.
-            // Convertendo payload array para string (simplificação - no app real o plugin receberá array).
-            const payloadStr = String.fromCharCode.apply(null, payload);
 
-            await printTicketViaBluetooth(device.address, payloadStr);
-            
-            // Sucesso - envia ACK
+          try {
+            if (isQzDevice) {
+              await printTextViaQz(device.address, job.content);
+            } else {
+              const builder = new EscPosBuilder();
+              builder.alignCenter().boldOn().textLine('--- TICKET ---').boldOff().alignLeft();
+              builder.textLine(job.content).feed(3).cut();
+              const payload = builder.build();
+              const payloadStr = String.fromCharCode.apply(null, payload);
+              await printTicketViaBluetooth(device.address, payloadStr);
+            }
+
             await api.post(`/printing/spooler/${job.id}/ack`, { printerDeviceId: device.id });
             addLog(`Job #${job.id} impresso e finalizado (ACK).`);
           } catch (printErr: unknown) {
             const msg = printErr instanceof Error ? printErr.message : 'Erro';
-            addLog(`Falha na impressora física: ${msg}`);
-            // Falha - envia FAIL
-            await api.post(`/printing/spooler/${job.id}/fail`, { 
-              printerDeviceId: device.id, 
+            addLog(`Falha na impressora fisica: ${msg}`);
+            await api.post(`/printing/spooler/${job.id}/fail`, {
+              printerDeviceId: device.id,
               errorMessage: msg,
             });
           }
@@ -481,13 +603,12 @@ export function PrinterSettings() {
     };
 
     if (isSpoolerRunning) {
-      if (!isNative) {
-        addLog('AVISO: O Spooler Automático só envia para impressoras físicas no app Android.');
-        addLog('No navegador, esta tela funciona apenas como painel de controle.');
+      if (!selectedDeviceCanAutoPrint) {
+        addLog('Selecione uma impressora compativel e ative a opcao Auto-Print antes de iniciar.');
         setIsSpoolerRunning(false);
         return;
       }
-      addLog(`Spooler Bluetooth iniciado no device ID: ${selectedDevice}`);
+      addLog(`Auto-Print iniciado no device ID: ${selectedDevice}`);
       poll();
     } else {
       addLog('Spooler parado.');
@@ -496,7 +617,7 @@ export function PrinterSettings() {
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [isSpoolerRunning, selectedDevice, pollingInterval, isNative, devices]);
+  }, [isSpoolerRunning, selectedDevice, selectedDeviceCanAutoPrint, pollingInterval, isNative, devices]);
 
   return (
     <div className="p-8 max-w-6xl mx-auto animate-in fade-in duration-500">
@@ -518,7 +639,7 @@ export function PrinterSettings() {
         <div className="mb-6 p-4 bg-status-warning/10 border-l-4 border-status-warning rounded-r-lg flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-status-warning mt-0.5" />
           <div className="text-sm text-status-warning-800 dark:text-status-warning-400">
-            <strong>Modo Navegador Web:</strong> A impressão térmica Bluetooth direta (SPP) funciona exclusivamente dentro do Aplicativo Android nativo (Capacitor). Aqui no navegador, você pode visualizar e configurar os dispositivos, mas o Auto-Print físico está desativado.
+            <strong>Modo Navegador Web:</strong> Bluetooth SPP direto continua exclusivo do app Android. No computador, use QZ Tray aberto para listar impressoras do Windows e ativar Auto-Print via USB/driver local.
           </div>
         </div>
       )}
@@ -616,7 +737,27 @@ export function PrinterSettings() {
                     <option key={d.id} value={d.id}>{d.name} ({d.address}){d.isPrimary ? ' - principal' : ''}</option>
                   ))}
                 </select>
+                {selectedPrinterDevice ? (
+                  <p className="mt-2 text-xs font-semibold text-muted-foreground">
+                    Tipo: {selectedPrinterDevice.connectionType} {selectedPrinterDevice.autoPrintEnabled ? '- Auto-Print ativo' : '- Auto-Print desativado'}
+                  </p>
+                ) : null}
               </div>
+
+              <label className="flex items-start gap-3 rounded-xl border border-border bg-muted/20 p-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={autoPrintEnabled}
+                  onChange={(event) => setAutoPrintEnabled(event.target.checked)}
+                  className="mt-1 h-4 w-4 accent-primary"
+                />
+                <span>
+                  <span className="block text-xs font-black uppercase tracking-widest text-foreground">Imprimir pedidos automaticamente</span>
+                  <span className="mt-1 block text-xs font-semibold text-muted-foreground">
+                    Opcional por dispositivo. Quando desligado, a impressora fica salva, mas o spooler automatico nao imprime.
+                  </span>
+                </span>
+              </label>
 
               <div className="pt-2">
                 <button
@@ -651,7 +792,7 @@ export function PrinterSettings() {
                 </button>
                 <button
                   onClick={() => setIsSpoolerRunning(!isSpoolerRunning)}
-                  disabled={!isNative}
+                  disabled={!selectedDeviceCanAutoPrint}
                   className={`w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
                     isSpoolerRunning 
                       ? 'bg-destructive text-white shadow-destructive/20 active:scale-95' 
@@ -667,6 +808,77 @@ export function PrinterSettings() {
               </div>
             </div>
           </section>
+
+          {!isNative && (
+            <section className="bg-card dark:bg-muted900 rounded-3xl border border-border dark:border-border800 p-6 shadow-sm">
+              <h2 className="text-sm font-black uppercase tracking-widest text-muted-foreground mb-4">Adicionar Impressora (QZ Tray / Windows)</h2>
+
+              <button
+                type="button"
+                onClick={handleConnectQzTray}
+                disabled={isQzConnecting}
+                className="w-full py-3 bg-primary text-primary-foreground font-bold rounded-xl shadow mb-4 disabled:opacity-70 disabled:cursor-wait"
+              >
+                {isQzConnecting ? 'Conectando...' : 'Conectar e listar impressoras'}
+              </button>
+
+              <div className="mb-4 rounded-xl border border-border bg-muted/40 p-3 text-xs">
+                <p className="font-black uppercase tracking-widest text-muted-foreground">Status QZ</p>
+                <p className="mt-1 font-bold text-foreground">
+                  {qzStatus || 'Abra o QZ Tray no Windows e clique em conectar.'}
+                </p>
+              </div>
+
+              {qzError ? (
+                <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm font-bold text-destructive">
+                  {qzError}
+                </div>
+              ) : null}
+
+              <div className="space-y-2">
+                {qzPrinterNames.map((printerName) => (
+                  <div key={printerName} className="flex items-center justify-between gap-3 p-3 border border-border dark:border-border800 rounded-lg">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold">{printerName}</p>
+                      <p className="text-xs text-muted-foreground">Windows / QZ Tray</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleLocalQzTestPrint(printerName)}
+                        className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-black uppercase tracking-widest text-foreground hover:bg-muted"
+                      >
+                        Testar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddQzPrinter(printerName)}
+                        disabled={isSavingDevice}
+                        className="p-2 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 disabled:opacity-60 disabled:cursor-wait"
+                        title="Adicionar QZ"
+                      >
+                        {isSavingDevice ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {selectedPrinterDevice?.connectionType === 'QZ_TRAY' ? (
+                <button
+                  type="button"
+                  onClick={() => handleLocalQzTestPrint()}
+                  className="mt-4 w-full rounded-xl bg-status-success px-4 py-3 text-sm font-black uppercase tracking-widest text-white shadow"
+                >
+                  Testar impressora QZ selecionada
+                </button>
+              ) : null}
+
+              {testPrintStatus ? (
+                <p className="mt-3 text-sm font-bold text-muted-foreground">{testPrintStatus}</p>
+              ) : null}
+            </section>
+          )}
 
           {isNative && (
             <section className="bg-card dark:bg-muted900 rounded-3xl border border-border dark:border-border800 p-6 shadow-sm">
