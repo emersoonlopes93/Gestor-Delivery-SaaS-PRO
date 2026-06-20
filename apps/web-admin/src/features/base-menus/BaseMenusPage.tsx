@@ -27,7 +27,7 @@ import { useAdminPermissions } from '../../hooks/use-admin-auth';
 type PublicationStatus = 'draft' | 'published' | 'archived';
 type ImageStatus = 'linked_exact' | 'linked_tag' | 'linked_fallback' | 'missing_lookup' | 'no_published_asset' | 'draft_only';
 type ImportStatus = 'success' | 'partial' | 'failed';
-type TabId = 'products' | 'images' | 'versions' | 'imports' | 'metadata';
+type TabId = 'products' | 'imports' | 'advanced';
 
 type BaseMenuVersionSummary = {
   id: string;
@@ -84,6 +84,7 @@ type PublishedGlobalImage = {
 
 type BaseMenuProduct = {
   id: string;
+  categoryId: string;
   slug: string;
   name: string;
   description: string | null;
@@ -172,6 +173,19 @@ type DraftActionModalState = {
   mode: 'publish' | 'discard';
 };
 
+type ProductModalMode = 'create' | 'edit' | 'duplicate';
+
+type ProductModalState = {
+  mode: ProductModalMode;
+  categoryId: string;
+  product: BaseMenuProduct | null;
+};
+
+type GalleryAsset = PublishedGlobalImage & {
+  tagsJson: string[];
+  metadataJson: Record<string, unknown>;
+};
+
 type ImportLog = {
   id: string;
   tenant: { id: string; name: string; slug: string };
@@ -201,11 +215,9 @@ const imageStatusLabels: Record<ImageStatus, string> = {
 };
 
 const tabs: Array<{ id: TabId; label: string }> = [
-  { id: 'products', label: 'Categorias e produtos' },
-  { id: 'images', label: 'Imagens' },
-  { id: 'versions', label: 'Versoes' },
+  { id: 'products', label: 'Produtos' },
   { id: 'imports', label: 'Importações' },
-  { id: 'metadata', label: 'Metadados' },
+  { id: 'advanced', label: 'Avançado' },
 ];
 
 export function BaseMenusPage() {
@@ -293,7 +305,7 @@ function BaseMenuListView() {
         </div>
       </div>
 
-      <section className="rounded-xl border border-border bg-card p-4">
+      <section className="hidden rounded-xl border border-border bg-card p-4">
         <p className="text-sm font-bold text-muted-foreground">
           Apenas templates publicados aparecem para tenants. Imagens em draft não são usadas na importação.
         </p>
@@ -381,31 +393,13 @@ function BaseMenuListView() {
   );
 }
 
-function DraftActionButton({ item, onDone }: { item: BaseMenuListItem; onDone: () => void | Promise<void> }) {
+function DraftActionButton({ item }: { item: BaseMenuListItem; onDone?: () => void | Promise<void> }) {
   const navigate = useNavigate();
-  const [busy, setBusy] = useState(false);
-
-  async function createOrContinue() {
-    if (item.draftVersion) {
-      navigate(`/base-menus/${item.slug}/draft`);
-      return;
-    }
-    setBusy(true);
-    try {
-      await api.post<BaseMenuDraft>(`/admin/base-menus/${item.slug}/draft-version`);
-      await onDone();
-      navigate(`/base-menus/${item.slug}/draft`);
-    } catch (err) {
-      window.alert(errorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
-    <button aria-label={item.draftVersion ? 'Continuar edicao' : 'Criar draft'} onClick={() => void createOrContinue()} disabled={busy} className="inline-flex h-9 items-center justify-center gap-1 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground disabled:opacity-60">
-      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-      {item.draftVersion ? 'Continuar edicao' : 'Criar draft'}
+    <button aria-label="Editar cardápio" onClick={() => navigate(`/base-menus/${item.slug}/draft`)} className="inline-flex h-9 items-center justify-center gap-1 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground">
+      <Plus className="h-3.5 w-3.5" />
+      Editar cardápio
     </button>
   );
 }
@@ -418,6 +412,9 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<DraftActionModalState | null>(null);
+  const [productModal, setProductModal] = useState<ProductModalState | null>(null);
+  const [imagePickerProduct, setImagePickerProduct] = useState<BaseMenuProduct | null>(null);
+  const [optionsProduct, setOptionsProduct] = useState<BaseMenuProduct | null>(null);
 
   async function loadDraft() {
     setLoading(true);
@@ -426,6 +423,17 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
       const response = await api.get<BaseMenuDraft>(`/admin/base-menus/${id}/draft`);
       setDraft(response.data);
     } catch (err) {
+      if (getErrorStatus(err) === 404 && canManage) {
+        try {
+          await api.post<BaseMenuDraft>(`/admin/base-menus/${id}/draft-version`);
+          const response = await api.get<BaseMenuDraft>(`/admin/base-menus/${id}/draft`);
+          setDraft(response.data);
+          return;
+        } catch (createErr) {
+          setError(errorMessage(createErr));
+          return;
+        }
+      }
       setError(errorMessage(err));
     } finally {
       setLoading(false);
@@ -458,14 +466,14 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
       </button>
 
       <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-900">
-        Voce esta editando uma versao draft. Tenants so verao esta versao apos publicacao. Cardapios ja importados por tenants nao serao alterados. A Galeria Base continua sendo o local para publicar ou substituir imagens.
+        Alteracoes nao publicadas. Novos lojistas que importarem este modelo receberao a nova versao. Lojistas que ja importaram nao serao alterados automaticamente.
       </section>
 
       <section className="rounded-xl border border-border bg-card p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <h1 className="text-2xl font-black text-foreground">{draft.template.icon ? `${draft.template.icon} ` : ''}{draft.template.name}</h1>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">Publicada atual: {draft.template.currentPublishedVersionId ?? '-'} · Draft: v{draft.version.versionNumber}</p>
+            <p className="mt-1 text-sm font-bold text-muted-foreground">Edicao simples do cardapio para futuras importacoes.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link to="/base-media" className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">
@@ -474,13 +482,13 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
             </Link>
             {canManage ? (
               <>
-                <button aria-label="Descartar draft" onClick={() => setModal({ draft, mode: 'discard' })} className="inline-flex items-center justify-center gap-2 rounded-xl border border-destructive/30 bg-background px-4 py-2 text-sm font-black text-destructive hover:bg-destructive/10">
+                <button aria-label="Descartar alterações" onClick={() => setModal({ draft, mode: 'discard' })} className="inline-flex items-center justify-center gap-2 rounded-xl border border-destructive/30 bg-background px-4 py-2 text-sm font-black text-destructive hover:bg-destructive/10">
                   <Trash2 className="h-4 w-4" />
-                  Descartar draft
+                  Descartar alterações
                 </button>
-                <button aria-label="Publicar draft" onClick={() => setModal({ draft, mode: 'publish' })} disabled={draft.validation.errors.length > 0} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700 disabled:opacity-50">
+                <button aria-label="Publicar alterações" onClick={() => setModal({ draft, mode: 'publish' })} disabled={draft.validation.errors.length > 0} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700 disabled:opacity-50">
                   <Send className="h-4 w-4" />
-                  Revisar e publicar
+                  Publicar alterações
                 </button>
               </>
             ) : null}
@@ -488,25 +496,53 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
         </div>
       </section>
 
-      <DraftValidationPanel validation={draft.validation} />
-
-      {canManage ? <TemplateForm draft={draft} onSaved={loadDraft} /> : <ReadOnlyNotice />}
-
       <section className="space-y-4">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-black text-foreground">Categorias e produtos</h2>
-          {canManage ? <CategoryCreateForm draft={draft} onSaved={loadDraft} /> : null}
+          <div>
+            <h2 className="text-lg font-black text-foreground">Produtos</h2>
+            <p className="text-sm font-bold text-muted-foreground">Edite nome, preco, categoria, imagem e complementos sem ver JSON tecnico.</p>
+          </div>
+          {canManage ? <CategoryCreateButton draft={draft} onSaved={loadDraft} /> : null}
         </div>
         {draft.categories.map((category) => (
           <div key={category.id} className="overflow-hidden rounded-xl border border-border bg-card">
-            <CategoryEditor draft={draft} category={category} canManage={canManage} onSaved={loadDraft} />
+            <CategoryHeader
+              draft={draft}
+              category={category}
+              canManage={canManage}
+              onSaved={loadDraft}
+              onCreateProduct={() => setProductModal({ mode: 'create', categoryId: category.id, product: null })}
+            />
             <div className="divide-y divide-border">
-              {category.products.map((product) => <ProductEditor key={product.id} draft={draft} product={product} canManage={canManage} onSaved={loadDraft} />)}
+              {category.products.map((product) => (
+                <SimpleProductCard
+                  key={product.id}
+                  draft={draft}
+                  product={product}
+                  categoryName={category.name}
+                  canManage={canManage}
+                  onSaved={loadDraft}
+                  onEdit={() => setProductModal({ mode: 'edit', categoryId: category.id, product })}
+                  onDuplicate={() => setProductModal({ mode: 'duplicate', categoryId: category.id, product })}
+                  onImage={() => setImagePickerProduct(product)}
+                  onOptions={() => setOptionsProduct(product)}
+                />
+              ))}
             </div>
-            {canManage ? <ProductCreateForm draft={draft} category={category} onSaved={loadDraft} /> : null}
           </div>
         ))}
       </section>
+
+      <details className="rounded-xl border border-border bg-card p-4">
+        <summary className="cursor-pointer text-sm font-black text-foreground">Avancado</summary>
+        <div className="mt-4 space-y-4">
+          {canManage ? <TemplateForm draft={draft} onSaved={loadDraft} /> : <ReadOnlyNotice />}
+          <DraftValidationPanel validation={draft.validation} />
+          <section className="rounded-xl border border-border bg-muted/20 p-4 text-sm font-bold text-muted-foreground">
+            Historico, importacoes e metadados continuam disponiveis na tela de detalhe do Cardapio Base.
+          </section>
+        </div>
+      </details>
 
       {modal ? (
         <DraftActionModal
@@ -516,6 +552,33 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
             setModal(null);
             navigate(`/base-menus/${draft.template.slug}`);
           }}
+        />
+      ) : null}
+
+      {productModal && canManage ? (
+        <ProductEditorModal
+          draft={draft}
+          state={productModal}
+          onClose={() => setProductModal(null)}
+          onSaved={loadDraft}
+        />
+      ) : null}
+
+      {imagePickerProduct && canManage ? (
+        <ProductImagePickerModal
+          draft={draft}
+          product={imagePickerProduct}
+          onClose={() => setImagePickerProduct(null)}
+          onSaved={loadDraft}
+        />
+      ) : null}
+
+      {optionsProduct && canManage ? (
+        <ProductOptionsModal
+          draft={draft}
+          product={optionsProduct}
+          onClose={() => setOptionsProduct(null)}
+          onSaved={loadDraft}
         />
       ) : null}
     </div>
@@ -631,12 +694,6 @@ function BaseMenuDetailView({ id }: { id: string }) {
                   createdAt: detail.template.createdAt,
                   updatedAt: detail.template.updatedAt,
                 }} onDone={loadDetail} />
-                {detail.draftVersion ? (
-                  <Link to={`/base-menus/${detail.template.slug}/draft`} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700">
-                    <Send className="h-4 w-4" />
-                    Revisar/Publicar draft
-                  </Link>
-                ) : null}
                 <button aria-label="Duplicar cardápio" onClick={() => setDuplicateOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">
                   <Copy className="h-4 w-4" />
                   Duplicar
@@ -675,12 +732,24 @@ function BaseMenuDetailView({ id }: { id: string }) {
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <section className="hidden grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Kpi label="Categorias" value={detail.totals.totalCategories} />
         <Kpi label="Produtos" value={detail.totals.totalProducts} />
         <Kpi label="Com lookup" value={detail.totals.totalProductsWithMediaLookupKey} />
         <Kpi label="Com imagem" value={detail.totals.totalProductsWithPublishedGlobalImage} tone="success" />
         <Kpi label="Pendências" value={detail.totals.totalProductsWithoutImage} tone={detail.totals.totalProductsWithoutImage > 0 ? 'danger' : 'success'} />
+      </section>
+
+      <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+        <p className="text-[11px] font-black uppercase tracking-wide">Alterações não publicadas</p>
+        <p className="mt-1 text-sm font-bold">
+          {detail.draftVersion
+            ? 'Existe uma versão em edição. Você pode alterar produtos, imagens e complementos e publicar quando estiver pronto.'
+            : 'Nenhuma alteração pendente no momento. Clique em Editar cardápio para abrir ou continuar a edição.'}
+        </p>
+        <p className="mt-2 text-xs font-semibold text-amber-900/80">
+          Alterações aqui afetam apenas futuras importações deste Cardápio Pronto.
+        </p>
       </section>
 
       <nav className="flex flex-wrap gap-2 border-b border-border">
@@ -696,10 +765,8 @@ function BaseMenuDetailView({ id }: { id: string }) {
       </nav>
 
       {tab === 'products' ? <ProductsTab categories={detail.categories} /> : null}
-      {tab === 'images' ? <ImagesTab groups={imageGroups} /> : null}
-      {tab === 'versions' ? <VersionsTab versions={versions} currentVersionId={detail.currentPublishedVersion?.id ?? null} /> : null}
       {tab === 'imports' ? <ImportsTab logs={logs} /> : null}
-      {tab === 'metadata' ? <MetadataTab detail={detail} /> : null}
+      {tab === 'advanced' ? <AdvancedTab detail={detail} versions={versions} imageGroups={imageGroups} /> : null}
 
       {duplicateOpen && canManage ? (
         <DuplicateTemplateModal
@@ -747,6 +814,180 @@ function ReadOnlyNotice() {
     <section className="rounded-xl border border-border bg-card p-4 text-sm font-bold text-muted-foreground">
       Seu usuario possui apenas leitura. A edicao do draft exige saas.base_menu.manage.
     </section>
+  );
+}
+
+type OptionItemDraft = {
+  name: string;
+  description: string;
+  priceImpactValue: string;
+  allowQuantity: boolean;
+  minQty: string;
+  maxQty: string;
+  order: string;
+  isActive: boolean;
+};
+
+type OptionGroupDraft = {
+  name: string;
+  description: string;
+  selectionType: 'single' | 'multiple';
+  isRequired: boolean;
+  minSelect: string;
+  maxSelect: string;
+  order: string;
+  isActive: boolean;
+  items: OptionItemDraft[];
+};
+
+type BaseMediaPickerItem = {
+  id: string;
+  title: string | null;
+  category: string | null;
+  categoryName: string | null;
+  publicUrl: string;
+  altText: string | null;
+  tagsJson: string[];
+  publicationStatus: 'draft' | 'published' | 'archived';
+  productName: string | null;
+  mediaLookupKey: string | null;
+};
+
+function CategoryCreateButton({ draft, onSaved }: { draft: BaseMenuDraft; onSaved: () => void | Promise<void> }) {
+  return <CategoryCreateForm draft={draft} onSaved={onSaved} />;
+}
+
+function CategoryHeader({
+  draft,
+  category,
+  canManage,
+  onSaved,
+  onCreateProduct,
+}: {
+  draft: BaseMenuDraft;
+  category: BaseMenuCategory;
+  canManage: boolean;
+  onSaved: () => void | Promise<void>;
+  onCreateProduct: () => void;
+}) {
+  const categories = [...draft.categories].sort((left, right) => left.sortOrder - right.sortOrder);
+  const index = categories.findIndex((item) => item.id === category.id);
+  const canMoveUp = index > 0;
+  const canMoveDown = index >= 0 && index < categories.length - 1;
+
+  async function move(direction: -1 | 1) {
+    await moveCategoryInDraft(draft, category, direction);
+    await onSaved();
+  }
+
+  return (
+    <div className="space-y-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <div>
+          <p className="text-sm font-black text-foreground">{category.name}</p>
+          <p className="text-xs font-bold text-muted-foreground">{category.products.length} produtos</p>
+        </div>
+        {canManage ? (
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={!canMoveUp} onClick={() => void move(-1)} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted disabled:opacity-50">
+              Mover para cima
+            </button>
+            <button type="button" disabled={!canMoveDown} onClick={() => void move(1)} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted disabled:opacity-50">
+              Mover para baixo
+            </button>
+            <button onClick={onCreateProduct} className="inline-flex h-9 items-center justify-center gap-1 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground">
+              <Plus className="h-3.5 w-3.5" />
+              Novo produto
+            </button>
+          </div>
+        ) : null}
+      </div>
+      <CategoryEditor draft={draft} category={category} canManage={canManage} onSaved={onSaved} />
+    </div>
+  );
+}
+
+function SimpleProductCard({
+  draft,
+  product,
+  categoryName,
+  canManage,
+  onSaved,
+  onEdit,
+  onDuplicate,
+  onImage,
+  onOptions,
+}: {
+  draft: BaseMenuDraft;
+  product: BaseMenuProduct;
+  categoryName: string;
+  canManage: boolean;
+  onSaved: () => void | Promise<void>;
+  onEdit: () => void;
+  onDuplicate: () => void;
+  onImage: () => void;
+  onOptions: () => void;
+}) {
+  const groups = readOptionGroups(product);
+  const optionsLabel = groups.length === 0 ? 'Sem complementos' : `${groups.length} grupo${groups.length === 1 ? '' : 's'} de complementos`;
+  const imageLabel = product.imageStatus === 'linked_exact' || product.imageStatus === 'linked_tag' ? 'Imagem ok' : product.imageStatus === 'linked_fallback' ? 'Imagem fallback' : 'Sem imagem';
+
+  async function move(direction: -1 | 1) {
+    await moveProductInDraft(draft, product, direction);
+    await onSaved();
+  }
+
+  async function duplicate() {
+    await duplicateProductInDraft(draft, product);
+    await onSaved();
+  }
+
+  async function remove() {
+    await deleteProduct(draft, product, onSaved);
+  }
+
+  return (
+    <article className="grid gap-4 px-4 py-4 lg:grid-cols-[76px_1.4fr_220px]">
+      <div>
+        {product.publishedGlobalImage ? (
+          <img src={product.publishedGlobalImage.publicUrl} alt={product.publishedGlobalImage.altText ?? product.name} className="h-16 w-16 rounded-xl object-cover bg-muted" />
+        ) : (
+          <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+            <ImageOff className="h-6 w-6" />
+          </div>
+        )}
+      </div>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-black text-foreground">{product.name}</p>
+            <p className="mt-1 text-xs font-bold text-muted-foreground">{product.description ?? 'Sem descricao'}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="inline-flex h-8 items-center rounded-xl bg-muted px-3 text-xs font-black text-muted-foreground">{categoryName}</span>
+            <span className={`inline-flex h-8 items-center rounded-xl px-3 text-xs font-black ${imageLabel === 'Sem imagem' ? 'bg-amber-500/10 text-amber-600' : 'bg-emerald-500/10 text-emerald-600'}`}>{imageLabel}</span>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-muted-foreground">
+          <span className="rounded-lg bg-muted px-2 py-1">{formatMoney(product.basePrice)}</span>
+          {product.compareAtPrice !== null ? <span className="rounded-lg bg-muted px-2 py-1">Promo: {formatMoney(product.compareAtPrice)}</span> : null}
+          <span className="rounded-lg bg-muted px-2 py-1">{optionsLabel}</span>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button onClick={onEdit} className="rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground">Editar</button>
+          <button onClick={onImage} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Trocar imagem</button>
+          <button onClick={onOptions} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Complementos</button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => void duplicate()} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Duplicar</button>
+          <button onClick={() => void remove()} className="rounded-xl border border-destructive/30 bg-background px-3 py-2 text-xs font-black text-destructive hover:bg-destructive/10">Excluir</button>
+          <button onClick={() => void move(-1)} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Mover para cima</button>
+          <button onClick={() => void move(1)} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Mover para baixo</button>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -858,7 +1099,7 @@ function DraftActionModal({ state, onClose, onDone }: { state: DraftActionModalS
           <div>
             <p className="text-[11px] font-black uppercase text-muted-foreground">{isPublish ? 'Confirmar publicacao' : 'Confirmar descarte'}</p>
             <h2 className="mt-1 text-xl font-black text-foreground">{state.draft.template.name}</h2>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">{state.draft.template.slug} - draft v{state.draft.version.versionNumber}</p>
+            <p className="mt-1 text-sm font-bold text-muted-foreground">Confirme a acao para alterar o Cardapio Base.</p>
           </div>
           <button onClick={onClose} className="rounded-xl border border-border px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Fechar</button>
         </div>
@@ -898,9 +1139,9 @@ function DraftActionModal({ state, onClose, onDone }: { state: DraftActionModalS
 
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button onClick={onClose} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">Cancelar</button>
-          <button aria-label={isPublish ? 'Confirmar publicacao do draft' : 'Confirmar descarte do draft'} onClick={() => void submit()} disabled={!canSubmit || busy} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black text-white disabled:opacity-50 ${isPublish ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-destructive hover:bg-destructive/90'}`}>
+          <button aria-label={isPublish ? 'Confirmar publicacao' : 'Confirmar descarte'} onClick={() => void submit()} disabled={!canSubmit || busy} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black text-white disabled:opacity-50 ${isPublish ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-destructive hover:bg-destructive/90'}`}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : isPublish ? <Send className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
-            {isPublish ? 'Publicar draft' : 'Descartar draft'}
+            {isPublish ? 'Publicar alterações' : 'Descartar alterações'}
           </button>
         </div>
       </section>
@@ -1108,6 +1349,534 @@ async function deleteProduct(draft: BaseMenuDraft, product: BaseMenuProduct, onS
   }
 }
 
+async function moveProductInDraft(draft: BaseMenuDraft, product: BaseMenuProduct, direction: -1 | 1) {
+  const category = draft.categories.find((item) => item.id === product.categoryId);
+  if (!category) return;
+  const products = [...category.products].sort((left, right) => left.sortOrder - right.sortOrder);
+  const index = products.findIndex((item) => item.id === product.id);
+  const targetIndex = index + direction;
+  const target = products[targetIndex];
+  if (!target) return;
+
+  await Promise.all([
+    api.patch(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/products/${product.id}`, {
+      sortOrder: target.sortOrder,
+    }),
+    api.patch(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/products/${target.id}`, {
+      sortOrder: product.sortOrder,
+    }),
+  ]);
+}
+
+async function duplicateProductInDraft(draft: BaseMenuDraft, product: BaseMenuProduct) {
+  const category = draft.categories.find((item) => item.id === product.categoryId);
+  if (!category) return;
+  await api.post(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/categories/${category.id}/products`, {
+    name: `${product.name} - cópia`,
+    description: product.description,
+    basePrice: product.basePrice,
+    compareAtPrice: product.compareAtPrice,
+    sortOrder: product.sortOrder + 1,
+    mediaLookupKey: product.mediaLookupKey,
+    searchTagsJson: product.searchTagsJson,
+    metadataJson: product.metadataJson,
+  });
+}
+
+async function moveCategoryInDraft(draft: BaseMenuDraft, category: BaseMenuCategory, direction: -1 | 1) {
+  const categories = [...draft.categories].sort((left, right) => left.sortOrder - right.sortOrder);
+  const index = categories.findIndex((item) => item.id === category.id);
+  const targetIndex = index + direction;
+  const target = categories[targetIndex];
+  if (!target) return;
+
+  await Promise.all([
+    api.patch(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/categories/${category.id}`, {
+      name: category.name,
+      description: category.description,
+      sortOrder: target.sortOrder,
+    }),
+    api.patch(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/categories/${target.id}`, {
+      name: target.name,
+      description: target.description,
+      sortOrder: category.sortOrder,
+    }),
+  ]);
+}
+
+function readOptionGroups(product: BaseMenuProduct): OptionGroupDraft[] {
+  const metadata = isRecord(product.metadataJson) ? product.metadataJson : null;
+  const optionGroups = metadata && Array.isArray(metadata.optionGroups) ? metadata.optionGroups : [];
+  if (!Array.isArray(optionGroups)) return [];
+
+  return optionGroups
+    .map((group): OptionGroupDraft | null => {
+      if (!isRecord(group) || typeof group.name !== 'string') return null;
+      const items = Array.isArray(group.items) ? group.items : [];
+      return {
+        name: group.name,
+        description: typeof group.description === 'string' ? group.description : '',
+        selectionType: group.selectionType === 'single' ? 'single' : 'multiple',
+        isRequired: group.isRequired === true,
+        minSelect: numberValue(group.minSelect, '0'),
+        maxSelect: numberValue(group.maxSelect, '1'),
+        order: numberValue(group.order, '0'),
+        isActive: group.isActive !== false,
+        items: items
+          .map((item): OptionItemDraft | null => {
+            if (!isRecord(item) || typeof item.name !== 'string') return null;
+            return {
+              name: item.name,
+              description: typeof item.description === 'string' ? item.description : '',
+              priceImpactValue: String(typeof item.priceImpactValue === 'number' || typeof item.priceImpactValue === 'string' ? item.priceImpactValue : 0),
+              allowQuantity: item.allowQuantity === true,
+              minQty: typeof item.minQty === 'number' ? String(item.minQty) : '',
+              maxQty: typeof item.maxQty === 'number' ? String(item.maxQty) : '',
+              order: numberValue(item.order, '0'),
+              isActive: item.isActive !== false,
+            };
+          })
+          .filter((item): item is OptionItemDraft => item !== null),
+      };
+    })
+    .filter((group): group is OptionGroupDraft => group !== null);
+}
+
+function buildOptionGroupsPayload(groups: OptionGroupDraft[]): Record<string, unknown> {
+  return {
+    optionGroups: groups.map((group, groupIndex) => ({
+      name: group.name,
+      description: group.description || undefined,
+      selectionType: group.selectionType,
+      isRequired: group.isRequired,
+      minSelect: Math.max(0, Number(group.minSelect) || 0),
+      maxSelect: Math.max(1, Number(group.maxSelect) || 1),
+      order: Number(group.order) || groupIndex + 1,
+      isActive: group.isActive,
+      items: group.items.map((item, itemIndex) => ({
+        name: item.name,
+        description: item.description || undefined,
+        priceImpactValue: Number(item.priceImpactValue) || 0,
+        allowQuantity: item.allowQuantity,
+        minQty: item.minQty.trim() ? Number(item.minQty) : undefined,
+        maxQty: item.maxQty.trim() ? Number(item.maxQty) : undefined,
+        order: Number(item.order) || itemIndex + 1,
+        isActive: item.isActive,
+      })),
+    })),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function numberValue(value: unknown, fallback: string): string {
+  return typeof value === 'number' && Number.isFinite(value) ? String(value) : fallback;
+}
+
+function blankOptionGroup(index: number): OptionGroupDraft {
+  return {
+    name: '',
+    description: '',
+    selectionType: 'multiple',
+    isRequired: false,
+    minSelect: '0',
+    maxSelect: '1',
+    order: String(index + 1),
+    isActive: true,
+    items: [blankOptionItem(1)],
+  };
+}
+
+function blankOptionItem(index: number): OptionItemDraft {
+  return {
+    name: '',
+    description: '',
+    priceImpactValue: '0',
+    allowQuantity: false,
+    minQty: '',
+    maxQty: '',
+    order: String(index),
+    isActive: true,
+  };
+}
+
+function ProductEditorModal({
+  draft,
+  state,
+  onClose,
+  onSaved,
+}: {
+  draft: BaseMenuDraft;
+  state: ProductModalState;
+  onClose: () => void;
+  onSaved: () => void | Promise<void>;
+}) {
+  const product = state.product;
+  const [name, setName] = useState(product ? (state.mode === 'duplicate' ? `${product.name} - cópia` : product.name) : '');
+  const [description, setDescription] = useState(product?.description ?? '');
+  const [basePrice, setBasePrice] = useState(product ? String(product.basePrice) : '');
+  const [compareAtPrice, setCompareAtPrice] = useState(product?.compareAtPrice === null || product?.compareAtPrice === undefined ? '' : String(product.compareAtPrice));
+  const [categoryId, setCategoryId] = useState(product?.categoryId ?? state.categoryId);
+  const [sortOrder, setSortOrder] = useState(product ? String(product.sortOrder) : '1');
+  const [busy, setBusy] = useState(false);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const body = {
+        name,
+        description: description.trim() || undefined,
+        basePrice: Number(basePrice),
+        compareAtPrice: compareAtPrice.trim() ? Number(compareAtPrice) : null,
+        sortOrder: Number(sortOrder),
+        categoryId,
+      };
+      if (state.mode === 'edit' && product) {
+        await api.patch(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/products/${product.id}`, body);
+      } else {
+        await api.post(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/categories/${categoryId}/products`, {
+          ...body,
+          name: state.mode === 'duplicate' && product ? body.name : body.name,
+          mediaLookupKey: product?.mediaLookupKey ?? null,
+          searchTagsJson: product?.searchTagsJson ?? [],
+          metadataJson: product?.metadataJson ?? null,
+        });
+      }
+      await onSaved();
+      onClose();
+    } catch (err) {
+      window.alert(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <form onSubmit={(event) => void submit(event)} className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-xl border border-border bg-card shadow-xl">
+        <div className="border-b border-border p-5">
+          <p className="text-[11px] font-black uppercase text-muted-foreground">
+            {state.mode === 'edit' ? 'Editar produto' : state.mode === 'duplicate' ? 'Duplicar produto' : 'Novo produto'}
+          </p>
+          <h2 className="mt-1 text-xl font-black text-foreground">{product?.name ?? 'Produto novo'}</h2>
+          <p className="mt-1 text-sm font-bold text-muted-foreground">Imagem e complementos são editados pelos atalhos próprios na lista.</p>
+        </div>
+        <div className="grid gap-4 p-5">
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Nome" value={name} onChange={setName} />
+            <label className="block">
+              <span className="text-[11px] font-black uppercase text-muted-foreground">Categoria</span>
+              <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)} className="mt-1 h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring">
+                {draft.categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <Field label="Descricao" value={description} onChange={setDescription} />
+          <div className="grid gap-3 md:grid-cols-3">
+            <Field label="Preco" value={basePrice} onChange={setBasePrice} type="number" step="0.01" />
+            <Field label="Preco promocional" value={compareAtPrice} onChange={setCompareAtPrice} type="number" step="0.01" />
+            <Field label="Ordem" value={sortOrder} onChange={setSortOrder} type="number" />
+          </div>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 border-t border-border bg-muted/20 p-5">
+          <button type="button" onClick={onClose} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">
+            Cancelar
+          </button>
+          <button type="submit" disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground disabled:opacity-50">
+            <Save className="h-4 w-4" />
+            {state.mode === 'edit' ? 'Salvar alterações' : 'Criar produto'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function ProductImagePickerModal({
+  draft,
+  product,
+  onClose,
+  onSaved,
+}: {
+  draft: BaseMenuDraft;
+  product: BaseMenuProduct;
+  onClose: () => void;
+  onSaved: () => void | Promise<void>;
+}) {
+  const [items, setItems] = useState<BaseMediaPickerItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ page: String(page), pageSize: '24', status: 'published' });
+      if (search.trim()) params.set('search', search.trim());
+      if (category) params.set('category', category);
+      const response = await api.get<{ items: BaseMediaPickerItem[]; totalPages: number }>(`/admin/base-media?${params.toString()}`);
+      setItems(response.data.items);
+      setTotalPages(response.data.totalPages || 1);
+    } catch (err) {
+      window.alert(errorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void load();
+  }, [page, search, category]);
+
+  const categories = useMemo(() => Array.from(new Set(items.map((item) => item.categoryName ?? item.category).filter((value): value is string => Boolean(value)))).sort(), [items]);
+
+  async function saveImage(asset: BaseMediaPickerItem | null) {
+    try {
+      await api.patch(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/products/${product.id}`, {
+        mediaLookupKey: asset?.mediaLookupKey ?? null,
+        searchTagsJson: asset?.tagsJson ?? [],
+      });
+      await onSaved();
+      onClose();
+    } catch (err) {
+      window.alert(errorMessage(err));
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <section className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-xl border border-border bg-card shadow-xl">
+        <div className="border-b border-border p-5">
+          <p className="text-[11px] font-black uppercase text-muted-foreground">Trocar imagem</p>
+          <h2 className="mt-1 text-xl font-black text-foreground">{product.name}</h2>
+          <p className="mt-1 text-sm font-bold text-muted-foreground">Selecione uma imagem publicada da Galeria Base.</p>
+        </div>
+        <div className="grid gap-3 border-b border-border p-5 md:grid-cols-[1fr_220px_140px]">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} className="h-10 w-full rounded-xl border border-input bg-background pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring" placeholder="Buscar na Galeria Base" />
+          </div>
+          <select value={category} onChange={(event) => setCategory(event.target.value)} className="h-10 rounded-xl border border-input bg-background px-3 text-sm">
+            <option value="">Todas categorias</option>
+            {categories.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+          <button type="button" onClick={() => void load()} className="h-10 rounded-xl bg-primary px-4 text-sm font-black text-primary-foreground">
+            Filtrar
+          </button>
+        </div>
+        <div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">
+          <button type="button" onClick={() => void saveImage(null)} className="flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 p-4 text-center">
+            <ImageOff className="h-8 w-8 text-muted-foreground" />
+            <span className="mt-2 text-sm font-black text-foreground">Remover imagem</span>
+            <span className="mt-1 text-xs font-bold text-muted-foreground">Volta para placeholder</span>
+          </button>
+          {loading ? <div className="col-span-full py-8 text-center text-sm font-bold text-muted-foreground">Carregando imagens...</div> : null}
+          {!loading && items.map((item) => (
+            <button key={item.id} type="button" onClick={() => void saveImage(item)} className="overflow-hidden rounded-xl border border-border bg-background text-left hover:bg-muted">
+              <img src={item.publicUrl} alt={item.altText ?? item.title ?? 'Imagem'} className="h-48 w-full object-cover" />
+              <div className="space-y-1 p-3">
+                <p className="truncate text-sm font-black text-foreground">{item.productName ?? item.title ?? 'Sem nome'}</p>
+                <p className="truncate text-xs font-bold text-muted-foreground">{item.mediaLookupKey ?? 'Sem lookup'}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center justify-between border-t border-border bg-muted/20 p-5">
+          <p className="text-xs font-bold text-muted-foreground">Página {page} de {totalPages}</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground disabled:opacity-50">Anterior</button>
+            <button type="button" onClick={() => setPage((current) => current + 1)} disabled={page >= totalPages} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground disabled:opacity-50">Próxima</button>
+            <button type="button" onClick={onClose} className="rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground">Fechar</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ProductOptionsModal({
+  draft,
+  product,
+  onClose,
+  onSaved,
+}: {
+  draft: BaseMenuDraft;
+  product: BaseMenuProduct;
+  onClose: () => void;
+  onSaved: () => void | Promise<void>;
+}) {
+  const [groups, setGroups] = useState<OptionGroupDraft[]>(() => {
+    const initial = readOptionGroups(product);
+    return initial.length > 0 ? initial : [blankOptionGroup(0)];
+  });
+  const [busy, setBusy] = useState(false);
+
+  function updateGroup(index: number, patch: Partial<OptionGroupDraft>) {
+    setGroups((current) => current.map((group, groupIndex) => (groupIndex === index ? { ...group, ...patch } : group)));
+  }
+
+  function updateItem(groupIndex: number, itemIndex: number, patch: Partial<OptionItemDraft>) {
+    setGroups((current) =>
+      current.map((group, currentGroupIndex) => {
+        if (currentGroupIndex !== groupIndex) return group;
+        return {
+          ...group,
+          items: group.items.map((item, currentItemIndex) => (currentItemIndex === itemIndex ? { ...item, ...patch } : item)),
+        };
+      }),
+    );
+  }
+
+  function moveGroup(index: number, direction: -1 | 1) {
+    setGroups((current) => {
+      const next = [...current];
+      const target = index + direction;
+      if (!next[target]) return current;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
+  function moveItem(groupIndex: number, itemIndex: number, direction: -1 | 1) {
+    setGroups((current) =>
+      current.map((group, currentGroupIndex) => {
+        if (currentGroupIndex !== groupIndex) return group;
+        const nextItems = [...group.items];
+        const target = itemIndex + direction;
+        if (!nextItems[target]) return group;
+        [nextItems[itemIndex], nextItems[target]] = [nextItems[target], nextItems[itemIndex]];
+        return { ...group, items: nextItems };
+      }),
+    );
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      await api.patch(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/products/${product.id}`, {
+        metadataJson: buildOptionGroupsPayload(groups),
+      });
+      await onSaved();
+      onClose();
+    } catch (err) {
+      window.alert(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <form onSubmit={(event) => void submit(event)} className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-xl border border-border bg-card shadow-xl">
+        <div className="border-b border-border p-5">
+          <p className="text-[11px] font-black uppercase text-muted-foreground">Complementos do produto</p>
+          <h2 className="mt-1 text-xl font-black text-foreground">{product.name}</h2>
+          <p className="mt-1 text-sm font-bold text-muted-foreground">Edite grupos e itens sem ver JSON cru.</p>
+        </div>
+        <div className="space-y-4 p-5">
+          {groups.map((group, groupIndex) => (
+            <div key={`${groupIndex}-${group.name || 'grupo'}`} className="rounded-xl border border-border bg-muted/20 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="grid flex-1 gap-3 md:grid-cols-2">
+                  <Field label="Grupo" value={group.name} onChange={(value) => updateGroup(groupIndex, { name: value })} />
+                  <Field label="Descricao" value={group.description} onChange={(value) => updateGroup(groupIndex, { description: value })} />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => moveGroup(groupIndex, -1)} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Mover para cima</button>
+                  <button type="button" onClick={() => moveGroup(groupIndex, 1)} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Mover para baixo</button>
+                  <button type="button" onClick={() => setGroups((current) => current.filter((_, currentIndex) => currentIndex !== groupIndex))} className="rounded-xl border border-destructive/30 bg-background px-3 py-2 text-xs font-black text-destructive hover:bg-destructive/10">Remover grupo</button>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-4">
+                <label className="block">
+                  <span className="text-[11px] font-black uppercase text-muted-foreground">Selecao</span>
+                  <select value={group.selectionType} onChange={(event) => updateGroup(groupIndex, { selectionType: event.target.value === 'single' ? 'single' : 'multiple' })} className="mt-1 h-10 w-full rounded-xl border border-input bg-background px-3 text-sm">
+                    <option value="single">Escolha única</option>
+                    <option value="multiple">Múltipla escolha</option>
+                  </select>
+                </label>
+                <label className="flex items-end gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm font-bold text-foreground">
+                  <input type="checkbox" checked={group.isRequired} onChange={(event) => updateGroup(groupIndex, { isRequired: event.target.checked })} />
+                  Obrigatório
+                </label>
+                <Field label="Minimo" value={group.minSelect} onChange={(value) => updateGroup(groupIndex, { minSelect: value })} type="number" />
+                <Field label="Maximo" value={group.maxSelect} onChange={(value) => updateGroup(groupIndex, { maxSelect: value })} type="number" />
+                <Field label="Ordem" value={group.order} onChange={(value) => updateGroup(groupIndex, { order: value })} type="number" />
+                <label className="flex items-end gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm font-bold text-foreground">
+                  <input type="checkbox" checked={group.isActive} onChange={(event) => updateGroup(groupIndex, { isActive: event.target.checked })} />
+                  Ativo
+                </label>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-black text-foreground">Itens</p>
+                  <button type="button" onClick={() => updateGroup(groupIndex, { items: [...group.items, blankOptionItem(group.items.length + 1)] })} className="rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground">Adicionar item</button>
+                </div>
+                <div className="space-y-3">
+                  {group.items.map((item, itemIndex) => (
+                    <div key={`${groupIndex}-${itemIndex}-${item.name || 'item'}`} className="rounded-xl border border-border bg-card p-3">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <Field label="Item" value={item.name} onChange={(value) => updateItem(groupIndex, itemIndex, { name: value })} />
+                        <Field label="Descricao" value={item.description} onChange={(value) => updateItem(groupIndex, itemIndex, { description: value })} />
+                      </div>
+                      <div className="mt-3 grid gap-3 md:grid-cols-4">
+                        <Field label="Preco adicional" value={item.priceImpactValue} onChange={(value) => updateItem(groupIndex, itemIndex, { priceImpactValue: value })} type="number" step="0.01" />
+                        <Field label="Ordem" value={item.order} onChange={(value) => updateItem(groupIndex, itemIndex, { order: value })} type="number" />
+                        <Field label="Qtd minima" value={item.minQty} onChange={(value) => updateItem(groupIndex, itemIndex, { minQty: value })} type="number" />
+                        <Field label="Qtd maxima" value={item.maxQty} onChange={(value) => updateItem(groupIndex, itemIndex, { maxQty: value })} type="number" />
+                        <label className="flex items-end gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm font-bold text-foreground">
+                          <input type="checkbox" checked={item.allowQuantity} onChange={(event) => updateItem(groupIndex, itemIndex, { allowQuantity: event.target.checked })} />
+                          Permite quantidade
+                        </label>
+                        <label className="flex items-end gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm font-bold text-foreground">
+                          <input type="checkbox" checked={item.isActive} onChange={(event) => updateItem(groupIndex, itemIndex, { isActive: event.target.checked })} />
+                          Ativo
+                        </label>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button type="button" onClick={() => moveItem(groupIndex, itemIndex, -1)} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Mover para cima</button>
+                        <button type="button" onClick={() => moveItem(groupIndex, itemIndex, 1)} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Mover para baixo</button>
+                        <button type="button" onClick={() => updateGroup(groupIndex, { items: group.items.filter((_, currentIndex) => currentIndex !== itemIndex) })} className="rounded-xl border border-destructive/30 bg-background px-3 py-2 text-xs font-black text-destructive hover:bg-destructive/10">Remover item</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <button type="button" onClick={() => setGroups((current) => [...current, blankOptionGroup(current.length)])} className="rounded-xl border border-dashed border-border bg-background px-4 py-3 text-sm font-black text-foreground hover:bg-muted">
+            + Adicionar grupo
+          </button>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 border-t border-border bg-muted/20 p-5">
+          <button type="button" onClick={onClose} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">Cancelar</button>
+          <button type="submit" disabled={busy} className="rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground disabled:opacity-50">
+            <Save className="mr-2 inline h-4 w-4" />
+            Salvar complementos
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function VersionsTab({ versions, currentVersionId }: { versions: BaseMenuVersionDetail[]; currentVersionId: string | null }) {
   return (
     <section className="space-y-4">
@@ -1264,6 +2033,31 @@ function ImportsTab({ logs }: { logs: ImportLog[] }) {
   );
 }
 
+function AdvancedTab({ detail, versions, imageGroups }: { detail: BaseMenuDetail; versions: BaseMenuVersionDetail[]; imageGroups: { linked: BaseMenuProduct[]; draftOnly: BaseMenuProduct[]; noAsset: BaseMenuProduct[]; noLookup: BaseMenuProduct[] } }) {
+  return (
+    <section className="space-y-4">
+      <details className="rounded-xl border border-border bg-card p-4" open>
+        <summary className="cursor-pointer text-sm font-black text-foreground">Imagens</summary>
+        <div className="mt-4">
+          <ImagesTab groups={imageGroups} />
+        </div>
+      </details>
+      <details className="rounded-xl border border-border bg-card p-4">
+        <summary className="cursor-pointer text-sm font-black text-foreground">Versões</summary>
+        <div className="mt-4">
+          <VersionsTab versions={versions} currentVersionId={detail.currentPublishedVersion?.id ?? null} />
+        </div>
+      </details>
+      <details className="rounded-xl border border-border bg-card p-4">
+        <summary className="cursor-pointer text-sm font-black text-foreground">Metadados</summary>
+        <div className="mt-4">
+          <MetadataTab detail={detail} />
+        </div>
+      </details>
+    </section>
+  );
+}
+
 function MetadataTab({ detail }: { detail: BaseMenuDetail }) {
   const metadata = {
     template: detail.template.metadataJson,
@@ -1352,6 +2146,12 @@ function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   if (error instanceof Error) return error.message;
   return 'Falha ao carregar dados.';
+}
+
+function getErrorStatus(error: unknown): number | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const candidate = error as { status?: unknown };
+  return typeof candidate.status === 'number' ? candidate.status : null;
 }
 
 function CreateTemplateModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {

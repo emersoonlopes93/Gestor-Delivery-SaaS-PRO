@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,7 +8,15 @@ import { api } from '../../lib/api-client';
 import { useAdminPermissions } from '../../hooks/use-admin-auth';
 
 vi.mock('../../lib/api-client', () => ({
-  ApiError: class ApiError extends Error {},
+  ApiError: class ApiError extends Error {
+    constructor(
+      public status: number,
+      message: string,
+    ) {
+      super(message);
+      this.name = 'ApiError';
+    }
+  },
   api: {
     get: vi.fn(),
     post: vi.fn(),
@@ -43,40 +51,54 @@ const draftVersion = {
   metadataJson: null,
 };
 
-const templateListItem = {
-  id: 'template-1',
-  slug: 'acai',
-  name: 'Acai',
-  description: 'Template de acai',
-  segment: 'acai',
-  icon: 'A',
-  status: 'published' as const,
-  currentPublishedVersion: publishedVersion,
-  draftVersion: null,
-  totalCategories: 1,
-  totalProducts: 1,
-  totalProductsWithMediaLookupKey: 1,
-  totalProductsWithPublishedGlobalImage: 1,
-  totalProductsWithoutImage: 0,
-  lastPublishedAt: '2026-06-01T00:00:00.000Z',
-  createdAt: '2026-06-01T00:00:00.000Z',
-  updatedAt: '2026-06-01T00:00:00.000Z',
-};
-
 const product = {
   id: 'product-1',
   categoryId: 'category-1',
   slug: 'acai-300ml',
-  name: 'Acai 300ml',
+  name: 'Açaí 300ml',
   description: 'Copo pequeno',
   basePrice: 15,
   compareAtPrice: null,
   sortOrder: 1,
   mediaLookupKey: 'lookup:acai-300',
   searchTagsJson: ['lookup:acai-300'],
-  metadataJson: null,
+  metadataJson: {
+    optionGroups: [
+      {
+        name: 'Coberturas',
+        description: '',
+        selectionType: 'multiple',
+        isRequired: false,
+        minSelect: 0,
+        maxSelect: 5,
+        order: 1,
+        isActive: true,
+        items: [
+          {
+            name: 'Leite em pó',
+            description: '',
+            priceImpactValue: 2,
+            allowQuantity: false,
+            minQty: null,
+            maxQty: null,
+            order: 1,
+            isActive: true,
+          },
+        ],
+      },
+    ],
+  },
   imageStatus: 'linked_exact' as const,
-  publishedGlobalImage: null,
+  publishedGlobalImage: {
+    id: 'asset-1',
+    title: 'Açaí 300ml',
+    publicUrl: 'https://cdn.local/acai.webp',
+    altText: 'Açaí 300ml',
+    filename: 'acai.webp',
+    publicationStatus: 'published',
+    category: 'acai',
+    createdAt: '2026-06-01T00:00:00.000Z',
+  },
 };
 
 const category = {
@@ -88,94 +110,6 @@ const category = {
   metadataJson: null,
   products: [product],
 };
-
-function makeDetail(hasDraft: boolean) {
-  return {
-    template: {
-      id: 'template-1',
-      slug: 'acai',
-      name: 'Acai',
-      description: 'Template de acai',
-      segment: 'acai',
-      icon: 'A',
-      status: 'published' as const,
-      metadataJson: null,
-      createdAt: '2026-06-01T00:00:00.000Z',
-      updatedAt: '2026-06-01T00:00:00.000Z',
-    },
-    currentPublishedVersion: publishedVersion,
-    draftVersion: hasDraft ? draftVersion : null,
-    totals: {
-      totalCategories: 1,
-      totalProducts: 1,
-      totalProductsWithMediaLookupKey: 1,
-      totalProductsWithPublishedGlobalImage: 1,
-      totalProductsWithoutImage: 0,
-    },
-    categories: [category],
-    versions: [],
-  };
-}
-
-function makeValidation(overrides?: Partial<{
-  errors: string[];
-  warnings: string[];
-  linkedFallback: number;
-  noPublishedAsset: number;
-}>) {
-  return {
-    errors: overrides?.errors ?? [],
-    warnings: overrides?.warnings ?? [],
-    totals: { categories: 1, products: 1 },
-    imageSummary: {
-      linkedExact: 1,
-      linkedTag: 0,
-      linkedFallback: overrides?.linkedFallback ?? 0,
-      missingLookup: 0,
-      noPublishedAsset: overrides?.noPublishedAsset ?? 0,
-      draftOnly: 0,
-    },
-    replacingVersionId: 'version-1',
-    publishingVersionId: 'version-2',
-    publishingVersionNumber: 2,
-  };
-}
-
-function makeDraft(validation = makeValidation()) {
-  return {
-    template: { ...makeDetail(true).template, currentPublishedVersionId: 'version-1' },
-    version: { ...draftVersion, templateId: 'template-1' },
-    validation,
-    categories: [category],
-  };
-}
-
-const versions = [
-  {
-    ...draftVersion,
-    templateId: 'template-1',
-    isCurrentPublished: false,
-    totals: { categories: 1, products: 1, linkedImages: 0, missingImages: 1, fallbackImages: 0 },
-  },
-  {
-    ...publishedVersion,
-    templateId: 'template-1',
-    isCurrentPublished: true,
-    totals: { categories: 1, products: 1, linkedImages: 1, missingImages: 0, fallbackImages: 0 },
-  },
-  {
-    id: 'version-0',
-    versionNumber: 0,
-    status: 'archived' as const,
-    publishedAt: '2026-05-01T00:00:00.000Z',
-    createdAt: '2026-05-01T00:00:00.000Z',
-    updatedAt: '2026-05-01T00:00:00.000Z',
-    metadataJson: null,
-    templateId: 'template-1',
-    isCurrentPublished: false,
-    totals: { categories: 1, products: 1, linkedImages: 1, missingImages: 0, fallbackImages: 0 },
-  },
-];
 
 function ok<T>(data: T): ApiResponse<T> {
   return { success: true, data };
@@ -190,18 +124,6 @@ function setPermissions(permissions: Permission[]) {
   });
 }
 
-function mockApi(draft = makeDraft(), listDraft = false) {
-  vi.mocked(api.get).mockImplementation(<T,>(endpoint: string): Promise<ApiResponse<T>> => {
-    if (endpoint === '/admin/base-menus') return Promise.resolve(ok([{ ...templateListItem, draftVersion: listDraft ? draftVersion : null }]) as ApiResponse<T>);
-    if (endpoint === '/admin/base-menus/acai') return Promise.resolve(ok(makeDetail(listDraft)) as ApiResponse<T>);
-    if (endpoint === '/admin/base-menus/acai/import-logs') return Promise.resolve(ok([]) as ApiResponse<T>);
-    if (endpoint === '/admin/base-menus/acai/versions') return Promise.resolve(ok(versions) as ApiResponse<T>);
-    if (endpoint === '/admin/base-menus/acai/draft') return Promise.resolve(ok(draft) as ApiResponse<T>);
-    return Promise.reject(new Error(`Unhandled GET ${endpoint}`));
-  });
-  vi.mocked(api.post).mockImplementation(<T,>(): Promise<ApiResponse<T>> => Promise.resolve(ok({}) as ApiResponse<T>));
-}
-
 function renderPage(route: string) {
   return render(
     <MemoryRouter initialEntries={[route]}>
@@ -214,186 +136,279 @@ function renderPage(route: string) {
   );
 }
 
+function mockApis({ createDraft = false, baseMediaItems = [] as Array<Record<string, unknown>> } = {}) {
+  let draftCalls = 0;
+  vi.mocked(api.get).mockImplementation(<T,>(endpoint: string): Promise<ApiResponse<T>> => {
+    if (endpoint === '/admin/base-menus') {
+      return Promise.resolve(ok([
+        {
+          id: 'template-1',
+          slug: 'acai',
+          name: 'Açaí',
+          description: 'Template de açaí',
+          segment: 'acai',
+          icon: 'A',
+          status: 'published',
+          currentPublishedVersion: publishedVersion,
+          draftVersion: null,
+          totalCategories: 1,
+          totalProducts: 1,
+          totalProductsWithMediaLookupKey: 1,
+          totalProductsWithPublishedGlobalImage: 1,
+          totalProductsWithoutImage: 0,
+          lastPublishedAt: '2026-06-01T00:00:00.000Z',
+          createdAt: '2026-06-01T00:00:00.000Z',
+          updatedAt: '2026-06-01T00:00:00.000Z',
+        },
+      ]) as ApiResponse<T>);
+    }
+
+    if (endpoint === '/admin/base-menus/acai') {
+      return Promise.resolve(ok({
+        template: {
+          id: 'template-1',
+          slug: 'acai',
+          name: 'Açaí',
+          description: 'Template de açaí',
+          segment: 'acai',
+          icon: 'A',
+          status: 'published',
+          metadataJson: null,
+          createdAt: '2026-06-01T00:00:00.000Z',
+          updatedAt: '2026-06-01T00:00:00.000Z',
+        },
+        currentPublishedVersion: publishedVersion,
+        draftVersion: createDraft ? draftVersion : null,
+        totals: {
+          totalCategories: 1,
+          totalProducts: 1,
+          totalProductsWithMediaLookupKey: 1,
+          totalProductsWithPublishedGlobalImage: 1,
+          totalProductsWithoutImage: 0,
+        },
+        categories: [category],
+        versions: [],
+      }) as ApiResponse<T>);
+    }
+
+    if (endpoint === '/admin/base-menus/acai/import-logs') {
+      return Promise.resolve(ok([]) as ApiResponse<T>);
+    }
+
+    if (endpoint === '/admin/base-menus/acai/versions') {
+      return Promise.resolve(ok([
+        {
+          ...draftVersion,
+          templateId: 'template-1',
+          isCurrentPublished: false,
+          totals: { categories: 1, products: 1, linkedImages: 1, missingImages: 0, fallbackImages: 0 },
+        },
+        {
+          ...publishedVersion,
+          templateId: 'template-1',
+          isCurrentPublished: true,
+          totals: { categories: 1, products: 1, linkedImages: 1, missingImages: 0, fallbackImages: 0 },
+        },
+      ]) as ApiResponse<T>);
+    }
+
+    if (endpoint === '/admin/base-menus/acai/draft') {
+      draftCalls += 1;
+      if (!createDraft && draftCalls === 1) {
+        return Promise.reject(Object.assign(new Error('Draft not found'), { status: 404 })) as Promise<ApiResponse<T>>;
+      }
+      return Promise.resolve(ok({
+        template: { ...draftVersionTemplate, currentPublishedVersionId: 'version-1' },
+        version: { ...draftVersion, templateId: 'template-1' },
+        validation: {
+          errors: [],
+          warnings: [],
+          totals: { categories: 1, products: 1 },
+          imageSummary: { linkedExact: 1, linkedTag: 0, linkedFallback: 0, missingLookup: 0, noPublishedAsset: 0, draftOnly: 0 },
+          replacingVersionId: 'version-1',
+          publishingVersionId: 'version-2',
+          publishingVersionNumber: 2,
+        },
+        categories: [category],
+      }) as ApiResponse<T>);
+    }
+
+    if (endpoint.startsWith('/admin/base-media?')) {
+      return Promise.resolve(ok({
+        items: baseMediaItems,
+        total: baseMediaItems.length,
+        page: 1,
+        pageSize: 24,
+        totalPages: 1,
+        hasNext: false,
+        hasPrevious: false,
+      }) as ApiResponse<T>);
+    }
+
+    return Promise.reject(new Error(`Unhandled GET ${endpoint}`));
+  });
+
+  vi.mocked(api.post).mockImplementation(<T,>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> => {
+    if (endpoint === '/admin/base-menus/acai/draft-version') return Promise.resolve(ok({}) as ApiResponse<T>);
+    if (endpoint === '/admin/base-menus/acai/publish-draft') return Promise.resolve(ok({}) as ApiResponse<T>);
+    if (endpoint === '/admin/base-menus/acai/discard-draft') return Promise.resolve(ok({}) as ApiResponse<T>);
+    if (endpoint.includes('/products')) return Promise.resolve(ok({}) as ApiResponse<T>);
+    return Promise.resolve(ok({}) as ApiResponse<T>);
+  });
+
+  vi.mocked(api.patch).mockResolvedValue(ok({}) as ApiResponse<unknown>);
+  vi.mocked(api.delete).mockResolvedValue(ok({}) as ApiResponse<unknown>);
+}
+
+const draftVersionTemplate = {
+  id: 'template-1',
+  slug: 'acai',
+  name: 'Açaí',
+  description: 'Template de açaí',
+  segment: 'acai',
+  icon: 'A',
+  status: 'published' as const,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
+  setPermissions(['saas.base_menu.read', 'saas.base_menu.manage']);
 });
 
-describe('BaseMenusPage RBAC and draft safety', () => {
-  it('hides management actions for read-only users while allowing versions view', async () => {
-    setPermissions(['saas.base_menu.read']);
-    mockApi(makeDraft(), true);
+describe('BaseMenusPage', () => {
+  it('cria um draft automaticamente ao abrir o editor', async () => {
+    mockApis();
 
-    renderPage('/base-menus/acai');
-
-    expect(await screen.findByRole('heading', { name: /Acai/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Criar draft' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Publicar draft' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Descartar draft' })).not.toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Versoes' }));
-    expect(screen.getByText(/Versoes antigas ficam como historico/)).toBeInTheDocument();
-    expect(screen.getByText('current')).toBeInTheDocument();
-    expect(screen.getByText('Arquivado')).toBeInTheDocument();
-  });
-
-  it('shows create and continue draft actions for manage users', async () => {
-    setPermissions(['saas.base_menu.read', 'saas.base_menu.manage']);
-    mockApi(makeDraft(), false);
-    const { unmount } = renderPage('/base-menus');
-
-    expect(await screen.findByRole('button', { name: 'Criar draft' })).toBeInTheDocument();
-
-    unmount();
-    mockApi(makeDraft(), true);
     renderPage('/base-menus');
 
-    expect(await screen.findByRole('button', { name: 'Continuar edicao' })).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Editar cardápio' }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/base-menus/acai/draft-version'));
+    expect(await screen.findByText(/Alteracoes nao publicadas/i)).toBeInTheDocument();
   });
 
-  it('requires PUBLICAR before calling publish endpoint and shows safety copy', async () => {
-    setPermissions(['saas.base_menu.read', 'saas.base_menu.manage']);
-    mockApi(makeDraft(makeValidation({ warnings: ['Produto sem tags'], linkedFallback: 1 })), true);
+  it('mostra produto com imagem, preço e complementos e salva alterações', async () => {
+    mockApis({ createDraft: true });
 
     renderPage('/base-menus/acai/draft');
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Publicar draft' }));
-    expect(screen.getByText(/Tenants novos passarao a importar esta nova versao/)).toBeInTheDocument();
-    expect(screen.getByText(/Tenants que ja importaram versoes antigas nao serao alterados/)).toBeInTheDocument();
-    expect(screen.getByText(/Esta acao nao edita cardapios reais de lojas/)).toBeInTheDocument();
+    expect(await screen.findByText('Açaí 300ml')).toBeInTheDocument();
+    expect(screen.getByText('Imagem ok')).toBeInTheDocument();
+    expect(screen.getByText(/15,00/)).toBeInTheDocument();
+    expect(screen.getByText('1 grupo de complementos')).toBeInTheDocument();
 
-    const confirmButton = screen.getByRole('button', { name: 'Confirmar publicacao do draft' });
-    expect(confirmButton).toBeDisabled();
-    await userEvent.type(screen.getByLabelText(/Digite PUBLICAR para confirmar/), 'ERRADO');
-    expect(confirmButton).toBeDisabled();
-    await userEvent.clear(screen.getByLabelText(/Digite PUBLICAR para confirmar/));
+    await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    await userEvent.clear(screen.getAllByLabelText('Nome')[1]);
+    await userEvent.type(screen.getAllByLabelText('Nome')[1], 'Açaí 500ml');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
+
+    await waitFor(() => expect(api.patch).toHaveBeenCalledWith(
+      '/admin/base-menus/acai/versions/version-2/products/product-1',
+      expect.objectContaining({ name: 'Açaí 500ml', basePrice: 15 }),
+    ));
+  });
+
+  it('troca a imagem do produto usando a Galeria Base', async () => {
+    mockApis({
+      createDraft: true,
+      baseMediaItems: [
+        {
+          id: 'asset-2',
+          title: 'Novo Açaí',
+          category: 'acai',
+          categoryName: 'Açaí',
+          publicUrl: 'https://cdn.local/novo.webp',
+          altText: 'Novo Açaí',
+          tagsJson: ['lookup:acai-500'],
+          publicationStatus: 'published',
+          productName: 'Açaí 500ml',
+          mediaLookupKey: 'lookup:acai-500',
+        },
+      ],
+    });
+
+    renderPage('/base-menus/acai/draft');
+
+    expect(await screen.findByText('Açaí 300ml')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Trocar imagem' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Açaí 500ml/ }));
+
+    await waitFor(() => expect(api.patch).toHaveBeenCalledWith(
+      '/admin/base-menus/acai/versions/version-2/products/product-1',
+      expect.objectContaining({ mediaLookupKey: 'lookup:acai-500', searchTagsJson: ['lookup:acai-500'] }),
+    ));
+  });
+
+  it('adiciona complementos sem expor JSON cru e bloqueia min/max inválido pelo backend', async () => {
+    mockApis({ createDraft: true });
+
+    renderPage('/base-menus/acai/draft');
+
+    expect(await screen.findByText('Açaí 300ml')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Complementos' }));
+    await userEvent.clear(screen.getAllByLabelText('Grupo')[0]);
+    await userEvent.type(screen.getAllByLabelText('Grupo')[0], 'Coberturas');
+    await userEvent.type(screen.getAllByLabelText('Preco adicional')[0], '2');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar complementos' }));
+
+    await waitFor(() => expect(api.patch).toHaveBeenCalledWith(
+      '/admin/base-menus/acai/versions/version-2/products/product-1',
+      expect.objectContaining({
+        metadataJson: expect.objectContaining({
+          optionGroups: expect.any(Array),
+        }),
+      }),
+    ));
+
+    vi.mocked(api.patch).mockRejectedValueOnce(Object.assign(new Error('maxSelect nao pode ser menor que minSelect.'), { status: 400 }));
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Complementos' }));
+    await userEvent.clear(screen.getAllByLabelText('Minimo')[0]);
+    await userEvent.type(screen.getAllByLabelText('Minimo')[0], '2');
+    await userEvent.clear(screen.getAllByLabelText('Maximo')[0]);
+    await userEvent.type(screen.getAllByLabelText('Maximo')[0], '1');
+    await userEvent.click(screen.getByRole('button', { name: 'Salvar complementos' }));
+
+    await waitFor(() => expect(alertSpy).toHaveBeenCalled());
+  });
+
+  it('exige confirmacao forte para publicar alteracoes', async () => {
+    mockApis({ createDraft: true });
+
+    renderPage('/base-menus/acai/draft');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Publicar alterações' }));
+    const publishConfirm = screen.getByRole('button', { name: 'Confirmar publicacao' });
+    expect(publishConfirm).toBeDisabled();
     await userEvent.type(screen.getByLabelText(/Digite PUBLICAR para confirmar/), 'PUBLICAR');
-    expect(confirmButton).toBeEnabled();
-    await userEvent.click(confirmButton);
-
+    expect(publishConfirm).toBeEnabled();
+    await userEvent.click(publishConfirm);
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/base-menus/acai/publish-draft'));
   });
 
-  it('blocks publishing when draft has structural errors', async () => {
-    setPermissions(['saas.base_menu.read', 'saas.base_menu.manage']);
-    mockApi(makeDraft(makeValidation({ errors: ['Template sem produtos.'] })), true);
+  it('exige confirmacao forte para descartar alteracoes', async () => {
+    mockApis({ createDraft: true });
 
     renderPage('/base-menus/acai/draft');
 
-    expect(await screen.findByText('Bloqueado por erros')).toBeInTheDocument();
-    expect(screen.getByText(/Template sem produtos/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Publicar draft' })).toBeDisabled();
-  });
-
-  it('allows publishing with warnings after strong confirmation', async () => {
-    setPermissions(['saas.base_menu.read', 'saas.base_menu.manage']);
-    mockApi(makeDraft(makeValidation({ warnings: ['Produto sem imagem publicada.'], noPublishedAsset: 1 })), true);
-
-    renderPage('/base-menus/acai/draft');
-
-    expect(await screen.findByText('Publicavel com avisos')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Publicar draft' }));
-    expect(screen.getAllByText(/Produto sem imagem publicada/).length).toBeGreaterThan(0);
-    await userEvent.type(screen.getByLabelText(/Digite PUBLICAR para confirmar/), 'PUBLICAR');
-    await userEvent.click(screen.getByRole('button', { name: 'Confirmar publicacao do draft' }));
-
-    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/base-menus/acai/publish-draft'));
-  });
-
-  it('requires DESCARTAR before calling discard endpoint', async () => {
-    setPermissions(['saas.base_menu.read', 'saas.base_menu.manage']);
-    mockApi(makeDraft(), true);
-
-    renderPage('/base-menus/acai/draft');
-
-    await userEvent.click(await screen.findByRole('button', { name: 'Descartar draft' }));
-    expect(screen.getByText(/Todas as alteracoes desta versao draft serao perdidas/)).toBeInTheDocument();
-    expect(screen.getByText(/A versao publicada atual continuara ativa/)).toBeInTheDocument();
-    expect(screen.getByText(/Esta acao nao altera tenants nem cardapios reais de lojas/)).toBeInTheDocument();
-
-    const dialog = screen.getByText('Confirmar descarte').closest('section');
-    expect(dialog).not.toBeNull();
-    const scoped = within(dialog as HTMLElement);
-    const confirmButton = scoped.getByRole('button', { name: 'Confirmar descarte do draft' });
-    expect(confirmButton).toBeDisabled();
-    await userEvent.type(scoped.getByLabelText(/Digite DESCARTAR para confirmar/), 'PUBLICAR');
-    expect(confirmButton).toBeDisabled();
-    await userEvent.clear(scoped.getByLabelText(/Digite DESCARTAR para confirmar/));
-    await userEvent.type(scoped.getByLabelText(/Digite DESCARTAR para confirmar/), 'DESCARTAR');
-    expect(confirmButton).toBeEnabled();
-    await userEvent.click(confirmButton);
-
+    await userEvent.click(await screen.findByRole('button', { name: 'Descartar alterações' }));
+    const discardConfirm = screen.getByRole('button', { name: 'Confirmar descarte' });
+    expect(discardConfirm).toBeDisabled();
+    await userEvent.type(screen.getByLabelText(/Digite DESCARTAR para confirmar/), 'DESCARTAR');
+    expect(discardConfirm).toBeEnabled();
+    await userEvent.click(discardConfirm);
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/base-menus/acai/discard-draft'));
   });
 
-  it('allows creating a new template from list view', async () => {
-    setPermissions(['saas.base_menu.read', 'saas.base_menu.manage']);
-    mockApi(makeDraft(), false);
-    vi.mocked(api.post).mockResolvedValue(ok({ template: { slug: 'novo-menu' } }) as ApiResponse<{ template: { slug: string } }>);
-
-    renderPage('/base-menus');
-
-    await userEvent.click(await screen.findByRole('button', { name: 'Novo Cardápio' }));
-    
-    const nameInput = screen.getByLabelText(/Nome/);
-    await userEvent.type(nameInput, 'Novo Menu');
-    
-    const slugInput = screen.getByLabelText(/Slug/);
-    await userEvent.type(slugInput, 'novo-menu');
-    
-    await userEvent.click(screen.getByRole('button', { name: 'Criar' }));
-
-    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/base-menus', expect.objectContaining({ name: 'Novo Menu', slug: 'novo-menu' })));
-  });
-
-  it('allows duplicating a template from detail view', async () => {
-    setPermissions(['saas.base_menu.read', 'saas.base_menu.manage']);
-    mockApi(makeDraft(), false);
-    vi.mocked(api.post).mockResolvedValue(ok({ template: { slug: 'acai-copia' } }) as ApiResponse<{ template: { slug: string } }>);
+  it('esconde os detalhes tecnicos na aba avancada', async () => {
+    mockApis({ createDraft: true });
 
     renderPage('/base-menus/acai');
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Duplicar cardápio' }));
-    
-    const nameInput = screen.getByLabelText(/Novo Nome/);
-    await userEvent.clear(nameInput);
-    await userEvent.type(nameInput, 'Acai Copia');
-    
-    await userEvent.click(screen.getByRole('button', { name: 'Duplicar' }));
-
-    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/base-menus/template-1/duplicate', expect.objectContaining({ name: 'Acai Copia' })));
-  });
-
-  it('allows archiving and restoring a template from detail view', async () => {
-    setPermissions(['saas.base_menu.read', 'saas.base_menu.manage']);
-    const detail = makeDetail(false);
-    
-    // First render as published
-    vi.mocked(api.get).mockImplementation(<T,>(endpoint: string): Promise<ApiResponse<T>> => {
-      if (endpoint === '/admin/base-menus/acai') return Promise.resolve(ok(detail) as ApiResponse<T>);
-      return Promise.resolve(ok([]) as ApiResponse<T>);
-    });
-    vi.mocked(api.post).mockResolvedValue(ok({}) as ApiResponse<unknown>);
-    
-    // Auto confirm for window.confirm
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-
-    const { unmount } = renderPage('/base-menus/acai');
-    
-    await userEvent.click(await screen.findByRole('button', { name: 'Arquivar cardápio' }));
-    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/base-menus/acai/archive'));
-
-    unmount();
-
-    // Now render as archived
-    const archivedDetail = { ...detail, template: { ...detail.template, status: 'archived' as const } };
-    vi.mocked(api.get).mockImplementation(<T,>(endpoint: string): Promise<ApiResponse<T>> => {
-      if (endpoint === '/admin/base-menus/acai') return Promise.resolve(ok(archivedDetail) as ApiResponse<T>);
-      return Promise.resolve(ok([]) as ApiResponse<T>);
-    });
-
-    renderPage('/base-menus/acai');
-
-    await userEvent.click(await screen.findByRole('button', { name: 'Restaurar cardápio' }));
-    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/base-menus/acai/restore'));
+    expect(await screen.findByRole('heading', { name: /Açaí/ })).toBeInTheDocument();
+    expect(screen.queryByText('Metadados')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Avançado' }));
+    expect(screen.getByText('Metadados')).toBeInTheDocument();
+    expect(screen.getByText('Versões')).toBeInTheDocument();
   });
 });

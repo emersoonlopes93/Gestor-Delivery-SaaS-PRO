@@ -183,6 +183,49 @@ describe('AdminBaseMenuService draft/published flow', () => {
     expect(prisma.baseMenuTemplate.update).not.toHaveBeenCalled();
   });
 
+  it('moves a product to another category in draft', async () => {
+    const prisma = makePrisma();
+    const service = new AdminBaseMenuService(prisma as never);
+    prisma.baseMenuTemplate.findFirst.mockResolvedValue(template);
+    prisma.baseMenuTemplateVersion.findFirst.mockResolvedValue({ ...draftVersion, categories: undefined });
+    prisma.baseMenuCategory.findFirst.mockResolvedValue({ ...publishedCategory, id: 'category-v2' });
+    prisma.baseMenuProduct.findFirst.mockResolvedValue(draftVersion.categories[0].products[0]);
+    prisma.baseMenuProduct.update.mockImplementation(({ data }) => Promise.resolve({
+      ...draftVersion.categories[0].products[0],
+      ...data,
+    }));
+
+    await service.updateProduct('acai', 'version-2', 'product-v2', { categoryId: 'category-v2', name: 'Acai 300ml Especial' }, actor);
+
+    expect(prisma.baseMenuProduct.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'product-v2' },
+      data: expect.objectContaining({
+        category: { connect: { id: 'category-v2' } },
+        name: 'Acai 300ml Especial',
+      }),
+    }));
+  });
+
+  it('rejects invalid option metadata when updating a product', async () => {
+    const prisma = makePrisma();
+    const service = new AdminBaseMenuService(prisma as never);
+    prisma.baseMenuTemplate.findFirst.mockResolvedValue(template);
+    prisma.baseMenuTemplateVersion.findFirst.mockResolvedValue({ ...draftVersion, categories: undefined });
+    prisma.baseMenuProduct.findFirst.mockResolvedValue(draftVersion.categories[0].products[0]);
+
+    await expect(service.updateProduct('acai', 'version-2', 'product-v2', {
+      metadataJson: {
+        optionGroups: [
+          {
+            name: 'Coberturas',
+            maxSelect: 0,
+            items: [{ name: 'Leite em po', priceImpactValue: 2 }],
+          },
+        ],
+      },
+    }, actor)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('blocks product updates on published versions', async () => {
     const prisma = makePrisma();
     const service = new AdminBaseMenuService(prisma as never);

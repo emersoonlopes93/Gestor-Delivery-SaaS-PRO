@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
+import { parseBaseMenuProductOptionGroups } from '../../catalog/menu-import/base-menu-options.parser';
 
 const PLATFORM_AUDIT_TENANT_SLUG = '__platform_audit__';
 
@@ -65,6 +66,7 @@ export type ProductBody = {
   basePrice?: unknown;
   compareAtPrice?: unknown;
   sortOrder?: unknown;
+  categoryId?: unknown;
   mediaLookupKey?: unknown;
   searchTagsJson?: unknown;
   metadataJson?: unknown;
@@ -715,6 +717,7 @@ export class AdminBaseMenuService {
     const price = requiredMoney(body.basePrice ?? 0, 'basePrice');
     const compareAtPrice = optionalMoney(body.compareAtPrice, 'compareAtPrice');
     validateCompareAtPrice(price, compareAtPrice);
+    validateBaseMenuProductMetadata(body.metadataJson);
     const created = await this.prisma.$transaction(async (tx) => {
       await this.ensureProductSlugAvailable(tx, category.id, slug);
       const result = await tx.baseMenuProduct.create({
@@ -740,12 +743,15 @@ export class AdminBaseMenuService {
   async updateProduct(idOrSlug: string, versionId: string, productId: string, body: ProductBody, actor: AdminActor) {
     const { template, version } = await this.requireDraftVersion(idOrSlug, versionId);
     const product = await this.findProductInVersion(productId, version.id);
+    const nextCategory = 'categoryId' in body && typeof body.categoryId === 'string' && body.categoryId.trim()
+      ? await this.findCategoryInVersion(body.categoryId, version.id)
+      : null;
     const data: Prisma.BaseMenuProductUpdateInput = {};
 
     if ('name' in body) data.name = requiredString(body.name, 'name', 180);
     if ('slug' in body) {
       const slug = normalizeSlug(requiredString(body.slug, 'slug', 120));
-      await this.ensureProductSlugAvailable(this.prisma, product.categoryId, slug, product.id);
+      await this.ensureProductSlugAvailable(this.prisma, nextCategory?.id ?? product.categoryId, slug, product.id);
       data.slug = slug;
     }
     if ('description' in body) data.description = optionalString(body.description, 'description');
@@ -760,9 +766,13 @@ export class AdminBaseMenuService {
       data.compareAtPrice = nextCompare;
     }
     if ('sortOrder' in body) data.sortOrder = requiredNumber(body.sortOrder, 'sortOrder');
+    if (nextCategory) data.category = { connect: { id: nextCategory.id } };
     if ('mediaLookupKey' in body) data.mediaLookupKey = normalizeOptionalLookup(body.mediaLookupKey);
     if ('searchTagsJson' in body) data.searchTagsJson = stringArrayJson(body.searchTagsJson);
-    if ('metadataJson' in body) data.metadataJson = mergeJsonObject(product.metadataJson, body.metadataJson);
+    if ('metadataJson' in body) {
+      validateBaseMenuProductMetadata(body.metadataJson);
+      data.metadataJson = mergeJsonObject(product.metadataJson, body.metadataJson);
+    }
 
     validateCompareAtPrice(nextBase, nextCompare);
 
@@ -1055,6 +1065,11 @@ export class AdminBaseMenuService {
         if (!product.description?.trim()) warnings.push(`Produto "${product.name}" sem descricao.`);
         if (!product.mediaLookupKey?.trim()) warnings.push(`Produto "${product.name}" sem mediaLookupKey.`);
         if (extractStringArray(product.searchTagsJson).length === 0) warnings.push(`Produto "${product.name}" sem tags de busca.`);
+        try {
+          validateBaseMenuProductMetadata(product.metadataJson);
+        } catch (error) {
+          errors.push(error instanceof Error ? error.message : `Produto "${product.name}" com metadata invalido.`);
+        }
       }
     }
 
@@ -1333,6 +1348,15 @@ function mergeJsonObject(current: Prisma.JsonValue | null, patch: unknown): Pris
   if (patch === null) return Prisma.JsonNull;
   if (typeof patch !== 'object' || Array.isArray(patch)) throw new BadRequestException('metadataJson deve ser objeto JSON.');
   return { ...asRecord(current), ...(patch as Prisma.InputJsonObject) } as Prisma.InputJsonObject;
+}
+
+function validateBaseMenuProductMetadata(metadataJson: unknown) {
+  if (metadataJson === undefined || metadataJson === null) return;
+  try {
+    parseBaseMenuProductOptionGroups(metadataJson);
+  } catch (error) {
+    throw new BadRequestException(error instanceof Error ? error.message : 'metadataJson de complementos invalido.');
+  }
 }
 
 function pickTemplateAudit(template: { name: string; description: string | null; segment: string; icon: string | null; metadataJson: Prisma.JsonValue | null }) {

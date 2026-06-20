@@ -8,15 +8,55 @@ describe('HttpExceptionFilter', () => {
       json: jest.fn(),
     };
 
-    return {
-      host: {
-        switchToHttp: () => ({
-          getResponse: () => response,
-          getRequest: () => request,
-        }),
-      } as unknown as ArgumentsHost,
-      response,
+    const host: ArgumentsHost = {
+      getArgs<T extends Array<unknown> = Array<unknown>>() {
+        return [request, response] as T;
+      },
+      getArgByIndex<T = unknown>(index: number) {
+        return [request, response][index] as T;
+      },
+      switchToHttp() {
+        return {
+          getResponse<T = unknown>() {
+            return response as T;
+          },
+          getRequest<T = unknown>() {
+            return request as T;
+          },
+          getNext<T = unknown>() {
+            return undefined as T;
+          },
+        };
+      },
+      switchToRpc() {
+        return {
+          getData<T = unknown>() {
+            return undefined as T;
+          },
+          getContext<T = unknown>() {
+            return undefined as T;
+          },
+        };
+      },
+      switchToWs() {
+        return {
+          getClient<T = unknown>() {
+            return undefined as T;
+          },
+          getData<T = unknown>() {
+            return undefined as T;
+          },
+          getPattern<T = string>() {
+            return undefined as T;
+          },
+        };
+      },
+      getType<TContext extends string = 'http'>() {
+        return 'http' as TContext;
+      },
     };
+
+    return { host, response };
   };
 
   let logSpy: jest.SpyInstance;

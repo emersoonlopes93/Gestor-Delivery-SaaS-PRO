@@ -167,8 +167,8 @@ export class MarketplaceOrderIngestionService {
         data: {
           externalDisplayId: normalized.externalDisplayId ?? null,
           statusExternal: normalized.externalStatus ?? null,
-          rawPayload: normalized.rawPayload as Prisma.InputJsonValue,
-          normalizedPayload: normalized as unknown as Prisma.InputJsonValue,
+          rawPayload: this.toInputJsonValue(normalized.rawPayload),
+          normalizedPayload: this.toInputJsonValue(normalized),
           lastSyncedAt: new Date(),
         },
       });
@@ -183,8 +183,8 @@ export class MarketplaceOrderIngestionService {
         externalDisplayId: normalized.externalDisplayId ?? null,
         statusExternal: normalized.externalStatus ?? null,
         statusInternal: this.resolveInitialStatusValue(connectionId, normalized),
-        rawPayload: normalized.rawPayload as Prisma.InputJsonValue,
-        normalizedPayload: normalized as unknown as Prisma.InputJsonValue,
+        rawPayload: this.toInputJsonValue(normalized.rawPayload),
+        normalizedPayload: this.toInputJsonValue(normalized),
       },
     });
   }
@@ -328,6 +328,10 @@ export class MarketplaceOrderIngestionService {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
       ? value as Record<string, unknown>
       : null;
+  }
+
+  private toInputJsonValue(value: unknown): Prisma.InputJsonValue {
+    return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
   }
 
   private readString(value: Prisma.JsonValue, keys: string[]): string | null {

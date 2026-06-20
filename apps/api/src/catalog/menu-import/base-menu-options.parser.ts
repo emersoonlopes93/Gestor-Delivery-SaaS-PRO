@@ -4,6 +4,7 @@ export type ParsedBaseMenuOptionItem = {
   slug: string;
   name: string;
   description: string | null;
+  isActive: boolean;
   priceImpactType: PriceImpactType;
   priceImpactValue: Prisma.Decimal;
   allowQuantity: boolean;
@@ -16,6 +17,7 @@ export type ParsedBaseMenuOptionGroup = {
   slug: string;
   name: string;
   description: string | null;
+  isActive: boolean;
   selectionType: OptionSelectionType;
   isRequired: boolean;
   minSelect: number;
@@ -84,6 +86,7 @@ function parseOptionGroup(value: unknown, index: number): ParsedBaseMenuOptionGr
     slug,
     name,
     description: optionalString(input.description, `${path}.description`, 1000),
+    isActive: optionalBoolean(input.isActive, true, `${path}.isActive`),
     selectionType,
     isRequired,
     minSelect: effectiveMinSelect,
@@ -125,6 +128,7 @@ function parseOptionItem(value: unknown, index: number, groupPath: string): Pars
     slug,
     name,
     description: optionalString(input.description, `${path}.description`, 1000),
+    isActive: optionalBoolean(input.isActive, true, `${path}.isActive`),
     priceImpactType,
     priceImpactValue,
     allowQuantity,

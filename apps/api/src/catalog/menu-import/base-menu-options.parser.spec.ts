@@ -31,11 +31,13 @@ describe('parseBaseMenuProductOptionGroups', () => {
       isRequired: false,
       minSelect: 0,
       maxSelect: 5,
+      isActive: true,
     });
     expect(result[0].items[0]).toMatchObject({
       slug: 'leite-em-po',
       priceImpactType: PriceImpactType.fixed,
       allowQuantity: false,
+      isActive: true,
     });
     expect(result[0].items[0].priceImpactValue.toNumber()).toBe(2.5);
   });
