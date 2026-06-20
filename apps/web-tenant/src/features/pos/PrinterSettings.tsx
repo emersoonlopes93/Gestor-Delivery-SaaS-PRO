@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Printer, Monitor, Plus } from 'lucide-react';
-import { api } from '../../lib/api-client';
+import { api, ApiError } from '../../lib/api-client';
 import { 
   usePrintingStations, 
   usePrinterDevices, 
@@ -45,6 +45,34 @@ function getConnectionLabel(connectionType?: string | null) {
   if (connectionType === 'USB') return 'USB';
   if (connectionType === 'IP') return 'Rede';
   return connectionType;
+}
+
+function buildTestPrintContent(deviceName: string, stationLabel: string) {
+  const now = new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(new Date());
+
+  return [
+    'TESTE DE IMPRESSAO',
+    `Dispositivo: ${deviceName}`,
+    `Setor: ${stationLabel}`,
+    `Data: ${now}`,
+    '',
+    'Se este ticket saiu corretamente, a impressora esta pronta.',
+  ].join('\n');
+}
+
+function getFriendlyTestPrintError(device: PrinterDevice, error: unknown) {
+  if (error instanceof ApiError && error.status === 500) {
+    return device.isPrimary
+      ? 'Nao foi possivel imprimir o teste. Verifique se ha uma impressora principal configurada e tente novamente.'
+      : 'Nao foi possivel imprimir o teste. Verifique se a impressora do setor esta configurada e tente novamente.';
+  }
+
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === 'string' && error.trim()) return error;
+  return 'Nao foi possivel imprimir o teste.';
 }
 
 export function PrinterSettings() {
@@ -92,7 +120,10 @@ export function PrinterSettings() {
     refetchInterval: 30000,
     retry: false,
   });
-  const selectedPrinterDevice = devices.find((device) => device.id === selectedDevice);
+  const selectedPrinterDevice = useMemo(
+    () => devices.find((device) => device.id === selectedDevice) ?? null,
+    [devices, selectedDevice],
+  );
   const primaryPrinterDevice = useMemo(
     () => devices.find((device) => device.isPrimary && device.isActive) ?? null,
     [devices],
@@ -117,6 +148,7 @@ export function PrinterSettings() {
   const autoPrintStatus = selectedDeviceCanAutoPrint ? 'Ativa' : 'Parada';
   const lastPrintStatus = formatMinutesAgo(lastPrintedJob?.printedAt ?? lastPrintedJob?.createdAt ?? null);
   const spoolerRef = useRef<{ running: boolean }>({ running: false });
+  const lastSpoolerStateRef = useRef<'running' | 'stopped' | null>('stopped');
 
   // Update selected defaults when data loads
   useEffect(() => {
@@ -480,15 +512,48 @@ export function PrinterSettings() {
     const stationSlug = device.isPrimary
       ? 'MAIN'
       : stations.find((station) => station.id === device.stationId)?.slug || selectedStation || 'MAIN';
+    const stationLabel = device.isPrimary ? 'Principal' : stationSlug;
+    const testContent = buildTestPrintContent(device.name, stationLabel);
 
     try {
+      if (device.connectionType === 'QZ_TRAY' && device.address) {
+        setTestPrintStatus(`Imprimindo teste local em ${device.name}...`);
+        await printTextViaQz(device.address, testContent);
+        addLog(`Teste local enviado para ${device.name} via impressão no Windows.`);
+        setTestPrintStatus('Teste de impressão enviado com sucesso.');
+        return;
+      }
+
+      if (device.connectionType === 'BLUETOOTH_SPP') {
+        if (!isNative) {
+          throw new Error('Bluetooth SPP só funciona no app Android.');
+        }
+        if (!device.address) {
+          throw new Error('A impressora Bluetooth não possui endereço configurado.');
+        }
+        setTestPrintStatus(`Imprimindo teste em ${device.name}...`);
+        const builder = new EscPosBuilder();
+        builder.alignCenter().boldOn().textLine('--- TESTE DE IMPRESSAO ---').boldOff().alignLeft();
+        builder.textLine(testContent).feed(3).cut();
+        const payload = builder.build();
+        const payloadStr = String.fromCharCode.apply(null, payload);
+        await printTicketViaBluetooth(device.address, payloadStr);
+        addLog(`Teste local enviado para ${device.name} via Bluetooth.`);
+        setTestPrintStatus('Teste de impressão enviado com sucesso.');
+        return;
+      }
+
+      setTestPrintStatus(`Solicitando teste para ${device.name}...`);
       await testPrint.mutateAsync({
         stationSlug,
         deviceName: device.name,
       });
-      addLog(`Teste de impressao enviado para ${device.name}.`);
+      addLog(`Teste solicitado para ${device.name}.`);
+      setTestPrintStatus('Teste de impressão enviado com sucesso.');
     } catch (error) {
-      addLog(`Erro ao solicitar teste para ${device.name}.`);
+      const friendlyMessage = getFriendlyTestPrintError(device, error);
+      setTestPrintStatus(friendlyMessage);
+      addLog(`Falha no teste de impressão para ${device.name}: ${friendlyMessage}`);
     }
   };
 
@@ -508,46 +573,49 @@ export function PrinterSettings() {
   // Spooler local: Android usa Bluetooth SPP; navegador/Windows usa QZ Tray.
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+
+    const stopSpooler = (message: string) => {
+      if (lastSpoolerStateRef.current !== 'stopped') {
+        addLog(message);
+        lastSpoolerStateRef.current = 'stopped';
+      }
+      setIsSpoolerRunning(false);
+    };
 
     const poll = async () => {
-      if (!spoolerRef.current.running) return;
+      if (cancelled || !spoolerRef.current.running) return;
 
-      if (!selectedDevice) {
-        addLog('Erro: Nenhum dispositivo selecionado para o spooler.');
-        setIsSpoolerRunning(false);
+      if (!selectedPrinterDevice) {
+        stopSpooler('Erro: nenhum dispositivo de impressão foi selecionado.');
         return;
       }
 
-      const device = devices.find(d => d.id === selectedDevice);
-      if (!device || !device.address) {
-        addLog('Erro: Dispositivo invalido ou sem endereco de impressora.');
-        setIsSpoolerRunning(false);
+      if (!selectedPrinterDevice.address) {
+        stopSpooler('Erro: a impressora selecionada não possui endereço configurado.');
         return;
       }
 
-      if (!device.autoPrintEnabled) {
-        addLog('Auto-Print esta desativado para este dispositivo.');
-        setIsSpoolerRunning(false);
+      if (!selectedPrinterDevice.autoPrintEnabled) {
+        stopSpooler('A impressão automática está desativada para este dispositivo.');
         return;
       }
 
-      const isBluetoothDevice = device.connectionType === 'BLUETOOTH_SPP';
-      const isQzDevice = device.connectionType === 'QZ_TRAY';
+      const isBluetoothDevice = selectedPrinterDevice.connectionType === 'BLUETOOTH_SPP';
+      const isQzDevice = selectedPrinterDevice.connectionType === 'QZ_TRAY';
 
       if (isBluetoothDevice && !isNative) {
-        addLog('Esta impressora Bluetooth so imprime automaticamente no app Android.');
-        setIsSpoolerRunning(false);
+        stopSpooler('Esta impressora Bluetooth só imprime automaticamente no app Android.');
         return;
       }
 
       if (!isBluetoothDevice && !isQzDevice) {
-        addLog(`Tipo de impressora sem spooler local: ${device.connectionType}.`);
-        setIsSpoolerRunning(false);
+        stopSpooler('Este tipo de impressora não usa a fila local de impressão.');
         return;
       }
 
       try {
-        const res = await api.post<PrintJobDTO | null>('/printing/spooler/next', { printerDeviceId: device.id });
+        const res = await api.post<PrintJobDTO | null>('/printing/spooler/next', { printerDeviceId: selectedPrinterDevice.id });
         const job = res.data;
 
         if (job && job.id) {
@@ -555,23 +623,23 @@ export function PrinterSettings() {
 
           try {
             if (isQzDevice) {
-              await printTextViaQz(device.address, job.content);
+              await printTextViaQz(selectedPrinterDevice.address, job.content);
             } else {
               const builder = new EscPosBuilder();
               builder.alignCenter().boldOn().textLine('--- TICKET ---').boldOff().alignLeft();
               builder.textLine(job.content).feed(3).cut();
               const payload = builder.build();
               const payloadStr = String.fromCharCode.apply(null, payload);
-              await printTicketViaBluetooth(device.address, payloadStr);
+              await printTicketViaBluetooth(selectedPrinterDevice.address, payloadStr);
             }
 
-            await api.post(`/printing/spooler/${job.id}/ack`, { printerDeviceId: device.id });
+            await api.post(`/printing/spooler/${job.id}/ack`, { printerDeviceId: selectedPrinterDevice.id });
             addLog(`Job #${job.id} impresso e finalizado (ACK).`);
           } catch (printErr: unknown) {
             const msg = printErr instanceof Error ? printErr.message : 'Erro';
-            addLog(`Falha na impressora fisica: ${msg}`);
+            addLog(`Falha na impressora física: ${msg}`);
             await api.post(`/printing/spooler/${job.id}/fail`, {
-              printerDeviceId: device.id,
+              printerDeviceId: selectedPrinterDevice.id,
               errorMessage: msg,
             });
           }
@@ -583,27 +651,38 @@ export function PrinterSettings() {
         }
       }
 
-      if (spoolerRef.current.running) {
+      if (!cancelled && spoolerRef.current.running) {
         timeoutId = setTimeout(poll, pollingInterval);
       }
     };
 
     if (isSpoolerRunning) {
       if (!selectedDeviceCanAutoPrint) {
-        addLog('Selecione uma impressora compativel e ative a opcao Auto-Print antes de iniciar.');
-        setIsSpoolerRunning(false);
-        return;
+        stopSpooler('Selecione uma impressora compatível e ative a impressão automática antes de iniciar.');
+        return () => {
+          cancelled = true;
+          if (timeoutId) clearTimeout(timeoutId);
+        };
       }
-      addLog(`Auto-Print iniciado no device ID: ${selectedDevice}`);
-      poll();
-    } else {
-      addLog('Spooler parado.');
+
+      if (lastSpoolerStateRef.current !== 'running') {
+        addLog(`Auto-Print iniciado para ${selectedPrinterDevice?.name || 'o dispositivo selecionado'}.`);
+        lastSpoolerStateRef.current = 'running';
+      }
+
+      spoolerRef.current.running = true;
+      void poll();
+    } else if (lastSpoolerStateRef.current !== 'stopped') {
+      addLog('Fila local pausada.');
+      lastSpoolerStateRef.current = 'stopped';
+      spoolerRef.current.running = false;
     }
 
     return () => {
+      cancelled = true;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [isSpoolerRunning, selectedDevice, selectedDeviceCanAutoPrint, pollingInterval, isNative, devices]);
+  }, [isSpoolerRunning, selectedDeviceCanAutoPrint, pollingInterval, isNative, selectedPrinterDevice, selectedPrinterDevice?.id, selectedPrinterDevice?.address, selectedPrinterDevice?.autoPrintEnabled, selectedPrinterDevice?.name]);
 
   return (
     <div className="mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
@@ -628,76 +707,89 @@ export function PrinterSettings() {
         </button>
       </div>
 
-      <div className="mb-6 grid gap-4 md:grid-cols-3">
-        <section className="rounded-3xl border border-border bg-card p-5 shadow-sm">
-          <p className="text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">Impressora principal</p>
-          <p className="mt-3 text-2xl font-black text-foreground">{mainPrinterStatus}</p>
-          <p className="mt-1 text-sm font-medium text-muted-foreground">{mainPrinterDevice ? mainPrinterDevice.name : 'Nenhuma impressora principal configurada.'}</p>
+      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">Impressora principal</p>
+          <p className="mt-2 text-lg font-black text-foreground">{mainPrinterStatus}</p>
+          <p className="mt-1 text-sm font-medium text-muted-foreground truncate">{mainPrinterDevice ? mainPrinterDevice.name : 'Nenhuma impressora principal configurada.'}</p>
         </section>
-        <section className="rounded-3xl border border-border bg-card p-5 shadow-sm">
-          <p className="text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">Impressao automatica</p>
-          <p className="mt-3 text-2xl font-black text-foreground">{autoPrintStatus}</p>
-          <p className="mt-1 text-sm font-medium text-muted-foreground">{selectedPrinterDevice?.autoPrintEnabled ? 'A fila local esta pronta para imprimir' : 'A fila local esta parada no momento'}</p>
+        <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">Impressão automática</p>
+          <p className="mt-2 text-lg font-black text-foreground">{autoPrintStatus}</p>
+          <p className="mt-1 text-sm font-medium text-muted-foreground">{selectedPrinterDevice?.autoPrintEnabled ? 'Fila local pronta.' : 'Fila local parada.'}</p>
         </section>
-        <section className="rounded-3xl border border-border bg-card p-5 shadow-sm">
-          <p className="text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">Ultima impressao</p>
-          <p className="mt-3 text-2xl font-black text-foreground">{lastPrintStatus}</p>
-          <p className="mt-1 text-sm font-medium text-muted-foreground">{lastPrintedJob ? `Job #${lastPrintedJob.id}` : 'Nenhum pedido impresso ainda'}</p>
+        <section className="rounded-3xl border border-border bg-card p-4 shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">Última impressão</p>
+          <p className="mt-2 text-lg font-black text-foreground">{lastPrintStatus}</p>
+          <p className="mt-1 text-sm font-medium text-muted-foreground truncate">{lastPrintedJob ? `Job #${lastPrintedJob.id}` : 'Nenhum pedido impresso ainda'}</p>
         </section>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
         <div className="space-y-6">
           <section className="overflow-hidden rounded-[2rem] border border-border bg-card shadow-sm">
-            <div className="border-b border-border px-6 py-5">
+            <div className="border-b border-border px-5 py-4 sm:px-6 sm:py-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-2">
-                  <p className="text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">Impressora principal</p>
-                  <h2 className="text-2xl font-black text-foreground">Comanda completa do pedido</h2>
-                  <p className="max-w-2xl text-sm font-medium text-muted-foreground">Imprime a comanda completa do pedido, com cliente, endereco, itens, pagamento e observacoes.</p>
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">Impressora principal</p>
+                  <h2 className="text-xl font-black text-foreground sm:text-2xl">Comanda completa do pedido</h2>
+                  <p className="max-w-2xl text-sm font-medium text-muted-foreground">Imprime cliente, endereço, itens, pagamento e observações.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={handleOpenPrinterWizard} className="rounded-2xl border border-border bg-background px-4 py-2.5 text-sm font-bold text-foreground transition hover:bg-muted/40">Alterar impressora</button>
-                  <button type="button" onClick={() => mainPrinterDevice && void handleTestSpecificDevice(mainPrinterDevice)} disabled={!mainPrinterDevice} className="rounded-2xl bg-primary px-4 py-2.5 text-sm font-black text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50">Testar impressao</button>
-                  <button type="button" onClick={() => mainPrinterDevice && void handleToggleDeviceAutoPrint(mainPrinterDevice)} disabled={!mainPrinterDevice} className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-2.5 text-sm font-bold text-primary transition hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-50">{selectedDeviceCanAutoPrint ? 'Parar impressao automatica' : 'Ativar impressao automatica'}</button>
+                  <button type="button" onClick={handleOpenPrinterWizard} className="rounded-2xl border border-border bg-background px-4 py-2.5 text-sm font-bold text-foreground transition hover:bg-muted/40">Alterar</button>
+                  <button type="button" onClick={() => mainPrinterDevice && void handleTestSpecificDevice(mainPrinterDevice)} disabled={!mainPrinterDevice} className="rounded-2xl bg-primary px-4 py-2.5 text-sm font-black text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50">Testar</button>
+                  <button type="button" onClick={() => mainPrinterDevice && void handleToggleDeviceAutoPrint(mainPrinterDevice)} disabled={!mainPrinterDevice} className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-2.5 text-sm font-bold text-primary transition hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-50">{selectedDeviceCanAutoPrint ? 'Pausar auto' : 'Ativar auto'}</button>
                 </div>
               </div>
             </div>
-            <div className="grid gap-4 p-6 md:grid-cols-[1.3fr_0.7fr]">
-              <div className="rounded-3xl border border-border bg-muted/20 p-5">
-                {mainPrinterDevice ? (
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-lg font-black text-foreground">{mainPrinterDevice.name}</p>
-                      <p className="mt-1 text-sm font-medium text-muted-foreground">{getConnectionLabel(mainPrinterDevice.connectionType)} {mainPrinterDevice.address ? `- ${mainPrinterDevice.address}` : ''}</p>
+            <div className="p-5 sm:p-6">
+              {mainPrinterDevice ? (
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(240px,0.8fr)]">
+                  <div className="rounded-3xl border border-border bg-muted/20 p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-lg font-black text-foreground">{mainPrinterDevice.name}</p>
+                        <p className="mt-1 text-sm font-medium text-muted-foreground">{getConnectionLabel(mainPrinterDevice.connectionType)}{mainPrinterDevice.address ? ` · ${mainPrinterDevice.address}` : ''}</p>
+                      </div>
+                      <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${mainPrinterDevice.isActive === false ? 'bg-muted text-muted-foreground' : 'bg-emerald-500/10 text-emerald-600'}`}>
+                        {mainPrinterDevice.isActive === false ? 'Inativa' : 'Pronta'}
+                      </span>
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-border bg-card p-4"><p className="text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">Status</p><p className="mt-2 text-base font-bold text-foreground">{mainPrinterDevice.isActive === false ? 'Inativa' : 'Pronta para uso'}</p></div>
-                      <div className="rounded-2xl border border-border bg-card p-4"><p className="text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">Impressao automatica</p><p className="mt-2 text-base font-bold text-foreground">{selectedDeviceCanAutoPrint ? 'Ativa' : 'Parada'}</p></div>
+                    <p className="mt-4 text-sm font-medium text-muted-foreground">
+                      Esta impressora recebe a comanda completa dos pedidos e não depende de setor.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                    <div className="rounded-2xl border border-border bg-background p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">Conexão</p>
+                      <p className="mt-2 text-sm font-bold text-foreground">{mainPrinterDevice ? getConnectionLabel(mainPrinterDevice.connectionType) : 'Não configurada'}</p>
+                    </div>
+                    <div className="rounded-2xl border border-border bg-background p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">Uso</p>
+                      <p className="mt-2 text-sm font-bold text-foreground">{mainPrinterDevice?.isPrimary ? 'Principal' : 'Padrão de loja'}</p>
+                    </div>
+                    <div className="rounded-2xl border border-border bg-background p-4">
+                      <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">Auto-print</p>
+                      <p className="mt-2 text-sm font-bold text-foreground">{selectedDeviceCanAutoPrint ? 'Ativo' : 'Parado'}</p>
                     </div>
                   </div>
-                ) : (
-                  <div className="flex min-h-[220px] flex-col items-start justify-center gap-4 rounded-3xl border border-dashed border-border bg-background p-6">
-                    <div>
-                      <p className="text-2xl font-black text-foreground">Nenhuma impressora principal configurada.</p>
-                      <p className="mt-2 max-w-lg text-sm font-medium text-muted-foreground">Configure a impressora principal para receber a comanda completa dos pedidos.</p>
-                    </div>
-                    <button type="button" onClick={handleOpenPrinterWizard} className="rounded-2xl bg-primary px-4 py-3 text-sm font-black uppercase tracking-widest text-primary-foreground">Configurar impressora principal</button>
+                </div>
+              ) : (
+                <div className="flex min-h-[180px] flex-col items-start justify-center gap-4 rounded-3xl border border-dashed border-border bg-background p-6">
+                  <div>
+                    <p className="text-2xl font-black text-foreground">Nenhuma impressora principal configurada.</p>
+                    <p className="mt-2 max-w-lg text-sm font-medium text-muted-foreground">Configure a impressora principal para receber a comanda completa dos pedidos.</p>
                   </div>
-                )}
-              </div>
-              <div className="space-y-3">
-                <div className="rounded-3xl border border-border bg-card p-4"><p className="text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">Conexao</p><p className="mt-2 text-base font-bold text-foreground">{mainPrinterDevice ? getConnectionLabel(mainPrinterDevice.connectionType) : 'Nao configurada'}</p></div>
-                <div className="rounded-3xl border border-border bg-card p-4"><p className="text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">Setor</p><p className="mt-2 text-base font-bold text-foreground">{mainPrinterDevice?.isPrimary ? 'Principal' : 'Nao exige setor'}</p></div>
-                <div className="rounded-3xl border border-border bg-card p-4"><p className="text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">Observacao</p><p className="mt-2 text-sm font-medium text-muted-foreground">A impressora principal nao depende de setor e continua separada das impressoras de producao.</p></div>
-              </div>
+                  <button type="button" onClick={handleOpenPrinterWizard} className="rounded-2xl bg-primary px-4 py-3 text-sm font-black uppercase tracking-widest text-primary-foreground">Configurar impressora principal</button>
+                </div>
+              )}
             </div>
           </section>
           <section className="overflow-hidden rounded-[2rem] border border-border bg-card shadow-sm">
-            <div className="border-b border-border px-6 py-5">
-              <p className="text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">Impressoras por setor</p>
-              <h2 className="mt-2 text-2xl font-black text-foreground">Impressoras por setor</h2>
-              <p className="mt-2 text-sm font-medium text-muted-foreground">Use impressoras separadas para cozinha, bebidas, balcao ou producao.</p>
+            <div className="border-b border-border px-5 py-4 sm:px-6">
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">Impressoras por setor</p>
+              <h2 className="mt-2 text-xl font-black text-foreground sm:text-2xl">Impressoras por setor</h2>
+              <p className="mt-2 text-sm font-medium text-muted-foreground">Use impressoras separadas para cozinha, bebidas, balcão ou produção.</p>
             </div>
             <div className="space-y-4 p-4 sm:p-6">
               {sectorDevices.length > 0 ? (
@@ -715,22 +807,16 @@ export function PrinterSettings() {
                           </span>
                         </div>
 
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                          <div className="rounded-2xl border border-border bg-muted/20 p-3">
-                            <p className="text-xs font-black uppercase tracking-[0.18em] text-muted-foreground">Impressora</p>
-                            <p className="mt-1 text-sm font-bold text-foreground">{device?.name || 'Nenhuma'}</p>
-                            <p className="mt-1 text-xs font-medium text-muted-foreground">{device ? getConnectionLabel(device.connectionType) : 'Sem impressora configurada'}</p>
+                        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-foreground">{device?.name || 'Nenhuma impressora configurada'}</p>
+                            <p className="mt-1 text-xs font-medium text-muted-foreground">{device ? getConnectionLabel(device.connectionType) : 'Sem impressora por setor'}</p>
                           </div>
-                          <div className="rounded-2xl border border-border bg-muted/20 p-3">
-                            <p className="text-xs font-black uppercase tracking-[0.18em] text-muted-foreground">Ticket</p>
-                            <p className="mt-1 text-sm font-bold text-foreground">Comanda de producao</p>
+                          <div className="flex flex-wrap gap-2">
+                            <button type="button" onClick={() => handleConfigureSector(station.slug, device?.id)} className="rounded-2xl border border-border bg-background px-3 py-2 text-xs font-black uppercase tracking-widest text-foreground transition hover:bg-muted/40">Configurar</button>
+                            <button type="button" onClick={() => device && void handleTestSpecificDevice(device)} disabled={!device} className="rounded-2xl bg-primary px-3 py-2 text-xs font-black uppercase tracking-widest text-primary-foreground transition disabled:cursor-not-allowed disabled:opacity-50">Testar</button>
+                            <button type="button" onClick={() => device && void handleToggleDeviceAutoPrint(device)} disabled={!device} className="rounded-2xl border border-primary/20 bg-primary/10 px-3 py-2 text-xs font-black uppercase tracking-widest text-primary transition disabled:cursor-not-allowed disabled:opacity-50">{device?.autoPrintEnabled ? 'Desativar' : 'Ativar'}</button>
                           </div>
-                        </div>
-
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          <button type="button" onClick={() => handleConfigureSector(station.slug, device?.id)} className="rounded-2xl border border-border bg-background px-3 py-2 text-xs font-black uppercase tracking-widest text-foreground transition hover:bg-muted/40">Configurar</button>
-                          <button type="button" onClick={() => device && void handleTestSpecificDevice(device)} disabled={!device} className="rounded-2xl bg-primary px-3 py-2 text-xs font-black uppercase tracking-widest text-primary-foreground transition disabled:cursor-not-allowed disabled:opacity-50">Testar</button>
-                          <button type="button" onClick={() => device && void handleToggleDeviceAutoPrint(device)} disabled={!device} className="rounded-2xl border border-primary/20 bg-primary/10 px-3 py-2 text-xs font-black uppercase tracking-widest text-primary transition disabled:cursor-not-allowed disabled:opacity-50">{device?.autoPrintEnabled ? 'Desativar' : 'Ativar'}</button>
                         </div>
                       </div>
                     ))}
@@ -763,7 +849,7 @@ export function PrinterSettings() {
                 </>
               ) : (
                 <div className="rounded-3xl border border-dashed border-border bg-background p-6 text-sm font-medium text-muted-foreground">
-                  Nenhum setor configurado. Use apenas a impressora principal ou crie setores no KDS.
+                  Nenhuma impressora por setor configurada.
                 </div>
               )}
             </div>
@@ -772,33 +858,31 @@ export function PrinterSettings() {
 
         <div className="space-y-6">
           <details className="rounded-[2rem] border border-border bg-card shadow-sm">
-            <summary className="cursor-pointer list-none px-6 py-5">
+            <summary className="cursor-pointer list-none px-5 py-4 sm:px-6">
               <div className="flex items-center justify-between gap-4">
-                <div><p className="text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">Diagnostico avancado</p><h2 className="mt-2 text-2xl font-black text-foreground">Diagnostico avancado</h2></div>
-                <span className="rounded-full bg-muted/50 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-muted-foreground">Fechado por padrao</span>
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">Diagnóstico avançado</p>
+                  <h2 className="text-lg font-black text-foreground sm:text-xl">Diagnóstico avançado</h2>
+                  <p className="text-sm text-muted-foreground">Use apenas se precisar investigar problemas de conexão ou impressão.</p>
+                </div>
+                <span className="rounded-full bg-muted/50 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-muted-foreground">Fechado</span>
               </div>
             </summary>
-            <div className="space-y-4 border-t border-border px-6 py-5">
-              <div className="grid gap-3">
+            <div className="space-y-4 border-t border-border px-5 py-5 sm:px-6">
+              <div className="grid gap-3 md:grid-cols-2">
                 <div className="rounded-3xl border border-border bg-muted/20 p-4">
-                  <p className="text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">Conector do Windows</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">Conector do Windows</p>
                   <p className="mt-2 text-sm font-bold text-foreground">
-                    {isNative ? 'Nao se aplica no Android.' : qzStatus || 'Abra o conector do Windows para listar as impressoras instaladas.'}
+                    {isNative ? 'Não se aplica no Android.' : qzStatus || 'Abra o conector do Windows para listar as impressoras instaladas.'}
                   </p>
                   {qzError ? <p className="mt-2 text-sm font-medium text-destructive">{qzError}</p> : null}
                 </div>
-                <div className="rounded-3xl border border-border bg-muted/20 p-4 space-y-3">
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">Impressao automatica</p>
-                    <p className="mt-2 text-sm font-bold text-foreground">
-                      Intervalo atual de {pollingInterval} ms. {isSpoolerRunning ? 'Fila ativa.' : 'Fila parada.'}
-                    </p>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                <div className="rounded-3xl border border-border bg-muted/20 p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">Impressão automática</p>
+                  <p className="mt-2 text-sm font-bold text-foreground">Intervalo atual de {pollingInterval} ms. {isSpoolerRunning ? 'Fila ativa.' : 'Fila parada.'}</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
                     <label className="space-y-2">
-                      <span className="block text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">
-                        Ajustar intervalo
-                      </span>
+                      <span className="block text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">Ajustar intervalo</span>
                       <input
                         type="range"
                         min={1500}
@@ -810,9 +894,7 @@ export function PrinterSettings() {
                       />
                     </label>
                     <label className="space-y-2 sm:w-28">
-                      <span className="block text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">
-                        ms
-                      </span>
+                      <span className="block text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">ms</span>
                       <input
                         type="number"
                         min={1500}
@@ -825,22 +907,23 @@ export function PrinterSettings() {
                     </label>
                   </div>
                 </div>
-                {bluetoothConnectionError || testPrintStatus ? (
-                  <div className="rounded-3xl border border-border bg-background p-4 space-y-2">
-                    <p className="text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">Ultimo feedback</p>
-                    {bluetoothConnectionError ? (
-                      <p className="text-sm font-medium text-destructive">{bluetoothConnectionError}</p>
-                    ) : null}
-                    {testPrintStatus ? (
-                      <p className="text-sm font-medium text-foreground">{testPrintStatus}</p>
-                    ) : null}
-                  </div>
-                ) : null}
               </div>
+
+              {bluetoothConnectionError || testPrintStatus ? (
+                <div className="rounded-3xl border border-border bg-background p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">Último feedback</p>
+                  {bluetoothConnectionError ? <p className="mt-2 text-sm font-medium text-destructive">{bluetoothConnectionError}</p> : null}
+                  {testPrintStatus ? <p className="mt-2 text-sm font-medium text-foreground">{testPrintStatus}</p> : null}
+                </div>
+              ) : null}
+
               <div className="rounded-3xl border border-border bg-background">
-                <div className="flex items-center justify-between border-b border-border px-4 py-3"><p className="text-xs font-black uppercase tracking-[0.24em] text-muted-foreground">Logs do app local</p><button type="button" onClick={() => setLogs([])} className="text-xs font-black uppercase tracking-widest text-primary">Limpar</button></div>
-                <div className="max-h-[320px] space-y-2 overflow-y-auto p-4 text-[13px]">
-                  {logs.length === 0 ? <div className="flex min-h-[180px] flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/20 text-center text-muted-foreground"><Monitor className="mb-3 h-10 w-10 opacity-40" /><p className="text-sm font-medium">Nenhum log gerado ainda.</p></div> : logs.map((log, index) => <div key={`${index}-${log}`} className={`rounded-2xl px-3 py-2 ${log.includes('ACK') ? 'bg-emerald-500/10 font-bold text-emerald-600' : log.includes('Erro') || log.includes('Falha') ? 'bg-destructive/10 font-bold text-destructive' : log.includes('recebido') ? 'bg-primary/10 text-primary' : 'bg-muted/30 text-muted-foreground'}`}>{log}</div>)}
+                <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">Diagnóstico</p>
+                  <button type="button" onClick={() => setLogs([])} className="text-xs font-black uppercase tracking-widest text-primary">Limpar</button>
+                </div>
+                <div className="max-h-[220px] space-y-2 overflow-y-auto p-4 text-[13px]">
+                  {logs.length === 0 ? <div className="flex min-h-[140px] flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/20 text-center text-muted-foreground"><Monitor className="mb-3 h-8 w-8 opacity-40" /><p className="text-sm font-medium">Nenhum log gerado ainda.</p></div> : logs.map((log, index) => <div key={`${index}-${log}`} className={`rounded-2xl px-3 py-2 ${log.includes('ACK') ? 'bg-emerald-500/10 font-bold text-emerald-600' : log.includes('Erro') || log.includes('Falha') ? 'bg-destructive/10 font-bold text-destructive' : log.includes('recebido') ? 'bg-primary/10 text-primary' : 'bg-muted/30 text-muted-foreground'}`}>{log}</div>)}
                 </div>
               </div>
             </div>

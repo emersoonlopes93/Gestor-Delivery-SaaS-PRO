@@ -15,8 +15,9 @@ interface OperatingHourForm {
   closeTime?: string;
 }
 
-import { Clock, Pause, Save, Copy, Calendar, MapPin, Building2, ChefHat, Wallet, Store } from 'lucide-react';
+import { Clock, Save, Copy, Calendar, MapPin, Building2, ChefHat, Wallet, Store } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { StoreStatusControl } from '../../components/store/StoreStatusControl';
 import { useNavigate } from 'react-router-dom';
 import { maskPhone, maskCEP, maskCPFCNPJ, unmask } from '@gestor/utils';
 
@@ -225,19 +226,21 @@ export function SettingsPage() {
     }
   };
 
-  const handleTogglePause = async () => {
-    const newStatus = !settings.isStorePaused;
+  const handleTogglePause = async (nextPaused: boolean, reason: string) => {
     try {
       const res = await api.patch('/tenant/store-pause', {
-        isStorePaused: newStatus,
-        storePauseReason: settings.storePauseReason || '',
+        isStorePaused: nextPaused,
+        storePauseReason: reason,
       });
       if (res.success) {
-        setSettings({ ...settings, isStorePaused: newStatus });
-        alert(newStatus ? 'Loja pausada com sucesso!' : 'Loja reaberta com sucesso!');
+        setSettings((current) => ({
+          ...current,
+          isStorePaused: nextPaused,
+          storePauseReason: reason,
+        }));
       }
     } catch (error) {
-      alert('Erro ao alterar status da loja.');
+      throw new Error('Não foi possível alterar o status da loja.');
     }
   };
 
@@ -502,43 +505,11 @@ export function SettingsPage() {
             </div>
           )}
 
-          <div className={`bg-card rounded-2xl shadow-sm border p-5 transition-all ${settings.isStorePaused ? 'border-status-warning/20 bg-status-warning/5 dark:border-status-warning/30 dark:bg-status-warning/5' : 'border-border'}`}>
-            <div className="flex items-start gap-4">
-              <div className={`p-3 rounded-xl ${settings.isStorePaused ? 'bg-status-warning/10 text-status-warning' : 'bg-status-success/10 text-status-success'}`}>
-                <Pause className="w-5 h-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-base font-bold text-foreground">Pausa temporária</h2>
-                  <span className={`text-[11px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full ${settings.isStorePaused ? 'bg-status-warning/10 text-status-warning' : 'bg-status-success/10 text-status-success'}`}>
-                    {settings.isStorePaused ? 'Pausada' : 'Ativa'}
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground font-medium mt-2">Feche a loja imediatamente sem mexer nos horários.</p>
-              </div>
-            </div>
-            <div className="mt-4 space-y-3">
-              {settings.isStorePaused && (
-                <input
-                  type="text"
-                  placeholder="Motivo da pausa (opcional)"
-                  value={settings.storePauseReason || ''}
-                  onChange={(e) => setSettings({ ...settings, storePauseReason: e.target.value })}
-                  className="input-premium border-status-warning/20 dark:border-status-warning/30 focus:border-status-warning !py-2"
-                />
-              )}
-              <button
-                onClick={handleTogglePause}
-                className={`w-full px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm ${
-                  settings.isStorePaused 
-                    ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
-                    : 'bg-status-warning text-slate-950 hover:bg-status-warning/90'
-                }`}
-              >
-                {settings.isStorePaused ? 'Reabrir loja' : 'Pausar agora'}
-              </button>
-            </div>
-          </div>
+          <StoreStatusControl
+            isPaused={Boolean(settings.isStorePaused)}
+            pauseReason={settings.storePauseReason || ''}
+            onTogglePause={handleTogglePause}
+          />
         </div>
       </div>
 

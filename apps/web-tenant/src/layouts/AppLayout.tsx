@@ -51,6 +51,7 @@ import type { BusinessGroupContext, Tenant, TenantLoginResponse, TenantSettings,
 import { useNotificationAudio } from '../hooks/useNotificationAudio';
 import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
 import { useLogisticsSocket } from '../features/delivery/hooks/useLogisticsSocket';
+import { StoreStatusBadge } from '../components/store/StoreStatusControl';
 import { Toaster } from 'react-hot-toast';
 import { addNativeNotificationClickListener } from '../lib/native-notifications';
 
@@ -374,22 +375,6 @@ export function AppLayout() {
 
   const queryClient = useQueryClient();
   const accessibleStores = user?.accessibleTenants ?? [];
-  const toggleStoreMutation = useMutation({
-    mutationFn: async (isPaused: boolean) => {
-      const res = await api.patch<unknown>('/tenant/store-pause', { 
-        isStorePaused: isPaused, 
-        storePauseReason: '' 
-      });
-      return res.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenant-settings-applayout'] });
-    },
-    onError: (err) => {
-      console.error('Erro ao alterar status:', err);
-      alert('Erro ao alterar status da loja.');
-    }
-  });
 
   const switchStoreMutation = useMutation({
     mutationFn: async (tenantId: string) => {
@@ -467,10 +452,6 @@ export function AppLayout() {
 
     return 'closed';
   }, [tenantData]);
-
-  const handleToggleStore = () => {
-    toggleStoreMutation.mutate(storeStatus !== 'paused');
-  };
 
   const handleSwitchStore = () => {
     if (!selectedTenantId || selectedTenantId === user?.tenantId) {
@@ -735,49 +716,11 @@ export function AppLayout() {
 
           {!collapsed && (
             <div className="space-y-4">
-              {/* Status Toggle Operational */}
-              <button
-                onClick={handleToggleStore}
-                disabled={toggleStoreMutation.isPending}
-                className={`w-full flex items-center justify-between p-2.5 rounded-2xl border transition-all duration-300 group hover:shadow-md active:scale-[0.98] ${
-                  storeStatus === 'open'
-                    ? 'bg-status-success/10 text-status-success border-status-success/30'
-                    : storeStatus === 'closed'
-                    ? 'bg-status-warning/10 text-status-warning border-status-warning/30'
-                    : 'bg-destructive/10 text-destructive border-destructive/30'
-                } ${toggleStoreMutation.isPending ? 'opacity-70 cursor-not-allowed' : ''}`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="relative flex h-2 w-2">
-                    {storeStatus === 'open' && (
-                      <span className="animate-ping absolute inset-0 rounded-full bg-status-success opacity-75" />
-                    )}
-                    <span className={`relative inline-flex rounded-full h-2 w-2 ${
-                      storeStatus === 'open'
-                        ? 'bg-status-success'
-                        : storeStatus === 'closed'
-                        ? 'bg-status-warning'
-                        : 'bg-destructive'
-                    }`} />
-                  </div>
-                  <span className="text-[10px] font-black tracking-widest uppercase">
-                    {storeStatus === 'open'
-                      ? 'Loja Aberta'
-                      : storeStatus === 'paused'
-                      ? 'Loja Pausada'
-                      : 'Loja Fechada'}
-                  </span>
-                </div>
-                <div className={`w-9 h-5 rounded-full relative transition-colors duration-300 ${
-                  storeStatus === 'open'
-                    ? 'bg-status-success/20'
-                    : storeStatus === 'closed'
-                    ? 'bg-status-warning/20'
-                    : 'bg-destructive/20'
-                }`}>
-                   <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-foreground border border-border transition-all duration-300 ${storeStatus === 'open' ? 'right-0.5' : 'left-0.5'}`} />
-                </div>
-              </button>
+              <StoreStatusBadge
+                status={storeStatus}
+                compact
+                onManage={() => navigate('/settings')}
+              />
 
               {/* Action Buttons */}
               <div className="grid grid-cols-2 gap-2">
