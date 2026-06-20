@@ -92,6 +92,60 @@ function getRedisCacheReconnectDelay(attempt: number): false | number {
   return getRedisReconnectDelay(attempt) ?? false;
 }
 
+function shouldRejectUnauthorizedRedisTls(): boolean {
+  return process.env.REDIS_TLS_REJECT_UNAUTHORIZED !== 'false';
+}
+
+function getRedisTlsServerName(): string | undefined {
+  const host = process.env.REDIS_HOST;
+  if (!host || host === 'localhost' || host === '127.0.0.1') return undefined;
+  return host;
+}
+
+function getRedisCacheSocketOptions() {
+  const host = process.env.REDIS_HOST;
+  if (!host) return undefined;
+  return process.env.REDIS_TLS === 'true'
+    ? {
+        host,
+        port: Number(process.env.REDIS_PORT || 6379),
+        tls: true as const,
+        servername: getRedisTlsServerName(),
+        rejectUnauthorized: shouldRejectUnauthorizedRedisTls(),
+        connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
+        reconnectStrategy: getRedisCacheReconnectDelay,
+      }
+    : {
+        host,
+        port: Number(process.env.REDIS_PORT || 6379),
+        connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
+        reconnectStrategy: getRedisCacheReconnectDelay,
+      };
+}
+
+function getBullmqRedisConnectionOptions() {
+  const host = process.env.REDIS_HOST || 'localhost';
+  const base = {
+    host,
+    port: Number(process.env.REDIS_PORT || 6379),
+    password: process.env.REDIS_PASSWORD || undefined,
+    connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
+    maxRetriesPerRequest: null,
+    enableReadyCheck: true,
+    retryStrategy: getRedisReconnectDelay,
+  };
+
+  return process.env.REDIS_TLS === 'true'
+    ? {
+        ...base,
+        tls: {
+          servername: getRedisTlsServerName(),
+          rejectUnauthorized: shouldRejectUnauthorizedRedisTls(),
+        },
+      }
+    : base;
+}
+
 function attachRedisClientEventHandlers(client: { on?: (event: string, handler: (...args: unknown[]) => void) => void } | undefined, source: 'cache' | 'bullmq') {
   if (!client || typeof client.on !== 'function') return;
 
@@ -152,16 +206,7 @@ if (process.env.REDIS_ENABLED === 'false') {
     ...(process.env.REDIS_ENABLED !== 'false' && (process.env.BULLMQ_ENABLED === 'true' || process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true')
       ? [
           BullModule.forRoot({
-            connection: {
-              host: process.env.REDIS_HOST || 'localhost',
-              port: Number(process.env.REDIS_PORT || 6379),
-              password: process.env.REDIS_PASSWORD || undefined,
-              tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
-              connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
-              maxRetriesPerRequest: null,
-              enableReadyCheck: true,
-              retryStrategy: getRedisReconnectDelay,
-            },
+            connection: getBullmqRedisConnectionOptions(),
             defaultJobOptions: {
               removeOnComplete: 1000,
               removeOnFail: 5000,
@@ -189,13 +234,7 @@ if (process.env.REDIS_ENABLED === 'false') {
             return {};
           }
           const store = await redisStore({
-            socket: {
-              host: process.env.REDIS_HOST,
-              port: Number(process.env.REDIS_PORT || 6379),
-              tls: process.env.REDIS_TLS === 'true' ? true : undefined,
-              connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
-              reconnectStrategy: getRedisCacheReconnectDelay,
-            },
+            socket: getRedisCacheSocketOptions(),
             password: process.env.REDIS_PASSWORD || undefined,
             ttl: 60000, // Default 60s
           }) as { client: { ping(): Promise<string> } };

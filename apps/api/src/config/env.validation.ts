@@ -60,6 +60,7 @@ const baseEnvSchema = z.object({
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
   REDIS_PASSWORD: z.string().default(''),
   REDIS_TLS: z.enum(['true', 'false']).default('false'),
+  REDIS_TLS_REJECT_UNAUTHORIZED: z.enum(['true', 'false']).default('true'),
 
   // Feature Flags
   BULLMQ_ENABLED: z.enum(['true', 'false']).default('false'),
