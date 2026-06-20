@@ -283,7 +283,7 @@ describe('BaseMenusPage', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Editar cardápio' }));
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/admin/base-menus/acai/draft-version'));
-    expect(await screen.findByText(/Alteracoes nao publicadas/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Alterações não publicadas/i)).toBeInTheDocument();
   });
 
   it('mostra produto com imagem, preço e complementos e salva alterações', async () => {
@@ -407,7 +407,7 @@ describe('BaseMenusPage', () => {
 
     expect(await screen.findByRole('heading', { name: /Açaí/ })).toBeInTheDocument();
     expect(screen.queryByText('Metadados')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Avançado' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Mais opções' }));
     expect(screen.getByText('Metadados')).toBeInTheDocument();
     expect(screen.getByText('Versões')).toBeInTheDocument();
   });

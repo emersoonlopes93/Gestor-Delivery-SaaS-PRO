@@ -217,7 +217,7 @@ const imageStatusLabels: Record<ImageStatus, string> = {
 const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'products', label: 'Produtos' },
   { id: 'imports', label: 'Importações' },
-  { id: 'advanced', label: 'Avançado' },
+  { id: 'advanced', label: 'Mais opções' },
 ];
 
 export function BaseMenusPage() {
@@ -459,53 +459,69 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
   }
 
   return (
-    <div className="space-y-6">
-      <button onClick={() => navigate(`/base-menus/${draft.template.slug}`)} className="inline-flex items-center gap-2 text-sm font-black text-muted-foreground hover:text-foreground">
+    <div className="relative isolate space-y-6 pb-10">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-64 bg-[radial-gradient(circle_at_top_left,_rgba(249,115,22,0.14),_transparent_44%),radial-gradient(circle_at_top_right,_rgba(15,23,42,0.08),_transparent_38%)]" />
+
+      <button onClick={() => navigate(`/base-menus/${draft.template.slug}`)} className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-2 text-sm font-black text-muted-foreground backdrop-blur transition-colors hover:bg-background hover:text-foreground">
         <ArrowLeft className="h-4 w-4" />
         Voltar para detalhes
       </button>
 
-      <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-bold text-amber-900">
-        Alteracoes nao publicadas. Novos lojistas que importarem este modelo receberao a nova versao. Lojistas que ja importaram nao serao alterados automaticamente.
+      <section className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 p-4 text-amber-950 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em]">Alterações não publicadas</p>
+            <p className="mt-1 text-sm font-bold leading-6">Novos lojistas que importarem este modelo receberão a nova versão. Lojistas que já importaram não serão alterados automaticamente.</p>
+          </div>
+          <span className="rounded-full bg-white/70 px-3 py-1 text-xs font-black text-amber-900">Edição em andamento</span>
+        </div>
       </section>
 
-      <section className="rounded-xl border border-border bg-card p-5">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div>
-            <h1 className="text-2xl font-black text-foreground">{draft.template.icon ? `${draft.template.icon} ` : ''}{draft.template.name}</h1>
-            <p className="mt-1 text-sm font-bold text-muted-foreground">Edicao simples do cardapio para futuras importacoes.</p>
+      <section className="overflow-hidden rounded-3xl border border-border/60 bg-card/95 shadow-[0_24px_80px_-45px_rgba(15,23,42,0.45)] backdrop-blur">
+        <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-7">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="inline-flex items-center rounded-full bg-amber-500/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-amber-700">Cardápio pronto</span>
+              <span className="rounded-full bg-muted px-3 py-1 text-xs font-black text-muted-foreground">Editar cardápio</span>
+            </div>
+            <h1 className="mt-3 text-3xl font-black tracking-tight text-foreground sm:text-4xl">{draft.template.icon ? `${draft.template.icon} ` : ''}{draft.template.name}</h1>
+            <p className="mt-2 text-sm font-bold text-muted-foreground sm:text-base">Edição simples do cardápio para futuras importações.</p>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">Edite produtos, imagens e complementos com uma experiência mais direta, sem expor a estrutura técnica de versão.</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link to="/base-media" className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">
+          <div className="rounded-2xl border border-border/70 bg-background/80 p-4 shadow-sm">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">Ações rápidas</p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+              <Link to="/base-media" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border bg-background px-4 py-3 text-sm font-black text-foreground transition-colors hover:bg-muted">
               <ExternalLink className="h-4 w-4" />
               Galeria Base
-            </Link>
-            {canManage ? (
-              <>
-                <button aria-label="Descartar alterações" onClick={() => setModal({ draft, mode: 'discard' })} className="inline-flex items-center justify-center gap-2 rounded-xl border border-destructive/30 bg-background px-4 py-2 text-sm font-black text-destructive hover:bg-destructive/10">
-                  <Trash2 className="h-4 w-4" />
-                  Descartar alterações
-                </button>
-                <button aria-label="Publicar alterações" onClick={() => setModal({ draft, mode: 'publish' })} disabled={draft.validation.errors.length > 0} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700 disabled:opacity-50">
-                  <Send className="h-4 w-4" />
-                  Publicar alterações
-                </button>
-              </>
-            ) : null}
+              </Link>
+              {canManage ? (
+                <>
+                  <button aria-label="Descartar alterações" onClick={() => setModal({ draft, mode: 'discard' })} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-destructive/30 bg-background px-4 py-3 text-sm font-black text-destructive transition-colors hover:bg-destructive/10">
+                    <Trash2 className="h-4 w-4" />
+                    Descartar alterações
+                  </button>
+                  <button aria-label="Publicar alterações" onClick={() => setModal({ draft, mode: 'publish' })} disabled={draft.validation.errors.length > 0} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-emerald-700 disabled:opacity-50">
+                    <Send className="h-4 w-4" />
+                    Publicar alterações
+                  </button>
+                </>
+              ) : null}
+            </div>
           </div>
         </div>
       </section>
 
       <section className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-card p-4 shadow-sm md:flex-row md:items-end md:justify-between">
           <div>
             <h2 className="text-lg font-black text-foreground">Produtos</h2>
-            <p className="text-sm font-bold text-muted-foreground">Edite nome, preco, categoria, imagem e complementos sem ver JSON tecnico.</p>
+            <p className="text-sm font-bold text-muted-foreground">Edite nome, preço, categoria, imagem e complementos sem ver JSON técnico.</p>
           </div>
           {canManage ? <CategoryCreateButton draft={draft} onSaved={loadDraft} /> : null}
         </div>
         {draft.categories.map((category) => (
-          <div key={category.id} className="overflow-hidden rounded-xl border border-border bg-card">
+          <div key={category.id} className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-shadow hover:shadow-md">
             <CategoryHeader
               draft={draft}
               category={category}
@@ -533,12 +549,12 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
         ))}
       </section>
 
-      <details className="rounded-xl border border-border bg-card p-4">
-        <summary className="cursor-pointer text-sm font-black text-foreground">Avancado</summary>
+      <details className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
+        <summary className="cursor-pointer text-sm font-black text-foreground">Mais opções</summary>
         <div className="mt-4 space-y-4">
           {canManage ? <TemplateForm draft={draft} onSaved={loadDraft} /> : <ReadOnlyNotice />}
           <DraftValidationPanel validation={draft.validation} />
-          <section className="rounded-xl border border-border bg-muted/20 p-4 text-sm font-bold text-muted-foreground">
+          <section className="rounded-2xl border border-border bg-muted/20 p-4 text-sm font-bold text-muted-foreground">
             Historico, importacoes e metadados continuam disponiveis na tela de detalhe do Cardapio Base.
           </section>
         </div>
@@ -882,20 +898,20 @@ function CategoryHeader({
 
   return (
     <div className="space-y-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+      <div className="flex flex-col gap-3 border-b border-border/70 bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-black text-foreground">{category.name}</p>
-          <p className="text-xs font-bold text-muted-foreground">{category.products.length} produtos</p>
+          <p className="text-sm font-black tracking-tight text-foreground">{category.name}</p>
+          <p className="text-xs font-bold text-muted-foreground">{category.products.length} produtos nesta categoria</p>
         </div>
         {canManage ? (
           <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={!canMoveUp} onClick={() => void move(-1)} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted disabled:opacity-50">
+            <button type="button" disabled={!canMoveUp} onClick={() => void move(-1)} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted disabled:opacity-50">
               Mover para cima
             </button>
-            <button type="button" disabled={!canMoveDown} onClick={() => void move(1)} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted disabled:opacity-50">
+            <button type="button" disabled={!canMoveDown} onClick={() => void move(1)} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted disabled:opacity-50">
               Mover para baixo
             </button>
-            <button onClick={onCreateProduct} className="inline-flex h-9 items-center justify-center gap-1 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground">
+            <button onClick={onCreateProduct} className="inline-flex h-9 items-center justify-center gap-1 rounded-full bg-primary px-4 text-xs font-black text-primary-foreground shadow-sm transition-transform hover:-translate-y-0.5">
               <Plus className="h-3.5 w-3.5" />
               Novo produto
             </button>
@@ -947,44 +963,44 @@ function SimpleProductCard({
   }
 
   return (
-    <article className="grid gap-4 px-4 py-4 lg:grid-cols-[76px_1.4fr_220px]">
-      <div>
+    <article className="grid gap-4 px-4 py-4 transition-colors hover:bg-muted/20 lg:grid-cols-[92px_minmax(0,1fr)_minmax(280px,320px)]">
+      <div className="flex items-start justify-start">
         {product.publishedGlobalImage ? (
-          <img src={product.publishedGlobalImage.publicUrl} alt={product.publishedGlobalImage.altText ?? product.name} className="h-16 w-16 rounded-xl object-cover bg-muted" />
+          <img src={product.publishedGlobalImage.publicUrl} alt={product.publishedGlobalImage.altText ?? product.name} className="h-20 w-20 rounded-2xl object-cover bg-muted ring-1 ring-border/70" />
         ) : (
-          <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-            <ImageOff className="h-6 w-6" />
+          <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-muted text-muted-foreground ring-1 ring-border/70">
+            <ImageOff className="h-7 w-7" />
           </div>
         )}
       </div>
-      <div className="min-w-0">
+      <div className="min-w-0 self-center">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate text-sm font-black text-foreground">{product.name}</p>
-            <p className="mt-1 text-xs font-bold text-muted-foreground">{product.description ?? 'Sem descricao'}</p>
+            <p className="truncate text-sm font-black tracking-tight text-foreground sm:text-base">{product.name}</p>
+            <p className="mt-1 text-xs font-bold leading-5 text-muted-foreground sm:text-sm">{product.description ?? 'Sem descrição'}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <span className="inline-flex h-8 items-center rounded-xl bg-muted px-3 text-xs font-black text-muted-foreground">{categoryName}</span>
-            <span className={`inline-flex h-8 items-center rounded-xl px-3 text-xs font-black ${imageLabel === 'Sem imagem' ? 'bg-amber-500/10 text-amber-600' : 'bg-emerald-500/10 text-emerald-600'}`}>{imageLabel}</span>
+            <span className="inline-flex h-8 items-center rounded-full bg-muted px-3 text-xs font-black text-muted-foreground">{categoryName}</span>
+            <span className={`inline-flex h-8 items-center rounded-full px-3 text-xs font-black ${imageLabel === 'Sem imagem' ? 'bg-amber-500/10 text-amber-600' : 'bg-emerald-500/10 text-emerald-600'}`}>{imageLabel}</span>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-muted-foreground">
-          <span className="rounded-lg bg-muted px-2 py-1">{formatMoney(product.basePrice)}</span>
-          {product.compareAtPrice !== null ? <span className="rounded-lg bg-muted px-2 py-1">Promo: {formatMoney(product.compareAtPrice)}</span> : null}
-          <span className="rounded-lg bg-muted px-2 py-1">{optionsLabel}</span>
+          <span className="rounded-full bg-muted px-3 py-1">{formatMoney(product.basePrice)}</span>
+          {product.compareAtPrice !== null ? <span className="rounded-full bg-muted px-3 py-1">Promo: {formatMoney(product.compareAtPrice)}</span> : null}
+          <span className="rounded-full bg-muted px-3 py-1">{optionsLabel}</span>
         </div>
       </div>
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap gap-2">
-          <button onClick={onEdit} className="rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground">Editar</button>
-          <button onClick={onImage} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Trocar imagem</button>
-          <button onClick={onOptions} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Complementos</button>
+      <div className="flex flex-col gap-2 self-center">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <button onClick={onEdit} className="rounded-full bg-primary px-3 py-2 text-xs font-black text-primary-foreground shadow-sm transition-transform hover:-translate-y-0.5">Editar</button>
+          <button onClick={onImage} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted">Trocar imagem</button>
+          <button onClick={onOptions} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted">Complementos</button>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => void duplicate()} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Duplicar</button>
-          <button onClick={() => void remove()} className="rounded-xl border border-destructive/30 bg-background px-3 py-2 text-xs font-black text-destructive hover:bg-destructive/10">Excluir</button>
-          <button onClick={() => void move(-1)} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Mover para cima</button>
-          <button onClick={() => void move(1)} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Mover para baixo</button>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <button onClick={() => void duplicate()} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted">Duplicar</button>
+          <button onClick={() => void remove()} className="rounded-full border border-destructive/30 bg-background px-3 py-2 text-xs font-black text-destructive transition-colors hover:bg-destructive/10">Excluir</button>
+          <button onClick={() => void move(-1)} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted">Mover para cima</button>
+          <button onClick={() => void move(1)} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted">Mover para baixo</button>
         </div>
       </div>
     </article>
