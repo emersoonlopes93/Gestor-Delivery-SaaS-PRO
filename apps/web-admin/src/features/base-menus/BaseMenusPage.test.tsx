@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -289,6 +290,11 @@ beforeEach(() => {
 });
 
 describe('BaseMenusPage', () => {
+  async function getFirstProductCard() {
+    const cards = await screen.findAllByRole('article');
+    return cards[0];
+  }
+
   it('cria um draft automaticamente ao abrir o editor', async () => {
     mockApis();
 
@@ -304,12 +310,15 @@ describe('BaseMenusPage', () => {
 
     renderPage('/base-menus/acai/draft');
 
-    expect(await screen.findByText('Açaí 300ml')).toBeInTheDocument();
-    expect(screen.getByText('Imagem ok')).toBeInTheDocument();
+    const productCard = await getFirstProductCard();
+    const productScope = within(productCard);
+
+    expect(productScope.getByText('Açaí 300ml')).toBeInTheDocument();
+    expect(productScope.getByText('Imagem ok')).toBeInTheDocument();
     expect(screen.getByText(/15,00/)).toBeInTheDocument();
     expect(screen.getByText('1 grupo de complementos')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Editar' }));
+    await userEvent.click(productScope.getByRole('button', { name: 'Editar' }));
     await userEvent.clear(screen.getAllByLabelText('Nome')[1]);
     await userEvent.type(screen.getAllByLabelText('Nome')[1], 'Açaí 500ml');
     await userEvent.click(screen.getByRole('button', { name: 'Salvar alterações' }));
@@ -341,8 +350,11 @@ describe('BaseMenusPage', () => {
 
     renderPage('/base-menus/acai/draft');
 
-    expect(await screen.findByText('Açaí 300ml')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Trocar imagem' }));
+    const productCard = await getFirstProductCard();
+    const productScope = within(productCard);
+
+    expect(productScope.getByText('Açaí 300ml')).toBeInTheDocument();
+    await userEvent.click(productScope.getByRole('button', { name: 'Trocar imagem' }));
     await userEvent.click(await screen.findByRole('button', { name: /Açaí 500ml/ }));
 
     await waitFor(() => expect(api.patch).toHaveBeenCalledWith(
@@ -356,8 +368,11 @@ describe('BaseMenusPage', () => {
 
     renderPage('/base-menus/acai/draft');
 
-    expect(await screen.findByText('Açaí 300ml')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Complementos' }));
+    const productCard = await getFirstProductCard();
+    const productScope = within(productCard);
+
+    expect(productScope.getByText('Açaí 300ml')).toBeInTheDocument();
+    await userEvent.click(productScope.getByRole('button', { name: 'Complementos' }));
     await userEvent.clear(screen.getAllByLabelText('Grupo')[0]);
     await userEvent.type(screen.getAllByLabelText('Grupo')[0], 'Coberturas');
     await userEvent.type(screen.getAllByLabelText('Preco adicional')[0], '2');
@@ -375,7 +390,7 @@ describe('BaseMenusPage', () => {
     vi.mocked(api.patch).mockRejectedValueOnce(Object.assign(new Error('maxSelect nao pode ser menor que minSelect.'), { status: 400 }));
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Complementos' }));
+    await userEvent.click(productScope.getByRole('button', { name: 'Complementos' }));
     await userEvent.clear(screen.getAllByLabelText('Minimo')[0]);
     await userEvent.type(screen.getAllByLabelText('Minimo')[0], '2');
     await userEvent.clear(screen.getAllByLabelText('Maximo')[0]);
@@ -404,7 +419,8 @@ describe('BaseMenusPage', () => {
 
     renderPage('/base-menus/acai/draft');
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Descartar alterações' }));
+    const discardButton = await screen.findByRole('button', { name: 'Descartar alterações' });
+    await userEvent.click(discardButton);
     const discardConfirm = screen.getByRole('button', { name: 'Confirmar descarte' });
     expect(discardConfirm).toBeDisabled();
     await userEvent.type(screen.getByLabelText(/Digite DESCARTAR para confirmar/), 'DESCARTAR');
@@ -418,7 +434,7 @@ describe('BaseMenusPage', () => {
 
     renderPage('/base-menus/acai');
 
-    expect(await screen.findByRole('heading', { name: /Açaí/ })).toBeInTheDocument();
+    expect(await screen.findByText('Açaí')).toBeInTheDocument();
     expect(screen.queryByText('Metadados')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Mais opções' }));
     expect(screen.getByText('Metadados')).toBeInTheDocument();
