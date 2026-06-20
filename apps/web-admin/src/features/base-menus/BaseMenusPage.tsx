@@ -216,8 +216,8 @@ const imageStatusLabels: Record<ImageStatus, string> = {
 
 const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'products', label: 'Produtos' },
-  { id: 'imports', label: 'ImportaÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes' },
-  { id: 'advanced', label: 'Mais opÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes' },
+  { id: 'imports', label: 'ImportaÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes' },
+  { id: 'advanced', label: 'Mais opÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes' },
 ];
 
 export function BaseMenusPage() {
@@ -277,14 +277,13 @@ function BaseMenuListView() {
     products: items.reduce((sum, item) => sum + item.totalProducts, 0),
     imageIssues: items.reduce((sum, item) => sum + item.totalProductsWithoutImage, 0),
   }), [items]);
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <h1 className="text-2xl font-black text-foreground">CardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pios Base</h1>
+          <h1 className="text-2xl font-black text-foreground">Cardápios Base</h1>
           <p className="mt-1 max-w-3xl text-sm font-bold text-muted-foreground">
-            Modelos globais usados pelos tenants ao importar um cardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio inicial. Ao importar, o tenant recebe uma cÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia independente.
+            Modelos globais usados pelos tenants ao importar um cardápio inicial. Ao importar, o tenant recebe uma cópia independente.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -299,7 +298,7 @@ function BaseMenuListView() {
           {canManage ? (
             <button onClick={() => setCreateOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700">
               <Plus className="h-4 w-4" />
-              Novo CardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio
+              Novo Cardápio
             </button>
           ) : null}
         </div>
@@ -307,7 +306,7 @@ function BaseMenuListView() {
 
       <section className="hidden rounded-xl border border-border bg-card p-4">
         <p className="text-sm font-bold text-muted-foreground">
-          Apenas templates publicados aparecem para tenants. Imagens em draft nÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o sÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o usadas na importaÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o.
+          Apenas templates publicados aparecem para tenants. Imagens em draft não são usadas na importação.
         </p>
       </section>
 
@@ -343,7 +342,7 @@ function BaseMenuListView() {
           </select>
           <label className="flex h-10 items-center gap-2 rounded-xl border border-input bg-background px-3 text-sm font-bold text-foreground whitespace-nowrap">
             <input type="checkbox" checked={onlyImageIssues} onChange={(event) => setOnlyImageIssues(event.target.checked)} />
-            com pendÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âªncia de imagem
+            com pendência de imagem
           </label>
         </div>
       </section>
@@ -355,11 +354,11 @@ function BaseMenuListView() {
               <span>Nome</span>
               <span>Segmento</span>
               <span>Status</span>
-              <span>VersÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o</span>
+              <span>Versão</span>
               <span>Categorias</span>
               <span>Produtos</span>
               <span>Cobertura</span>
-              <span>AÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o</span>
+              <span>Ações</span>
             </div>
             {loading ? <TableMessage icon={<Loader2 className="h-8 w-8 animate-spin" />} text="Carregando modelos..." /> : null}
             {!loading && error ? <TableMessage icon={<AlertTriangle className="h-8 w-8" />} text={error} /> : null}
@@ -393,16 +392,52 @@ function BaseMenuListView() {
   );
 }
 
-function DraftActionButton({ item }: { item: BaseMenuListItem; onDone?: () => void | Promise<void> }) {
+function DraftActionButton({ item, className }: { item: BaseMenuListItem; onDone?: () => void | Promise<void>; className?: string }) {
   const navigate = useNavigate();
 
   return (
-    <button aria-label="Editar cardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio" onClick={() => navigate(`/base-menus/${item.slug}/draft`)} className="inline-flex h-9 items-center justify-center gap-1 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground">
+    <button aria-label="Editar cardápio" onClick={() => navigate(`/base-menus/${item.slug}/draft`)} className={className ?? 'inline-flex h-9 items-center justify-center gap-1 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground'}>
       <Plus className="h-3.5 w-3.5" />
-      Editar cardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio
+      Editar cardápio
     </button>
   );
 }
+
+type OptionItemDraft = {
+  name: string;
+  description: string;
+  priceImpactValue: string;
+  allowQuantity: boolean;
+  minQty: string;
+  maxQty: string;
+  order: string;
+  isActive: boolean;
+};
+
+type OptionGroupDraft = {
+  name: string;
+  description: string;
+  selectionType: 'single' | 'multiple';
+  isRequired: boolean;
+  minSelect: string;
+  maxSelect: string;
+  order: string;
+  isActive: boolean;
+  items: OptionItemDraft[];
+};
+
+type BaseMediaPickerItem = {
+  id: string;
+  title: string | null;
+  category: string | null;
+  categoryName: string | null;
+  publicUrl: string;
+  altText: string | null;
+  tagsJson: string[];
+  publicationStatus: 'draft' | 'published' | 'archived';
+  productName: string | null;
+  mediaLookupKey: string | null;
+};
 
 function BaseMenuDraftEditor({ id }: { id: string }) {
   const navigate = useNavigate();
@@ -453,19 +488,380 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
           <ArrowLeft className="h-4 w-4" />
           Voltar
         </button>
-        <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-sm font-bold text-destructive">{error ?? 'Draft nao encontrado.'}</div>
+        <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-sm font-bold text-destructive">{error ?? 'Draft não encontrado.'}</div>
       </div>
     );
   }
 
+  const orderedCategories = [...draft.categories].sort((left, right) => left.sortOrder - right.sortOrder);
+  const primaryDraft = canManage ? (
+    <DraftActionButton
+      item={{
+        id: draft.template.id,
+        slug: draft.template.slug,
+        name: draft.template.name,
+        description: draft.template.description,
+        segment: draft.template.segment,
+        icon: draft.template.icon,
+        status: draft.template.status,
+        currentPublishedVersion: null,
+        draftVersion: null,
+        totalCategories: draft.validation.totals.categories,
+        totalProducts: draft.validation.totals.products,
+        totalProductsWithMediaLookupKey: 0,
+        totalProductsWithPublishedGlobalImage: 0,
+        totalProductsWithoutImage: 0,
+        lastPublishedAt: draft.version.publishedAt,
+        createdAt: draft.template.createdAt,
+        updatedAt: draft.template.updatedAt,
+      }}
+      className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-black text-primary-foreground shadow-sm transition-transform hover:-translate-y-0.5"
+    />
+  ) : null;
+
   return (
-    <div className="relative isolate space-y-6 pb-10">
+    <div className="relative isolate space-y-5 pb-10 lg:space-y-6">
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-64 bg-[radial-gradient(circle_at_top_left,_rgba(249,115,22,0.14),_transparent_44%),radial-gradient(circle_at_top_right,_rgba(15,23,42,0.08),_transparent_38%)]" />
 
       <button onClick={() => navigate(`/base-menus/${draft.template.slug}`)} className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-2 text-sm font-black text-muted-foreground backdrop-blur transition-colors hover:bg-background hover:text-foreground">
         <ArrowLeft className="h-4 w-4" />
         Voltar para detalhes
       </button>
+
+      <section className="overflow-hidden rounded-[28px] border border-border/60 bg-card/95 p-5 shadow-[0_24px_80px_-45px_rgba(15,23,42,0.45)] backdrop-blur lg:p-7">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_360px] lg:items-stretch">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="inline-flex items-center rounded-full bg-amber-500/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-amber-700">Cardápio em edição</span>
+              <span className="rounded-full bg-muted px-3 py-1 text-xs font-black text-muted-foreground">{draft.validation.totals.products} produtos</span>
+              <span className="rounded-full bg-muted px-3 py-1 text-xs font-black text-muted-foreground">{draft.validation.totals.categories} categorias</span>
+            </div>
+            <h1 className="mt-3 max-w-3xl text-3xl font-black tracking-tight text-foreground sm:text-4xl lg:text-[3rem] lg:leading-[0.95]">{draft.template.icon ? `${draft.template.icon} ` : ''}{draft.template.name}</h1>
+            <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{draft.template.slug} · {draft.template.segment}</p>
+            <p className="mt-4 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">Edite produtos, imagens e complementos com uma experiência direta, sem expor a estrutura técnica do rascunho.</p>
+            <div className="mt-5 flex flex-wrap gap-2 text-[11px] font-bold text-muted-foreground">
+              <span className="rounded-full border border-border/70 bg-background/80 px-3 py-1">Alterações salvas no rascunho</span>
+              <span className="rounded-full border border-border/70 bg-background/80 px-3 py-1">Não afeta tenants existentes</span>
+            </div>
+          </div>
+          <div className="rounded-[24px] border border-border/70 bg-background/85 p-4 shadow-sm backdrop-blur-sm">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">Ações rápidas</p>
+              <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold text-muted-foreground">Fluxo simples</span>
+            </div>
+            <div className="mt-4 space-y-2">
+              {primaryDraft}
+              <Link to="/base-media" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-border bg-background px-4 text-sm font-black text-foreground transition-colors hover:bg-muted">
+                <ExternalLink className="h-4 w-4" />
+                Abrir Galeria Base
+              </Link>
+              <button onClick={loadDraft} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-border bg-background px-4 text-sm font-black text-foreground transition-colors hover:bg-muted">
+                <RefreshCw className="h-4 w-4" />
+                Atualizar
+              </button>
+              {canManage ? (
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button aria-label="Descartar alterações" onClick={() => setModal({ draft, mode: 'discard' })} className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-destructive/30 bg-background px-3 text-xs font-black text-destructive transition-colors hover:bg-destructive/10">
+                    <Trash2 className="h-4 w-4" />
+                    Descartar
+                  </button>
+                  <button aria-label="Publicar alterações" onClick={() => setModal({ draft, mode: 'publish' })} disabled={draft.validation.errors.length > 0} className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-3 text-xs font-black text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-emerald-700 disabled:opacity-50">
+                    <Send className="h-4 w-4" />
+                    Publicar
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+        <p className="text-[11px] font-black uppercase tracking-wide">Alterações não publicadas</p>
+        <p className="mt-1 text-sm font-bold">
+          {draft.validation.errors.length > 0
+            ? 'Existem erros que precisam ser corrigidos antes de publicar.'
+            : draft.validation.warnings.length > 0
+              ? 'A edição está pronta para publicar, com alguns avisos.'
+              : 'A edição está pronta para publicar.'}
+        </p>
+        <p className="mt-2 text-xs font-semibold text-amber-900/80">Alterações aqui afetam apenas futuras importações deste Cardápio Pronto.</p>
+      </section>
+
+      <section className="space-y-4">
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">Estrutura do cardápio</p>
+              <h2 className="mt-1 text-lg font-black text-foreground">Categorias e produtos</h2>
+            </div>
+            {canManage ? <span className="rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground">Edição ativa</span> : null}
+          </div>
+          <div className="mt-4">
+            <TemplateForm draft={draft} onSaved={loadDraft} />
+          </div>
+        </div>
+
+        {orderedCategories.map((category) => {
+          const categoryProducts = [...category.products].sort((left, right) => left.sortOrder - right.sortOrder);
+          const categoryIndex = orderedCategories.findIndex((item) => item.id === category.id);
+          return (
+            <div key={category.id} className="overflow-hidden rounded-2xl border border-border bg-card">
+              <div className="flex flex-col gap-3 border-b border-border/70 bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-black tracking-tight text-foreground">{category.name}</p>
+                  <p className="text-xs font-bold text-muted-foreground">{categoryProducts.length} produtos nesta categoria</p>
+                </div>
+                {canManage ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" disabled={categoryIndex <= 0} onClick={() => void moveCategoryInDraft(draft, category, -1)} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted disabled:opacity-50">
+                      Mover para cima
+                    </button>
+                    <button type="button" disabled={categoryIndex >= orderedCategories.length - 1} onClick={() => void moveCategoryInDraft(draft, category, 1)} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted disabled:opacity-50">
+                      Mover para baixo
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              <CategoryEditor draft={draft} category={category} canManage={canManage} onSaved={loadDraft} />
+              <div className="divide-y divide-border">
+                {categoryProducts.map((product) => {
+                  const groups = readOptionGroups(product);
+                  const optionsLabel = groups.length === 0 ? 'Sem complementos' : `${groups.length} grupo${groups.length === 1 ? '' : 's'} de complementos`;
+                  const imageLabel = product.imageStatus === 'linked_exact' || product.imageStatus === 'linked_tag' ? 'Imagem ok' : product.imageStatus === 'linked_fallback' ? 'Imagem fallback' : 'Sem imagem';
+                  return (
+                    <article key={product.id} className="grid gap-4 px-4 py-4 transition-colors hover:bg-muted/20 lg:grid-cols-[92px_minmax(0,1fr)_minmax(260px,320px)]">
+                      <div className="flex items-start justify-start">
+                        {product.publishedGlobalImage ? (
+                          <img src={product.publishedGlobalImage.publicUrl} alt={product.publishedGlobalImage.altText ?? product.name} className="h-20 w-20 rounded-2xl object-cover bg-muted ring-1 ring-border/70" />
+                        ) : (
+                          <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-muted text-muted-foreground ring-1 ring-border/70">
+                            <ImageOff className="h-7 w-7" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 self-center">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-black tracking-tight text-foreground sm:text-base">{product.name}</p>
+                            <p className="mt-1 text-xs font-bold leading-5 text-muted-foreground sm:text-sm">{product.description ?? 'Sem descrição'}</p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <span className="inline-flex h-8 items-center rounded-full bg-muted px-3 text-xs font-black text-muted-foreground">{category.name}</span>
+                            <span className={`inline-flex h-8 items-center rounded-full px-3 text-xs font-black ${imageLabel === 'Sem imagem' ? 'bg-amber-500/10 text-amber-600' : 'bg-emerald-500/10 text-emerald-600'}`}>{imageLabel}</span>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-muted-foreground">
+                          <span className="rounded-full bg-muted px-3 py-1">{formatMoney(product.basePrice)}</span>
+                          {product.compareAtPrice !== null ? <span className="rounded-full bg-muted px-3 py-1">Promo: {formatMoney(product.compareAtPrice)}</span> : null}
+                          <span className="rounded-full bg-muted px-3 py-1">{optionsLabel}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2 self-center">
+                        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                          <button type="button" onClick={() => setProductModal({ mode: 'edit', categoryId: product.categoryId, product })} className="rounded-full bg-primary px-3 py-2 text-xs font-black text-primary-foreground shadow-sm transition-transform hover:-translate-y-0.5">Editar</button>
+                          <button type="button" onClick={() => setImagePickerProduct(product)} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted">Trocar imagem</button>
+                          <button type="button" onClick={() => setOptionsProduct(product)} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted">Complementos</button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                          <button type="button" onClick={() => setProductModal({ mode: 'duplicate', categoryId: product.categoryId, product })} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted">Duplicar</button>
+                          <button type="button" onClick={() => void deleteProduct(draft, product, loadDraft)} className="rounded-full border border-destructive/30 bg-background px-3 py-2 text-xs font-black text-destructive transition-colors hover:bg-destructive/10">Excluir</button>
+                          <button type="button" onClick={() => void moveProductInDraft(draft, product, -1)} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted">Mover para cima</button>
+                          <button type="button" onClick={() => void moveProductInDraft(draft, product, 1)} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted">Mover para baixo</button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              {canManage ? <ProductCreateForm draft={draft} category={category} onSaved={loadDraft} /> : null}
+            </div>
+          );
+        })}
+
+        {canManage ? <DraftValidationPanel validation={draft.validation} /> : null}
+      </section>
+
+      {modal ? <DraftActionModal state={modal} onClose={() => setModal(null)} onDone={loadDraft} /> : null}
+      {productModal ? <ProductEditorModal draft={draft} state={productModal} onClose={() => setProductModal(null)} onSaved={loadDraft} /> : null}
+      {imagePickerProduct ? <ProductImagePickerModal draft={draft} product={imagePickerProduct} onClose={() => setImagePickerProduct(null)} onSaved={loadDraft} /> : null}
+      {optionsProduct ? <ProductOptionsModal draft={draft} product={optionsProduct} onClose={() => setOptionsProduct(null)} onSaved={loadDraft} /> : null}
+    </div>
+  );
+}
+
+function BaseMenuDetailView({ id }: { id: string }) {
+  const navigate = useNavigate();
+  const { has } = useAdminPermissions();
+  const canManage = has('saas.base_menu.manage');
+  const [detail, setDetail] = useState<BaseMenuDetail | null>(null);
+  const [logs, setLogs] = useState<ImportLog[]>([]);
+  const [versions, setVersions] = useState<BaseMenuVersionDetail[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<TabId>('products');
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+
+  async function loadDetail() {
+    setLoading(true);
+    setError(null);
+    try {
+      const [detailResponse, logsResponse, versionsResponse] = await Promise.all([
+        api.get<BaseMenuDetail>(`/admin/base-menus/${id}`),
+        api.get<ImportLog[]>(`/admin/base-menus/${id}/import-logs`),
+        api.get<BaseMenuVersionDetail[]>(`/admin/base-menus/${id}/versions`),
+      ]);
+      setDetail(detailResponse.data);
+      setLogs(logsResponse.data);
+      setVersions(versionsResponse.data);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadDetail();
+  }, [id]);
+
+  const products = useMemo(() => detail?.categories.flatMap((category) => category.products) ?? [], [detail]);
+  const imageGroups = useMemo(() => ({
+    linked: products.filter((product) => ['linked_exact', 'linked_tag', 'linked_fallback'].includes(product.imageStatus)),
+    draftOnly: products.filter((product) => product.imageStatus === 'draft_only'),
+    noAsset: products.filter((product) => product.imageStatus === 'no_published_asset'),
+    noLookup: products.filter((product) => product.imageStatus === 'missing_lookup'),
+  }), [products]);
+
+  if (loading) {
+    return <div className="flex min-h-[480px] items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando modelo...</div>;
+  }
+
+  if (error || !detail) {
+    return (
+      <div className="space-y-4">
+        <button onClick={() => navigate('/base-menus')} className="inline-flex items-center gap-2 text-sm font-black text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" />
+          Voltar
+        </button>
+        <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-sm font-bold text-destructive">{error ?? 'Modelo não encontrado.'}</div>
+      </div>
+    );
+  }
+
+  async function handleArchive() {
+    if (!window.confirm('Tem certeza que deseja arquivar este cardápio base? Ele deixará de aparecer para novos tenants.')) return;
+    setActionBusy(true);
+    try {
+      await api.post(`/admin/base-menus/${detail!.template.slug}/archive`);
+      await loadDetail();
+    } catch (err) {
+      window.alert(errorMessage(err));
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function handleRestore() {
+    if (!window.confirm('Tem certeza que deseja restaurar este cardápio base?')) return;
+    setActionBusy(true);
+    try {
+      await api.post(`/admin/base-menus/${detail!.template.slug}/restore`);
+      await loadDetail();
+    } catch (err) {
+      window.alert(errorMessage(err));
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  return (
+    <div className="relative isolate space-y-5 pb-10 lg:space-y-6">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 bg-[radial-gradient(circle_at_top_left,_rgba(249,115,22,0.12),_transparent_42%),radial-gradient(circle_at_top_right,_rgba(15,23,42,0.08),_transparent_36%)]" />
+
+      <button onClick={() => navigate('/base-menus')} className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-2 text-sm font-black text-muted-foreground backdrop-blur transition-colors hover:bg-background hover:text-foreground">
+        <ArrowLeft className="h-4 w-4" />
+        Voltar para Cardápios Base
+      </button>
+
+      <section className="overflow-hidden rounded-[28px] border border-border/60 bg-card/95 p-5 shadow-[0_24px_80px_-45px_rgba(15,23,42,0.45)] backdrop-blur lg:p-7">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_360px] lg:items-stretch">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="inline-flex items-center rounded-full bg-amber-500/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-amber-700">Cardápio Base</span>
+              <StatusPill status={detail.template.status} />
+              <span className="rounded-full bg-muted px-3 py-1 text-xs font-black text-muted-foreground">{detail.currentPublishedVersion ? `v${detail.currentPublishedVersion.versionNumber}` : 'sem versão publicada'}</span>
+            </div>
+            <h1 className="mt-3 max-w-3xl text-3xl font-black tracking-tight text-foreground sm:text-4xl lg:text-[3rem] lg:leading-[0.95]">{detail.template.icon ? `${detail.template.icon} ` : ''}{detail.template.name}</h1>
+            <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{detail.template.slug} · {detail.template.segment}</p>
+            <p className="mt-4 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">Este modelo é usado como ponto de partida. Alterações futuras no modelo não alteram cardápios já importados.</p>
+            <div className="mt-5 flex flex-wrap gap-2 text-[11px] font-bold text-muted-foreground">
+              <span className="rounded-full border border-border/70 bg-background/80 px-3 py-1">Alterações salvas no rascunho</span>
+              <span className="rounded-full border border-border/70 bg-background/80 px-3 py-1">Não afeta tenants existentes</span>
+            </div>
+          </div>
+          <div className="rounded-[24px] border border-border/70 bg-background/85 p-4 shadow-sm backdrop-blur-sm">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">Ações rápidas</p>
+              <span className="rounded-full bg-muted px-2.5 py-1 text-[11px] font-bold text-muted-foreground">Fluxo simples</span>
+            </div>
+            <div className="mt-4 space-y-2">
+              {canManage ? (
+                <DraftActionButton
+                  item={{
+                    id: detail.template.id,
+                    slug: detail.template.slug,
+                    name: detail.template.name,
+                    description: detail.template.description,
+                    segment: detail.template.segment,
+                    icon: detail.template.icon,
+                    status: detail.template.status,
+                    currentPublishedVersion: detail.currentPublishedVersion,
+                    draftVersion: detail.draftVersion,
+                    totalCategories: detail.totals.totalCategories,
+                    totalProducts: detail.totals.totalProducts,
+                    totalProductsWithMediaLookupKey: detail.totals.totalProductsWithMediaLookupKey,
+                    totalProductsWithPublishedGlobalImage: detail.totals.totalProductsWithPublishedGlobalImage,
+                    totalProductsWithoutImage: detail.totals.totalProductsWithoutImage,
+                    lastPublishedAt: detail.currentPublishedVersion?.publishedAt ?? null,
+                    createdAt: detail.template.createdAt,
+                    updatedAt: detail.template.updatedAt,
+                  }}
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-black text-primary-foreground shadow-sm transition-transform hover:-translate-y-0.5"
+                />
+              ) : null}
+              <Link to="/base-media" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-border bg-background px-4 text-sm font-black text-foreground transition-colors hover:bg-muted">
+                <ExternalLink className="h-4 w-4" />
+                Abrir Galeria Base
+              </Link>
+              <button onClick={loadDetail} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-border bg-background px-4 text-sm font-black text-foreground transition-colors hover:bg-muted">
+                <RefreshCw className="h-4 w-4" />
+                Atualizar
+              </button>
+              {canManage ? (
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button aria-label="Duplicar cardápio" onClick={() => setDuplicateOpen(true)} className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-border bg-background px-3 text-xs font-black text-foreground transition-colors hover:bg-muted">
+                    <Copy className="h-4 w-4" />
+                    Duplicar
+                  </button>
+                  {detail.template.status === 'archived' ? (
+                    <button aria-label="Restaurar cardápio" onClick={() => void handleRestore()} disabled={actionBusy} className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-border bg-background px-3 text-xs font-black text-foreground transition-colors hover:bg-muted disabled:opacity-60">
+                      <Undo2 className="h-4 w-4" />
+                      Restaurar
+                    </button>
+                  ) : (
+                    <button aria-label="Arquivar cardápio" onClick={() => void handleArchive()} disabled={actionBusy} className="inline-flex h-10 items-center justify-center gap-2 rounded-2xl border border-border bg-background px-3 text-xs font-black text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-60">
+                      <Archive className="h-4 w-4" />
+                      Arquivar
+                    </button>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
         <p className="text-[11px] font-black uppercase tracking-wide">Alterações não publicadas</p>
@@ -474,12 +870,10 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
             ? 'Existe uma versão em edição. Você pode alterar produtos, imagens e complementos e publicar quando estiver pronto.'
             : 'Nenhuma alteração pendente no momento. Clique em Editar cardápio para abrir ou continuar a edição.'}
         </p>
-        <p className="mt-2 text-xs font-semibold text-amber-900/80">
-          Alterações aqui afetam apenas futuras importações deste Cardápio Pronto.
-        </p>
+        <p className="mt-2 text-xs font-semibold text-amber-900/80">Alterações aqui afetam apenas futuras importações deste Cardápio Pronto.</p>
       </section>
 
-      <nav className="flex gap-2 overflow-x-auto border-b border-border pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <nav className="flex gap-2 overflow-x-auto border-b border-border pb-1 pl-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {tabs.map((item) => (
           <button
             key={item.id}
@@ -508,222 +902,14 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
       ) : null}
     </div>
   );
-
-  async function handleArchive() {
-    if (!window.confirm('Tem certeza que deseja arquivar este cardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio base? Ele deixarÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ de aparecer para novos tenants.')) return;
-    setActionBusy(true);
-    try {
-      await api.post(`/admin/base-menus/${detail!.template.slug}/archive`);
-      await loadDetail();
-    } catch (err) {
-      window.alert(errorMessage(err));
-    } finally {
-      setActionBusy(false);
-    }
-  }
-
-  async function handleRestore() {
-    if (!window.confirm('Tem certeza que deseja restaurar este cardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio base?')) return;
-    setActionBusy(true);
-    try {
-      await api.post(`/admin/base-menus/${detail!.template.slug}/restore`);
-      await loadDetail();
-    } catch (err) {
-      window.alert(errorMessage(err));
-    } finally {
-      setActionBusy(false);
-    }
-  }
 }
-
-function ReadOnlyNotice() {
-  return (
-    <section className="rounded-xl border border-border bg-card p-4 text-sm font-bold text-muted-foreground">
-      Seu usuario possui apenas leitura. A edicao do draft exige saas.base_menu.manage.
-    </section>
-  );
-}
-
-type OptionItemDraft = {
-  name: string;
-  description: string;
-  priceImpactValue: string;
-  allowQuantity: boolean;
-  minQty: string;
-  maxQty: string;
-  order: string;
-  isActive: boolean;
-};
-
-type OptionGroupDraft = {
-  name: string;
-  description: string;
-  selectionType: 'single' | 'multiple';
-  isRequired: boolean;
-  minSelect: string;
-  maxSelect: string;
-  order: string;
-  isActive: boolean;
-  items: OptionItemDraft[];
-};
-
-type BaseMediaPickerItem = {
-  id: string;
-  title: string | null;
-  category: string | null;
-  categoryName: string | null;
-  publicUrl: string;
-  altText: string | null;
-  tagsJson: string[];
-  publicationStatus: 'draft' | 'published' | 'archived';
-  productName: string | null;
-  mediaLookupKey: string | null;
-};
-
-function CategoryCreateButton({ draft, onSaved }: { draft: BaseMenuDraft; onSaved: () => void | Promise<void> }) {
-  return <CategoryCreateForm draft={draft} onSaved={onSaved} />;
-}
-
-function CategoryHeader({
-  draft,
-  category,
-  canManage,
-  onSaved,
-  onCreateProduct,
-}: {
-  draft: BaseMenuDraft;
-  category: BaseMenuCategory;
-  canManage: boolean;
-  onSaved: () => void | Promise<void>;
-  onCreateProduct: () => void;
-}) {
-  const categories = [...draft.categories].sort((left, right) => left.sortOrder - right.sortOrder);
-  const index = categories.findIndex((item) => item.id === category.id);
-  const canMoveUp = index > 0;
-  const canMoveDown = index >= 0 && index < categories.length - 1;
-
-  async function move(direction: -1 | 1) {
-    await moveCategoryInDraft(draft, category, direction);
-    await onSaved();
-  }
-
-  return (
-    <div className="space-y-0">
-      <div className="flex flex-col gap-3 border-b border-border/70 bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-black tracking-tight text-foreground">{category.name}</p>
-          <p className="text-xs font-bold text-muted-foreground">{category.products.length} produtos nesta categoria</p>
-        </div>
-        {canManage ? (
-          <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={!canMoveUp} onClick={() => void move(-1)} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted disabled:opacity-50">
-              Mover para cima
-            </button>
-            <button type="button" disabled={!canMoveDown} onClick={() => void move(1)} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted disabled:opacity-50">
-              Mover para baixo
-            </button>
-            <button onClick={onCreateProduct} className="inline-flex h-9 items-center justify-center gap-1 rounded-full bg-primary px-4 text-xs font-black text-primary-foreground shadow-sm transition-transform hover:-translate-y-0.5">
-              <Plus className="h-3.5 w-3.5" />
-              Novo produto
-            </button>
-          </div>
-        ) : null}
-      </div>
-      <CategoryEditor draft={draft} category={category} canManage={canManage} onSaved={onSaved} />
-    </div>
-  );
-}
-
-function SimpleProductCard({
-  draft,
-  product,
-  categoryName,
-  canManage,
-  onSaved,
-  onEdit,
-  onDuplicate,
-  onImage,
-  onOptions,
-}: {
-  draft: BaseMenuDraft;
-  product: BaseMenuProduct;
-  categoryName: string;
-  canManage: boolean;
-  onSaved: () => void | Promise<void>;
-  onEdit: () => void;
-  onDuplicate: () => void;
-  onImage: () => void;
-  onOptions: () => void;
-}) {
-  const groups = readOptionGroups(product);
-  const optionsLabel = groups.length === 0 ? 'Sem complementos' : `${groups.length} grupo${groups.length === 1 ? '' : 's'} de complementos`;
-  const imageLabel = product.imageStatus === 'linked_exact' || product.imageStatus === 'linked_tag' ? 'Imagem ok' : product.imageStatus === 'linked_fallback' ? 'Imagem fallback' : 'Sem imagem';
-
-  async function move(direction: -1 | 1) {
-    await moveProductInDraft(draft, product, direction);
-    await onSaved();
-  }
-
-  async function duplicate() {
-    await duplicateProductInDraft(draft, product);
-    await onSaved();
-  }
-
-  async function remove() {
-    await deleteProduct(draft, product, onSaved);
-  }
-
-  return (
-    <article className="grid gap-4 px-4 py-4 transition-colors hover:bg-muted/20 lg:grid-cols-[92px_minmax(0,1fr)_minmax(280px,320px)]">
-      <div className="flex items-start justify-start">
-        {product.publishedGlobalImage ? (
-          <img src={product.publishedGlobalImage.publicUrl} alt={product.publishedGlobalImage.altText ?? product.name} className="h-20 w-20 rounded-2xl object-cover bg-muted ring-1 ring-border/70" />
-        ) : (
-          <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-muted text-muted-foreground ring-1 ring-border/70">
-            <ImageOff className="h-7 w-7" />
-          </div>
-        )}
-      </div>
-      <div className="min-w-0 self-center">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-black tracking-tight text-foreground sm:text-base">{product.name}</p>
-            <p className="mt-1 text-xs font-bold leading-5 text-muted-foreground sm:text-sm">{product.description ?? 'Sem descriÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o'}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <span className="inline-flex h-8 items-center rounded-full bg-muted px-3 text-xs font-black text-muted-foreground">{categoryName}</span>
-            <span className={`inline-flex h-8 items-center rounded-full px-3 text-xs font-black ${imageLabel === 'Sem imagem' ? 'bg-amber-500/10 text-amber-600' : 'bg-emerald-500/10 text-emerald-600'}`}>{imageLabel}</span>
-          </div>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-muted-foreground">
-          <span className="rounded-full bg-muted px-3 py-1">{formatMoney(product.basePrice)}</span>
-          {product.compareAtPrice !== null ? <span className="rounded-full bg-muted px-3 py-1">Promo: {formatMoney(product.compareAtPrice)}</span> : null}
-          <span className="rounded-full bg-muted px-3 py-1">{optionsLabel}</span>
-        </div>
-      </div>
-      <div className="flex flex-col gap-2 self-center">
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          <button onClick={onEdit} className="rounded-full bg-primary px-3 py-2 text-xs font-black text-primary-foreground shadow-sm transition-transform hover:-translate-y-0.5">Editar</button>
-          <button onClick={onImage} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted">Trocar imagem</button>
-          <button onClick={onOptions} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted">Complementos</button>
-        </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          <button onClick={() => void duplicate()} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted">Duplicar</button>
-          <button onClick={() => void remove()} className="rounded-full border border-destructive/30 bg-background px-3 py-2 text-xs font-black text-destructive transition-colors hover:bg-destructive/10">Excluir</button>
-          <button onClick={() => void move(-1)} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted">Mover para cima</button>
-          <button onClick={() => void move(1)} className="rounded-full border border-border bg-background px-3 py-2 text-xs font-black text-foreground transition-colors hover:bg-muted">Mover para baixo</button>
-        </div>
-      </div>
-    </article>
-  );
-}
-
 function PublishSummary({ validation }: { validation: DraftValidation }) {
+
   return (
     <section className="grid gap-3 lg:grid-cols-[1fr_1fr_1.4fr]">
       <div className="rounded-xl border border-border bg-card p-4">
         <p className="text-[11px] font-black uppercase text-muted-foreground">Resumo</p>
-        <p className="mt-2 text-sm font-black text-foreground">{validation.totals.categories} categorias ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {validation.totals.products} produtos</p>
+        <p className="mt-2 text-sm font-black text-foreground">{validation.totals.categories} categorias ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {validation.totals.products} produtos</p>
         <p className="mt-1 text-xs font-bold text-muted-foreground">Sera publicada a v{validation.publishingVersionNumber}</p>
       </div>
       <div className="rounded-xl border border-border bg-card p-4">
@@ -734,10 +920,10 @@ function PublishSummary({ validation }: { validation: DraftValidation }) {
       <div className="rounded-xl border border-border bg-card p-4">
         <p className="text-[11px] font-black uppercase text-muted-foreground">Validacao antes de publicar</p>
         <p className={`mt-2 text-sm font-black ${validation.errors.length > 0 ? 'text-destructive' : 'text-emerald-600'}`}>
-          {validation.errors.length} erros ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {validation.warnings.length} avisos
+          {validation.errors.length} erros ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {validation.warnings.length} avisos
         </p>
         <div className="mt-2 max-h-24 overflow-auto text-xs font-bold text-muted-foreground">
-          {[...validation.errors, ...validation.warnings].slice(0, 8).map((item) => <p key={item}>ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ {item}</p>)}
+          {[...validation.errors, ...validation.warnings].slice(0, 8).map((item) => <p key={item}>ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ {item}</p>)}
         </div>
       </div>
     </section>
@@ -752,6 +938,7 @@ function DraftValidationPanel({ validation }: { validation: DraftValidation }) {
       : { label: 'Pronto para publicar', tone: 'success' as const };
   const linkedImages = validation.imageSummary.linkedExact + validation.imageSummary.linkedTag + validation.imageSummary.linkedFallback;
   const missingImages = validation.imageSummary.noPublishedAsset + validation.imageSummary.missingLookup + validation.imageSummary.draftOnly;
+
 
   return (
     <section className="grid gap-3 lg:grid-cols-[1fr_1fr_1.5fr]">
@@ -778,6 +965,7 @@ function DraftValidationPanel({ validation }: { validation: DraftValidation }) {
 
 function ValidationList({ title, items, emptyText, tone, wide }: { title: string; items: string[]; emptyText: string; tone: 'danger' | 'warning'; wide?: boolean }) {
   const color = tone === 'danger' ? 'text-destructive' : 'text-amber-600';
+
   return (
     <div className={`rounded-xl border border-border bg-card p-4 ${wide ? 'lg:col-span-2' : ''}`}>
       <p className="text-[11px] font-black uppercase text-muted-foreground">{title}</p>
@@ -818,6 +1006,7 @@ function DraftActionModal({ state, onClose, onDone }: { state: DraftActionModalS
       setBusy(false);
     }
   }
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -868,7 +1057,7 @@ function DraftActionModal({ state, onClose, onDone }: { state: DraftActionModalS
           <button onClick={onClose} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">Cancelar</button>
           <button aria-label={isPublish ? 'Confirmar publicacao' : 'Confirmar descarte'} onClick={() => void submit()} disabled={!canSubmit || busy} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black text-white disabled:opacity-50 ${isPublish ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-destructive hover:bg-destructive/90'}`}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : isPublish ? <Send className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
-            {isPublish ? 'Publicar alteraÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes' : 'Descartar alteraÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes'}
+            {isPublish ? 'Publicar alteraÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes' : 'Descartar alteraÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes'}
           </button>
         </div>
       </section>
@@ -896,6 +1085,7 @@ function TemplateForm({ draft, onSaved }: { draft: BaseMenuDraft; onSaved: () =>
     }
   }
 
+
   return (
     <form onSubmit={(event) => void submit(event)} className="rounded-xl border border-border bg-card p-4">
       <div className="grid gap-3 lg:grid-cols-[1fr_1fr_120px]">
@@ -919,6 +1109,7 @@ function CategoryCreateForm({ draft, onSaved }: { draft: BaseMenuDraft; onSaved:
   const [name, setName] = useState('');
   const [sortOrder, setSortOrder] = useState('0');
   if (!open) return <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground"><Plus className="h-4 w-4" /> Categoria</button>;
+
   return (
     <form onSubmit={(event) => void submitCategoryCreate(event, draft, name, sortOrder, onSaved, () => { setName(''); setOpen(false); })} className="flex flex-wrap items-end gap-2">
       <Field label="Nova categoria" value={name} onChange={setName} />
@@ -932,6 +1123,7 @@ function CategoryEditor({ draft, category, canManage, onSaved }: { draft: BaseMe
   const [name, setName] = useState(category.name);
   const [description, setDescription] = useState(category.description ?? '');
   const [sortOrder, setSortOrder] = useState(String(category.sortOrder));
+
 
   return (
     <form onSubmit={(event) => void submitCategoryUpdate(event, draft, category, { name, description, sortOrder }, onSaved)} className="border-b border-border px-4 py-3">
@@ -951,6 +1143,7 @@ function CategoryEditor({ draft, category, canManage, onSaved }: { draft: BaseMe
 function ProductCreateForm({ draft, category, onSaved }: { draft: BaseMenuDraft; category: BaseMenuCategory; onSaved: () => void | Promise<void> }) {
   const [name, setName] = useState('');
   const [basePrice, setBasePrice] = useState('0');
+
   return (
     <form onSubmit={(event) => void submitProductCreate(event, draft, category, name, basePrice, onSaved, () => setName(''))} className="flex flex-wrap items-end gap-2 border-t border-border p-4">
       <Field label="Novo produto" value={name} onChange={setName} />
@@ -968,6 +1161,7 @@ function ProductEditor({ draft, product, canManage, onSaved }: { draft: BaseMenu
   const [mediaLookupKey, setMediaLookupKey] = useState(product.mediaLookupKey ?? '');
   const [tags, setTags] = useState(product.searchTagsJson.join(', '));
   const [sortOrder, setSortOrder] = useState(String(product.sortOrder));
+
 
   return (
     <form onSubmit={(event) => void submitProductUpdate(event, draft, product, { name, description, basePrice, compareAtPrice, mediaLookupKey, tags, sortOrder }, onSaved)} className="grid gap-3 px-4 py-4 lg:grid-cols-[72px_1fr_140px_160px_150px]">
@@ -997,6 +1191,7 @@ function ProductEditor({ draft, product, canManage, onSaved }: { draft: BaseMenu
 }
 
 function Field({ label, value, onChange, type = 'text', step, disabled }: { label: string; value: string; onChange: (value: string) => void; type?: string; step?: string; disabled?: boolean }) {
+
   return (
     <label className="block">
       <span className="text-[11px] font-black uppercase text-muted-foreground">{label}</span>
@@ -1099,7 +1294,7 @@ async function duplicateProductInDraft(draft: BaseMenuDraft, product: BaseMenuPr
   const category = draft.categories.find((item) => item.id === product.categoryId);
   if (!category) return;
   await api.post(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/categories/${category.id}/products`, {
-    name: `${product.name} - cÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia`,
+    name: `${product.name} - cÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia`,
     description: product.description,
     basePrice: product.basePrice,
     compareAtPrice: product.compareAtPrice,
@@ -1241,7 +1436,7 @@ function ProductEditorModal({
   onSaved: () => void | Promise<void>;
 }) {
   const product = state.product;
-  const [name, setName] = useState(product ? (state.mode === 'duplicate' ? `${product.name} - cÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia` : product.name) : '');
+  const [name, setName] = useState(product ? (state.mode === 'duplicate' ? `${product.name} - cÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia` : product.name) : '');
   const [description, setDescription] = useState(product?.description ?? '');
   const [basePrice, setBasePrice] = useState(product ? String(product.basePrice) : '');
   const [compareAtPrice, setCompareAtPrice] = useState(product?.compareAtPrice === null || product?.compareAtPrice === undefined ? '' : String(product.compareAtPrice));
@@ -1281,6 +1476,7 @@ function ProductEditorModal({
     }
   }
 
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <form onSubmit={(event) => void submit(event)} className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-xl border border-border bg-card shadow-xl">
@@ -1289,7 +1485,7 @@ function ProductEditorModal({
             {state.mode === 'edit' ? 'Editar produto' : state.mode === 'duplicate' ? 'Duplicar produto' : 'Novo produto'}
           </p>
           <h2 className="mt-1 text-xl font-black text-foreground">{product?.name ?? 'Produto novo'}</h2>
-          <p className="mt-1 text-sm font-bold text-muted-foreground">Imagem e complementos sÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o editados pelos atalhos prÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³prios na lista.</p>
+          <p className="mt-1 text-sm font-bold text-muted-foreground">Imagem e complementos sÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o editados pelos atalhos prÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³prios na lista.</p>
         </div>
         <div className="grid gap-4 p-5">
           <div className="grid gap-3 md:grid-cols-2">
@@ -1318,7 +1514,7 @@ function ProductEditorModal({
           </button>
           <button type="submit" disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground disabled:opacity-50">
             <Save className="h-4 w-4" />
-            {state.mode === 'edit' ? 'Salvar alteraÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes' : 'Criar produto'}
+            {state.mode === 'edit' ? 'Salvar alteraÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes' : 'Criar produto'}
           </button>
         </div>
       </form>
@@ -1379,6 +1575,7 @@ function ProductImagePickerModal({
     }
   }
 
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <section className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-xl border border-border bg-card shadow-xl">
@@ -1422,10 +1619,10 @@ function ProductImagePickerModal({
           ))}
         </div>
         <div className="flex items-center justify-between border-t border-border bg-muted/20 p-5">
-          <p className="text-xs font-bold text-muted-foreground">PÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡gina {page} de {totalPages}</p>
+          <p className="text-xs font-bold text-muted-foreground">PÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡gina {page} de {totalPages}</p>
           <div className="flex gap-2">
             <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground disabled:opacity-50">Anterior</button>
-            <button type="button" onClick={() => setPage((current) => current + 1)} disabled={page >= totalPages} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground disabled:opacity-50">PrÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³xima</button>
+            <button type="button" onClick={() => setPage((current) => current + 1)} disabled={page >= totalPages} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground disabled:opacity-50">PrÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³xima</button>
             <button type="button" onClick={onClose} className="rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground">Fechar</button>
           </div>
         </div>
@@ -1506,6 +1703,7 @@ function ProductOptionsModal({
     }
   }
 
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <form onSubmit={(event) => void submit(event)} className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-xl border border-border bg-card shadow-xl">
@@ -1533,13 +1731,13 @@ function ProductOptionsModal({
                 <label className="block">
                   <span className="text-[11px] font-black uppercase text-muted-foreground">Selecao</span>
                   <select value={group.selectionType} onChange={(event) => updateGroup(groupIndex, { selectionType: event.target.value === 'single' ? 'single' : 'multiple' })} className="mt-1 h-10 w-full rounded-xl border border-input bg-background px-3 text-sm">
-                    <option value="single">Escolha ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºnica</option>
-                    <option value="multiple">MÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºltipla escolha</option>
+                    <option value="single">Escolha ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºnica</option>
+                    <option value="multiple">MÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºltipla escolha</option>
                   </select>
                 </label>
                 <label className="flex items-end gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm font-bold text-foreground">
                   <input type="checkbox" checked={group.isRequired} onChange={(event) => updateGroup(groupIndex, { isRequired: event.target.checked })} />
-                  ObrigatÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³rio
+                  ObrigatÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³rio
                 </label>
                 <Field label="Minimo" value={group.minSelect} onChange={(value) => updateGroup(groupIndex, { minSelect: value })} type="number" />
                 <Field label="Maximo" value={group.maxSelect} onChange={(value) => updateGroup(groupIndex, { maxSelect: value })} type="number" />
@@ -1605,6 +1803,7 @@ function ProductOptionsModal({
 }
 
 function VersionsTab({ versions, currentVersionId }: { versions: BaseMenuVersionDetail[]; currentVersionId: string | null }) {
+
   return (
     <section className="space-y-4">
       <div className="rounded-xl border border-border bg-card p-4 text-sm font-bold text-muted-foreground">
@@ -1645,13 +1844,14 @@ function VersionsTab({ versions, currentVersionId }: { versions: BaseMenuVersion
 }
 
 function ProductsTab({ categories }: { categories: BaseMenuCategory[] }) {
+
   return (
     <section className="space-y-4">
       {categories.map((category) => (
         <div key={category.id} className="overflow-hidden rounded-xl border border-border bg-card">
           <div className="border-b border-border px-4 py-3">
             <p className="text-sm font-black text-foreground">{category.name}</p>
-            <p className="text-xs font-bold text-muted-foreground">{category.products.length} produtos ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ordem {category.sortOrder}</p>
+            <p className="text-xs font-bold text-muted-foreground">{category.products.length} produtos ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ordem {category.sortOrder}</p>
           </div>
           <div className="divide-y divide-border">
             {category.products.map((product) => <ProductRow key={product.id} product={product} />)}
@@ -1663,6 +1863,7 @@ function ProductsTab({ categories }: { categories: BaseMenuCategory[] }) {
 }
 
 function ProductRow({ product }: { product: BaseMenuProduct }) {
+
   return (
     <article className="grid grid-cols-1 gap-4 px-4 py-4 lg:grid-cols-[72px_1fr_130px_180px_160px]">
       <div>
@@ -1674,13 +1875,13 @@ function ProductRow({ product }: { product: BaseMenuProduct }) {
       </div>
       <div className="min-w-0">
         <p className="text-sm font-black text-foreground">{product.name}</p>
-        <p className="mt-1 text-xs font-bold text-muted-foreground">{product.description ?? 'Sem descriÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o'}</p>
+        <p className="mt-1 text-xs font-bold text-muted-foreground">{product.description ?? 'Sem descriÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o'}</p>
         <div className="mt-2 flex flex-wrap gap-1">
           {product.searchTagsJson.map((tag) => <span key={tag} className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">{tag}</span>)}
         </div>
       </div>
       <div>
-        <p className="text-[11px] font-black uppercase text-muted-foreground">PreÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§o sugerido</p>
+        <p className="text-[11px] font-black uppercase text-muted-foreground">PreÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§o sugerido</p>
         <p className="text-sm font-black text-foreground">{formatMoney(product.basePrice)}</p>
       </div>
       <div>
@@ -1693,6 +1894,7 @@ function ProductRow({ product }: { product: BaseMenuProduct }) {
 }
 
 function ImagesTab({ groups }: { groups: { linked: BaseMenuProduct[]; draftOnly: BaseMenuProduct[]; noAsset: BaseMenuProduct[]; noLookup: BaseMenuProduct[] } }) {
+
   return (
     <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
       <ImageGroup title="Com imagem publicada" products={groups.linked} status="linked_exact" />
@@ -1704,6 +1906,7 @@ function ImagesTab({ groups }: { groups: { linked: BaseMenuProduct[]; draftOnly:
 }
 
 function ImageGroup({ title, products, status }: { title: string; products: BaseMenuProduct[]; status: ImageStatus }) {
+
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -1725,13 +1928,14 @@ function ImageGroup({ title, products, status }: { title: string; products: Base
             </Link>
           </div>
         ))}
-        {products.length === 0 ? <p className="py-8 text-center text-sm font-bold text-muted-foreground">Nenhum produto nesta condiÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o.</p> : null}
+        {products.length === 0 ? <p className="py-8 text-center text-sm font-bold text-muted-foreground">Nenhum produto nesta condiÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o.</p> : null}
       </div>
     </div>
   );
 }
 
 function ImportsTab({ logs }: { logs: ImportLog[] }) {
+
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card">
       <div className="grid grid-cols-[1.2fr_150px_120px_130px_130px_180px] gap-3 border-b border-border px-4 py-3 text-[11px] font-black uppercase text-muted-foreground">
@@ -1740,7 +1944,7 @@ function ImportsTab({ logs }: { logs: ImportLog[] }) {
         <span>Status</span>
         <span>Criados</span>
         <span>Pulados</span>
-        <span>VersÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o</span>
+        <span>VersÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o</span>
       </div>
       {logs.map((log) => (
         <article key={log.id} className="grid grid-cols-[1.2fr_150px_120px_130px_130px_180px] gap-3 border-b border-border px-4 py-4 last:border-b-0">
@@ -1750,17 +1954,18 @@ function ImportsTab({ logs }: { logs: ImportLog[] }) {
           </div>
           <span className="text-xs font-bold text-muted-foreground">{formatDate(log.createdAt)}</span>
           <ImportStatusPill status={log.status} />
-          <span className="text-sm font-black text-foreground">{log.categoriesCreated} cat ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {log.productsCreated} prod</span>
-          <span className="text-sm font-black text-foreground">{log.categoriesSkipped} cat ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {log.productsSkipped} prod</span>
-          <span className="text-sm font-black text-foreground">v{log.version.versionNumber} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {statusLabels[log.version.status]}</span>
+          <span className="text-sm font-black text-foreground">{log.categoriesCreated} cat ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {log.productsCreated} prod</span>
+          <span className="text-sm font-black text-foreground">{log.categoriesSkipped} cat ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {log.productsSkipped} prod</span>
+          <span className="text-sm font-black text-foreground">v{log.version.versionNumber} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {statusLabels[log.version.status]}</span>
         </article>
       ))}
-      {logs.length === 0 ? <TableMessage icon={<ListChecks className="h-8 w-8" />} text="Nenhuma importaÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o registrada para este modelo." /> : null}
+      {logs.length === 0 ? <TableMessage icon={<ListChecks className="h-8 w-8" />} text="Nenhuma importaÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o registrada para este modelo." /> : null}
     </section>
   );
 }
 
 function AdvancedTab({ detail, versions, imageGroups }: { detail: BaseMenuDetail; versions: BaseMenuVersionDetail[]; imageGroups: { linked: BaseMenuProduct[]; draftOnly: BaseMenuProduct[]; noAsset: BaseMenuProduct[]; noLookup: BaseMenuProduct[] } }) {
+
   return (
     <section className="space-y-4">
       <details className="rounded-xl border border-border bg-card p-4" open>
@@ -1770,7 +1975,7 @@ function AdvancedTab({ detail, versions, imageGroups }: { detail: BaseMenuDetail
         </div>
       </details>
       <details className="rounded-xl border border-border bg-card p-4">
-        <summary className="cursor-pointer text-sm font-black text-foreground">VersÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes</summary>
+        <summary className="cursor-pointer text-sm font-black text-foreground">VersÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes</summary>
         <div className="mt-4">
           <VersionsTab versions={versions} currentVersionId={detail.currentPublishedVersion?.id ?? null} />
         </div>
@@ -1798,11 +2003,12 @@ function MetadataTab({ detail }: { detail: BaseMenuDetail }) {
     }))),
   };
 
+
   return (
     <section className="rounded-xl border border-border bg-card p-4">
       <div className="mb-3 flex items-center gap-2 text-sm font-black text-foreground">
         <FileJson className="h-4 w-4" />
-        Metadados ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºteis do modelo
+        Metadados ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºteis do modelo
       </div>
       <pre className="max-h-[620px] overflow-auto rounded-xl bg-muted/50 p-4 text-xs text-foreground">{JSON.stringify(metadata, null, 2)}</pre>
     </section>
@@ -1811,6 +2017,7 @@ function MetadataTab({ detail }: { detail: BaseMenuDetail }) {
 
 function Kpi({ label, value, tone = 'neutral' }: { label: string; value: number; tone?: 'neutral' | 'success' | 'warning' | 'danger' }) {
   const color = tone === 'success' ? 'text-emerald-600' : tone === 'warning' ? 'text-amber-600' : tone === 'danger' ? 'text-destructive' : 'text-foreground';
+
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <p className="text-[11px] font-black uppercase text-muted-foreground">{label}</p>
@@ -1843,6 +2050,7 @@ function ImageStatusBadge({ status, compact }: { status: ImageStatus; compact?: 
     : status === 'draft_only'
       ? 'bg-amber-500/10 text-amber-600'
       : 'bg-destructive/10 text-destructive';
+
   return (
     <span className={`inline-flex h-8 items-center justify-center rounded-xl px-3 text-xs font-black ${color}`}>
       {isLinked ? <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> : <AlertTriangle className="mr-1 h-3.5 w-3.5" />}
@@ -1852,6 +2060,7 @@ function ImageStatusBadge({ status, compact }: { status: ImageStatus; compact?: 
 }
 
 function TableMessage({ icon, text }: { icon: React.ReactNode; text: string }) {
+
   return (
     <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 p-8 text-center text-muted-foreground">
       {icon}
@@ -1907,11 +2116,12 @@ function CreateTemplateModal({ onClose, onDone }: { onClose: () => void; onDone:
     }
   }
 
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <form onSubmit={(event) => void submit(event)} className="w-full max-w-md overflow-hidden rounded-xl bg-card shadow-xl">
         <div className="border-b border-border p-5">
-          <h2 className="text-xl font-black text-foreground">Novo CardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio Base</h2>
+          <h2 className="text-xl font-black text-foreground">Novo CardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio Base</h2>
           <p className="mt-1 text-sm font-bold text-muted-foreground">Cria um rascunho em branco.</p>
         </div>
         <div className="space-y-4 p-5">
@@ -1932,7 +2142,7 @@ function CreateTemplateModal({ onClose, onDone }: { onClose: () => void; onDone:
 }
 
 function DuplicateTemplateModal({ sourceTemplateId, sourceTemplateName, onClose, onDone }: { sourceTemplateId: string; sourceTemplateName: string; onClose: () => void; onDone: (slug: string) => void }) {
-  const [name, setName] = useState(`${sourceTemplateName} (CÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia)`);
+  const [name, setName] = useState(`${sourceTemplateName} (CÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia)`);
   const [slug, setSlug] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -1952,12 +2162,13 @@ function DuplicateTemplateModal({ sourceTemplateId, sourceTemplateName, onClose,
     }
   }
 
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <form onSubmit={(event) => void submit(event)} className="w-full max-w-md overflow-hidden rounded-xl bg-card shadow-xl">
         <div className="border-b border-border p-5">
-          <h2 className="text-xl font-black text-foreground">Duplicar CardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio Base</h2>
-          <p className="mt-1 text-sm font-bold text-muted-foreground">Isso criarÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ uma cÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia independente de todas as categorias e produtos.</p>
+          <h2 className="text-xl font-black text-foreground">Duplicar CardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio Base</h2>
+          <p className="mt-1 text-sm font-bold text-muted-foreground">Isso criarÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ uma cÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia independente de todas as categorias e produtos.</p>
         </div>
         <div className="space-y-4 p-5">
           <Field label="Novo Nome" value={name} onChange={setName} />
