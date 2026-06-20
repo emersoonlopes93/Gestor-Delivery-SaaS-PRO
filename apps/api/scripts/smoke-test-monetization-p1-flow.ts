@@ -42,6 +42,7 @@ type SmokeReport = {
   cleanupAttempted: boolean;
   cleanupCompleted: boolean;
   lastStep: string | null;
+  classification: string | null;
   checks: string[];
   notes: string[];
 };
@@ -49,6 +50,19 @@ type SmokeReport = {
 class HttpSmokeError extends Error {
   constructor(
     message: string,
+    readonly method: string,
+    readonly url: string,
+    readonly status?: number,
+    readonly body?: unknown,
+  ) {
+    super(message);
+  }
+}
+
+class SmokeClassificationError extends Error {
+  constructor(
+    message: string,
+    readonly classification: string,
     readonly method: string,
     readonly url: string,
     readonly status?: number,
@@ -331,10 +345,11 @@ async function main() {
     tenantSlug: config.tenantSlug,
     runId,
     cleanupAttempted: config.allowReset,
-    cleanupCompleted: false,
-    lastStep: null,
-    checks: [],
-    notes: [],
+  cleanupCompleted: false,
+  lastStep: null,
+  classification: null,
+  checks: [],
+  notes: [],
   };
 
   const anonymous = new ApiClient(config.baseUrl, config);
@@ -361,14 +376,34 @@ async function main() {
     report.notes.push('Captured billing settings snapshot for restore.');
 
     setup = await runStep(report, 'smoke.setup', async () => {
-      return admin!.request<SmokeSetupResponse>('POST', '/admin/billing/smoke/monetization/setup', {
-        tenantSlug: config.tenantSlug,
-        tenantEmail: config.tenantEmail,
-        tenantPassword: config.tenantPassword,
-        tenantName: 'Smoke Monetization',
-        runId,
-        allowReset: config.allowReset,
-      });
+      try {
+        return await admin!.request<SmokeSetupResponse>('POST', '/admin/billing/smoke/monetization/setup', {
+          tenantSlug: config.tenantSlug,
+          tenantEmail: config.tenantEmail,
+          tenantPassword: config.tenantPassword,
+          tenantName: 'Smoke Monetization',
+          runId,
+          allowReset: config.allowReset,
+        });
+      } catch (error) {
+        if (error instanceof HttpSmokeError && error.method === 'POST' && error.url.endsWith('/admin/billing/smoke/monetization/setup')) {
+          if (error.status === 404) {
+            const classification = 'DEPLOY_DRIFT';
+            report.classification = classification;
+            throw new SmokeClassificationError([
+              'DEPLOY_DRIFT: staging não expõe o endpoint HTTP-only de smoke monetization.',
+              'Ação: redeployar backend staging com o commit atual e repetir o smoke.',
+              `lastStep=smoke.setup`,
+              `method=POST`,
+              `url=/admin/billing/smoke/monetization/setup`,
+              `status=404`,
+              `classification=${classification}`,
+            ].join('\n'));
+          }
+          report.classification = error.status === 401 || error.status === 403 ? 'AUTH_PERMISSIONS_ENV' : error.status && error.status >= 500 ? 'ENDPOINT_FAILURE' : 'HTTP_SMOKE_FAILURE';
+        }
+        throw error;
+      }
     });
     report.notes.push(`Smoke tenant provisioned: ${setup.tenantSlug}`);
 
@@ -532,6 +567,15 @@ async function main() {
               status: error.status,
               body: sanitizeForLog(error.body),
             }
+          : error instanceof SmokeClassificationError
+            ? {
+                message: error.message,
+                classification: error.classification,
+                method: error.method,
+                url: error.url,
+                status: error.status,
+                body: sanitizeForLog(error.body),
+              }
           : {
               message: error instanceof Error ? error.message : String(error),
             },

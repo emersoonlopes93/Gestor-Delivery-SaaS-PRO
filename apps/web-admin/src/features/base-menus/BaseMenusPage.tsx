@@ -216,8 +216,8 @@ const imageStatusLabels: Record<ImageStatus, string> = {
 
 const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'products', label: 'Produtos' },
-  { id: 'imports', label: 'Importações' },
-  { id: 'advanced', label: 'Mais opções' },
+  { id: 'imports', label: 'ImportaÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes' },
+  { id: 'advanced', label: 'Mais opÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes' },
 ];
 
 export function BaseMenusPage() {
@@ -282,9 +282,9 @@ function BaseMenuListView() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <h1 className="text-2xl font-black text-foreground">Cardápios Base</h1>
+          <h1 className="text-2xl font-black text-foreground">CardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pios Base</h1>
           <p className="mt-1 max-w-3xl text-sm font-bold text-muted-foreground">
-            Modelos globais usados pelos tenants ao importar um cardápio inicial. Ao importar, o tenant recebe uma cópia independente.
+            Modelos globais usados pelos tenants ao importar um cardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio inicial. Ao importar, o tenant recebe uma cÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia independente.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -299,7 +299,7 @@ function BaseMenuListView() {
           {canManage ? (
             <button onClick={() => setCreateOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700">
               <Plus className="h-4 w-4" />
-              Novo Cardápio
+              Novo CardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio
             </button>
           ) : null}
         </div>
@@ -307,7 +307,7 @@ function BaseMenuListView() {
 
       <section className="hidden rounded-xl border border-border bg-card p-4">
         <p className="text-sm font-bold text-muted-foreground">
-          Apenas templates publicados aparecem para tenants. Imagens em draft não são usadas na importação.
+          Apenas templates publicados aparecem para tenants. Imagens em draft nÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o sÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o usadas na importaÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o.
         </p>
       </section>
 
@@ -343,7 +343,7 @@ function BaseMenuListView() {
           </select>
           <label className="flex h-10 items-center gap-2 rounded-xl border border-input bg-background px-3 text-sm font-bold text-foreground whitespace-nowrap">
             <input type="checkbox" checked={onlyImageIssues} onChange={(event) => setOnlyImageIssues(event.target.checked)} />
-            com pendência de imagem
+            com pendÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âªncia de imagem
           </label>
         </div>
       </section>
@@ -355,11 +355,11 @@ function BaseMenuListView() {
               <span>Nome</span>
               <span>Segmento</span>
               <span>Status</span>
-              <span>Versão</span>
+              <span>VersÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o</span>
               <span>Categorias</span>
               <span>Produtos</span>
               <span>Cobertura</span>
-              <span>Ação</span>
+              <span>AÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o</span>
             </div>
             {loading ? <TableMessage icon={<Loader2 className="h-8 w-8 animate-spin" />} text="Carregando modelos..." /> : null}
             {!loading && error ? <TableMessage icon={<AlertTriangle className="h-8 w-8" />} text={error} /> : null}
@@ -397,9 +397,9 @@ function DraftActionButton({ item }: { item: BaseMenuListItem; onDone?: () => vo
   const navigate = useNavigate();
 
   return (
-    <button aria-label="Editar cardápio" onClick={() => navigate(`/base-menus/${item.slug}/draft`)} className="inline-flex h-9 items-center justify-center gap-1 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground">
+    <button aria-label="Editar cardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio" onClick={() => navigate(`/base-menus/${item.slug}/draft`)} className="inline-flex h-9 items-center justify-center gap-1 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground">
       <Plus className="h-3.5 w-3.5" />
-      Editar cardápio
+      Editar cardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio
     </button>
   );
 }
@@ -467,295 +467,6 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
         Voltar para detalhes
       </button>
 
-      <section className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 p-4 text-amber-950 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em]">Alterações não publicadas</p>
-            <p className="mt-1 text-sm font-bold leading-6">Novos lojistas que importarem este modelo receberão a nova versão. Lojistas que já importaram não serão alterados automaticamente.</p>
-          </div>
-          <span className="rounded-full bg-white/70 px-3 py-1 text-xs font-black text-amber-900">Edição em andamento</span>
-        </div>
-      </section>
-
-      <section className="overflow-hidden rounded-3xl border border-border/60 bg-card/95 shadow-[0_24px_80px_-45px_rgba(15,23,42,0.45)] backdrop-blur">
-        <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:p-7">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center rounded-full bg-amber-500/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-amber-700">Cardápio pronto</span>
-              <span className="rounded-full bg-muted px-3 py-1 text-xs font-black text-muted-foreground">Editar cardápio</span>
-            </div>
-            <h1 className="mt-3 text-3xl font-black tracking-tight text-foreground sm:text-4xl">{draft.template.icon ? `${draft.template.icon} ` : ''}{draft.template.name}</h1>
-            <p className="mt-2 text-sm font-bold text-muted-foreground sm:text-base">Edição simples do cardápio para futuras importações.</p>
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">Edite produtos, imagens e complementos com uma experiência mais direta, sem expor a estrutura técnica de versão.</p>
-          </div>
-          <div className="rounded-2xl border border-border/70 bg-background/80 p-4 shadow-sm">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">Ações rápidas</p>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-              <Link to="/base-media" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border bg-background px-4 py-3 text-sm font-black text-foreground transition-colors hover:bg-muted">
-              <ExternalLink className="h-4 w-4" />
-              Galeria Base
-              </Link>
-              {canManage ? (
-                <>
-                  <button aria-label="Descartar alterações" onClick={() => setModal({ draft, mode: 'discard' })} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-destructive/30 bg-background px-4 py-3 text-sm font-black text-destructive transition-colors hover:bg-destructive/10">
-                    <Trash2 className="h-4 w-4" />
-                    Descartar alterações
-                  </button>
-                  <button aria-label="Publicar alterações" onClick={() => setModal({ draft, mode: 'publish' })} disabled={draft.validation.errors.length > 0} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-emerald-700 disabled:opacity-50">
-                    <Send className="h-4 w-4" />
-                    Publicar alterações
-                  </button>
-                </>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-4">
-        <div className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-card p-4 shadow-sm md:flex-row md:items-end md:justify-between">
-          <div>
-            <h2 className="text-lg font-black text-foreground">Produtos</h2>
-            <p className="text-sm font-bold text-muted-foreground">Edite nome, preço, categoria, imagem e complementos sem ver JSON técnico.</p>
-          </div>
-          {canManage ? <CategoryCreateButton draft={draft} onSaved={loadDraft} /> : null}
-        </div>
-        {draft.categories.map((category) => (
-          <div key={category.id} className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-shadow hover:shadow-md">
-            <CategoryHeader
-              draft={draft}
-              category={category}
-              canManage={canManage}
-              onSaved={loadDraft}
-              onCreateProduct={() => setProductModal({ mode: 'create', categoryId: category.id, product: null })}
-            />
-            <div className="divide-y divide-border">
-              {category.products.map((product) => (
-                <SimpleProductCard
-                  key={product.id}
-                  draft={draft}
-                  product={product}
-                  categoryName={category.name}
-                  canManage={canManage}
-                  onSaved={loadDraft}
-                  onEdit={() => setProductModal({ mode: 'edit', categoryId: category.id, product })}
-                  onDuplicate={() => setProductModal({ mode: 'duplicate', categoryId: category.id, product })}
-                  onImage={() => setImagePickerProduct(product)}
-                  onOptions={() => setOptionsProduct(product)}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
-      </section>
-
-      <details className="rounded-2xl border border-border/60 bg-card p-4 shadow-sm">
-        <summary className="cursor-pointer text-sm font-black text-foreground">Mais opções</summary>
-        <div className="mt-4 space-y-4">
-          {canManage ? <TemplateForm draft={draft} onSaved={loadDraft} /> : <ReadOnlyNotice />}
-          <DraftValidationPanel validation={draft.validation} />
-          <section className="rounded-2xl border border-border bg-muted/20 p-4 text-sm font-bold text-muted-foreground">
-            Historico, importacoes e metadados continuam disponiveis na tela de detalhe do Cardapio Base.
-          </section>
-        </div>
-      </details>
-
-      {modal ? (
-        <DraftActionModal
-          state={modal}
-          onClose={() => setModal(null)}
-          onDone={() => {
-            setModal(null);
-            navigate(`/base-menus/${draft.template.slug}`);
-          }}
-        />
-      ) : null}
-
-      {productModal && canManage ? (
-        <ProductEditorModal
-          draft={draft}
-          state={productModal}
-          onClose={() => setProductModal(null)}
-          onSaved={loadDraft}
-        />
-      ) : null}
-
-      {imagePickerProduct && canManage ? (
-        <ProductImagePickerModal
-          draft={draft}
-          product={imagePickerProduct}
-          onClose={() => setImagePickerProduct(null)}
-          onSaved={loadDraft}
-        />
-      ) : null}
-
-      {optionsProduct && canManage ? (
-        <ProductOptionsModal
-          draft={draft}
-          product={optionsProduct}
-          onClose={() => setOptionsProduct(null)}
-          onSaved={loadDraft}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function BaseMenuDetailView({ id }: { id: string }) {
-  const navigate = useNavigate();
-  const { has } = useAdminPermissions();
-  const canManage = has('saas.base_menu.manage');
-  const [detail, setDetail] = useState<BaseMenuDetail | null>(null);
-  const [logs, setLogs] = useState<ImportLog[]>([]);
-  const [versions, setVersions] = useState<BaseMenuVersionDetail[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<TabId>('products');
-  const [duplicateOpen, setDuplicateOpen] = useState(false);
-  const [actionBusy, setActionBusy] = useState(false);
-
-  async function loadDetail() {
-    setLoading(true);
-    setError(null);
-    try {
-      const [detailResponse, logsResponse, versionsResponse] = await Promise.all([
-        api.get<BaseMenuDetail>(`/admin/base-menus/${id}`),
-        api.get<ImportLog[]>(`/admin/base-menus/${id}/import-logs`),
-        api.get<BaseMenuVersionDetail[]>(`/admin/base-menus/${id}/versions`),
-      ]);
-      setDetail(detailResponse.data);
-      setLogs(logsResponse.data);
-      setVersions(versionsResponse.data);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void loadDetail();
-  }, [id]);
-
-  const products = useMemo(() => detail?.categories.flatMap((category) => category.products) ?? [], [detail]);
-  const imageGroups = useMemo(() => ({
-    linked: products.filter((product) => ['linked_exact', 'linked_tag', 'linked_fallback'].includes(product.imageStatus)),
-    draftOnly: products.filter((product) => product.imageStatus === 'draft_only'),
-    noAsset: products.filter((product) => product.imageStatus === 'no_published_asset'),
-    noLookup: products.filter((product) => product.imageStatus === 'missing_lookup'),
-  }), [products]);
-
-  if (loading) {
-    return <div className="flex min-h-[480px] items-center justify-center text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando modelo...</div>;
-  }
-
-  if (error || !detail) {
-    return (
-      <div className="space-y-4">
-        <button onClick={() => navigate('/base-menus')} className="inline-flex items-center gap-2 text-sm font-black text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" />
-          Voltar
-        </button>
-        <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-6 text-sm font-bold text-destructive">{error ?? 'Modelo não encontrado.'}</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <button onClick={() => navigate('/base-menus')} className="inline-flex items-center gap-2 text-sm font-black text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" />
-        Voltar para Cardápios Base
-      </button>
-
-      <section className="rounded-xl border border-border bg-card p-5">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-black text-foreground">{detail.template.icon ? `${detail.template.icon} ` : ''}{detail.template.name}</h1>
-              <StatusPill status={detail.template.status} />
-              <span className="rounded-xl bg-muted px-3 py-1 text-xs font-black text-muted-foreground">
-                {detail.currentPublishedVersion ? `v${detail.currentPublishedVersion.versionNumber}` : 'sem versão publicada'}
-              </span>
-            </div>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">{detail.template.slug} · {detail.template.segment}</p>
-            <p className="mt-3 max-w-4xl text-sm font-bold text-muted-foreground">{detail.template.description}</p>
-            <p className="mt-3 max-w-4xl text-sm text-muted-foreground">
-              Este modelo é usado como ponto de partida. Alterações futuras no modelo não alteram cardápios já importados.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link to="/base-media" className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">
-              <ExternalLink className="h-4 w-4" />
-              Abrir Galeria Base
-            </Link>
-            {canManage ? (
-              <>
-                <DraftActionButton item={{
-                  id: detail.template.id,
-                  slug: detail.template.slug,
-                  name: detail.template.name,
-                  description: detail.template.description,
-                  segment: detail.template.segment,
-                  icon: detail.template.icon,
-                  status: detail.template.status,
-                  currentPublishedVersion: detail.currentPublishedVersion,
-                  draftVersion: detail.draftVersion,
-                  totalCategories: detail.totals.totalCategories,
-                  totalProducts: detail.totals.totalProducts,
-                  totalProductsWithMediaLookupKey: detail.totals.totalProductsWithMediaLookupKey,
-                  totalProductsWithPublishedGlobalImage: detail.totals.totalProductsWithPublishedGlobalImage,
-                  totalProductsWithoutImage: detail.totals.totalProductsWithoutImage,
-                  lastPublishedAt: detail.currentPublishedVersion?.publishedAt ?? null,
-                  createdAt: detail.template.createdAt,
-                  updatedAt: detail.template.updatedAt,
-                }} onDone={loadDetail} />
-                <button aria-label="Duplicar cardápio" onClick={() => setDuplicateOpen(true)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">
-                  <Copy className="h-4 w-4" />
-                  Duplicar
-                </button>
-                {detail.template.status === 'archived' ? (
-                  <button aria-label="Restaurar cardápio" onClick={() => void handleRestore()} disabled={actionBusy} className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">
-                    <Undo2 className="h-4 w-4" />
-                    Restaurar
-                  </button>
-                ) : (
-                  <button aria-label="Arquivar cardápio" onClick={() => void handleArchive()} disabled={actionBusy} className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-destructive hover:bg-muted">
-                    <Archive className="h-4 w-4" />
-                    Arquivar
-                  </button>
-                )}
-              </>
-            ) : null}
-            <button onClick={loadDetail} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground">
-              <RefreshCw className="h-4 w-4" />
-              Atualizar
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-border bg-card p-4">
-        <div className="grid gap-3 md:grid-cols-2">
-          <div>
-            <p className="text-[11px] font-black uppercase text-muted-foreground">VersÃ£o publicada atual</p>
-            <p className="mt-1 text-sm font-black text-foreground">{detail.currentPublishedVersion ? `v${detail.currentPublishedVersion.versionNumber}` : 'Nenhuma'}</p>
-          </div>
-          <div>
-            <p className="text-[11px] font-black uppercase text-muted-foreground">Draft em ediÃ§Ã£o</p>
-            <p className="mt-1 text-sm font-black text-foreground">{detail.draftVersion ? `v${detail.draftVersion.versionNumber}` : 'Sem draft aberto'}</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="hidden grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Kpi label="Categorias" value={detail.totals.totalCategories} />
-        <Kpi label="Produtos" value={detail.totals.totalProducts} />
-        <Kpi label="Com lookup" value={detail.totals.totalProductsWithMediaLookupKey} />
-        <Kpi label="Com imagem" value={detail.totals.totalProductsWithPublishedGlobalImage} tone="success" />
-        <Kpi label="Pendências" value={detail.totals.totalProductsWithoutImage} tone={detail.totals.totalProductsWithoutImage > 0 ? 'danger' : 'success'} />
-      </section>
-
       <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
         <p className="text-[11px] font-black uppercase tracking-wide">Alterações não publicadas</p>
         <p className="mt-1 text-sm font-bold">
@@ -768,12 +479,12 @@ function BaseMenuDetailView({ id }: { id: string }) {
         </p>
       </section>
 
-      <nav className="flex flex-wrap gap-2 border-b border-border">
+      <nav className="flex gap-2 overflow-x-auto border-b border-border pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {tabs.map((item) => (
           <button
             key={item.id}
             onClick={() => setTab(item.id)}
-            className={`border-b-2 px-3 py-3 text-sm font-black transition-colors ${tab === item.id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+            className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-black transition-colors ${tab === item.id ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'}`}
           >
             {item.label}
           </button>
@@ -799,7 +510,7 @@ function BaseMenuDetailView({ id }: { id: string }) {
   );
 
   async function handleArchive() {
-    if (!window.confirm('Tem certeza que deseja arquivar este cardápio base? Ele deixará de aparecer para novos tenants.')) return;
+    if (!window.confirm('Tem certeza que deseja arquivar este cardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio base? Ele deixarÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ de aparecer para novos tenants.')) return;
     setActionBusy(true);
     try {
       await api.post(`/admin/base-menus/${detail!.template.slug}/archive`);
@@ -812,7 +523,7 @@ function BaseMenuDetailView({ id }: { id: string }) {
   }
 
   async function handleRestore() {
-    if (!window.confirm('Tem certeza que deseja restaurar este cardápio base?')) return;
+    if (!window.confirm('Tem certeza que deseja restaurar este cardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio base?')) return;
     setActionBusy(true);
     try {
       await api.post(`/admin/base-menus/${detail!.template.slug}/restore`);
@@ -977,7 +688,7 @@ function SimpleProductCard({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="truncate text-sm font-black tracking-tight text-foreground sm:text-base">{product.name}</p>
-            <p className="mt-1 text-xs font-bold leading-5 text-muted-foreground sm:text-sm">{product.description ?? 'Sem descrição'}</p>
+            <p className="mt-1 text-xs font-bold leading-5 text-muted-foreground sm:text-sm">{product.description ?? 'Sem descriÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o'}</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <span className="inline-flex h-8 items-center rounded-full bg-muted px-3 text-xs font-black text-muted-foreground">{categoryName}</span>
@@ -1012,7 +723,7 @@ function PublishSummary({ validation }: { validation: DraftValidation }) {
     <section className="grid gap-3 lg:grid-cols-[1fr_1fr_1.4fr]">
       <div className="rounded-xl border border-border bg-card p-4">
         <p className="text-[11px] font-black uppercase text-muted-foreground">Resumo</p>
-        <p className="mt-2 text-sm font-black text-foreground">{validation.totals.categories} categorias · {validation.totals.products} produtos</p>
+        <p className="mt-2 text-sm font-black text-foreground">{validation.totals.categories} categorias ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {validation.totals.products} produtos</p>
         <p className="mt-1 text-xs font-bold text-muted-foreground">Sera publicada a v{validation.publishingVersionNumber}</p>
       </div>
       <div className="rounded-xl border border-border bg-card p-4">
@@ -1023,10 +734,10 @@ function PublishSummary({ validation }: { validation: DraftValidation }) {
       <div className="rounded-xl border border-border bg-card p-4">
         <p className="text-[11px] font-black uppercase text-muted-foreground">Validacao antes de publicar</p>
         <p className={`mt-2 text-sm font-black ${validation.errors.length > 0 ? 'text-destructive' : 'text-emerald-600'}`}>
-          {validation.errors.length} erros · {validation.warnings.length} avisos
+          {validation.errors.length} erros ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {validation.warnings.length} avisos
         </p>
         <div className="mt-2 max-h-24 overflow-auto text-xs font-bold text-muted-foreground">
-          {[...validation.errors, ...validation.warnings].slice(0, 8).map((item) => <p key={item}>• {item}</p>)}
+          {[...validation.errors, ...validation.warnings].slice(0, 8).map((item) => <p key={item}>ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ {item}</p>)}
         </div>
       </div>
     </section>
@@ -1157,7 +868,7 @@ function DraftActionModal({ state, onClose, onDone }: { state: DraftActionModalS
           <button onClick={onClose} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">Cancelar</button>
           <button aria-label={isPublish ? 'Confirmar publicacao' : 'Confirmar descarte'} onClick={() => void submit()} disabled={!canSubmit || busy} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black text-white disabled:opacity-50 ${isPublish ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-destructive hover:bg-destructive/90'}`}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : isPublish ? <Send className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
-            {isPublish ? 'Publicar alterações' : 'Descartar alterações'}
+            {isPublish ? 'Publicar alteraÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes' : 'Descartar alteraÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes'}
           </button>
         </div>
       </section>
@@ -1388,7 +1099,7 @@ async function duplicateProductInDraft(draft: BaseMenuDraft, product: BaseMenuPr
   const category = draft.categories.find((item) => item.id === product.categoryId);
   if (!category) return;
   await api.post(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/categories/${category.id}/products`, {
-    name: `${product.name} - cópia`,
+    name: `${product.name} - cÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia`,
     description: product.description,
     basePrice: product.basePrice,
     compareAtPrice: product.compareAtPrice,
@@ -1530,7 +1241,7 @@ function ProductEditorModal({
   onSaved: () => void | Promise<void>;
 }) {
   const product = state.product;
-  const [name, setName] = useState(product ? (state.mode === 'duplicate' ? `${product.name} - cópia` : product.name) : '');
+  const [name, setName] = useState(product ? (state.mode === 'duplicate' ? `${product.name} - cÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia` : product.name) : '');
   const [description, setDescription] = useState(product?.description ?? '');
   const [basePrice, setBasePrice] = useState(product ? String(product.basePrice) : '');
   const [compareAtPrice, setCompareAtPrice] = useState(product?.compareAtPrice === null || product?.compareAtPrice === undefined ? '' : String(product.compareAtPrice));
@@ -1578,7 +1289,7 @@ function ProductEditorModal({
             {state.mode === 'edit' ? 'Editar produto' : state.mode === 'duplicate' ? 'Duplicar produto' : 'Novo produto'}
           </p>
           <h2 className="mt-1 text-xl font-black text-foreground">{product?.name ?? 'Produto novo'}</h2>
-          <p className="mt-1 text-sm font-bold text-muted-foreground">Imagem e complementos são editados pelos atalhos próprios na lista.</p>
+          <p className="mt-1 text-sm font-bold text-muted-foreground">Imagem e complementos sÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o editados pelos atalhos prÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³prios na lista.</p>
         </div>
         <div className="grid gap-4 p-5">
           <div className="grid gap-3 md:grid-cols-2">
@@ -1607,7 +1318,7 @@ function ProductEditorModal({
           </button>
           <button type="submit" disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground disabled:opacity-50">
             <Save className="h-4 w-4" />
-            {state.mode === 'edit' ? 'Salvar alterações' : 'Criar produto'}
+            {state.mode === 'edit' ? 'Salvar alteraÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes' : 'Criar produto'}
           </button>
         </div>
       </form>
@@ -1711,10 +1422,10 @@ function ProductImagePickerModal({
           ))}
         </div>
         <div className="flex items-center justify-between border-t border-border bg-muted/20 p-5">
-          <p className="text-xs font-bold text-muted-foreground">Página {page} de {totalPages}</p>
+          <p className="text-xs font-bold text-muted-foreground">PÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡gina {page} de {totalPages}</p>
           <div className="flex gap-2">
             <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground disabled:opacity-50">Anterior</button>
-            <button type="button" onClick={() => setPage((current) => current + 1)} disabled={page >= totalPages} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground disabled:opacity-50">Próxima</button>
+            <button type="button" onClick={() => setPage((current) => current + 1)} disabled={page >= totalPages} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground disabled:opacity-50">PrÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³xima</button>
             <button type="button" onClick={onClose} className="rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground">Fechar</button>
           </div>
         </div>
@@ -1822,13 +1533,13 @@ function ProductOptionsModal({
                 <label className="block">
                   <span className="text-[11px] font-black uppercase text-muted-foreground">Selecao</span>
                   <select value={group.selectionType} onChange={(event) => updateGroup(groupIndex, { selectionType: event.target.value === 'single' ? 'single' : 'multiple' })} className="mt-1 h-10 w-full rounded-xl border border-input bg-background px-3 text-sm">
-                    <option value="single">Escolha única</option>
-                    <option value="multiple">Múltipla escolha</option>
+                    <option value="single">Escolha ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºnica</option>
+                    <option value="multiple">MÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºltipla escolha</option>
                   </select>
                 </label>
                 <label className="flex items-end gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm font-bold text-foreground">
                   <input type="checkbox" checked={group.isRequired} onChange={(event) => updateGroup(groupIndex, { isRequired: event.target.checked })} />
-                  Obrigatório
+                  ObrigatÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³rio
                 </label>
                 <Field label="Minimo" value={group.minSelect} onChange={(value) => updateGroup(groupIndex, { minSelect: value })} type="number" />
                 <Field label="Maximo" value={group.maxSelect} onChange={(value) => updateGroup(groupIndex, { maxSelect: value })} type="number" />
@@ -1940,7 +1651,7 @@ function ProductsTab({ categories }: { categories: BaseMenuCategory[] }) {
         <div key={category.id} className="overflow-hidden rounded-xl border border-border bg-card">
           <div className="border-b border-border px-4 py-3">
             <p className="text-sm font-black text-foreground">{category.name}</p>
-            <p className="text-xs font-bold text-muted-foreground">{category.products.length} produtos · ordem {category.sortOrder}</p>
+            <p className="text-xs font-bold text-muted-foreground">{category.products.length} produtos ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ordem {category.sortOrder}</p>
           </div>
           <div className="divide-y divide-border">
             {category.products.map((product) => <ProductRow key={product.id} product={product} />)}
@@ -1963,13 +1674,13 @@ function ProductRow({ product }: { product: BaseMenuProduct }) {
       </div>
       <div className="min-w-0">
         <p className="text-sm font-black text-foreground">{product.name}</p>
-        <p className="mt-1 text-xs font-bold text-muted-foreground">{product.description ?? 'Sem descrição'}</p>
+        <p className="mt-1 text-xs font-bold text-muted-foreground">{product.description ?? 'Sem descriÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o'}</p>
         <div className="mt-2 flex flex-wrap gap-1">
           {product.searchTagsJson.map((tag) => <span key={tag} className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">{tag}</span>)}
         </div>
       </div>
       <div>
-        <p className="text-[11px] font-black uppercase text-muted-foreground">Preço sugerido</p>
+        <p className="text-[11px] font-black uppercase text-muted-foreground">PreÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§o sugerido</p>
         <p className="text-sm font-black text-foreground">{formatMoney(product.basePrice)}</p>
       </div>
       <div>
@@ -2014,7 +1725,7 @@ function ImageGroup({ title, products, status }: { title: string; products: Base
             </Link>
           </div>
         ))}
-        {products.length === 0 ? <p className="py-8 text-center text-sm font-bold text-muted-foreground">Nenhum produto nesta condição.</p> : null}
+        {products.length === 0 ? <p className="py-8 text-center text-sm font-bold text-muted-foreground">Nenhum produto nesta condiÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o.</p> : null}
       </div>
     </div>
   );
@@ -2029,7 +1740,7 @@ function ImportsTab({ logs }: { logs: ImportLog[] }) {
         <span>Status</span>
         <span>Criados</span>
         <span>Pulados</span>
-        <span>Versão</span>
+        <span>VersÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o</span>
       </div>
       {logs.map((log) => (
         <article key={log.id} className="grid grid-cols-[1.2fr_150px_120px_130px_130px_180px] gap-3 border-b border-border px-4 py-4 last:border-b-0">
@@ -2039,12 +1750,12 @@ function ImportsTab({ logs }: { logs: ImportLog[] }) {
           </div>
           <span className="text-xs font-bold text-muted-foreground">{formatDate(log.createdAt)}</span>
           <ImportStatusPill status={log.status} />
-          <span className="text-sm font-black text-foreground">{log.categoriesCreated} cat · {log.productsCreated} prod</span>
-          <span className="text-sm font-black text-foreground">{log.categoriesSkipped} cat · {log.productsSkipped} prod</span>
-          <span className="text-sm font-black text-foreground">v{log.version.versionNumber} · {statusLabels[log.version.status]}</span>
+          <span className="text-sm font-black text-foreground">{log.categoriesCreated} cat ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {log.productsCreated} prod</span>
+          <span className="text-sm font-black text-foreground">{log.categoriesSkipped} cat ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {log.productsSkipped} prod</span>
+          <span className="text-sm font-black text-foreground">v{log.version.versionNumber} ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {statusLabels[log.version.status]}</span>
         </article>
       ))}
-      {logs.length === 0 ? <TableMessage icon={<ListChecks className="h-8 w-8" />} text="Nenhuma importação registrada para este modelo." /> : null}
+      {logs.length === 0 ? <TableMessage icon={<ListChecks className="h-8 w-8" />} text="Nenhuma importaÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o registrada para este modelo." /> : null}
     </section>
   );
 }
@@ -2059,7 +1770,7 @@ function AdvancedTab({ detail, versions, imageGroups }: { detail: BaseMenuDetail
         </div>
       </details>
       <details className="rounded-xl border border-border bg-card p-4">
-        <summary className="cursor-pointer text-sm font-black text-foreground">Versões</summary>
+        <summary className="cursor-pointer text-sm font-black text-foreground">VersÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes</summary>
         <div className="mt-4">
           <VersionsTab versions={versions} currentVersionId={detail.currentPublishedVersion?.id ?? null} />
         </div>
@@ -2091,7 +1802,7 @@ function MetadataTab({ detail }: { detail: BaseMenuDetail }) {
     <section className="rounded-xl border border-border bg-card p-4">
       <div className="mb-3 flex items-center gap-2 text-sm font-black text-foreground">
         <FileJson className="h-4 w-4" />
-        Metadados úteis do modelo
+        Metadados ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºteis do modelo
       </div>
       <pre className="max-h-[620px] overflow-auto rounded-xl bg-muted/50 p-4 text-xs text-foreground">{JSON.stringify(metadata, null, 2)}</pre>
     </section>
@@ -2200,7 +1911,7 @@ function CreateTemplateModal({ onClose, onDone }: { onClose: () => void; onDone:
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <form onSubmit={(event) => void submit(event)} className="w-full max-w-md overflow-hidden rounded-xl bg-card shadow-xl">
         <div className="border-b border-border p-5">
-          <h2 className="text-xl font-black text-foreground">Novo Cardápio Base</h2>
+          <h2 className="text-xl font-black text-foreground">Novo CardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio Base</h2>
           <p className="mt-1 text-sm font-bold text-muted-foreground">Cria um rascunho em branco.</p>
         </div>
         <div className="space-y-4 p-5">
@@ -2221,7 +1932,7 @@ function CreateTemplateModal({ onClose, onDone }: { onClose: () => void; onDone:
 }
 
 function DuplicateTemplateModal({ sourceTemplateId, sourceTemplateName, onClose, onDone }: { sourceTemplateId: string; sourceTemplateName: string; onClose: () => void; onDone: (slug: string) => void }) {
-  const [name, setName] = useState(`${sourceTemplateName} (Cópia)`);
+  const [name, setName] = useState(`${sourceTemplateName} (CÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia)`);
   const [slug, setSlug] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -2245,8 +1956,8 @@ function DuplicateTemplateModal({ sourceTemplateId, sourceTemplateName, onClose,
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <form onSubmit={(event) => void submit(event)} className="w-full max-w-md overflow-hidden rounded-xl bg-card shadow-xl">
         <div className="border-b border-border p-5">
-          <h2 className="text-xl font-black text-foreground">Duplicar Cardápio Base</h2>
-          <p className="mt-1 text-sm font-bold text-muted-foreground">Isso criará uma cópia independente de todas as categorias e produtos.</p>
+          <h2 className="text-xl font-black text-foreground">Duplicar CardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio Base</h2>
+          <p className="mt-1 text-sm font-bold text-muted-foreground">Isso criarÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ uma cÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia independente de todas as categorias e produtos.</p>
         </div>
         <div className="space-y-4 p-5">
           <Field label="Novo Nome" value={name} onChange={setName} />
@@ -2263,3 +1974,4 @@ function DuplicateTemplateModal({ sourceTemplateId, sourceTemplateName, onClose,
     </div>
   );
 }
+
