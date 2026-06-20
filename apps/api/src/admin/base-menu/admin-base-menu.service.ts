@@ -97,6 +97,8 @@ type ProductImageCoverage = {
   asset: BaseMenuMediaMatch | null;
 };
 
+type AuditClient = Pick<Prisma.TransactionClient, 'tenant' | 'auditLog'>;
+
 @Injectable()
 export class AdminBaseMenuService {
   constructor(private readonly prisma: PrismaService) {}
@@ -418,15 +420,18 @@ export class AdminBaseMenuService {
           }
         }
 
-        await this.audit(tx, 'base_menu.draft.create', actor, {
-          templateId: template.id,
-          versionId: created.id,
-          fromVersionId: published.id,
-          fromVersionNumber: published.versionNumber,
-          versionNumber: created.versionNumber,
-        });
-
         return created;
+      }, {
+        maxWait: Number(process.env.PRISMA_TX_MAX_WAIT_MS ?? 5000),
+        timeout: Number(process.env.PRISMA_BASE_MENU_DRAFT_TX_TIMEOUT_MS ?? 20000),
+      });
+
+      await this.audit(this.prisma, 'base_menu.draft.create', actor, {
+        templateId: template.id,
+        versionId: draft.id,
+        fromVersionId: published.id,
+        fromVersionNumber: published.versionNumber,
+        versionNumber: draft.versionNumber,
       });
 
       return this.getDraft(draft.templateId);
@@ -1117,7 +1122,7 @@ export class AdminBaseMenuService {
     };
   }
 
-  private async audit(client: Prisma.TransactionClient, action: BaseMenuAdminAction, actor: AdminActor, details: Prisma.InputJsonObject) {
+  private async audit(client: AuditClient, action: BaseMenuAdminAction, actor: AdminActor, details: Prisma.InputJsonObject) {
     const tenantId = await this.platformAuditTenantId(client);
     await client.auditLog.create({
       data: {
@@ -1132,7 +1137,7 @@ export class AdminBaseMenuService {
     });
   }
 
-  private async platformAuditTenantId(client: Prisma.TransactionClient): Promise<string> {
+  private async platformAuditTenantId(client: AuditClient): Promise<string> {
     const tenant = await client.tenant.upsert({
       where: { slug: PLATFORM_AUDIT_TENANT_SLUG },
       update: {},

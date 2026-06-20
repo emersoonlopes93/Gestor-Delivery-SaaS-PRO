@@ -59,6 +59,12 @@ export class AdminBaseMenuController {
     return this.baseMenus.getDraft(id);
   }
 
+  @Get(':id/draft-version')
+  @RequireAdminPermissions('saas.base_menu.manage')
+  getOrCreateDraftVersion(@Param('id') id: string, @CurrentUser('sub') adminId: string, @Request() req: ExpressRequest & { user: AdminJwtPayload }) {
+    return this.baseMenus.createDraftVersion(id, { id: adminId, ip: req.ip });
+  }
+
   @Get(':id/draft/validation')
   @RequireAdminPermissions('saas.base_menu.read')
   validateDraft(@Param('id') id: string) {
