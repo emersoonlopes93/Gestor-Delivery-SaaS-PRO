@@ -519,15 +519,15 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
         Voltar para detalhes
       </button>
 
-      <section className="overflow-hidden rounded-[28px] border border-border/60 bg-card/95 p-5 shadow-[0_24px_80px_-45px_rgba(15,23,42,0.45)] backdrop-blur lg:p-7">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_360px] lg:items-stretch">
+      <section className="overflow-hidden rounded-[28px] border border-border/60 bg-card/95 p-5 shadow-[0_24px_80px_-45px_rgba(15,23,42,0.45)] backdrop-blur xl:p-7">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_360px] xl:items-stretch">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
               <span className="inline-flex items-center rounded-full bg-amber-500/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-amber-700">Cardápio em edição</span>
               <span className="rounded-full bg-muted px-3 py-1 text-xs font-black text-muted-foreground">{draft.validation.totals.products} produtos</span>
               <span className="rounded-full bg-muted px-3 py-1 text-xs font-black text-muted-foreground">{draft.validation.totals.categories} categorias</span>
             </div>
-            <h1 className="mt-3 max-w-3xl text-3xl font-black tracking-tight text-foreground sm:text-4xl lg:text-[3rem] lg:leading-[0.95]">{draft.template.icon ? `${draft.template.icon} ` : ''}{draft.template.name}</h1>
+            <h1 className="mt-3 max-w-3xl text-3xl font-black tracking-tight text-foreground sm:text-4xl xl:text-[3rem] xl:leading-[0.95]">{draft.template.icon ? `${draft.template.icon} ` : ''}{draft.template.name}</h1>
             <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{draft.template.slug} · {draft.template.segment}</p>
             <p className="mt-4 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">Edite produtos, imagens e complementos com uma experiência direta, sem expor a estrutura técnica do rascunho.</p>
             <div className="mt-5 flex flex-wrap gap-2 text-[11px] font-bold text-muted-foreground">
@@ -621,7 +621,7 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
                   const optionsLabel = groups.length === 0 ? 'Sem complementos' : `${groups.length} grupo${groups.length === 1 ? '' : 's'} de complementos`;
                   const imageLabel = product.imageStatus === 'linked_exact' || product.imageStatus === 'linked_tag' ? 'Imagem ok' : product.imageStatus === 'linked_fallback' ? 'Imagem fallback' : 'Sem imagem';
                   return (
-                    <article key={product.id} className="grid gap-4 px-4 py-4 transition-colors hover:bg-muted/20 lg:grid-cols-[92px_minmax(0,1fr)_minmax(260px,320px)]">
+                    <article key={product.id} className="grid gap-4 px-4 py-4 transition-colors hover:bg-muted/20 xl:grid-cols-[92px_minmax(0,1fr)_minmax(260px,320px)]">
                       <div className="flex items-start justify-start">
                         {product.publishedGlobalImage ? (
                           <img src={product.publishedGlobalImage.publicUrl} alt={product.publishedGlobalImage.altText ?? product.name} className="h-20 w-20 rounded-2xl object-cover bg-muted ring-1 ring-border/70" />
@@ -776,15 +776,15 @@ function BaseMenuDetailView({ id }: { id: string }) {
         Voltar para Cardápios Base
       </button>
 
-      <section className="overflow-hidden rounded-[28px] border border-border/60 bg-card/95 p-5 shadow-[0_24px_80px_-45px_rgba(15,23,42,0.45)] backdrop-blur lg:p-7">
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_360px] lg:items-stretch">
+      <section className="overflow-hidden rounded-[28px] border border-border/60 bg-card/95 p-5 shadow-[0_24px_80px_-45px_rgba(15,23,42,0.45)] backdrop-blur xl:p-7">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_360px] xl:items-stretch">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
               <span className="inline-flex items-center rounded-full bg-amber-500/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-amber-700">Cardápio Base</span>
               <StatusPill status={detail.template.status} />
               <span className="rounded-full bg-muted px-3 py-1 text-xs font-black text-muted-foreground">{detail.currentPublishedVersion ? `v${detail.currentPublishedVersion.versionNumber}` : 'sem versão publicada'}</span>
             </div>
-            <h1 className="mt-3 max-w-3xl text-3xl font-black tracking-tight text-foreground sm:text-4xl lg:text-[3rem] lg:leading-[0.95]">{detail.template.icon ? `${detail.template.icon} ` : ''}{detail.template.name}</h1>
+            <h1 className="mt-3 max-w-3xl text-3xl font-black tracking-tight text-foreground sm:text-4xl xl:text-[3rem] xl:leading-[0.95]">{detail.template.icon ? `${detail.template.icon} ` : ''}{detail.template.name}</h1>
             <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">{detail.template.slug} · {detail.template.segment}</p>
             <p className="mt-4 max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">Este modelo é usado como ponto de partida. Alterações futuras no modelo não alteram cardápios já importados.</p>
             <div className="mt-5 flex flex-wrap gap-2 text-[11px] font-bold text-muted-foreground">
