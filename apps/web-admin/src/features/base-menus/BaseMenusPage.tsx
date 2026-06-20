@@ -1000,8 +1000,9 @@ function DraftActionModal({ state, onClose, onDone }: { state: DraftActionModalS
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <section className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-xl border border-border bg-card p-5 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
+      <section className="my-3 w-full max-w-3xl overflow-hidden rounded-2xl border border-border bg-card shadow-xl sm:my-6">
+        <div className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto sm:max-h-[calc(100dvh-3rem)]">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-black uppercase text-muted-foreground">{isPublish ? 'Confirmar publicacao' : 'Confirmar descarte'}</p>
@@ -1011,7 +1012,7 @@ function DraftActionModal({ state, onClose, onDone }: { state: DraftActionModalS
           <button onClick={onClose} className="rounded-xl border border-border px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Fechar</button>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Kpi label="Categorias" value={validation.totals.categories} />
           <Kpi label="Produtos" value={validation.totals.products} />
           <Kpi label="Sem imagem" value={missingImages} tone={missingImages > 0 ? 'warning' : 'success'} />
@@ -1044,12 +1045,13 @@ function DraftActionModal({ state, onClose, onDone }: { state: DraftActionModalS
           <input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} className="mt-1 h-11 w-full rounded-xl border border-input bg-background px-3 font-mono text-sm outline-none focus:ring-2 focus:ring-ring" />
         </label>
 
-        <div className="mt-4 flex flex-wrap justify-end gap-2">
+        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button onClick={onClose} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">Cancelar</button>
-          <button aria-label={isPublish ? 'Confirmar publicacao' : 'Confirmar descarte'} onClick={() => void submit()} disabled={!canSubmit || busy} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black text-white disabled:opacity-50 ${isPublish ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-destructive hover:bg-destructive/90'}`}>
+          <button aria-label={isPublish ? 'Confirmar publicacao' : 'Confirmar descarte'} onClick={() => void submit()} disabled={!canSubmit || busy} className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-black text-white disabled:opacity-50 ${isPublish ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-destructive hover:bg-destructive/90'}`}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : isPublish ? <Send className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
             {isPublish ? 'Publicar alterações' : 'Descartar alterações'}
           </button>
+        </div>
         </div>
       </section>
     </div>
@@ -1469,8 +1471,9 @@ function ProductEditorModal({
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <form onSubmit={(event) => void submit(event)} className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-xl border border-border bg-card shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
+      <form onSubmit={(event) => void submit(event)} className="my-3 w-full max-w-3xl overflow-hidden rounded-2xl border border-border bg-card shadow-xl sm:my-6">
+        <div className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto sm:max-h-[calc(100dvh-3rem)]">
         <div className="border-b border-border p-5">
           <p className="text-[11px] font-black uppercase text-muted-foreground">
             {state.mode === 'edit' ? 'Editar produto' : state.mode === 'duplicate' ? 'Duplicar produto' : 'Novo produto'}
@@ -1499,14 +1502,15 @@ function ProductEditorModal({
             <Field label="Ordem" value={sortOrder} onChange={setSortOrder} type="number" />
           </div>
         </div>
-        <div className="flex flex-wrap justify-end gap-2 border-t border-border bg-muted/20 p-5">
+        <div className="flex flex-col-reverse gap-2 border-t border-border bg-muted/20 p-5 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">
             Cancelar
           </button>
-          <button type="submit" disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground disabled:opacity-50">
+          <button type="submit" disabled={busy} className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground disabled:opacity-50">
             <Save className="h-4 w-4" />
             {state.mode === 'edit' ? 'Salvar alterações' : 'Criar produto'}
           </button>
+        </div>
         </div>
       </form>
     </div>
@@ -1568,8 +1572,9 @@ function ProductImagePickerModal({
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <section className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-xl border border-border bg-card shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
+      <section className="my-3 w-full max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-xl sm:my-6">
+        <div className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto sm:max-h-[calc(100dvh-3rem)]">
         <div className="border-b border-border p-5">
           <p className="text-[11px] font-black uppercase text-muted-foreground">Trocar imagem</p>
           <h2 className="mt-1 text-xl font-black text-foreground">{product.name}</h2>
@@ -1609,13 +1614,14 @@ function ProductImagePickerModal({
             </button>
           ))}
         </div>
-        <div className="flex items-center justify-between border-t border-border bg-muted/20 p-5">
+        <div className="flex flex-col gap-3 border-t border-border bg-muted/20 p-5 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs font-bold text-muted-foreground">Página {page} de {totalPages}</p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 sm:justify-end">
             <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground disabled:opacity-50">Anterior</button>
             <button type="button" onClick={() => setPage((current) => current + 1)} disabled={page >= totalPages} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground disabled:opacity-50">Próxima</button>
             <button type="button" onClick={onClose} className="rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground">Fechar</button>
           </div>
+        </div>
         </div>
       </section>
     </div>
@@ -1696,8 +1702,9 @@ function ProductOptionsModal({
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <form onSubmit={(event) => void submit(event)} className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-xl border border-border bg-card shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
+      <form onSubmit={(event) => void submit(event)} className="my-3 w-full max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-xl sm:my-6">
+        <div className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto sm:max-h-[calc(100dvh-3rem)]">
         <div className="border-b border-border p-5">
           <p className="text-[11px] font-black uppercase text-muted-foreground">Complementos do produto</p>
           <h2 className="mt-1 text-xl font-black text-foreground">{product.name}</h2>
@@ -1706,12 +1713,12 @@ function ProductOptionsModal({
         <div className="space-y-4 p-5">
           {groups.map((group, groupIndex) => (
             <div key={`${groupIndex}-${group.name || 'grupo'}`} className="rounded-xl border border-border bg-muted/20 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div className="grid flex-1 gap-3 md:grid-cols-2">
                   <Field label="Grupo" value={group.name} onChange={(value) => updateGroup(groupIndex, { name: value })} />
                   <Field label="Descricao" value={group.description} onChange={(value) => updateGroup(groupIndex, { description: value })} />
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 lg:justify-end">
                   <button type="button" onClick={() => moveGroup(groupIndex, -1)} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Mover para cima</button>
                   <button type="button" onClick={() => moveGroup(groupIndex, 1)} className="rounded-xl border border-border bg-background px-3 py-2 text-xs font-black text-foreground hover:bg-muted">Mover para baixo</button>
                   <button type="button" onClick={() => setGroups((current) => current.filter((_, currentIndex) => currentIndex !== groupIndex))} className="rounded-xl border border-destructive/30 bg-background px-3 py-2 text-xs font-black text-destructive hover:bg-destructive/10">Remover grupo</button>
@@ -1781,12 +1788,13 @@ function ProductOptionsModal({
             + Adicionar grupo
           </button>
         </div>
-        <div className="flex flex-wrap justify-end gap-2 border-t border-border bg-muted/20 p-5">
+        <div className="flex flex-col-reverse gap-2 border-t border-border bg-muted/20 p-5 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">Cancelar</button>
-          <button type="submit" disabled={busy} className="rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground disabled:opacity-50">
+          <button type="submit" disabled={busy} className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground disabled:opacity-50">
             <Save className="mr-2 inline h-4 w-4" />
             Salvar complementos
           </button>
+        </div>
         </div>
       </form>
     </div>
@@ -2109,8 +2117,8 @@ function CreateTemplateModal({ onClose, onDone }: { onClose: () => void; onDone:
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <form onSubmit={(event) => void submit(event)} className="w-full max-w-md overflow-hidden rounded-xl bg-card shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
+      <form onSubmit={(event) => void submit(event)} className="my-3 w-full max-w-md overflow-hidden rounded-2xl bg-card shadow-xl sm:my-6">
         <div className="border-b border-border p-5">
           <h2 className="text-xl font-black text-foreground">Novo Cardápio Base</h2>
           <p className="mt-1 text-sm font-bold text-muted-foreground">Cria um rascunho em branco.</p>
@@ -2120,7 +2128,7 @@ function CreateTemplateModal({ onClose, onDone }: { onClose: () => void; onDone:
           <Field label="Slug (opcional)" value={slug} onChange={setSlug} />
           <Field label="Segmento (ex: acai)" value={segment} onChange={setSegment} />
         </div>
-        <div className="flex gap-2 border-t border-border bg-muted/40 p-5">
+        <div className="flex flex-col gap-2 border-t border-border bg-muted/40 p-5 sm:flex-row">
           <button type="button" onClick={onClose} disabled={busy} className="flex-1 rounded-xl border border-border bg-background py-2 text-sm font-black text-foreground hover:bg-muted disabled:opacity-50">Cancelar</button>
           <button type="submit" disabled={busy || !name.trim()} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-2 text-sm font-black text-primary-foreground disabled:opacity-50">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
@@ -2155,8 +2163,8 @@ function DuplicateTemplateModal({ sourceTemplateId, sourceTemplateName, onClose,
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <form onSubmit={(event) => void submit(event)} className="w-full max-w-md overflow-hidden rounded-xl bg-card shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
+      <form onSubmit={(event) => void submit(event)} className="my-3 w-full max-w-md overflow-hidden rounded-2xl bg-card shadow-xl sm:my-6">
         <div className="border-b border-border p-5">
           <h2 className="text-xl font-black text-foreground">Duplicar Cardápio Base</h2>
           <p className="mt-1 text-sm font-bold text-muted-foreground">Isso criará uma cópia independente de todas as categorias e produtos.</p>
@@ -2165,7 +2173,7 @@ function DuplicateTemplateModal({ sourceTemplateId, sourceTemplateName, onClose,
           <Field label="Novo Nome" value={name} onChange={setName} />
           <Field label="Novo Slug (opcional)" value={slug} onChange={setSlug} />
         </div>
-        <div className="flex gap-2 border-t border-border bg-muted/40 p-5">
+        <div className="flex flex-col gap-2 border-t border-border bg-muted/40 p-5 sm:flex-row">
           <button type="button" onClick={onClose} disabled={busy} className="flex-1 rounded-xl border border-border bg-background py-2 text-sm font-black text-foreground hover:bg-muted disabled:opacity-50">Cancelar</button>
           <button type="submit" disabled={busy || !name.trim()} className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary py-2 text-sm font-black text-primary-foreground disabled:opacity-50">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
