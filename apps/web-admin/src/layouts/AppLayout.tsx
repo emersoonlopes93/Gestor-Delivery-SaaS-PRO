@@ -247,11 +247,11 @@ export function AppLayout() {
   return (
     <div className="min-h-screen flex bg-background transition-colors duration-300">
       {isMobileOpen ? (
-        <div className="fixed inset-0 z-40 bg-black/40 md:hidden backdrop-blur-sm" onClick={closeMobile} />
+        <div className="fixed inset-0 z-30 bg-black/40 md:hidden backdrop-blur-sm" onClick={closeMobile} />
       ) : null}
 
       <aside
-        className={`fixed z-50 inset-y-0 left-0 bg-card border-r border-border flex flex-col transition-[width,transform] duration-300 ease-out md:static md:translate-x-0 ${
+        className={`fixed z-40 inset-y-0 left-0 bg-card border-r border-border flex flex-col transition-[width,transform] duration-300 ease-out md:static md:translate-x-0 ${
           collapsed ? 'w-[72px]' : 'w-64'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
       >
@@ -297,8 +297,8 @@ export function AppLayout() {
         </div>
       </aside>
 
-      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        <header className="hidden md:flex sticky top-0 z-30 h-16 bg-background/80 backdrop-blur-xl border-b border-border px-6 items-center gap-4">
+      <div className="relative z-0 flex-1 min-w-0 flex flex-col overflow-hidden">
+        <header className="hidden md:flex sticky top-0 z-10 h-16 bg-background/80 backdrop-blur-xl border-b border-border px-6 items-center gap-4">
           <button onClick={toggleCollapsed} className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-all">
             <Menu size={20} />
           </button>
@@ -337,7 +337,7 @@ export function AppLayout() {
           </div>
         </header>
 
-        <header className="md:hidden sticky top-0 z-30 h-14 bg-background backdrop-blur-xl border-b border-border px-4 flex items-center justify-between transition-colors">
+        <header className="md:hidden sticky top-0 z-10 h-14 bg-background backdrop-blur-xl border-b border-border px-4 flex items-center justify-between transition-colors">
           <button onClick={openMobile} className="w-10 h-10 flex items-center justify-center rounded-xl bg-card text-foreground">
             <Menu size={20} />
           </button>

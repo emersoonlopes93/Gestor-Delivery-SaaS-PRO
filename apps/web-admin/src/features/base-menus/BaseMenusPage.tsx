@@ -1000,7 +1000,7 @@ function DraftActionModal({ state, onClose, onDone }: { state: DraftActionModalS
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
       <section className="my-3 w-full max-w-3xl overflow-hidden rounded-2xl border border-border bg-card shadow-xl sm:my-6">
         <div className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto sm:max-h-[calc(100dvh-3rem)]">
         <div className="flex items-start justify-between gap-4">
@@ -1471,7 +1471,7 @@ function ProductEditorModal({
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
       <form onSubmit={(event) => void submit(event)} className="my-3 w-full max-w-3xl overflow-hidden rounded-2xl border border-border bg-card shadow-xl sm:my-6">
         <div className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto sm:max-h-[calc(100dvh-3rem)]">
         <div className="border-b border-border p-5">
@@ -1572,7 +1572,7 @@ function ProductImagePickerModal({
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
       <section className="my-3 w-full max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-xl sm:my-6">
         <div className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto sm:max-h-[calc(100dvh-3rem)]">
         <div className="border-b border-border p-5">
@@ -1702,7 +1702,7 @@ function ProductOptionsModal({
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
       <form onSubmit={(event) => void submit(event)} className="my-3 w-full max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-xl sm:my-6">
         <div className="max-h-[calc(100dvh-1.5rem)] overflow-y-auto sm:max-h-[calc(100dvh-3rem)]">
         <div className="border-b border-border p-5">
@@ -2117,7 +2117,7 @@ function CreateTemplateModal({ onClose, onDone }: { onClose: () => void; onDone:
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
       <form onSubmit={(event) => void submit(event)} className="my-3 w-full max-w-md overflow-hidden rounded-2xl bg-card shadow-xl sm:my-6">
         <div className="border-b border-border p-5">
           <h2 className="text-xl font-black text-foreground">Novo Cardápio Base</h2>
@@ -2163,7 +2163,7 @@ function DuplicateTemplateModal({ sourceTemplateId, sourceTemplateName, onClose,
 
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-black/50 p-3 sm:items-center sm:p-4">
       <form onSubmit={(event) => void submit(event)} className="my-3 w-full max-w-md overflow-hidden rounded-2xl bg-card shadow-xl sm:my-6">
         <div className="border-b border-border p-5">
           <h2 className="text-xl font-black text-foreground">Duplicar Cardápio Base</h2>
