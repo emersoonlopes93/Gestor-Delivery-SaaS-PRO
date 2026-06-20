@@ -410,6 +410,16 @@ export class PrintingService {
   }
 
   async createTestJob(tenantId: string, stationSlug: string, deviceName: string) {
+    const latestOrder = await this.db.order.findFirst({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+
+    if (!latestOrder) {
+      throw new NotFoundException('Nenhum pedido encontrado para criar um job de teste.');
+    }
+
     const content = `GESTOR PRO
 TESTE DE IMPRESSAO
 
@@ -423,7 +433,7 @@ Bluetooth OK
     return this.db.printJob.create({
       data: {
         tenantId,
-        orderId: 'TEST',
+        orderId: latestOrder.id,
         station: stationSlug,
         type: PrintType.summary,
         content,

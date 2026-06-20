@@ -77,15 +77,17 @@ export function PrinterSettings() {
 
   // Update selected defaults when data loads
   useEffect(() => {
-    if (stations.length > 0 && !selectedStation) {
+    if (!selectedStation && stations.length > 0) {
       const savedStation = localStorage.getItem('printing.selectedStation');
-      setSelectedStation(savedStation || stations[0].slug);
+      const nextStation = savedStation || stations[0].slug;
+      if (nextStation !== selectedStation) setSelectedStation(nextStation);
     }
-    if (devices.length > 0 && !selectedDevice) {
+    if (!selectedDevice && devices.length > 0) {
       const savedDevice = localStorage.getItem('printing.selectedDevice');
-      setSelectedDevice(savedDevice || devices[0].id);
+      const nextDevice = savedDevice || devices[0].id;
+      if (nextDevice !== selectedDevice) setSelectedDevice(nextDevice);
     }
-  }, [stations, devices, selectedStation, selectedDevice]);
+  }, [stations.length, devices.length, selectedStation, selectedDevice]);
 
   useEffect(() => {
     if (printerRole === 'station' && stations.length === 0) {
@@ -114,10 +116,10 @@ export function PrinterSettings() {
   }, [printerRole]);
 
   useEffect(() => {
-    if (selectedPrinterDevice) {
-      setAutoPrintEnabled(selectedPrinterDevice.autoPrintEnabled === true);
-    }
-  }, [selectedPrinterDevice]);
+    if (!selectedPrinterDevice) return;
+    const nextAutoPrint = selectedPrinterDevice.autoPrintEnabled === true;
+    setAutoPrintEnabled((current) => (current === nextAutoPrint ? current : nextAutoPrint));
+  }, [selectedPrinterDevice?.id, selectedPrinterDevice?.autoPrintEnabled]);
 
   useEffect(() => {
     spoolerRef.current.running = isSpoolerRunning;
