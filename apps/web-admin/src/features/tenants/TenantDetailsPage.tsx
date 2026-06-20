@@ -278,6 +278,16 @@ export function TenantDetailsPage() {
                 <ExternalLink className="w-3 h-3 text-muted-foreground" />
               </button>
               <button
+                onClick={() => navigate(`/tenants/${tenant.id}/access`)}
+                className="w-full flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Shield className="w-4 h-4 text-emerald-500" />
+                  <span className="text-sm font-medium">Acessos e recursos</span>
+                </div>
+                <ExternalLink className="w-3 h-3 text-muted-foreground" />
+              </button>
+              <button
                 onClick={() => navigate(`/tenants/${tenant.id}/scheduling`)}
                 className="w-full flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted transition-colors"
               >

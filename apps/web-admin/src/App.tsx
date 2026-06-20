@@ -3,6 +3,7 @@ import { LoginPage } from './features/auth/LoginPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { TenantsPage } from './features/tenants/TenantsPage';
 import { TenantDetailsPage } from './features/tenants/TenantDetailsPage';
+import { TenantAccessPage } from './features/tenants/TenantAccessPage';
 import { TenantModulesPage } from './features/tenants/TenantModulesPage';
 import { TenantSchedulingPage } from './features/tenants/TenantSchedulingPage';
 import { TenantAiAgentConfigPage } from './features/tenants/TenantAiAgentConfigPage';
@@ -62,6 +63,14 @@ export function App() {
             element={
               <PermissionGate permission="saas.modules.read">
                 <TenantModulesPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="/tenants/:tenantId/access"
+            element={
+              <PermissionGate permission="saas.tenants.read">
+                <TenantAccessPage />
               </PermissionGate>
             }
           />

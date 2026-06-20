@@ -21,10 +21,40 @@ describe('BillingEntitlementsService', () => {
     basePrice?: number;
     addons?: Array<{ addonKey: string; price: number; status?: string }>;
     aiUsed?: number;
+    featureOverrides?: Array<{
+      id: string;
+      tenantId: string;
+      featureKey: string;
+      enabled: boolean;
+      source?: string;
+      reason: string;
+      expiresAt?: Date | null;
+      createdByAdminId?: string | null;
+      updatedByAdminId?: string | null;
+      createdAt?: Date;
+      updatedAt?: Date;
+    }>;
   }) => {
     const prisma = {
       chatMessage: {
         count: jest.fn().mockResolvedValue(overrides?.aiUsed ?? 0),
+      },
+      tenantFeatureEntitlementOverride: {
+        findMany: jest.fn().mockResolvedValue(
+          (overrides?.featureOverrides ?? []).map((override) => ({
+            id: override.id,
+            tenantId: override.tenantId,
+            featureKey: override.featureKey,
+            enabled: override.enabled,
+            source: override.source ?? 'manual_override',
+            reason: override.reason,
+            expiresAt: override.expiresAt ?? null,
+            createdByAdminId: override.createdByAdminId ?? null,
+            updatedByAdminId: override.updatedByAdminId ?? null,
+            createdAt: override.createdAt ?? new Date('2026-06-01T00:00:00.000Z'),
+            updatedAt: override.updatedAt ?? new Date('2026-06-01T00:00:00.000Z'),
+          })),
+        ),
       },
     };
     const billingSettingsService = {
@@ -118,6 +148,9 @@ describe('BillingEntitlementsService', () => {
       chatMessage: {
         count: jest.fn().mockResolvedValue(0),
       },
+      tenantFeatureEntitlementOverride: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
     const billingSettingsService = {
       ensureDefaultSettings: jest.fn().mockResolvedValue({
@@ -170,5 +203,50 @@ describe('BillingEntitlementsService', () => {
         url: 'https://example.com/marketing',
       }),
     ]);
+  });
+
+  it('applies manual feature overrides and exposes them in the entitlement payload', async () => {
+    const service = makeService({
+      basePrice: 0,
+      aiUsed: 0,
+      featureOverrides: [
+        {
+          id: 'override-1',
+          tenantId: 'tenant-1',
+          featureKey: 'campaigns',
+          enabled: true,
+          reason: 'Liberacao comercial assistida',
+          expiresAt: null,
+        },
+        {
+          id: 'override-2',
+          tenantId: 'tenant-1',
+          featureKey: 'ifood_integration',
+          enabled: false,
+          reason: 'Bloqueio temporario',
+          expiresAt: new Date('2026-05-01T00:00:00.000Z'),
+        },
+      ],
+    });
+
+    const result = await service.resolveTenantEntitlements('tenant-1');
+
+    expect(result.flags.canUseCampaigns).toBe(true);
+    expect(result.flags.canUseIfoodIntegration).toBe(true);
+    expect(result.ai.source).toBe('blocked');
+    expect(result.featureOverrides).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          featureKey: 'campaigns',
+          enabled: true,
+          isActiveNow: true,
+        }),
+        expect.objectContaining({
+          featureKey: 'ifood_integration',
+          enabled: false,
+          isActiveNow: false,
+        }),
+      ]),
+    );
   });
 });

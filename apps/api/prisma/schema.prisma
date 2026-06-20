@@ -110,6 +110,7 @@ model Tenant {
   marketplaceConnections      MarketplaceConnection[]
   marketplaceEventInboxes     MarketplaceEventInbox[]
   marketplaceOrders           MarketplaceOrder[]
+  featureEntitlementOverrides TenantFeatureEntitlementOverride[]
   tenantAddons                TenantAddon[]
   users                       TenantUser[]
   businessGroup               BusinessGroup?               @relation("TenantBusinessGroupMembers", fields: [businessGroupId], references: [id])
@@ -2064,6 +2065,26 @@ model TenantModuleAccess {
   @@unique([tenantId, module])
   @@index([tenantId])
   @@map("tenant_module_access")
+}
+
+model TenantFeatureEntitlementOverride {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  featureKey      String   @map("feature_key") @db.VarChar(80)
+  enabled         Boolean  @default(true)
+  source          String   @default("manual_override") @db.VarChar(40)
+  reason          String   @db.VarChar(255)
+  expiresAt       DateTime? @map("expires_at")
+  createdByAdminId String? @map("created_by_admin_id")
+  updatedByAdminId String? @map("updated_by_admin_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, featureKey])
+  @@index([tenantId])
+  @@index([tenantId, featureKey, enabled])
+  @@map("tenant_feature_entitlement_overrides")
 }
 
 model Goal {

@@ -235,7 +235,7 @@ export class AdminTenantsService {
   /**
    * Update tenant status (activate/suspend).
    */
-  async updateStatus(id: string, status: 'active' | 'inactive' | 'suspended' | 'trial', adminId?: string) {
+  async updateStatus(id: string, status: 'active' | 'inactive' | 'suspended' | 'trial', adminId?: string, reason?: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id },
     });
@@ -273,17 +273,18 @@ export class AdminTenantsService {
               subscriptionId: subscription.id,
               previousStatus: subscription.status,
               nextStatus: nextBillingStatus,
-              reason: status === 'suspended' ? 'admin_suspended_tenant' : 'admin_reactivated_tenant',
-              source: 'saas_admin',
-              actorType: adminId ? 'admin' : 'system',
-              actorId: adminId ?? null,
-              metadata: {
-                previousTenantStatus: tenant.status,
-                nextTenantStatus: status,
+                reason: reason?.trim() || (status === 'suspended' ? 'admin_suspended_tenant' : 'admin_reactivated_tenant'),
+                source: 'saas_admin',
+                actorType: adminId ? 'admin' : 'system',
+                actorId: adminId ?? null,
+                metadata: {
+                  previousTenantStatus: tenant.status,
+                  nextTenantStatus: status,
+                  reason: reason?.trim() ?? null,
+                },
               },
-            },
-          });
-        }
+            });
+          }
       }
 
       await tx.auditLog.create({
@@ -298,6 +299,7 @@ export class AdminTenantsService {
             nextStatus: status,
             billingSubscriptionId: subscription?.id ?? null,
             billingStatusUpdated: Boolean(subscription && (status === 'suspended' || status === 'active')),
+            reason: reason?.trim() ?? null,
           },
         },
       });
