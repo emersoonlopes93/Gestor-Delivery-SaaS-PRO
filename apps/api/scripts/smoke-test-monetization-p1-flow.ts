@@ -64,7 +64,7 @@ function normalizeBaseUrl(value: string): string {
 
 function assertSafeTarget(baseUrl: string): void {
   const host = new URL(baseUrl).hostname.toLowerCase();
-  const looksSafe = /localhost|127\.0\.0\.1|staging|homolog|qa|dev/.test(host);
+  const looksSafe = /localhost|127\.0\.0\.1|staging|homolog|qa|dev/.test(host) || host.endsWith('.onrender.com');
   if (!looksSafe || host.includes('prod')) {
     throw new Error(`Refusing monetization smoke against non-local/non-staging host: ${host}.`);
   }
