@@ -111,12 +111,14 @@ export function PrinterSettings() {
   const createDevice = useCreateDevice();
   const updateDevice = useUpdateDevice();
   const testPrint = useTestPrint();
+  const canReadPrintingJobs = !!user?.permissions?.includes('printing.read');
   const { data: printJobs = [] } = useQuery<PrintJobRecord[]>({
     queryKey: ['printing-jobs'],
     queryFn: async () => {
       const { data } = await api.get<PrintJobRecord[]>('/printing/jobs');
       return data;
     },
+    enabled: canReadPrintingJobs,
     refetchInterval: 30000,
     retry: false,
   });

@@ -25,6 +25,9 @@ Thumbs.db
 # Turbo
 .turbo/
 
+#cache
+.pnpm-store
+
 # Logs
 *.log
 npm-debug.log*
