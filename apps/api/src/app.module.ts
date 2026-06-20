@@ -92,6 +92,23 @@ function getRedisCacheReconnectDelay(attempt: number): false | number {
   return getRedisReconnectDelay(attempt) ?? false;
 }
 
+function attachRedisClientEventHandlers(client: { on?: (event: string, handler: (...args: unknown[]) => void) => void } | undefined, source: 'cache' | 'bullmq') {
+  if (!client || typeof client.on !== 'function') return;
+
+  client.on('error', (err: unknown) => {
+    logRedisState(
+      'error',
+      `${source}_redis_client_error:${classifyRedisError(err)}`,
+      `[${source.toUpperCase()}] redis_client_error - keeping_process_alive`,
+      err,
+    );
+  });
+
+  client.on('end', () => {
+    logRedisState('warn', `${source}_redis_client_end`, `[${source.toUpperCase()}] redis_client_closed`);
+  });
+}
+
 // Log Redis initialization status at startup with throttling and without secrets.
 if (process.env.REDIS_ENABLED === 'false') {
   logRedisState('warn', 'redis_disabled', '[REDIS] disabled_intentionally - cache_fallback_memory bullmq_unavailable productionReady=false');
@@ -182,6 +199,7 @@ if (process.env.REDIS_ENABLED === 'false') {
             password: process.env.REDIS_PASSWORD || undefined,
             ttl: 60000, // Default 60s
           }) as { client: { ping(): Promise<string> } };
+          attachRedisClientEventHandlers((store as { client?: { on?: (event: string, handler: (...args: unknown[]) => void) => void } }).client, 'cache');
           // Testa ping
           await store.client.ping();
           logRedisState('log', 'cache_redis_connected', '[CACHE] redis_connected');
