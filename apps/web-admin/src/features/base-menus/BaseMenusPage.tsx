@@ -216,8 +216,8 @@ const imageStatusLabels: Record<ImageStatus, string> = {
 
 const tabs: Array<{ id: TabId; label: string }> = [
   { id: 'products', label: 'Produtos' },
-  { id: 'imports', label: 'ImportaÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes' },
-  { id: 'advanced', label: 'Mais opÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes' },
+  { id: 'imports', label: 'Importações' },
+  { id: 'advanced', label: 'Mais opções' },
 ];
 
 export function BaseMenusPage() {
@@ -455,20 +455,11 @@ function BaseMenuDraftEditor({ id }: { id: string }) {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get<BaseMenuDraft>(`/admin/base-menus/${id}/draft`);
+      const response = canManage
+        ? await api.post<BaseMenuDraft>(`/admin/base-menus/${id}/draft-version`)
+        : await api.get<BaseMenuDraft>(`/admin/base-menus/${id}/draft`);
       setDraft(response.data);
     } catch (err) {
-      if (getErrorStatus(err) === 404 && canManage) {
-        try {
-          await api.post<BaseMenuDraft>(`/admin/base-menus/${id}/draft-version`);
-          const response = await api.get<BaseMenuDraft>(`/admin/base-menus/${id}/draft`);
-          setDraft(response.data);
-          return;
-        } catch (createErr) {
-          setError(errorMessage(createErr));
-          return;
-        }
-      }
       setError(errorMessage(err));
     } finally {
       setLoading(false);
@@ -909,7 +900,7 @@ function PublishSummary({ validation }: { validation: DraftValidation }) {
     <section className="grid gap-3 lg:grid-cols-[1fr_1fr_1.4fr]">
       <div className="rounded-xl border border-border bg-card p-4">
         <p className="text-[11px] font-black uppercase text-muted-foreground">Resumo</p>
-        <p className="mt-2 text-sm font-black text-foreground">{validation.totals.categories} categorias ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {validation.totals.products} produtos</p>
+        <p className="mt-2 text-sm font-black text-foreground">{validation.totals.categories} categorias · {validation.totals.products} produtos</p>
         <p className="mt-1 text-xs font-bold text-muted-foreground">Sera publicada a v{validation.publishingVersionNumber}</p>
       </div>
       <div className="rounded-xl border border-border bg-card p-4">
@@ -920,10 +911,10 @@ function PublishSummary({ validation }: { validation: DraftValidation }) {
       <div className="rounded-xl border border-border bg-card p-4">
         <p className="text-[11px] font-black uppercase text-muted-foreground">Validacao antes de publicar</p>
         <p className={`mt-2 text-sm font-black ${validation.errors.length > 0 ? 'text-destructive' : 'text-emerald-600'}`}>
-          {validation.errors.length} erros ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {validation.warnings.length} avisos
+          {validation.errors.length} erros · {validation.warnings.length} avisos
         </p>
         <div className="mt-2 max-h-24 overflow-auto text-xs font-bold text-muted-foreground">
-          {[...validation.errors, ...validation.warnings].slice(0, 8).map((item) => <p key={item}>ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ {item}</p>)}
+          {[...validation.errors, ...validation.warnings].slice(0, 8).map((item) => <p key={item}>- {item}</p>)}
         </div>
       </div>
     </section>
@@ -1057,7 +1048,7 @@ function DraftActionModal({ state, onClose, onDone }: { state: DraftActionModalS
           <button onClick={onClose} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground hover:bg-muted">Cancelar</button>
           <button aria-label={isPublish ? 'Confirmar publicacao' : 'Confirmar descarte'} onClick={() => void submit()} disabled={!canSubmit || busy} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-black text-white disabled:opacity-50 ${isPublish ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-destructive hover:bg-destructive/90'}`}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : isPublish ? <Send className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
-            {isPublish ? 'Publicar alteraÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes' : 'Descartar alteraÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes'}
+            {isPublish ? 'Publicar alterações' : 'Descartar alterações'}
           </button>
         </div>
       </section>
@@ -1294,7 +1285,7 @@ async function duplicateProductInDraft(draft: BaseMenuDraft, product: BaseMenuPr
   const category = draft.categories.find((item) => item.id === product.categoryId);
   if (!category) return;
   await api.post(`/admin/base-menus/${draft.template.slug}/versions/${draft.version.id}/categories/${category.id}/products`, {
-    name: `${product.name} - cÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia`,
+    name: `${product.name} - cópia`,
     description: product.description,
     basePrice: product.basePrice,
     compareAtPrice: product.compareAtPrice,
@@ -1436,7 +1427,7 @@ function ProductEditorModal({
   onSaved: () => void | Promise<void>;
 }) {
   const product = state.product;
-  const [name, setName] = useState(product ? (state.mode === 'duplicate' ? `${product.name} - cÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia` : product.name) : '');
+  const [name, setName] = useState(product ? (state.mode === 'duplicate' ? `${product.name} - cópia` : product.name) : '');
   const [description, setDescription] = useState(product?.description ?? '');
   const [basePrice, setBasePrice] = useState(product ? String(product.basePrice) : '');
   const [compareAtPrice, setCompareAtPrice] = useState(product?.compareAtPrice === null || product?.compareAtPrice === undefined ? '' : String(product.compareAtPrice));
@@ -1485,7 +1476,7 @@ function ProductEditorModal({
             {state.mode === 'edit' ? 'Editar produto' : state.mode === 'duplicate' ? 'Duplicar produto' : 'Novo produto'}
           </p>
           <h2 className="mt-1 text-xl font-black text-foreground">{product?.name ?? 'Produto novo'}</h2>
-          <p className="mt-1 text-sm font-bold text-muted-foreground">Imagem e complementos sÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o editados pelos atalhos prÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³prios na lista.</p>
+          <p className="mt-1 text-sm font-bold text-muted-foreground">Imagem e complementos são editados pelos atalhos próprios na lista.</p>
         </div>
         <div className="grid gap-4 p-5">
           <div className="grid gap-3 md:grid-cols-2">
@@ -1514,7 +1505,7 @@ function ProductEditorModal({
           </button>
           <button type="submit" disabled={busy} className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground disabled:opacity-50">
             <Save className="h-4 w-4" />
-            {state.mode === 'edit' ? 'Salvar alteraÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes' : 'Criar produto'}
+            {state.mode === 'edit' ? 'Salvar alterações' : 'Criar produto'}
           </button>
         </div>
       </form>
@@ -1619,10 +1610,10 @@ function ProductImagePickerModal({
           ))}
         </div>
         <div className="flex items-center justify-between border-t border-border bg-muted/20 p-5">
-          <p className="text-xs font-bold text-muted-foreground">PÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡gina {page} de {totalPages}</p>
+          <p className="text-xs font-bold text-muted-foreground">Página {page} de {totalPages}</p>
           <div className="flex gap-2">
             <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground disabled:opacity-50">Anterior</button>
-            <button type="button" onClick={() => setPage((current) => current + 1)} disabled={page >= totalPages} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground disabled:opacity-50">PrÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³xima</button>
+            <button type="button" onClick={() => setPage((current) => current + 1)} disabled={page >= totalPages} className="rounded-xl border border-border bg-background px-4 py-2 text-sm font-black text-foreground disabled:opacity-50">Próxima</button>
             <button type="button" onClick={onClose} className="rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground">Fechar</button>
           </div>
         </div>
@@ -1731,13 +1722,13 @@ function ProductOptionsModal({
                 <label className="block">
                   <span className="text-[11px] font-black uppercase text-muted-foreground">Selecao</span>
                   <select value={group.selectionType} onChange={(event) => updateGroup(groupIndex, { selectionType: event.target.value === 'single' ? 'single' : 'multiple' })} className="mt-1 h-10 w-full rounded-xl border border-input bg-background px-3 text-sm">
-                    <option value="single">Escolha ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºnica</option>
-                    <option value="multiple">MÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºltipla escolha</option>
+                    <option value="single">Escolha única</option>
+                    <option value="multiple">Múltipla escolha</option>
                   </select>
                 </label>
                 <label className="flex items-end gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm font-bold text-foreground">
                   <input type="checkbox" checked={group.isRequired} onChange={(event) => updateGroup(groupIndex, { isRequired: event.target.checked })} />
-                  ObrigatÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³rio
+                  Obrigatório
                 </label>
                 <Field label="Minimo" value={group.minSelect} onChange={(value) => updateGroup(groupIndex, { minSelect: value })} type="number" />
                 <Field label="Maximo" value={group.maxSelect} onChange={(value) => updateGroup(groupIndex, { maxSelect: value })} type="number" />
@@ -1851,7 +1842,7 @@ function ProductsTab({ categories }: { categories: BaseMenuCategory[] }) {
         <div key={category.id} className="overflow-hidden rounded-xl border border-border bg-card">
           <div className="border-b border-border px-4 py-3">
             <p className="text-sm font-black text-foreground">{category.name}</p>
-            <p className="text-xs font-bold text-muted-foreground">{category.products.length} produtos ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ordem {category.sortOrder}</p>
+            <p className="text-xs font-bold text-muted-foreground">{category.products.length} produtos · ordem {category.sortOrder}</p>
           </div>
           <div className="divide-y divide-border">
             {category.products.map((product) => <ProductRow key={product.id} product={product} />)}
@@ -1875,13 +1866,13 @@ function ProductRow({ product }: { product: BaseMenuProduct }) {
       </div>
       <div className="min-w-0">
         <p className="text-sm font-black text-foreground">{product.name}</p>
-        <p className="mt-1 text-xs font-bold text-muted-foreground">{product.description ?? 'Sem descriÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o'}</p>
+        <p className="mt-1 text-xs font-bold text-muted-foreground">{product.description ?? 'Sem descrição'}</p>
         <div className="mt-2 flex flex-wrap gap-1">
           {product.searchTagsJson.map((tag) => <span key={tag} className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground">{tag}</span>)}
         </div>
       </div>
       <div>
-        <p className="text-[11px] font-black uppercase text-muted-foreground">PreÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§o sugerido</p>
+        <p className="text-[11px] font-black uppercase text-muted-foreground">Preço sugerido</p>
         <p className="text-sm font-black text-foreground">{formatMoney(product.basePrice)}</p>
       </div>
       <div>
@@ -1928,7 +1919,7 @@ function ImageGroup({ title, products, status }: { title: string; products: Base
             </Link>
           </div>
         ))}
-        {products.length === 0 ? <p className="py-8 text-center text-sm font-bold text-muted-foreground">Nenhum produto nesta condiÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o.</p> : null}
+        {products.length === 0 ? <p className="py-8 text-center text-sm font-bold text-muted-foreground">Nenhum produto nesta condição.</p> : null}
       </div>
     </div>
   );
@@ -1944,7 +1935,7 @@ function ImportsTab({ logs }: { logs: ImportLog[] }) {
         <span>Status</span>
         <span>Criados</span>
         <span>Pulados</span>
-        <span>VersÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o</span>
+        <span>Versão</span>
       </div>
       {logs.map((log) => (
         <article key={log.id} className="grid grid-cols-[1.2fr_150px_120px_130px_130px_180px] gap-3 border-b border-border px-4 py-4 last:border-b-0">
@@ -1954,12 +1945,12 @@ function ImportsTab({ logs }: { logs: ImportLog[] }) {
           </div>
           <span className="text-xs font-bold text-muted-foreground">{formatDate(log.createdAt)}</span>
           <ImportStatusPill status={log.status} />
-          <span className="text-sm font-black text-foreground">{log.categoriesCreated} cat ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {log.productsCreated} prod</span>
-          <span className="text-sm font-black text-foreground">{log.categoriesSkipped} cat ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {log.productsSkipped} prod</span>
-          <span className="text-sm font-black text-foreground">v{log.version.versionNumber} ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· {statusLabels[log.version.status]}</span>
+          <span className="text-sm font-black text-foreground">{log.categoriesCreated} cat · {log.productsCreated} prod</span>
+          <span className="text-sm font-black text-foreground">{log.categoriesSkipped} cat · {log.productsSkipped} prod</span>
+          <span className="text-sm font-black text-foreground">v{log.version.versionNumber} · {statusLabels[log.version.status]}</span>
         </article>
       ))}
-      {logs.length === 0 ? <TableMessage icon={<ListChecks className="h-8 w-8" />} text="Nenhuma importaÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£o registrada para este modelo." /> : null}
+      {logs.length === 0 ? <TableMessage icon={<ListChecks className="h-8 w-8" />} text="Nenhuma importação registrada para este modelo." /> : null}
     </section>
   );
 }
@@ -1975,7 +1966,7 @@ function AdvancedTab({ detail, versions, imageGroups }: { detail: BaseMenuDetail
         </div>
       </details>
       <details className="rounded-xl border border-border bg-card p-4">
-        <summary className="cursor-pointer text-sm font-black text-foreground">VersÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âµes</summary>
+        <summary className="cursor-pointer text-sm font-black text-foreground">Versões</summary>
         <div className="mt-4">
           <VersionsTab versions={versions} currentVersionId={detail.currentPublishedVersion?.id ?? null} />
         </div>
@@ -2008,7 +1999,7 @@ function MetadataTab({ detail }: { detail: BaseMenuDetail }) {
     <section className="rounded-xl border border-border bg-card p-4">
       <div className="mb-3 flex items-center gap-2 text-sm font-black text-foreground">
         <FileJson className="h-4 w-4" />
-        Metadados ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âºteis do modelo
+        Metadados úteis do modelo
       </div>
       <pre className="max-h-[620px] overflow-auto rounded-xl bg-muted/50 p-4 text-xs text-foreground">{JSON.stringify(metadata, null, 2)}</pre>
     </section>
@@ -2121,7 +2112,7 @@ function CreateTemplateModal({ onClose, onDone }: { onClose: () => void; onDone:
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <form onSubmit={(event) => void submit(event)} className="w-full max-w-md overflow-hidden rounded-xl bg-card shadow-xl">
         <div className="border-b border-border p-5">
-          <h2 className="text-xl font-black text-foreground">Novo CardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio Base</h2>
+          <h2 className="text-xl font-black text-foreground">Novo Cardápio Base</h2>
           <p className="mt-1 text-sm font-bold text-muted-foreground">Cria um rascunho em branco.</p>
         </div>
         <div className="space-y-4 p-5">
@@ -2142,7 +2133,7 @@ function CreateTemplateModal({ onClose, onDone }: { onClose: () => void; onDone:
 }
 
 function DuplicateTemplateModal({ sourceTemplateId, sourceTemplateName, onClose, onDone }: { sourceTemplateId: string; sourceTemplateName: string; onClose: () => void; onDone: (slug: string) => void }) {
-  const [name, setName] = useState(`${sourceTemplateName} (CÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia)`);
+  const [name, setName] = useState(`${sourceTemplateName} (cópia)`);
   const [slug, setSlug] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -2167,8 +2158,8 @@ function DuplicateTemplateModal({ sourceTemplateId, sourceTemplateName, onClose,
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <form onSubmit={(event) => void submit(event)} className="w-full max-w-md overflow-hidden rounded-xl bg-card shadow-xl">
         <div className="border-b border-border p-5">
-          <h2 className="text-xl font-black text-foreground">Duplicar CardÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡pio Base</h2>
-          <p className="mt-1 text-sm font-bold text-muted-foreground">Isso criarÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ uma cÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³pia independente de todas as categorias e produtos.</p>
+          <h2 className="text-xl font-black text-foreground">Duplicar Cardápio Base</h2>
+          <p className="mt-1 text-sm font-bold text-muted-foreground">Isso criará uma cópia independente de todas as categorias e produtos.</p>
         </div>
         <div className="space-y-4 p-5">
           <Field label="Novo Nome" value={name} onChange={setName} />

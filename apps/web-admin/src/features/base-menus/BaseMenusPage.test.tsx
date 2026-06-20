@@ -137,7 +137,6 @@ function renderPage(route: string) {
 }
 
 function mockApis({ createDraft = false, baseMediaItems = [] as Array<Record<string, unknown>> } = {}) {
-  let draftCalls = 0;
   vi.mocked(api.get).mockImplementation(<T,>(endpoint: string): Promise<ApiResponse<T>> => {
     if (endpoint === '/admin/base-menus') {
       return Promise.resolve(ok([
@@ -213,8 +212,7 @@ function mockApis({ createDraft = false, baseMediaItems = [] as Array<Record<str
     }
 
     if (endpoint === '/admin/base-menus/acai/draft') {
-      draftCalls += 1;
-      if (!createDraft && draftCalls === 1) {
+      if (!createDraft) {
         return Promise.reject(Object.assign(new Error('Draft not found'), { status: 404 })) as Promise<ApiResponse<T>>;
       }
       return Promise.resolve(ok({
@@ -249,7 +247,22 @@ function mockApis({ createDraft = false, baseMediaItems = [] as Array<Record<str
   });
 
   vi.mocked(api.post).mockImplementation(<T,>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> => {
-    if (endpoint === '/admin/base-menus/acai/draft-version') return Promise.resolve(ok({}) as ApiResponse<T>);
+    if (endpoint === '/admin/base-menus/acai/draft-version') {
+      return Promise.resolve(ok({
+        template: { ...draftVersionTemplate, currentPublishedVersionId: 'version-1' },
+        version: { ...draftVersion, templateId: 'template-1' },
+        validation: {
+          errors: [],
+          warnings: [],
+          totals: { categories: 1, products: 1 },
+          imageSummary: { linkedExact: 1, linkedTag: 0, linkedFallback: 0, missingLookup: 0, noPublishedAsset: 0, draftOnly: 0 },
+          replacingVersionId: 'version-1',
+          publishingVersionId: 'version-2',
+          publishingVersionNumber: 2,
+        },
+        categories: [category],
+      }) as ApiResponse<T>);
+    }
     if (endpoint === '/admin/base-menus/acai/publish-draft') return Promise.resolve(ok({}) as ApiResponse<T>);
     if (endpoint === '/admin/base-menus/acai/discard-draft') return Promise.resolve(ok({}) as ApiResponse<T>);
     if (endpoint.includes('/products')) return Promise.resolve(ok({}) as ApiResponse<T>);
