@@ -15,6 +15,8 @@ import { TenantBillingResolverService } from '../../billing/tenant-billing-resol
 import { normalizeSeededRevenueTierLabel } from '../../billing/revenue-tier-label';
 import { RevenueLedgerService } from '../../billing/revenue-ledger.service';
 import { BillingAddonService } from '../../billing/billing-addon.service';
+import * as bcrypt from 'bcryptjs';
+import { TenantDefaultRole } from '@gestor/core';
 
 type BillingRevenueTierInput = {
   id?: string;
@@ -73,6 +75,19 @@ type UpdateBillingSettingsBody = {
   defaultGracePeriodDays?: number;
   defaultTrialDays?: number;
   requirePaymentMethodForPaidPlans?: boolean;
+};
+
+type MonetizationSmokeSetupBody = {
+  tenantSlug?: string;
+  tenantEmail?: string;
+  tenantPassword?: string;
+  tenantName?: string;
+  runId?: string;
+  allowReset?: boolean;
+};
+
+type MonetizationSmokeCleanupBody = {
+  tenantSlug?: string;
 };
 
 type NormalizedBillingRevenueTier = {
@@ -761,6 +776,301 @@ export class AdminBillingController {
     };
   }
 
+  @Post('smoke/monetization/setup')
+  @RequireAdminPermissions('saas.billing.manage')
+  async setupMonetizationSmoke(@Body() body: MonetizationSmokeSetupBody) {
+    this.assertMonetizationSmokeEnabled();
+
+    const tenantSlug = this.requireSmokeTenantSlug(body.tenantSlug);
+    const tenantEmail = this.requireSmokeString(body.tenantEmail, 'tenantEmail');
+    const tenantPassword = this.requireSmokeString(body.tenantPassword, 'tenantPassword');
+    const tenantName = body.tenantName?.trim() || 'Smoke Monetization';
+    const runId = body.runId?.trim() || `monetization-smoke-${Date.now()}`;
+
+    if (body.allowReset !== true || (process.env.ALLOW_SMOKE_RESET ?? 'false').toLowerCase() !== 'true') {
+      throw new BadRequestException('ALLOW_SMOKE_RESET=true e allowReset=true sao obrigatorios para o smoke de monetizacao.');
+    }
+
+    const tenant = await this.prisma.$transaction(async (tx) => {
+      const existingTenant = await tx.tenant.findUnique({
+        where: { slug: tenantSlug },
+      });
+
+      const createdTenant = existingTenant ?? await tx.tenant.create({
+        data: {
+          name: tenantName,
+          slug: tenantSlug,
+          status: 'active',
+          onboarding: { create: {} },
+          settings: { create: {} },
+          aiAgentConfig: {
+            create: {
+              isEnabled: false,
+              useGlobalDefaults: true,
+              humanInterventionEnabled: true,
+              humanInterventionMinutes: 15,
+              resumeAutomatically: true,
+            },
+          },
+          schedulingSettings: {
+            create: {
+              enabled: false,
+              maximumAdvanceDays: 7,
+              timezone: 'America/Sao_Paulo',
+            },
+          },
+        },
+      });
+
+      await tx.tenant.update({
+        where: { id: createdTenant.id },
+        data: {
+          name: tenantName,
+          slug: tenantSlug,
+          status: 'active',
+        },
+      });
+
+      await tx.tenantSettings.upsert({
+        where: { tenantId: createdTenant.id },
+        create: { tenantId: createdTenant.id },
+        update: {},
+      });
+
+      await tx.tenantOnboarding.upsert({
+        where: { tenantId: createdTenant.id },
+        create: { tenantId: createdTenant.id },
+        update: {},
+      });
+
+      await tx.schedulingSettings.upsert({
+        where: { tenantId: createdTenant.id },
+        create: {
+          tenantId: createdTenant.id,
+          enabled: false,
+          maximumAdvanceDays: 7,
+          timezone: 'America/Sao_Paulo',
+        },
+        update: {
+          enabled: false,
+          maximumAdvanceDays: 7,
+          timezone: 'America/Sao_Paulo',
+        },
+      });
+
+      const passwordHash = await bcrypt.hash(tenantPassword, 12);
+      const tenantUser = await tx.tenantUser.upsert({
+        where: {
+          tenantId_email: {
+            tenantId: createdTenant.id,
+            email: tenantEmail.toLowerCase(),
+          },
+        },
+        create: {
+          tenantId: createdTenant.id,
+          email: tenantEmail.toLowerCase(),
+          name: tenantName,
+          passwordHash,
+          isActive: true,
+        },
+        update: {
+          name: tenantName,
+          passwordHash,
+          isActive: true,
+        },
+      });
+
+      let ownerRole = await tx.tenantRole.findFirst({
+        where: {
+          tenantId: createdTenant.id,
+          slug: TenantDefaultRole.TENANT_OWNER,
+        },
+      });
+
+      if (!ownerRole) {
+        ownerRole = await tx.tenantRole.create({
+          data: {
+            tenantId: createdTenant.id,
+            name: 'Dono',
+            slug: TenantDefaultRole.TENANT_OWNER,
+            isSystem: true,
+          },
+        });
+      }
+
+      await tx.tenantUserRole.deleteMany({
+        where: { userId: tenantUser.id },
+      });
+
+      const permissions = await tx.tenantPermission.findMany({
+        select: { id: true },
+      });
+
+      if (permissions.length > 0) {
+        await tx.tenantRolePermission.deleteMany({
+          where: { roleId: ownerRole.id },
+        });
+        await tx.tenantRolePermission.createMany({
+          data: permissions.map((permission) => ({
+            roleId: ownerRole.id,
+            permissionId: permission.id,
+          })),
+        });
+      }
+
+      await tx.tenantUserRole.create({
+        data: {
+          userId: tenantUser.id,
+          roleId: ownerRole.id,
+        },
+      });
+
+      return createdTenant;
+    });
+
+    const plan = await this.tenantBillingResolver.getDefaultBillingPlan();
+    const subscription = await this.tenantBillingResolver.getOrCreateTenantBillingSubscription(tenant.id, plan.id);
+    const settings = await this.billingSettingsService.ensureDefaultSettings();
+    await this.billingAddonService.ensureAiAddonDefinition();
+
+    const seedBase = new Date(Date.now() - 10 * 60 * 1000);
+    const seed1 = new Date(seedBase.getTime());
+    const seed2 = new Date(seedBase.getTime() + 60_000);
+    const seed3 = new Date(seedBase.getTime() + 120_000);
+    const seed4 = new Date(seedBase.getTime() + 180_000);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.paymentAttempt.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.invoiceItem.deleteMany({
+        where: {
+          invoice: {
+            tenantId: tenant.id,
+          },
+        },
+      });
+      await tx.invoice.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.billingUsageSnapshot.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.billingCycleRecord.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.subscriptionStatusHistory.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.tenantAddon.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.billingPaymentMethod.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.revenueEvent.deleteMany({
+        where: {
+          tenantId: tenant.id,
+          idempotencyKey: {
+            startsWith: `${runId}:`,
+          },
+        },
+      });
+    });
+
+    const seededEvents = [
+      {
+        orderId: `${runId}:baseline-direct-online`,
+        amount: 1400,
+        sourceChannel: 'direct_online',
+        occurredAt: seed1,
+      },
+      {
+        orderId: `${runId}:alias-storefront`,
+        amount: 200,
+        sourceChannel: 'storefront',
+        occurredAt: seed2,
+      },
+      {
+        orderId: `${runId}:cap-direct-online`,
+        amount: 5000,
+        sourceChannel: 'direct_online',
+        occurredAt: seed3,
+      },
+      {
+        orderId: `${runId}:ifood-marketplace`,
+        amount: 250,
+        sourceChannel: 'marketplace_ifood',
+        occurredAt: seed4,
+      },
+    ] as const;
+
+    for (const seed of seededEvents) {
+      await this.revenueLedgerService.recordOrderStatusEvent({
+        tenantId: tenant.id,
+        orderId: seed.orderId,
+        orderStatus: 'completed',
+        orderTotal: new Prisma.Decimal(seed.amount),
+        sourceChannel: seed.sourceChannel,
+        occurredAt: seed.occurredAt,
+        actorType: 'system',
+        actorId: 'smoke-monetization',
+        reason: `smoke_seed_${seed.orderId}`,
+      });
+    }
+
+    return {
+      tenantId: tenant.id,
+      tenantSlug,
+      tenantEmail: tenantEmail.toLowerCase(),
+      planId: plan.id,
+      subscriptionId: subscription.id,
+      settings,
+      seedTimeline: {
+        baselineEnd: new Date(seed2.getTime() - 1),
+        progressiveEnd: new Date(seed3.getTime() - 1),
+        capEnd: new Date(seed4.getTime() - 1),
+        fullEnd: new Date(seed4.getTime() + 1),
+      },
+      seededEvents: seededEvents.map((seed) => ({
+        orderId: seed.orderId,
+        sourceChannel: seed.sourceChannel,
+        amount: seed.amount,
+        occurredAt: seed.occurredAt,
+      })),
+      state: await this.tenantBillingResolver.getTenantBillingState(tenant.id),
+    };
+  }
+
+  @Post('smoke/monetization/cleanup')
+  @RequireAdminPermissions('saas.billing.manage')
+  async cleanupMonetizationSmoke(@Body() body: MonetizationSmokeCleanupBody) {
+    this.assertMonetizationSmokeEnabled();
+
+    const tenantSlug = this.requireSmokeTenantSlug(body.tenantSlug);
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+      select: { id: true, slug: true },
+    });
+
+    if (!tenant) {
+      return {
+        tenantSlug,
+        cleaned: false,
+        reason: 'tenant_not_found',
+      };
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.paymentAttempt.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.invoiceItem.deleteMany({
+        where: {
+          invoice: {
+            tenantId: tenant.id,
+          },
+        },
+      });
+      await tx.invoice.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.billingUsageSnapshot.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.billingCycleRecord.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.subscriptionStatusHistory.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.tenantAddon.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.billingPaymentMethod.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.revenueEvent.deleteMany({ where: { tenantId: tenant.id } });
+    });
+
+    return {
+      tenantSlug,
+      cleaned: true,
+    };
+  }
+
   @Post('usage-snapshots')
   @RequireAdminPermissions('saas.billing.manage')
   async createUsageSnapshot(
@@ -848,6 +1158,36 @@ export class AdminBillingController {
       cycleId,
       planId,
     });
+  }
+
+  private assertMonetizationSmokeEnabled(): void {
+    const enabled =
+      process.env.NODE_ENV !== 'production' ||
+      process.env.BILLING_SMOKE_ENABLED === 'true' ||
+      process.env.SMOKE_ENABLED === 'true';
+
+    if (!enabled) {
+      throw new BadRequestException('Smoke de monetizacao desabilitado neste ambiente.');
+    }
+  }
+
+  private requireSmokeTenantSlug(slug?: string): string {
+    const tenantSlug = slug?.trim();
+    if (!tenantSlug) {
+      throw new BadRequestException('tenantSlug e obrigatorio.');
+    }
+    if (!tenantSlug.startsWith('smoke-')) {
+      throw new BadRequestException('tenantSlug deve comecar com smoke-.');
+    }
+    return tenantSlug;
+  }
+
+  private requireSmokeString(value: string | undefined, field: string): string {
+    const normalized = value?.trim();
+    if (!normalized) {
+      throw new BadRequestException(`${field} e obrigatorio.`);
+    }
+    return normalized;
   }
 
   private normalizeRevenueTiers(tiers: BillingRevenueTierInput[]): NormalizedBillingRevenueTier[] {

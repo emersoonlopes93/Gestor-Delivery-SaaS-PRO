@@ -1,6 +1,3 @@
-import { OrderStatus, Prisma, PrismaClient } from '@prisma/client';
-import { RevenueLedgerService } from '../src/billing/revenue-ledger.service';
-
 type JsonObject = Record<string, unknown>;
 
 type SmokeConfig = {
@@ -16,12 +13,35 @@ type SmokeConfig = {
   retryDelayMs: number;
 };
 
+type SmokeSetupResponse = {
+  tenantId: string;
+  tenantSlug: string;
+  tenantEmail: string;
+  planId: string;
+  subscriptionId: string;
+  settings: JsonObject;
+  seedTimeline: {
+    baselineEnd: string;
+    progressiveEnd: string;
+    capEnd: string;
+    fullEnd: string;
+  };
+  seededEvents: Array<{
+    orderId: string;
+    sourceChannel: string;
+    amount: number;
+    occurredAt: string;
+  }>;
+  state: JsonObject;
+};
+
 type SmokeReport = {
   baseUrl: string;
   tenantSlug: string;
   runId: string;
   cleanupAttempted: boolean;
   cleanupCompleted: boolean;
+  lastStep: string | null;
   checks: string[];
   notes: string[];
 };
@@ -29,6 +49,8 @@ type SmokeReport = {
 class HttpSmokeError extends Error {
   constructor(
     message: string,
+    readonly method: string,
+    readonly url: string,
     readonly status?: number,
     readonly body?: unknown,
   ) {
@@ -64,7 +86,9 @@ function normalizeBaseUrl(value: string): string {
 
 function assertSafeTarget(baseUrl: string): void {
   const host = new URL(baseUrl).hostname.toLowerCase();
-  const looksSafe = /localhost|127\.0\.0\.1|staging|homolog|qa|dev/.test(host) || host.endsWith('.onrender.com');
+  const looksSafe =
+    /localhost|127\.0\.0\.1|staging|homolog|qa|dev/.test(host) ||
+    host.endsWith('.onrender.com');
   if (!looksSafe || host.includes('prod')) {
     throw new Error(`Refusing monetization smoke against non-local/non-staging host: ${host}.`);
   }
@@ -110,12 +134,21 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function currentMonthWindow(): { periodStart: Date; periodEnd: Date } {
-  const now = new Date();
-  return {
-    periodStart: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)),
-    periodEnd: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)),
-  };
+function monthStart(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1, 0, 0, 0, 0));
+}
+
+function sanitizeForLog(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map((item) => sanitizeForLog(item));
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value as JsonObject).map(([key, entry]) => {
+      if (/password|token|authorization|secret|credential/i.test(key)) {
+        return [key, '[REDACTED]'];
+      }
+      return [key, sanitizeForLog(entry)];
+    }),
+  );
 }
 
 function getNested(value: unknown, path: string): unknown {
@@ -139,17 +172,24 @@ function getNestedBoolean(value: unknown, path: string): boolean {
   return current;
 }
 
-function sanitizeForLog(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map((item) => sanitizeForLog(item));
-  if (!value || typeof value !== 'object') return value;
-  return Object.fromEntries(
-    Object.entries(value as JsonObject).map(([key, entry]) => {
-      if (/password|token|authorization|secret|credential/i.test(key)) {
-        return [key, '[REDACTED]'];
-      }
-      return [key, sanitizeForLog(entry)];
-    }),
-  );
+function getNestedArray(value: unknown, path: string): unknown[] {
+  const current = getNested(value, path);
+  assert(Array.isArray(current), `${path} must be an array.`);
+  return current as unknown[];
+}
+
+function expectedTierPrice(
+  revenue: number,
+  tiers: Array<{ minRevenue: unknown; maxRevenue: unknown; price: unknown }>,
+): number {
+  for (const tier of tiers) {
+    const minRevenue = decimalToNumber(tier.minRevenue);
+    const maxRevenue = tier.maxRevenue === null ? null : decimalToNumber(tier.maxRevenue);
+    if (revenue >= minRevenue && (maxRevenue === null || revenue <= maxRevenue)) {
+      return decimalToNumber(tier.price);
+    }
+  }
+  return tiers.length ? decimalToNumber(tiers[tiers.length - 1]?.price) : 0;
 }
 
 type RequestOptions = {
@@ -175,12 +215,13 @@ class ApiClient {
   ): Promise<T> {
     let lastError: unknown;
     const expectedStatuses = options.expectedStatuses ?? [200, 201];
+    const url = `${this.baseUrl}${path}`;
 
     for (let attempt = 1; attempt <= this.config.retryAttempts; attempt += 1) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), this.config.requestTimeoutMs);
       try {
-        const response = await fetch(`${this.baseUrl}${path}`, {
+        const response = await fetch(url, {
           method,
           signal: controller.signal,
           headers: {
@@ -195,7 +236,13 @@ class ApiClient {
         if (expectedStatuses.includes(response.status)) {
           return unwrap<T>(parsed);
         }
-        const error = new HttpSmokeError(`${method} ${path} failed with HTTP ${response.status}`, response.status, sanitizeForLog(parsed));
+        const error = new HttpSmokeError(
+          `${method} ${path} failed with HTTP ${response.status}`,
+          method,
+          url,
+          response.status,
+          sanitizeForLog(parsed),
+        );
         if (attempt === this.config.retryAttempts || (response.status < 500 && response.status !== 429)) {
           throw error;
         }
@@ -221,76 +268,59 @@ class ApiClient {
   }
 }
 
-async function resetSmokeTenantData(prisma: PrismaClient, tenantId: string) {
-  const invoiceIds = await prisma.invoice.findMany({
-    where: { tenantId },
-    select: { id: true },
-  });
-  const sessionIds = await prisma.chatSession.findMany({
-    where: { tenantId },
-    select: { id: true },
-  });
-
-  await prisma.paymentAttempt.deleteMany({ where: { tenantId } });
-  if (invoiceIds.length) {
-    await prisma.invoiceItem.deleteMany({
-      where: {
-        invoiceId: {
-          in: invoiceIds.map((invoice) => invoice.id),
-        },
-      },
-    });
-  }
-  await prisma.invoice.deleteMany({ where: { tenantId } });
-  await prisma.billingUsageSnapshot.deleteMany({ where: { tenantId } });
-  await prisma.billingCycleRecord.deleteMany({ where: { tenantId } });
-  await prisma.subscriptionStatusHistory.deleteMany({ where: { tenantId } });
-  await prisma.revenueEvent.deleteMany({ where: { tenantId } });
-  await prisma.tenantAddon.deleteMany({ where: { tenantId } });
-  await prisma.billingPaymentMethod.deleteMany({ where: { tenantId } });
-  if (sessionIds.length) {
-    await prisma.chatMessage.deleteMany({
-      where: {
-        sessionId: {
-          in: sessionIds.map((session) => session.id),
-        },
-      },
-    });
-  }
-  await prisma.chatSession.deleteMany({ where: { tenantId } });
-  await prisma.tenantBillingSubscription.deleteMany({ where: { tenantId } });
+async function runStep<T>(
+  report: SmokeReport,
+  step: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  report.lastStep = step;
+  const result = await fn();
+  report.checks.push(step);
+  return result;
 }
 
-function expectedTierPrice(revenue: number, tiers: Array<{ minRevenue: unknown; maxRevenue: unknown; price: unknown }>): number {
-  for (const tier of tiers) {
-    const minRevenue = decimalToNumber(tier.minRevenue);
-    const maxRevenue = tier.maxRevenue === null ? null : decimalToNumber(tier.maxRevenue);
-    if (revenue >= minRevenue && (maxRevenue === null || revenue <= maxRevenue)) {
-      return decimalToNumber(tier.price);
-    }
-  }
-  return tiers.length ? decimalToNumber(tiers[tiers.length - 1]?.price) : 0;
-}
+function pluckRestorableSettings(settings: JsonObject): JsonObject {
+  const keys = [
+    'freeTierRevenueLimit',
+    'maxMonthlyCharge',
+    'trialProEnabled',
+    'trialProDays',
+    'trialRequiresPaymentMethod',
+    'trialIncludesAi',
+    'trialIncludesIfood',
+    'trialIncludesAdvancedReports',
+    'trialAutoConvertToBilling',
+    'aiAddonEnabled',
+    'aiAddonPrice',
+    'aiFreeTrialMessages',
+    'aiIncludedForPaidTenants',
+    'aiIncludedMonthlyMessages',
+    'aiHardLimitMonthlyMessages',
+    'countMarketplaceOrdersDefault',
+    'includeDeliveryFeeByDefault',
+    'includeServiceFeeByDefault',
+    'countStorefrontOrders',
+    'countDirectOnlineOrders',
+    'countPosOrders',
+    'countWhatsappAiOrders',
+    'countManualOrders',
+    'countMarketplaceIfoodOrders',
+    'countMarketplaceRappiOrders',
+    'countMarketplaceUbereatsOrders',
+    'countMarketplace99foodOrders',
+    'countMarketplaceKettaOrders',
+    'countMarketplaceZeDeliveryOrders',
+    'countConfirmedOrders',
+    'countCompletedOrders',
+    'excludeCancelledOrders',
+    'discountReducesRevenue',
+    'defaultGracePeriodDays',
+    'defaultTrialDays',
+    'requirePaymentMethodForPaidPlans',
+    'partnerLinksJson',
+  ] as const;
 
-async function seedCompletedOrder(
-  ledger: RevenueLedgerService,
-  input: {
-    tenantId: string;
-    orderId: string;
-    amount: number;
-    sourceChannel: string;
-  },
-) {
-  await ledger.recordOrderStatusEvent({
-    tenantId: input.tenantId,
-    orderId: input.orderId,
-    orderStatus: OrderStatus.completed,
-    orderTotal: new Prisma.Decimal(input.amount),
-    sourceChannel: input.sourceChannel,
-    occurredAt: new Date(),
-    actorType: 'system',
-    actorId: 'smoke-test',
-  });
+  return Object.fromEntries(keys.map((key) => [key, settings[key]]));
 }
 
 async function main() {
@@ -302,280 +332,242 @@ async function main() {
     runId,
     cleanupAttempted: config.allowReset,
     cleanupCompleted: false,
+    lastStep: null,
     checks: [],
     notes: [],
   };
 
   const anonymous = new ApiClient(config.baseUrl, config);
-  const prisma = new PrismaClient();
-  const ledger = new RevenueLedgerService(prisma as never);
-  const { periodStart, periodEnd } = currentMonthWindow();
+  let admin: ApiClient | null = null;
+  let tenant: ApiClient | null = null;
   let originalSettings: JsonObject | null = null;
+  let setup: SmokeSetupResponse | null = null;
+  let succeeded = false;
 
   try {
     assert(config.tenantSlug.startsWith('smoke-'), 'SMOKE_TENANT_SLUG must start with smoke-.');
 
-    const adminLogin = await anonymous.request<JsonObject>('POST', '/auth/admin/login', {
-      email: config.adminEmail,
-      password: config.adminPassword,
+    const adminLogin = await runStep(report, 'admin.login', async () => {
+      return anonymous.request<JsonObject>('POST', '/auth/admin/login', {
+        email: config.adminEmail,
+        password: config.adminPassword,
+      });
     });
-    const admin = anonymous.withToken(getNestedString(adminLogin, 'accessToken'));
-    report.checks.push('admin login ok');
+    admin = anonymous.withToken(getNestedString(adminLogin, 'accessToken'));
 
-    const tenantLogin = await anonymous.request<JsonObject>('POST', '/auth/tenant/login', {
-      email: config.tenantEmail,
-      password: config.tenantPassword,
-      tenantSlug: config.tenantSlug,
+    originalSettings = await runStep(report, 'admin.billing.settings.snapshot', async () => {
+      return admin!.request<JsonObject>('GET', '/admin/billing/settings');
     });
-    const tenantApi = anonymous.withToken(getNestedString(tenantLogin, 'accessToken'));
-    report.checks.push('tenant login ok');
+    report.notes.push('Captured billing settings snapshot for restore.');
 
-    await prisma.$connect();
-
-    const tenantRecord = await prisma.tenant.findUnique({
-      where: { slug: config.tenantSlug },
-      select: { id: true, slug: true, name: true },
+    setup = await runStep(report, 'smoke.setup', async () => {
+      return admin!.request<SmokeSetupResponse>('POST', '/admin/billing/smoke/monetization/setup', {
+        tenantSlug: config.tenantSlug,
+        tenantEmail: config.tenantEmail,
+        tenantPassword: config.tenantPassword,
+        tenantName: 'Smoke Monetization',
+        runId,
+        allowReset: config.allowReset,
+      });
     });
-    assert(tenantRecord, 'Smoke tenant not found in database.');
-    const tenantId = tenantRecord.id;
+    report.notes.push(`Smoke tenant provisioned: ${setup.tenantSlug}`);
 
-    originalSettings = await admin.request<JsonObject>('GET', '/admin/billing/settings');
-    report.notes.push('billing settings snapshot captured');
-
-    if (config.allowReset) {
-      await resetSmokeTenantData(prisma, tenantId);
-      report.notes.push('smoke tenant billing state reset');
-    } else {
-      const existingEvents = await prisma.revenueEvent.count({ where: { tenantId } });
-      const existingAddons = await prisma.tenantAddon.count({ where: { tenantId } });
-      assert(existingEvents === 0 && existingAddons === 0, 'Smoke tenant already has monetization data. Re-run with ALLOW_SMOKE_RESET=true.');
-    }
-
-    await admin.request('PUT', '/admin/billing/settings', {
-      trialProEnabled: true,
-      trialProDays: 14,
-      trialRequiresPaymentMethod: true,
-      trialAutoConvertToBilling: false,
-      countMarketplaceOrdersDefault: true,
-      countMarketplaceIfoodOrders: true,
-      aiAddonEnabled: true,
-      aiAddonPrice: 70,
+    const tenantLogin = await runStep(report, 'tenant.login', async () => {
+      return anonymous.request<JsonObject>('POST', '/auth/tenant/login', {
+        email: config.tenantEmail,
+        password: config.tenantPassword,
+        tenantSlug: config.tenantSlug,
+      });
     });
-    report.checks.push('admin monetization baseline applied');
+    tenant = anonymous.withToken(getNestedString(tenantLogin, 'accessToken'));
 
-    const plans = await tenantApi.request<Array<JsonObject>>('GET', '/billing/plans');
-    const defaultPlan = plans[0];
-    assert(defaultPlan, 'Default billing plan not found.');
-    const planId = getNestedString(defaultPlan, 'id');
-    await tenantApi.request('POST', '/billing/subscription', { planId });
-    report.checks.push('tenant billing subscription ensured');
+    const tenantId = setup.tenantId;
+    const planId = setup.planId;
+    const subscriptionId = setup.subscriptionId;
+    const seedTimeline = {
+      baselineEnd: new Date(getNestedString(setup, 'seedTimeline.baselineEnd')),
+      progressiveEnd: new Date(getNestedString(setup, 'seedTimeline.progressiveEnd')),
+      capEnd: new Date(getNestedString(setup, 'seedTimeline.capEnd')),
+      fullEnd: new Date(getNestedString(setup, 'seedTimeline.fullEnd')),
+    };
+    const windowStart = monthStart(seedTimeline.baselineEnd);
+    const revenueTiers = getNestedArray(setup, 'state.plan.revenueTiers') as Array<{
+      minRevenue: unknown;
+      maxRevenue: unknown;
+      price: unknown;
+    }>;
 
-    await seedCompletedOrder(ledger, {
-      tenantId,
-      orderId: `${runId}-free-direct-online`,
-      amount: 1400,
-      sourceChannel: 'direct_online',
-    });
-
-    let overview = await tenantApi.request<JsonObject>('GET', '/billing/me');
-    let entitlements = getNested(overview, 'entitlements') as JsonObject;
-    assert(decimalToNumber(getNested(entitlements, 'estimatedBasePrice')) === 0, 'Free controlled tenant should not generate base charge up to R$ 1.500.');
-    assert(getNestedString(entitlements, 'commercialStatus') === 'free_controlled', 'Commercial status should be free_controlled below the free tier.');
-    assert(getNestedBoolean(entitlements, 'flags.canUseAiAgent') === false, 'AI must stay blocked without add-on for a free tenant.');
-    report.checks.push('free tier up to R$ 1.500 validated');
-
-    const aiBlocked = await tenantApi.request<JsonObject>('GET', '/ai-agent/config', undefined, { expectedStatuses: [403] });
-    const aiBlockedMessage = String((aiBlocked as JsonObject).message ?? '');
-    assert(/Trial Pro|add-on/i.test(aiBlockedMessage), 'AI blocked endpoint should return a clear commercial guidance message.');
-    report.checks.push('ai endpoint blocks free tenant without entitlement');
-
-    await seedCompletedOrder(ledger, {
-      tenantId,
-      orderId: `${runId}-paid-storefront`,
-      amount: 200,
-      sourceChannel: 'storefront',
-    });
-
-    overview = await tenantApi.request<JsonObject>('GET', '/billing/me');
-    entitlements = getNested(overview, 'entitlements') as JsonObject;
-    const tiers = (getNested(overview, 'plan.revenueTiers') as Array<JsonObject>) ?? [];
-    const billableRevenue = decimalToNumber(getNested(entitlements, 'billableRevenue'));
-    const expectedProgressivePrice = expectedTierPrice(billableRevenue, tiers.map((tier) => ({
-      minRevenue: tier.minRevenue,
-      maxRevenue: tier.maxRevenue,
-      price: tier.price,
-    })));
-    assert(decimalToNumber(getNested(entitlements, 'estimatedBasePrice')) === expectedProgressivePrice, 'Progressive billing should select the correct revenue tier.');
-    assert(decimalToNumber(getNested(entitlements, 'estimatedBasePrice')) > 0, 'Revenue above the free tier should generate a positive base price.');
-
-    const eventsAfterStorefront = await admin.request<Array<JsonObject>>(
+    const usagePreview = (periodEnd: Date) => admin!.request<JsonObject>(
       'GET',
-      `/admin/billing/audit/revenue-events?tenantId=${encodeURIComponent(tenantId)}&periodStart=${encodeURIComponent(periodStart.toISOString())}&periodEnd=${encodeURIComponent(periodEnd.toISOString())}`,
+      `/admin/billing/usage-preview?tenantId=${encodeURIComponent(tenantId)}&planId=${encodeURIComponent(planId)}&periodStart=${encodeURIComponent(windowStart.toISOString())}&periodEnd=${encodeURIComponent(periodEnd.toISOString())}`,
     );
-    const storefrontEvent = eventsAfterStorefront.find((event) => String(event.orderId ?? '') === `${runId}-paid-storefront`);
-    assert(storefrontEvent && String(storefrontEvent.source ?? '') === 'direct_online', 'Legacy storefront revenue must remain normalized as direct_online.');
-    report.checks.push('progressive tier and storefront alias validated');
 
-    await seedCompletedOrder(ledger, {
-      tenantId,
-      orderId: `${runId}-cap-direct-online`,
-      amount: 5000,
-      sourceChannel: 'direct_online',
+    const freePreview = await runStep(report, 'billing.freeTier', async () => usagePreview(seedTimeline.baselineEnd));
+    const freeBillable = decimalToNumber(getNested(freePreview, 'billableAmount'));
+    const freeRatingPrice = decimalToNumber(getNested(freePreview, 'rating.currentMonthlyPrice'));
+    assert(freeBillable === 1400, 'Free tier preview should stay at R$ 1.400,00.');
+    assert(freeRatingPrice === 0, 'Free tier preview should remain at zero charge.');
+
+    const progressivePreview = await runStep(report, 'billing.progressiveTier', async () => usagePreview(seedTimeline.progressiveEnd));
+    const progressiveBillable = decimalToNumber(getNested(progressivePreview, 'billableAmount'));
+    const progressiveRatingPrice = decimalToNumber(getNested(progressivePreview, 'rating.currentMonthlyPrice'));
+    const expectedProgressive = expectedTierPrice(1600, revenueTiers);
+    assert(progressiveBillable === 1600, 'Progressive preview should include the first two seeded events.');
+    assert(progressiveRatingPrice === expectedProgressive, 'Progressive preview should match the configured revenue tier.');
+
+    const capPreview = await runStep(report, 'billing.cap300', async () => usagePreview(seedTimeline.capEnd));
+    const capRatingPrice = decimalToNumber(getNested(capPreview, 'rating.currentMonthlyPrice'));
+    assert(capRatingPrice === 300, 'Cap preview should stop at R$ 300,00.');
+
+    const revenueEvents = await runStep(report, 'billing.sourceAlias', async () => {
+      return admin!.request<Array<JsonObject>>(
+        'GET',
+        `/admin/billing/audit/revenue-events?tenantId=${encodeURIComponent(tenantId)}&periodStart=${encodeURIComponent(windowStart.toISOString())}&periodEnd=${encodeURIComponent(seedTimeline.fullEnd.toISOString())}`,
+      );
     });
+    const aliasSeed = `${runId}:alias-storefront`;
+    const aliasEvent = revenueEvents.find((event) => String(event.orderId ?? '') === aliasSeed);
+    assert(aliasEvent !== undefined, 'Storefront alias event must exist in revenue audit.');
+    assert(String(aliasEvent?.source ?? '') === 'direct_online', 'Storefront must be normalized to direct_online.');
 
-    overview = await tenantApi.request<JsonObject>('GET', '/billing/me');
-    entitlements = getNested(overview, 'entitlements') as JsonObject;
-    const topTier = tiers[tiers.length - 1];
-    const topTierPrice = decimalToNumber(topTier?.price);
-    assert(decimalToNumber(getNested(entitlements, 'estimatedBasePrice')) === topTierPrice, 'High revenue should respect the top revenue tier price cap.');
+    const ifoodIncludedPreview = await runStep(report, 'billing.ifoodIncluded', async () => usagePreview(seedTimeline.fullEnd));
+    const includedChannels = getNestedArray(ifoodIncludedPreview, 'includedChannels').map(String);
+    const ifoodIncludedAmount = decimalToNumber(getNested(ifoodIncludedPreview, 'billableAmount'));
+    assert(includedChannels.includes('marketplace_ifood'), 'iFood should be counted by default.');
 
-    const adminSettings = await admin.request<JsonObject>('GET', '/admin/billing/settings');
-    assert(decimalToNumber(adminSettings.maxMonthlyCharge) === topTierPrice, 'Admin maxMonthlyCharge must stay derived from the highest BillingRevenueTier.');
-    report.checks.push('monthly cap of R$ 300 validated through revenue tiers');
-
-    await seedCompletedOrder(ledger, {
-      tenantId,
-      orderId: `${runId}-ifood-marketplace`,
-      amount: 250,
-      sourceChannel: 'marketplace_ifood',
+    const ifoodExcludedPreview = await runStep(report, 'billing.ifoodExcluded', async () => {
+      await admin!.request('PUT', '/admin/billing/settings', {
+        ...pluckRestorableSettings(originalSettings!),
+        countMarketplaceOrdersDefault: false,
+        countMarketplaceIfoodOrders: false,
+      });
+      return admin!.request<JsonObject>(
+        'GET',
+        `/admin/billing/usage-preview?tenantId=${encodeURIComponent(tenantId)}&planId=${encodeURIComponent(planId)}&periodStart=${encodeURIComponent(windowStart.toISOString())}&periodEnd=${encodeURIComponent(seedTimeline.fullEnd.toISOString())}`,
+      );
     });
+    const excludedChannels = getNestedArray(ifoodExcludedPreview, 'includedChannels').map(String);
+    const ifoodExcludedAmount = decimalToNumber(getNested(ifoodExcludedPreview, 'billableAmount'));
+    assert(!excludedChannels.includes('marketplace_ifood'), 'iFood must be excluded after the admin flag is disabled.');
+    assert(ifoodExcludedAmount < ifoodIncludedAmount, 'Excluding iFood should reduce the billable amount.');
 
-    let usagePreview = await admin.request<JsonObject>(
-      'GET',
-      `/admin/billing/usage-preview?tenantId=${encodeURIComponent(tenantId)}&planId=${encodeURIComponent(planId)}&periodStart=${encodeURIComponent(periodStart.toISOString())}&periodEnd=${encodeURIComponent(periodEnd.toISOString())}`,
+    const addonOverview = await runStep(report, 'addons.ai.activate', async () => {
+      return tenant!.request<JsonObject>('POST', '/billing/addons/ai-agent/activate', {});
+    });
+    assert(Boolean(addonOverview), 'AI add-on activation should return an overview.');
+
+    const entitlementAfterAddon = await runStep(report, 'addons.ai.entitlement', async () => {
+      return tenant!.request<JsonObject>('GET', '/billing/entitlements');
+    });
+    assert(getNestedBoolean(entitlementAfterAddon, 'flags.canUseAiAgent') === true, 'AI entitlement should be enabled after add-on activation.');
+    assert(decimalToNumber(getNested(entitlementAfterAddon, 'addonsAmount')) === 70, 'AI add-on should add R$ 70,00 to billing.');
+
+    const billingStateAfterAddon = await tenant!.request<JsonObject>('GET', '/billing/state');
+    const invoicePreview = await runStep(report, 'addons.ai.invoicePreview', async () => {
+      const currentCycle = await admin!.request<JsonObject>('POST', '/admin/billing/cycles/current', {
+        tenantId,
+        subscriptionId,
+        now: seedTimeline.fullEnd.toISOString(),
+      });
+      const cycleId = getNestedString(currentCycle, 'id');
+      const preview = await admin!.request<JsonObject>(
+        'GET',
+        `/admin/billing/cycles/${encodeURIComponent(cycleId)}/preview-invoice?tenantId=${encodeURIComponent(tenantId)}&subscriptionId=${encodeURIComponent(subscriptionId)}&planId=${encodeURIComponent(planId)}`,
+      );
+      report.notes.push(`Current billing cycle id: ${cycleId}`);
+      return preview;
+    });
+    const invoiceItems = getNestedArray(invoicePreview, 'invoiceItems') as Array<JsonObject>;
+    assert(decimalToNumber(getNested(invoicePreview, 'addonsAmount')) === 70, 'Invoice preview should include the AI add-on amount.');
+    assert(invoiceItems.some((item) => String(item.type ?? '') === 'addon:ai_agent'), 'Invoice preview should include the AI add-on line item.');
+    report.notes.push(`Billing state status after add-on: ${String(getNested(billingStateAfterAddon, 'subscription.status') ?? '')}`);
+
+    const addonCanceled = await runStep(report, 'addons.ai.cancel', async () => {
+      return tenant!.request<JsonObject>('POST', '/billing/addons/ai-agent/cancel', {});
+    });
+    assert(Boolean(addonCanceled), 'AI add-on cancel should return an overview.');
+
+    const entitlementAfterCancel = await tenant!.request<JsonObject>('GET', '/billing/entitlements');
+    const activeAddons = getNestedArray(entitlementAfterCancel, 'activeAddons') as Array<JsonObject>;
+    const aiAddon = activeAddons.find((addon) => String(addon.addonKey ?? '') === 'ai_agent');
+    assert(getNestedBoolean(entitlementAfterCancel, 'flags.canUseAiAgent') === true, 'AI should remain available until the current cycle ends.');
+    assert(String(aiAddon?.status ?? '') === 'scheduled_cancel', 'AI add-on should be scheduled for cancellation at cycle end.');
+
+    const trialBlocked = await runStep(report, 'trialPro.selfServiceBlocked', async () => {
+      return tenant!.request<JsonObject>('POST', '/billing/trial-pro/start', {}, { expectedStatuses: [400] });
+    });
+    const trialBlockedMessage = String((trialBlocked as JsonObject).message ?? '');
+    assert(
+      /cartao|gateway|nao esta pronto|ainda nao esta pronto/i.test(trialBlockedMessage),
+      'Self-service Trial Pro should be blocked with a clear gateway message.',
     );
-    let includedChannels = getNested(usagePreview, 'includedChannels') as string[];
-    assert(includedChannels.includes('marketplace_ifood'), 'marketplace_ifood should count in billing by default.');
-    const ifoodIncludedAmount = decimalToNumber(getNested(usagePreview, 'billableAmount'));
 
-    await admin.request('PUT', '/admin/billing/settings', {
-      ...originalSettings,
-      trialProEnabled: true,
-      trialProDays: 14,
-      trialRequiresPaymentMethod: true,
-      trialAutoConvertToBilling: false,
-      countMarketplaceOrdersDefault: false,
-      countMarketplaceIfoodOrders: false,
-      aiAddonEnabled: true,
-      aiAddonPrice: 70,
+    const assistedTrial = await runStep(report, 'trialPro.adminActivate', async () => {
+      return admin!.request<JsonObject>('POST', `/admin/billing/tenants/${encodeURIComponent(tenantId)}/trial-pro/activate`, {});
     });
-    usagePreview = await admin.request<JsonObject>(
-      'GET',
-      `/admin/billing/usage-preview?tenantId=${encodeURIComponent(tenantId)}&planId=${encodeURIComponent(planId)}&periodStart=${encodeURIComponent(periodStart.toISOString())}&periodEnd=${encodeURIComponent(periodEnd.toISOString())}`,
-    );
-    includedChannels = getNested(usagePreview, 'includedChannels') as string[];
-    assert(!includedChannels.includes('marketplace_ifood'), 'marketplace_ifood should be excluded after the admin setting is disabled.');
-    const ifoodExcludedAmount = decimalToNumber(getNested(usagePreview, 'billableAmount'));
-    assert(ifoodExcludedAmount < ifoodIncludedAmount, 'Excluding iFood should reduce the billable revenue preview without deleting historical events.');
-    const historicalIfoodEvent = await prisma.revenueEvent.findFirst({
-      where: { tenantId, orderId: `${runId}-ifood-marketplace` },
+    assert(String(getNested(assistedTrial, 'activationMode') ?? '') === 'assisted_admin', 'Admin-assisted Trial Pro should report assisted_admin mode.');
+
+    const billingOverview = await tenant!.request<JsonObject>('GET', '/billing/me');
+    assert(getNestedString(billingOverview, 'entitlements.commercialStatus') === 'trial_pro', 'Trial Pro activation should unlock the tenant commercial status.');
+    assert(getNestedBoolean(billingOverview, 'entitlements.flags.canUseAdvancedReports') === true, 'Trial Pro should enable advanced reports.');
+    assert(getNestedBoolean(billingOverview, 'paymentModeInfo.automaticBillingActive') === false, 'Trial Pro should not expose automatic billing while the gateway is not ready.');
+
+    const partners = await runStep(report, 'partners.list', async () => {
+      return tenant!.request<Array<JsonObject>>('GET', '/billing/partners');
     });
-    assert(Boolean(historicalIfoodEvent), 'Historical iFood RevenueEvent must remain persisted after excluding the channel from billing.');
-    report.checks.push('iFood channel inclusion/exclusion validated');
+    assert(Array.isArray(partners), 'Partners endpoint should return an array.');
+    report.notes.push(`Partners returned: ${partners.length}`);
 
-    await admin.request('PUT', '/admin/billing/settings', {
-      ...originalSettings,
-      trialProEnabled: true,
-      trialProDays: 14,
-      trialRequiresPaymentMethod: true,
-      trialAutoConvertToBilling: false,
-      countMarketplaceOrdersDefault: true,
-      countMarketplaceIfoodOrders: true,
-      aiAddonEnabled: true,
-      aiAddonPrice: 70,
-    });
-
-    let addonOverview = await tenantApi.request<JsonObject>('POST', '/billing/addons/ai-agent/activate', {});
-    let addonEntitlements = getNested(addonOverview, 'entitlements') as JsonObject;
-    let tenantAddon = await prisma.tenantAddon.findUnique({
-      where: {
-        tenantId_addonKey: {
-          tenantId,
-          addonKey: 'ai_agent',
-        },
-      },
-    });
-    assert(Boolean(tenantAddon), 'TenantAddon should be created for the AI add-on.');
-    assert(getNestedBoolean(addonEntitlements, 'flags.canUseAiAgent') === true, 'AI add-on should enable AI entitlement.');
-    assert(decimalToNumber(getNested(addonEntitlements, 'addonsAmount')) === 70, 'AI add-on should contribute its configured price to billing preview.');
-    report.checks.push('ai add-on activation validated');
-
-    addonOverview = await tenantApi.request<JsonObject>('POST', '/billing/addons/ai-agent/cancel', {});
-    addonEntitlements = getNested(addonOverview, 'entitlements') as JsonObject;
-    tenantAddon = await prisma.tenantAddon.findUnique({
-      where: {
-        tenantId_addonKey: {
-          tenantId,
-          addonKey: 'ai_agent',
-        },
-      },
-    });
-    assert(tenantAddon?.status === 'scheduled_cancel', 'AI add-on cancellation should be scheduled for the end of the cycle in P1.');
-    assert(getNestedBoolean(addonEntitlements, 'flags.canUseAiAgent') === true, 'Scheduled cancellation should keep AI active until the cycle ends.');
-    report.checks.push('ai add-on cancel-at-cycle-end policy validated');
-
-    const selfServeTrialAttempt = await tenantApi.request<JsonObject>('POST', '/billing/trial-pro/start', {}, { expectedStatuses: [400] });
-    const selfServeTrialMessage = String((selfServeTrialAttempt as JsonObject).message ?? '');
-    assert(/ainda nao esta pronto|gateway real/i.test(selfServeTrialMessage), 'Self-serve Trial Pro should fail with a clear message when payment method/tokenization is not ready.');
-    report.checks.push('self-serve trial blocked when card-on-file is unavailable');
-
-    const assistedTrial = await admin.request<JsonObject>('POST', `/admin/billing/tenants/${tenantId}/trial-pro/activate`, {});
-    assert(String(assistedTrial.activationMode ?? '') === 'assisted_admin', 'Admin-assisted Trial Pro should return its activation mode.');
-    overview = await tenantApi.request<JsonObject>('GET', '/billing/me');
-    entitlements = getNested(overview, 'entitlements') as JsonObject;
-    assert(getNestedString(entitlements, 'commercialStatus') === 'trial_pro', 'Admin-assisted Trial Pro should unlock trial entitlements.');
-    assert(getNestedBoolean(entitlements, 'flags.canUseAdvancedReports') === true, 'Trial Pro should unlock advanced reports.');
-    assert(getNestedBoolean(overview, 'paymentModeInfo.automaticBillingActive') === false, 'Trial Pro assistido nao pode expor cobranca automatica enquanto o gateway nao estiver pronto.');
-    report.checks.push('admin-assisted Trial Pro validated');
-
-    const partners = await tenantApi.request<Array<JsonObject>>('GET', '/billing/partners');
-    assert(Array.isArray(partners) && partners.length > 0, 'Partners endpoint should return configured cards.');
-    report.checks.push('partners endpoint validated');
-
-    console.log(JSON.stringify({
-      status: 'ok',
-      report,
-    }, null, 2));
+    succeeded = true;
   } catch (error) {
-    console.error(JSON.stringify({
-      status: 'failed',
-      report,
-      error: error instanceof HttpSmokeError
-        ? {
-            message: error.message,
-            status: error.status,
-            body: sanitizeForLog(error.body),
-          }
-        : {
-            message: error instanceof Error ? error.message : String(error),
-          },
-    }, null, 2));
+    console.error(JSON.stringify(
+      {
+        status: 'failed',
+        report,
+        error: error instanceof HttpSmokeError
+          ? {
+              message: error.message,
+              method: error.method,
+              url: error.url,
+              status: error.status,
+              body: sanitizeForLog(error.body),
+            }
+          : {
+              message: error instanceof Error ? error.message : String(error),
+            },
+      },
+      null,
+      2,
+    ));
     process.exitCode = 1;
   } finally {
-    try {
-      if (originalSettings) {
-        await anonymous
-          .request<JsonObject>('POST', '/auth/admin/login', {
-            email: config.adminEmail,
-            password: config.adminPassword,
-          })
-          .then((body) => anonymous.withToken(getNestedString(body, 'accessToken')))
-          .then((admin) => admin.request('PUT', '/admin/billing/settings', originalSettings));
-      }
-
-      if (config.allowReset) {
-        const tenantRecord = await prisma.tenant.findUnique({
-          where: { slug: config.tenantSlug },
-          select: { id: true },
-        });
-        if (tenantRecord) {
-          await resetSmokeTenantData(prisma, tenantRecord.id);
+    if (admin && originalSettings) {
+      try {
+        await runStep(report, 'cleanup.restore', async () => {
+          await admin!.request('PUT', '/admin/billing/settings', pluckRestorableSettings(originalSettings));
+          await admin!.request('POST', '/admin/billing/smoke/monetization/cleanup', {
+            tenantSlug: config.tenantSlug,
+          });
           report.cleanupCompleted = true;
-        }
+          return null;
+        });
+        report.notes.push('Billing settings restored and smoke data cleaned up.');
+      } catch (error) {
+        report.notes.push(`Cleanup/restore failed: ${error instanceof Error ? error.message : String(error)}`);
       }
-    } finally {
-      await prisma.$disconnect();
     }
+  }
+
+  if (succeeded && report.cleanupCompleted) {
+    console.log(JSON.stringify(
+      {
+        status: 'ok',
+        report,
+        result: 'MONETIZATION_P1_SMOKE_GO',
+      },
+      null,
+      2,
+    ));
   }
 }
 
