@@ -27,11 +27,13 @@ const CartItemSchema = z.object({
 
 interface CartState {
   tenantId: string | null;
+  tenantSlug: string | null;
   tableId: string | null;
   items: CartLineItem[];
   subtotal: number;
   
   // Actions
+  setTenantSlug: (slug: string) => void;
   setTenantId: (id: string) => void;
   setTableId: (id: string | null) => void;
   
@@ -58,9 +60,16 @@ export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       tenantId: null,
+      tenantSlug: null,
       tableId: null,
       items: [],
       subtotal: 0,
+
+      setTenantSlug: (slug) => {
+        if (get().tenantSlug !== slug) {
+          set({ tenantSlug: slug, tenantId: null, tableId: null, items: [], subtotal: 0 });
+        }
+      },
 
       setTenantId: (id) => {
         if (get().tenantId !== id) {
@@ -165,7 +174,13 @@ export const useCartStore = create<CartState>()(
     {
       name: 'gestor_cart_temp',
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ items: state.items, subtotal: state.subtotal, tableId: state.tableId }),
+      partialize: (state) => ({
+        tenantId: state.tenantId,
+        tenantSlug: state.tenantSlug,
+        items: state.items,
+        subtotal: state.subtotal,
+        tableId: state.tableId,
+      }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         

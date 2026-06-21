@@ -15,12 +15,20 @@ import { useCartStore } from '../store/use-cart-store';
 import { useToast } from '../components/Toast';
 import type { OrderListItemDTO, OrderResponseDTO, StorefrontPayload, CartLineItem } from '@gestor/types';
 import { generateId } from '@gestor/utils';
+import { useEffect } from 'react';
 
 export function OrdersHistoryPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
-  const { isLoggedIn, logout } = useCustomerStore();
+  const { isLoggedIn, logout, tenantSlug: customerTenantSlug, setTenantSlug } = useCustomerStore();
+  const setCartTenantSlug = useCartStore(s => s.setTenantSlug);
   const { showToast } = useToast();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!tenantSlug) return;
+    setTenantSlug(tenantSlug);
+    setCartTenantSlug(tenantSlug);
+  }, [tenantSlug, setTenantSlug, setCartTenantSlug]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['order-history', tenantSlug],
@@ -30,7 +38,7 @@ export function OrdersHistoryPage() {
       );
       return res.data;
     },
-    enabled: isLoggedIn,
+    enabled: isLoggedIn && customerTenantSlug === tenantSlug,
   });
 
   const { data: storefront } = useQuery({
@@ -42,7 +50,7 @@ export function OrdersHistoryPage() {
     enabled: !!tenantSlug,
   });
 
-  if (!isLoggedIn) {
+  if (!isLoggedIn || customerTenantSlug !== tenantSlug) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center">
         <Package className="w-16 h-16 text-gray-200 mb-4" />

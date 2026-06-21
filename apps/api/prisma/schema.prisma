@@ -395,6 +395,7 @@ model TenantSettings {
   currency                     String   @default("BRL") @db.VarChar(10)
   language                     String   @default("pt-BR") @db.VarChar(10)
   businessPhone                String?  @map("business_phone") @db.VarChar(20)
+  orderWhatsappNumber          String?  @map("order_whatsapp_number") @db.VarChar(20)
   businessEmail                String?  @map("business_email") @db.VarChar(255)
   address                      String?
   logoUrl                      String?  @map("logo_url") @db.VarChar(500)
@@ -438,10 +439,10 @@ model TenantSettings {
   browserNotificationsEnabled Boolean @default(true) @map("browser_notifications_enabled")
   automationCooldownHours     Int     @default(24) @map("automation_cooldown_hours")
   automationMaxMessagesPerDay Int     @default(1) @map("automation_max_messages_per_day")
-  loyaltyEnabled              Boolean @default(true) @map("loyalty_enabled")
+  loyaltyEnabled              Boolean @default(false) @map("loyalty_enabled")
   loyaltyPointsPerReal        Float   @default(1.0) @map("loyalty_points_per_real")
-  cashbackEnabled             Boolean @default(true) @map("cashback_enabled")
-  cashbackPercent             Float   @default(5.0) @map("cashback_percent")
+  cashbackEnabled             Boolean @default(false) @map("cashback_enabled")
+  cashbackPercent             Float   @default(0) @map("cashback_percent")
   cashbackValidityDays        Int     @default(90) @map("cashback_validity_days")
   gamificationEnabled         Boolean @default(true) @map("gamification_enabled")
 

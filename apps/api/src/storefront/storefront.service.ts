@@ -35,6 +35,17 @@ export class StorefrontService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
+  private normalizeBrazilWhatsappNumber(raw?: string | null): string | null {
+    if (!raw) return null;
+    const digits = raw.replace(/\D/g, '');
+    if (!digits) return null;
+
+    if (digits.length >= 12 && digits.startsWith('55')) return digits;
+    if (digits.length === 10 || digits.length === 11) return `55${digits}`;
+
+    return null;
+  }
+
   async getStorefrontPayload(
     slug: string,
     fulfillmentType: 'delivery' | 'pickup' = 'delivery',
@@ -51,7 +62,7 @@ export class StorefrontService {
     // 1. Resolve Tenant
     const tenant = await this.prisma.tenant.findFirst({
       where: { slug, status: 'active' }, // only active tenants
-      include: { settings: true },
+      include: { settings: true, schedulingSettings: true },
     });
 
     if (!tenant) {
@@ -408,10 +419,9 @@ export class StorefrontService {
 
     const storeStatus = await this.availabilityService.getStoreStatus(tenant.id);
 
-    const waInstance = await this.prisma.whatsAppInstance.findFirst({
-      where: { tenantId: tenant.id, status: 'connected' },
-      select: { phoneNumber: true },
-    });
+    const storefrontWhatsappNumber = this.normalizeBrazilWhatsappNumber(
+      tenant.settings?.orderWhatsappNumber || tenant.settings?.businessPhone || null,
+    );
 
     const tenantInfo = {
       id: tenant.id,
@@ -422,7 +432,7 @@ export class StorefrontService {
       statusMessage: storeStatus.message,
       nextOpenAt: storeStatus.nextOpenAt,
       paymentMethods: (tenant.settings?.paymentMethods as string[]) || [],
-      whatsappNumber: waInstance?.phoneNumber || tenant.settings?.businessPhone || null,
+      whatsappNumber: storefrontWhatsappNumber,
       address: tenant.settings ? {
         street: tenant.settings.street || '',
         number: tenant.settings.number || '',
@@ -434,12 +444,16 @@ export class StorefrontService {
         lng: tenant.settings.lng || undefined,
       } : undefined,
       minimumOrderValue: tenant.settings?.minimumOrderValue ? Number(tenant.settings.minimumOrderValue) : null,
-      cashback: tenant.settings?.cashbackEnabled ? {
+      cashback: tenant.settings?.cashbackEnabled && Number(tenant.settings?.cashbackPercent || 0) > 0 ? {
         enabled: tenant.settings.cashbackEnabled,
         percent: Number(tenant.settings.cashbackPercent || 0),
       } : undefined,
+      loyalty: tenant.settings?.loyaltyEnabled && Number(tenant.settings?.loyaltyPointsPerReal || 0) > 0 ? {
+        enabled: tenant.settings.loyaltyEnabled,
+        pointsPerReal: Number(tenant.settings.loyaltyPointsPerReal || 0),
+      } : undefined,
       scheduling: {
-        enabled: true // Tenant supports scheduling by default if scheduling module is used
+        enabled: Boolean(tenant.schedulingSettings?.enabled)
       }
     };
 

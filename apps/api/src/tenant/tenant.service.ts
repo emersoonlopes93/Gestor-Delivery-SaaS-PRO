@@ -22,6 +22,19 @@ export class TenantService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
+  private async invalidateStorefrontCacheByTenantId(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { slug: true },
+    });
+    if (!tenant?.slug) return;
+
+    await Promise.all([
+      this.cacheManager.del(`storefront:${tenant.slug}:delivery`),
+      this.cacheManager.del(`storefront:${tenant.slug}:pickup`),
+    ]);
+  }
+
   private async findOwnerUser(tenantId: string) {
     return this.prisma.tenantUser.findFirst({
       where: {
@@ -492,7 +505,7 @@ export class TenantService {
       notificationTemplates: dto.notificationTemplates as Prisma.InputJsonValue,
     };
 
-    return this.prisma.tenantSettings.upsert({
+    const updated = await this.prisma.tenantSettings.upsert({
       where: { tenantId },
       create: {
         ...dto,
@@ -501,6 +514,10 @@ export class TenantService {
       } as Prisma.TenantSettingsUncheckedCreateInput,
       update: data,
     });
+
+    await this.invalidateStorefrontCacheByTenantId(tenantId);
+
+    return updated;
   }
 
   /**

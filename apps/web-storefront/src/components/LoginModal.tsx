@@ -55,7 +55,7 @@ export function LoginModal({ isOpen, onClose, tenantSlug }: LoginModalProps) {
         code: otp 
       });
       
-      setCustomer(response.data.customer, response.data.accessToken);
+      setCustomer(response.data.customer, response.data.accessToken, tenantSlug);
       showToast({ title: 'Bem-vindo!', type: 'success' });
       onClose();
     } catch (error: unknown) {

@@ -73,6 +73,7 @@ export interface TenantSettings {
   currency: string;
   language: string;
   businessPhone?: string;
+  orderWhatsappNumber?: string;
   businessEmail?: string;
   address?: string; // Legacy/Plain text
 
@@ -91,6 +92,7 @@ export interface TenantSettings {
 
   // Payment Methods
   paymentMethods?: string[];
+  minimumOrderValue?: number | null;
 
   // Financial / Pix
   pixKey?: string;
@@ -121,6 +123,11 @@ export interface TenantSettings {
   readySound?: string;
   notificationVolume?: number;
   browserNotificationsEnabled?: boolean;
+  loyaltyEnabled?: boolean;
+  loyaltyPointsPerReal?: number;
+  cashbackEnabled?: boolean;
+  cashbackPercent?: number;
+  cashbackValidityDays?: number;
   createdAt: string;
   updatedAt: string;
 }

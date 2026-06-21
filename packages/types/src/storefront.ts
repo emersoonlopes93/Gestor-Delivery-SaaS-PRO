@@ -27,6 +27,10 @@ export interface StorefrontTenantInfo {
     enabled: boolean;
     percent: number;
   };
+  loyalty?: {
+    enabled: boolean;
+    pointsPerReal: number;
+  };
   scheduling?: {
     enabled: boolean;
   };

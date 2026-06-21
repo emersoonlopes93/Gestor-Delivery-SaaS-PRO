@@ -15,7 +15,12 @@ interface OperatingHourForm {
   closeTime?: string;
 }
 
-import { Clock, Save, Copy, Calendar, MapPin, Building2, ChefHat, Wallet, Store } from 'lucide-react';
+interface WhatsAppStatusPayload {
+  connected: boolean;
+  phoneNumber?: string | null;
+}
+
+import { Clock, Save, Copy, Calendar, MapPin, Building2, ChefHat, Wallet, Store, MessageCircleWarning } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { StoreStatusControl } from '../../components/store/StoreStatusControl';
 import { useNavigate } from 'react-router-dom';
@@ -58,6 +63,7 @@ export function SettingsPage() {
     currency: 'BRL',
     language: 'pt-BR',
     businessPhone: '',
+    orderWhatsappNumber: '',
     businessEmail: '',
     address: '',
     street: '',
@@ -70,6 +76,7 @@ export function SettingsPage() {
     lat: undefined,
     lng: undefined,
     paymentMethods: ['pix', 'cash', 'card_on_delivery'],
+    minimumOrderValue: undefined,
     pixKey: '',
     bankName: '',
     bankAgency: '',
@@ -83,15 +90,22 @@ export function SettingsPage() {
     taxRegime: '',
     standardCfop: '',
     standardNcm: '',
+    loyaltyEnabled: false,
+    loyaltyPointsPerReal: 1,
+    cashbackEnabled: false,
+    cashbackPercent: 0,
+    cashbackValidityDays: 90,
     businessGroupId: null,
   });
 
   const [hours, setHours] = useState<OperatingHourForm[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [connectedWhatsappNumber, setConnectedWhatsappNumber] = useState<string | null>(null);
 
   useEffect(() => {
     loadSettings();
     loadOperatingHours();
+    loadWhatsappStatus();
   }, []);
 
   const loadSettings = async () => {
@@ -189,6 +203,7 @@ export function SettingsPage() {
         currency: settings.currency || undefined,
         language: settings.language || undefined,
         businessPhone: unmask(settings.businessPhone) || undefined,
+        orderWhatsappNumber: unmask(settings.orderWhatsappNumber) || undefined,
         businessEmail: settings.businessEmail?.trim() || undefined,
         address: derivedAddress,
         street: settings.street?.trim() || undefined,
@@ -201,6 +216,7 @@ export function SettingsPage() {
         lat,
         lng,
         paymentMethods: settings.paymentMethods || undefined,
+        minimumOrderValue: settings.minimumOrderValue ?? undefined,
         pixKey: settings.pixKey?.trim() || undefined,
         bankName: settings.bankName?.trim() || undefined,
         bankAgency: settings.bankAgency?.trim() || undefined,
@@ -212,6 +228,11 @@ export function SettingsPage() {
         taxRegime: settings.taxRegime || undefined,
         standardCfop: settings.standardCfop || undefined,
         standardNcm: settings.standardNcm || undefined,
+        loyaltyEnabled: settings.loyaltyEnabled ?? undefined,
+        loyaltyPointsPerReal: settings.loyaltyPointsPerReal ?? undefined,
+        cashbackEnabled: settings.cashbackEnabled ?? undefined,
+        cashbackPercent: settings.cashbackPercent ?? undefined,
+        cashbackValidityDays: settings.cashbackValidityDays ?? undefined,
       };
       
       const response = await api.patch('/tenant/settings', cleanedSettings);
@@ -241,6 +262,17 @@ export function SettingsPage() {
       }
     } catch (error) {
       throw new Error('Não foi possível alterar o status da loja.');
+    }
+  };
+
+  const loadWhatsappStatus = async () => {
+    try {
+      const response = await api.get<WhatsAppStatusPayload>('/whatsapp/instance/status');
+      if (response.success) {
+        setConnectedWhatsappNumber(response.data.phoneNumber || null);
+      }
+    } catch {
+      setConnectedWhatsappNumber(null);
     }
   };
 
@@ -566,6 +598,18 @@ export function SettingsPage() {
                   />
                 </div>
                 <div>
+                  <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">WhatsApp de Pedidos</label>
+                  <input
+                    type="tel"
+                    value={maskPhone(settings.orderWhatsappNumber || '')}
+                    onChange={e => setSettings({...settings, orderWhatsappNumber: unmask(e.target.value)})}
+                    className="input-premium"
+                  />
+                  <p className="mt-2 text-[10px] text-muted-foreground font-medium">
+                    Número usado no botão final do cardápio digital.
+                  </p>
+                </div>
+                <div>
                   <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">E-mail Comercial</label>
                   <input
                     type="email"
@@ -574,6 +618,22 @@ export function SettingsPage() {
                     className="input-premium"
                   />
                 </div>
+                {connectedWhatsappNumber ? (
+                  <div className="md:col-span-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <div className="flex items-start gap-3">
+                      <MessageCircleWarning className="mt-0.5 h-4 w-4 shrink-0" />
+                      <div>
+                        <p className="font-black">WhatsApp conectado à IA: {maskPhone(connectedWhatsappNumber)}</p>
+                        {unmask(settings.orderWhatsappNumber || settings.businessPhone || '') !== '' &&
+                        unmask(settings.orderWhatsappNumber || settings.businessPhone || '') !== connectedWhatsappNumber ? (
+                          <p className="mt-1 text-xs">
+                            O WhatsApp de pedidos é diferente do WhatsApp conectado à IA. Os pedidos do cardápio serão enviados para o número configurado em “WhatsApp de Pedidos”.
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -769,6 +829,19 @@ export function SettingsPage() {
                 </div>
               </div>
 
+              <div className="mt-6">
+                <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Pedido mÃ­nimo</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={settings.minimumOrderValue ?? ''}
+                  onChange={e => setSettings({ ...settings, minimumOrderValue: e.target.value ? Number(e.target.value) : undefined })}
+                  placeholder="0,00"
+                  className="input-premium"
+                />
+              </div>
+
               <div className="mt-8 pt-6 border-t border-border space-y-6">
                 <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
                   Dados para Repasse / PIX
@@ -843,6 +916,76 @@ export function SettingsPage() {
                     <option value="BRL">Real (BRL)</option>
                     <option value="USD">Dólar (USD)</option>
                   </select>
+                </div>
+              </div>
+            </div>
+
+            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isFinanceTab ? '' : 'hidden'}`}>
+              <h2 className="text-lg font-bold text-foreground mb-6">Cashback e Fidelidade</h2>
+              <div className="space-y-8">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-black text-foreground">Cashback</p>
+                      <p className="text-xs text-muted-foreground">Quando ativo, o cliente verá essa vantagem no cardápio digital.</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={settings.cashbackEnabled ?? false}
+                      onChange={e => setSettings({ ...settings, cashbackEnabled: e.target.checked })}
+                      className="h-4 w-4"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Percentual de cashback</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={settings.cashbackPercent ?? 0}
+                        onChange={e => setSettings({ ...settings, cashbackPercent: Number(e.target.value) })}
+                        className="input-premium"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Validade em dias</label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={settings.cashbackValidityDays ?? 90}
+                        onChange={e => setSettings({ ...settings, cashbackValidityDays: Number(e.target.value) })}
+                        className="input-premium"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4 border-t border-border pt-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-black text-foreground">Programa de pontos</p>
+                      <p className="text-xs text-muted-foreground">Só aparece para o cliente final quando estiver ativo.</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={settings.loyaltyEnabled ?? false}
+                      onChange={e => setSettings({ ...settings, loyaltyEnabled: e.target.checked })}
+                      className="h-4 w-4"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Pontos por R$ 1,00</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={settings.loyaltyPointsPerReal ?? 1}
+                      onChange={e => setSettings({ ...settings, loyaltyPointsPerReal: Number(e.target.value) })}
+                      className="input-premium"
+                    />
+                  </div>
                 </div>
               </div>
             </div>

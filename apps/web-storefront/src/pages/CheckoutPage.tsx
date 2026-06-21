@@ -43,8 +43,9 @@ export function CheckoutPage() {
   const subtotal = useCartStore(s => s.subtotal);
   const tableId = useCartStore(s => s.tableId);
   const clearCart = useCartStore(s => s.clearCart);
+  const setCartTenantSlug = useCartStore(s => s.setTenantSlug);
 
-  const { customer, isLoggedIn } = useCustomerStore();
+  const { customer, isLoggedIn, setTenantSlug } = useCustomerStore();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
 
   // Form state
@@ -91,6 +92,12 @@ export function CheckoutPage() {
   const [discountTotal, setDiscountTotal] = useState(0);
   const [isValidating, setIsValidating] = useState(false);
   const [tenantInfo, setTenantInfo] = useState<StorefrontTenantInfo | null>(null);
+
+  useEffect(() => {
+    if (!tenantSlug) return;
+    setTenantSlug(tenantSlug);
+    setCartTenantSlug(tenantSlug);
+  }, [tenantSlug, setTenantSlug, setCartTenantSlug]);
 
   useEffect(() => {
     async function loadTenant() {

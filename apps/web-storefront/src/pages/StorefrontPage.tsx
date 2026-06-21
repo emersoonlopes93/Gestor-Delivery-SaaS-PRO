@@ -62,6 +62,7 @@ export function StorefrontPage() {
   const tableIdParam = searchParams.get('tableId');
 
   const setTenantId = useCartStore(s => s.setTenantId);
+  const setCartTenantSlug = useCartStore(s => s.setTenantSlug);
   const setTableId = useCartStore(s => s.setTableId);
   const cartSubtotal = useCartStore(s => s.subtotal);
   const cartItemsCount = useCartStore(s => s.items.length);
@@ -71,7 +72,13 @@ export function StorefrontPage() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
 
-  const { customer, logout, isLoggedIn } = useCustomerStore();
+  const { customer, logout, isLoggedIn, tenantSlug: customerTenantSlug, setTenantSlug } = useCustomerStore();
+
+  useEffect(() => {
+    if (!tenantSlug) return;
+    setTenantSlug(tenantSlug);
+    setCartTenantSlug(tenantSlug);
+  }, [tenantSlug, setTenantSlug, setCartTenantSlug]);
 
   // Demo state for layout testing
   const [productLayout, setProductLayout] = useState<StorefrontProductLayout>('grid');
@@ -90,7 +97,7 @@ export function StorefrontPage() {
   const { data: customerHome } = useQuery({
     queryKey: ['customer-profile', tenantSlug],
     queryFn: async () => (await api.get<CustomerHomePayload>('/public/customer-profile')).data,
-    enabled: isLoggedIn,
+    enabled: isLoggedIn && customerTenantSlug === tenantSlug,
     staleTime: 60_000,
   });
 
@@ -277,7 +284,9 @@ export function StorefrontPage() {
               </h2>
               <p className="mt-1 text-sm text-[var(--storefront-muted-foreground)]">
                 {customerHome.intelligence?.daysSinceLastOrder == null
-                  ? 'Seu historico, pontos e carteira ficam sempre no perfil.'
+                  ? tenant.loyalty?.enabled
+                    ? 'Seu historico, pontos e carteira ficam sempre no perfil.'
+                    : 'Seu historico e carteira ficam sempre no perfil.'
                   : `Ultimo pedido ha ${customerHome.intelligence.daysSinceLastOrder} dia(s).`}
               </p>
             </div>
@@ -291,8 +300,12 @@ export function StorefrontPage() {
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <SmartMetric icon={Wallet} label="Cashback" value={money(customerHome.wallet.cashbackBalance)} />
-            <SmartMetric icon={Award} label="Pontos" value={customerHome.loyalty.balance} />
+            {tenant.cashback?.enabled ? (
+              <SmartMetric icon={Wallet} label="Cashback" value={money(customerHome.wallet.cashbackBalance)} />
+            ) : null}
+            {tenant.loyalty?.enabled ? (
+              <SmartMetric icon={Award} label="Pontos" value={customerHome.loyalty.balance} />
+            ) : null}
             <SmartMetric icon={Gift} label="Cupons" value={customerHome.coupons.length} />
             <SmartMetric icon={Heart} label="Favoritos" value={customerHome.intelligence?.favoriteProducts.length ?? 0} />
           </div>
