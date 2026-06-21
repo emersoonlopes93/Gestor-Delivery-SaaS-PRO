@@ -548,7 +548,7 @@ export function CheckoutPage() {
             <div key={idx} className="flex justify-between text-sm">
               <span className="text-gray-600">{item.quantity}x {item.snapshot.productName}</span>
               <span className="font-medium text-gray-900">
-                {item.snapshot.lineSubtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                {Number(item.snapshot.lineSubtotal ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
               </span>
             </div>
           ))}

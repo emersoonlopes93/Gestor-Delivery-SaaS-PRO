@@ -550,7 +550,7 @@ export class OrdersService {
         id: o.id,
         orderNumber: o.orderNumber,
         status: o.status as OrderStatus,
-          fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
+        fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
         customerName: o.customerName,
         customerPhone: o.customerPhone,
         total: Number(o.total),
@@ -559,6 +559,7 @@ export class OrdersService {
         scheduledFor: o.scheduledFor ? o.scheduledFor.toISOString() : null,
         isScheduled: o.isScheduled ?? false,
         sourceChannel: o.sourceChannel,
+        publicTrackingToken: o.publicTrackingToken,
         createdAt: o.createdAt.toISOString(),
       })),
       total,
@@ -706,6 +707,7 @@ export class OrdersService {
         snapshotBasePrice: Number(item.snapshotBasePrice),
         snapshotExtrasTotal: Number(item.snapshotExtrasTotal),
         snapshotComposition: item.snapshotComposition,
+        snapshotCatalogV2Json: item.snapshotCatalogV2Json,
       })),
       deliveryAddress: order.deliveryAddress
         ? {

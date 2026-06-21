@@ -341,6 +341,7 @@ export interface OrderListItemDTO {
   paymentMethod: PaymentMethod;
   sourceChannel: string;
   waiterId?: string | null;
+  publicTrackingToken?: string | null;
   createdAt: string;
   // Scheduling
   scheduledFor?: string | null;
