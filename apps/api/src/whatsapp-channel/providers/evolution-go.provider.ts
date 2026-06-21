@@ -498,6 +498,11 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     },
   ): Promise<WhatsAppSendResult> {
     const client = this.buildInstanceClient(apiUrl, apiKey, instanceId);
+    const kind = input.mediaUrl ? 'media' : 'text';
+    const contentLength = (input.text || input.caption || '').length;
+    this.logger.log(
+      `[STATUS_PUBLISH] instanceId=${instanceId} kind=${kind} hasMedia=${Boolean(input.mediaUrl)} mediaType=${input.mediaType || 'text'} contentLength=${contentLength} target=status@broadcast`,
+    );
 
     try {
       if (input.mediaUrl) {
@@ -570,8 +575,10 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     body: { number: string; type: 'image' | 'video'; media: string; caption: string },
   ): Promise<WhatsAppSendResult> {
     const mediaBody = {
-      ...body,
+      number: body.number,
+      type: body.type,
       url: body.media,
+      caption: body.caption,
     };
 
     try {

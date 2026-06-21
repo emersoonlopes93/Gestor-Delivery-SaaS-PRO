@@ -58,16 +58,28 @@ export class CampaignProcessor extends WorkerHost {
     if (isStatus) {
       this.logger.log(`Processing status campaign ${campaignId}`);
       try {
+        const campaignMeta = await this.prisma.campaign.findUnique({
+          where: { id: campaignId },
+          select: { startedAt: true },
+        });
+        const publishStartedAt = Date.now();
         const result = await this.whatsappSender.publishStatus(tenantId, {
           text: messageTemplate!,
           mediaUrl: mediaUrl || undefined,
           mediaType: mediaType || undefined,
           caption: messageTemplate!,
         });
+        const publishDurationMs = Date.now() - publishStartedAt;
+        const elapsedSinceStartMs = campaignMeta?.startedAt ? Date.now() - campaignMeta.startedAt.getTime() : publishDurationMs;
+        this.logger.log(
+          `status_publish_result campaignId=${campaignId} success=${result.success} publishDurationMs=${publishDurationMs} elapsedSinceStartMs=${elapsedSinceStartMs} hasMedia=${Boolean(mediaUrl)} mediaType=${mediaType || 'text'} captionLength=${messageTemplate?.length ?? 0}`,
+        );
         
         await this.prisma.campaign.update({
           where: { id: campaignId },
-          data: { status: result.success ? 'completed' : 'cancelled' },
+          data: result.success
+            ? { status: 'completed', completedAt: new Date() }
+            : { status: 'cancelled' },
         });
 
         return { success: result.success, messageId: result.messageId };

@@ -164,6 +164,11 @@ export function CampaignsPage() {
                       <span className="text-sm font-medium text-foreground">
                         {c.status === 'completed' ? 'Publicado' : c.status === 'cancelled' ? 'Falhou' : 'Aguardando'}
                       </span>
+                      {c.status === 'completed' && c.completedAt && (
+                        <span className="text-xs text-muted-foreground">
+                          Publicado em {new Date(c.completedAt).toLocaleString('pt-BR')}
+                        </span>
+                      )}
                       <span className="text-xs text-muted-foreground mt-1">Disparo único de status</span>
                     </div>
                   ) : (

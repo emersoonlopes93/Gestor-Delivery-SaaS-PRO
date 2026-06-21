@@ -119,7 +119,10 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
   };
 
   const handleSubmit = () => {
-    createMutation.mutate(formData);
+    createMutation.mutate({
+      ...formData,
+      scheduledAt: formData.scheduledAt || undefined,
+    });
   };
 
   // Verificação forte para envio
@@ -272,6 +275,18 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
                   className="w-full px-4 py-2 border border-input rounded-lg focus:ring-primary bg-input-bg text-foreground"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Agendamento opcional</label>
+                <input
+                  type="datetime-local"
+                  value={formData.scheduledAt || ''}
+                  onChange={(e) => updateFormData('scheduledAt', e.target.value || undefined)}
+                  className="w-full px-4 py-2 border border-input rounded-lg focus:ring-primary bg-input-bg text-foreground"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Se ficar em branco, a campanha será iniciada manualmente ou pelo fluxo de automação.
+                </p>
+              </div>
             </div>
           )}
 
@@ -371,6 +386,12 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
                       <div className="flex justify-between border-b border-border pb-2">
                         <span className="text-muted-foreground">Campanha:</span>
                         <span className="font-medium text-foreground">{formData.name}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-border pb-2">
+                        <span className="text-muted-foreground">Agendamento:</span>
+                        <span className="font-medium text-foreground">
+                          {formData.scheduledAt ? new Date(formData.scheduledAt).toLocaleString('pt-BR') : 'Imediato'}
+                        </span>
                       </div>
                       <div className="flex justify-between border-b border-border pb-2">
                         <span className="text-muted-foreground">Audiência Estimada:</span>
