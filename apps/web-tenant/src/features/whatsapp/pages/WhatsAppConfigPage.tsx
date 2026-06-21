@@ -37,6 +37,7 @@ interface WhatsAppStatusResponse {
   status: string;
   qrCode?: string;
   pairingCode?: string;
+  phoneNumber?: string | null;
 }
 
 
@@ -190,7 +191,7 @@ export function WhatsAppConfigPage() {
       const res = await api.post<WhatsAppStatusResponse>('/whatsapp/instance/connect', {});
       return res.data;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       console.log('[Frontend] Connect response:', data);
       if (data.qrCode) {
         setQrCode(data.qrCode);
@@ -198,7 +199,10 @@ export function WhatsAppConfigPage() {
       if (data.status === 'connected') {
         setQrCode(null);
       }
-      refetchStatus();
+      await Promise.all([
+        refetchStatus(),
+        queryClient.invalidateQueries({ queryKey: ['whatsapp-instance'] }),
+      ]);
     },
   });
 
@@ -285,6 +289,7 @@ export function WhatsAppConfigPage() {
     (featureWhatsappConnect && loadingInstance) || 
     (featureOrderNotifications && loadingSettings) || 
     loadingAi;
+  const connectedPhoneNumber = status?.phoneNumber || instance?.phoneNumber || null;
 
   if (isLoading) {
     return <div className="p-8 text-center text-muted-foreground">Carregando configurações...</div>;
@@ -374,6 +379,11 @@ export function WhatsAppConfigPage() {
                       <p className={`${status?.status === 'connected' ? 'text-status-success' : 'text-status-warning'} font-medium`}>
                         {status?.status === 'connected' ? 'Online' : 'Desconectado'}
                       </p>
+                      {connectedPhoneNumber ? (
+                        <p className="mt-1 text-xs font-mono text-muted-foreground">
+                          Número conectado: {connectedPhoneNumber}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {status?.status === 'connected' ? (
