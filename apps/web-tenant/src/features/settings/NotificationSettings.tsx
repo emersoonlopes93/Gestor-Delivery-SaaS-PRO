@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Bell, 
   Save, 
@@ -38,6 +38,7 @@ export function NotificationSettings() {
   const [handoffSound, setHandoffSound] = useState<string>('notification.mp3');
   const [readySound, setReadySound] = useState<string>('notification.mp3');
   const [templates, setTemplates] = useState<Record<string, string>>(DEFAULT_TEMPLATES);
+  const templateRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ['tenant-settings'],
@@ -144,6 +145,28 @@ export function NotificationSettings() {
         duration: 4000,
         style: { fontWeight: 'bold' },
       });
+    });
+  };
+
+  const insertTemplateVariable = (status: string, variable: string) => {
+    const textarea = templateRefs.current[status];
+    setTemplates(prev => {
+      const current = prev[status] ?? '';
+      if (!textarea) {
+        return { ...prev, [status]: `${current}${current ? ' ' : ''}${variable}` };
+      }
+
+      const start = textarea.selectionStart ?? current.length;
+      const end = textarea.selectionEnd ?? current.length;
+      const nextValue = `${current.slice(0, start)}${variable}${current.slice(end)}`;
+
+      window.requestAnimationFrame(() => {
+        textarea.focus();
+        const nextCursor = start + variable.length;
+        textarea.setSelectionRange(nextCursor, nextCursor);
+      });
+
+      return { ...prev, [status]: nextValue };
     });
   };
 
@@ -374,11 +397,12 @@ export function NotificationSettings() {
                     <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">{status.replace(/_/g, ' ')}</span>
                   </div>
                   <div className="flex gap-2 flex-wrap justify-end">
-                     <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-1 rounded">{"{{orderNumber}}"}</span>
-                     <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-1 rounded">{"{{restaurantName}}"}</span>
+                     <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => insertTemplateVariable(status, '{{orderNumber}}')} className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-1 rounded hover:text-primary transition-colors">{"{{orderNumber}}"}</button>
+                     <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => insertTemplateVariable(status, '{{restaurantName}}')} className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-1 rounded hover:text-primary transition-colors">{"{{restaurantName}}"}</button>
                   </div>
                 </div>
                 <textarea
+                  ref={(el) => { templateRefs.current[status] = el; }}
                   value={content}
                   onChange={(e) => setTemplates(prev => ({ ...prev, [status]: e.target.value }))}
                   className="w-full bg-muted/50 border border-border rounded-2xl p-3 sm:p-4 text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none transition-all min-h-[88px] sm:min-h-[100px]"

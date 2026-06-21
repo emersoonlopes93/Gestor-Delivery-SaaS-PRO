@@ -3,6 +3,8 @@ import { AiFlowLogger, type AiFlowContext } from '../../common/logging/ai-flow-l
 import { resolveWhatsAppPresenceTarget } from '../../common/utils/whatsapp-presence.util';
 import { WhatsAppInstanceService } from './whatsapp-instance.service';
 import { WhatsAppProviderRegistryService } from './whatsapp-provider-registry.service';
+import { PrismaService } from '../../database/prisma.service';
+import { applyCampaignTemplate } from '../../campaigns/utils/campaign-template.util';
 import type {
   WhatsAppSendTextInput,
   WhatsAppSendMediaInput,
@@ -22,6 +24,7 @@ export class WhatsAppSenderService {
   constructor(
     private readonly instanceService: WhatsAppInstanceService,
     private readonly providerRegistry: WhatsAppProviderRegistryService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async sendText(
@@ -29,12 +32,13 @@ export class WhatsAppSenderService {
     input: WhatsAppSendTextInput,
   ): Promise<WhatsAppSendResult> {
     const { provider, instance } = await this.resolveProvider(tenantId);
+    const resolvedInput = await this.resolveOutgoingText(tenantId, input.text);
 
     return provider.sendText(
       instance.apiUrl,
       instance.apiKey,
       instance.evolutionInstanceId || instance.instanceName,
-      input,
+      { ...input, text: resolvedInput },
     );
   }
 
@@ -43,12 +47,13 @@ export class WhatsAppSenderService {
     input: WhatsAppSendMediaInput,
   ): Promise<WhatsAppSendResult> {
     const { provider, instance } = await this.resolveProvider(tenantId);
+    const resolvedCaption = input.caption ? await this.resolveOutgoingText(tenantId, input.caption) : input.caption;
 
     return provider.sendMedia(
       instance.apiUrl,
       instance.apiKey,
       instance.evolutionInstanceId || instance.instanceName,
-      input,
+      { ...input, caption: resolvedCaption },
     );
   }
 
@@ -199,5 +204,17 @@ export class WhatsAppSenderService {
     }, { providerType: provider.providerType });
 
     return { provider, instance };
+  }
+
+  private async resolveOutgoingText(tenantId: string, text: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true, slug: true },
+    });
+
+    return applyCampaignTemplate(text, {
+      link_cardapio: tenant?.slug ? `https://${tenant.slug}.gestordelivery.com` : '',
+      nome_loja: tenant?.name || '',
+    });
   }
 }

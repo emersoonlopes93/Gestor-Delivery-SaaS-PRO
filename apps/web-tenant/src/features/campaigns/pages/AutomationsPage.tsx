@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Bot, Clock, DollarSign, Megaphone, PauseCircle, RefreshCw, Send, ShoppingCart, Sparkles, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -97,7 +97,8 @@ export function AutomationConfigCard({
   configs, 
   onSave, 
   defaultTemplate,
-  extraConfigUI 
+  extraConfigUI,
+  variables = ['{nome}', '{link_cardapio}', '{cupom}', '{pedido}', '{total}'],
 }: {
   title: string;
   description: string;
@@ -105,12 +106,32 @@ export function AutomationConfigCard({
   configs?: Array<{ type: string; enabled: boolean; messageTemplate: string; config: Record<string, unknown> }>;
   onSave: (data: { type: string; payload: { enabled: boolean; messageTemplate: string; config: Record<string, unknown> } }) => void;
   defaultTemplate: string;
+  variables?: string[];
   extraConfigUI: (config: Record<string, unknown>, setConfig: (c: Record<string, unknown>) => void) => React.ReactNode;
 }) {
   const config = configs?.find(c => c.type === type);
   const [enabled, setEnabled] = useState(config?.enabled ?? false);
   const [template, setTemplate] = useState(config?.messageTemplate ?? defaultTemplate);
   const [localConfig, setLocalConfig] = useState(config?.config ?? {});
+  const templateRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const insertVariable = (variable: string) => {
+    const textarea = templateRef.current;
+    setTemplate(prev => {
+      if (!textarea) {
+        return `${prev}${prev ? ' ' : ''}${variable}`;
+      }
+      const start = textarea.selectionStart ?? prev.length;
+      const end = textarea.selectionEnd ?? prev.length;
+      const nextValue = `${prev.slice(0, start)}${variable}${prev.slice(end)}`;
+      window.requestAnimationFrame(() => {
+        textarea.focus();
+        const nextCursor = start + variable.length;
+        textarea.setSelectionRange(nextCursor, nextCursor);
+      });
+      return nextValue;
+    });
+  };
 
   return (
     <Card className="flex flex-col gap-4">
@@ -122,7 +143,22 @@ export function AutomationConfigCard({
         <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
         <span className="text-sm">Habilitado</span>
       </div>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="font-semibold text-muted-foreground">Variáveis:</span>
+        {variables.map((variable) => (
+          <button
+            key={variable}
+            type="button"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => insertVariable(variable)}
+            className="rounded-full border border-border bg-background px-3 py-1 font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
+          >
+            {variable}
+          </button>
+        ))}
+      </div>
       <textarea
+        ref={templateRef}
         className="w-full p-2 border rounded-md text-sm min-h-[80px]"
         value={template}
         onChange={(e) => setTemplate(e.target.value)}

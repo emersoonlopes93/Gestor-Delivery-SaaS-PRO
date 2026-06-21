@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { WhatsAppSenderService } from '../whatsapp-channel/services/whatsapp-sender.service';
 import { PrismaService } from '../database/prisma.service';
+import { applyCampaignTemplate } from '../campaigns/utils/campaign-template.util';
 
 export interface WhatsAppMessagePayload {
   to: string;        // Phone number in international format e.g. 5511999999999
@@ -154,10 +155,10 @@ export class WhatsappService {
       return false;
     }
 
-    // Replace variables
-    const finalMessage = message
-      .replace(/{{orderNumber}}/g, orderNumber)
-      .replace(/{{restaurantName}}/g, restaurantName);
+    const finalMessage = applyCampaignTemplate(message, {
+      orderNumber,
+      restaurantName,
+    });
 
     return this.sendTextMessage(customerPhone, finalMessage, tenantId);
   }
