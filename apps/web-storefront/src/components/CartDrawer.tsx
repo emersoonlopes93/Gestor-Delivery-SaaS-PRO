@@ -166,7 +166,9 @@ export function CartDrawer({ onClose, upsells, minimumOrderValue }: CartDrawerPr
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] font-bold text-gray-900 truncate leading-none mb-1">{item.name}</p>
                         <div className="flex items-center justify-between">
-                           <span className="text-[11px] font-black text-primary-600">R${item.finalPrice.toFixed(2)}</span>
+                           <span className="text-[11px] font-black text-primary-600">
+                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(item.finalPrice ?? 0))}
+                           </span>
                            <button 
                              onClick={() => addUpsellItem(u, item)}
                              className="w-5 h-5 bg-primary-600 text-white rounded-full flex items-center justify-center hover:scale-110 transition-transform"

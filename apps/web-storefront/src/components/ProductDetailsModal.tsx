@@ -176,7 +176,7 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
       id: item.productId,
       name: item.name,
       slug: `upsell-${item.productId}`,
-      basePrice: item.finalPrice,
+      basePrice: Number(item.finalPrice ?? item.originalPrice ?? 0),
       image: item.image || '',
       type: 'simple',
       isAvailable: true,
@@ -192,7 +192,7 @@ export function ProductDetailsModal({ product, isStoreClosed, onClose }: Product
       quantity: 1,
       notes: `Oferta: ${upsell.name}`,
       sourceUpsellId: upsell.id,
-      computedUnitPrice: item.finalPrice,
+      computedUnitPrice: Number(item.finalPrice ?? item.originalPrice ?? 0),
       compositionLabel: 'Oferta Especial'
     });
   };
