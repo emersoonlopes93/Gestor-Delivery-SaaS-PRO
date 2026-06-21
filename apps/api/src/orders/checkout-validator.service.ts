@@ -19,6 +19,7 @@ import { DeliveryRateService } from '../delivery/delivery-rate.service';
 import { AvailabilityService } from '../catalog/publication/availability.service';
 import { UpsellsService } from '../catalog/upsells.service';
 import { PizzaEngineService } from '../catalog/pizza-engine.service';
+import { validateCashChangeFor } from './public-checkout-guards.util';
 
 type ProductWithData = Prisma.ProductGetPayload<{
   include: {
@@ -113,6 +114,12 @@ export class CheckoutValidatorService {
 
     if (items.length === 0) {
       throw new BadRequestException('O pedido deve conter pelo menos 1 item.');
+    }
+
+    if (options?.scheduledFor || options?.timeSlotId) {
+      if (!options?.scheduledFor || !options?.timeSlotId) {
+        throw new BadRequestException('Escolha um horário de agendamento para continuar.');
+      }
     }
 
     const validatedLines: ValidatedLine[] = [];
@@ -1149,14 +1156,7 @@ export class CheckoutValidatorService {
     }
 
     if (payment.method === 'cash') {
-      if (!payment.changeFor) {
-        throw new BadRequestException('Para pagamento em dinheiro, informe o troco.');
-      }
-      if (payment.changeFor < total) {
-        throw new BadRequestException(
-          `O valor para troco (${payment.changeFor}) deve ser maior ou igual ao total do pedido (${total}).`,
-        );
-      }
+      validateCashChangeFor(payment.changeFor, total);
     }
   }
 

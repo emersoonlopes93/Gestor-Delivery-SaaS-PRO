@@ -40,6 +40,7 @@ import { OrdersGateway } from './orders.gateway';
 import { KdsService } from '../kds/kds.service';
 import { RevenueLedgerService } from '../billing/revenue-ledger.service';
 import { MarketplaceStatusSyncService } from '../marketplace/services/marketplace-status-sync.service';
+import { assertOnlinePaymentEmail, normalizeReturnUrl } from './public-checkout-guards.util';
 
 @Injectable()
 export class OrdersService {
@@ -150,6 +151,8 @@ export class OrdersService {
       // Return existing order (idempotent)
       return this.getOrderDetail(existingOrder.id, tenantId);
     }
+
+    assertOnlinePaymentEmail(dto.payment.method, dto.customerEmail);
 
     // 4. Transactional order creation
     const finalTotal = total; 
@@ -331,7 +334,7 @@ export class OrdersService {
       try {
         const pixPayment = await this.paymentGatewayService.createPixPayment(
           order.id,
-          dto.customerEmail || '',
+          dto.customerEmail!,
           dto.customerName
         );
         
@@ -345,9 +348,9 @@ export class OrdersService {
       try {
         const preferencePayment = await this.paymentGatewayService.createPreferencePayment(
           order.id,
-          dto.customerEmail || '',
+          dto.customerEmail!,
           dto.customerName,
-          dto.returnUrl || 'https://gestor-delivery-pro.vercel.app', // Fallback URL if frontend didnt send
+          normalizeReturnUrl(dto.returnUrl),
           dto.payment.method
         );
 
