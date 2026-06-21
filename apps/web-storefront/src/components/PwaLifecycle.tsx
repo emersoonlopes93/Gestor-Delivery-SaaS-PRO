@@ -4,7 +4,8 @@ import { Download, Share, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from './Toast';
 
-const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.1.1';
+const SW_VERSION = '20260621-fix2';
+const SW_URL = `/sw.js?v=${encodeURIComponent(SW_VERSION)}`;
 const IOS_BANNER_DISMISSED_KEY = 'pwa-ios-banner-dismissed';
 
 type BeforeInstallPromptEvent = Event & {
@@ -53,18 +54,35 @@ export function PwaLifecycle() {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
 
-    const reloadKey = `pwa-reloaded:${APP_VERSION}`;
+    const reloadKey = `pwa-reloaded:${SW_VERSION}`;
+
+    console.info('[PWA] registering service worker', SW_URL);
 
     navigator.serviceWorker
-      .register(`/sw.js?v=${encodeURIComponent(APP_VERSION)}`)
+      .register(SW_URL)
       .then((registration) => {
+        console.info('[PWA] service worker registered', {
+          scope: registration.scope,
+          activeScriptURL: registration.active?.scriptURL ?? null,
+          installingScriptURL: registration.installing?.scriptURL ?? null,
+          waitingScriptURL: registration.waiting?.scriptURL ?? null,
+        });
         registration.update().catch(() => undefined);
 
         registration.addEventListener('updatefound', () => {
           const nextWorker = registration.installing;
           if (!nextWorker) return;
 
+          console.info('[PWA] service worker update found', {
+            scriptURL: nextWorker.scriptURL,
+          });
+
           nextWorker.addEventListener('statechange', () => {
+            console.info('[PWA] service worker state change', {
+              scriptURL: nextWorker.scriptURL,
+              state: nextWorker.state,
+            });
+
             if (nextWorker.state === 'installed' && navigator.serviceWorker.controller) {
               showToast({ title: 'Atualizacao pronta', message: 'O app sera atualizado automaticamente.', type: 'info' });
               nextWorker.postMessage({ type: 'SKIP_WAITING' });
@@ -77,6 +95,7 @@ export function PwaLifecycle() {
       });
 
     const onControllerChange = () => {
+      console.info('[PWA] service worker controller changed');
       if (sessionStorage.getItem(reloadKey)) return;
       sessionStorage.setItem(reloadKey, '1');
       window.location.reload();

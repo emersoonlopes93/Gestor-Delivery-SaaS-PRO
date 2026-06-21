@@ -1,6 +1,7 @@
 // PedeHub - PWA shell, offline fallback and Web Push Notifications.
 
-const CACHE_VERSION = 'gestor-storefront-v11.1';
+const SW_VERSION = 'storefront-sw-2026-06-21-fix2';
+const CACHE_VERSION = 'storefront-sw-2026-06-21-fix2';
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest',
@@ -9,13 +10,17 @@ const APP_SHELL = [
   '/icons/app-maskable.svg',
 ];
 
+console.info('[SW] loaded', SW_VERSION);
+
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()),
+    caches.open(CACHE_VERSION).then((cache) => cache.addAll(APP_SHELL)),
   );
 });
 
 self.addEventListener('activate', (event) => {
+  console.info('[SW] activated', SW_VERSION);
   event.waitUntil(
     caches
       .keys()
@@ -33,7 +38,13 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (event) => {
   const request = event.request;
 
-  const url = new URL(request.url);
+  let url;
+  try {
+    url = new URL(request.url);
+  } catch {
+    return;
+  }
+
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
   if (request.method !== 'GET') return;
 
@@ -53,45 +64,73 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  const safeCachePut = async (cacheKey, response) => {
-    try {
-      if (response && response.ok) {
-        const cache = await caches.open(CACHE_VERSION);
-        await cache.put(cacheKey, response.clone());
-      }
-    } catch (error) {
-      console.warn('[SW] cache put skipped', {
-        url: request.url,
-        reason: error instanceof Error ? error.message : String(error),
-      });
-    }
-  };
+  event.respondWith(handleSafeGetRequest(request, url));
+});
 
+async function safeCachePut(cacheKey, request, url, response) {
+  try {
+    if (
+      response &&
+      response.ok &&
+      request.method === 'GET' &&
+      (url.protocol === 'http:' || url.protocol === 'https:')
+    ) {
+      const cache = await caches.open(CACHE_VERSION);
+      await cache.put(cacheKey, response.clone());
+    }
+  } catch (cacheError) {
+    console.warn('[SW] cache put skipped', {
+      version: SW_VERSION,
+      url: request.url,
+      reason: cacheError instanceof Error ? cacheError.message : String(cacheError),
+    });
+  }
+}
+
+async function handleSafeGetRequest(request, url) {
   if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const clone = response.clone();
-          safeCachePut('/', clone);
-          return response;
-        })
-        .catch(() => caches.match('/').then((cached) => cached || Response.error())),
-    );
-    return;
+    try {
+      const response = await fetch(request);
+      await safeCachePut('/', request, url, response);
+      return response;
+    } catch (networkError) {
+      const cached = await caches.match('/');
+      if (cached) return cached;
+
+      console.warn('[SW] network failed, no cache fallback', {
+        version: SW_VERSION,
+        url: request.url,
+        reason: networkError instanceof Error ? networkError.message : String(networkError),
+      });
+
+      throw networkError;
+    }
   }
 
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request).then((response) => {
-        if (response.ok && ['style', 'script', 'image', 'font'].includes(request.destination)) {
-          safeCachePut(request, response);
-        }
-        return response;
-      });
-    }),
-  );
-});
+  const cached = await caches.match(request);
+  if (cached) return cached;
+
+  try {
+    const response = await fetch(request);
+
+    if (['style', 'script', 'image', 'font'].includes(request.destination)) {
+      await safeCachePut(request, request, url, response);
+    }
+
+    return response;
+  } catch (networkError) {
+    const fallback = await caches.match(request);
+    if (fallback) return fallback;
+
+    console.warn('[SW] network failed, no cache fallback', {
+      version: SW_VERSION,
+      url: request.url,
+      reason: networkError instanceof Error ? networkError.message : String(networkError),
+    });
+
+    throw networkError;
+  }
+}
 
 self.addEventListener('push', (event) => {
   if (!event.data) return;
