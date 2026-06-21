@@ -5,6 +5,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { WhatsAppSenderService } from '../../whatsapp-channel/services/whatsapp-sender.service';
 import { CampaignDispatcherService } from './campaign-dispatcher.service';
 import { CampaignAutomationService } from './campaign-automation.service';
+import { applyCampaignTemplate } from '../utils/campaign-template.util';
 
 export interface CampaignJobData {
   campaignId?: string;
@@ -60,19 +61,28 @@ export class CampaignProcessor extends WorkerHost {
       try {
         const campaignMeta = await this.prisma.campaign.findUnique({
           where: { id: campaignId },
-          select: { startedAt: true },
+          select: { startedAt: true, tenant: { select: { name: true, slug: true } } },
         });
         const publishStartedAt = Date.now();
+        const statusTemplate = messageTemplate || '';
+        const resolvedStatusMessage = applyCampaignTemplate(statusTemplate, {
+          nome: campaignMeta?.tenant?.name?.split(' ')[0] || 'cliente',
+          nome_loja: campaignMeta?.tenant?.name || 'nossa loja',
+          link_cardapio: campaignMeta?.tenant?.slug ? `https://${campaignMeta.tenant.slug}.gestordelivery.com` : '',
+          cupom: '',
+          pedido: '',
+          total: '',
+        });
         const result = await this.whatsappSender.publishStatus(tenantId, {
-          text: messageTemplate!,
+          text: resolvedStatusMessage,
           mediaUrl: mediaUrl || undefined,
           mediaType: mediaType || undefined,
-          caption: messageTemplate!,
+          caption: resolvedStatusMessage,
         });
         const publishDurationMs = Date.now() - publishStartedAt;
         const elapsedSinceStartMs = campaignMeta?.startedAt ? Date.now() - campaignMeta.startedAt.getTime() : publishDurationMs;
         this.logger.log(
-          `status_publish_result campaignId=${campaignId} success=${result.success} publishDurationMs=${publishDurationMs} elapsedSinceStartMs=${elapsedSinceStartMs} hasMedia=${Boolean(mediaUrl)} mediaType=${mediaType || 'text'} captionLength=${messageTemplate?.length ?? 0}`,
+          `status_publish_result campaignId=${campaignId} success=${result.success} publishDurationMs=${publishDurationMs} elapsedSinceStartMs=${elapsedSinceStartMs} hasMedia=${Boolean(mediaUrl)} mediaType=${mediaType || 'text'} captionLength=${resolvedStatusMessage.length}`,
         );
         
         await this.prisma.campaign.update({
@@ -144,7 +154,9 @@ export class CampaignProcessor extends WorkerHost {
     }
 
     const firstName = customerName.trim().split(' ')[0] || 'cliente';
-    const personalizedMessage = messageTemplate.replace(/{{nome}}/gi, firstName);
+    const personalizedMessage = applyCampaignTemplate(messageTemplate, {
+      nome: firstName,
+    });
 
     // Jitter/Delay aleatório para evitar banimento do WhatsApp (Anti-Spam)
     // Entre 5000ms e 15000ms

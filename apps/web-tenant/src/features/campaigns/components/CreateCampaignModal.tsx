@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { X, Megaphone, ChevronRight, ChevronLeft, AlertTriangle } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '../../../lib/api-client';
@@ -14,6 +14,7 @@ interface CreateCampaignModalProps {
 
 export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampaignModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
+  const messageTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [formData, setFormData] = useState<CreateCampaignDto>({
     name: '',
     objective: '',
@@ -52,6 +53,34 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
 
   const updateFormData = <K extends keyof CreateCampaignDto>(field: K, value: CreateCampaignDto[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const insertMessageVariable = (variable: string) => {
+    const textarea = messageTextareaRef.current;
+
+    setFormData(prev => {
+      if (!textarea) {
+        return {
+          ...prev,
+          messageTemplate: `${prev.messageTemplate}${prev.messageTemplate ? ' ' : ''}${variable}`,
+        };
+      }
+
+      const start = textarea.selectionStart ?? prev.messageTemplate.length;
+      const end = textarea.selectionEnd ?? prev.messageTemplate.length;
+      const nextMessage = `${prev.messageTemplate.slice(0, start)}${variable}${prev.messageTemplate.slice(end)}`;
+
+      window.requestAnimationFrame(() => {
+        textarea.focus();
+        const nextCursor = start + variable.length;
+        textarea.setSelectionRange(nextCursor, nextCursor);
+      });
+
+      return {
+        ...prev,
+        messageTemplate: nextMessage,
+      };
+    });
   };
 
   const updateSegmentRules = <K extends keyof CreateCampaignDto['segmentRules']>(
@@ -251,11 +280,24 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">Corpo da Mensagem *</label>
                 <div className="bg-muted p-3 rounded-lg mb-2">
-                  <p className="text-xs text-muted-foreground">
-                    <strong>Variáveis:</strong> {'{nome}'}, {'{link_cardapio}'}, {'{cupom}'}, {'{pedido}'}, {'{total}'}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold text-muted-foreground">Variáveis:</span>
+                    {['{nome}', '{link_cardapio}', '{cupom}', '{pedido}', '{total}'].map(variable => (
+                      <button
+                        key={variable}
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => insertMessageVariable(variable)}
+                        className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
+                      >
+                        {variable}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">Clique em uma variável para inseri-la no campo da mensagem.</p>
                 </div>
                 <textarea
+                  ref={messageTextareaRef}
                   value={formData.messageTemplate}
                   onChange={(e) => updateFormData('messageTemplate', e.target.value)}
                   placeholder="Olá {nome}..."

@@ -10,6 +10,7 @@ import { CustomerIntelligenceService } from '../../crm/customer-intelligence.ser
 import { BusinessInsightsService } from '../../analytics/business-insights.service';
 import { PrismaService } from '../../database/prisma.service';
 import { CouponsService } from '../../promotions/coupons.service';
+import { applyCampaignTemplate } from '../utils/campaign-template.util';
 
 type AutomationRunResult = {
   tenantId: string;
@@ -275,11 +276,7 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
   }
 
   private applyTemplate(template: string, vars: Record<string, string>) {
-    let result = template;
-    for (const [key, value] of Object.entries(vars)) {
-      result = result.replace(new RegExp(key, 'g'), value);
-    }
-    return result;
+    return applyCampaignTemplate(template, vars);
   }
 
   private async runPostOrderReview(tenantId: string, result: AutomationRunResult) {
