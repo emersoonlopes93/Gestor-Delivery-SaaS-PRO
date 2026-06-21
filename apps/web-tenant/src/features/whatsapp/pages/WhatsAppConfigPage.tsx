@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Bot, Smartphone, Settings, RefreshCw, QrCode as QrIcon, Bell, Info } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { api } from '@/lib/api-client';
+import { api, ApiError } from '@/lib/api-client';
 import { toast } from 'react-hot-toast';
 import type { TenantSettings } from '@gestor/types';
 
@@ -49,7 +49,6 @@ export function WhatsAppConfigPage() {
   // Feature Flags de variáveis de ambiente
   const featureWhatsappConnect = import.meta.env.VITE_FEATURE_WHATSAPP_CONNECT !== 'false';
   const featureOrderNotifications = import.meta.env.VITE_FEATURE_ORDER_NOTIFICATIONS !== 'false';
-  const featureAiAgent = import.meta.env.VITE_FEATURE_AI_AGENT === 'true';
 
   // Fetch Instance Data
   const { data: instance, isLoading: loadingInstance } = useQuery({
@@ -71,14 +70,14 @@ export function WhatsAppConfigPage() {
     enabled: featureOrderNotifications,
   });
 
-  // Fetch AI Config
-  const { data: aiConfig, isLoading: loadingAi } = useQuery({
+  // Fetch AI Config: o backend valida o entitlement e retorna 403 quando a loja não tem acesso.
+  const { data: aiConfig, isLoading: loadingAi, error: aiError } = useQuery({
     queryKey: ['ai-agent-config'],
     queryFn: async () => {
       const res = await api.get<AiAgentConfig>('/ai-agent/config');
       return res.data;
     },
-    enabled: featureAiAgent,
+    retry: false,
   });
 
   // Fetch Chat Sessions to check for active handoffs
@@ -285,7 +284,7 @@ export function WhatsAppConfigPage() {
   const isLoading = 
     (featureWhatsappConnect && loadingInstance) || 
     (featureOrderNotifications && loadingSettings) || 
-    (featureAiAgent && loadingAi);
+    loadingAi;
 
   if (isLoading) {
     return <div className="p-8 text-center text-muted-foreground">Carregando configurações...</div>;
@@ -315,7 +314,7 @@ export function WhatsAppConfigPage() {
         )}
       </div>
 
-      {hasHandoffActive && featureAiAgent && (
+      {hasHandoffActive && Boolean(aiConfig) && (
         <div className="bg-status-warning/10 dark:bg-status-warning/5 border border-status-warning/20 dark:border-status-warning/30 rounded-xl p-4 flex items-start gap-3 animate-in fade-in duration-300">
           <div className="flex-shrink-0 text-status-warning">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -607,7 +606,7 @@ export function WhatsAppConfigPage() {
         ) : null}
 
         {/* CARD 3: CONFIGURAÇÃO DO AGENTE IA */}
-        {featureAiAgent ? (
+        {aiConfig ? (
           <div className="bg-card text-card-foreground border border-border rounded-3xl shadow-sm p-6 relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-primary/10" />
             <div className="flex items-start justify-between mb-6">
@@ -764,18 +763,31 @@ export function WhatsAppConfigPage() {
                </button>
             </div>
           </div>
-        ) : (
-          /* Card Discreto se a IA estiver desativada */
+        ) : aiError instanceof ApiError && aiError.status === 403 ? (
+          /* Card Discreto quando a loja ainda não tem entitlement de IA */
           <div className="bg-card text-card-foreground border border-border/70 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-center items-center text-center opacity-75">
             <div className="p-4 bg-muted/50 rounded-full text-muted-foreground mb-4">
               <Bot className="w-8 h-8" />
             </div>
-            <h3 className="text-lg font-bold text-foreground mb-2">Agente IA (Beta)</h3>
+            <h3 className="text-lg font-bold text-foreground mb-2">Agente IA</h3>
             <p className="text-sm text-muted-foreground max-w-sm">
-              O atendimento automático por Inteligência Artificial está disponível em planos avançados do PedeHub.
+              O atendimento automático por Inteligência Artificial ainda não está liberado para este tenant.
             </p>
             <div className="mt-4 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[10px] font-black uppercase text-amber-700 tracking-wider">
-              Disponível em breve
+              Bloqueado pelo plano
+            </div>
+          </div>
+        ) : (
+          <div className="bg-card text-card-foreground border border-border/70 rounded-3xl p-6 relative overflow-hidden flex flex-col justify-center items-center text-center">
+            <div className="p-4 bg-muted/50 rounded-full text-muted-foreground mb-4">
+              <Bot className="w-8 h-8" />
+            </div>
+            <h3 className="text-lg font-bold text-foreground mb-2">Agente IA</h3>
+            <p className="text-sm text-muted-foreground max-w-sm">
+              Não foi possível carregar a configuração do Agente IA neste momento.
+            </p>
+            <div className="mt-4 px-3 py-1 bg-destructive/10 border border-destructive/20 rounded-xl text-[10px] font-black uppercase text-destructive tracking-wider">
+              Erro de carregamento
             </div>
           </div>
         )}
