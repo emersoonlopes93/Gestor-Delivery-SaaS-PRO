@@ -109,7 +109,7 @@ export function CheckoutPage() {
         // Auto-select first available payment method if current is not available
         const methods = (data.tenant.paymentMethods as PaymentMethod[]) || [];
         if (methods.length > 0 && !methods.includes(payment.method)) {
-          setPayment({ method: methods[0] });
+          setPayment((prev) => ({ ...prev, method: methods[0] }));
         }
       } catch (err) {
         console.error('Error loading tenant info', err);
@@ -210,7 +210,7 @@ export function CheckoutPage() {
         // Safe payment for validation: if cash and no/invalid change, use a large dummy value
         // to avoid validation failure on the backend while just checking delivery fees/items.
         const validationPayment = { ...payment };
-        if (payment.method === 'cash' && (!payment.changeFor || payment.changeFor < total)) {
+        if (payment.method === 'cash' && (payment.changeFor == null || payment.changeFor < total)) {
           validationPayment.changeFor = 9999; 
         }
 
@@ -478,7 +478,7 @@ export function CheckoutPage() {
         notes: notes.trim() || undefined,
         payment: {
           ...payment,
-          changeFor: payment.method === 'cash' ? payment.changeFor || undefined : undefined,
+          changeFor: payment.method === 'cash' ? (payment.changeFor ?? undefined) : undefined,
         },
         sourceChannel: 'direct_online',
         couponCode: appliedCoupon || undefined,
@@ -757,35 +757,35 @@ export function CheckoutPage() {
         </h2>
         <div className="grid grid-cols-3 gap-2">
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('pix')) && (
-            <button onClick={() => setPayment({ method: PaymentMethod.pix })}
+            <button onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.pix }))}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'pix' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <QrCode className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase">PIX</span>
             </button>
           )}
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('credit_card')) && (
-            <button onClick={() => setPayment({ method: PaymentMethod.credit_card })}
+            <button onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.credit_card }))}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'credit_card' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <CreditCard className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase text-center leading-none">Crédito<br/>On-line</span>
             </button>
           )}
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('debit_card')) && (
-            <button onClick={() => setPayment({ method: PaymentMethod.debit_card })}
+            <button onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.debit_card }))}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'debit_card' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <CreditCard className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase text-center leading-none">Débito<br/>On-line</span>
             </button>
           )}
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('card_on_delivery')) && (
-            <button onClick={() => setPayment({ method: PaymentMethod.card_on_delivery })}
+            <button onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.card_on_delivery }))}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'card_on_delivery' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <CreditCard className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase tracking-tight text-center leading-none">Cartão na<br/>Entrega</span>
             </button>
           )}
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('cash')) && (
-            <button onClick={() => setPayment({ method: PaymentMethod.cash, changeFor: null })}
+            <button onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.cash, changeFor: null }))}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'cash' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <Banknote className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase mt-2">Dinheiro</span>
@@ -799,10 +799,10 @@ export function CheckoutPage() {
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">R$</span>
               <input type="number" placeholder="0,00" value={payment.changeFor || ''} 
-                onChange={e => setPayment({ ...payment, changeFor: Number(e.target.value) })}
+                onChange={e => setPayment(prev => ({ ...prev, changeFor: e.target.value === '' ? null : Number(e.target.value) }))}
                 className="input-premium pl-10" />
             </div>
-            {payment.changeFor !== null && payment.changeFor < total && (
+            {payment.changeFor != null && payment.changeFor < total && (
               <p className="mt-2 text-[10px] text-red-500 font-bold uppercase tracking-wider flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" /> O troco deve ser maior que o total
               </p>
@@ -811,11 +811,17 @@ export function CheckoutPage() {
         )}
 
         {payment.method === PaymentMethod.credit_card && tenantInfo?.mercadoPagoPublicKey && (
+          customerEmail.trim() ? (
           <CardPayment
             publicKey={tenantInfo.mercadoPagoPublicKey}
             amount={total}
             onSubmit={handleCardSubmit}
           />
+          ) : (
+            <div className="mt-4 p-4 rounded-2xl border border-amber-200 bg-amber-50 text-amber-800 text-sm">
+              Para pagamento com cartão, informe um e-mail válido antes de continuar.
+            </div>
+          )
         )}
       </section>
 

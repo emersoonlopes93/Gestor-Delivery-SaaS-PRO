@@ -24,6 +24,9 @@ export function CardPayment({ publicKey, amount, onSubmit }: CardPaymentProps) {
 
   useEffect(() => {
     if (!window.MercadoPago || !containerRef.current) return;
+    if (!Number.isFinite(amount) || amount <= 0) return;
+
+    containerRef.current.innerHTML = '';
 
     const mp = new window.MercadoPago(publicKey, { locale: 'pt-BR' });
     const bricksBuilder = mp.bricks();
