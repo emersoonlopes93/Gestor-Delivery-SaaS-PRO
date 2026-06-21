@@ -137,6 +137,15 @@ export interface IWhatsAppProvider {
   ): Promise<void>;
 
   /**
+   * Exclui a instância remota no provider
+   */
+  deleteInstance(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+  ): Promise<void>;
+
+  /**
    * Consulta status de conexão
    */
   getConnectionStatus(

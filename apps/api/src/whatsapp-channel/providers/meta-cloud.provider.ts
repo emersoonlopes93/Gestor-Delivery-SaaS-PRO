@@ -71,6 +71,14 @@ export class MetaCloudProvider implements IWhatsAppProvider {
     // No-op para Meta Cloud
   }
 
+  async deleteInstance(
+    _apiUrl: string,
+    _apiKey: string,
+    _instanceId: string,
+  ): Promise<void> {
+    // No-op para Meta Cloud
+  }
+
   async getConnectionStatus(
     apiUrl: string,
     apiKey: string,

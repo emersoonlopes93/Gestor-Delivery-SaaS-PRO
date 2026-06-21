@@ -359,21 +359,15 @@ export class WhatsAppInstanceService {
       instanceApiKey: instance.apiKey,
     });
 
+    const provider = this.getProvider(instance.providerType);
+    const instanceName = instance.evolutionInstanceId || instance.instanceName;
+
     try {
-      const client = axios.create({
-        baseURL: instance.apiUrl.replace(/\/+$/, ''),
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: apiKeyForDelete,
-        },
-        timeout: 10_000,
-      });
-      const instanceName = instance.evolutionInstanceId || instance.instanceName;
-      await client.delete(`/instance/delete/${instanceName}`);
-      this.logger.log(`Instance ${instanceName} deleted from Evolution-Go`);
+      await provider.deleteInstance(instance.apiUrl, apiKeyForDelete, instanceName);
+      this.logger.log(`Instance ${instanceName} deleted from external provider during devResetInstance`);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.warn(`Failed to delete instance from Evolution-Go during devResetInstance: ${msg}`);
+      this.logger.warn(`Failed to delete instance from external provider during devResetInstance: ${msg}`);
     }
 
     await this.prisma.whatsAppInstance.delete({

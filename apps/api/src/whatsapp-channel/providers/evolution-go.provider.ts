@@ -218,6 +218,38 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     }
   }
 
+  async deleteInstance(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+  ): Promise<void> {
+    const client = axios.create({
+      baseURL: apiUrl.replace(/\/+$/, ''),
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: apiKey,
+        instanceId,
+      },
+      timeout: 30_000,
+    });
+
+    try {
+      await client.post('/instance/logout');
+    } catch (logoutError) {
+      const message = logoutError instanceof Error ? logoutError.message : 'Unknown error';
+      this.logger.warn(`[WHATSAPP_WARN] step=delete_instance instanceId=${instanceId} logout failed: ${message}`);
+    }
+
+    try {
+      await client.delete(`/instance/delete/${instanceId}`);
+      this.logger.log(`[WHATSAPP_DELETE_INSTANCE] instanceId=${instanceId} deleted_remote=true`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`[WHATSAPP_WARN] step=delete_instance instanceId=${instanceId} delete failed: ${message}`);
+      throw error;
+    }
+  }
+
   async generatePairingCode(
     apiUrl: string,
     apiKey: string,
@@ -872,7 +904,9 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     const result = {
       connected: state === 'connected',
       state,
-      phoneNumber: (data?.phoneNumber || data?.phone || data?.jid || data?.number) as string | undefined,
+      phoneNumber: this.normalizeConnectedPhoneNumber(
+        (data?.phoneNumber || data?.phone || data?.jid || data?.number) as string | undefined,
+      ),
       qrCode: normalizedQr,
     };
 
@@ -884,5 +918,11 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     this.logger.log(`[WHATSAPP_QR] qrPresent=${!!normalizedQr} keys=[${keysFiltered.join(', ')}]`);
 
     return result;
+  }
+
+  private normalizeConnectedPhoneNumber(value?: string): string | undefined {
+    if (!value) return undefined;
+    const normalized = normalizeWhatsAppSendNumber(value);
+    return normalized || undefined;
   }
 }

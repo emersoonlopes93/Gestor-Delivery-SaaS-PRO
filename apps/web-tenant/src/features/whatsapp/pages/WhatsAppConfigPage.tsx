@@ -40,6 +40,22 @@ interface WhatsAppStatusResponse {
   phoneNumber?: string | null;
 }
 
+function formatWhatsAppPhoneNumber(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const beforeAt = raw.includes('@') ? raw.split('@')[0] : raw;
+  const digits = beforeAt.replace(/\D/g, '');
+  return digits || null;
+}
+
+function formatConnectedLabel(value: string | null | undefined): string | null {
+  const normalized = formatWhatsAppPhoneNumber(value);
+  if (!normalized) return null;
+  if (normalized.length <= 5) return normalized;
+  return `${normalized.slice(0, 5)}...`;
+}
+
 
 
 export function WhatsAppConfigPage() {
@@ -289,7 +305,7 @@ export function WhatsAppConfigPage() {
     (featureWhatsappConnect && loadingInstance) || 
     (featureOrderNotifications && loadingSettings) || 
     loadingAi;
-  const connectedPhoneNumber = status?.phoneNumber || instance?.phoneNumber || null;
+  const connectedPhoneLabel = formatConnectedLabel(status?.phoneNumber || instance?.phoneNumber || null);
 
   if (isLoading) {
     return <div className="p-8 text-center text-muted-foreground">Carregando configurações...</div>;
@@ -379,9 +395,9 @@ export function WhatsAppConfigPage() {
                       <p className={`${status?.status === 'connected' ? 'text-status-success' : 'text-status-warning'} font-medium`}>
                         {status?.status === 'connected' ? 'Online' : 'Desconectado'}
                       </p>
-                      {connectedPhoneNumber ? (
+                      {connectedPhoneLabel ? (
                         <p className="mt-1 text-xs font-mono text-muted-foreground">
-                          Número conectado: {connectedPhoneNumber}
+                          Conectado: {connectedPhoneLabel}
                         </p>
                       ) : null}
                     </div>
