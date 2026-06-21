@@ -69,11 +69,6 @@ export class CampaignDispatcherService implements OnModuleInit, OnModuleDestroy 
           }, {
             jobId: `status-${campaign.id}`, // Idempotência
           });
-
-          await this.prisma.campaign.update({
-            where: { id: campaign.id },
-            data: { status: 'completed', completedAt: new Date() },
-          });
           continue;
         }
 
