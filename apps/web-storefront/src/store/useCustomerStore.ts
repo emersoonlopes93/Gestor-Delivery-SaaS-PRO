@@ -3,6 +3,21 @@ import { persist } from 'zustand/middleware';
 
 import type { CustomerDTO } from '@gestor/types';
 
+function normalizeCustomer(customer: CustomerDTO | null): CustomerDTO | null {
+  if (!customer) return null;
+
+  return {
+    ...customer,
+    email: customer.email ?? null,
+    totalOrders: Number(customer.totalOrders ?? 0),
+    totalSpent: Number(customer.totalSpent ?? 0),
+    loyaltyPoints: Number(customer.loyaltyPoints ?? 0),
+    cashbackBalance: Number(customer.cashbackBalance ?? 0),
+    createdAt: customer.createdAt ?? new Date(0).toISOString(),
+    updatedAt: customer.updatedAt ?? new Date(0).toISOString(),
+  };
+}
+
 interface CustomerState {
   customer: CustomerDTO | null;
   accessToken: string | null;
@@ -21,7 +36,7 @@ export const useCustomerStore = create<CustomerState>()(
       tenantSlug: null,
       isLoggedIn: false,
       setCustomer: (customer, accessToken, tenantSlug) => set({ 
-        customer, 
+        customer: normalizeCustomer(customer),
         accessToken, 
         tenantSlug,
         isLoggedIn: !!accessToken 
@@ -48,6 +63,10 @@ export const useCustomerStore = create<CustomerState>()(
     }),
     {
       name: 'customer-storage',
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        state.customer = normalizeCustomer(state.customer);
+      },
     }
   )
 );

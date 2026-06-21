@@ -15,7 +15,10 @@ export function CashbackSelector({
   onRemoveCashback,
   maxUsable 
 }: CashbackSelectorProps) {
-  const maxCashbackToUse = Math.min(availableBalance, maxUsable || Infinity);
+  const safeAvailableBalance = Number.isFinite(availableBalance) ? availableBalance : 0;
+  const safeUsedAmount = Number.isFinite(usedAmount) ? usedAmount : 0;
+  const safeMaxUsable = Number.isFinite(maxUsable) ? Number(maxUsable) : Infinity;
+  const maxCashbackToUse = Math.max(0, Math.min(safeAvailableBalance, safeMaxUsable));
 
   const handleUseMax = () => {
     onUseCashback(maxCashbackToUse);
@@ -25,7 +28,7 @@ export function CashbackSelector({
     onRemoveCashback();
   };
 
-  if (usedAmount > 0) {
+  if (safeUsedAmount > 0) {
     return (
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
@@ -42,17 +45,17 @@ export function CashbackSelector({
         </div>
         <div className="text-right">
           <div className="text-2xl font-bold text-blue-600">
-            R$ {usedAmount.toFixed(2)}
+            R$ {safeUsedAmount.toFixed(2)}
           </div>
           <div className="text-sm text-blue-500">
-            Saldo restante: R$ {(availableBalance - usedAmount).toFixed(2)}
+            Saldo restante: R$ {(safeAvailableBalance - safeUsedAmount).toFixed(2)}
           </div>
         </div>
       </div>
     );
   }
 
-  if (availableBalance <= 0) {
+  if (safeAvailableBalance <= 0) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
         <div className="flex items-center gap-2 text-gray-500">
@@ -70,7 +73,7 @@ export function CashbackSelector({
         <div>
           <h3 className="font-semibold text-yellow-800">Usar Cashback</h3>
           <p className="text-sm text-yellow-600">
-            Saldo disponível: <span className="font-semibold">R$ {availableBalance.toFixed(2)}</span>
+            Saldo disponível: <span className="font-semibold">R$ {safeAvailableBalance.toFixed(2)}</span>
           </p>
         </div>
       </div>
@@ -86,7 +89,7 @@ export function CashbackSelector({
               min="0"
               max={maxCashbackToUse}
               step="0.01"
-              onChange={(e) => onUseCashback(Number(e.target.value))}
+              onChange={(e) => onUseCashback(Number.isFinite(Number(e.target.value)) ? Number(e.target.value) : 0)}
               className="flex-1 input-premium"
               placeholder="0,00"
             />

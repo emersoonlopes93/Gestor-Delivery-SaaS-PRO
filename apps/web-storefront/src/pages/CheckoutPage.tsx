@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { ArrowLeft, MapPin, User, FileText, Loader2, AlertCircle, Truck, Store, CreditCard, Banknote, QrCode } from 'lucide-react';
 import { useCartStore } from '../store/use-cart-store';
 import { api } from '../lib/api-client';
+import { useQuery } from '@tanstack/react-query';
 import { 
   CreateOrderDTO, 
   CreateOrderItemDTO, 
@@ -47,6 +48,7 @@ export function CheckoutPage() {
 
   const { customer, isLoggedIn, setTenantSlug } = useCustomerStore();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const cartTenantSlug = useCartStore(s => s.tenantSlug);
 
   // Form state
   const [customerName, setCustomerName] = useState('');
@@ -92,6 +94,13 @@ export function CheckoutPage() {
   const [discountTotal, setDiscountTotal] = useState(0);
   const [isValidating, setIsValidating] = useState(false);
   const [tenantInfo, setTenantInfo] = useState<StorefrontTenantInfo | null>(null);
+  const safeCustomerCashbackBalance = Number(customer?.cashbackBalance ?? 0);
+
+  const { data: customerProfile } = useQuery({
+    queryKey: ['customer-profile', tenantSlug],
+    queryFn: async () => (await api.get<{ profile?: { email?: string | null }; wallet?: { cashbackBalance?: number | null } }>('/public/customer-profile')).data,
+    enabled: isLoggedIn && !!tenantSlug,
+  });
 
   useEffect(() => {
     if (!tenantSlug) return;
@@ -126,6 +135,11 @@ export function CheckoutPage() {
       setCustomerEmail(prev => prev || customer?.email || '');
     }
   }, [isLoggedIn, customer]);
+
+  useEffect(() => {
+    if (!customerProfile) return;
+    setCustomerEmail(prev => prev || customerProfile.profile?.email || '');
+  }, [customerProfile]);
 
   // Set default fulfillment to table if tableId exists
   useEffect(() => {
@@ -251,6 +265,7 @@ export function CheckoutPage() {
   }, [debouncedAddress, fulfillmentType, items, tenantSlug, payment, appliedCoupon, usedCashback, isScheduled, scheduledFor, timeSlotId]);
 
   const total = Math.round((subtotal + deliveryFee - discountTotal) * 100) / 100;
+  const effectiveCashbackBalance = Number(customerProfile?.wallet?.cashbackBalance ?? safeCustomerCashbackBalance);
 
   const handleAddressSelected = (addr: StructuredAddress) => {
     setStreet(addr.street);
@@ -306,13 +321,31 @@ export function CheckoutPage() {
 
     if (!payment.method) return false;
     if (payment.method === 'cash') {
-      if (!payment.changeFor || payment.changeFor < total) return false;
+      if (payment.changeFor == null) return false;
+      if (payment.changeFor > 0 && payment.changeFor < total) return false;
     }
 
     if (isScheduled && !timeSlotId) return false;
 
     return true;
   }, [customerName, customerPhone, items, fulfillmentType, street, number, neighborhood, city, state, zipCode, lat, lng, payment, total, isScheduled, timeSlotId]);
+
+  useEffect(() => {
+    if (!tenantSlug) return;
+    if (cartTenantSlug && cartTenantSlug !== tenantSlug) {
+      navigate(`/${tenantSlug}`, { replace: true });
+      return;
+    }
+
+    if (items.length === 0) {
+      showEmptyCartMessageOnce();
+      navigate(`/${tenantSlug}`, { replace: true });
+    }
+  }, [items.length, tenantSlug, cartTenantSlug, navigate]);
+
+  function showEmptyCartMessageOnce() {
+    setSubmitError((prev) => prev ?? 'Seu carrinho está vazio. Adicione itens antes de finalizar.');
+  }
 
   const handleCardSubmit = async (formData: MercadoPagoCardFormData) => {
     if (isSubmitting) return;
@@ -598,7 +631,7 @@ export function CheckoutPage() {
           
           {customer && (
             <CashbackSelector
-              availableBalance={customer.cashbackBalance}
+              availableBalance={effectiveCashbackBalance}
               usedAmount={usedCashback}
               onUseCashback={setUsedCashback}
               onRemoveCashback={() => setUsedCashback(0)}
@@ -798,11 +831,11 @@ export function CheckoutPage() {
             <label className="block text-xs font-semibold text-gray-700 mb-2">Troco para quanto?</label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">R$</span>
-              <input type="number" placeholder="0,00" value={payment.changeFor || ''} 
+              <input type="number" placeholder="0,00" value={payment.changeFor ?? ''} 
                 onChange={e => setPayment(prev => ({ ...prev, changeFor: e.target.value === '' ? null : Number(e.target.value) }))}
                 className="input-premium pl-10" />
             </div>
-            {payment.changeFor != null && payment.changeFor < total && (
+            {payment.changeFor != null && payment.changeFor > 0 && payment.changeFor < total && (
               <p className="mt-2 text-[10px] text-red-500 font-bold uppercase tracking-wider flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" /> O troco deve ser maior que o total
               </p>

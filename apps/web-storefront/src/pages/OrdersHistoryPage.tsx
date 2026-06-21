@@ -51,7 +51,7 @@ type OrderItemSnapshotV2 = {
 export function OrdersHistoryPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const { isLoggedIn, logout, tenantSlug: customerTenantSlug, setTenantSlug } = useCustomerStore();
-  const { setTenantSlug: setCartTenantSlug, addItem } = useCartStore();
+  const { tenantSlug: cartTenantSlug, setTenantSlug: setCartTenantSlug, addItem, clearCart } = useCartStore();
   const { showToast } = useToast();
   const navigate = useNavigate();
 
@@ -110,8 +110,17 @@ export function OrdersHistoryPage() {
   };
 
   const handleReorder = async (orderId: string) => {
-    if (!storefront) {
+    if (!tenantSlug || !storefront) {
       showToast({ title: 'Carregando cardapio...', type: 'info' });
+      return;
+    }
+
+    if (customerTenantSlug && customerTenantSlug !== tenantSlug) {
+      showToast({
+        title: 'Nao foi possivel refazer este pedido',
+        message: 'Abra o cardapio correto para continuar.',
+        type: 'error',
+      });
       return;
     }
 
@@ -148,6 +157,16 @@ export function OrdersHistoryPage() {
       let itemsAdded = 0;
       let itemsMissing = 0;
       let priceChanged = false;
+      const reorderQueue: Array<{
+        product: StorefrontProductPayload;
+        quantity: number;
+        notes?: string;
+        selections?: CartSelectedOptionGroup[];
+        slots?: CartSelectedComboSlot[];
+        bundleItems?: CartBundleItemSnapshot[];
+        computedUnitPrice: number;
+        compositionLabel: string;
+      }> = [];
 
       for (const item of order.items) {
         const catalogId = item.lineType === 'combo' ? item.comboId : item.productId;
@@ -167,6 +186,11 @@ export function OrdersHistoryPage() {
           snapshotV2.pricing?.unitPrice ??
           item.unitPrice ??
           item.snapshotBasePrice + item.snapshotExtrasTotal;
+
+        if (!Number.isFinite(computedUnitPrice) || computedUnitPrice < 0) {
+          itemsMissing++;
+          continue;
+        }
 
         if (computedUnitPrice !== item.unitPrice || currentProduct.basePrice !== item.snapshotBasePrice) {
           priceChanged = true;
@@ -196,7 +220,7 @@ export function OrdersHistoryPage() {
           .filter((name): name is string => Boolean(name))
           .join(', ');
 
-        addItem({
+        reorderQueue.push({
           product: currentProduct,
           quantity: item.quantity,
           notes: item.notes || undefined,
@@ -210,6 +234,12 @@ export function OrdersHistoryPage() {
       }
 
       if (itemsAdded > 0) {
+        if (cartTenantSlug !== tenantSlug) {
+          setCartTenantSlug(tenantSlug);
+        }
+        clearCart();
+        reorderQueue.forEach((queuedItem) => addItem(queuedItem));
+
         let message = `${itemsAdded} item(s) adicionados.`;
         if (itemsMissing > 0) message += ` ${itemsMissing} item(s) nao estao mais disponiveis.`;
         if (priceChanged) message += ' Atencao: alguns precos foram atualizados.';
@@ -225,7 +255,7 @@ export function OrdersHistoryPage() {
 
       showToast({
         title: 'Erro ao repetir',
-        message: 'Nenhum dos itens esta disponivel no momento.',
+        message: 'Nao foi possivel refazer este pedido porque alguns itens nao estao mais disponiveis.',
         type: 'error',
       });
     } catch (e: unknown) {
