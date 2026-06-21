@@ -4,7 +4,7 @@ import { Download, Share, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useToast } from './Toast';
 
-const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.1.0';
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.1.1';
 const IOS_BANNER_DISMISSED_KEY = 'pwa-ios-banner-dismissed';
 
 type BeforeInstallPromptEvent = Event & {
@@ -244,4 +244,3 @@ function resolveDeepLink(rawUrl: string) {
     return null;
   }
 }
-

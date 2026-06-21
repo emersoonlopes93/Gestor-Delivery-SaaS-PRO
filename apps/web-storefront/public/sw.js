@@ -1,6 +1,6 @@
 // PedeHub - PWA shell, offline fallback and Web Push Notifications.
 
-const CACHE_VERSION = 'gestor-storefront-v11';
+const CACHE_VERSION = 'gestor-storefront-v11.1';
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest',
@@ -32,17 +32,47 @@ self.addEventListener('message', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const request = event.request;
-  if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
-  if (url.pathname.startsWith('/api/')) return;
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+  if (request.method !== 'GET') return;
+
+  const bypassPrefixes = [
+    '/api',
+    '/auth',
+    '/checkout',
+    '/orders',
+    '/payments',
+    '/customer',
+    '/customers',
+    '/mercadopago',
+    '/webhooks',
+  ];
+
+  if (bypassPrefixes.some((prefix) => url.pathname.startsWith(prefix))) {
+    return;
+  }
+
+  const safeCachePut = async (cacheKey, response) => {
+    try {
+      if (response && response.ok) {
+        const cache = await caches.open(CACHE_VERSION);
+        await cache.put(cacheKey, response.clone());
+      }
+    } catch (error) {
+      console.warn('[SW] cache put skipped', {
+        url: request.url,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
 
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((response) => {
           const clone = response.clone();
-          caches.open(CACHE_VERSION).then((cache) => cache.put('/', clone));
+          safeCachePut('/', clone);
           return response;
         })
         .catch(() => caches.match('/').then((cached) => cached || Response.error())),
@@ -55,8 +85,7 @@ self.addEventListener('fetch', (event) => {
       if (cached) return cached;
       return fetch(request).then((response) => {
         if (response.ok && ['style', 'script', 'image', 'font'].includes(request.destination)) {
-          const clone = response.clone();
-          caches.open(CACHE_VERSION).then((cache) => cache.put(request, clone));
+          safeCachePut(request, response);
         }
         return response;
       });
