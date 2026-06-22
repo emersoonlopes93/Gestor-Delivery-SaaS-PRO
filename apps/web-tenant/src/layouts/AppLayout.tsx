@@ -161,8 +161,6 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
       { id: 'management-employees', label: 'Funcionários', to: '/management/employees', icon: Users, permission: 'users.read' },
       { id: 'management-suppliers', label: 'Fornecedores', to: '/management/suppliers', icon: Truck, permission: 'purchasing.read' },
       { id: 'management-purchases', label: 'Compras / Entradas', to: '/management/purchases', icon: ShoppingCart, permission: 'purchasing.read' },
-      { id: 'management-inventory-count', label: 'Inventário Físico', to: '/management/inventory-count', icon: ClipboardList, permission: 'inventory.adjust', featureFlag: 'VITE_FEATURE_INVENTORY_ADVANCED' },
-      { id: 'management-losses', label: 'Perdas e Desperdícios', to: '/management/losses', icon: SlidersHorizontal, permission: 'inventory.adjust', featureFlag: 'VITE_FEATURE_INVENTORY_ADVANCED' },
       { id: 'management-finance', label: 'Financeiro / Fluxo', to: '/management/finance', icon: Wallet, permission: 'finance.read', featureFlag: 'VITE_FEATURE_FINANCE_ADVANCED' },
     ],
   },

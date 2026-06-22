@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { api } from '../../lib/api-client';
+import { api } from '@/lib/api-client';
 import { IngredientDTO, UnitType } from '@gestor/types';
 import { ClipboardList, Save, AlertTriangle, CheckCircle2, RefreshCcw } from 'lucide-react';
 
@@ -28,7 +28,7 @@ export function InventoryCountPage() {
       const response = await api.get<IngredientDTO[]>('/inventory/ingredients');
       if (response.success) {
         setIngredients(response.data);
-        setCountItems(response.data.map(ing => ({
+        setCountItems(response.data.map((ing: IngredientDTO) => ({
           ingredientId: ing.id,
           name: ing.name,
           unit: ing.unit,

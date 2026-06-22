@@ -49,8 +49,6 @@ import { ReportsPage, GoalsPage } from './features/analytics';
 import { BusinessIntelligencePage } from './features/analytics/BusinessIntelligencePage';
 import { SuppliersPage } from './features/purchasing/SuppliersPage';
 import { PurchasesPage } from './features/purchasing/PurchasesPage';
-import { InventoryCountPage } from './features/purchasing/InventoryCountPage';
-import { LossesPage } from './features/purchasing/LossesPage';
 import { FinancePage } from './features/purchasing/FinancePage';
 import { EmployeesPage } from './features/management/employees/EmployeesPage';
 
@@ -374,22 +372,6 @@ export function App() {
           element={
             <PermissionGate permission="purchasing.read">
               <PurchasesPage />
-            </PermissionGate>
-          }
-        />
-        <Route
-          path="/management/inventory-count"
-          element={
-            <PermissionGate permission="inventory.adjust">
-              <InventoryCountPage />
-            </PermissionGate>
-          }
-        />
-        <Route
-          path="/management/losses"
-          element={
-            <PermissionGate permission="inventory.adjust">
-              <LossesPage />
             </PermissionGate>
           }
         />
