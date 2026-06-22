@@ -880,7 +880,7 @@ export function CheckoutPage() {
             </button>
           )}
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('cash')) && (
-            <button onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.cash, changeFor: null }))}
+            <button onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.cash, changeFor: 0 }))}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'cash' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <Banknote className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase mt-2">Dinheiro</span>

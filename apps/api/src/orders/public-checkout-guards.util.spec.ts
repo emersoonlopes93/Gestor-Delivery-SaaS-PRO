@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import type { PaymentMethod } from '@gestor/types';
 import {
   assertOnlinePaymentEmail,
   normalizeReturnUrl,
@@ -8,11 +9,11 @@ import {
 describe('public-checkout guards', () => {
   describe('assertOnlinePaymentEmail', () => {
     it.each(['pix', 'credit_card', 'debit_card'] as const)('rejects %s without email', (method) => {
-      expect(() => assertOnlinePaymentEmail(method as any, '')).toThrow(BadRequestException);
+      expect(() => assertOnlinePaymentEmail(method as PaymentMethod, '')).toThrow(BadRequestException);
     });
 
     it('accepts offline payments without email', () => {
-      expect(() => assertOnlinePaymentEmail('cash' as any, '')).not.toThrow();
+      expect(() => assertOnlinePaymentEmail('cash' as PaymentMethod, '')).not.toThrow();
     });
   });
 
@@ -26,8 +27,8 @@ describe('public-checkout guards', () => {
     });
 
     it('rejects NaN and empty-like values', () => {
-      expect(() => validateCashChangeFor('' as any, 10)).toThrow('Informe um valor de troco válido.');
-      expect(() => validateCashChangeFor('abc' as any, 10)).toThrow('Informe um valor de troco válido.');
+      expect(() => validateCashChangeFor('', 10)).toThrow('Informe um valor de troco válido.');
+      expect(() => validateCashChangeFor('abc', 10)).toThrow('Informe um valor de troco válido.');
       expect(() => validateCashChangeFor(Number.NaN, 10)).toThrow('Informe um valor de troco válido.');
     });
   });

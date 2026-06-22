@@ -100,6 +100,12 @@ export function StorefrontPage() {
     enabled: isLoggedIn && customerTenantSlug === tenantSlug,
     staleTime: 60_000,
   });
+  const displayCustomerName =
+    customerHome?.profile?.name?.trim() && customerHome.profile.name !== 'Cliente Novo'
+      ? customerHome.profile.name
+      : customer?.name?.trim() && customer.name !== 'Cliente Novo'
+        ? customer.name
+        : '';
 
   useEffect(() => {
     if (data?.tenant) {
@@ -237,7 +243,7 @@ export function StorefrontPage() {
               </Link>
               <div className="text-right hidden sm:block">
                 <p className="text-xs text-[var(--storefront-muted-foreground)]">Olá,</p>
-                <p className="text-sm font-bold text-[var(--storefront-foreground)]">{customer?.name}</p>
+                <p className="text-sm font-bold text-[var(--storefront-foreground)]">{displayCustomerName || 'Cliente'}</p>
               </div>
               <button
                 onClick={logout}
