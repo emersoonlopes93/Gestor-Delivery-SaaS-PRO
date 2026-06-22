@@ -14,7 +14,8 @@ import {
   DeliveryAddressDTO,
   CheckoutValidationResult,
   StorefrontPayload,
-  StorefrontTenantInfo
+  StorefrontTenantInfo,
+  PublicCustomerProfileAddressDTO
 } from '@gestor/types';
 import { AddressAutocomplete } from '../components/AddressAutocomplete';
 import { StructuredAddress, fetchAddressByCep, geocodeAddress } from '../lib/maps-service';
@@ -95,10 +96,11 @@ export function CheckoutPage() {
   const [isValidating, setIsValidating] = useState(false);
   const [tenantInfo, setTenantInfo] = useState<StorefrontTenantInfo | null>(null);
   const safeCustomerCashbackBalance = Number(customer?.cashbackBalance ?? 0);
+  const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<string | null>(null);
 
   const { data: customerProfile } = useQuery({
     queryKey: ['customer-profile', tenantSlug],
-    queryFn: async () => (await api.get<{ profile?: { email?: string | null }; wallet?: { cashbackBalance?: number | null } }>('/public/customer-profile')).data,
+    queryFn: async () => (await api.get<{ profile?: { name?: string | null; email?: string | null }; wallet?: { cashbackBalance?: number | null }; addresses?: PublicCustomerProfileAddressDTO[] }>('/public/customer-profile')).data,
     enabled: isLoggedIn && !!tenantSlug,
   });
 
@@ -130,14 +132,18 @@ export function CheckoutPage() {
   // Pre-fill customer data
   useEffect(() => {
     if (isLoggedIn && customer) {
-      setCustomerName(prev => prev || customer.name);
+      const displayName = customer.name && customer.name !== 'Cliente Novo' ? customer.name : '';
+      setCustomerName(prev => prev || displayName || customerProfile?.profile?.name || '');
       setCustomerPhone(prev => prev || customer.phone);
-      setCustomerEmail(prev => prev || customer?.email || '');
+      setCustomerEmail(prev => prev || customer?.email || customerProfile?.profile?.email || '');
     }
-  }, [isLoggedIn, customer]);
+  }, [isLoggedIn, customer, customerProfile]);
 
   useEffect(() => {
     if (!customerProfile) return;
+    if (!customerName.trim() && customerProfile.profile?.name && customerProfile.profile.name !== 'Cliente Novo') {
+      setCustomerName(customerProfile.profile.name);
+    }
     setCustomerEmail(prev => prev || customerProfile.profile?.email || '');
   }, [customerProfile]);
 
@@ -266,6 +272,11 @@ export function CheckoutPage() {
 
   const total = Math.round((subtotal + deliveryFee - discountTotal) * 100) / 100;
   const effectiveCashbackBalance = Number(customerProfile?.wallet?.cashbackBalance ?? safeCustomerCashbackBalance);
+  const savedAddresses = customerProfile?.addresses ?? [];
+  const selectedSavedAddress = savedAddresses.find((address) => address.id === selectedSavedAddressId)
+    ?? savedAddresses.find((address) => address.isDefault)
+    ?? savedAddresses[0]
+    ?? null;
 
   const handleAddressSelected = (addr: StructuredAddress) => {
     setStreet(addr.street);
@@ -343,8 +354,29 @@ export function CheckoutPage() {
     }
   }, [items.length, tenantSlug, cartTenantSlug, navigate]);
 
+  useEffect(() => {
+    if (fulfillmentType !== 'delivery') return;
+    if (!savedAddresses.length) return;
+    if (street || number || neighborhood) return;
+    applySavedAddress(selectedSavedAddress);
+  }, [fulfillmentType, savedAddresses.length]);
+
   function showEmptyCartMessageOnce() {
     setSubmitError((prev) => prev ?? 'Seu carrinho está vazio. Adicione itens antes de finalizar.');
+  }
+
+  function applySavedAddress(address: PublicCustomerProfileAddressDTO | null) {
+    if (!address) return;
+    setStreet(address.street);
+    setNumber(address.number);
+    setComplement(address.complement || '');
+    setNeighborhood(address.neighborhood);
+    setCity(address.city);
+    setState(address.state);
+    setZipCode(address.zipCode);
+    setLat(address.lat ?? undefined);
+    setLng(address.lng ?? undefined);
+    setSelectedSavedAddressId(address.id);
   }
 
   const handleCardSubmit = async (formData: MercadoPagoCardFormData) => {
@@ -722,6 +754,36 @@ export function CheckoutPage() {
           <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
             <MapPin className="w-4 h-4" /> Endereço de Entrega
           </h2>
+          
+          {savedAddresses.length > 0 && (
+            <div className="mb-4 space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Endereços salvos</p>
+              <div className="grid gap-2">
+                {savedAddresses.map((address) => (
+                  <button
+                    key={address.id}
+                    type="button"
+                    onClick={() => applySavedAddress(address)}
+                    className={`rounded-xl border px-3 py-2 text-left text-xs transition-colors ${selectedSavedAddressId === address.id ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 bg-white text-gray-700'}`}
+                  >
+                    <span className="font-bold">{address.label || (address.isDefault ? 'Principal' : 'Salvo')}</span>
+                    <span className="block text-[11px] text-gray-500">
+                      {address.street}, {address.number} - {address.neighborhood}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {selectedSavedAddress && (
+                <button
+                  type="button"
+                  onClick={() => applySavedAddress(selectedSavedAddress)}
+                  className="text-xs font-bold text-primary-600 underline underline-offset-2"
+                >
+                  Usar este endereço salvo
+                </button>
+              )}
+            </div>
+          )}
           
           <AddressAutocomplete 
             onAddressSelected={handleAddressSelected}

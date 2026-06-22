@@ -229,9 +229,9 @@ export class OrdersService {
         }
 
         // Delivery address
-        if (dto.fulfillmentType === 'delivery' && dto.deliveryAddress) {
-          await tx.orderDeliveryAddress.create({
-            data: {
+    if (dto.fulfillmentType === 'delivery' && dto.deliveryAddress) {
+      await tx.orderDeliveryAddress.create({
+        data: {
               orderId: newOrder.id,
               tenantId,
               street: dto.deliveryAddress.street,
@@ -322,6 +322,24 @@ export class OrdersService {
     }
 
     const orderDetail = await this.getOrderDetail(order.id, tenantId);
+
+    if (customerId && dto.fulfillmentType === 'delivery' && dto.deliveryAddress) {
+      await this.customerService.saveDeliveryAddressFromOrder(tenantId, customerId, {
+        street: dto.deliveryAddress.street,
+        number: dto.deliveryAddress.number,
+        complement: dto.deliveryAddress.complement || null,
+        neighborhood: dto.deliveryAddress.neighborhood,
+        city: dto.deliveryAddress.city,
+        state: dto.deliveryAddress.state,
+        zipCode: dto.deliveryAddress.zipCode,
+        reference: dto.deliveryAddress.reference || null,
+        lat: dto.deliveryAddress.lat ?? null,
+        lng: dto.deliveryAddress.lng ?? null,
+      }).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Unknown address sync error';
+        this.logger.warn(`Failed to sync customer address from order ${order.id}: ${message}`);
+      });
+    }
     
     // Emitir via Socket para o painel administrativo (tempo real)
     this.ordersGateway.emitNewOrder(tenantId, {

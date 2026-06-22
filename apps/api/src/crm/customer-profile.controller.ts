@@ -7,6 +7,7 @@ import { CustomerIntelligenceService } from './customer-intelligence.service';
 import { LoyaltyService } from '../promotions/loyalty.service';
 import { WalletService } from '../promotions/wallet.service';
 import { CouponsService } from '../promotions/coupons.service';
+import type { CustomerAddressSummaryDTO } from '@gestor/types';
 
 @Controller('public/customer-profile')
 @UseGuards(CustomerAuthGuard)
@@ -21,7 +22,7 @@ export class CustomerProfileController {
 
   @Get()
   async getProfile(@CurrentCustomer() customer: CustomerJwtPayload) {
-    const [record, intelligence, loyalty, wallet, coupons, orders] = await Promise.all([
+    const [record, intelligence, loyalty, wallet, coupons, orders, addresses] = await Promise.all([
       this.prisma.customer.findUnique({
         where: { id: customer.sub, tenantId: customer.tenantId },
         select: { id: true, name: true, phone: true, email: true, birthDate: true, totalOrders: true, totalSpent: true },
@@ -36,6 +37,26 @@ export class CustomerProfileController {
         take: 20,
         select: { id: true, orderNumber: true, total: true, status: true, createdAt: true, couponId: true, cashbackUsed: true },
       }),
+      this.prisma.customerAddress.findMany({
+        where: { tenantId: customer.tenantId, customerId: customer.sub },
+        orderBy: [{ isDefault: 'desc' }, { updatedAt: 'desc' }],
+        take: 5,
+        select: {
+          id: true,
+          label: true,
+          street: true,
+          number: true,
+          complement: true,
+          neighborhood: true,
+          city: true,
+          state: true,
+          zipCode: true,
+          reference: true,
+          lat: true,
+          lng: true,
+          isDefault: true,
+        },
+      }) as Promise<CustomerAddressSummaryDTO[]>,
     ]);
 
     return {
@@ -49,6 +70,7 @@ export class CustomerProfileController {
         total: Number(order.total),
         cashbackUsed: order.cashbackUsed ? Number(order.cashbackUsed) : 0,
       })),
+      addresses,
     };
   }
 

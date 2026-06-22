@@ -96,6 +96,11 @@ export interface PosCustomerSearchResultDTO {
   addresses: CustomerAddressSummaryDTO[];
 }
 
+export interface PublicCustomerProfileAddressDTO extends CustomerAddressSummaryDTO {
+  id: string;
+  label?: string | null;
+}
+
 export class UpsertCustomerAddressDTO {
   @IsString() @IsOptional()
   label?: string;

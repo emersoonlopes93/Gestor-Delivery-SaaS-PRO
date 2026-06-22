@@ -1,16 +1,45 @@
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { CheckCircle, ArrowLeft, Clock, MapPin, FileText, Package, MessageCircle } from 'lucide-react';
 import type { OrderResponseDTO, StorefrontPayload } from '@gestor/types';
 import { useQueryClient } from '@tanstack/react-query';
+import { api } from '../lib/api-client';
 
 export function OrderConfirmationPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const order = (location.state as { order?: OrderResponseDTO })?.order;
+  const [order, setOrder] = useState<OrderResponseDTO | null>((location.state as { order?: OrderResponseDTO })?.order ?? null);
+  const [isLoading, setIsLoading] = useState(!order);
   const storefront = queryClient.getQueryData<StorefrontPayload>(['storefront', tenantSlug]);
   const whatsappNumber = storefront?.tenant?.whatsappNumber;
+
+  useEffect(() => {
+    if (order || !tenantSlug) return;
+    const match = location.pathname.match(/\/order\/([^/]+)/);
+    const orderId = match?.[1];
+    if (!orderId) return;
+
+    setIsLoading(true);
+    api.get<OrderResponseDTO>(`/public/orders/${orderId}`)
+      .then((response) => setOrder(response.data))
+      .catch(() => {
+        setOrder(null);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, [order, tenantSlug, location.pathname]);
+
+  if (isLoading) {
+    return (
+      <div className="px-4 py-12 text-center">
+        <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-gray-800 mb-2">Carregando confirmação</h2>
+      </div>
+    );
+  }
 
   if (!order) {
     return (
