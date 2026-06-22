@@ -18,6 +18,7 @@ import { DriversService } from './drivers.service';
 })
 export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger('DeliveryTrackingGateway');
+  static instance: DeliveryTrackingGateway | null = null;
 
   @WebSocketServer()
   server!: Server;
@@ -25,7 +26,9 @@ export class DeliveryTrackingGateway implements OnGatewayConnection, OnGatewayDi
   constructor(
     @Inject(forwardRef(() => DriversService))
     private readonly driversService: DriversService,
-  ) {}
+  ) {
+    DeliveryTrackingGateway.instance = this;
+  }
 
   handleConnection(client: Socket) {
     this.logger.log(`Client connected: ${client.id}`);

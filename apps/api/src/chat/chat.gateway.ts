@@ -29,6 +29,7 @@ interface SessionUpdatedEvent {
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger('ChatGateway');
+  static instance: ChatGateway | null = null;
 
   @WebSocketServer()
   server!: Server;
@@ -36,7 +37,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
-  ) {}
+  ) {
+    ChatGateway.instance = this;
+  }
 
   private async validateToken(token: string): Promise<TenantJwtPayload | null> {
     try {

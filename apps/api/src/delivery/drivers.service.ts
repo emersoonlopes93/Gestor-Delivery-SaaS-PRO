@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateDriverDTO, UpdateDriverDTO } from '@gestor/types';
 import { UpdateDriverLocationDTO } from './dto/update-driver-location.dto';
@@ -10,6 +10,7 @@ import * as bcrypt from 'bcryptjs';
 export class DriversService {
   constructor(
     private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => DeliveryTrackingGateway))
     private readonly trackingGateway: DeliveryTrackingGateway,
   ) {}
 
