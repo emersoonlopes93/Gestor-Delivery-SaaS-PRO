@@ -9,6 +9,17 @@ import { GoalDTO, GoalType } from '@gestor/types';
 export function GoalsPage() {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<GoalDTO | null>(null);
+
+  const handleOpenModal = (goal?: GoalDTO) => {
+    setEditingGoal(goal || null);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setEditingGoal(null);
+    setIsModalOpen(false);
+  };
 
   const { data: goals, isLoading } = useQuery({
     queryKey: ['goals'],
@@ -42,7 +53,7 @@ export function GoalsPage() {
         </div>
         
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => handleOpenModal()}
           className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-all shadow-sm"
         >
           <Plus size={20} /> Nova Meta
@@ -60,7 +71,7 @@ export function GoalsPage() {
             Comece definindo objetivos de faturamento, volume de pedidos ou eficiência para motivar sua equipe.
           </p>
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => handleOpenModal()}
             className="mt-6 text-primary font-bold hover:underline"
           >
             Criar minha primeira meta
@@ -72,6 +83,7 @@ export function GoalsPage() {
             <GoalListItem 
               key={goal.id} 
               goal={goal} 
+              onEdit={() => handleOpenModal(goal)}
               onDelete={() => {
                 if (window.confirm('Excluir esta meta?')) deleteMutation.mutate(goal.id);
               }}
@@ -82,13 +94,16 @@ export function GoalsPage() {
 
       {/* Modal Placeholder */}
       {isModalOpen && (
-        <GoalFormModal onClose={() => setIsModalOpen(false)} />
+        <GoalFormModal 
+          onClose={handleCloseModal} 
+          initialData={editingGoal || undefined} 
+        />
       )}
     </div>
   );
 }
 
-function GoalListItem({ goal, onDelete }: { goal: GoalDTO, onDelete: () => void }) {
+function GoalListItem({ goal, onEdit, onDelete }: { goal: GoalDTO, onEdit: () => void, onDelete: () => void }) {
   const isRevenue = goal.type === GoalType.REVENUE;
   const progressColor = goal.progressPercentage >= 100 
     ? 'bg-green-500' 
@@ -120,6 +135,9 @@ function GoalListItem({ goal, onDelete }: { goal: GoalDTO, onDelete: () => void 
                 {goal.trend === 'on_track' ? 'No Prazo' : goal.trend === 'at_risk' ? 'Em Risco' : 'Atrasado'}
               </span>
             </div>
+            <button onClick={onEdit} className="p-2 text-muted-foreground hover:text-primary transition-colors">
+              <span className="text-lg leading-none">✏️</span>
+            </button>
             <button onClick={onDelete} className="p-2 text-muted-foreground hover:text-destructive transition-colors">
               <Trash2 size={18} />
             </button>
@@ -161,18 +179,23 @@ function GoalListItem({ goal, onDelete }: { goal: GoalDTO, onDelete: () => void 
   );
 }
 
-function GoalFormModal({ onClose }: { onClose: () => void }) {
+function GoalFormModal({ onClose, initialData }: { onClose: () => void, initialData?: GoalDTO }) {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
-    name: '',
-    type: GoalType.REVENUE,
-    targetValue: '',
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    name: initialData?.name || '',
+    type: initialData?.type || GoalType.REVENUE,
+    targetValue: initialData?.targetValue?.toString() || '',
+    startDate: initialData?.startDate ? new Date(initialData.startDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+    endDate: initialData?.endDate ? new Date(initialData.endDate).toISOString().split('T')[0] : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
   });
 
   const mutation = useMutation({
-    mutationFn: (data: Partial<GoalDTO>) => api.post('/goals', data),
+    mutationFn: (data: Partial<GoalDTO>) => {
+      if (initialData?.id) {
+        return api.patch(`/goals/${initialData.id}`, data);
+      }
+      return api.post('/goals', data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goals'] });
       onClose();
@@ -183,7 +206,7 @@ function GoalFormModal({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Configurar Nova Meta</h2>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{initialData ? 'Editar Meta' : 'Configurar Nova Meta'}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:text-gray-400">×</button>
         </div>
         

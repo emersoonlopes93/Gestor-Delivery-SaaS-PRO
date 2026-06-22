@@ -264,7 +264,7 @@ export function FinancePage() {
               )}
               <div className="pt-3 mt-3 border-t border-border flex justify-between text-xs font-bold uppercase text-destructive">
                 <span>Total a Vencer</span>
-                <span>R$ 900,00</span>
+                <span>R$ {transactions.filter(t => t.type === 'expense' && t.status !== 'paid').reduce((acc, t) => acc + Number(t.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
               </div>
             </div>
           </div>

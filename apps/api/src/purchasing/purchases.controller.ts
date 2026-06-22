@@ -5,7 +5,7 @@ import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { CurrentTenant, RequirePermissions } from '../common/decorators';
 
-@Controller('purchases')
+@Controller('purchasing/purchases')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
 export class PurchasesController {
   constructor(private readonly purchasesService: PurchasesService) {}

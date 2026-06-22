@@ -60,6 +60,21 @@ export function PurchasesPage() {
     p.supplier?.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
+
+  const totalCompradoMes = purchases
+    .filter(p => {
+      const d = new Date(p.purchaseDate);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear && p.status !== PurchaseStatus.CANCELLED;
+    })
+    .reduce((sum, p) => sum + Number(p.totalValue), 0);
+
+  const pendingPurchases = purchases.filter(p => p.paymentStatus === PaymentStatus.PENDING || p.paymentStatus === PaymentStatus.PARTIAL && p.status !== PurchaseStatus.CANCELLED);
+  const pagamentosPendentes = pendingPurchases.reduce((sum, p) => sum + Number(p.totalValue), 0);
+  const uniqueSuppliers = new Set(purchases.map(p => p.supplier?.id)).size;
+
   return (
     <div className="p-6 max-w-7xl mx-auto text-left">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
@@ -82,18 +97,18 @@ export function PurchasesPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-card p-6 rounded-2xl shadow-sm border border-border">
           <div className="text-sm font-medium text-muted-foreground mb-1">Total Comprado (Mês)</div>
-          <div className="text-2xl font-bold text-foreground">R$ 0,00</div>
-          <div className="text-xs text-green-600 mt-1">↑ 12% vs mês anterior</div>
+          <div className="text-2xl font-bold text-foreground">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalCompradoMes)}</div>
+          <div className="text-xs text-muted-foreground mt-1">Referente a compras não canceladas neste mês</div>
         </div>
         <div className="bg-card p-6 rounded-2xl shadow-sm border border-border">
           <div className="text-sm font-medium text-muted-foreground mb-1">Pagamentos Pendentes</div>
-          <div className="text-2xl font-bold text-red-600">R$ 0,00</div>
-          <div className="text-xs text-muted-foreground mt-1">3 faturas vencendo esta semana</div>
+          <div className="text-2xl font-bold text-red-600">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pagamentosPendentes)}</div>
+          <div className="text-xs text-muted-foreground mt-1">{pendingPurchases.length} faturas pendentes ou parciais</div>
         </div>
         <div className="bg-card p-6 rounded-2xl shadow-sm border border-border">
-          <div className="text-sm font-medium text-muted-foreground mb-1">Principais Insumos</div>
-          <div className="text-2xl font-bold text-primary-600">8</div>
-          <div className="text-xs text-muted-foreground mt-1">Variação de custo monitorada</div>
+          <div className="text-sm font-medium text-muted-foreground mb-1">Fornecedores Ativos</div>
+          <div className="text-2xl font-bold text-primary-600">{uniqueSuppliers}</div>
+          <div className="text-xs text-muted-foreground mt-1">Fornecedores que você já comprou</div>
         </div>
       </div>
 

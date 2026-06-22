@@ -98,29 +98,21 @@ export function ReportsPage() {
           title="Faturamento Total" 
           value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.commercial.totalRevenue)}
           icon={<DollarSign className="text-primary-600" />}
-          trend="+12%" 
-          trendUp={true}
         />
         <MetricCard 
           title="Total de Pedidos" 
           value={stats.commercial.totalOrders.toString()}
           icon={<Package className="text-green-600" />}
-          trend="+5.4%" 
-          trendUp={true}
         />
         <MetricCard 
           title="Ticket Médio" 
           value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.commercial.averageTicket)}
           icon={<TrendingUp className="text-amber-600" />}
-          trend="-2.1%" 
-          trendUp={false}
         />
         <MetricCard 
           title="Cancelamentos" 
           value={`${stats.operational.cancellationRate.toFixed(1)}%`}
           icon={<ArrowDownRight className="text-red-600" />}
-          trend="-0.5%" 
-          trendUp={true}
         />
       </div>
 
@@ -221,8 +213,8 @@ interface MetricCardProps {
   title: string;
   value: string;
   icon: React.ReactNode;
-  trend: string;
-  trendUp: boolean;
+  trend?: string;
+  trendUp?: boolean;
 }
 
 function MetricCard({ title, value, icon, trend, trendUp }: MetricCardProps) {
@@ -230,12 +222,14 @@ function MetricCard({ title, value, icon, trend, trendUp }: MetricCardProps) {
     <div className="bg-card p-6 rounded-xl border border-border shadow-sm hover:shadow-md transition-all">
       <div className="flex items-center justify-between mb-4">
         <div className="p-2 bg-muted rounded-lg">{icon}</div>
+        {trend && (
         <div className={`flex items-center text-xs font-medium px-2 py-1 rounded-full ${
           trendUp ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
         }`}>
           {trendUp ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
           {trend}
         </div>
+        )}
       </div>
       <p className="text-xs text-muted-foreground uppercase font-black tracking-wider mb-1">{title}</p>
       <h3 className="text-2xl font-bold text-foreground">{value}</h3>
