@@ -801,6 +801,7 @@ model ProductCategory {
 
   @@unique([tenantId, slug])
   @@index([tenantId])
+  @@index([tenantId, isActive, deletedAt, order])
   @@map("product_categories")
 }
 
@@ -850,6 +851,8 @@ model Product {
   @@index([tenantId])
   @@index([categoryId])
   @@index([mediaAssetId])
+  @@index([tenantId, type, isActive, deletedAt, order])
+  @@index([categoryId, isActive, deletedAt, order])
   @@map("products")
 }
 
@@ -984,6 +987,9 @@ model Order {
   @@unique([tenantId, orderNumber])
   @@index([tenantId])
   @@index([tenantId, status])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, customerId, createdAt])
   @@map("orders")
 }
 
@@ -2238,6 +2244,7 @@ model TimeSlot {
   tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, startTime])
+  @@index([tenantId, status, isActive, startTime])
   @@map("time_slots")
 }
 
@@ -2263,6 +2270,8 @@ model ScheduledOrder {
   timeSlot          TimeSlot?            @relation(fields: [timeSlotId], references: [id])
 
   @@index([tenantId, scheduledFor])
+  @@index([tenantId, timeSlotId, status, scheduledFor])
+  @@index([tenantId, customerId, status])
   @@map("scheduled_orders")
 }
 
