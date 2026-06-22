@@ -8,6 +8,7 @@ import {
   useAddCashMovement,
 } from './hooks/useCashSession';
 import type { CashMovementDTO } from '@gestor/types';
+import { Button } from '../../components/ui/Button';
 
 function formatCurrency(value: number): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -97,13 +98,13 @@ export default function CashPage() {
                 placeholder="0.00"
               />
             </div>
-            <button
+            <Button
               onClick={handleOpen}
               disabled={openMutation.isPending}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-6 py-2 rounded-lg disabled:opacity-50 transition-colors"
+              className="bg-status-success hover:opacity-90 text-white"
             >
               {openMutation.isPending ? 'Abrindo...' : 'Abrir Caixa'}
-            </button>
+            </Button>
           </div>
           {openMutation.isError && (
             <p className="mt-2 text-destructive text-sm">{(openMutation.error as Error).message}</p>
@@ -164,13 +165,13 @@ export default function CashPage() {
                   placeholder="Opcional"
                 />
               </div>
-              <button
+              <Button
                 onClick={handleMovement}
                 disabled={movementMutation.isPending}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-lg disabled:opacity-50 transition-colors"
+                variant="primary"
               >
                 Registrar
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -283,13 +284,13 @@ export default function CashPage() {
                   placeholder="Opcional"
                 />
               </div>
-              <button
+              <Button
                 onClick={handleClose}
                 disabled={closeMutation.isPending}
-                className="bg-red-600 hover:bg-red-700 text-white font-medium px-6 py-2 rounded-lg disabled:opacity-50 transition-colors"
+                variant="destructive"
               >
                 {closeMutation.isPending ? 'Fechando...' : 'Fechar Caixa'}
-              </button>
+              </Button>
             </div>
             {closeMutation.isSuccess && closeMutation.data && (
               <div className="mt-4 bg-muted rounded-lg p-4">

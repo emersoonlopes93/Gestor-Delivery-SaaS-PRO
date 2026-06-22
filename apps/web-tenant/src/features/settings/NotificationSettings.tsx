@@ -363,7 +363,7 @@ export function NotificationSettings() {
           <div className="border-t border-border pt-4 sm:pt-6 mt-4 sm:mt-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex gap-3 sm:gap-4">
-                <div className={`p-2.5 rounded-2xl transition-colors ${browserNotificationsEnabled ? 'bg-blue-600/10 text-blue-600' : 'bg-muted text-muted-foreground'}`}>
+                <div className={`p-2.5 rounded-2xl transition-colors ${browserNotificationsEnabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
                   <Smartphone className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
                 <div>
