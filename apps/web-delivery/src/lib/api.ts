@@ -1,13 +1,9 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 
-const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
+const configuredApiUrl = import.meta.env.VITE_API_URL?.trim() || import.meta.env.VITE_API_BASE_URL?.trim();
 
-if (import.meta.env.PROD && !configuredApiUrl) {
-  throw new Error('VITE_API_URL precisa estar configurado para o app entregador em produÃ§Ã£o.');
-}
-
-const API_BASE_URL = configuredApiUrl || 'http://localhost:3333/api/v1';
+const API_BASE_URL = (configuredApiUrl || '/api/v1').replace(/\/$/, '');
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

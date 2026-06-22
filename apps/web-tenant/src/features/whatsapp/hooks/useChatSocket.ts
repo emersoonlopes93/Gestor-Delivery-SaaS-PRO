@@ -26,9 +26,10 @@ export function useChatSocket(tenantId: string | undefined) {
     const token = localStorage.getItem('accessToken');
     if (!token) return;
 
-    const API_URL = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL || 'http://localhost:3333';
-    const socketUrl = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
-    const socket = io(`${socketUrl}/chat`, {
+    const API_URL = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '';
+    const socketUrlBase = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
+    const socketPath = socketUrlBase ? `${socketUrlBase}/chat` : '/chat';
+    const socket = io(socketPath, {
       reconnection: true,
       reconnectionAttempts: 10,
       auth: { token },

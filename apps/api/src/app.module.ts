@@ -6,6 +6,7 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bullmq';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-yet';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
@@ -248,6 +249,12 @@ if (process.env.REDIS_ENABLED === 'false') {
           return {};
         }
       },
+    }),
+
+    // Events
+    EventEmitterModule.forRoot({
+      global: true,
+      wildcard: true,
     }),
 
     // Database (Prisma)

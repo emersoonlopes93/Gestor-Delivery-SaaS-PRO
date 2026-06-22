@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException, Inject } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
+import { StorefrontCacheService } from './services/storefront-cache.service';
 import { DateTime } from 'luxon';
 import { PrismaService } from '../database/prisma.service';
 import { 
@@ -32,7 +31,7 @@ export class StorefrontService {
     private readonly mediaLibrary: MediaLibraryService,
     private readonly schedulingService: SchedulingService,
     private readonly biService: BusinessIntelligenceService,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private readonly storefrontCache: StorefrontCacheService,
   ) {}
 
   private normalizeBrazilWhatsappNumber(raw?: string | null): string | null {
@@ -53,8 +52,7 @@ export class StorefrontService {
     const channel: SalesChannel =
       fulfillmentType === 'pickup' ? 'storefront_pickup' : 'storefront_delivery';
 
-    const cacheKey = `storefront:${slug}:${fulfillmentType}`;
-    const cachedPayload = await this.cacheManager.get<StorefrontPayload>(cacheKey);
+    const cachedPayload = await this.storefrontCache.getPayload(slug, fulfillmentType);
     if (cachedPayload) {
       return cachedPayload;
     }
@@ -589,9 +587,7 @@ export class StorefrontService {
       customization,
     };
 
-    // Cache for configurable TTL (default 60 seconds)
-    const cacheTtl = Number(process.env.STOREFRONT_CACHE_TTL || 60000);
-    await this.cacheManager.set(cacheKey, payload, cacheTtl);
+    await this.storefrontCache.setPayload(slug, fulfillmentType, payload);
 
     return payload;
   }

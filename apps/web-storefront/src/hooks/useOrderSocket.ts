@@ -3,14 +3,15 @@ import { io, Socket } from 'socket.io-client';
 import { logger } from '../lib/logger';
 import { OrderStatusUpdatedEvent } from '@gestor/types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3333';
-const socketUrl = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '';
+const socketUrlBase = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
+const socketPath = socketUrlBase ? `${socketUrlBase}/orders` : '/orders';
 
 export function useOrderSocket(token: string | null, onStatusUpdate: (data: OrderStatusUpdatedEvent) => void) {
   useEffect(() => {
     if (!token) return;
 
-    const socket: Socket = io(`${socketUrl}/orders`, {
+    const socket: Socket = io(socketPath, {
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,

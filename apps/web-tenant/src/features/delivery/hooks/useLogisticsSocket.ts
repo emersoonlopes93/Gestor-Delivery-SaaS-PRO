@@ -6,21 +6,22 @@ import { invalidateLogisticsQueries } from '../lib/invalidate-logistics';
 /**
  * Mantém Despacho/Mapa/Entregadores sincronizados via eventos do namespace /orders.
  */
+
 export function useLogisticsSocket(tenantId: string | undefined) {
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!tenantId) return;
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3333';
-    const socketUrl = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
-    const socket = io(`${socketUrl}/orders`, {
+    const API_URL = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '';
+    const socketUrlBase = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
+    const socketPath = socketUrlBase ? `${socketUrlBase}/orders` : '/orders';
+    const socket = io(socketPath, {
       reconnection: true,
       reconnectionAttempts: 3,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 4000,
     });
-
     const refresh = () => invalidateLogisticsQueries(queryClient);
 
     socket.on('connect', () => {
