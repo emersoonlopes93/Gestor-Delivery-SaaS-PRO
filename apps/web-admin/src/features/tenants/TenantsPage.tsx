@@ -45,7 +45,8 @@ export function TenantsPage() {
     try {
       const res = await api.post<{ accessToken: string }>(`/admin/tenants/${tenantId}/impersonate`, { reason });
       if (res.success && res.data.accessToken) {
-        window.open(`http://localhost:5173?impersonate_token=${res.data.accessToken}`, '_blank');
+        const tenantUrl = import.meta.env.VITE_TENANT_URL || 'http://localhost:5173';
+        window.open(`${tenantUrl}?impersonate_token=${res.data.accessToken}`, '_blank');
       }
     } catch (error) {
       console.error('Erro ao impersonar:', error);
