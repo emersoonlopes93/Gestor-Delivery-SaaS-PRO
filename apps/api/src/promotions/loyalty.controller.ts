@@ -27,6 +27,16 @@ export class LoyaltyController {
   ) {
     return this.loyaltyService.redeem(req.user.tenantId, customerId, body.points, body.description);
   }
+
+  @Post('customer/:customerId/add')
+  @RequirePermissions('crm.manage_loyalty_cashback')
+  add(
+    @Request() req: { user: { tenantId: string } },
+    @Param('customerId') customerId: string,
+    @Body() body: { points: number; description?: string },
+  ) {
+    return this.loyaltyService.add(req.user.tenantId, customerId, body.points, body.description);
+  }
 }
 
 @Controller('public/customer/loyalty')

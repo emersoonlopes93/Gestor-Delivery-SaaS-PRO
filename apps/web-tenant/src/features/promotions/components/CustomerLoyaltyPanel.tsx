@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api-client';
-import { ArrowDown, ArrowUp, Star, Gift, ShieldAlert } from 'lucide-react';
+import { ArrowDown, ArrowUp, Star, Gift } from 'lucide-react';
 import { BalanceAdjustmentModal } from './BalanceAdjustmentModal';
 
 interface LoyaltyTransaction {
@@ -43,22 +43,17 @@ export function CustomerLoyaltyPanel({ customerId, customerName }: CustomerLoyal
   }, [customerId]);
 
   const handleAdjustment = async (points: number, description: string) => {
-    // If it's add, we might not have a direct endpoint in the controller, wait! 
-    // The loyalty controller only exposes /loyalty/customer/:customerId/redeem 
-    // Wait, let's look at loyalty.controller.ts that we saw earlier:
-    // It only had 'redeem'. If we want to add points manually, maybe we don't have the endpoint yet.
-    // If we only have 'redeem' we will use it for removal.
-    
     if (modalType === 'add') {
-      alert('A adição manual de pontos de fidelidade requer uma atualização na API. Atualmente apenas resgates são suportados.');
-      return;
+      await api.post(`/loyalty/customer/${customerId}/add`, {
+        points,
+        description: description || 'Bônus manual de pontos'
+      });
+    } else {
+      await api.post(`/loyalty/customer/${customerId}/redeem`, {
+        points,
+        description: description || 'Resgate manual'
+      });
     }
-
-    await api.post(`/loyalty/customer/${customerId}/redeem`, {
-      points,
-      description: description || 'Resgate manual'
-    });
-    
     await loadData();
   };
 
@@ -83,10 +78,9 @@ export function CustomerLoyaltyPanel({ customerId, customerName }: CustomerLoyal
         <div className="card-premium p-6 flex flex-col justify-center gap-3">
           <button 
             onClick={() => setModalType('add')}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-muted hover:bg-muted/80 text-muted-foreground rounded-xl text-sm font-bold transition-colors cursor-not-allowed opacity-50"
-            title="Funcionalidade em breve na API"
+            className="w-full flex items-center justify-center gap-2 py-3 bg-orange-50 hover:bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:hover:bg-orange-900/40 dark:text-orange-400 rounded-xl text-sm font-bold transition-colors"
           >
-            <ShieldAlert size={16} /> Adicionar Pontos (Indisponível)
+            <Star size={16} /> Adicionar Pontos Manualmente
           </button>
           <button 
             onClick={() => setModalType('remove')}
