@@ -38,11 +38,11 @@ export function useDynamicManifest(tenantSlug?: string, tenant?: { name: string,
       return () => {
         if (url) URL.revokeObjectURL(url);
       };
-    } else if (tenantSlug) {
-      // Fallback
-      manifestLink.href = `/manifest/${tenantSlug}.webmanifest`;
-    } else {
+    } else if (!tenantSlug) {
+      // Se não houver slug (ex: páginas institucionais), fallback seguro sem causar loop 
       manifestLink.href = `/manifest.webmanifest`;
     }
+    // IMPORTANTE: Não injetar URL temporária como `/manifest/${tenantSlug}.webmanifest`
+    // para evitar que o navegador tente baixar uma rota estática inválida antes do tenant carregar.
   }, [tenantSlug, tenant]);
 }
