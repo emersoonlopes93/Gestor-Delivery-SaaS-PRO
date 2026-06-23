@@ -2,7 +2,7 @@ services:
   - type: web
     name: gestor-api-staging
     env: node
-    buildCommand: pnpm install --frozen-lockfile && pnpm -C apps/api prisma:generate && pnpm --filter @gestor/api build
+    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm -C apps/api prisma:generate && pnpm --filter @gestor/api build
     startCommand: pnpm --filter @gestor/api start:prod
     envVars:
       - key: NODE_ENV
