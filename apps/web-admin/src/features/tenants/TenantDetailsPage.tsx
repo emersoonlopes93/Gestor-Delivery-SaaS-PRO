@@ -125,6 +125,24 @@ export function TenantDetailsPage() {
     }
   };
 
+  const handleCreateAsaasSubscription = async () => {
+    if (!tenant) return;
+    const planId = window.prompt('Informe o ID do BillingPlan (ex: uuid do mvp-starter) ou deixe em branco para listar o padrao:');
+    if (planId === null) return; // Cancelou
+    
+    try {
+      await api.post(`/admin/billing/asaas/subscriptions/${tenant.id}`, { 
+        planId: planId.trim(), 
+        cycle: 'MONTHLY',
+        billingType: 'PIX'
+      });
+      alert('Assinatura Asaas gerada com sucesso! Recarregando...');
+      loadTenant();
+    } catch (err: any) {
+      alert('Erro ao gerar assinatura: ' + (err?.response?.data?.message || err.message));
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-screen">
@@ -224,13 +242,21 @@ export function TenantDetailsPage() {
                  </div>
                </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-border">
+            <div className="mt-4 pt-4 border-t border-border flex flex-col gap-2">
                <button
                   onClick={() => navigate('/billing')}
-                  className="text-primary text-sm font-bold hover:underline"
+                  className="text-primary text-sm font-bold hover:underline text-left"
                >
                  Acessar Console de Billing para simulações completas &rarr;
                </button>
+               {(!subV2?.id || billingStatus === 'Sem Assinatura') && (
+                 <button
+                    onClick={handleCreateAsaasSubscription}
+                    className="text-blue-500 text-sm font-bold hover:underline text-left mt-2"
+                 >
+                   Gerar Assinatura Asaas (PIX / Mensal) &rarr;
+                 </button>
+               )}
             </div>
           </div>
 

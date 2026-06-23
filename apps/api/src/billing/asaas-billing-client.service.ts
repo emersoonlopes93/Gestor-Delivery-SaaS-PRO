@@ -26,7 +26,7 @@ export type AsaasBillingCustomerListResponse = {
 
 export type AsaasBillingPaymentRequest = {
   customer: string;
-  billingType: 'UNDEFINED';
+  billingType: 'UNDEFINED' | 'BOLETO' | 'CREDIT_CARD' | 'PIX';
   value: number;
   dueDate: string;
   description: string;
@@ -41,6 +41,27 @@ export type AsaasBillingPaymentResponse = {
   paymentLink?: string | null;
   value?: number;
   dueDate?: string;
+  externalReference?: string | null;
+};
+
+export type AsaasBillingSubscriptionRequest = {
+  customer: string;
+  billingType: 'UNDEFINED' | 'BOLETO' | 'CREDIT_CARD' | 'PIX';
+  value: number;
+  nextDueDate: string;
+  cycle: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'SEMIANNUALLY' | 'YEARLY';
+  description: string;
+  externalReference: string;
+};
+
+export type AsaasBillingSubscriptionResponse = {
+  id: string;
+  dateCreated: string;
+  customer: string;
+  status: string;
+  value: number;
+  nextDueDate: string;
+  cycle: string;
   externalReference?: string | null;
 };
 
@@ -88,6 +109,42 @@ export class AsaasBillingClientService {
     }
   }
 
+  async createSubscription(input: AsaasBillingSubscriptionRequest): Promise<AsaasBillingSubscriptionResponse> {
+    const client = this.createClient();
+    try {
+      const response = await client.post<AsaasBillingSubscriptionResponse>('/subscriptions', input, {
+        headers: this.authHeaders(),
+      });
+      return response.data;
+    } catch (error) {
+      throw this.toSafeException(error, 'assinatura');
+    }
+  }
+
+  async getSubscription(id: string): Promise<AsaasBillingSubscriptionResponse> {
+    const client = this.createClient();
+    try {
+      const response = await client.get<AsaasBillingSubscriptionResponse>(`/subscriptions/${id}`, {
+        headers: this.authHeaders(),
+      });
+      return response.data;
+    } catch (error) {
+      throw this.toSafeException(error, 'consulta de assinatura');
+    }
+  }
+
+  async cancelSubscription(id: string): Promise<{ id: string; status: string }> {
+    const client = this.createClient();
+    try {
+      const response = await client.delete<{ id: string; status: string }>(`/subscriptions/${id}`, {
+        headers: this.authHeaders(),
+      });
+      return response.data;
+    } catch (error) {
+      throw this.toSafeException(error, 'cancelamento de assinatura');
+    }
+  }
+
   isConfigured(): boolean {
     return Boolean(this.apiKey());
   }
@@ -127,16 +184,16 @@ export class AsaasBillingClientService {
   private toSafeException(error: unknown, entity: string): Error {
     if (!axios.isAxiosError(error)) {
       this.logger.error(`Asaas billing ${entity} error: ${error instanceof Error ? error.message : 'unknown'}`);
-      return new ServiceUnavailableException(`Falha segura ao criar ${entity} no Asaas sandbox.`);
+      return new ServiceUnavailableException(`Falha segura ao criar/consultar ${entity} no Asaas sandbox.`);
     }
 
     const status = error.response?.status;
     const description = this.extractAsaasErrorDescription(error);
     this.logger.error(`Asaas billing ${entity} error status=${status ?? 'unknown'} description=${description}`);
     if (status === 400) {
-      return new BadRequestException(`Asaas sandbox recusou ${entity}: ${description}`);
+      return new BadRequestException(`Asaas sandbox recusou operação para ${entity}: ${description}`);
     }
-    return new ServiceUnavailableException(`Falha segura ao criar ${entity} no Asaas sandbox.`);
+    return new ServiceUnavailableException(`Falha segura ao processar ${entity} no Asaas sandbox.`);
   }
 
   private extractAsaasErrorDescription(error: AxiosError<unknown>): string {
