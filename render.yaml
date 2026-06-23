@@ -10,6 +10,8 @@ services:
     buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm -C apps/api prisma:generate && pnpm --filter @gestor/api build
     startCommand: pnpm --filter @gestor/api start:prod
     envVars:
+      - key: NODE_VERSION
+        value: 22
       - key: NODE_ENV
         value: production
       - key: APP_ENV

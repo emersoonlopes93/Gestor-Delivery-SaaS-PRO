@@ -138,8 +138,9 @@ export function TenantDetailsPage() {
       });
       alert('Assinatura Asaas gerada com sucesso! Recarregando...');
       loadTenant();
-    } catch (err: any) {
-      alert('Erro ao gerar assinatura: ' + (err?.response?.data?.message || err.message));
+    } catch (err: unknown) {
+      const error = err as Error & { response?: { data?: { message?: string } } };
+      alert('Erro ao gerar assinatura: ' + (error?.response?.data?.message || error.message));
     }
   };
 
