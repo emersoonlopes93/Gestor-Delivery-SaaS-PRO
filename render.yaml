@@ -2,6 +2,7 @@ services:
   - type: redis
     name: gestor-redis-staging
     plan: free # Change if needed
+    ipAllowList: [] # Required by Render to specify who can access from outside (empty = internal only)
 
   - type: web
     name: gestor-api-staging
