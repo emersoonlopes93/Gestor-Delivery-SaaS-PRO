@@ -127,7 +127,7 @@ export class AsaasSaasBillingWebhookController {
   private async syncSubscriptionStatus(providerSubscriptionId: string, asaasPaymentStatus: string) {
     let nextStatus: TenantSubscriptionStatus = 'active';
 
-    if (asaasPaymentStatus === 'OVERDUE') nextStatus = 'overdue';
+    if (asaasPaymentStatus === 'OVERDUE') nextStatus = 'past_due';
     else if (asaasPaymentStatus === 'RECEIVED' || asaasPaymentStatus === 'CONFIRMED') nextStatus = 'active';
     else if (asaasPaymentStatus === 'REFUNDED' || asaasPaymentStatus === 'CHARGEBACK_REQUESTED') nextStatus = 'suspended';
     else if (asaasPaymentStatus === 'DELETED') nextStatus = 'canceled';
