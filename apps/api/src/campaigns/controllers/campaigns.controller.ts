@@ -21,11 +21,13 @@ import { CampaignAutomationService } from '../services/campaign-automation.servi
 import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions as Permissions } from '../../common/decorators';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { AuthenticatedRequest } from '../../common/interfaces/request.interface';
 import { BillingEntitlementsService } from '../../billing/billing-entitlements.service';
 
 @Controller('campaigns')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
+@RequiresFeature('campaigns')
 export class CampaignsController {
   constructor(
     private readonly campaignsService: CampaignsService,

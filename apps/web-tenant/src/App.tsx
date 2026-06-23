@@ -10,6 +10,7 @@ import { AppLayout } from './layouts/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { OnboardingGuard } from './components/OnboardingGuard';
 import { PermissionGate } from './components/PermissionGate';
+import { ModuleGate } from './components/ModuleGate';
 import { OnboardingWizard } from './features/onboarding/OnboardingWizard';
 import { CategoriesPage } from './features/catalog/CategoriesPage';
 import { ProductsPage } from './features/catalog/ProductsPage';
@@ -288,17 +289,21 @@ export function App() {
         <Route
           path="/crm/dashboard"
           element={
-            <PermissionGate permission="crm.read">
-              <CrmDashboardPage />
-            </PermissionGate>
+            <ModuleGate module="crm">
+              <PermissionGate permission="crm.read">
+                <CrmDashboardPage />
+              </PermissionGate>
+            </ModuleGate>
           }
         />
         <Route
           path="/customers"
           element={
-            <PermissionGate permission="crm.read">
-              <CustomersListPage />
-            </PermissionGate>
+            <ModuleGate module="crm">
+              <PermissionGate permission="crm.read">
+                <CustomersListPage />
+              </PermissionGate>
+            </ModuleGate>
           }
         />
 
@@ -306,9 +311,11 @@ export function App() {
         <Route
           path="/promotions"
           element={
-            <PermissionGate permission="crm.manage_coupons">
-              <PromotionsPage />
-            </PermissionGate>
+            <ModuleGate module="crm">
+              <PermissionGate permission="crm.manage_coupons">
+                <PromotionsPage />
+              </PermissionGate>
+            </ModuleGate>
           }
         />
 
@@ -316,17 +323,21 @@ export function App() {
         <Route
           path="/campaigns"
           element={
-            <PermissionGate permission="crm.manage_coupons">
-              <CampaignsPage />
-            </PermissionGate>
+            <ModuleGate module="campaigns">
+              <PermissionGate permission="crm.manage_coupons">
+                <CampaignsPage />
+              </PermissionGate>
+            </ModuleGate>
           }
         />
         <Route
           path="/marketing/automations"
           element={
-            <PermissionGate permission="crm.read">
-              <AutomationsPage />
-            </PermissionGate>
+            <ModuleGate module="campaigns">
+              <PermissionGate permission="crm.read">
+                <AutomationsPage />
+              </PermissionGate>
+            </ModuleGate>
           }
         />
 
@@ -334,17 +345,21 @@ export function App() {
         <Route
           path="/whatsapp/config"
           element={
-            <PermissionGate permission="settings.manage">
-              <WhatsAppConfigPage />
-            </PermissionGate>
+            <ModuleGate module="whatsapp">
+              <PermissionGate permission="settings.manage">
+                <WhatsAppConfigPage />
+              </PermissionGate>
+            </ModuleGate>
           }
         />
         <Route
           path="/whatsapp/inbox"
           element={
-            <PermissionGate permission="orders.read">
-              <InboxPage />
-            </PermissionGate>
+            <ModuleGate module="whatsapp">
+              <PermissionGate permission="orders.read">
+                <InboxPage />
+              </PermissionGate>
+            </ModuleGate>
           }
         />
 
@@ -352,9 +367,11 @@ export function App() {
         <Route
           path="/inventory"
           element={
-            <PermissionGate permission="inventory.read">
-              <InventoryPage />
-            </PermissionGate>
+            <ModuleGate module="inventory">
+              <PermissionGate permission="inventory.read">
+                <InventoryPage />
+              </PermissionGate>
+            </ModuleGate>
           }
         />
 
@@ -362,25 +379,31 @@ export function App() {
         <Route
           path="/management/suppliers"
           element={
-            <PermissionGate permission="purchasing.read">
-              <SuppliersPage />
-            </PermissionGate>
+            <ModuleGate module="purchasing">
+              <PermissionGate permission="purchasing.read">
+                <SuppliersPage />
+              </PermissionGate>
+            </ModuleGate>
           }
         />
         <Route
           path="/management/purchases"
           element={
-            <PermissionGate permission="purchasing.read">
-              <PurchasesPage />
-            </PermissionGate>
+            <ModuleGate module="purchasing">
+              <PermissionGate permission="purchasing.read">
+                <PurchasesPage />
+              </PermissionGate>
+            </ModuleGate>
           }
         />
         <Route
           path="/management/finance"
           element={
-            <PermissionGate permission="finance.read">
-              <FinancePage />
-            </PermissionGate>
+            <ModuleGate module="finance">
+              <PermissionGate permission="finance.read">
+                <FinancePage />
+              </PermissionGate>
+            </ModuleGate>
           }
         />
         <Route
@@ -396,25 +419,31 @@ export function App() {
         <Route
           path="/analytics/reports"
           element={
-            <PermissionGate permission="reports.read">
-              <ReportsPage />
-            </PermissionGate>
+            <ModuleGate module="reports">
+              <PermissionGate permission="reports.read">
+                <ReportsPage />
+              </PermissionGate>
+            </ModuleGate>
           }
         />
         <Route
           path="/analytics/business-intelligence"
           element={
-            <PermissionGate permission="reports.read">
-              <BusinessIntelligencePage />
-            </PermissionGate>
+            <ModuleGate module="bi">
+              <PermissionGate permission="reports.read">
+                <BusinessIntelligencePage />
+              </PermissionGate>
+            </ModuleGate>
           }
         />
         <Route
           path="/analytics/goals"
           element={
-            <PermissionGate permission="goals.read">
-              <GoalsPage />
-            </PermissionGate>
+            <ModuleGate module="goals">
+              <PermissionGate permission="goals.read">
+                <GoalsPage />
+              </PermissionGate>
+            </ModuleGate>
           }
         />
 
@@ -438,9 +467,11 @@ export function App() {
         <Route
           path="/settings/integrations"
           element={
-            <PermissionGate permission="settings.manage">
-              <IntegrationsPage />
-            </PermissionGate>
+            <ModuleGate module="marketplace">
+              <PermissionGate permission="settings.manage">
+                <IntegrationsPage />
+              </PermissionGate>
+            </ModuleGate>
           }
         />
         <Route

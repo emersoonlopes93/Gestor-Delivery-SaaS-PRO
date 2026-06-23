@@ -74,8 +74,12 @@ type SidebarGroup = {
 
 const isFeatureVisible = (flag?: string) => {
   if (!flag) return true;
-  // TODO: implement actual feature flags from config/environment
-  return true;
+  // Acessa a flag no import.meta.env, lidando de forma segura
+  const envValue = import.meta.env[flag];
+  if (envValue === undefined) {
+    return false; // Se a flag não existe, não mostrar.
+  }
+  return String(envValue).toLowerCase() === 'true';
 };
 
 const SIDEBAR_STORAGE_KEY = 'tenant_sidebar_state_v1';

@@ -3,10 +3,12 @@ import { GoalsService } from './goals.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions, CurrentTenant } from '../common/decorators';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { CreateGoalDTO, UpdateGoalDTO, GoalDTO } from '@gestor/types';
 
 @Controller('goals')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
+@RequiresFeature('reports')
 export class GoalsController {
   constructor(private readonly goalsService: GoalsService) {}
 

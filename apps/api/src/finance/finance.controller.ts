@@ -14,9 +14,11 @@ import {
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { CurrentTenant, RequirePermissions } from '../common/decorators';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 
 @Controller('finance')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
+@RequiresFeature('finance')
 export class FinanceController {
   constructor(
     private readonly accountsService: FinancialAccountsService,

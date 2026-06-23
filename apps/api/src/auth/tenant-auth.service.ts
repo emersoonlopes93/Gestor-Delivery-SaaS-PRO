@@ -12,6 +12,7 @@ import { TenantStatus, TenantDefaultRole } from '@gestor/core';
 import type { TenantJwtPayload, TenantUserSession } from '@gestor/types';
 import { AuthSessionService } from './auth-session.service';
 import { AuthSubjectType, Prisma } from '@prisma/client';
+import { TenantBillingResolverService } from '../billing/tenant-billing-resolver.service';
 import { MailService } from '../mail/mail.service';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
@@ -58,6 +59,7 @@ export class TenantAuthService {
     private readonly authSessionService: AuthSessionService,
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
+    private readonly tenantBillingResolver: TenantBillingResolverService,
   ) {}
 
   private buildRoles(user: TenantUserWithRelations): string[] {
@@ -134,6 +136,27 @@ export class TenantAuthService {
     const permissions = this.buildPermissions(user);
     const accessibleTenants = await this.findAccessibleTenants(user.email, user.tenant.businessGroupId);
 
+    // Resolve módulos ativos do tenant a partir do plano de billing + overrides manuais
+    let enabledModules: string[] = [];
+    try {
+      const entitlements = await this.tenantBillingResolver.resolveTenantEntitlements(user.tenantId);
+      if (entitlements.allowAllModules) {
+        // allowAllModules = plano que libera tudo (ex: plan interno de teste)
+        enabledModules = [
+          'catalog', 'orders', 'delivery', 'pos', 'cash', 'crm',
+          'inventory', 'reports', 'whatsapp', 'ai_agent',
+          'purchasing', 'finance', 'campaigns', 'goals', 'bi',
+          'employees', 'kds', 'printing', 'pos_tables', 'marketplace',
+        ];
+      } else {
+        enabledModules = entitlements.includedModules;
+      }
+    } catch (err) {
+      this.logger.warn(`Não foi possível resolver entitlements para tenant ${user.tenantId}: ${String(err)}`);
+      // Mantém lista vazia para não bloquear o login, mas sem acesso a módulos avançados
+      enabledModules = [];
+    }
+
     return {
       userId: user.id,
       email: user.email,
@@ -141,6 +164,7 @@ export class TenantAuthService {
       tenantId: user.tenantId,
       roles,
       permissions,
+      enabledModules,
       accessibleTenants,
       tenant: {
         id: user.tenant.id,

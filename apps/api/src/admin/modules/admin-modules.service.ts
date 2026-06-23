@@ -33,9 +33,19 @@ export class AdminModulesService {
       { key: 'cash', name: 'Caixa', description: 'Gestão de caixa e movimentações' },
       { key: 'crm', name: 'CRM', description: 'Clientes, promoções e cashback' },
       { key: 'inventory', name: 'Estoque', description: 'Controle de ingredientes e receitas' },
-      { key: 'reports', name: 'Relatórios', description: 'Relatórios gerenciais e metas' },
+      { key: 'reports', name: 'Relatórios', description: 'Relatórios gerenciais' },
       { key: 'whatsapp', name: 'WhatsApp', description: 'Conexão e automação via WhatsApp' },
       { key: 'ai_agent', name: 'Agente IA', description: 'Assistente virtual inteligente' },
+      { key: 'purchasing', name: 'Compras', description: 'Gestão de compras e fornecedores' },
+      { key: 'finance', name: 'Financeiro', description: 'Contas, transações e fluxo de caixa' },
+      { key: 'campaigns', name: 'Campanhas', description: 'Marketing pesado e envio em massa' },
+      { key: 'goals', name: 'Metas', description: 'Acompanhamento de metas gerenciais' },
+      { key: 'bi', name: 'Business Intelligence', description: 'Análises e relatórios avançados' },
+      { key: 'employees', name: 'Funcionários', description: 'Controle de ponto e equipe' },
+      { key: 'kds', name: 'KDS', description: 'Kitchen Display System (Telas de Cozinha)' },
+      { key: 'printing', name: 'Impressões', description: 'Impressão direta e roteamento' },
+      { key: 'pos_tables', name: 'Mesas (PDV)', description: 'Gestão de mesas e comandas' },
+      { key: 'marketplace', name: 'Marketplace', description: 'Integração com iFood e outros' },
     ];
   }
 

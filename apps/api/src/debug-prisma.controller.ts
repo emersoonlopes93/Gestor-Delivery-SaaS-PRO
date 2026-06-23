@@ -5,19 +5,15 @@ import * as bcrypt from 'bcryptjs';
 
 @Controller('debug-prisma')
 export class DebugPrismaController {
-  constructor(private readonly prisma: PrismaService) {}
-
-  private ensureDebugEnabled() {
+  constructor(private readonly prisma: PrismaService) {
     if (process.env.NODE_ENV === 'production') {
-      throw new NotFoundException();
+      throw new NotFoundException('Cannot find debug-prisma controller in production');
     }
   }
 
   @Public()
   @Get('users')
   async getUsers(@Query('email') email: string) {
-    this.ensureDebugEnabled();
-
     const directUser = await this.prisma.tenantUser.findFirst({
       where: email ? { email } : {},
       include: { tenant: true }
@@ -38,8 +34,6 @@ export class DebugPrismaController {
   @Public()
   @Get('test-hash')
   async testHash(@Query('email') email: string, @Query('pass') pass: string) {
-    this.ensureDebugEnabled();
-
     const user = await this.prisma.tenantUser.findFirst({
       where: { email },
     });
@@ -58,7 +52,6 @@ export class DebugPrismaController {
   @Public()
   @Get('context')
   async getContext() {
-    this.ensureDebugEnabled();
     return {
       contextTenantId: this.prisma.tenantContext?.getTenantId(),
     };

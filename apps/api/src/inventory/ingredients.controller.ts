@@ -2,11 +2,13 @@ import { Controller, Get, Post, Put, Body, Param, UseGuards } from '@nestjs/comm
 import { CurrentTenant, RequirePermissions } from '../common/decorators';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { IngredientsService } from './ingredients.service';
 import { CreateIngredientDTO, UpdateIngredientDTO, IngredientDTO } from '@gestor/types';
 
 @Controller('inventory/ingredients')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
+@RequiresFeature('inventory')
 export class IngredientsController {
   constructor(private readonly ingredientsService: IngredientsService) {}
 

@@ -198,6 +198,35 @@ async function seedBillingFoundation() {
     },
   });
 
+  const mvpPlan = await prisma.billingPlan.upsert({
+    where: { slug: 'mvp-starter' },
+    update: {
+      name: 'MVP Starter',
+      description: 'Plano inicial (apenas funcionalidades essenciais)',
+      type: 'fixed',
+      cycleInterval: 'monthly',
+      isActive: true,
+      isPublic: true,
+      currency: 'BRL',
+      trialDays: 0,
+      requiresPaymentMethod: false,
+      allowAllModules: false, // Bloqueia módulos avançados
+    },
+    create: {
+      name: 'MVP Starter',
+      slug: 'mvp-starter',
+      description: 'Plano inicial (apenas funcionalidades essenciais)',
+      type: 'fixed',
+      cycleInterval: 'monthly',
+      isActive: true,
+      isPublic: true,
+      currency: 'BRL',
+      trialDays: 0,
+      requiresPaymentMethod: false,
+      allowAllModules: false,
+    },
+  });
+
   const tiers = [
     { minRevenue: 0, maxRevenue: 1500, price: 0, label: 'Até R$ 1.500', sortOrder: 0 },
     { minRevenue: 1500.01, maxRevenue: 4000, price: 100, label: 'R$ 1.500,01 até R$ 4.000', sortOrder: 1 },

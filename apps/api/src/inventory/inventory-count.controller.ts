@@ -4,9 +4,11 @@ import { CreateInventoryCountDTO, InventoryCountDTO } from '@gestor/types';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { CurrentTenant, RequirePermissions } from '../common/decorators';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 
 @Controller('inventory-counts')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
+@RequiresFeature('inventory')
 export class InventoryCountController {
   constructor(private readonly inventoryCountService: InventoryCountService) {}
 

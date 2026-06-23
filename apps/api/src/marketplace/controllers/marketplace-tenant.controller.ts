@@ -5,6 +5,7 @@ import { Prisma } from '@prisma/client';
 import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { MarketplaceProviderRegistryService } from '../services/marketplace-provider-registry.service';
 import { MarketplaceConnectionService } from '../services/marketplace-connection.service';
 import { MarketplaceEventInboxService } from '../services/marketplace-event-inbox.service';
@@ -15,6 +16,7 @@ type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
 
 @Controller('marketplaces')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
+@RequiresFeature('marketplace')
 export class MarketplaceTenantController {
   constructor(
     private readonly providerRegistry: MarketplaceProviderRegistryService,
