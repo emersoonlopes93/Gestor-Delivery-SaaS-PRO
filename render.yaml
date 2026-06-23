@@ -1,4 +1,8 @@
 services:
+  - type: redis
+    name: gestor-redis-staging
+    plan: free # Change if needed
+
   - type: web
     name: gestor-api-staging
     env: node
@@ -43,6 +47,3 @@ databases:
   - name: gestor-db-staging
     databaseName: gestor_staging
     user: gestor
-
-  - type: redis
-    name: gestor-redis-staging
