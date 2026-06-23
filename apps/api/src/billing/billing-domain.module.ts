@@ -58,6 +58,7 @@ import { BillingEntitlementsService } from './billing-entitlements.service';
     RevenueLedgerService,
     BillingAddonService,
     BillingEntitlementsService,
+    AsaasBillingClientService,
   ],
 })
 export class BillingDomainModule {}
