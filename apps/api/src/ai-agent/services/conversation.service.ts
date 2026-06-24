@@ -171,171 +171,6 @@ type AiToolFailureEntry = {
   lastErrorCode?: string;
 };
 
-
-export interface AiOrderDraft {
-  items: Array<{
-    productId: string | null;
-    quantity: number;
-    notes?: string | null;
-    /** Nome legível do produto (ex: Pizza de Calabresa) */
-    name?: string | null;
-    /** Alias legado mantido por compatibilidade */
-    productName?: string | null;
-    /** Preço unitário real do produto */
-    unitPrice?: number | null;
-  }>;
-  fulfillmentType: 'delivery' | 'pickup' | null;
-  customerName: string | null;
-  customerPhone: string | null;
-  deliveryAddress: {
-    street: string | null;
-    number: string | null;
-    neighborhood: string | null;
-    city: string | null;
-    state: string | null;
-    zipCode: string | null;
-    complement: string | null;
-    reference: string | null;
-    lat: number | null;
-    lng: number | null;
-  };
-  payment: {
-    method: string | null;
-    changeFor: number | null;
-    /** true = cliente confirmou que não precisa de troco */
-    changeConfirmed?: boolean | null;
-  };
-  deliveryFee: number | null;
-  subtotal: number | null;
-  total: number | null;
-  missingFields: string[];
-  readyToConfirm: boolean;
-  confirmationAskedAt: string | null;
-  /** Data/hora ISO para pedido agendado (loja fechada) */
-  scheduledFor: string | null;
-  /** true = cliente confirmou explicitamente não precisa troco */
-  changeConfirmed?: boolean | null;
-}
-
-// Tipos auxiliares para dados do metadata (JSON)
-interface MetadataAi {
-  lastAiProcessedAt?: string;
-  lastProcessedMessageId?: string;
-  pendingCustomerMessageIds?: unknown;
-  currentIntent?: unknown;
-  orderDraft?: unknown;
-  lastKnownCustomerName?: string;
-  lastKnownCustomerNameAt?: string;
-  lastKnownAddress?: unknown;
-  lastKnownAddressAt?: string;
-  lastOrderId?: string;
-  lastOrderSummary?: string;
-  lastOrderCreatedAt?: string;
-  toolFailures?: unknown;
-}
-
-interface MetadataOrderDraft {
-  items?: unknown;
-  fulfillmentType?: unknown;
-  customerName?: unknown;
-  customerPhone?: unknown;
-  deliveryAddress?: unknown;
-  payment?: unknown;
-  deliveryFee?: unknown;
-  subtotal?: unknown;
-  total?: unknown;
-  missingFields?: unknown;
-  readyToConfirm?: unknown;
-  confirmationAskedAt?: unknown;
-  scheduledFor?: unknown;
-  changeConfirmed?: unknown;
-}
-
-interface MetadataDeliveryAddress {
-  street?: unknown;
-  number?: unknown;
-  neighborhood?: unknown;
-  city?: unknown;
-  state?: unknown;
-  zipCode?: unknown;
-  complement?: unknown;
-  reference?: unknown;
-  lat?: unknown;
-  lng?: unknown;
-}
-
-interface MetadataPayment {
-  method?: unknown;
-  changeFor?: unknown;
-  changeConfirmed?: unknown;
-}
-
-interface MetadataLastKnownAddress {
-  street?: unknown;
-  number?: unknown;
-  neighborhood?: unknown;
-  city?: unknown;
-  state?: unknown;
-  zipCode?: unknown;
-  complement?: unknown;
-  reference?: unknown;
-}
-
-interface MetadataToolFailures {
-  [key: string]: unknown;
-}
-
-interface MetadataToolFailureEntry {
-  count?: unknown;
-  lastAt?: unknown;
-  lastSignatureHash?: unknown;
-  lastErrorCode?: unknown;
-}
-
-export interface AiSessionMemory {
-  lastAiProcessedAt: string | null;
-  lastProcessedMessageId: string | null;
-  pendingCustomerMessageIds: string[];
-  currentIntent: 'order' | 'menu' | 'delivery_fee' | 'payment' | 'support' | null;
-  orderDraft: AiOrderDraft;
-  lastKnownCustomerName: string | null;
-  lastKnownCustomerNameAt: string | null;
-  lastKnownAddress: {
-    street: string | null;
-    number: string | null;
-    neighborhood: string | null;
-    city: string | null;
-    state: string | null;
-    zipCode: string | null;
-    complement: string | null;
-    reference: string | null;
-  };
-  lastKnownAddressAt: string | null;
-  lastOrderId: string | null;
-  lastOrderSummary: string | null;
-  lastOrderCreatedAt: string | null;
-}
-
-export interface CreateMessageDto {
-  sessionId: string;
-  direction: MessageDirection;
-  senderType?: 'customer' | 'ai' | 'human' | 'system';
-  content: string;
-  messageType?: string;
-  externalId?: string;
-  externalStatus?: 'sent' | 'delivered' | 'read' | 'failed';
-  timestamp?: Date;
-  toolCalls?: Prisma.InputJsonValue;
-  metadata?: Prisma.InputJsonValue;
-}
-
-type AiToolFailureEntry = {
-  count: number;
-  lastAt: string;
-  lastSignatureHash?: string;
-  lastErrorCode?: string;
-};
-
 type AiToolFailuresMap = Record<string, AiToolFailureEntry>;
 
 @Injectable()
@@ -598,6 +433,235 @@ export class ConversationService {
     }
   }
 
+  /**
+   * Limpa o orderDraft após criação bem-sucedida do pedido.
+   */
+  async clearOrderDraft(sessionId: string): Promise<void> {
+    const emptyDraft: AiOrderDraft = {
+      items: [],
+      fulfillmentType: null,
+      customerName: null,
+      customerPhone: null,
+      deliveryAddress: {
+        street: null, number: null, neighborhood: null, city: null,
+        state: null, zipCode: null, complement: null, reference: null,
+        lat: null, lng: null,
+      },
+      payment: { method: null, changeFor: null, changeConfirmed: null },
+      deliveryFee: null,
+      subtotal: null,
+      total: null,
+      missingFields: [],
+      readyToConfirm: false,
+      confirmationAskedAt: null,
+      scheduledFor: null,
+    };
+    await this.updateSessionAiMemory(sessionId, { orderDraft: emptyDraft });
+    this.logger.log(`[AI_DRAFT] draft_cleared sessionId=${sessionId}`);
+  }
+
+  /**
+   * Encontra a sessão ativa ou cria uma nova.
+   */
+  private isSessionExpired(
+    session: { state: ChatState; expiresAt: Date | null; lastMessageAt: Date },
+    sessionTimeoutMin?: number,
+  ) {
+    // Verifica se sessão já está em estado terminal
+    if (session.state === 'closed') {
+      return true;
+    }
+
+    const timeout = sessionTimeoutMin ?? 120;
+    if (timeout <= 0) {
+      return false;
+    }
+
+    const expiresAt = session.expiresAt ?? new Date(session.lastMessageAt.getTime() + timeout * 60000);
+    return expiresAt.getTime() <= Date.now();
+  }
+
+  async getOrCreateSession(
+    tenantId: string,
+    customerPhone: string,
+    options?: {
+      customerId?: string;
+      displayName?: string;
+      remoteJid?: string;
+      sessionTimeoutMin?: number;
+    },
+  ) {
+    const now = new Date();
+    const activeSession = await this.prisma.chatSession.findFirst({
+      where: {
+        tenantId,
+        customerPhone,
+        state: { notIn: ['closed'] }, // Remove 'expired' which is not ChatState in older schemas
+        closedAt: null,
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    if (activeSession) {
+      if (this.isSessionExpired(activeSession, options?.sessionTimeoutMin)) {
+        await this.expireSession(activeSession.id, 'timeout');
+      } else {
+        const updateData: Prisma.ChatSessionUpdateInput = {
+          lastMessageAt: now,
+        };
+        if (options?.displayName) updateData.displayName = options.displayName;
+        if (options?.remoteJid) updateData.remoteJid = options.remoteJid;
+        if (options?.customerId) {
+          updateData.customer = { connect: { id: options.customerId } };
+        }
+        if (options?.sessionTimeoutMin !== undefined) {
+          updateData.expiresAt = new Date(now.getTime() + options.sessionTimeoutMin * 60000);
+        }
+
+        return this.prisma.chatSession.update({
+          where: { id: activeSession.id },
+          data: updateData,
+        });
+      }
+    }
+
+    const data: Prisma.ChatSessionCreateInput = {
+      customerPhone,
+      displayName: options?.displayName,
+      remoteJid: options?.remoteJid,
+      state: 'greeting',
+      lastMessageAt: now,
+      tenant: { connect: { id: tenantId } },
+      expiresAt:
+        options?.sessionTimeoutMin !== undefined
+          ? new Date(now.getTime() + options.sessionTimeoutMin * 60000)
+          : undefined,
+    };
+
+    if (options?.customerId) {
+      data.customer = { connect: { id: options.customerId } };
+    }
+
+    return this.prisma.chatSession.create({ data });
+  }
+
+  async getRecentHistory(sessionId: string, limit: number = 20) {
+    return this.prisma.chatMessage.findMany({
+      where: { sessionId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    }).then(messages => messages.reverse()); // Retorna ordem cronológica
+  }
+
+  /**
+   * Helpers para criação centralizada de mensagens internas (tool calls e tool results)
+   */
+  async createInternalToolCallMessage(sessionId: string, toolCalls: Prisma.InputJsonValue[]) {
+    return this.addMessage({
+      sessionId,
+      direction: 'outbound',
+      senderType: 'system',
+      content: '',
+      messageType: 'tool_call',
+      externalStatus: 'sent',
+      timestamp: new Date(),
+      toolCalls,
+      metadata: {
+        type: 'tool_call',
+        hiddenFromInbox: true,
+      },
+    });
+  }
+
+  async createInternalToolResultMessage(
+    sessionId: string,
+    content: string,
+    toolCallName: string,
+    status: string,
+  ) {
+    return this.addMessage({
+      sessionId,
+      direction: 'outbound',
+      senderType: 'system',
+      content,
+      messageType: 'tool_result',
+      externalStatus: 'sent',
+      timestamp: new Date(),
+      metadata: {
+        type: 'tool_result',
+        hiddenFromInbox: true,
+        toolName: toolCallName,
+        status,
+      },
+    });
+  }
+
+  /**
+   * Registra uma nova mensagem no banco de dados com defaults seguros.
+   */
+  async addMessage(dto: CreateMessageDto) {
+    // 1. Determinar se é uma mensagem interna de tool call ou tool result
+    const isToolCall =
+      dto.messageType === 'tool_call' ||
+      (dto.metadata &&
+        typeof dto.metadata === 'object' &&
+        (dto.metadata as Record<string, unknown>).type === 'tool_call');
+
+    const isToolResult =
+      dto.messageType === 'tool_result' ||
+      (dto.metadata &&
+        typeof dto.metadata === 'object' &&
+        (dto.metadata as Record<string, unknown>).type === 'tool_result');
+
+    const direction = dto.direction ?? 'outbound';
+
+    // Se for tool call ou result, o senderType deve obrigatoriamente ser 'system'
+    let senderType: 'customer' | 'ai' | 'human' | 'system' = 'system';
+    if (!isToolCall && !isToolResult) {
+      senderType = dto.senderType ?? (direction === 'inbound' ? 'customer' : 'system');
+    }
+
+    // Prefere externalStatus explícito ou infere conforme direção
+    const externalStatus: 'sent' | 'delivered' | 'read' | 'failed' =
+      dto.externalStatus ?? (direction === 'inbound' ? 'delivered' : 'sent');
+
+    const timestamp = dto.timestamp ?? new Date();
+    const messageType = dto.messageType ?? (isToolCall ? 'tool_call' : isToolResult ? 'tool_result' : 'text');
+
+    // 2. Construir objeto de criação do Prisma omitindo chaves com valores undefined
+    const data: Prisma.ChatMessageCreateInput = {
+      session: { connect: { id: dto.sessionId } },
+      direction,
+      senderType,
+      content: dto.content ?? '',
+      messageType,
+      externalStatus,
+      ...(timestamp ? { timestamp } : {}),
+      ...(dto.externalId ? { externalId: dto.externalId } : {}),
+      ...(dto.toolCalls ? { toolCalls: dto.toolCalls } : {}),
+      ...(dto.metadata ? { metadata: dto.metadata } : {}),
+    };
+
+    const message = await this.prisma.chatMessage.create({ data });
+
+    const session = await this.prisma.chatSession.update({
+      where: { id: dto.sessionId },
+      data: {
+        lastMessageAt: timestamp,
+        ...(direction === 'inbound' ? { lastCustomerMessageAt: timestamp } : {}),
+        ...(direction === 'outbound' ? { lastAgentMessageAt: timestamp } : {}),
+      },
+      select: { tenantId: true },
+    });
+
+    if (session) {
+      ChatGateway.instance?.emitMessageCreated(session.tenantId, dto.sessionId, message);
+    }
+
+    this.logger.log(
+      `[CHAT_INBOX] message_saved sessionId=${dto.sessionId} senderType=${message.senderType} direction=${message.direction}`,
+    );
+
     return message;
   }
 
@@ -614,7 +678,7 @@ export class ConversationService {
     });
 
     // Emit WebSocket event for session update
-    this.chatGateway.emitSessionUpdated(session.tenantId, session);
+    ChatGateway.instance?.emitSessionUpdated(session.tenantId, session);
 
     return session;
   }
@@ -635,7 +699,7 @@ export class ConversationService {
     this.logger.log(`[CHAT_INBOX] handoff_activated sessionId=${sessionId} reason=${reason || 'default'}`);
 
     // Emit WebSocket event for session update
-    this.chatGateway.emitSessionUpdated(session.tenantId, session);
+    ChatGateway.instance?.emitSessionUpdated(session.tenantId, session);
 
     // Log system message
     await this.addMessage({
@@ -664,7 +728,7 @@ export class ConversationService {
     this.logger.log(`[CHAT_INBOX] handoff_deactivated sessionId=${sessionId}`);
 
     // Emit WebSocket event for session update
-    this.chatGateway.emitSessionUpdated(session.tenantId, session);
+    ChatGateway.instance?.emitSessionUpdated(session.tenantId, session);
 
     // Log system message
     await this.addMessage({
@@ -730,6 +794,87 @@ export class ConversationService {
     metadata.ai = nextAi;
 
     await this.prisma.chatSession.update({
+      where: { id: sessionId },
+      data: { metadata: metadata as Prisma.InputJsonObject },
+    });
+  }
+
+  async expireSession(sessionId: string, reason: string = 'timeout') {
+    const resetDraft = await this.getResetDraftSetting(sessionId);
+    await this.clearSessionTemporaryAiMemory(sessionId, resetDraft);
+
+    const session = await this.prisma.chatSession.update({
+      where: { id: sessionId },
+      data: {
+        state: 'expired',
+        closedAt: new Date(),
+        closeReason: reason,
+        handoffActive: false,
+      },
+    });
+
+    this.logger.log(`[CHAT_INBOX] session_expired sessionId=${sessionId} reason=${reason}`);
+    ChatGateway.instance?.emitSessionUpdated(session.tenantId, session);
+
+    await this.addMessage({
+      sessionId,
+      direction: 'outbound',
+      senderType: 'system',
+      content: 'Sessão expirada por inatividade. Envie uma nova mensagem para iniciar um novo atendimento.',
+      messageType: 'system',
+      externalStatus: 'sent',
+      metadata: {
+        type: 'system',
+        hiddenFromInbox: true,
+      },
+      timestamp: new Date(),
+    });
+
+    return session;
+  }
+
+  /**
+   * Encerra a sessão totalmente.
+   */
+  async closeSession(sessionId: string, reason?: string) {
+    const resetDraft = await this.getResetDraftSetting(sessionId);
+    await this.clearSessionTemporaryAiMemory(sessionId, resetDraft);
+
+    const session = await this.prisma.chatSession.update({
+      where: { id: sessionId },
+      data: {
+        state: 'closed',
+        closedAt: new Date(),
+        closeReason: reason ?? 'manual',
+        handoffActive: false,
+      },
+    });
+    this.logger.log(`[CHAT_INBOX] session_closed sessionId=${sessionId} reason=${reason ?? 'manual'}`);
+
+    // Emit WebSocket event for session update
+    ChatGateway.instance?.emitSessionUpdated(session.tenantId, session);
+
+    // Log system message
+    await this.addMessage({
+      sessionId,
+      direction: 'outbound',
+      senderType: 'system',
+      content: 'Conversa encerrada',
+      messageType: 'system',
+      externalStatus: 'sent',
+      metadata: {
+        type: 'system',
+        hiddenFromInbox: true,
+      },
+      timestamp: new Date(),
+    });
+
+    return session;
+  }
+
+  private asJsonObject<T = Record<string, unknown>>(value: unknown): T {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as T;
     }
     return {} as T;
   }
@@ -899,9 +1044,7 @@ export class ConversationService {
     this.logger.log(
       `[AI_SESSION] exit_command_received sessionId=${sessionId} command="${exitCommand}" closeReason=customer_exit`,
     );
-    if (ChatGateway.instance) {
-      ChatGateway.instance.emitSessionUpdated(session.tenantId, session);
-    }
+    ChatGateway.instance?.emitSessionUpdated(session.tenantId, session);
 
     // Registra o comando do cliente como mensagem
     await this.addMessage({
