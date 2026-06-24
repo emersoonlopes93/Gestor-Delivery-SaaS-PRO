@@ -227,6 +227,9 @@ export class WhatsAppWebhookController {
     trace.chatJid = chatJid;
     if (externalId) trace.messageId = externalId;
 
+    this.logger.log(`[WA_WEBHOOK] received traceId=${trace.traceId} tenantId=${tenantId}`);
+    this.logger.log(`[WA_WEBHOOK] message_event fromMe=${isFromMe} externalId=${externalId} contentPreview=${content?.substring(0, 20)}`);
+
     AiFlowLogger.flow('handle_message_start', trace, {
       hasChatJid: Boolean(chatJid),
       textLength: content?.length ?? 0,
@@ -246,6 +249,7 @@ export class WhatsAppWebhookController {
         where: { externalId },
       });
       if (existing) {
+        this.logger.log(`[WA_WEBHOOK] duplicate_skipped externalId=${externalId} sessionId=${existing.sessionId}`);
         AiFlowLogger.ignored('duplicate_message_id', trace, {
           sessionId: existing.sessionId,
         });
@@ -326,6 +330,8 @@ export class WhatsAppWebhookController {
         remoteJid: chatJid,
         sessionTimeoutMin: config.sessionTimeoutMin,
       });
+      
+      this.logger.log(`[WA_WEBHOOK] session_resolved sessionId=${session.id}`);
 
       const updateSessionData: Record<string, unknown> = {
         customerId: customerId || undefined,
@@ -376,11 +382,14 @@ export class WhatsAppWebhookController {
         // Se duas requisições simultâneas tentarem criar o mesmo externalId, apenas ignorar a duplicata.
         const msg = err instanceof Error ? err.message : 'Unknown error';
         if (msg.toLowerCase().includes('unique') && externalId) {
+          this.logger.log(`[WA_WEBHOOK] duplicate_skipped (race condition) externalId=${externalId}`);
           AiFlowLogger.ignored('duplicate_message_id_race', trace, { sessionId: session.id });
           return;
         }
         throw err;
       }
+      
+      this.logger.log(`[WA_WEBHOOK] message_persist_success sessionId=${session.id} externalId=${externalId}`);
 
       AiFlowLogger.flow('message_persist_success', trace, {
         sessionId: session.id,
@@ -399,14 +408,16 @@ export class WhatsAppWebhookController {
         const lastMessage = savedMessages[0];
         if (lastMessage) {
           ChatGateway.instance?.emitMessageCreated(tenantId, session.id, lastMessage);
+          this.logger.log(`[WA_WEBHOOK] socket_emit_success event=messageCreated sessionId=${session.id}`);
         }
         // Atualiza contadores e lista lateral
         const updatedSession = await this.prisma.chatSession.findUnique({ where: { id: session.id } });
         if (updatedSession) {
           ChatGateway.instance?.emitSessionUpdated(tenantId, updatedSession);
+          this.logger.log(`[WA_WEBHOOK] socket_emit_success event=sessionUpdated sessionId=${session.id}`);
         }
       } catch (emitErr) {
-        this.logger.warn(`[CHAT_WS] Failed to emit socket event: ${emitErr instanceof Error ? emitErr.message : 'unknown'}`);
+        this.logger.error(`[WA_WEBHOOK] error stage=socket_emit message=${emitErr instanceof Error ? emitErr.message : 'unknown'}`);
       }
 
       if (session.handoffActive || isFromMe) {

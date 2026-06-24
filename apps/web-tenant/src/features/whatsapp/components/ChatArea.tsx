@@ -60,10 +60,12 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       return res.data;
     },
     onMutate: (content) => {
+      console.log(`[CHAT_UI] send_clicked contentPreview=${content.substring(0, 20)}`);
       // Salva o texto para restaurar se falhar
       const previousMessage = message;
       // Limpa o input imediatamente (optimistic UX)
       setMessage('');
+      console.log(`[CHAT_UI] input_cleared`);
       // Adiciona mensagem otimista na lista
       const optimisticMsg: ChatMessage = {
         id: `optimistic-${Date.now()}`,
@@ -78,9 +80,11 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
         updatedAt: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, optimisticMsg]);
+      console.log(`[CHAT_UI] optimistic_added id=${optimisticMsg.id}`);
       return { previousMessage };
     },
     onSuccess: (data) => {
+      console.log(`[CHAT_UI] mutation_success`);
       if (!data) return;
       // Substitui a mensagem otimista pela mensagem real do servidor
       setMessages((prev) =>
@@ -88,13 +92,16 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
           m.id.startsWith('optimistic-') ? (data as ChatMessage) : m
         ),
       );
+      console.log(`[CHAT_UI] optimistic_replaced`);
       // Revalida do servidor para garantir sincronia
       refetchMessages();
     },
-    onError: (_error, _content, context) => {
+    onError: (error: any, _content, context) => {
+      console.error(`[CHAT_UI] mutation_error message=${error?.message || 'unknown'}`);
       // Em caso de erro, restaura o texto no input e remove a mensagem otimista
       if (context?.previousMessage) {
         setMessage(context.previousMessage);
+        console.log(`[CHAT_UI] input_restored contentPreview=${context.previousMessage.substring(0, 20)}`);
       }
       setMessages((prev) => prev.filter((m) => !m.id.startsWith('optimistic-')));
     },

@@ -372,63 +372,90 @@ export class ChatController {
     @Param('id') sessionId: string,
     @Body() dto: CreateMessageDto,
   ) {
-    const session = await this.prisma.chatSession.findFirst({
-      where: { id: sessionId, tenantId: req.user.tenantId },
-      select: { id: true, tenantId: true, customerPhone: true, handoffActive: true },
-    });
-    if (!session) {
-      return { error: 'Sessão não encontrada' };
-    }
+    const tenantId = req.user.tenantId;
+    // Generate a simple requestId for tracing
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    this.logger.log(`[CHAT_SEND] start requestId=${requestId} tenantId=${tenantId} sessionId=${sessionId}`);
 
-    // Envio real para WhatsApp
-    const sendResult = await this.whatsappSender.sendText(session.tenantId, {
-      to: session.customerPhone,
-      text: dto.content,
-    });
+    try {
+      const session = await this.prisma.chatSession.findFirst({
+        where: { id: sessionId, tenantId },
+        select: { id: true, tenantId: true, customerPhone: true, handoffActive: true },
+      });
+      if (!session) {
+        this.logger.warn(`[CHAT_SEND] error stage=session_not_found requestId=${requestId}`);
+        return { error: 'Sessão não encontrada' };
+      }
+      this.logger.log(`[CHAT_SEND] session_loaded requestId=${requestId}`);
 
-    const externalId = sendResult.success ? sendResult.messageId : undefined;
+      // Envio real para WhatsApp
+      this.logger.log(`[CHAT_SEND] evolution_send_start requestId=${requestId}`);
+      const sendResult = await this.whatsappSender.sendText(session.tenantId, {
+        to: session.customerPhone,
+        text: dto.content,
+      });
+      this.logger.log(`[CHAT_SEND] evolution_send_success requestId=${requestId} status=${sendResult.success ? 'success' : 'failed'}`);
 
-    const message = await this.conversationService.addMessage({
-      sessionId,
-      direction: 'outbound',
-      senderType: 'human',
-      content: dto.content,
-      messageType: dto.messageType || 'text',
-      externalId,
-      externalStatus: sendResult.success ? 'sent' : 'failed',
-      timestamp: new Date(),
-      metadata: {
-        ...(dto.metadata && typeof dto.metadata === 'object' ? dto.metadata : {}),
-        whatsapp: {
-          sent: sendResult.success,
-          error: sendResult.success ? null : sendResult.error,
+      const externalId = sendResult.success ? sendResult.messageId : undefined;
+
+      this.logger.log(`[CHAT_SEND] message_persist_start requestId=${requestId} externalId=${externalId}`);
+      const message = await this.conversationService.addMessage({
+        sessionId,
+        direction: 'outbound',
+        senderType: 'human',
+        content: dto.content,
+        messageType: dto.messageType || 'text',
+        externalId,
+        externalStatus: sendResult.success ? 'sent' : 'failed',
+        timestamp: new Date(),
+        metadata: {
+          ...(dto.metadata && typeof dto.metadata === 'object' ? dto.metadata : {}),
+          whatsapp: {
+            sent: sendResult.success,
+            error: sendResult.success ? null : sendResult.error,
+          },
         },
-      },
-    });
+      });
+      this.logger.log(`[CHAT_SEND] message_persist_success requestId=${requestId} messageId=${message.id}`);
 
-    const config = await this.prisma.aiAgentConfig.findUnique({
-      where: { tenantId: session.tenantId },
-      select: { humanInterventionEnabled: true, humanInterventionMinutes: true },
-    });
+      this.logger.log(`[CHAT_SEND] session_update_start requestId=${requestId}`);
+      const config = await this.prisma.aiAgentConfig.findUnique({
+        where: { tenantId: session.tenantId },
+        select: { humanInterventionEnabled: true, humanInterventionMinutes: true },
+      });
 
-    const updateData: Prisma.ChatSessionUpdateInput = { lastMessageAt: new Date() };
+      const updateData: Prisma.ChatSessionUpdateInput = { lastMessageAt: new Date() };
 
-    if (config?.humanInterventionEnabled) {
-      updateData.handoffActive = true;
-      updateData.handoffOperator = 'human';
-      updateData.handoffReason = 'Intervenção humana (mensagem enviada pelo atendente)';
-      updateData.handoffAt = new Date();
-      const until = new Date();
-      until.setMinutes(until.getMinutes() + (config.humanInterventionMinutes || 15));
-      updateData.handoffUntil = until;
+      if (config?.humanInterventionEnabled) {
+        updateData.handoffActive = true;
+        updateData.handoffOperator = 'human';
+        updateData.handoffReason = 'Intervenção humana (mensagem enviada pelo atendente)';
+        updateData.handoffAt = new Date();
+        const until = new Date();
+        until.setMinutes(until.getMinutes() + (config.humanInterventionMinutes || 15));
+        updateData.handoffUntil = until;
+      }
+
+      await this.prisma.chatSession.update({
+        where: { id: sessionId },
+        data: updateData,
+      });
+      this.logger.log(`[CHAT_SEND] session_update_success requestId=${requestId}`);
+
+      this.logger.log(`[CHAT_SEND] socket_emit_start requestId=${requestId}`);
+      try {
+        this.chatGateway.emitMessageCreated(session.tenantId, sessionId, message);
+        this.logger.log(`[CHAT_SEND] socket_emit_success requestId=${requestId}`);
+      } catch (wsErr: any) {
+        this.logger.error(`[CHAT_SEND] socket_emit_failed requestId=${requestId} error=${wsErr?.message}`);
+      }
+
+      this.logger.log(`[CHAT_SEND] response_success requestId=${requestId}`);
+      return message;
+    } catch (error: any) {
+      this.logger.error(`[CHAT_SEND] error requestId=${requestId} tenantId=${tenantId} sessionId=${sessionId} errorName=${error?.name} errorMessage=${error?.message} prismaCode=${error?.code}`);
+      throw error;
     }
-
-    await this.prisma.chatSession.update({
-      where: { id: sessionId },
-      data: updateData,
-    });
-
-    return message;
   }
 
   @Post('sessions/:id/read')

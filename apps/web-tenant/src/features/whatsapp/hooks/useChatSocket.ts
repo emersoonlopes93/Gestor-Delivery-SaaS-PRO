@@ -22,15 +22,21 @@ export function useChatSocket(tenantId: string | undefined) {
     if (!tenantId) return;
 
     const token = localStorage.getItem('accessToken');
-    if (!token) return;
-
+    const hasToken = !!token;
+    
     // Extrai a URL base da API removendo /api/v1 ou /api do final
     // Ex: "https://api.render.com/api/v1" → "https://api.render.com"
     const API_URL = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '';
     const socketOrigin = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '') || window.location.origin;
+    const socketUrl = `${socketOrigin}/chat`;
 
+    console.log(`[CHAT_WS] building_url socketUrl=${socketUrl} namespace=/chat hasToken=${hasToken} tenantId=${tenantId}`);
+
+    if (!token) return;
+
+    console.log(`[CHAT_WS] connecting socketUrl=${socketUrl}`);
     // socket.io-client: passar "origin/namespace" = connectar no namespace /chat
-    const socket = io(`${socketOrigin}/chat`, {
+    const socket = io(socketUrl, {
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
@@ -42,32 +48,39 @@ export function useChatSocket(tenantId: string | undefined) {
     try { (window as Window & typeof globalThis & { __CHAT_SOCKET: typeof socket | null }).__CHAT_SOCKET = socket; } catch { /* ignore */ }
 
     socket.on('connect', () => {
-      console.log('[CHAT_WS] connected id=', socket.id);
+      console.log(`[CHAT_WS] connected id=${socket.id} tenantId=${tenantId}`);
       try { (window as Window & typeof globalThis & { __CHAT_SOCKET_CONNECTED: boolean }).__CHAT_SOCKET_CONNECTED = true; } catch { /* ignore */ }
       socket.emit('joinTenant', { tenantId });
     });
 
     socket.on('connect_error', (err) => {
-      console.warn('[CHAT_WS] connect_error', err?.message || err);
+      console.warn(`[CHAT_WS] connect_error message=${err?.message || err} socketUrl=${socketUrl}`);
       try { (window as Window & typeof globalThis & { __CHAT_SOCKET_CONNECTED: boolean }).__CHAT_SOCKET_CONNECTED = false; } catch { /* ignore */ }
     });
 
     socket.on('disconnect', (reason) => {
-      console.log('[CHAT_WS] disconnected', reason);
+      console.log(`[CHAT_WS] disconnect reason=${reason}`);
       try { (window as Window & typeof globalThis & { __CHAT_SOCKET_CONNECTED: boolean }).__CHAT_SOCKET_CONNECTED = false; } catch { /* ignore */ }
     });
 
     socket.on('messageCreated', (event: MessageCreatedEvent) => {
-      console.log('[CHAT_WS] messageCreated sessionId=', event.sessionId);
+      console.log(`[CHAT_WS] messageCreated received eventName=messageCreated sessionId=${event.sessionId}`);
 
       // Atualiza o cache de mensagens instantaneamente via setQueryData (sem aguardar refetch)
       queryClient.setQueryData<ChatMessage[]>(
         ['chat-messages', event.sessionId],
         (old) => {
-          if (!old) return [event.message];
+          if (!old) {
+            console.log(`[CHAT_WS] cache updated action=set_new array_size=1 sessionId=${event.sessionId}`);
+            return [event.message];
+          }
           // Evita duplicatas pelo id
           const exists = old.some((m) => m.id === event.message.id);
-          if (exists) return old;
+          if (exists) {
+            console.log(`[CHAT_WS] cache updated action=duplicate_skipped sessionId=${event.sessionId}`);
+            return old;
+          }
+          console.log(`[CHAT_WS] cache updated action=append array_size=${old.length + 1} sessionId=${event.sessionId}`);
           return [...old, event.message];
         },
       );
@@ -82,7 +95,7 @@ export function useChatSocket(tenantId: string | undefined) {
     });
 
     socket.on('sessionUpdated', (event: SessionUpdatedEvent) => {
-      console.log('[CHAT_WS] sessionUpdated sessionId=', event.session.id);
+      console.log(`[CHAT_WS] sessionUpdated received eventName=sessionUpdated sessionId=${event.session.id}`);
 
       // Invalida a sessão individual e a lista
       queryClient.invalidateQueries({ queryKey: ['chat-session', event.session.id] });
