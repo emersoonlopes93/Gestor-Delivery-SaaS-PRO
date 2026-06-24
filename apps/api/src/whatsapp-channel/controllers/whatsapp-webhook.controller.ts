@@ -358,6 +358,7 @@ export class WhatsAppWebhookController {
         }
       } else {
         updateSessionData.unreadCount = { increment: 1 };
+        updateSessionData.lastMessageAt = new Date(); // Reset expiration timer for customer messages
       }
 
       await this.prisma.chatSession.update({
@@ -420,7 +421,12 @@ export class WhatsAppWebhookController {
         this.logger.error(`[WA_WEBHOOK] error stage=socket_emit message=${emitErr instanceof Error ? emitErr.message : 'unknown'}`);
       }
 
-      if (session.handoffActive || isFromMe) {
+      // [AI_GUARD] Check handoffActive state immediately before dispatching to AI
+      const freshSession = await this.prisma.chatSession.findUnique({ where: { id: session.id }, select: { handoffActive: true } });
+      const isHandoffActive = freshSession?.handoffActive ?? session.handoffActive;
+
+      if (isHandoffActive || isFromMe) {
+        this.logger.log(`[AI_GUARD] Ignoring message dispatch for sessionId=${session.id} (handoffActive=${isHandoffActive}, isFromMe=${isFromMe})`);
         AiFlowLogger.ignored('human_handoff', trace, { sessionId: session.id, isFromMe });
         return;
       }

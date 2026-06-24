@@ -304,7 +304,7 @@ export class ChatController {
 
     const messages = await this.prisma.chatMessage.findMany({
       where: {
-        session: { tenantId: req.user.tenantId, customerPhone: session.customerPhone },
+        sessionId: sessionId,
       },
       orderBy: { createdAt: 'asc' },
       take: 200,
