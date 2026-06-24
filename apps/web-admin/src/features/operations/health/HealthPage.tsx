@@ -298,16 +298,39 @@ function BillingBadge({ status }: { status: string }) {
   return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-500/10 text-slate-600 border border-slate-500/20 uppercase tracking-wider">{status}</span>;
 }
 
+function formatAdminPhoneNumber(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const beforeAt = raw.includes('@') ? raw.split('@')[0] : raw;
+  const beforeColon = beforeAt.includes(':') ? beforeAt.split(':')[0] : beforeAt;
+  const digits = beforeColon.replace(/\D/g, '');
+  
+  if (!digits) return null;
+
+  if (digits.startsWith('55') && digits.length >= 12) {
+    const ddd = digits.slice(2, 4);
+    const number = digits.slice(4);
+    if (number.length === 9) {
+      return `+55 (${ddd}) ${number.slice(0, 5)}-${number.slice(5)}`;
+    }
+    return `+55 (${ddd}) ${number.slice(0, 4)}-${number.slice(4)}`;
+  }
+  
+  return `+${digits}`;
+}
+
 function WhatsAppBadge({ whatsapp }: { whatsapp: HealthTenantListItem['whatsapp'] }) {
   if (!whatsapp) {
     return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700 uppercase tracking-wider">Não configurado</span>;
   }
   
   if (whatsapp.status === 'connected') {
+    const label = formatAdminPhoneNumber(whatsapp.connectedNumber) || 'Sem número';
     return (
       <div className="flex flex-col gap-1">
         <span className="inline-flex w-fit items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 uppercase tracking-wider">Conectado</span>
-        <span className="text-xs text-muted-foreground">{whatsapp.connectedNumber || 'Sem número'}</span>
+        <span className="text-xs text-muted-foreground font-mono">{label}</span>
       </div>
     );
   }

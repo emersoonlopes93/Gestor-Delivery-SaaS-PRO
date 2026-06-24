@@ -45,7 +45,8 @@ function formatWhatsAppPhoneNumber(value: string | null | undefined): string | n
   const raw = String(value).trim();
   if (!raw) return null;
   const beforeAt = raw.includes('@') ? raw.split('@')[0] : raw;
-  const digits = beforeAt.replace(/\D/g, '');
+  const beforeColon = beforeAt.includes(':') ? beforeAt.split(':')[0] : beforeAt;
+  const digits = beforeColon.replace(/\D/g, '');
   return digits || null;
 }
 
