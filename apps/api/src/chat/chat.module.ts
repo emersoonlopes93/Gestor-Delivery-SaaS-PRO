@@ -6,7 +6,7 @@ import { RbacModule } from '../rbac/rbac.module';
 import { QuickRepliesService } from './services/quick-replies.service';
 import { WhatsAppChannelModule } from '../whatsapp-channel/whatsapp-channel.module';
 import { ChatGateway } from './chat.gateway';
-import { JwtModule } from '@nestjs/jwt';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -14,7 +14,7 @@ import { JwtModule } from '@nestjs/jwt';
     forwardRef(() => AiAgentModule), // para ConversationService
     RbacModule, // para PermissionsGuard e RbacService
     WhatsAppChannelModule, // para WhatsAppSenderService
-    JwtModule.register({}),
+    AuthModule,
   ],
   controllers: [ChatController],
   providers: [QuickRepliesService, ChatGateway],
