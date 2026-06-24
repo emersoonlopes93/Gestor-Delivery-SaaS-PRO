@@ -642,7 +642,34 @@ export class ConversationService {
       ...(dto.metadata ? { metadata: dto.metadata } : {}),
     };
 
-    const message = await this.prisma.chatMessage.create({ data });
+    let message;
+    try {
+      if (dto.externalId) {
+        message = await this.prisma.chatMessage.upsert({
+          where: { externalId: dto.externalId },
+          create: data,
+          update: {
+            // Update non-destructive fields
+            externalStatus,
+            ...(dto.metadata ? { metadata: dto.metadata } : {}),
+          },
+        });
+      } else {
+        message = await this.prisma.chatMessage.create({ data });
+      }
+    } catch (error: unknown) {
+      // Catch remaining concurrency issues (e.g. upsert race condition)
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('Unique constraint failed') && dto.externalId) {
+        this.logger.warn(`[CHAT_INBOX] Concurrent create caught for externalId=${dto.externalId}`);
+        message = await this.prisma.chatMessage.findUnique({
+          where: { externalId: dto.externalId },
+        });
+        if (!message) throw error;
+      } else {
+        throw error;
+      }
+    }
 
     const session = await this.prisma.chatSession.update({
       where: { id: dto.sessionId },
