@@ -989,12 +989,37 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     const rawQr = this.extractQrFromObject(data);
     const normalizedQr = this.normalizeQrCode(rawQr);
 
+    // Tenta encontrar o phoneNumber em vários locais possíveis da resposta da Evolution API
+    let foundPhoneNumber: string | undefined;
+
+    if (data?.phoneNumber) foundPhoneNumber = String(data.phoneNumber);
+    else if (data?.phone) foundPhoneNumber = String(data.phone);
+    else if (data?.jid) foundPhoneNumber = String(data.jid);
+    else if (data?.number) foundPhoneNumber = String(data.number);
+    else if (data?.ownerJid) foundPhoneNumber = String(data.ownerJid);
+    else if (data?.owner) foundPhoneNumber = String(data.owner);
+
+    // connection.user.id ou connection.user.number
+    if (!foundPhoneNumber && data?.connection && typeof data.connection === 'object') {
+      const conn = data.connection as Record<string, unknown>;
+      if (conn.user && typeof conn.user === 'object') {
+        const user = conn.user as Record<string, unknown>;
+        if (user.id) foundPhoneNumber = String(user.id);
+        else if (user.number) foundPhoneNumber = String(user.number);
+      }
+    }
+
+    // instance.owner ou instance.phoneNumber
+    if (!foundPhoneNumber && data?.instance && typeof data.instance === 'object') {
+      const inst = data.instance as Record<string, unknown>;
+      if (inst.owner) foundPhoneNumber = String(inst.owner);
+      else if (inst.phoneNumber) foundPhoneNumber = String(inst.phoneNumber);
+    }
+
     const result = {
       connected: state === 'connected',
       state,
-      phoneNumber: this.normalizeConnectedPhoneNumber(
-        (data?.phoneNumber || data?.phone || data?.jid || data?.number) as string | undefined,
-      ),
+      phoneNumber: this.normalizeConnectedPhoneNumber(foundPhoneNumber),
       qrCode: normalizedQr,
     };
 

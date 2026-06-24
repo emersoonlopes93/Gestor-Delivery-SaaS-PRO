@@ -52,8 +52,18 @@ function formatWhatsAppPhoneNumber(value: string | null | undefined): string | n
 function formatConnectedLabel(value: string | null | undefined): string | null {
   const normalized = formatWhatsAppPhoneNumber(value);
   if (!normalized) return null;
-  if (normalized.length <= 5) return normalized;
-  return `${normalized.slice(0, 5)}...`;
+  
+  // Se for um número brasileiro com DDI (55)
+  if (normalized.startsWith('55') && normalized.length >= 12) {
+    const ddd = normalized.slice(2, 4);
+    const number = normalized.slice(4);
+    if (number.length === 9) {
+      return `+55 (${ddd}) ${number.slice(0, 5)}-${number.slice(5)}`;
+    }
+    return `+55 (${ddd}) ${number.slice(0, 4)}-${number.slice(4)}`;
+  }
+  
+  return `+${normalized}`;
 }
 
 
