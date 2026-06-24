@@ -424,16 +424,16 @@ export class ChatController {
         select: { humanInterventionEnabled: true, humanInterventionMinutes: true },
       });
 
-      const updateData: Prisma.ChatSessionUpdateInput = { lastMessageAt: new Date() };
+      const updateData: Prisma.ChatSessionUpdateInput = { 
+        lastMessageAt: new Date(),
+        state: 'handoff_human',
+        closedAt: null, // Always reopen the session
+      };
 
       if (config?.humanInterventionEnabled) {
         updateData.handoffActive = true;
-        updateData.handoffOperator = 'human';
-        updateData.handoffReason = 'Intervenção humana (mensagem enviada pelo atendente)';
-        updateData.handoffAt = new Date();
-        const until = new Date();
-        until.setMinutes(until.getMinutes() + (config.humanInterventionMinutes || 15));
-        updateData.handoffUntil = until;
+        const minutes = config.humanInterventionMinutes || 60;
+        updateData.handoffUntil = new Date(Date.now() + minutes * 60000);
       }
 
       await this.prisma.chatSession.update({
@@ -450,8 +450,16 @@ export class ChatController {
         this.logger.error(`[CHAT_SEND] socket_emit_failed requestId=${requestId} error=${wsErr?.message}`);
       }
 
-      this.logger.log(`[CHAT_SEND] response_success requestId=${requestId}`);
-      return message;
+      const emittedSessionId = sessionId; // Always the URL's sessionId
+      this.logger.log(`[CHAT_SEND] sessionIdFromUrl=${sessionId} persistedSessionId=${message.sessionId} emittedSessionId=${emittedSessionId}`);
+      this.logger.log(`[CHAT_SEND] complete requestId=${requestId}`);
+
+      return {
+        success: true,
+        message,
+        externalId,
+        emittedSessionId,
+      };
     } catch (error: any) {
       this.logger.error(`[CHAT_SEND] error requestId=${requestId} tenantId=${tenantId} sessionId=${sessionId} errorName=${error?.name} errorMessage=${error?.message} prismaCode=${error?.code}`);
       throw error;

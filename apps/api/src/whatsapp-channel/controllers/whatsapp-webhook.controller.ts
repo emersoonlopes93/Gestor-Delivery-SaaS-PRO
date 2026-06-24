@@ -249,8 +249,12 @@ export class WhatsAppWebhookController {
         where: { externalId },
       });
       if (existing) {
-        this.logger.log(`[WA_WEBHOOK] duplicate_skipped externalId=${externalId} sessionId=${existing.sessionId}`);
-        AiFlowLogger.ignored('duplicate_message_id', trace, {
+        this.logger.log(`[WA_WEBHOOK] duplicate_found updating externalId=${externalId} sessionId=${existing.sessionId}`);
+        await this.prisma.chatMessage.update({
+          where: { id: existing.id },
+          data: { externalStatus: 'sent' } // Atualiza o status
+        });
+        AiFlowLogger.ignored('duplicate_message_id_updated', trace, {
           sessionId: existing.sessionId,
         });
         return;

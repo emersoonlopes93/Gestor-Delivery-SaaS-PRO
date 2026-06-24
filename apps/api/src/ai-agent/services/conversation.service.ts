@@ -492,7 +492,8 @@ export class ConversationService {
     },
   ) {
     const now = new Date();
-    const activeSession = await this.prisma.chatSession.findFirst({
+    // [SESSION_RESOLVE] Fetch all active sessions for the canonical key (tenantId + customerPhone)
+    const activeSessions = await this.prisma.chatSession.findMany({
       where: {
         tenantId,
         customerPhone,
@@ -502,8 +503,37 @@ export class ConversationService {
       orderBy: { updatedAt: 'desc' },
     });
 
+    let activeSession = null;
+    if (activeSessions.length > 0) {
+      // Prioritize the one in handoff, otherwise the most recently updated
+      activeSession = activeSessions.find(s => s.handoffActive) || activeSessions[0];
+
+      // Auto-heal duplicate sessions without deleting their messages
+      const duplicates = activeSessions.filter(s => s.id !== activeSession?.id);
+      if (duplicates.length > 0) {
+        let messageCount = 0;
+        for (const duplicate of duplicates) {
+           const count = await this.prisma.chatMessage.count({ where: { sessionId: duplicate.id } });
+           messageCount += count;
+        }
+        
+        this.logger.warn(`[SESSION_RESOLVE] key=${tenantId}:${customerPhone} selectedSessionId=${activeSession.id} reason=${activeSession.handoffActive ? 'handoff_active' : 'latest'}`);
+        if (messageCount > 0) {
+           this.logger.warn(`[SESSION_RESOLVE] duplicate_closed_with_messages duplicateCount=${duplicates.length} messageCount=${messageCount}`);
+        }
+
+        await this.prisma.chatSession.updateMany({
+          where: { id: { in: duplicates.map(d => d.id) } },
+          data: { state: 'closed', closedAt: now, closeReason: 'duplicate_merge' }
+        });
+      }
+    }
+
     if (activeSession) {
-      if (this.isSessionExpired(activeSession, options?.sessionTimeoutMin)) {
+      // Handoff sessions should NEVER expire automatically by timeout
+      const isExpired = activeSession.handoffActive ? false : this.isSessionExpired(activeSession, options?.sessionTimeoutMin);
+
+      if (isExpired) {
         await this.expireSession(activeSession.id, 'timeout');
       } else {
         const updateData: Prisma.ChatSessionUpdateInput = {
