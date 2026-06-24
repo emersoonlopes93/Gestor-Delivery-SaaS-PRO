@@ -22,6 +22,7 @@ import {
   isNonActionableWebhookEvent,
 } from '../../common/utils/whatsapp-presence.util';
 import { isExitCommand } from '../../ai-agent/constants/session.constants';
+import { ChatGateway } from '../../chat/chat.gateway';
 
 
 /**
@@ -387,6 +388,26 @@ export class WhatsAppWebhookController {
         textLength: content.length,
         senderType: 'customer',
       });
+
+      // Emite evento de socket para atualizar o Inbox em tempo real
+      try {
+        const savedMessages = await this.prisma.chatMessage.findMany({
+          where: { sessionId: session.id },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        });
+        const lastMessage = savedMessages[0];
+        if (lastMessage) {
+          ChatGateway.instance?.emitMessageCreated(tenantId, session.id, lastMessage);
+        }
+        // Atualiza contadores e lista lateral
+        const updatedSession = await this.prisma.chatSession.findUnique({ where: { id: session.id } });
+        if (updatedSession) {
+          ChatGateway.instance?.emitSessionUpdated(tenantId, updatedSession);
+        }
+      } catch (emitErr) {
+        this.logger.warn(`[CHAT_WS] Failed to emit socket event: ${emitErr instanceof Error ? emitErr.message : 'unknown'}`);
+      }
 
       if (session.handoffActive || isFromMe) {
         AiFlowLogger.ignored('human_handoff', trace, { sessionId: session.id, isFromMe });

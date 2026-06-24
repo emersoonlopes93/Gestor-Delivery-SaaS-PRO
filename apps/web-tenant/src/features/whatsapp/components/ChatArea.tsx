@@ -51,7 +51,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
-      if (!session) return;
+      if (!session) return null;
       const res = await api.post(`/chat/sessions/${session.id}/messages`, {
         direction: 'outbound',
         content,
@@ -59,9 +59,44 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       });
       return res.data;
     },
-    onSuccess: () => {
+    onMutate: (content) => {
+      // Salva o texto para restaurar se falhar
+      const previousMessage = message;
+      // Limpa o input imediatamente (optimistic UX)
       setMessage('');
+      // Adiciona mensagem otimista na lista
+      const optimisticMsg: ChatMessage = {
+        id: `optimistic-${Date.now()}`,
+        sessionId: session?.id ?? '',
+        direction: 'outbound',
+        senderType: 'human',
+        content,
+        messageType: 'text',
+        externalStatus: 'sent',
+        timestamp: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, optimisticMsg]);
+      return { previousMessage };
+    },
+    onSuccess: (data) => {
+      if (!data) return;
+      // Substitui a mensagem otimista pela mensagem real do servidor
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id.startsWith('optimistic-') ? (data as ChatMessage) : m
+        ),
+      );
+      // Revalida do servidor para garantir sincronia
       refetchMessages();
+    },
+    onError: (_error, _content, context) => {
+      // Em caso de erro, restaura o texto no input e remove a mensagem otimista
+      if (context?.previousMessage) {
+        setMessage(context.previousMessage);
+      }
+      setMessages((prev) => prev.filter((m) => !m.id.startsWith('optimistic-')));
     },
   });
 
@@ -138,8 +173,9 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
   }, [messages]);
 
   const handleSend = () => {
-    if (message.trim() && session) {
-      sendMessageMutation.mutate(message.trim());
+    const trimmed = message.trim();
+    if (trimmed && session) {
+      sendMessageMutation.mutate(trimmed);
     }
   };
 
@@ -273,14 +309,17 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
             
             {/* Avatar */}
             <div className="relative shrink-0 w-10 h-10 rounded-full overflow-hidden flex items-center justify-center font-bold text-sm bg-primary text-primary-foreground">
-              {session.profilePictureUrl && (
-                <img 
-                  src={session.profilePictureUrl} 
-                  alt={session.displayName || `Cliente ${session.customerPhone}`} 
-                  className="absolute inset-0 w-full h-full object-cover"
-                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                />
-              )}
+              {(() => {
+                const avatarUrl = (session as ChatSession & { customer?: { profilePictureUrl?: string | null } }).customer?.profilePictureUrl || session.profilePictureUrl;
+                return avatarUrl ? (
+                  <img 
+                    src={avatarUrl} 
+                    alt={session.displayName || `Cliente ${session.customerPhone}`} 
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                ) : null;
+              })()}
               <span>{(session.displayName || `Cliente ${session.customerPhone}`).charAt(0).toUpperCase()}</span>
             </div>
 

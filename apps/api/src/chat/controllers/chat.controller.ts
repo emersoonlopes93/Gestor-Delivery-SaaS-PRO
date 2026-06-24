@@ -285,7 +285,13 @@ export class ChatController {
       where: { id: sessionId, tenantId: req.user.tenantId },
       include: { customer: { select: { profilePictureUrl: true } } },
     });
-    return session;
+    if (!session) return null;
+    // Achata profilePictureUrl para o nível raiz para que o frontend possa acessar
+    const { customer, ...rest } = session;
+    return {
+      ...rest,
+      profilePictureUrl: customer?.profilePictureUrl ?? null,
+    };
   }
 
   @Get('sessions/:id/messages')
