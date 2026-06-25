@@ -306,10 +306,10 @@ export class ChatController {
       where: {
         sessionId: sessionId,
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
       take: 200,
     });
-    return messages.filter((msg) => this.isInboxMessage(msg));
+    return messages.reverse().filter((msg) => this.isInboxMessage(msg));
   }
 
   @Get('sessions/:id/ai/summary')
@@ -454,12 +454,7 @@ export class ChatController {
       this.logger.log(`[CHAT_SEND] sessionIdFromUrl=${sessionId} persistedSessionId=${message.sessionId} emittedSessionId=${emittedSessionId}`);
       this.logger.log(`[CHAT_SEND] complete requestId=${requestId}`);
 
-      return {
-        success: true,
-        message,
-        externalId,
-        emittedSessionId,
-      };
+      return message;
     } catch (error: any) {
       this.logger.error(`[CHAT_SEND] error requestId=${requestId} tenantId=${tenantId} sessionId=${sessionId} errorName=${error?.name} errorMessage=${error?.message} prismaCode=${error?.code}`);
       throw error;
