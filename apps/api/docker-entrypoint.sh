@@ -6,7 +6,7 @@ echo "Aguardando banco de dados..."
 
 if [ "$CLEAN_DB" = "true" ]; then
   echo "CLEAN_DB=true detectado. Executando limpeza do banco de dados..."
-  node apps/api/clean_db.js
+  node clean_db.js
 fi
 
 echo "Rodando Prisma Migrate Deploy..."
