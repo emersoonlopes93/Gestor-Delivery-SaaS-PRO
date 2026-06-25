@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { CurrentTenant, RequirePermissions } from '../common/decorators';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
@@ -7,6 +7,12 @@ import { BillingUsageService } from './billing-usage.service';
 import type { CreatePlanDto, CreateSubscriptionDto, UpdatePlanDto, UpdateSubscriptionDto } from './dto/create-plan.dto';
 import { TenantBillingResolverService } from './tenant-billing-resolver.service';
 import { TenantBillingPortalService } from './tenant-billing-portal.service';
+import { BillingAddonService } from './billing-addon.service';
+import { BillingEntitlementsService } from './billing-entitlements.service';
+import { BillingSettingsService } from './billing-settings.service';
+import { BillingPaymentGatewayService } from './billing-payment-gateway.service';
+import { PrismaService } from '../database/prisma.service';
+import { TenantSubscriptionStatus } from '@prisma/client';
 
 @Controller('billing')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -16,6 +22,11 @@ export class BillingController {
     private readonly tenantBillingResolver: TenantBillingResolverService,
     private readonly billingUsageService: BillingUsageService,
     private readonly tenantBillingPortalService: TenantBillingPortalService,
+    private readonly billingAddonService: BillingAddonService,
+    private readonly billingEntitlementsService: BillingEntitlementsService,
+    private readonly billingSettingsService: BillingSettingsService,
+    private readonly billingPaymentGatewayService: BillingPaymentGatewayService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Get('me')
@@ -42,6 +53,19 @@ export class BillingController {
   @Get('plans')
   async listPlans() {
     return [await this.tenantBillingResolver.getDefaultBillingPlan()];
+  }
+
+  @Get('entitlements')
+  @RequirePermissions('billing.read')
+  async getEntitlements(@CurrentTenant() tenantId: string) {
+    return this.billingEntitlementsService.resolveTenantEntitlements(tenantId);
+  }
+
+  @Get('partners')
+  @RequirePermissions('billing.read')
+  async getPartners(@CurrentTenant() tenantId: string) {
+    const entitlements = await this.billingEntitlementsService.resolveTenantEntitlements(tenantId);
+    return this.billingEntitlementsService.getPartnerLinks(entitlements.settings);
   }
 
   @Post('plans')
@@ -91,6 +115,57 @@ export class BillingController {
   ) {
     const subscription = await this.tenantBillingResolver.getOrCreateTenantBillingSubscription(tenantId, dto.planId);
     return this.tenantBillingResolver.getTenantBillingState(subscription.tenantId);
+  }
+
+  @Post('trial-pro/start')
+  @RequirePermissions('billing.write')
+  async startTrialPro(@CurrentTenant() tenantId: string) {
+    const settings = await this.billingSettingsService.ensureDefaultSettings();
+    if (!settings.trialProEnabled) {
+      throw new BadRequestException('Trial Pro desativado no SaaS Admin.');
+    }
+
+    const plan = await this.tenantBillingResolver.getDefaultBillingPlan();
+    if (plan.requiresPaymentMethod) {
+      const runtime = this.billingPaymentGatewayService.getRuntimeConfig();
+      const paymentMethod = await this.prisma.billingPaymentMethod.findFirst({
+        where: { tenantId, isActive: true, isDefault: true },
+      });
+      if (!runtime.paymentsEnabled || !paymentMethod) {
+        throw new BadRequestException('Trial Pro com cartao ainda nao esta pronto neste ambiente. Mantenha a flag desabilitada ate o gateway real estar disponivel.');
+      }
+    }
+
+    const subscription = await this.tenantBillingResolver.getOrCreateTenantBillingSubscription(tenantId, plan.id);
+    const now = new Date();
+    const trialEndsAt = new Date(now);
+    trialEndsAt.setDate(trialEndsAt.getDate() + Math.max(0, plan.trialDays));
+
+    await this.prisma.tenantBillingSubscription.update({
+      where: { id: subscription.id },
+      data: {
+        status: TenantSubscriptionStatus.trialing,
+        trialStartedAt: now,
+        trialEndsAt,
+        requiresPaymentMethod: plan.requiresPaymentMethod,
+      },
+    });
+
+    return this.tenantBillingPortalService.getMyBillingOverview(tenantId);
+  }
+
+  @Post('addons/ai-agent/activate')
+  @RequirePermissions('billing.write')
+  async activateAiAddon(@CurrentTenant() tenantId: string) {
+    await this.billingAddonService.activateAiAddon(tenantId);
+    return this.tenantBillingPortalService.getMyBillingOverview(tenantId);
+  }
+
+  @Post('addons/ai-agent/cancel')
+  @RequirePermissions('billing.write')
+  async cancelAiAddon(@CurrentTenant() tenantId: string) {
+    await this.billingAddonService.cancelAiAddon(tenantId);
+    return this.tenantBillingPortalService.getMyBillingOverview(tenantId);
   }
 
   @Put('subscription')

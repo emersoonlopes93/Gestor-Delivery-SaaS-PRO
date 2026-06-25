@@ -148,10 +148,10 @@ export function MenuImportPage() {
           </div>
           <div>
             <h1 className="text-xl font-black text-slate-900 dark:text-white">
-              Importar Cardápio Base
+              Importar Cardápio Pronto
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Adicione um conjunto inicial de categorias e produtos
+              Adicione um conjunto inicial de categorias e produtos a partir de um modelo pronto
             </p>
           </div>
         </div>
@@ -347,7 +347,7 @@ export function MenuImportPage() {
               Cardápio importado com sucesso! 🎉
             </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Seu cardápio inicial foi criado com sucesso.
+              Foram criados {importResult.categoriesCreated} categorias e {importResult.productsCreated} produtos. Revise preços, imagens e disponibilidade antes de começar a vender.
             </p>
           </div>
 
@@ -385,10 +385,10 @@ export function MenuImportPage() {
               Importar outro
             </button>
             <button
-              onClick={() => navigate('/catalog/products')}
+              onClick={() => navigate(`/catalog/products?source=base-menu&categories=${importResult.categoriesCreated}&products=${importResult.productsCreated}&skipped=${importResult.categoriesSkipped + importResult.productsSkipped}`)}
               className="flex-[2] py-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-black rounded-2xl transition-all shadow-lg shadow-indigo-500/25 text-sm"
             >
-              Ver produtos →
+              Revisar produtos →
             </button>
           </div>
         </div>

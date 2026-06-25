@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api-client';
 import { useAuthStore } from '../../stores/auth.store';
 import type { TenantLoginResponse } from '@gestor/types';
-import { Mail, Lock, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Loader2, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 /**
  * Login page for tenant users with premium aesthetics.
@@ -11,6 +11,7 @@ import { Mail, Lock, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -39,7 +40,11 @@ export function LoginPage() {
       // Set user in store
       setUser(user);
 
-      navigate('/dashboard');
+      if (!user.onboardingCompletedAt) {
+        navigate('/onboarding');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -52,7 +57,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="card-premium p-8 shadow-2xl border-none bg-card/80 backdrop-blur-xl">
+    <div className="card-premium p-6 sm:p-8 shadow-2xl border border-border bg-card/95 backdrop-blur-xl">
       <form onSubmit={handleSubmit} className="space-y-6">
         {isExpired && !error && (
           <div className="alert-warning p-4 rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -87,7 +92,7 @@ export function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="input-premium pl-12 h-12"
-                placeholder="exemplo@gestor.com"
+                placeholder="exemplo@pedehub.com"
               />
             </div>
           </div>
@@ -100,7 +105,7 @@ export function LoginPage() {
               >
                 Sua Senha
               </label>
-              <button type="button" className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline decoration-2 underline-offset-4">
+              <button type="button" onClick={() => navigate('/forgot-password')} className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline decoration-2 underline-offset-4">
                 Esqueci a senha
               </button>
             </div>
@@ -110,13 +115,21 @@ export function LoginPage() {
               </div>
               <input
                 id="password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="input-premium pl-12 h-12"
+                className="input-premium pl-12 pr-12 h-12"
                 placeholder="••••••••••••"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
             </div>
           </div>
         </div>
@@ -124,7 +137,7 @@ export function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-12 bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed text-sm uppercase tracking-[0.2em] font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group relative overflow-hidden disabled:pointer-events-none"
+          className="w-full h-12 rounded-lg border border-primary/30 bg-primary px-4 text-sm font-black uppercase tracking-[0.18em] text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-xl hover:shadow-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:border-border disabled:bg-muted disabled:text-muted-foreground disabled:opacity-80 disabled:cursor-not-allowed disabled:shadow-none group relative overflow-hidden"
         >
           <span className={`flex items-center justify-center gap-2 transition-all ${loading ? 'opacity-0 scale-90' : 'opacity-100 scale-100'}`}>
             Acessar Painel

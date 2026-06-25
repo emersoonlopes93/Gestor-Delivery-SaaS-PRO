@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '@/lib/api-client';
+import { printThermalText } from '@/lib/thermal-print';
 import { useActiveSession } from '../cash/hooks/useCashSession';
 import { useCreatePosSale, type PosCreateSalePayload } from './hooks/usePosSale';
 import { useDraftSale } from './hooks/useDraftSale';
@@ -196,27 +197,10 @@ export default function PosPage() {
     try {
       const res = await api.get<{ content: string }>(`/pos/sales/${orderId}/print?type=${type}`);
       if (res.success && res.data.content) {
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-          printWindow.document.write(`
-            <html>
-              <head>
-                <style>
-                  @media print { margin: 0; }
-                  pre { font-family: 'Courier New', Courier, monospace; font-size: 12px; white-space: pre-wrap; }
-                </style>
-              </head>
-              <body><pre>${res.data.content}</pre></body>
-            </html>
-          `);
-          printWindow.document.close();
-          printWindow.focus();
-          // Small delay for document rendering
-          setTimeout(() => {
-            printWindow.print();
-            printWindow.close();
-          }, 250);
-        }
+        printThermalText(res.data.content, {
+          title: type === 'customer' ? 'Imprimir Cupom' : 'Imprimir Cozinha',
+          paperWidthMm: 58,
+        });
       }
     } catch (err) {
       // Falha de impressão não deve bloquear o PDV.
@@ -675,20 +659,20 @@ export default function PosPage() {
       <div className="hidden lg:flex w-16 flex-col bg-card dark:bg-muted900 border-r border-border200 dark:border-border800 py-4 gap-4 items-center">
         <button 
           onClick={() => setViewMode('catalog')}
-          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'catalog' ? 'bg-status-success text-foreground shadow-lg' : 'bg-card dark:bg-muted800 text-muted-foreground500 dark:text-muted-foreground400 hover:bg-muted100 dark:bg-muted700'}`}
+          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'catalog' ? 'bg-status-success text-foreground shadow-lg' : 'bg-background dark:bg-muted800 text-foreground/75 hover:bg-muted100 dark:hover:bg-muted700 border border-border/70 dark:border-border700'}`}
           title="Catálogo"
         >
           <Store size={20} />
         </button>
         <button 
           onClick={() => { setViewMode('salon'); queryClient.invalidateQueries({ queryKey: ['posSalon'] }); }}
-          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'salon' ? 'bg-status-success text-foreground shadow-lg' : 'bg-card dark:bg-muted800 text-muted-foreground500 dark:text-muted-foreground400 hover:bg-muted100 dark:bg-muted700'}`}
+          className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${viewMode === 'salon' ? 'bg-status-success text-foreground shadow-lg' : 'bg-background dark:bg-muted800 text-foreground/75 hover:bg-muted100 dark:hover:bg-muted700 border border-border/70 dark:border-border700'}`}
           title="Salão"
         >
           <LayoutGrid size={20} />
         </button>
         <div className="w-6 h-[1px] bg-card dark:bg-muted800" />
-        <button className="w-10 h-10 bg-card dark:bg-muted800 text-muted-foreground500 dark:text-muted-foreground400 rounded-xl flex items-center justify-center hover:text-muted-foreground900 dark:text-white transition-colors" title="Configurações">
+        <button className="w-10 h-10 bg-background dark:bg-muted800 text-foreground/75 rounded-xl flex items-center justify-center hover:text-foreground transition-colors border border-border/70 dark:border-border700" title="Configurações">
            <Keyboard size={18} />
         </button>
       </div>
@@ -732,14 +716,14 @@ export default function PosPage() {
                <>
                 <button 
                   onClick={() => handlePrint(currentOrderId!, 'customer')}
-                  className="bg-card dark:bg-muted800 text-muted-foreground600 dark:text-muted-foreground400 p-1.5 rounded-lg hover:text-muted-foreground900 dark:text-white transition-colors"
+                  className="bg-background dark:bg-muted800 text-foreground/70 p-1.5 rounded-lg hover:text-foreground transition-colors border border-border/70 dark:border-border700"
                   title="Imprimir Cupom"
                 >
                   <Receipt size={14} />
                 </button>
                 <button 
                   onClick={() => handlePrint(currentOrderId!, 'kitchen')}
-                  className="bg-card dark:bg-muted800 text-muted-foreground600 dark:text-muted-foreground400 p-1.5 rounded-lg hover:text-muted-foreground900 dark:text-white transition-colors"
+                  className="bg-background dark:bg-muted800 text-foreground/70 p-1.5 rounded-lg hover:text-foreground transition-colors border border-border/70 dark:border-border700"
                   title="Imprimir Cozinha"
                 >
                   <Printer size={14} />
@@ -766,7 +750,7 @@ export default function PosPage() {
               </div>
               <button 
                 onClick={() => setIsCustomerDrawerOpen(true)}
-                className="w-full bg-card dark:bg-muted800 hover:bg-muted100 dark:hover:bg-muted750 text-muted-foreground700 dark:text-muted-foreground300 border border-dashed border-border300 dark:border-border700 rounded-xl py-3 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
+                className="w-full bg-background dark:bg-muted800 hover:bg-muted100 dark:hover:bg-muted750 text-foreground/85 dark:text-foreground border border-dashed border-border300 dark:border-border700 rounded-xl py-3 text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-all"
               >
                 <UserPlus size={14} className="text-primary" />
                 Identificar Cliente
@@ -851,7 +835,7 @@ export default function PosPage() {
             {currentOrderId && fulfillmentType === PosFulfillmentType.TABLE && (
               <button 
                 onClick={() => setIsSplitModalOpen(true)}
-                className="w-full bg-card dark:bg-muted800 hover:bg-muted100 dark:bg-muted750 text-muted-foreground700 dark:text-muted-foreground300 border border-border200 dark:border-border700 rounded-xl py-3 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all mt-2"
+                className="w-full bg-background dark:bg-muted800 hover:bg-muted100 dark:hover:bg-muted750 text-foreground/85 dark:text-foreground border border-border200 dark:border-border700 rounded-xl py-3 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all mt-2"
               >
                   <Users size={14} />
                   Dividir Conta / Fechamento Parcial

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { TenantBillingResolverService } from '../../billing/tenant-billing-resolver.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AdminTenantsService {
@@ -37,6 +38,132 @@ export class AdminTenantsService {
 
     return {
       items: tenants,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+      hasNext: page * pageSize < total,
+      hasPrevious: page > 1,
+    };
+  }
+
+  /**
+   * Health overview of tenants (V1)
+   */
+  async getHealthOverview(page = 1, pageSize = 20, search?: string, operationalStatus?: string, billingStatus?: string, whatsappStatus?: string) {
+    const skip = (page - 1) * pageSize;
+    const where: Prisma.TenantWhereInput = {};
+    
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { slug: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+    
+    if (operationalStatus) {
+      where.status = operationalStatus as import('@prisma/client').TenantStatus;
+    }
+
+    if (whatsappStatus) {
+      if (whatsappStatus === 'none') {
+        where.whatsappInstance = { is: null };
+      } else {
+        where.whatsappInstance = { status: whatsappStatus as import('@prisma/client').WhatsAppInstanceStatus };
+      }
+    }
+
+    if (billingStatus) {
+      if (billingStatus === 'none') {
+        where.billingSubscriptions = { none: {} };
+      } else {
+        where.billingSubscriptions = { some: { status: billingStatus as import('@prisma/client').TenantSubscriptionStatus } };
+      }
+    }
+
+    const [tenants, total, statsCount] = await Promise.all([
+      this.prisma.tenant.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          whatsappInstance: { select: { status: true, phoneNumber: true, providerType: true, updatedAt: true } },
+          orders: { take: 1, orderBy: { createdAt: 'desc' }, select: { createdAt: true, total: true } },
+          billingSubscriptions: { orderBy: { createdAt: 'desc' }, take: 1, select: { status: true } },
+          subscription: { select: { status: true } },
+        }
+      }),
+      this.prisma.tenant.count({ where }),
+      Promise.all([
+        this.prisma.tenant.count(),
+        this.prisma.tenant.count({ where: { status: 'active' } }),
+        this.prisma.tenant.count({ where: { status: 'suspended' } }),
+      ])
+    ]);
+
+    const globalStats = {
+      total: statsCount[0],
+      active: statsCount[1],
+      suspended: statsCount[2],
+      pastDue: 0, 
+      trailing: 0,
+    };
+
+    const items = tenants.map(t => {
+      const bStatus = t.billingSubscriptions?.[0]?.status ?? t.subscription?.status ?? 'none';
+      const wStatus = t.whatsappInstance?.status ?? 'none';
+      const lastOrder = t.orders?.[0];
+
+      const alerts: Array<{ type: string; severity: string; message: string; createdAt: string }> = [];
+
+      if (t.status === 'suspended') {
+        alerts.push({ type: 'operational', severity: 'critical', message: 'Tenant suspenso', createdAt: new Date().toISOString() });
+      }
+
+      if (bStatus === 'overdue') {
+        alerts.push({ type: 'financial', severity: 'high', message: 'Assinatura inadimplente', createdAt: new Date().toISOString() });
+      }
+
+      if (t.status === 'active' && wStatus === 'disconnected') {
+        alerts.push({ type: 'operational', severity: 'high', message: 'WhatsApp desconectado', createdAt: new Date().toISOString() });
+      }
+
+      if (t.status === 'active') {
+        if (!lastOrder) {
+          alerts.push({ type: 'operational', severity: 'medium', message: 'Nenhum pedido registrado', createdAt: new Date().toISOString() });
+        } else {
+          const daysAgo = (new Date().getTime() - new Date(lastOrder.createdAt).getTime()) / (1000 * 3600 * 24);
+          if (daysAgo > 7) {
+            alerts.push({ type: 'operational', severity: 'medium', message: 'Sem pedidos recentes (>7 dias)', createdAt: new Date().toISOString() });
+          }
+        }
+      }
+
+      return {
+        tenantId: t.id,
+        tenantName: t.name,
+        slug: t.slug,
+        operationalStatus: t.status,
+        billingStatus: bStatus,
+        createdAt: t.createdAt.toISOString(),
+        whatsapp: t.whatsappInstance ? {
+          status: t.whatsappInstance.status,
+          connectedNumber: t.whatsappInstance.phoneNumber,
+          providerType: t.whatsappInstance.providerType,
+          lastUpdatedAt: t.whatsappInstance.updatedAt.toISOString(),
+        } : null,
+        orders: lastOrder ? {
+          lastOrderAt: lastOrder.createdAt.toISOString(),
+          lastOrderTotal: lastOrder.total,
+        } : null,
+        alerts,
+      };
+    });
+
+    return {
+      items,
+      stats: globalStats,
       total,
       page,
       pageSize,
@@ -108,7 +235,7 @@ export class AdminTenantsService {
   /**
    * Update tenant status (activate/suspend).
    */
-  async updateStatus(id: string, status: 'active' | 'inactive' | 'suspended' | 'trial', adminId?: string) {
+  async updateStatus(id: string, status: 'active' | 'inactive' | 'suspended' | 'trial', adminId?: string, reason?: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id },
     });
@@ -146,17 +273,18 @@ export class AdminTenantsService {
               subscriptionId: subscription.id,
               previousStatus: subscription.status,
               nextStatus: nextBillingStatus,
-              reason: status === 'suspended' ? 'admin_suspended_tenant' : 'admin_reactivated_tenant',
-              source: 'saas_admin',
-              actorType: adminId ? 'admin' : 'system',
-              actorId: adminId ?? null,
-              metadata: {
-                previousTenantStatus: tenant.status,
-                nextTenantStatus: status,
+                reason: reason?.trim() || (status === 'suspended' ? 'admin_suspended_tenant' : 'admin_reactivated_tenant'),
+                source: 'saas_admin',
+                actorType: adminId ? 'admin' : 'system',
+                actorId: adminId ?? null,
+                metadata: {
+                  previousTenantStatus: tenant.status,
+                  nextTenantStatus: status,
+                  reason: reason?.trim() ?? null,
+                },
               },
-            },
-          });
-        }
+            });
+          }
       }
 
       await tx.auditLog.create({
@@ -171,6 +299,7 @@ export class AdminTenantsService {
             nextStatus: status,
             billingSubscriptionId: subscription?.id ?? null,
             billingStatusUpdated: Boolean(subscription && (status === 'suspended' || status === 'active')),
+            reason: reason?.trim() ?? null,
           },
         },
       });

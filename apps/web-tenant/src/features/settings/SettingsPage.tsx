@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api-client';
-import { Tenant, TenantSettings } from '@gestor/types';
+import { BusinessGroupContext, Tenant, TenantSettings } from '@gestor/types';
 
 
 
@@ -15,9 +15,16 @@ interface OperatingHourForm {
   closeTime?: string;
 }
 
-import { Clock, Pause, Save, Copy, Calendar, MapPin, Building2, ChefHat } from 'lucide-react';
+interface WhatsAppStatusPayload {
+  connected: boolean;
+  phoneNumber?: string | null;
+}
+
+import { Clock, Save, Copy, Calendar, MapPin, Building2, ChefHat, Wallet, Store, MessageCircleWarning } from 'lucide-react';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { StoreStatusControl } from '../../components/store/StoreStatusControl';
 import { useNavigate } from 'react-router-dom';
+import { maskPhone, maskCEP, maskCPFCNPJ, unmask } from '@gestor/utils';
 
 async function geocodeNominatim(address: string): Promise<{ lat: number; lng: number } | null> {
   try {
@@ -25,7 +32,7 @@ async function geocodeNominatim(address: string): Promise<{ lat: number; lng: nu
     const response = await fetch(url, {
       headers: {
         'Accept-Language': 'pt-BR',
-        'User-Agent': 'Gestor-Delivery-SaaS-PRO-App',
+        'User-Agent': 'PedeHub-App',
       },
     });
     const data = await response.json();
@@ -47,13 +54,16 @@ const DAY_NAMES = [
 
 export function SettingsPage() {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'overview' | 'address' | 'finance' | 'hours'>('overview');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [businessGroup, setBusinessGroup] = useState<BusinessGroupContext | null>(null);
   const [settings, setSettings] = useState<Partial<TenantSettings>>({
     timezone: 'America/Sao_Paulo',
     currency: 'BRL',
     language: 'pt-BR',
     businessPhone: '',
+    orderWhatsappNumber: '',
     businessEmail: '',
     address: '',
     street: '',
@@ -66,6 +76,7 @@ export function SettingsPage() {
     lat: undefined,
     lng: undefined,
     paymentMethods: ['pix', 'cash', 'card_on_delivery'],
+    minimumOrderValue: undefined,
     pixKey: '',
     bankName: '',
     bankAgency: '',
@@ -79,15 +90,22 @@ export function SettingsPage() {
     taxRegime: '',
     standardCfop: '',
     standardNcm: '',
+    loyaltyEnabled: false,
+    loyaltyPointsPerReal: 1,
+    cashbackEnabled: false,
+    cashbackPercent: 0,
+    cashbackValidityDays: 90,
     businessGroupId: null,
   });
 
   const [hours, setHours] = useState<OperatingHourForm[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [connectedWhatsappNumber, setConnectedWhatsappNumber] = useState<string | null>(null);
 
   useEffect(() => {
     loadSettings();
     loadOperatingHours();
+    loadWhatsappStatus();
   }, []);
 
   const loadSettings = async () => {
@@ -101,6 +119,7 @@ export function SettingsPage() {
             businessGroupId: response.data.businessGroupId
           });
         }
+        setBusinessGroup(response.data.businessGroup ?? null);
       }
     } catch (error) {
       console.error('Erro ao carregar configurações:', error);
@@ -132,7 +151,7 @@ export function SettingsPage() {
   };
 
   const handleCepBlur = async () => {
-    const cep = settings.zipCode?.replace(/\D/g, '');
+    const cep = unmask(settings.zipCode || '');
     if (cep && cep.length === 8) {
       try {
         const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
@@ -183,7 +202,8 @@ export function SettingsPage() {
         timezone: settings.timezone || undefined,
         currency: settings.currency || undefined,
         language: settings.language || undefined,
-        businessPhone: settings.businessPhone?.trim() || undefined,
+        businessPhone: unmask(settings.businessPhone) || undefined,
+        orderWhatsappNumber: unmask(settings.orderWhatsappNumber) || undefined,
         businessEmail: settings.businessEmail?.trim() || undefined,
         address: derivedAddress,
         street: settings.street?.trim() || undefined,
@@ -192,21 +212,27 @@ export function SettingsPage() {
         neighborhood: settings.neighborhood?.trim() || undefined,
         city: settings.city?.trim() || undefined,
         state: settings.state?.trim() || undefined,
-        zipCode: settings.zipCode?.trim() || undefined,
+        zipCode: unmask(settings.zipCode) || undefined,
         lat,
         lng,
         paymentMethods: settings.paymentMethods || undefined,
+        minimumOrderValue: settings.minimumOrderValue ?? undefined,
         pixKey: settings.pixKey?.trim() || undefined,
         bankName: settings.bankName?.trim() || undefined,
         bankAgency: settings.bankAgency?.trim() || undefined,
         bankAccount: settings.bankAccount?.trim() || undefined,
         logoUrl: settings.logoUrl?.trim() || undefined,
-        cnpj: settings.cnpj?.trim() || undefined,
+        cnpj: unmask(settings.cnpj) || undefined,
         razaoSocial: settings.razaoSocial?.trim() || undefined,
         inscricaoEstadual: settings.inscricaoEstadual?.trim() || undefined,
         taxRegime: settings.taxRegime || undefined,
         standardCfop: settings.standardCfop || undefined,
         standardNcm: settings.standardNcm || undefined,
+        loyaltyEnabled: settings.loyaltyEnabled ?? undefined,
+        loyaltyPointsPerReal: settings.loyaltyPointsPerReal ?? undefined,
+        cashbackEnabled: settings.cashbackEnabled ?? undefined,
+        cashbackPercent: settings.cashbackPercent ?? undefined,
+        cashbackValidityDays: settings.cashbackValidityDays ?? undefined,
       };
       
       const response = await api.patch('/tenant/settings', cleanedSettings);
@@ -221,19 +247,32 @@ export function SettingsPage() {
     }
   };
 
-  const handleTogglePause = async () => {
-    const newStatus = !settings.isStorePaused;
+  const handleTogglePause = async (nextPaused: boolean, reason: string) => {
     try {
       const res = await api.patch('/tenant/store-pause', {
-        isStorePaused: newStatus,
-        storePauseReason: settings.storePauseReason || '',
+        isStorePaused: nextPaused,
+        storePauseReason: reason,
       });
       if (res.success) {
-        setSettings({ ...settings, isStorePaused: newStatus });
-        alert(newStatus ? 'Loja pausada com sucesso!' : 'Loja reaberta com sucesso!');
+        setSettings((current) => ({
+          ...current,
+          isStorePaused: nextPaused,
+          storePauseReason: reason,
+        }));
       }
     } catch (error) {
-      alert('Erro ao alterar status da loja.');
+      throw new Error('Não foi possível alterar o status da loja.');
+    }
+  };
+
+  const loadWhatsappStatus = async () => {
+    try {
+      const response = await api.get<WhatsAppStatusPayload>('/whatsapp/instance/status');
+      if (response.success) {
+        setConnectedWhatsappNumber(response.data.phoneNumber || null);
+      }
+    } catch {
+      setConnectedWhatsappNumber(null);
     }
   };
 
@@ -360,6 +399,12 @@ export function SettingsPage() {
     setHours(newHours);
   };
 
+  const isOverviewTab = activeTab === 'overview';
+  const isAddressTab = activeTab === 'address';
+  const isFinanceTab = activeTab === 'finance';
+  const isHoursTab = activeTab === 'hours';
+  const showMainColumn = !isHoursTab;
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -369,93 +414,142 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto text-left space-y-8">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto text-left space-y-6 lg:space-y-8">
       <PageHeader
         title="Configurações da Loja"
         description="Gerencie o funcionamento e informações do seu estabelecimento."
       />
 
-      {/* Card rápido: Importar Cardápio Base */}
-      <div className="bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
-              <ChefHat className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <div className="font-black text-slate-900 dark:text-white text-sm">Importar Cardápio Base</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Adicione categorias e produtos pré-definidos para o seu segmento em segundos
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => navigate('/settings/menu-import')}
-            className="shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl transition-all shadow-md shadow-indigo-500/20 text-sm"
-          >
-            Importar →
-          </button>
-        </div>
-      </div>
-
-      {settings.businessGroupId && (
-        <div className="bg-indigo-600 rounded-2xl shadow-lg p-5 text-white flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="bg-card/20 p-2.5 rounded-xl">
-              <Building2 className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="text-xs font-black uppercase tracking-widest text-indigo-200">Plano Corporativo</div>
-              <p className="font-bold">Esta unidade faz parte de um <span className="text-indigo-100 italic">Grupo de Negócios</span>.</p>
-            </div>
-          </div>
-          <div className="hidden md:block bg-card/10 px-4 py-2 rounded-lg border border-white/20 text-xs font-bold">
-            Multi-unidade Ativado
-          </div>
-        </div>
-      )}
-
-      {/* Pausa Manual */}
-      <div className={`bg-card rounded-2xl shadow-sm border p-6 transition-all ${settings.isStorePaused ? 'border-status-warning/20 bg-status-warning/5 dark:border-status-warning/30 dark:bg-status-warning/5' : 'border-border'}`}>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-start gap-4">
-            <div className={`p-3 rounded-xl ${settings.isStorePaused ? 'bg-status-warning/10 text-status-warning' : 'bg-status-success/10 text-status-success'}`}>
-              <Pause className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-foreground">Pausa Temporária</h2>
-              <p className="text-sm text-muted-foreground font-medium">Use isso para fechar a loja imediatamente, independente dos horários.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            {settings.isStorePaused && (
-              <input
-                type="text"
-                placeholder="Motivo da pausa (opcional)"
-                value={settings.storePauseReason || ''}
-                onChange={(e) => setSettings({ ...settings, storePauseReason: e.target.value })}
-                className="input-premium border-status-warning/20 dark:border-status-warning/30 focus:border-status-warning w-64 !py-2"
-              />
-            )}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+        {[
+          { id: 'overview', label: 'Loja', subtitle: 'Identidade e ações rápidas', icon: Store },
+          { id: 'address', label: 'Endereço', subtitle: 'CEP, rua e complemento', icon: MapPin },
+          { id: 'finance', label: 'Fiscal & Pagamento', subtitle: 'Dados fiscais e recebimentos', icon: Wallet },
+          { id: 'hours', label: 'Horários', subtitle: 'Agenda semanal e turnos', icon: Clock },
+        ].map((tab) => {
+          const active = activeTab === tab.id;
+          const Icon = tab.icon;
+          return (
             <button
-              onClick={handleTogglePause}
-              className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm ${
-                settings.isStorePaused 
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90' 
-                  : 'bg-status-warning text-slate-950 hover:bg-status-warning/90'
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id as typeof activeTab)}
+              className={`group w-full rounded-2xl border p-4 text-left transition-all min-h-[92px] ${
+                active
+                  ? 'bg-primary/10 text-primary border-primary/30 shadow-sm ring-1 ring-primary/20'
+                  : 'bg-card text-muted-foreground border-border hover:text-foreground hover:border-primary/20 hover:bg-muted/50'
               }`}
             >
-              {settings.isStorePaused ? '▶️ Reabrir Loja' : '⏸️ Pausar Agora'}
+              <div className="flex items-start gap-3">
+                <div
+                  className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                    active ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground group-hover:bg-primary/10 group-hover:text-primary'
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-black leading-tight truncate">{tab.label}</div>
+                  <div className={`mt-1 text-xs leading-snug ${active ? 'text-primary/80' : 'text-muted-foreground'}`}>
+                    {tab.subtitle}
+                  </div>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className={`grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.95fr)] ${isOverviewTab ? '' : 'hidden'}`}>
+        <div className="bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
+                <ChefHat className="w-5 h-5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-black text-slate-900 dark:text-white text-sm">Importar Cardápio Base</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 max-w-xl">
+                  Adicione categorias e produtos pré-definidos para o seu segmento em segundos.
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate('/settings/menu-import')}
+              className="shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl transition-all shadow-md shadow-indigo-500/20 text-sm"
+            >
+              Importar →
             </button>
           </div>
+        </div>
+
+        <div className="space-y-4">
+          {businessGroup && (
+            <div className="bg-indigo-600 rounded-2xl shadow-lg p-5 text-white">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-4 min-w-0">
+                  <div className="bg-card/20 p-2.5 rounded-xl shrink-0">
+                    <Building2 className="w-6 h-6" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-black uppercase tracking-widest text-indigo-200">Plano Corporativo</div>
+                    <p className="font-black text-base leading-snug mt-1 truncate">{businessGroup.name}</p>
+                    <p className="font-medium text-indigo-100/90 text-sm mt-2 leading-snug">
+                      Esta unidade faz parte de um grupo multi-unidades e compartilha contexto operacional com a rede.
+                    </p>
+                  </div>
+                </div>
+                <div className="hidden xl:flex shrink-0 items-center gap-2 bg-card/10 px-4 py-2 rounded-lg border border-white/20 text-xs font-bold">
+                  <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-300" />
+                  {businessGroup._count?.tenants ?? businessGroup.tenants?.length ?? 0} lojas
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-card/10 rounded-xl px-4 py-3 border border-white/10">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Unidades vinculadas</div>
+                  <div className="mt-1 text-sm font-bold">{businessGroup._count?.tenants ?? businessGroup.tenants?.length ?? 0} unidade(s)</div>
+                </div>
+                <div className="bg-card/10 rounded-xl px-4 py-3 border border-white/10">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200">Gerenciamento</div>
+                  <div className="mt-1 text-sm font-bold">Feito pelo painel administrativo</div>
+                </div>
+              </div>
+
+              {businessGroup.tenants && businessGroup.tenants.length > 0 && (
+                <div className="mt-4">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-2">Lojas da rede</div>
+                  <div className="flex flex-wrap gap-2">
+                    {businessGroup.tenants.slice(0, 4).map((tenant) => (
+                      <span key={tenant.id} className="inline-flex items-center gap-2 rounded-full bg-card/10 px-3 py-1.5 text-xs font-bold border border-white/10">
+                        <span className={`h-1.5 w-1.5 rounded-full ${tenant.status === 'active' ? 'bg-emerald-300' : 'bg-amber-300'}`} />
+                        {tenant.name}
+                      </span>
+                    ))}
+                    {businessGroup.tenants.length > 4 && (
+                      <span className="inline-flex items-center rounded-full bg-card/10 px-3 py-1.5 text-xs font-bold border border-white/10">
+                        +{businessGroup.tenants.length - 4}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <StoreStatusControl
+            isPaused={Boolean(settings.isStorePaused)}
+            pauseReason={settings.storePauseReason || ''}
+            onTogglePause={handleTogglePause}
+          />
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Coluna da Esquerda: Dados Básicos */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className={`${showMainColumn ? 'lg:col-span-2' : 'hidden'} space-y-6`}>
           <form onSubmit={handleSaveSettings} className="space-y-6">
-            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isOverviewTab ? '' : 'hidden'}`}>
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-primary/10 text-primary rounded-lg text-sm">🏪</span>
                 Identidade e Contato
@@ -497,11 +591,23 @@ export function SettingsPage() {
                 <div>
                   <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Telefone Comercial</label>
                   <input
-                    type="text"
-                    value={settings.businessPhone || ''}
-                    onChange={e => setSettings({...settings, businessPhone: e.target.value})}
+                    type="tel"
+                    value={maskPhone(settings.businessPhone || '')}
+                    onChange={e => setSettings({...settings, businessPhone: unmask(e.target.value)})}
                     className="input-premium"
                   />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">WhatsApp de Pedidos</label>
+                  <input
+                    type="tel"
+                    value={maskPhone(settings.orderWhatsappNumber || '')}
+                    onChange={e => setSettings({...settings, orderWhatsappNumber: unmask(e.target.value)})}
+                    className="input-premium"
+                  />
+                  <p className="mt-2 text-[10px] text-muted-foreground font-medium">
+                    Número usado no botão final do cardápio digital.
+                  </p>
                 </div>
                 <div>
                   <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">E-mail Comercial</label>
@@ -512,10 +618,26 @@ export function SettingsPage() {
                     className="input-premium"
                   />
                 </div>
+                {connectedWhatsappNumber ? (
+                  <div className="md:col-span-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <div className="flex items-start gap-3">
+                      <MessageCircleWarning className="mt-0.5 h-4 w-4 shrink-0" />
+                      <div>
+                        <p className="font-black">WhatsApp conectado à IA: {maskPhone(connectedWhatsappNumber)}</p>
+                        {unmask(settings.orderWhatsappNumber || settings.businessPhone || '') !== '' &&
+                        unmask(settings.orderWhatsappNumber || settings.businessPhone || '') !== connectedWhatsappNumber ? (
+                          <p className="mt-1 text-xs">
+                            O WhatsApp de pedidos é diferente do WhatsApp conectado à IA. Os pedidos do cardápio serão enviados para o número configurado em “WhatsApp de Pedidos”.
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
 
-            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isAddressTab ? '' : 'hidden'}`}>
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-primary/10 text-primary rounded-lg text-sm"><MapPin className="w-4 h-4" /></span>
                 Endereço da Loja
@@ -526,10 +648,10 @@ export function SettingsPage() {
                     <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">CEP</label>
                     <input
                       type="text"
-                      value={settings.zipCode || ''}
-                      onChange={e => setSettings({...settings, zipCode: e.target.value.replace(/\D/g, '').slice(0, 8)})}
+                      value={maskCEP(settings.zipCode || '')}
+                      onChange={e => setSettings({...settings, zipCode: unmask(e.target.value)})}
                       onBlur={handleCepBlur}
-                      placeholder="00000-000"
+                      placeholder="Somente números"
                       className="input-premium"
                     />
                   </div>
@@ -600,7 +722,7 @@ export function SettingsPage() {
                               </div>
             </div>
 
-            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isFinanceTab ? '' : 'hidden'}`}>
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-purple-500/10 text-purple-500 rounded-lg text-sm"><Building2 className="w-4 h-4" /></span>
                 Dados Fiscais & Integração
@@ -610,13 +732,9 @@ export function SettingsPage() {
                   <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">CNPJ</label>
                   <input
                     type="text"
-                    value={settings.cnpj || ''}
-                    onChange={e => {
-                      const raw = e.target.value.replace(/\D/g, '').slice(0, 14);
-                      const formatted = raw.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-                      setSettings({...settings, cnpj: raw.length > 2 ? formatted : raw});
-                    }}
-                    placeholder="XX.XXX.XXX/XXXX-XX"
+                    value={maskCPFCNPJ(settings.cnpj || '')}
+                    onChange={e => setSettings({...settings, cnpj: unmask(e.target.value)})}
+                    placeholder="Somente números"
                     className="input-premium font-mono tracking-wider"
                   />
                 </div>
@@ -679,7 +797,7 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isFinanceTab ? '' : 'hidden'}`}>
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-status-success/10 text-status-success rounded-lg text-sm">💰</span>
                 Configuração de Pagamento
@@ -709,6 +827,19 @@ export function SettingsPage() {
                     </label>
                   ))}
                 </div>
+              </div>
+
+              <div className="mt-6">
+                <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Pedido mÃ­nimo</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={settings.minimumOrderValue ?? ''}
+                  onChange={e => setSettings({ ...settings, minimumOrderValue: e.target.value ? Number(e.target.value) : undefined })}
+                  placeholder="0,00"
+                  className="input-premium"
+                />
               </div>
 
               <div className="mt-8 pt-6 border-t border-border space-y-6">
@@ -758,7 +889,7 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isFinanceTab ? '' : 'hidden'}`}>
               <h2 className="text-lg font-bold text-foreground mb-6 flex items-center gap-2">
                 <span className="p-1.5 bg-status-warning/10 text-status-warning rounded-lg text-sm">🌍</span>
                 Configurações Regionais
@@ -789,7 +920,77 @@ export function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex justify-end">
+            <div className={`bg-card rounded-2xl shadow-sm border border-border p-6 ${isFinanceTab ? '' : 'hidden'}`}>
+              <h2 className="text-lg font-bold text-foreground mb-6">Cashback e Fidelidade</h2>
+              <div className="space-y-8">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-black text-foreground">Cashback</p>
+                      <p className="text-xs text-muted-foreground">Quando ativo, o cliente verá essa vantagem no cardápio digital.</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={settings.cashbackEnabled ?? false}
+                      onChange={e => setSettings({ ...settings, cashbackEnabled: e.target.checked })}
+                      className="h-4 w-4"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Percentual de cashback</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={settings.cashbackPercent ?? 0}
+                        onChange={e => setSettings({ ...settings, cashbackPercent: Number(e.target.value) })}
+                        className="input-premium"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Validade em dias</label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={settings.cashbackValidityDays ?? 90}
+                        onChange={e => setSettings({ ...settings, cashbackValidityDays: Number(e.target.value) })}
+                        className="input-premium"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4 border-t border-border pt-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-black text-foreground">Programa de pontos</p>
+                      <p className="text-xs text-muted-foreground">Só aparece para o cliente final quando estiver ativo.</p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={settings.loyaltyEnabled ?? false}
+                      onChange={e => setSettings({ ...settings, loyaltyEnabled: e.target.checked })}
+                      className="h-4 w-4"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Pontos por R$ 1,00</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={settings.loyaltyPointsPerReal ?? 1}
+                      onChange={e => setSettings({ ...settings, loyaltyPointsPerReal: Number(e.target.value) })}
+                      className="input-premium"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className={`${showMainColumn ? 'flex justify-end' : 'hidden'}`}>
               <button
                 type="submit"
                 disabled={saving}
@@ -802,7 +1003,7 @@ export function SettingsPage() {
         </div>
 
         {/* Coluna da Direita: Horários */}
-        <div className="space-y-6">
+        <div className={`${isHoursTab ? 'lg:col-span-3' : 'hidden'} space-y-6`}>
           <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-foreground flex items-center gap-2">

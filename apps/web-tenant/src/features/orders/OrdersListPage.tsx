@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Package, Clock, ChevronRight, RefreshCw, Filter, ShoppingBag } from 'lucide-react';
 import { api, ApiError } from '../../lib/api-client';
-import type { OrderListItemDTO } from '@gestor/types';
+import { SOURCE_CHANNEL_LABELS, type OrderListItemDTO } from '@gestor/types';
 import { OrderDrawer } from './components/OrderDrawer';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Card } from '../../components/ui/Card';
@@ -22,11 +22,7 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
 };
 
 const CHANNEL_LABELS: Record<string, string> = {
-  storefront: 'Loja Online',
-  pos: 'PDV / Balcão',
-  whatsapp_ai: 'Agente WhatsApp',
-  whatsapp: 'WhatsApp Manual',
-  ifood: 'iFood',
+  ...SOURCE_CHANNEL_LABELS,
 };
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
@@ -309,4 +305,3 @@ export function OrdersListPage() {
     </div>
   );
 }
-

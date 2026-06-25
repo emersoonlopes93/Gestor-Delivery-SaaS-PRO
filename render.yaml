@@ -1,0 +1,52 @@
+services:
+  - type: redis
+    name: gestor-redis-staging
+    plan: free # Change if needed
+    ipAllowList: [] # Required by Render to specify who can access from outside (empty = internal only)
+
+  - type: web
+    name: gestor-api-staging
+    env: node
+    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm -C apps/api prisma:generate && pnpm --filter @gestor/api build
+    startCommand: pnpm --filter @gestor/api start:prod
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NODE_ENV
+        value: production
+      - key: APP_ENV
+        value: staging
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gestor-db-staging
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: gestor-redis-staging
+          property: connectionString
+      # Estas devem ser preenchidas manualmente no painel Render:
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: PUBLIC_API_URL
+        sync: false
+      - key: BILLING_GATEWAY_MODE
+        value: sandbox
+      - key: ASAAS_BILLING_BASE_URL
+        value: https://api-sandbox.asaas.com/v3
+      - key: ASAAS_BILLING_API_KEY
+        sync: false
+      - key: ASAAS_WEBHOOK_HMAC_SECRET
+        sync: false
+    # Opcional (Se aplicável para rodar migrações seguras antes de subir)
+    preDeployCommand: pnpm -C apps/api prisma:migrate deploy && pnpm -C apps/api prisma:seed
+    healthCheckPath: /api/v1/health
+    
+databases:
+  - name: gestor-db-staging
+    databaseName: gestor_staging
+    user: gestor

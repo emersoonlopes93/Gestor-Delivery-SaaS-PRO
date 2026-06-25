@@ -49,13 +49,19 @@ export class StorageService {
       this.logger.log('StorageService inicializado com driver Cloudflare R2.');
     } else {
       this.logger.log('StorageService inicializado com driver Local.');
+      if (this.config.get<string>('NODE_ENV') === 'production') {
+        this.logger.warn('========================================================================');
+        this.logger.warn('CRÍTICO: StorageProvider configurado como "local" em ambiente de PRODUÇÃO!');
+        this.logger.warn('Os uploads de imagens serão perdidos ao reiniciar o servidor ou durante deploys.');
+        this.logger.warn('Configure as variáveis R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET e STORAGE_DRIVER=r2');
+        this.logger.warn('========================================================================');
+      }
     }
   }
 
   getDriver(): 'local' | 'r2' {
     return this.driver;
   }
-
   async delete(key: string): Promise<void> {
     if (this.driver === 'r2') {
       try {

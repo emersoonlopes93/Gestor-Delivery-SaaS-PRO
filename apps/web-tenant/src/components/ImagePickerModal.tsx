@@ -37,7 +37,10 @@ export function ImagePickerModal({
   const [mineAssets, setMineAssets] = useState<MediaAsset[]>([]);
   const [globalAssets, setGlobalAssets] = useState<MediaAsset[]>([]);
   const [categories, setCategories] = useState<MediaCategory[]>([]);
-  const [isLoadingAssets, setIsLoadingAssets] = useState(false);
+  const [isLoadingMine, setIsLoadingMine] = useState(false);
+  const [isLoadingGlobal, setIsLoadingGlobal] = useState(false);
+  const [hasCheckedGlobal, setHasCheckedGlobal] = useState(false);
+  const [hasAnyGlobalAssets, setHasAnyGlobalAssets] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -56,18 +59,18 @@ export function ImagePickerModal({
 
   // Load tenant assets
   const loadMineAssets = useCallback(async () => {
-    setIsLoadingAssets(true);
+    setIsLoadingMine(true);
     try {
       const response = await api.get<MediaAsset[]>('/media/assets?origin=tenant');
       setMineAssets(response.data);
     } finally {
-      setIsLoadingAssets(false);
+      setIsLoadingMine(false);
     }
   }, []);
 
   // Load global assets with optional category filter
   const loadGlobalAssets = useCallback(async () => {
-    setIsLoadingAssets(true);
+    setIsLoadingGlobal(true);
     try {
       const params = new URLSearchParams({
         origin: 'system',
@@ -81,8 +84,12 @@ export function ImagePickerModal({
         (asset) => asset.scope === 'system_gallery'
       );
       setGlobalAssets(filtered);
+      if (!selectedCategory) {
+        setHasAnyGlobalAssets(filtered.length > 0);
+        setHasCheckedGlobal(true);
+      }
     } finally {
-      setIsLoadingAssets(false);
+      setIsLoadingGlobal(false);
     }
   }, [selectedCategory]);
 
@@ -131,29 +138,33 @@ export function ImagePickerModal({
     );
   }, [currentAssets, searchQuery]);
 
+  const isLoadingCurrent = activeTab === 'mine' ? isLoadingMine : isLoadingGlobal;
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Selecionar Imagem" maxWidth="max-w-4xl">
       <div className="space-y-4">
         {/* Tab Navigation */}
-        <div className="flex rounded-xl bg-muted p-1">
-          {(['mine', 'global'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => {
-                setActiveTab(tab);
-                setSearchQuery('');
-                setSelectedCategory('');
-              }}
-              className={`flex-1 rounded-lg px-4 py-2 text-sm font-black uppercase transition-all ${
-                activeTab === tab
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {tab === 'mine' ? 'Minhas Imagens' : 'Banco de Imagens'}
-            </button>
-          ))}
-        </div>
+        {hasCheckedGlobal && hasAnyGlobalAssets && (
+          <div className="flex rounded-xl bg-muted p-1">
+            {(['mine', 'global'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => {
+                  setActiveTab(tab);
+                  setSearchQuery('');
+                  setSelectedCategory('');
+                }}
+                className={`flex-1 rounded-lg px-4 py-2 text-sm font-black uppercase transition-all ${
+                  activeTab === tab
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {tab === 'mine' ? 'Minhas Imagens' : 'Banco de Imagens'}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Content Area */}
         <div className="space-y-4">
@@ -258,7 +269,7 @@ export function ImagePickerModal({
                 title="Atualizar"
               >
                 <RefreshCw
-                  className={`h-4 w-4 ${isLoadingAssets ? 'animate-spin' : ''}`}
+                  className={`h-4 w-4 ${isLoadingCurrent ? 'animate-spin' : ''}`}
                 />
               </button>
             </div>
@@ -266,7 +277,7 @@ export function ImagePickerModal({
 
           {/* Image Gallery */}
           <div className="rounded-xl border border-border bg-muted/20 p-4">
-            {isLoadingAssets ? (
+            {isLoadingCurrent ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-center">
                   <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
@@ -278,13 +289,38 @@ export function ImagePickerModal({
             ) : filteredAssets.length === 0 ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-center text-muted-foreground">
-                  <p className="text-sm font-bold">Nenhuma imagem encontrada.</p>
                   {activeTab === 'mine' ? (
-                    <p className="text-xs mt-1">Comece fazendo upload de uma imagem acima.</p>
+                    <>
+                      <p className="text-sm font-bold">Nenhuma imagem encontrada.</p>
+                      <p className="text-xs mt-1">Comece fazendo upload de uma imagem acima.</p>
+                    </>
+                  ) : globalAssets.length === 0 ? (
+                    <div className="mt-2 space-y-3">
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                        <Search className="w-5 h-5 text-primary" />
+                      </div>
+                      <p className="text-sm font-black text-foreground">Banco de imagens em preparação</p>
+                      <p className="text-xs text-muted-foreground">
+                        Em breve, imagens curadas de alta qualidade estarão disponíveis aqui.
+                      </p>
+                      <button
+                        onClick={() => {
+                          setActiveTab('mine');
+                          setSearchQuery('');
+                          setSelectedCategory('');
+                        }}
+                        className="mt-4 inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-black uppercase tracking-wider text-primary-foreground hover:bg-primary/90 transition-colors"
+                      >
+                        Usar Minhas Imagens
+                      </button>
+                    </div>
                   ) : (
-                    <p className="text-xs mt-1">
-                      Nenhuma imagem publicada nesta categoria.
-                    </p>
+                    <>
+                      <p className="text-sm font-bold">Nenhuma imagem encontrada.</p>
+                      <p className="text-xs mt-1">
+                        Tente mudar a categoria ou limpar sua busca.
+                      </p>
+                    </>
                   )}
                 </div>
               </div>
@@ -335,6 +371,15 @@ export function ImagePickerModal({
             )}
           </div>
         </div>
+        
+        {/* Footer info for empty global gallery */}
+        {hasCheckedGlobal && !hasAnyGlobalAssets && (
+          <div className="text-center mt-2">
+            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">
+              Banco de imagens global em preparação.
+            </p>
+          </div>
+        )}
       </div>
     </Modal>
   );

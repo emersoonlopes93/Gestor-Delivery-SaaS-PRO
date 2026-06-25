@@ -18,6 +18,10 @@ export class UpdateIntegrationsConfigDto {
   [key: string]: unknown;
 
   @IsOptional()
+  @IsString()
+  appName?: string;
+
+  @IsOptional()
   @IsEnum(WhatsAppProviderType)
   defaultWhatsAppProvider?: WhatsAppProviderType;
 

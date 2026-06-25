@@ -19,6 +19,7 @@ import { DeliveryRateService } from '../delivery/delivery-rate.service';
 import { AvailabilityService } from '../catalog/publication/availability.service';
 import { UpsellsService } from '../catalog/upsells.service';
 import { PizzaEngineService } from '../catalog/pizza-engine.service';
+import { validateCashChangeFor } from './public-checkout-guards.util';
 
 type ProductWithData = Prisma.ProductGetPayload<{
   include: {
@@ -78,7 +79,7 @@ export class CheckoutValidatorService {
     const [settings, operatingHours] = await Promise.all([
       this.prisma.tenantSettings.findUnique({
         where: { tenantId },
-        select: { isStorePaused: true, storePauseReason: true, timezone: true },
+        select: { isStorePaused: true, storePauseReason: true, timezone: true, minimumOrderValue: true },
       }),
       this.prisma.tenantOperatingHours.findMany({
         where: { tenantId },
@@ -113,6 +114,12 @@ export class CheckoutValidatorService {
 
     if (items.length === 0) {
       throw new BadRequestException('O pedido deve conter pelo menos 1 item.');
+    }
+
+    if (options?.scheduledFor || options?.timeSlotId) {
+      if (!options?.scheduledFor || !options?.timeSlotId) {
+        throw new BadRequestException('Escolha um horário de agendamento para continuar.');
+      }
     }
 
     const validatedLines: ValidatedLine[] = [];
@@ -220,6 +227,11 @@ export class CheckoutValidatorService {
 
     // 6. Validar pagamento
     this.validatePayment(options?.payment, finalTotal);
+
+    // 7. Validate minimum order value
+    if (settings?.minimumOrderValue && itemsSubtotal < Number(settings.minimumOrderValue)) {
+      throw new BadRequestException(`O valor mínimo do pedido é de R$ ${Number(settings.minimumOrderValue).toFixed(2).replace('.', ',')}.`);
+    }
 
     return { 
       tenantId, 
@@ -1144,14 +1156,7 @@ export class CheckoutValidatorService {
     }
 
     if (payment.method === 'cash') {
-      if (!payment.changeFor) {
-        throw new BadRequestException('Para pagamento em dinheiro, informe o troco.');
-      }
-      if (payment.changeFor < total) {
-        throw new BadRequestException(
-          `O valor para troco (${payment.changeFor}) deve ser maior ou igual ao total do pedido (${total}).`,
-        );
-      }
+      validateCashChangeFor(payment.changeFor, total);
     }
   }
 

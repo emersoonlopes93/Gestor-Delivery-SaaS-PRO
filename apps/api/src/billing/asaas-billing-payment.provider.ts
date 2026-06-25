@@ -40,7 +40,7 @@ export class AsaasBillingPaymentProvider implements BillingPaymentGateway {
       billingType: 'UNDEFINED' as const,
       value: Number(input.invoice.total),
       dueDate: this.formatDate(input.invoice.dueDate),
-      description: `Gestor Delivery SaaS invoice ${input.invoice.number}`,
+      description: `PedeHub SaaS invoice ${input.invoice.number}`,
       externalReference: input.idempotencyKey,
     };
     const payment = await this.asaasClient.createPayment(paymentRequest);

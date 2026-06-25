@@ -43,9 +43,10 @@ export function AuditLogsPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
 
-  // Filters
   const [tenantFilter, setTenantFilter] = useState('');
   const [actionFilter, setActionFilter] = useState('');
+  const [startDateFilter, setStartDateFilter] = useState('');
+  const [endDateFilter, setEndDateFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -56,6 +57,8 @@ export function AuditLogsPage() {
       params.set('pageSize', '25');
       if (tenantFilter) params.set('tenantId', tenantFilter);
       if (actionFilter) params.set('action', actionFilter);
+      if (startDateFilter) params.set('startDate', startDateFilter);
+      if (endDateFilter) params.set('endDate', endDateFilter);
 
       const res = await api.get<PaginatedResult>(`/admin/audit-logs?${params.toString()}`);
       setData(res.data);
@@ -64,7 +67,7 @@ export function AuditLogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, tenantFilter, actionFilter]);
+  }, [page, tenantFilter, actionFilter, startDateFilter, endDateFilter]);
 
   useEffect(() => {
     loadData();
@@ -94,10 +97,10 @@ export function AuditLogsPage() {
 
       {/* Filters Panel */}
       {showFilters && (
-        <Card className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FormField label="Tenant ID">
+        <Card className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <FormField label="Tenant ID / Slug">
             <Input
-              placeholder="UUID do tenant..."
+              placeholder="UUID ou slug..."
               value={tenantFilter}
               onChange={(e) => { setTenantFilter(e.target.value); setPage(1); }}
             />
@@ -109,12 +112,27 @@ export function AuditLogsPage() {
               onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
             />
           </FormField>
+          <FormField label="Data Inicial">
+            <Input
+              type="date"
+              value={startDateFilter}
+              onChange={(e) => { setStartDateFilter(e.target.value); setPage(1); }}
+            />
+          </FormField>
+          <FormField label="Data Final">
+            <Input
+              type="date"
+              value={endDateFilter}
+              onChange={(e) => { setEndDateFilter(e.target.value); setPage(1); }}
+            />
+          </FormField>
           <div className="flex items-end">
             <Button
               variant="ghost"
-              onClick={() => { setTenantFilter(''); setActionFilter(''); setPage(1); }}
+              className="w-full"
+              onClick={() => { setTenantFilter(''); setActionFilter(''); setStartDateFilter(''); setEndDateFilter(''); setPage(1); }}
             >
-              Limpar filtros
+              Limpar
             </Button>
           </div>
         </Card>

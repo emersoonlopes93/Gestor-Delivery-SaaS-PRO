@@ -1,5 +1,7 @@
-import { BadRequestException, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { CampaignsService } from './campaigns.service';
 import { RecoveryCampaignService } from './recovery-campaign.service';
 import { AbandonedCartService } from './abandoned-cart.service';
@@ -8,6 +10,7 @@ import { CustomerIntelligenceService } from '../../crm/customer-intelligence.ser
 import { BusinessInsightsService } from '../../analytics/business-insights.service';
 import { PrismaService } from '../../database/prisma.service';
 import { CouponsService } from '../../promotions/coupons.service';
+import { applyCampaignTemplate } from '../utils/campaign-template.util';
 
 type AutomationRunResult = {
   tenantId: string;
@@ -25,7 +28,6 @@ type AutomationRunResult = {
 @Injectable()
 export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(CampaignAutomationService.name);
-  private intervalId?: NodeJS.Timeout;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -36,6 +38,7 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
     private readonly customerIntelligenceService: CustomerIntelligenceService,
     private readonly businessInsightsService: BusinessInsightsService,
     private readonly couponsService: CouponsService,
+    @Optional() @InjectQueue('campaign-dispatch') private readonly campaignQueue?: Queue,
   ) {}
 
   onModuleInit() {
@@ -44,17 +47,66 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
       return;
     }
 
-    this.logger.log('Campaign automation scheduler enabled.');
-    this.intervalId = setInterval(() => {
-      this.runAllTenants().catch((error) => {
-        const message = error instanceof Error ? error.message : 'unknown_error';
-        this.logger.error(`automation_run_failed reason=${message}`);
-      });
-    }, 5 * 60 * 1000);
+    if (!this.campaignQueue) {
+      this.logger.warn('Campaign automation scheduler requires campaign-dispatch queue, but it is not available (Redis disabled).');
+      return;
+    }
+
+    this.logger.log('Campaign automation scheduler enabled via BullMQ.');
+    this.campaignQueue.add(
+      'system-automation-scan',
+      { isSystemJob: true },
+      {
+        jobId: 'system-automation-scan',
+        repeat: {
+          every: 5 * 60 * 1000,
+        },
+      },
+    ).catch(err => {
+      this.logger.error(`Erro ao registrar job system-automation-scan: ${err.message}`);
+    });
   }
 
   onModuleDestroy() {
-    if (this.intervalId) clearInterval(this.intervalId);
+    // Nada a fazer, o BullMQ gerencia os jobs repetíveis
+  }
+
+  async getAutomationConfigs(tenantId: string) {
+    return this.prisma.marketingAutomation.findMany({
+      where: { tenantId },
+    });
+  }
+
+  async saveAutomationConfig(tenantId: string, type: string, data: { enabled: boolean; messageTemplate: string; config: Prisma.InputJsonValue }) {
+    return this.prisma.marketingAutomation.upsert({
+      where: { tenantId_type: { tenantId, type } },
+      create: { tenantId, type, ...data },
+      update: data,
+    });
+  }
+
+  async getFeedbackMetrics(tenantId: string) {
+    const feedbacks = await this.prisma.orderFeedback.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      include: {
+        order: { select: { orderNumber: true } },
+        customer: { select: { name: true, phone: true } },
+      },
+    });
+
+    const total = await this.prisma.orderFeedback.count({ where: { tenantId } });
+    const aggregations = await this.prisma.orderFeedback.aggregate({
+      where: { tenantId },
+      _avg: { rating: true },
+    });
+
+    return {
+      feedbacks,
+      total,
+      averageRating: aggregations._avg.rating || 0,
+    };
   }
 
   async getReuseInventory(tenantId: string) {
@@ -187,6 +239,11 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
     await this.runReorder(tenantId, result);
     await this.runPostPurchaseUpsell(tenantId, result);
     await this.runSmartCoupons(tenantId, result);
+    
+    // P1 Automations
+    await this.runPostOrderReview(tenantId, result);
+    await this.runInactiveWinback(tenantId, result);
+    await this.runBirthdayGreeting(tenantId, result);
 
     await this.prisma.auditLog.create({
       data: {
@@ -194,11 +251,157 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
         userType: 'system',
         action: 'campaign_automation_run',
         resource: 'campaign',
-        details: result as unknown as Prisma.JsonObject,
+        details: result as Record<string, unknown> as Prisma.JsonObject,
       },
     });
 
     return result;
+  }
+
+  private async getTemplateVariables(tenantId: string, customer: { name: string }, order?: { orderNumber: string, total: import('@prisma/client').Prisma.Decimal | number, publicTrackingToken?: string }, config?: { config: import('@prisma/client').Prisma.JsonValue }) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    const storeName = tenant?.name || 'nossa loja';
+    const menuLink = `https://${tenant?.slug}.gestordelivery.com`;
+    const couponCode = (config?.config as Record<string, string>)?.couponCode || '';
+    
+    return {
+      '{nome}': customer?.name ? customer.name.split(' ')[0] : 'cliente',
+      '{nome_loja}': storeName,
+      '{link_cardapio}': menuLink,
+      '{cupom}': couponCode,
+      '{pedido}': order ? `#${order.orderNumber}` : '',
+      '{total}': order ? `R$ ${Number(order.total).toFixed(2).replace('.', ',')}` : '',
+      '{link_feedback}': order && order.publicTrackingToken && tenant ? `https://${tenant.slug}.gestordelivery.com/feedback/${order.publicTrackingToken}` : '',
+    };
+  }
+
+  private applyTemplate(template: string, vars: Record<string, string>) {
+    return applyCampaignTemplate(template, vars);
+  }
+
+  private async runPostOrderReview(tenantId: string, result: AutomationRunResult) {
+    try {
+      const config = await this.prisma.marketingAutomation.findUnique({
+        where: { tenantId_type: { tenantId, type: 'post_order_review' } }
+      });
+      if (!config || !config.enabled) return;
+
+      const delayHours = Number((config.config as Record<string, number>)?.delayHours ?? 2);
+      const limitDate = new Date(Date.now() - delayHours * 60 * 60 * 1000);
+      const limitWindow = new Date(Date.now() - (delayHours + 24) * 60 * 60 * 1000);
+
+      const orders = await this.prisma.order.findMany({
+        where: {
+          tenantId,
+          status: { in: ['completed'] },
+          customerId: { not: null },
+          updatedAt: { gte: limitWindow, lte: limitDate },
+          OrderFeedback: null,
+        },
+        include: { customer: true },
+      });
+
+      for (const order of orders) {
+        if (!order.customerId) continue;
+        const name = `Pos-pedido #${order.orderNumber}`;
+        if (await this.hasNamedCampaign(tenantId, name)) continue;
+
+        const vars = await this.getTemplateVariables(tenantId, { name: order.customerName }, order, config);
+        const message = this.applyTemplate(config.messageTemplate, vars);
+
+        const campaign = await this.campaignsService.createCampaign(tenantId, {
+          name,
+          objective: 'post_order_review',
+          messageTemplate: message,
+          segmentRules: { specificCustomers: [order.customerId] },
+          maxDispatches: 1,
+        });
+        await this.campaignsService.startCampaign(tenantId, campaign.id);
+      }
+    } catch (e) {
+      this.captureFailure(result, 'post_order_review', e);
+    }
+  }
+
+  private async runInactiveWinback(tenantId: string, result: AutomationRunResult) {
+    try {
+      const config = await this.prisma.marketingAutomation.findUnique({
+        where: { tenantId_type: { tenantId, type: 'inactive_customer_winback' } }
+      });
+      if (!config || !config.enabled) return;
+
+      const daysInactive = Number((config.config as Record<string, number>)?.daysInactive ?? 30);
+      const limitDate = new Date();
+      limitDate.setDate(limitDate.getDate() - daysInactive);
+
+      const limitWindow = new Date(limitDate);
+      limitWindow.setDate(limitWindow.getDate() - 7);
+
+      const customers = await this.prisma.customer.findMany({
+        where: {
+          tenantId,
+          lastOrderDate: { gte: limitWindow, lte: limitDate },
+          totalOrders: { gt: 0 }
+        }
+      });
+
+      for (const customer of customers) {
+        if (await this.hasRecentCustomerCampaign(tenantId, customer.id, 'inactive_customer_winback', 30)) continue;
+
+        const vars = await this.getTemplateVariables(tenantId, customer, undefined, config);
+        const message = this.applyTemplate(config.messageTemplate, vars);
+
+        const campaign = await this.campaignsService.createCampaign(tenantId, {
+          name: `Retorno inativo - ${customer.name}`,
+          objective: 'inactive_customer_winback',
+          messageTemplate: message,
+          segmentRules: { specificCustomers: [customer.id] },
+          maxDispatches: 1,
+        });
+        await this.campaignsService.startCampaign(tenantId, campaign.id);
+      }
+    } catch (e) {
+      this.captureFailure(result, 'inactive_customer_winback', e);
+    }
+  }
+
+  private async runBirthdayGreeting(tenantId: string, result: AutomationRunResult) {
+    try {
+      const config = await this.prisma.marketingAutomation.findUnique({
+        where: { tenantId_type: { tenantId, type: 'birthday_greeting' } }
+      });
+      if (!config || !config.enabled) return;
+
+      const today = new Date();
+      const month = today.getMonth() + 1;
+      const day = today.getDate();
+
+      const customers = await this.prisma.$queryRaw<{id: string, name: string}[]>`
+        SELECT id, name FROM customers 
+        WHERE tenant_id = ${tenantId} 
+        AND birth_date IS NOT NULL 
+        AND EXTRACT(MONTH FROM birth_date) = ${month} 
+        AND EXTRACT(DAY FROM birth_date) = ${day}
+      `;
+
+      for (const customer of customers) {
+        if (await this.hasRecentCustomerCampaign(tenantId, customer.id, 'birthday_greeting', 360)) continue;
+
+        const vars = await this.getTemplateVariables(tenantId, customer, undefined, config);
+        const message = this.applyTemplate(config.messageTemplate, vars);
+
+        const campaign = await this.campaignsService.createCampaign(tenantId, {
+          name: `Feliz aniversario - ${customer.name}`,
+          objective: 'birthday_greeting',
+          messageTemplate: message,
+          segmentRules: { specificCustomers: [customer.id] },
+          maxDispatches: 1,
+        });
+        await this.campaignsService.startCampaign(tenantId, campaign.id);
+      }
+    } catch (e) {
+      this.captureFailure(result, 'birthday_greeting', e);
+    }
   }
 
   private async runRecovery(tenantId: string, result: AutomationRunResult) {
@@ -217,7 +420,7 @@ export class CampaignAutomationService implements OnModuleInit, OnModuleDestroy 
   private async runAbandonedCart(tenantId: string, result: AutomationRunResult) {
     try {
       const dispatched = await this.abandonedCartService.dispatchDueReminders(tenantId, 25);
-      result.abandonedCartReminders = dispatched.results.filter((item) => item.sent).length;
+      result.abandonedCartReminders = dispatched.results.filter((item) => item.queued).length;
     } catch (error) {
       this.captureFailure(result, 'abandoned_cart', error);
     }

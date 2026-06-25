@@ -1,6 +1,7 @@
 import { ProductCardProps } from './ProductGridCard';
 import { StorefrontButton } from './StorefrontButton';
 import { StorefrontBadge } from './StorefrontBadge';
+import { ImageOff } from 'lucide-react';
 import { cn } from '../cn';
 
 export function ProductPremiumCard({
@@ -34,16 +35,28 @@ export function ProductPremiumCard({
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
           
           <div className="absolute bottom-3 left-3 flex flex-wrap gap-1">
-            {showBadges && product.badges?.map((badge, idx) => (
-              <StorefrontBadge key={idx} variant="primary" className="shadow-lg">{badge}</StorefrontBadge>
-            ))}
+            {showBadges && product.badges?.map((badge, idx) => {
+              let badgeVariant: 'primary' | 'secondary' | 'outline' = 'primary';
+              if (badge.variant === 'danger') badgeVariant = 'secondary';
+              if (badge.variant === 'neutral') badgeVariant = 'outline';
+              return <StorefrontBadge key={idx} variant={badgeVariant}>{badge.label}</StorefrontBadge>;
+            })}
           </div>
         </div>
-      ) : (
-        <div className="aspect-[4/3] w-full flex items-center justify-center bg-[var(--storefront-muted)]">
-          <span className="text-[var(--storefront-muted-foreground)]">Sem imagem</span>
+      ) : imageMode !== 'hidden' ? (
+        <div className="aspect-[4/3] w-full flex items-center justify-center bg-[var(--storefront-muted)] relative">
+          <ImageOff className="w-12 h-12 text-[var(--storefront-muted-foreground)] opacity-50" />
+          
+          <div className="absolute bottom-3 left-3 flex flex-wrap gap-1">
+            {showBadges && product.badges?.map((badge, idx) => {
+              let badgeVariant: 'primary' | 'secondary' | 'outline' = 'primary';
+              if (badge.variant === 'danger') badgeVariant = 'secondary';
+              if (badge.variant === 'neutral') badgeVariant = 'outline';
+              return <StorefrontBadge key={idx} variant={badgeVariant}>{badge.label}</StorefrontBadge>;
+            })}
+          </div>
         </div>
-      )}
+      ) : null}
 
       <div className="flex flex-col flex-1 p-6 text-center">
         <h3 className="text-xl font-black text-[var(--storefront-foreground)] mb-2 group-hover:text-[var(--storefront-primary)] transition-colors">

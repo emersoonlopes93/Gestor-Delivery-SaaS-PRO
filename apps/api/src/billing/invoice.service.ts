@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { BillingRevenueTier, Invoice, Prisma } from '@prisma/client';
 import { BillingRatingService } from './billing-rating.service';
+import { BillingAddonService } from './billing-addon.service';
 
 export type DraftInvoiceItemPreview = {
   type: string;
@@ -17,6 +18,7 @@ export class InvoiceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly billingRatingService: BillingRatingService,
+    private readonly billingAddonService: BillingAddonService,
   ) {}
 
   async getInvoiceById(invoiceId: string): Promise<Invoice | null> {
@@ -131,6 +133,7 @@ export class InvoiceService {
   }
 
   async buildDraftInvoiceItemsPreview(input: {
+    tenantId: string;
     planId: string;
     periodStart: Date;
     periodEnd: Date;
@@ -144,7 +147,7 @@ export class InvoiceService {
     const tierLabel = tier?.label ?? 'Sem faixa';
     const tierId = tier?.id ?? null;
 
-    return [
+    const items: DraftInvoiceItemPreview[] = [
       {
         type: 'revenue_tier_base',
         description: `Mensalidade por faturamento - faixa ${tierLabel}`,
@@ -160,6 +163,12 @@ export class InvoiceService {
           periodEnd: input.periodEnd.toISOString(),
         },
       },
+    ];
+
+    const addonItems = await this.billingAddonService.buildAddonInvoiceItems(input.tenantId);
+    return [
+      ...items,
+      ...addonItems,
     ];
   }
 
@@ -178,6 +187,7 @@ export class InvoiceService {
     }
 
     const items = await this.buildDraftInvoiceItemsPreview({
+      tenantId: cycle.tenantId,
       planId: input.planId,
       periodStart: cycle.startedAt,
       periodEnd: cycle.endedAt ?? cycle.startedAt,

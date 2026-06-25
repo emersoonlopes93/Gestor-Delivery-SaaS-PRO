@@ -6,9 +6,9 @@ export function normalizeWhatsAppSendNumber(phone: string): string {
   const trimmed = phone.trim();
   if (!trimmed) return trimmed;
 
-  if (trimmed.includes('@')) {
-    return trimmed.split('@')[0].replace(/\D/g, '');
-  }
+  // Extrai a parte antes do '@' e antes do ':' (para remover ID de dispositivo como :49)
+  const beforeAt = trimmed.split('@')[0];
+  const beforeColon = beforeAt.split(':')[0];
 
-  return trimmed.replace(/\D/g, '');
+  return beforeColon.replace(/\D/g, '');
 }

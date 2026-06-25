@@ -8,8 +8,17 @@ import {
   Save, 
   RefreshCcw,
   AlertCircle,
-  Zap
+  Zap,
+  Badge
 } from 'lucide-react';
+import { APP_NAME_STORAGE_KEY, DEFAULT_APP_NAME, normalizeAppName } from '../../../lib/branding';
+
+const GOOGLE_AI_FREE_MODELS = [
+  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (gratuito)' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (gratuito)' },
+  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (gratuito)' },
+] as const;
+
 
 const GOOGLE_AI_FREE_MODELS = [
   { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (gratuito)' },
@@ -18,14 +27,17 @@ const GOOGLE_AI_FREE_MODELS = [
 ] as const;
 
 interface SystemConfig {
+  appName: string;
   defaultWhatsAppProvider: 'evolution_go' | 'meta_cloud';
-  defaultAiProvider: 'openai' | 'anthropic' | 'google_ai';
+  defaultAiProvider: 'openai' | 'anthropic' | 'google_ai' | 'openrouter';
   evolutionUrl: string;
   evolutionGlobalToken: string;
   openaiApiKey: string;
   anthropicApiKey: string;
   googleAiApiKey: string;
+  openrouterApiKey: string;
   googleAiModel: string;
+  openrouterModel: string;
   baseAiPrompt: string;
 }
 
@@ -65,6 +77,7 @@ export default function IntegrationsPage() {
       setError(null);
 
       const updatePayload = {
+        appName: normalizeAppName(config.appName),
         defaultWhatsAppProvider: config.defaultWhatsAppProvider,
         defaultAiProvider: config.defaultAiProvider,
         evolutionUrl: config.evolutionUrl,
@@ -72,12 +85,17 @@ export default function IntegrationsPage() {
         openaiApiKey: config.openaiApiKey,
         anthropicApiKey: config.anthropicApiKey,
         googleAiApiKey: config.googleAiApiKey,
+        openrouterApiKey: config.openrouterApiKey,
         googleAiModel: config.googleAiModel,
+        openrouterModel: config.openrouterModel,
       };
 
       const response = await api.patch('/admin/integrations/config', updatePayload);
 
       if (!response.success) throw new Error('Falha ao salvar configurações');
+      const nextAppName = normalizeAppName(config.appName);
+      localStorage.setItem(APP_NAME_STORAGE_KEY, nextAppName);
+      document.title = `${nextAppName} - SaaS Admin`;
       
       showToast('success', 'Configurações salvas com sucesso!');
 
@@ -113,139 +131,27 @@ export default function IntegrationsPage() {
       </header>
 
       <form onSubmit={handleSave} className="space-y-8">
-        {/* WhatsApp Providers */}
         <section className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
           <div className="p-6 border-b border-border bg-muted/30">
             <div className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-green-600" />
-              <h2 className="text-xl font-bold text-foreground">Canal WhatsApp</h2>
+              <Badge className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-bold text-foreground">Marca do SaaS</h2>
             </div>
           </div>
-          
-          <div className="p-8 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Provedor Padrão</label>
-                <select 
-                  className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
-                  value={config?.defaultWhatsAppProvider}
-                  onChange={(e) => setConfig(prev => prev ? {...prev, defaultWhatsAppProvider: e.target.value as SystemConfig['defaultWhatsAppProvider']} : null)}
-                >
-                  <option value="evolution_go">Evolution Go (Recomendado)</option>
-                  <option value="meta_cloud">WhatsApp Business API (Meta)</option>
-                </select>
-                <p className="text-xs text-muted-foreground">Define qual provedor será sugerido para novos tenants.</p>
-              </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">URL Global Evolution Go</label>
-                <input 
-                  placeholder="https://api.meuserver.com"
-                  className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
-                  value={config?.evolutionUrl || ''}
-                  onChange={(e) => setConfig(prev => prev ? {...prev, evolutionUrl: e.target.value} : null)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground">Global Token Evolution Go</label>
-                <input 
-                  type="password"
-                  placeholder="Token Global do Servidor"
-                  className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
-                  value={config?.evolutionGlobalToken || ''}
-                  onChange={(e) => setConfig(prev => prev ? {...prev, evolutionGlobalToken: e.target.value} : null)}
-                />
-              </div>
-            </div>
-
-            <div className="p-4 bg-amber-500/10 rounded-xl border border-amber-500/20 flex gap-3">
-              <Zap className="h-5 w-5 text-amber-600 shrink-0" />
-              <p className="text-sm text-amber-600/90">
-                <strong>Dica:</strong> O Evolution Go permite conexões via QR Code e tem menor custo operacional para pequenas e médias empresas.
-              </p>
-            </div>
+          <div className="p-8 space-y-2">
+            <label className="text-sm font-semibold text-foreground">Nome do sistema</label>
+            <input
+              placeholder={DEFAULT_APP_NAME}
+              className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
+              value={config?.appName || DEFAULT_APP_NAME}
+              onChange={(e) => setConfig(prev => prev ? { ...prev, appName: e.target.value } : null)}
+            />
+            <p className="text-xs text-muted-foreground">Este nome aparece no SaaS Admin e pode ser trocado futuramente sem alterar o codigo.</p>
           </div>
         </section>
 
-        {/* AI Providers */}
-        <section className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
-          <div className="p-6 border-b border-border bg-muted/30">
-            <div className="flex items-center gap-2">
-              <Bot className="h-5 w-5 text-indigo-600" />
-              <h2 className="text-xl font-bold text-foreground">Inteligência Artificial (LLM)</h2>
-            </div>
-          </div>
-          
-          <div className="p-8 space-y-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Provedor de IA Padrão</label>
-                <select 
-                  className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
-                  value={config?.defaultAiProvider || 'openai'}
-                  onChange={(e) => setConfig(prev => prev ? {...prev, defaultAiProvider: e.target.value as SystemConfig['defaultAiProvider']} : null)}
-                >
-                  <option value="openai">OpenAI (GPT-4/o)</option>
-                  <option value="anthropic">Anthropic (Claude 3.5)</option>
-                  <option value="google_ai">Google AI (Gemini)</option>
-                </select>
-              </div>
-
-              {config?.defaultAiProvider === 'google_ai' && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Modelo Google AI</label>
-                  <select
-                    className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
-                    value={config?.googleAiModel || ''}
-                    onChange={(e) => setConfig(prev => prev ? {...prev, googleAiModel: e.target.value} : null)}
-                  >
-                    {GOOGLE_AI_FREE_MODELS.map(model => (
-                      <option key={model.id} value={model.id}>{model.label}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">API Key OpenAI</label>
-                  <input
-                    type="password"
-                    placeholder="sk-..."
-                    className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
-                    value={config?.openaiApiKey || ''}
-                    onChange={(e) => setConfig(prev => prev ? {...prev, openaiApiKey: e.target.value} : null)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">API Key Anthropic</label>
-                  <input
-                    type="password"
-                    placeholder="sk-ant-..."
-                    className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
-                    value={config?.anthropicApiKey || ''}
-                    onChange={(e) => setConfig(prev => prev ? {...prev, anthropicApiKey: e.target.value} : null)}
-                  />
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-medium text-foreground">API Key Google AI</label>
-                  <input
-                    type="password"
-                    placeholder="AIza..."
-                    className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
-                    value={config?.googleAiApiKey || ''}
-                    onChange={(e) => setConfig(prev => prev ? {...prev, googleAiApiKey: e.target.value} : null)}
-                  />
-                </div>
-              </div>
-
-              
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Prompt Mestre Global</label>
-                  <div className="p-4 rounded-xl border border-border bg-card">
+        {/* WhatsApp Providers */}
                     <p className="text-sm text-muted-foreground">O Prompt Mestre Global do Agente IA agora é gerenciado na tela Agente IA Global. Essa configuração define as regras centrais do agente para todos os tenants.</p>
                     <div className="mt-4">
                       <a href="/ai-agent/global" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground">

@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Clock, ArrowRight, User, Printer, Eye, Edit2, FileText, DollarSign, ShoppingBag, MapPin } from 'lucide-react';
-import type { OrderBoardItemDTO, OrderStatus } from '@gestor/types';
+import { SOURCE_CHANNEL_LABELS, formatFulfillmentTypeLabel, type OrderBoardItemDTO, type OrderStatus } from '@gestor/types';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -16,14 +16,6 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
   completed: 'Concluído',
   cancelled: 'Cancelado',
   draft: 'Rascunho',
-};
-
-const CHANNEL_LABELS: Record<string, string> = {
-  storefront: 'Online',
-  pos: 'PDV',
-  whatsapp_ai: 'IA',
-  whatsapp: 'WhatsApp',
-  ifood: 'iFood',
 };
 
 type StatusTone = {
@@ -143,11 +135,11 @@ export const OrderCard = memo(function OrderCard(props: OrderCardProps) {
           <p className="text-muted-foreground flex items-center gap-1.5 font-bold text-[10px] uppercase tracking-wider">
             <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
             <span>
-              {order.fulfillmentType === 'delivery' ? '📦 Entrega' : order.isScheduled ? '📅 Agendado' : '🏪 Retirada'}
+              {formatFulfillmentTypeLabel(order.fulfillmentType)}{order.isScheduled ? ' · Agendado' : ''}
             </span>
             <span>·</span>
             <span>
-              {CHANNEL_LABELS[order.sourceChannel || ''] || order.sourceChannel || 'Online'}
+              {SOURCE_CHANNEL_LABELS[order.sourceChannel as keyof typeof SOURCE_CHANNEL_LABELS] || order.sourceChannel || 'Online'}
             </span>
           </p>
         </div>

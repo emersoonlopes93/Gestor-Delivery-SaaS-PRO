@@ -19,6 +19,7 @@ export const TENANT_PERMISSIONS = {
   'catalog.update': 'Update catalog items',
   'catalog.delete': 'Delete catalog items',
   'catalog.publish': 'Publish catalog items',
+
   'catalog.manage_products': 'Manage catalog products',
   'catalog.manage_option_groups': 'Manage catalog option groups',
   'catalog.bulk_edit': 'Bulk edit catalog',
@@ -28,6 +29,12 @@ export const TENANT_PERMISSIONS = {
   // KDS module
   'kds.use': 'Use kitchen display',
   'kds.manage': 'Manage KDS settings',
+
+  // Printing module
+  'printing.read': 'View print jobs and stations',
+  'printing.manage': 'Manage print stations and devices',
+  'printing.print': 'Allow device to pull spooler jobs',
+  'printing.reprint': 'Reprint jobs',
 
   // Cash module
   'cash.read': 'View cash sessions and movements',
@@ -147,8 +154,14 @@ export const ADMIN_PERMISSIONS = {
   'saas.onboarding.manage': 'Manage tenant onboarding',
   'saas.ai.read': 'View global AI agent prompt and tools',
   'saas.ai.manage': 'Manage global AI agent prompt',
+  'saas.base_menu.read': 'View base menu templates',
+  'saas.base_menu.manage': 'Manage base menu templates',
+  'saas.base_media.read': 'View base menu media gallery',
+  'saas.base_media.manage': 'Manage base menu media gallery',
   'saas.settings.read': 'View system settings',
   'saas.settings.manage': 'Manage system settings',
+  'saas.franchise.read': 'View franchise dashboard and groups',
+  'saas.franchise.manage': 'Manage franchise operations',
 } as const;
 
 export type AdminPermission = keyof typeof ADMIN_PERMISSIONS;
@@ -164,6 +177,7 @@ export const TENANT_ROLE_PERMISSIONS: Record<string, TenantPermission[]> = {
     'orders.read', 'orders.create', 'orders.update', 'orders.update_status', 'orders.cancel', 'orders.view_timeline', 'orders.use_kanban', 'orders.use_kds',
     'catalog.read', 'catalog.create', 'catalog.update', 'catalog.publish', 'catalog.manage_products', 'catalog.manage_option_groups', 'catalog.bulk_edit', 'catalog.manage_complements', 'catalog.manage_combos',
     'kds.use', 'kds.manage',
+    'printing.read', 'printing.manage', 'printing.print', 'printing.reprint',
     'cash.read', 'cash.open', 'cash.close', 'cash.add_supply', 'cash.add_withdrawal', 'cash.manage',
     'pos.read', 'pos.create_sale', 'pos.apply_discount',
     'reports.read', 'reports.view_costs', 'reports.view_margin', 'reports.export',
@@ -244,6 +258,9 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
     'saas.tenants.read',
     'saas.support.access',
     'saas.audit.read',
+    'saas.base_menu.read',
+    'saas.base_media.read',
+    'saas.franchise.read',
   ],
   financial: [
     'saas.tenants.read',
@@ -267,6 +284,12 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
     'saas.modules.manage',
     'saas.metrics.read',
     'saas.audit.read',
+    'saas.base_menu.read',
+    'saas.base_menu.manage',
+    'saas.base_media.read',
+    'saas.base_media.manage',
+    'saas.franchise.read',
+    'saas.franchise.manage',
   ],
   auditor: [
     'saas.tenants.read',
@@ -274,5 +297,8 @@ export const ADMIN_ROLE_PERMISSIONS: Record<string, AdminPermission[]> = {
     'saas.metrics.read',
     'saas.billing.read',
     'saas.billing.audit',
+    'saas.base_menu.read',
+    'saas.base_media.read',
+    'saas.franchise.read',
   ],
 };

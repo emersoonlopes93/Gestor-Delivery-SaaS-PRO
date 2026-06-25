@@ -4,6 +4,7 @@ export interface TenantSettingsDTO {
   currency: string;
   language: string;
   businessPhone?: string;
+  orderWhatsappNumber?: string;
   businessEmail?: string;
   address?: string;
   street?: string;
@@ -16,6 +17,7 @@ export interface TenantSettingsDTO {
   lat?: number;
   lng?: number;
   paymentMethods: string[];
+  minimumOrderValue?: number;
   pixKey?: string;
   mercadoPagoAccessToken?: string;
   logoUrl?: string;
@@ -28,6 +30,11 @@ export interface TenantSettingsDTO {
   handoffSound: string;
   readySound: string;
   browserNotificationsEnabled: boolean;
+  loyaltyEnabled?: boolean;
+  loyaltyPointsPerReal?: number;
+  cashbackEnabled?: boolean;
+  cashbackPercent?: number;
+  cashbackValidityDays?: number;
   isStorePaused: boolean;
   storePauseReason?: string;
   createdAt: Date | string;
@@ -36,6 +43,7 @@ export interface TenantSettingsDTO {
 
 export interface SystemConfigDTO {
   id: string;
+  appName: string;
   defaultWhatsAppProvider: string;
   defaultAiProvider: string;
   maintenanceMode: boolean;

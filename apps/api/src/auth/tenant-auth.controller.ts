@@ -46,6 +46,27 @@ class RegisterDto {
   password!: string;
 }
 
+class ForgotPasswordDto {
+  @IsEmail()
+  email!: string;
+}
+
+class ResetPasswordDto {
+  @IsString()
+  @IsNotEmpty()
+  token!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  password!: string;
+}
+
+class SwitchTenantDto {
+  @IsString()
+  @IsNotEmpty()
+  tenantId!: string;
+}
+
 @Controller('auth/tenant')
 export class TenantAuthController {
   constructor(private readonly authService: TenantAuthService) {}
@@ -72,6 +93,20 @@ export class TenantAuthController {
   }
 
   @Public()
+  @Post('forgot-password')
+  @Throttle({ auth: { limit: 3, ttl: 300 } }) // Limite de 3 solicitações a cada 5 minutos
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto.email);
+  }
+
+  @Public()
+  @Post('reset-password')
+  @Throttle({ auth: { limit: 3, ttl: 300 } }) 
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.password);
+  }
+
+  @Public()
   @Post('refresh')
   @Throttle({ auth: { limit: 10, ttl: 60 } })
   async refresh(@Body() dto: RefreshTokenDto, @Req() req: Request) {
@@ -82,6 +117,16 @@ export class TenantAuthController {
   @Get('me')
   async me(@CurrentUser('sub') userId: string) {
     return this.authService.getSession(userId);
+  }
+
+  @UseGuards(TenantAuthGuard)
+  @Post('switch-store')
+  async switchStore(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: SwitchTenantDto,
+    @Req() req: Request,
+  ) {
+    return this.authService.switchTenant(userId, dto.tenantId, sessionContext(req));
   }
 
   @UseGuards(TenantAuthGuard)

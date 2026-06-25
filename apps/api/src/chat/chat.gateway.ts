@@ -29,6 +29,7 @@ interface SessionUpdatedEvent {
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger('ChatGateway');
+  static instance: ChatGateway | null = null;
 
   @WebSocketServer()
   server!: Server;
@@ -36,7 +37,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
-  ) {}
+  ) {
+    ChatGateway.instance = this;
+  }
 
   private async validateToken(token: string): Promise<TenantJwtPayload | null> {
     try {
@@ -56,6 +59,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   async handleConnection(client: Socket) {
+    this.logger.log(`[CHAT_WS] connection_attempt clientId=${client.id}`);
     try {
       // Normalize token coming from either auth or headers. Support both raw and "Bearer <token>" formats.
       let rawToken = client.handshake.auth?.token;
@@ -65,29 +69,29 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const token = typeof rawToken === 'string' ? rawToken : undefined;
 
       if (!token) {
-        this.logger.warn(`[CHAT_WS] Client ${client.id} connected without token`);
+        this.logger.warn(`[CHAT_WS] auth_error clientId=${client.id} reason=token_missing`);
         client.disconnect();
         return;
       }
 
       const payload = await this.validateToken(token);
       if (!payload || !payload.tenantId) {
-        this.logger.warn(`[CHAT_WS] Client ${client.id} connected with invalid token`);
+        this.logger.warn(`[CHAT_WS] auth_error clientId=${client.id} reason=token_invalid`);
         client.disconnect();
         return;
       }
 
       client.data.tenantId = payload.tenantId;
       client.data.userId = payload.sub;
-      this.logger.log(`[CHAT_WS] client_authenticated tenantId=${payload.tenantId} clientId=${client.id}`);
-    } catch (error) {
-      this.logger.error(`Error handling connection for client ${client.id}:`, error);
+      this.logger.log(`[CHAT_WS] connected tenantId=${payload.tenantId} clientId=${client.id}`);
+    } catch (error: unknown) {
+      this.logger.error(`[CHAT_WS] auth_error clientId=${client.id} reason=exception message=${error instanceof Error ? error.message : String(error)}`);
       client.disconnect();
     }
   }
 
   handleDisconnect(client: Socket) {
-    this.logger.log(`[CHAT_WS] client_disconnected clientId=${client.id}`);
+    this.logger.log(`[CHAT_WS] disconnect clientId=${client.id}`);
   }
 
   @SubscribeMessage('joinTenant')
@@ -108,7 +112,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     client.join(`tenant:${data.tenantId}`);
-    this.logger.log(`[CHAT_WS] joined_tenant_room tenantId=${data.tenantId} clientId=${client.id}`);
+    this.logger.log(`[CHAT_WS] join_tenant_room tenantId=${data.tenantId} clientId=${client.id}`);
     return { event: 'joinedTenant', data: { tenantId: data.tenantId } };
   }
 
@@ -131,7 +135,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     client.join(`session:${data.sessionId}`);
-    this.logger.log(`[CHAT_WS] joined_session_room sessionId=${data.sessionId} clientId=${client.id}`);
+    this.logger.log(`[CHAT_WS] join_session_room sessionId=${data.sessionId} clientId=${client.id}`);
     return { event: 'joinedSession', data: { sessionId: data.sessionId } };
   }
 
@@ -146,7 +150,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     };
     this.server.to(`tenant:${tenantId}`).emit('messageCreated', event);
     this.server.to(`session:${sessionId}`).emit('messageCreated', event);
-    this.logger.log(`[CHAT_WS] message_emitted for session ${sessionId} to tenant ${tenantId}`);
+    this.logger.log(`[CHAT_WS] emit_messageCreated for session ${sessionId} to tenant ${tenantId}`);
   }
 
   emitSessionUpdated(tenantId: string, session: ChatSession) {
@@ -158,6 +162,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       session,
     };
     this.server.to(`tenant:${tenantId}`).emit('sessionUpdated', event);
-    this.logger.log(`[CHAT_WS] session_updated for session ${session.id} to tenant ${tenantId}`);
+    this.logger.log(`[CHAT_WS] emit_sessionUpdated for session ${session.id} to tenant ${tenantId}`);
   }
 }

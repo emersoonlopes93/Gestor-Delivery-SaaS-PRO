@@ -34,10 +34,13 @@ import type {
   PizzaCompositionDTO,
 } from '@gestor/types';
 import { ORDER_STATUS_TRANSITIONS, UpdateOrderStatusDTO } from '@gestor/types';
+import type { FulfillmentType } from '@gestor/types';
 import { generatePublicTrackingToken } from '../common/utils/tracking-token.util';
 import { OrdersGateway } from './orders.gateway';
 import { KdsService } from '../kds/kds.service';
 import { RevenueLedgerService } from '../billing/revenue-ledger.service';
+import { MarketplaceStatusSyncService } from '../marketplace/services/marketplace-status-sync.service';
+import { assertOnlinePaymentEmail, normalizeReturnUrl } from './public-checkout-guards.util';
 
 @Injectable()
 export class OrdersService {
@@ -55,8 +58,8 @@ export class OrdersService {
     return map[p];
   }
 
-  private mapFulfillmentType(f: string | null): 'delivery' | 'pickup' {
-    if (f === 'pickup') return 'pickup';
+  private mapFulfillmentType(f: string | null): FulfillmentType {
+    if (f === 'pickup' || f === 'dine_in' || f === 'table' || f === 'delivery') return f;
     return 'delivery';
   }
 
@@ -74,6 +77,8 @@ export class OrdersService {
     private readonly ordersGateway: OrdersGateway,
     private readonly kdsService: KdsService,
     private readonly revenueLedgerService: RevenueLedgerService,
+    @Inject(forwardRef(() => MarketplaceStatusSyncService))
+    private readonly marketplaceStatusSyncService: MarketplaceStatusSyncService,
   ) {}
 
   async createOrder(slug: string, dto: CreateOrderDTO): Promise<OrderResponseDTO> {
@@ -147,6 +152,8 @@ export class OrdersService {
       return this.getOrderDetail(existingOrder.id, tenantId);
     }
 
+    assertOnlinePaymentEmail(dto.payment.method, dto.customerEmail);
+
     // 4. Transactional order creation
     const finalTotal = total; 
 
@@ -175,7 +182,7 @@ export class OrdersService {
             deliveryFee,
             serviceFee: 0,
             total: finalTotal,
-            sourceChannel: dto.sourceChannel || 'storefront',
+            sourceChannel: dto.sourceChannel || 'direct_online',
             idempotencyKey: dto.idempotencyKey,
             notes: dto.notes || null,
             customerId,
@@ -222,9 +229,9 @@ export class OrdersService {
         }
 
         // Delivery address
-        if (dto.fulfillmentType === 'delivery' && dto.deliveryAddress) {
-          await tx.orderDeliveryAddress.create({
-            data: {
+    if (dto.fulfillmentType === 'delivery' && dto.deliveryAddress) {
+      await tx.orderDeliveryAddress.create({
+        data: {
               orderId: newOrder.id,
               tenantId,
               street: dto.deliveryAddress.street,
@@ -247,7 +254,7 @@ export class OrdersService {
             orderId: newOrder.id,
             tenantId,
             status: 'pending',
-            note: `Pedido recebido via ${dto.sourceChannel || 'storefront'}.`,
+            note: `Pedido recebido via ${dto.sourceChannel || 'direct_online'}.`,
           },
         });
 
@@ -315,6 +322,24 @@ export class OrdersService {
     }
 
     const orderDetail = await this.getOrderDetail(order.id, tenantId);
+
+    if (customerId && dto.fulfillmentType === 'delivery' && dto.deliveryAddress) {
+      await this.customerService.saveDeliveryAddressFromOrder(tenantId, customerId, {
+        street: dto.deliveryAddress.street,
+        number: dto.deliveryAddress.number,
+        complement: dto.deliveryAddress.complement || null,
+        neighborhood: dto.deliveryAddress.neighborhood,
+        city: dto.deliveryAddress.city,
+        state: dto.deliveryAddress.state,
+        zipCode: dto.deliveryAddress.zipCode,
+        reference: dto.deliveryAddress.reference || null,
+        lat: dto.deliveryAddress.lat ?? null,
+        lng: dto.deliveryAddress.lng ?? null,
+      }).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Unknown address sync error';
+        this.logger.warn(`Failed to sync customer address from order ${order.id}: ${message}`);
+      });
+    }
     
     // Emitir via Socket para o painel administrativo (tempo real)
     this.ordersGateway.emitNewOrder(tenantId, {
@@ -327,7 +352,7 @@ export class OrdersService {
       try {
         const pixPayment = await this.paymentGatewayService.createPixPayment(
           order.id,
-          dto.customerEmail || '',
+          dto.customerEmail!,
           dto.customerName
         );
         
@@ -341,9 +366,9 @@ export class OrdersService {
       try {
         const preferencePayment = await this.paymentGatewayService.createPreferencePayment(
           order.id,
-          dto.customerEmail || '',
+          dto.customerEmail!,
           dto.customerName,
-          dto.returnUrl || 'https://gestor-delivery-pro.vercel.app', // Fallback URL if frontend didnt send
+          normalizeReturnUrl(dto.returnUrl),
           dto.payment.method
         );
 
@@ -546,7 +571,7 @@ export class OrdersService {
         id: o.id,
         orderNumber: o.orderNumber,
         status: o.status as OrderStatus,
-        fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+        fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
         customerName: o.customerName,
         customerPhone: o.customerPhone,
         total: Number(o.total),
@@ -555,6 +580,7 @@ export class OrdersService {
         scheduledFor: o.scheduledFor ? o.scheduledFor.toISOString() : null,
         isScheduled: o.isScheduled ?? false,
         sourceChannel: o.sourceChannel,
+        publicTrackingToken: o.publicTrackingToken,
         createdAt: o.createdAt.toISOString(),
       })),
       total,
@@ -588,7 +614,7 @@ export class OrdersService {
       id: o.id,
       orderNumber: o.orderNumber,
       status: o.status as OrderStatus,
-      fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+      fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
       customerName: o.customerName,
       total: Number(o.total),
       itemCount: o.items.reduce((sum, i) => sum + i.quantity, 0),
@@ -626,7 +652,7 @@ export class OrdersService {
       id: o.id,
       orderNumber: o.orderNumber,
       status: o.status as OrderStatus,
-      fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+      fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
       notes: o.notes,
       items: o.items.map((i) => ({
         id: i.id,
@@ -702,6 +728,7 @@ export class OrdersService {
         snapshotBasePrice: Number(item.snapshotBasePrice),
         snapshotExtrasTotal: Number(item.snapshotExtrasTotal),
         snapshotComposition: item.snapshotComposition,
+        snapshotCatalogV2Json: item.snapshotCatalogV2Json,
       })),
       deliveryAddress: order.deliveryAddress
         ? {
@@ -855,6 +882,16 @@ export class OrdersService {
         this.loyaltyService.awardForOrder(tenantId, orderId).catch((e) => this.logger.error(`Error awarding loyalty: ${e.message}`)),
       ]);
     }
+
+    await this.marketplaceStatusSyncService.handleInternalStatusChanged({
+      tenantId,
+      orderId,
+      status: nextStatus,
+      reason: dto.note ?? null,
+    }).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Unknown marketplace status sync error';
+      this.logger.warn(`Marketplace status sync failed for order ${orderId}: ${message}`);
+    });
 
     return updated;
   }
@@ -1132,7 +1169,7 @@ export class OrdersService {
       orderNumber: o.orderNumber,
       customerName: o.customerName,
       customerPhone: o.customerPhone ?? undefined,
-      fulfillmentType: o.fulfillmentType as 'delivery' | 'pickup',
+      fulfillmentType: this.mapFulfillmentType(o.fulfillmentType),
       status: o.status as OrderStatus,
       deliveryAddress: o.deliveryAddress
         ? {
@@ -1213,7 +1250,7 @@ export class OrdersService {
 
     if (!order) throw new NotFoundException('Pedido não encontrado.');
 
-    if (driverId && order.fulfillmentType !== 'delivery') {
+    if (order.fulfillmentType !== 'delivery') {
       throw new BadRequestException('Somente pedidos de entrega podem receber entregador.');
     }
 

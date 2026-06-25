@@ -1,6 +1,6 @@
 import { memo, useEffect, useState, useCallback } from 'react';
 import { X, RefreshCw } from 'lucide-react';
-import type { OrderResponseDTO, OrderStatus, UpdateOrderStatusDTO, DriverDTO } from '@gestor/types';
+import { SOURCE_CHANNEL_LABELS, type OrderResponseDTO, type OrderStatus, type UpdateOrderStatusDTO, type DriverDTO } from '@gestor/types';
 import { api, ApiError } from '@/lib/api-client';
 import { OrderStatusBadge } from './OrderStatusBadge';
 import { OrderCustomerSection } from './OrderCustomerSection';
@@ -13,6 +13,9 @@ import { OrderActionsBar } from './OrderActionsBar';
 import { OrderPrintTemplate } from './OrderPrintTemplate';
 import { EditOrderModal } from './EditOrderModal';
 import { DriverSelectionModal } from './DriverSelectionModal';
+import { Capacitor } from '@capacitor/core';
+import { printTicketViaPrimaryBluetooth } from '../../../lib/bluetooth';
+import { printThermalText } from '../../../lib/thermal-print';
 import toast from 'react-hot-toast';
 
 export interface OrderDrawerProps {
@@ -121,17 +124,21 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
     if (!order) return;
     setIsPrinting(true);
     try {
+      const printRes = await api.get<{ content: string }>(`/pos/sales/${order.id}/print?type=customer`);
       await api.post(`/orders/${order.id}/print-log`);
-      setTimeout(() => {
-        window.print();
+      if (Capacitor.isNativePlatform() && printRes.data?.content) {
+        await printTicketViaPrimaryBluetooth(printRes.data.content);
         setIsPrinting(false);
-        toast.success('Imprimindo...');
+        toast.success('Impressao enviada para a Bluetooth principal.');
         fetchDetail(true);
-      }, 100);
+        return;
+      }
+      printThermalText(printRes.data.content, { title: `Pedido #${order.orderNumber}`, paperWidthMm: 58 });
+      setIsPrinting(false);
+      toast.success('Imprimindo...');
+      fetchDetail(true);
     } catch (err) {
-      console.error('[OrderDrawer] Erro ao registrar impressão:', err);
-      // Ainda tenta imprimir mesmo se falhar o log
-      window.print();
+      console.error('[OrderDrawer] Erro ao registrar impressao:', err);
       setIsPrinting(false);
     }
   };
@@ -145,14 +152,14 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
   return (
     <>
       <div 
-        className={`fixed inset-0 z-50 flex flex-col items-end sm:justify-center transition-all duration-300 ${orderId ? 'visible' : 'invisible'}`}
+        className={`fixed inset-0 z-50 flex flex-col items-end sm:justify-center safe-inset transition-all duration-300 ${orderId ? 'visible' : 'invisible'}`}
       >
         <div 
           className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${orderId ? 'opacity-100' : 'opacity-0'}`} 
           onClick={onClose}
         />
         <div 
-          className={`relative z-50 h-[92%] sm:h-full w-full sm:w-[500px] bg-card shadow-2xl flex flex-col transform transition-transform duration-300 ease-in-out ${orderId ? 'translate-y-0 sm:translate-x-0' : 'translate-y-full sm:translate-x-full sm:translate-y-0'} rounded-t-[32px] sm:rounded-t-none border-l border-border`}
+          className={`relative z-50 h-[92%] sm:h-full w-full sm:w-[500px] bg-card shadow-2xl flex flex-col safe-sheet transform transition-transform duration-300 ease-in-out ${orderId ? 'translate-y-0 sm:translate-x-0' : 'translate-y-full sm:translate-x-full sm:translate-y-0'} rounded-t-[32px] sm:rounded-t-none border-l border-border`}
         >
           {/* Mobile Handle */}
           <div className="sm:hidden flex justify-center py-3 shrink-0">
@@ -169,7 +176,7 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
             </div>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                {order ? `Canal: ${order.sourceChannel}` : 'Carregando...'}
+                {order ? `Canal: ${SOURCE_CHANNEL_LABELS[order.sourceChannel as keyof typeof SOURCE_CHANNEL_LABELS] || order.sourceChannel}` : 'Carregando...'}
               </span>
               {isValidating && (
                 <span className="flex items-center gap-1 text-[10px] font-black text-primary-500 uppercase animate-pulse">
@@ -236,11 +243,12 @@ export const OrderDrawer = memo(function OrderDrawer({ orderId, onClose, onUpdat
 
               {/* Entregador (se for entrega) */}
               {order.fulfillmentType === 'delivery' && (
-                <OrderDriverSection 
-                  driverId={order.deliveryDriverId}
-                  driverName={order.deliveryDriverName}
-                  driverPhone={order.deliveryDriverPhone}
-                  driverStatus={order.deliveryDriverStatus}
+              <OrderDriverSection 
+                fulfillmentType={order.fulfillmentType}
+                driverId={order.deliveryDriverId}
+                driverName={order.deliveryDriverName}
+                driverPhone={order.deliveryDriverPhone}
+                driverStatus={order.deliveryDriverStatus}
                   onAssignDriver={async () => {
                     await fetchDrivers();
                     setIsDriverModalOpen(true);

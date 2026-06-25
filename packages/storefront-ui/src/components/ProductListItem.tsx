@@ -1,5 +1,6 @@
 import { ProductCardProps } from './ProductGridCard';
 import { StorefrontBadge } from './StorefrontBadge';
+import { ImageOff } from 'lucide-react';
 import { cn } from '../cn';
 
 export function ProductListItem({
@@ -22,9 +23,12 @@ export function ProductListItem({
     >
       <div className="flex-1 min-w-0 flex flex-col justify-center">
         <div className="flex flex-wrap gap-1 mb-1">
-          {showBadges && product.badges?.map((badge, idx) => (
-            <StorefrontBadge key={idx} variant="primary">{badge}</StorefrontBadge>
-          ))}
+          {showBadges && product.badges?.map((badge, idx) => {
+            let badgeVariant: 'primary' | 'secondary' | 'outline' = 'primary';
+            if (badge.variant === 'danger') badgeVariant = 'secondary';
+            if (badge.variant === 'neutral') badgeVariant = 'outline';
+            return <StorefrontBadge key={idx} variant={badgeVariant}>{badge.label}</StorefrontBadge>;
+          })}
         </div>
 
         <h3 className="font-bold text-[var(--storefront-foreground)] truncate group-hover:text-[var(--storefront-primary)] transition-colors">
@@ -54,7 +58,7 @@ export function ProductListItem({
         </div>
       </div>
 
-      {hasImage && (
+      {hasImage ? (
         <div className="w-24 h-24 flex-shrink-0 rounded-[var(--storefront-radius)] overflow-hidden bg-[var(--storefront-muted)]">
           <img 
             src={product.imageUrl!} 
@@ -65,7 +69,11 @@ export function ProductListItem({
             )}
           />
         </div>
-      )}
+      ) : imageMode !== 'hidden' ? (
+        <div className="w-24 h-24 flex-shrink-0 rounded-[var(--storefront-radius)] overflow-hidden bg-[var(--storefront-muted)] flex items-center justify-center">
+          <ImageOff className="w-8 h-8 text-[var(--storefront-muted-foreground)] opacity-50" />
+        </div>
+      ) : null}
     </div>
   );
 }

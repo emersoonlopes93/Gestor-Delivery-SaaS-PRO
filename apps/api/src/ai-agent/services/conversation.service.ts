@@ -179,8 +179,6 @@ export class ConversationService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(forwardRef(() => ChatGateway))
-    private readonly chatGateway: ChatGateway,
   ) {}
 
   /**
@@ -494,7 +492,8 @@ export class ConversationService {
     },
   ) {
     const now = new Date();
-    const activeSession = await this.prisma.chatSession.findFirst({
+    // [SESSION_RESOLVE] Fetch all active sessions for the canonical key (tenantId + customerPhone)
+    const activeSessions = await this.prisma.chatSession.findMany({
       where: {
         tenantId,
         customerPhone,
@@ -504,8 +503,37 @@ export class ConversationService {
       orderBy: { updatedAt: 'desc' },
     });
 
+    let activeSession = null;
+    if (activeSessions.length > 0) {
+      // Prioritize the one in handoff, otherwise the most recently updated
+      activeSession = activeSessions.find(s => s.handoffActive) || activeSessions[0];
+
+      // Auto-heal duplicate sessions without deleting their messages
+      const duplicates = activeSessions.filter(s => s.id !== activeSession?.id);
+      if (duplicates.length > 0) {
+        let messageCount = 0;
+        for (const duplicate of duplicates) {
+           const count = await this.prisma.chatMessage.count({ where: { sessionId: duplicate.id } });
+           messageCount += count;
+        }
+        
+        this.logger.warn(`[SESSION_RESOLVE] key=${tenantId}:${customerPhone} selectedSessionId=${activeSession.id} reason=${activeSession.handoffActive ? 'handoff_active' : 'latest'}`);
+        if (messageCount > 0) {
+           this.logger.warn(`[SESSION_RESOLVE] duplicate_closed_with_messages duplicateCount=${duplicates.length} messageCount=${messageCount}`);
+        }
+
+        await this.prisma.chatSession.updateMany({
+          where: { id: { in: duplicates.map(d => d.id) } },
+          data: { state: 'closed', closedAt: now, closeReason: 'duplicate_merge' }
+        });
+      }
+    }
+
     if (activeSession) {
-      if (this.isSessionExpired(activeSession, options?.sessionTimeoutMin)) {
+      // Handoff sessions should NEVER expire automatically by timeout
+      const isExpired = activeSession.handoffActive ? false : this.isSessionExpired(activeSession, options?.sessionTimeoutMin);
+
+      if (isExpired) {
         await this.expireSession(activeSession.id, 'timeout');
       } else {
         const updateData: Prisma.ChatSessionUpdateInput = {
@@ -644,7 +672,34 @@ export class ConversationService {
       ...(dto.metadata ? { metadata: dto.metadata } : {}),
     };
 
-    const message = await this.prisma.chatMessage.create({ data });
+    let message;
+    try {
+      if (dto.externalId) {
+        message = await this.prisma.chatMessage.upsert({
+          where: { externalId: dto.externalId },
+          create: data,
+          update: {
+            // Update non-destructive fields
+            externalStatus,
+            ...(dto.metadata ? { metadata: dto.metadata } : {}),
+          },
+        });
+      } else {
+        message = await this.prisma.chatMessage.create({ data });
+      }
+    } catch (error: unknown) {
+      // Catch remaining concurrency issues (e.g. upsert race condition)
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('Unique constraint failed') && dto.externalId) {
+        this.logger.warn(`[CHAT_INBOX] Concurrent create caught for externalId=${dto.externalId}`);
+        message = await this.prisma.chatMessage.findUnique({
+          where: { externalId: dto.externalId },
+        });
+        if (!message) throw error;
+      } else {
+        throw error;
+      }
+    }
 
     const session = await this.prisma.chatSession.update({
       where: { id: dto.sessionId },
@@ -657,7 +712,7 @@ export class ConversationService {
     });
 
     if (session) {
-      this.chatGateway.emitMessageCreated(session.tenantId, dto.sessionId, message);
+      ChatGateway.instance?.emitMessageCreated(session.tenantId, dto.sessionId, message);
     }
 
     this.logger.log(
@@ -680,7 +735,7 @@ export class ConversationService {
     });
 
     // Emit WebSocket event for session update
-    this.chatGateway.emitSessionUpdated(session.tenantId, session);
+    ChatGateway.instance?.emitSessionUpdated(session.tenantId, session);
 
     return session;
   }
@@ -701,7 +756,7 @@ export class ConversationService {
     this.logger.log(`[CHAT_INBOX] handoff_activated sessionId=${sessionId} reason=${reason || 'default'}`);
 
     // Emit WebSocket event for session update
-    this.chatGateway.emitSessionUpdated(session.tenantId, session);
+    ChatGateway.instance?.emitSessionUpdated(session.tenantId, session);
 
     // Log system message
     await this.addMessage({
@@ -730,7 +785,7 @@ export class ConversationService {
     this.logger.log(`[CHAT_INBOX] handoff_deactivated sessionId=${sessionId}`);
 
     // Emit WebSocket event for session update
-    this.chatGateway.emitSessionUpdated(session.tenantId, session);
+    ChatGateway.instance?.emitSessionUpdated(session.tenantId, session);
 
     // Log system message
     await this.addMessage({
@@ -816,7 +871,7 @@ export class ConversationService {
     });
 
     this.logger.log(`[CHAT_INBOX] session_expired sessionId=${sessionId} reason=${reason}`);
-    this.chatGateway.emitSessionUpdated(session.tenantId, session);
+    ChatGateway.instance?.emitSessionUpdated(session.tenantId, session);
 
     await this.addMessage({
       sessionId,
@@ -854,7 +909,7 @@ export class ConversationService {
     this.logger.log(`[CHAT_INBOX] session_closed sessionId=${sessionId} reason=${reason ?? 'manual'}`);
 
     // Emit WebSocket event for session update
-    this.chatGateway.emitSessionUpdated(session.tenantId, session);
+    ChatGateway.instance?.emitSessionUpdated(session.tenantId, session);
 
     // Log system message
     await this.addMessage({
@@ -1046,7 +1101,7 @@ export class ConversationService {
     this.logger.log(
       `[AI_SESSION] exit_command_received sessionId=${sessionId} command="${exitCommand}" closeReason=customer_exit`,
     );
-    this.chatGateway.emitSessionUpdated(session.tenantId, session);
+    ChatGateway.instance?.emitSessionUpdated(session.tenantId, session);
 
     // Registra o comando do cliente como mensagem
     await this.addMessage({

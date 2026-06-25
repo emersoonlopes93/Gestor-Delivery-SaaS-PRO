@@ -17,12 +17,16 @@ import {
   LogOut,
   Globe,
   Bot,
-  Images
+  Images,
+  LibraryBig,
+  BookOpenCheck,
+  Activity
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '../stores/auth.store';
 import { useThemeStore } from '../stores/theme.store';
 import { api } from '../lib/api-client';
+import { usePlatformBrand } from '../hooks/use-platform-brand';
 
 type SidebarItem = {
   id: string;
@@ -39,33 +43,61 @@ type SidebarGroup = {
   items: readonly SidebarItem[];
 };
 
+const isFeatureVisible = (flag?: string) => {
+  if (!flag) return true;
+  // TODO: implement actual feature flags from config/environment
+  return true;
+};
+
 const SIDEBAR_STORAGE_KEY = 'admin_sidebar_state_v1';
 
-function isFeatureVisible(flag: string | undefined): boolean {
+function isFeatureEnabled(flag: string): boolean {
   if (!flag) return true;
-  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
+  const envMeta = import.meta as { env?: Record<string, string | undefined> };
+  const env = envMeta.env ?? {};
   return env[flag] === 'true';
 }
 
 const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
   {
     id: 'core',
-    label: 'Admin',
+    label: 'Visão Geral',
     items: [
-      { id: 'dashboard', label: 'Dashboard', to: '/dashboard', icon: LayoutGrid },
-      { id: 'tenants', label: 'Tenants (Lojas)', to: '/tenants', icon: Store, permission: 'saas.tenants.read' },
+      { id: 'dashboard', label: 'Dashboard Analítico', to: '/dashboard', icon: LayoutGrid },
     ],
   },
   {
-    id: 'platform',
-    label: 'Plataforma',
+    id: 'clients',
+    label: 'Clientes',
     items: [
+      { id: 'tenants', label: 'Lojas (Tenants)', to: '/tenants', icon: Store, permission: 'saas.tenants.read' },
       { id: 'franchise', label: 'Franquias', to: '/franchise', icon: Globe, permission: 'saas.franchise.read', featureFlag: 'VITE_FEATURE_FRANCHISE' },
+    ],
+  },
+  {
+    id: 'financial',
+    label: 'Financeiro',
+    items: [
       { id: 'billing', label: 'Billing Console', to: '/billing', icon: CreditCard, permission: 'saas.billing.read' },
+    ],
+  },
+  {
+    id: 'operation',
+    label: 'Operação',
+    items: [
+      { id: 'health', label: 'Saúde dos Tenants', to: '/health', icon: Activity, permission: 'saas.tenants.read' },
       { id: 'integrations', label: 'Marketplace & IA', to: '/integrations', icon: Puzzle, permission: 'saas.settings.read', featureFlag: 'VITE_FEATURE_ADMIN_INTEGRATIONS' },
       { id: 'media', label: 'Biblioteca Global', to: '/media', icon: Images, permission: 'saas.settings.read' },
+      { id: 'base-menus', label: 'Cardápios Base', to: '/base-menus', icon: BookOpenCheck, permission: 'saas.base_menu.read' },
+      { id: 'base-media', label: 'Galeria Base', to: '/base-media', icon: LibraryBig, permission: 'saas.base_media.read' },
       { id: 'ai-global', label: 'Agente IA Global', to: '/ai-agent/global', icon: Bot, permission: 'saas.ai.read', featureFlag: 'VITE_FEATURE_AI_AGENT' },
-      { id: 'audit-logs', label: 'Auditoria', to: '/audit-logs', icon: Shield, permission: 'saas.audit.read' },
+    ],
+  },
+  {
+    id: 'security',
+    label: 'Segurança',
+    items: [
+      { id: 'audit-logs', label: 'Logs de Auditoria', to: '/audit-logs', icon: Shield, permission: 'saas.audit.read' },
     ],
   },
 ];
@@ -161,6 +193,7 @@ const SidebarGroupView = memo(function SidebarGroupView(props: {
 export function AppLayout() {
   const { user, clearUser } = useAuthStore();
   const { theme, setTheme } = useThemeStore();
+  const { appName, appInitial } = usePlatformBrand();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -214,11 +247,11 @@ export function AppLayout() {
   return (
     <div className="min-h-screen flex bg-background transition-colors duration-300">
       {isMobileOpen ? (
-        <div className="fixed inset-0 z-40 bg-black/40 md:hidden backdrop-blur-sm" onClick={closeMobile} />
+        <div className="fixed inset-0 z-30 bg-black/40 md:hidden backdrop-blur-sm" onClick={closeMobile} />
       ) : null}
 
       <aside
-        className={`fixed z-50 inset-y-0 left-0 bg-card border-r border-border flex flex-col transition-[width,transform] duration-300 ease-out md:static md:translate-x-0 ${
+        className={`fixed z-40 inset-y-0 left-0 bg-card border-r border-border flex flex-col transition-[width,transform] duration-300 ease-out md:static md:translate-x-0 ${
           collapsed ? 'w-[72px]' : 'w-64'
         } ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
       >
@@ -226,16 +259,16 @@ export function AppLayout() {
           {!collapsed ? (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20">
-                S
+                {appInitial}
               </div>
               <div className="min-w-0">
-                <h1 className="text-sm font-black text-foreground tracking-tight">SaaS<span className="text-primary">Admin</span></h1>
+                <h1 className="text-sm font-black text-foreground tracking-tight truncate">{appName}</h1>
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{user?.name || 'Carregando...'}</p>
               </div>
             </div>
           ) : (
             <div className="w-10 h-10 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center font-black text-xl shadow-lg shadow-primary/20">
-              S
+              {appInitial}
             </div>
           )}
         </div>
@@ -264,8 +297,8 @@ export function AppLayout() {
         </div>
       </aside>
 
-      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-        <header className="hidden md:flex sticky top-0 z-30 h-16 bg-background/80 backdrop-blur-xl border-b border-border px-6 items-center gap-4">
+      <div className="relative z-0 flex-1 min-w-0 flex flex-col overflow-hidden">
+        <header className="hidden md:flex sticky top-0 z-10 h-16 bg-background/80 backdrop-blur-xl border-b border-border px-6 items-center gap-4">
           <button onClick={toggleCollapsed} className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-xl transition-all">
             <Menu size={20} />
           </button>
@@ -304,12 +337,12 @@ export function AppLayout() {
           </div>
         </header>
 
-        <header className="md:hidden sticky top-0 z-30 h-14 bg-background backdrop-blur-xl border-b border-border px-4 flex items-center justify-between transition-colors">
+        <header className="md:hidden sticky top-0 z-10 h-14 bg-background backdrop-blur-xl border-b border-border px-4 flex items-center justify-between transition-colors">
           <button onClick={openMobile} className="w-10 h-10 flex items-center justify-center rounded-xl bg-card text-foreground">
             <Menu size={20} />
           </button>
           <div className="text-center">
-            <div className="text-sm font-black text-foreground uppercase tracking-tight">SaaS<span className="text-primary">Admin</span></div>
+            <div className="text-sm font-black text-foreground uppercase tracking-tight">{appName}</div>
             <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none mt-0.5">Gestão Global</div>
           </div>
           <button
@@ -321,7 +354,7 @@ export function AppLayout() {
         </header>
 
         <main className="flex-1 overflow-y-auto bg-background/50">
-          <div className="animate-in fade-in duration-500 p-4 md:p-8">
+          <div key={location.pathname} className="animate-in fade-in duration-500 p-4 md:p-8">
             <Outlet />
           </div>
         </main>

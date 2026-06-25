@@ -13,6 +13,9 @@ import { DriverSelectionModal } from './components/DriverSelectionModal';
 import { EditOrderModal } from './components/EditOrderModal';
 import { OrderPrintTemplate } from './components/OrderPrintTemplate';
 import { useOrderNotifications } from './hooks/useOrderNotifications';
+import { printTicketViaPrimaryBluetooth } from '../../lib/bluetooth';
+import { printThermalText } from '../../lib/thermal-print';
+import { Capacitor } from '@capacitor/core';
 import toast from 'react-hot-toast';
 
 /* ─── Kanban columns spec ───────────────────────────────────── */
@@ -120,18 +123,27 @@ export function OperationBoardPage() {
     setIsPrinting(true);
     try {
       const loadToastId = toast.loading('Carregando dados para impressão...');
-      const res = await api.get<OrderResponseDTO>(`/orders/${orderId}`);
+      const [orderRes, printRes] = await Promise.all([
+        api.get<OrderResponseDTO>(`/orders/${orderId}`),
+        api.get<{ content: string }>(`/pos/sales/${orderId}/print?type=customer`),
+      ]);
       toast.dismiss(loadToastId);
 
-      if (res.data) {
-        setOrderToPrint(res.data);
+      if (orderRes.data) {
+        setOrderToPrint(orderRes.data);
         await api.post(`/orders/${orderId}/print-log`);
-        setTimeout(() => {
-          window.print();
+        const content = printRes.data?.content || '';
+        if (Capacitor.isNativePlatform() && content.trim()) {
+          await printTicketViaPrimaryBluetooth(content);
           setIsPrinting(false);
           setOrderToPrint(null);
-          toast.success('Imprimindo ticket...');
-        }, 300);
+          toast.success('Impressão enviada para a Bluetooth principal.');
+          return;
+        }
+        printThermalText(content, { title: `Pedido #${orderRes.data.orderNumber}`, paperWidthMm: 58 });
+        setIsPrinting(false);
+        setOrderToPrint(null);
+        toast.success('Imprimindo ticket...');
       } else {
         throw new Error('Pedido não encontrado');
       }

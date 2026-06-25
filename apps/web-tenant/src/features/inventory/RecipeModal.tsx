@@ -106,13 +106,13 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] text-left">
-        <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-900/50/50">
+      <div className="bg-card rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] text-left border border-border">
+        <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-muted/50">
           <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Ficha Técnica</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{entityName}</p>
+            <h2 className="text-xl font-bold text-foreground">Ficha Técnica</h2>
+            <p className="text-sm text-muted-foreground">{entityName}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:text-gray-400">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <span className="text-2xl">&times;</span>
           </button>
         </div>
@@ -120,20 +120,20 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {isLoading ? (
             <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           ) : (
             <>
               <table className="w-full text-left">
                 <thead>
-                  <tr className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  <tr className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     <th className="pb-3 pr-4">Insumo</th>
                     <th className="pb-3 pr-4 w-32">Quantidade</th>
                     <th className="pb-3 text-right">Custo Est.</th>
                     <th className="pb-3 w-10"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-border">
                   {recipeItems.map((item, index) => {
                     const ing = ingredients.find(i => i.id === item.ingredientId);
                     const itemCost = Number(item.quantity) * (ing?.currentCost || 0);
@@ -144,7 +144,7 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
                           <select
                             value={item.ingredientId}
                             onChange={(e) => handleUpdateItem(index, { ingredientId: e.target.value })}
-                            className="w-full bg-white dark:bg-gray-900 border border-slate-200 dark:border-gray-700 rounded-lg px-2 py-1 text-sm font-medium text-gray-900 dark:text-gray-100 cursor-pointer focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all"
+                            className="w-full bg-input-bg border border-input rounded-lg px-2 py-1 text-sm font-medium text-foreground cursor-pointer focus:ring-2 focus:ring-primary/30 outline-none transition-all"
                           >
                             {ingredients.map(ing => (
                               <option key={ing.id} value={ing.id}>{ing.name} ({ing.unit})</option>
@@ -158,18 +158,18 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
                               step="0.001"
                               value={item.quantity}
                               onChange={(e) => handleUpdateItem(index, { quantity: Number(e.target.value) })}
-                              className="w-full px-2 py-1 rounded border border-gray-100 dark:border-gray-800 text-sm focus:ring-1 focus:ring-primary-500 outline-none"
+                              className="w-full px-2 py-1 rounded border border-input bg-input-bg text-foreground text-sm focus:ring-1 focus:ring-primary outline-none"
                             />
-                            <span className="text-xs text-gray-400">{ing?.unit}</span>
+                            <span className="text-xs text-muted-foreground">{ing?.unit}</span>
                           </div>
                         </td>
-                        <td className="py-3 text-right text-sm text-gray-600 dark:text-gray-400">
+                        <td className="py-3 text-right text-sm text-muted-foreground">
                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(itemCost)}
                         </td>
                         <td className="py-3 text-right">
                           <button
                             onClick={() => handleRemoveItem(index)}
-                            className="text-gray-300 hover:text-red-500 transition-colors"
+                            className="text-muted-foreground hover:text-destructive transition-colors text-lg"
                           >
                             &times;
                           </button>
@@ -182,7 +182,7 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
 
               <button
                 onClick={handleAddItem}
-                className="w-full py-2 border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-xl text-gray-400 text-sm font-medium hover:border-primary-200 hover:text-primary-600 transition-all"
+                className="w-full py-2 border-2 border-dashed border-border rounded-xl text-muted-foreground text-sm font-medium hover:border-primary/55 hover:text-primary transition-all"
               >
                 + Adicionar Insumo
               </button>
@@ -190,24 +190,24 @@ export function RecipeModal({ isOpen, onClose, entityType, entityId, entityName 
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-border bg-muted/50 flex items-center justify-between">
           <div>
-            <span className="text-sm text-gray-500 dark:text-gray-400">Custo Teórico Total:</span>
-            <div className="text-xl font-bold text-primary-600">
+            <span className="text-sm text-muted-foreground">Custo Teórico Total:</span>
+            <div className="text-xl font-bold text-primary">
               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalCost)}
             </div>
           </div>
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:text-gray-200"
+              className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
               Descartar
             </button>
             <button
               onClick={handleSave}
               disabled={isSaving || recipeItems.length === 0}
-              className="px-6 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-all disabled:opacity-50 shadow-sm"
+              className="px-6 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-all disabled:opacity-50 shadow-sm"
             >
               {isSaving ? 'Salvando...' : 'Salvar Alterações'}
             </button>

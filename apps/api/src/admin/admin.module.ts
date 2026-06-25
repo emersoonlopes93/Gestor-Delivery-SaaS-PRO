@@ -12,6 +12,8 @@ import { AdminHealthService } from './health/admin-health.service';
 import { AdminAuditLogsController } from './audit-logs/admin-audit-logs.controller';
 import { AdminAuditLogsService } from './audit-logs/admin-audit-logs.service';
 import { AdminBillingController } from './billing/admin-billing.controller';
+
+import { AsaasAdminController } from './billing/asaas-admin.controller';
 import { AdminFranchiseController } from './franchise/admin-franchise.controller';
 import { AdminFranchiseService } from './franchise/admin-franchise.service';
 import { AdminIntegrationsController } from './integrations/admin-integrations.controller';
@@ -20,16 +22,22 @@ import { SystemConfigService } from './services/system-config.service';
 import { AdminDashboardService } from './dashboard/admin-dashboard.service';
 import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
+import { UploadModule } from '../upload/upload.module';
 import { AdminModulesModule } from './modules/admin-modules.module';
 import { AiAgentModule } from '../ai-agent/ai-agent.module';
 import { AdminDebugAiAgentController } from '../ai-agent/controllers/admin-debug-ai-agent.controller';
 import { AdminAiAgentController } from './ai-agent/admin-ai-agent.controller';
 import { AiAgentPlanPresetService } from './ai-agent/ai-agent-plan-preset.service';
+import { AdminBaseMediaController } from './base-media/admin-base-media.controller';
+import { AdminBaseMediaService } from './base-media/admin-base-media.service';
+import { AdminBaseMenuController } from './base-menu/admin-base-menu.controller';
+import { AdminBaseMenuService } from './base-menu/admin-base-menu.service';
 
 @Module({
   imports: [
     AuthModule,
     BillingModule,
+    UploadModule,
     AdminModulesModule,
     forwardRef(() => AiAgentModule),
   ],
@@ -41,11 +49,14 @@ import { AiAgentPlanPresetService } from './ai-agent/ai-agent-plan-preset.servic
     AdminHealthController,
     AdminAuditLogsController,
     AdminBillingController,
+    AsaasAdminController,
     AdminFranchiseController,
     AdminIntegrationsController,
     AdminDashboardController,
     AdminDebugAiAgentController,
     AdminAiAgentController,
+    AdminBaseMenuController,
+    AdminBaseMediaController,
   ],
   providers: [
     AdminAuthService, 
@@ -58,6 +69,8 @@ import { AiAgentPlanPresetService } from './ai-agent/ai-agent-plan-preset.servic
     SystemConfigService,
     AdminDashboardService,
     AiAgentPlanPresetService,
+    AdminBaseMenuService,
+    AdminBaseMediaService,
   ],
   exports: [AdminAuthService, AdminRbacService, AdminModulesModule],
 })

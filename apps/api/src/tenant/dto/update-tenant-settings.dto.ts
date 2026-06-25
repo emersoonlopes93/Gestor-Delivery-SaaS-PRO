@@ -22,6 +22,11 @@ export class UpdateTenantSettingsDto {
   businessPhone?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  orderWhatsappNumber?: string;
+
+  @IsOptional()
   @IsEmail()
   @MaxLength(255)
   businessEmail?: string;
@@ -76,6 +81,10 @@ export class UpdateTenantSettingsDto {
   @IsOptional()
   @IsArray()
   paymentMethods?: string[];
+
+  @IsOptional()
+  @IsNumber()
+  minimumOrderValue?: number;
 
   @IsOptional()
   @IsString()
@@ -168,4 +177,24 @@ export class UpdateTenantSettingsDto {
   @IsOptional()
   @IsBoolean()
   browserNotificationsEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  loyaltyEnabled?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  loyaltyPointsPerReal?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  cashbackEnabled?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  cashbackPercent?: number;
+
+  @IsOptional()
+  @IsNumber()
+  cashbackValidityDays?: number;
 }

@@ -17,8 +17,28 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5174,
+    port: 5173,
     proxy: {
+      /**
+       * PROXY DE DESENVOLVIMENTO LOCAL
+       * ─────────────────────────────────────────────────────────────────────
+       * Este proxy redireciona requisições /api/* para o backend local na
+       * porta 3333 APENAS quando rodando via `pnpm dev` no navegador local.
+       *
+       * ⚠️  LIMITAÇÕES — leia antes de fazer o build do APK:
+       *
+       *  1. O proxy Vite NÃO funciona em builds de produção (vite build).
+       *  2. O proxy Vite NÃO funciona em APKs Android via Capacitor —
+       *     o WebView do dispositivo não passa pelo servidor de dev local.
+       *  3. Para o APK funcionar, defina em .env.local (ou .env):
+       *       VITE_API_URL=https://sua-api.onrender.com/api/v1
+       *     Depois rebuilde e sincronize:
+       *       pnpm --filter @gestor/web-tenant build
+       *       cd apps/web-tenant && npx cap sync android
+       *
+       *  ✅ O proxy continua aqui para facilitar o desenvolvimento local
+       *     quando VITE_API_URL não estiver definido (fallback para /api/v1).
+       */
       '/api': {
         target: 'http://localhost:3333',
         changeOrigin: true,

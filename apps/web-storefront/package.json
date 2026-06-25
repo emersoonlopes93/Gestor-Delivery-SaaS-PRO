@@ -24,6 +24,7 @@
     "@capacitor/share": "^7.0.2",
     "@gestor/core": "workspace:*",
     "@gestor/types": "workspace:*",
+    "@gestor/utils": "workspace:^",
     "@tanstack/react-query": "^5.60.0",
     "axios": "^1.7.7",
     "clsx": "^2.1.1",

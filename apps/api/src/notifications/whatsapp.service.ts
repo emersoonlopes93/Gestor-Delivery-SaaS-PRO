@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { WhatsAppSenderService } from '../whatsapp-channel/services/whatsapp-sender.service';
 import { PrismaService } from '../database/prisma.service';
+import { applyCampaignTemplate } from '../campaigns/utils/campaign-template.util';
 
 export interface WhatsAppMessagePayload {
   to: string;        // Phone number in international format e.g. 5511999999999
@@ -34,6 +35,57 @@ export class WhatsappService {
 
     try {
       const result = await this.whatsappSender.sendText(tenantId, { to, text: body });
+      
+      if (result.success && result.messageId) {
+        try {
+          const cleanPhone = to.replace(/\D/g, '');
+          const session = await this.prisma.chatSession.findFirst({
+            where: { tenantId, remoteJid: { contains: cleanPhone } },
+            select: { id: true }
+          });
+
+          if (session) {
+            await this.prisma.$transaction(async (tx) => {
+              const existingMsg = await tx.chatMessage.findUnique({
+                where: { externalId: result.messageId },
+              });
+
+              if (existingMsg) {
+                await tx.chatMessage.update({
+                  where: { id: existingMsg.id },
+                  data: { senderType: 'system' },
+                });
+                await tx.chatSession.update({
+                  where: { id: session.id },
+                  data: { 
+                    handoffActive: false, 
+                    handoffOperator: null, 
+                    handoffReason: null, 
+                    handoffUntil: null 
+                  },
+                });
+                this.logger.log(`Race condition auto-healed for message ${result.messageId}`);
+              } else {
+                await tx.chatMessage.create({
+                  data: {
+                    sessionId: session.id,
+                    direction: 'outbound',
+                    senderType: 'system',
+                    content: body,
+                    messageType: 'text',
+                    externalId: result.messageId,
+                    externalStatus: 'sent',
+                    timestamp: new Date(),
+                  },
+                });
+              }
+            });
+          }
+        } catch (dbError) {
+          this.logger.error(`Error saving system message: ${dbError instanceof Error ? dbError.message : 'unknown'}`);
+        }
+      }
+
       return result.success;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -67,6 +119,11 @@ export class WhatsappService {
     status: string,
     restaurantName: string,
   ): Promise<boolean> {
+    // Filtro P0: Apenas notificações cruciais para evitar spam
+    if (!['confirmed', 'out_for_delivery', 'cancelled'].includes(status)) {
+      return true;
+    }
+
     const settings = await this.prisma.tenantSettings.findUnique({
       where: { tenantId },
       select: { whatsappNotificationsEnabled: true, notificationTemplates: true }
@@ -98,10 +155,10 @@ export class WhatsappService {
       return false;
     }
 
-    // Replace variables
-    const finalMessage = message
-      .replace(/{{orderNumber}}/g, orderNumber)
-      .replace(/{{restaurantName}}/g, restaurantName);
+    const finalMessage = applyCampaignTemplate(message, {
+      orderNumber,
+      restaurantName,
+    });
 
     return this.sendTextMessage(customerPhone, finalMessage, tenantId);
   }

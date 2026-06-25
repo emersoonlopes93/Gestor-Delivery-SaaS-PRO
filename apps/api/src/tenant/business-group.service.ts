@@ -21,9 +21,32 @@ export class BusinessGroupService {
   }
 
   async addTenant(groupId: string, tenantId: string) {
-    return this.prisma.tenant.update({
-      where: { id: tenantId },
-      data: { businessGroupId: groupId },
+    const group = await this.prisma.businessGroup.findUnique({
+      where: { id: groupId },
+      select: { headquartersTenantId: true },
+    });
+
+    if (!group) {
+      throw new NotFoundException('Business Group not found');
+    }
+
+    const tenantRole = group.headquartersTenantId ? 'branch' : 'headquarters';
+
+    return this.prisma.$transaction(async (tx) => {
+      if (!group.headquartersTenantId) {
+        await tx.businessGroup.update({
+          where: { id: groupId },
+          data: { headquartersTenantId: tenantId },
+        });
+      }
+
+      return tx.tenant.update({
+        where: { id: tenantId },
+        data: {
+          businessGroupId: groupId,
+          businessGroupRole: tenantRole,
+        },
+      });
     });
   }
 

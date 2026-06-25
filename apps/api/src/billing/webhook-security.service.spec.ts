@@ -9,32 +9,46 @@ function mockRequest(body: string, headers: Record<string, string>): Request {
   const lowerHeaders = Object.fromEntries(
     Object.entries(headers).map(([key, value]) => [key.toLowerCase(), value]),
   );
-  return {
-    ip: '127.0.0.1',
-    rawBody: Buffer.from(body),
-    get: (name: string) => lowerHeaders[name.toLowerCase()],
-  } as unknown as Request;
+
+  function getHeader(name: 'set-cookie'): string[] | undefined;
+  function getHeader(name: string): string | undefined;
+  function getHeader(name: string): string | string[] | undefined {
+    return lowerHeaders[name.toLowerCase()];
+  }
+
+  const req = {} as Request & { rawBody: Buffer };
+  Object.defineProperty(req, 'ip', { value: '127.0.0.1' });
+  req.rawBody = Buffer.from(body);
+  req.get = getHeader;
+  return req;
 }
 
 describe('WebhookSecurityService', () => {
-  let prisma: any;
+  let mockPrisma: {
+    externalWebhookEvent: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+    };
+  };
   let service: WebhookSecurityService;
 
   beforeEach(() => {
-    prisma = {
+    mockPrisma = {
       externalWebhookEvent: {
         create: jest.fn().mockResolvedValue({ id: 'evt-db-1' }),
         findUnique: jest.fn(),
         update: jest.fn(),
       },
     };
+    const mockConfig = new ConfigService({
+      ASAAS_WEBHOOK_HMAC_SECRET: 'webhook-secret',
+      WEBHOOK_REPLAY_WINDOW_SECONDS: '300',
+      NODE_ENV: 'production',
+    });
     service = new WebhookSecurityService(
-      prisma,
-      { get: jest.fn((key: string, fallback?: string) => ({
-        ASAAS_WEBHOOK_HMAC_SECRET: 'webhook-secret',
-        WEBHOOK_REPLAY_WINDOW_SECONDS: '300',
-        NODE_ENV: 'production',
-      }[key] ?? fallback)) } as unknown as ConfigService,
+      mockPrisma as never,
+      mockConfig,
     );
   });
 
@@ -58,7 +72,7 @@ describe('WebhookSecurityService', () => {
     });
 
     expect(result.duplicate).toBe(false);
-    expect(prisma.externalWebhookEvent.create).toHaveBeenCalledWith({
+    expect(mockPrisma.externalWebhookEvent.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         provider: 'asaas',
         eventId: 'evt-1',

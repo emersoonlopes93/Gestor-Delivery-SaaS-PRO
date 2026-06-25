@@ -1,9 +1,10 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Circle, MapContainer, Marker, Polygon, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import { Circle, CircleMarker, MapContainer, Marker, Polygon, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet-draw';
 import {
   AlertCircle,
+  ArrowLeft,
   Ban,
   CheckCircle,
   Crosshair,
@@ -18,11 +19,9 @@ import {
   X,
 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api-client';
-import { createPolygonDrawer } from '@/lib/leaflet-draw-helper';
+// Import removido: createPolygonDrawer não é mais necessário
 import type { LatLngExpression } from 'leaflet';
 import { Tenant } from '@gestor/types';
-import { BottomSheet } from './components/BottomSheet';
-import { FloatingButtons } from './components/FloatingButtons';
 
 
 
@@ -291,16 +290,15 @@ const SimulationClickLayer = memo(function SimulationClickLayer(props: {
   return null;
 });
 
-const ZoneDrawLayer = memo(function ZoneDrawLayer(props: {
-  mode: DrawMode;
+const ZoneEditLayer = memo(function ZoneEditLayer(props: {
+  enabled: boolean;
   color: string;
   seedPolygon: PolygonCoordinates | null;
   onPolygonChange: (coords: PolygonCoordinates | null) => void;
 }) {
-  const { mode, color, seedPolygon, onPolygonChange } = props;
+  const { enabled, color, seedPolygon, onPolygonChange } = props;
   const map = useMap();
   const featureGroupRef = useRef<L.FeatureGroup | null>(null);
-  const drawRef = useRef<L.Draw.Polygon | null>(null);
 
   const clearLayers = useCallback(() => {
     if (!featureGroupRef.current) return;
@@ -378,25 +376,22 @@ const ZoneDrawLayer = memo(function ZoneDrawLayer(props: {
         polygon: false,
       },
     });
-
     map.addControl(editControl);
 
     return () => {
-      map.off(L.Draw.Event.CREATED, handleCreated);
       map.off(L.Draw.Event.EDITED, handleEdited);
       map.off(L.Draw.Event.DELETED, handleDeleted);
       map.removeControl(editControl);
       map.removeLayer(fg);
       featureGroupRef.current = null;
-      drawRef.current = null;
     };
-  }, [color, map, onPolygonChange]);
+  }, [color, map, onPolygonChange, enabled]);
 
   useEffect(() => {
     if (!featureGroupRef.current) return;
     clearLayers();
 
-    if (!seedPolygon || seedPolygon.length < 3) return;
+    if (!enabled || !seedPolygon || seedPolygon.length < 3) return;
     const seeded = ensureRingClosed(seedPolygon);
     const poly = new L.Polygon(coordsToLatLngs(seeded), {
       color,
@@ -405,38 +400,81 @@ const ZoneDrawLayer = memo(function ZoneDrawLayer(props: {
       weight: 3,
     });
     featureGroupRef.current.addLayer(poly);
-  }, [clearLayers, color, seedPolygon]);
-
-  useEffect(() => {
-    if (mode !== 'drawing') {
-      if (drawRef.current) {
-        drawRef.current.disable();
-        drawRef.current = null;
-      }
-      return;
-    }
-
-    const drawer = createPolygonDrawer(map, {
-      allowIntersection: false,
-      showArea: true,
-      shapeOptions: {
-        color,
-        fillColor: color,
-        fillOpacity: 0.12,
-        weight: 3,
-      },
-    });
-
-    drawRef.current = drawer;
-    drawer.enable();
-
-    return () => {
-      drawer.disable();
-      if (drawRef.current === drawer) drawRef.current = null;
-    };
-  }, [color, map, mode]);
+  }, [clearLayers, color, seedPolygon, enabled]);
 
   return null;
+});
+
+const ManualDrawLayer = memo(function ManualDrawLayer(props: {
+  enabled: boolean;
+  points: L.LatLng[];
+  setPoints: React.Dispatch<React.SetStateAction<L.LatLng[]>>;
+  color: string;
+}) {
+  const map = useMap();
+  const [mousePos, setMousePos] = useState<L.LatLng | null>(null);
+
+  useMapEvents({
+    click: (e) => {
+      if (!props.enabled) return;
+      props.setPoints((prev) => [...prev, e.latlng]);
+    },
+    mousemove: (e) => {
+      if (!props.enabled) return;
+      setMousePos(e.latlng);
+    },
+    mouseout: () => {
+      if (!props.enabled) return;
+      setMousePos(null);
+    }
+  });
+
+  useEffect(() => {
+    const el = map.getContainer();
+    if (props.enabled) {
+      el.style.cursor = 'crosshair';
+    } else {
+      el.style.cursor = '';
+      setMousePos(null);
+    }
+    return () => {
+      el.style.cursor = '';
+    };
+  }, [props.enabled, map]);
+
+  if (!props.enabled) return null;
+
+  const currentPositions = [...props.points];
+  if (mousePos) {
+    currentPositions.push(mousePos);
+  }
+
+  return (
+    <>
+      {props.points.map((p, i) => (
+        <CircleMarker
+          key={i}
+          center={p}
+          radius={5}
+          pathOptions={{ color: props.color, fillColor: '#fff', fillOpacity: 1, weight: 2 }}
+        />
+      ))}
+      
+      {currentPositions.length >= 2 && (
+        <Polygon
+          positions={currentPositions}
+          pathOptions={{
+            color: props.color,
+            weight: 2,
+            dashArray: '5, 5',
+            fillColor: currentPositions.length >= 3 ? props.color : 'transparent',
+            fillOpacity: currentPositions.length >= 3 ? 0.12 : 0,
+            interactive: false,
+          }}
+        />
+      )}
+    </>
+  );
 });
 
 async function geocodeNominatim(address: string): Promise<{ lat: number; lng: number } | null> {
@@ -445,7 +483,7 @@ async function geocodeNominatim(address: string): Promise<{ lat: number; lng: nu
     const response = await fetch(url, {
       headers: {
         'Accept-Language': 'pt-BR',
-        'User-Agent': 'Gestor-Delivery-SaaS-PRO-App',
+        'User-Agent': 'PedeHub-App',
       },
     });
     const data = await response.json();
@@ -461,8 +499,24 @@ async function geocodeNominatim(address: string): Promise<{ lat: number; lng: nu
   return null;
 }
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 1024);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  return isMobile;
+}
+
 export function DeliveryZonesPageRefactored() {
   const [coverage, setCoverage] = useState<CoverageConfig | null>(null);
+  const [hasDefaultCoords, setHasDefaultCoords] = useState(false);
+  const isMobile = useIsMobile();
+  const [showMobileMap, setShowMobileMap] = useState(false);
+
+  const [draftPolygonPoints, setDraftPolygonPoints] = useState<L.LatLng[]>([]);
   const [coverageDraft, setCoverageDraft] = useState({
     isDeliveryEnabled: true,
     storeLat: -23.55052,
@@ -474,6 +528,8 @@ export function DeliveryZonesPageRefactored() {
   });
 
   const [zones, setZones] = useState<DeliveryRateRule[]>([]);
+  const [globalDistanceRule, setGlobalDistanceRule] = useState<DeliveryRateRule | null>(null);
+  const [distanceTiersDraft, setDistanceTiersDraft] = useState<Array<{ id?: string; minDistanceKm: string; maxDistanceKm: string; fee: string }>>([]);
 
   const [loading, setLoading] = useState(true);
   const [savingCoverage, setSavingCoverage] = useState(false);
@@ -579,10 +635,19 @@ export function DeliveryZonesPageRefactored() {
       if (rulesRes.success) {
         const all = rulesRes.data ?? [];
         const zs = all.filter((r) => r.type === 'polygon');
+        const ds = all.filter((r) => r.type === 'distance');
 
         setZones(zs.sort((a, b) => a.priority - b.priority));
 
         if (zs.length > 0 && !selectedZoneId) setSelectedZoneId(zs[0].id);
+
+        const dRule = ds.find((r) => r.pricingMode === 'tiers');
+        setGlobalDistanceRule(dRule || null);
+        if (dRule?.distanceTiers) {
+           setDistanceTiersDraft(dRule.distanceTiers);
+        } else {
+           setDistanceTiersDraft([]);
+        }
       }
 
       const tenantRes = await api.get<Tenant>('/tenant/me');
@@ -590,24 +655,30 @@ export function DeliveryZonesPageRefactored() {
         const settings = tenantRes.data.settings;
         if (settings) {
           const isDefaultCoords = Math.abs(fetchedLat - (-23.55052)) < 0.0001 && Math.abs(fetchedLng - (-46.633308)) < 0.0001;
+          let updatedToRealCoords = false;
 
           if (typeof settings.lat === 'number' && typeof settings.lng === 'number') {
             setCoverageDraft((d) => ({ ...d, storeLat: settings.lat ?? 0, storeLng: settings.lng ?? 0 }));
             setFitToStoreSeq((v) => v + 1);
+            updatedToRealCoords = true;
           } else if (hasConfig && !isDefaultCoords) {
             setFitToStoreSeq((v) => v + 1);
+            updatedToRealCoords = true;
           } else if (settings.street && settings.number && settings.city) {
             const addressStr = `${settings.street}, ${settings.number}, ${settings.neighborhood || ''}, ${settings.city} - ${settings.state || ''}, Brasil`;
             const coords = await geocodeNominatim(addressStr);
             if (coords) {
               setCoverageDraft((d) => ({ ...d, storeLat: coords.lat, storeLng: coords.lng }));
               setFitToStoreSeq((v) => v + 1);
+              updatedToRealCoords = true;
             } else {
-              setToast('Aviso: Não foi possível geocodificar o endereço. Mapa não centralizado com precisão.');
+              setToast('Aviso: Não foi possível geocodificar o endereço. Edite o endereço da loja nas Configurações.');
             }
           } else {
             setToast('Aviso: Configure o endereço com precisão em Configurações para centralizar o mapa.');
           }
+
+          setHasDefaultCoords(!updatedToRealCoords);
         }
       }
 
@@ -665,7 +736,7 @@ export function DeliveryZonesPageRefactored() {
 
   const openNewZone = useCallback(() => {
     resetZoneForm();
-    setEditorOpen(true);
+    setEditorOpen(false);
     setDrawMode('drawing');
   }, [resetZoneForm]);
 
@@ -676,7 +747,11 @@ export function DeliveryZonesPageRefactored() {
 
   const handlePolygonChange = useCallback((coords: PolygonCoordinates | null) => {
     setZoneForm((z) => ({ ...z, polygonCoordinates: coords }));
-  }, []);
+    if (coords && coords.length >= 3 && drawMode === 'drawing') {
+      setEditorOpen(true);
+      setDrawMode('idle');
+    }
+  }, [drawMode]);
 
   const handleDeleteZone = useCallback(
     async (z: DeliveryRateRule) => {
@@ -695,6 +770,42 @@ export function DeliveryZonesPageRefactored() {
     },
     [fetchAll, selectedZoneId],
   );
+
+  const handleSaveDistanceTiers = useCallback(async () => {
+    setSavingZone(true);
+    setError(null);
+    try {
+      const payload = {
+        type: 'distance' as const,
+        isActive: true,
+        priority: 500,
+        isFallback: false,
+        pricingMode: 'tiers' as const,
+        distanceTiers: distanceTiersDraft.map((t, idx) => ({
+          id: t.id,
+          minDistanceKm: Number(t.minDistanceKm),
+          maxDistanceKm: Number(t.maxDistanceKm),
+          fee: Number(t.fee),
+          sortOrder: idx
+        })),
+        name: 'Faixas de Distância Globais',
+      };
+
+      if (globalDistanceRule?.id) {
+        await api.put(`/delivery/rates/${globalDistanceRule.id}`, payload);
+        setToast('Faixas atualizadas');
+      } else {
+        await api.post('/delivery/rates', payload);
+        setToast('Faixas criadas');
+      }
+      await fetchAll();
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'Erro ao salvar faixas';
+      setError(msg);
+    } finally {
+      setSavingZone(false);
+    }
+  }, [fetchAll, distanceTiersDraft, globalDistanceRule]);
 
   const handleSaveZone = useCallback(async () => {
     setSavingZone(true);
@@ -907,6 +1018,17 @@ export function DeliveryZonesPageRefactored() {
 
   const renderEditorForm = () => (
     <div className="flex flex-col h-full bg-card">
+      {isMobile && (
+        <div className="p-4 shrink-0 bg-blue-50/50 border-b border-blue-200">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+            <div className="text-sm text-blue-900">
+              <strong className="block font-black mb-1">Modo Simplificado</strong>
+              Edição avançada de formato e desenho disponível apenas no Computador.
+            </div>
+          </div>
+        </div>
+      )}
       <div className="p-4 border-b border-border flex items-start justify-between gap-3 shrink-0">
         <div className="min-w-0">
           <div className="text-lg font-black text-foreground">
@@ -915,7 +1037,7 @@ export function DeliveryZonesPageRefactored() {
           <div className="text-sm text-muted-foreground mt-0.5">
             {drawMode === 'drawing'
               ? 'Desenhe no mapa e depois ajuste os detalhes.'
-              : 'Ajuste os detalhes e salve.'}
+              : 'Essas regras têm prioridade sobre faixas de distância.'}
           </div>
         </div>
         <button
@@ -1197,17 +1319,20 @@ export function DeliveryZonesPageRefactored() {
 
       <div className="shrink-0 bg-card border-t border-border p-4 space-y-3 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setDrawMode((m) => (m === 'drawing' ? 'idle' : 'drawing'))}
-            className={'h-12 flex-1 rounded-xl text-sm font-black transition-all inline-flex items-center justify-center gap-2 ' +
-              (drawMode === 'drawing'
-                ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400'
-                : 'bg-primary-50 text-primary-700 hover:bg-primary-100 dark:bg-primary-500/10 dark:text-primary-400')}
-          >
-            {drawMode === 'drawing' ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
-            {drawMode === 'drawing' ? 'Parar desenho' : 'Editar área'}
-          </button>
+          {!isMobile && (
+            <button
+              type="button"
+              onClick={() => {
+                setDrawMode('drawing');
+                setEditorOpen(false);
+                setDraftPolygonPoints([]);
+              }}
+              className="h-12 px-4 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 text-sm font-bold flex flex-1 items-center justify-center gap-2 transition-colors"
+            >
+              <Pencil className="h-4 w-4" />
+              Refazer desenho
+            </button>
+          )}
 
           <button
             type="button"
@@ -1242,17 +1367,95 @@ export function DeliveryZonesPageRefactored() {
     );
   }
 
-  const renderDesktopContent = () => (
-    <div className="h-full flex overflow-hidden bg-muted/50">
-      <div className="w-[420px] shrink-0 h-full border-r border-border bg-card flex flex-col z-10 shadow-sm relative">
+  const renderLeftPanelContent = () => {
+    if (drawMode === 'drawing') {
+      return (
+        <div className="flex flex-col h-full bg-card">
+          <div className="p-6 pb-4 border-b border-border shrink-0">
+            <button 
+              type="button"
+              onClick={() => { setDrawMode('idle'); setEditorOpen(false); setDraftPolygonPoints([]); }} 
+              className="p-2 -ml-2 mb-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="text-sm font-bold">Voltar</span>
+            </button>
+            <h2 className="text-xl font-black text-foreground">Desenhando nova zona</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Clique no mapa para adicionar pontos. Use Concluir área quando terminar.
+            </p>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="bg-muted p-4 rounded-xl text-center border border-border">
+              <Crosshair className="h-8 w-8 text-primary mx-auto mb-2 animate-pulse" />
+              <div className="font-black text-lg">{draftPolygonPoints.length}</div>
+              <div className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Pontos marcados</div>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setDraftPolygonPoints((prev) => prev.slice(0, -1))}
+                disabled={draftPolygonPoints.length === 0}
+                className="w-full h-10 rounded-xl bg-card border border-input text-sm font-bold hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                Desfazer ponto
+              </button>
+              <button
+                type="button"
+                onClick={() => setDraftPolygonPoints([])}
+                disabled={draftPolygonPoints.length === 0}
+                className="w-full h-10 rounded-xl bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400 text-sm font-bold hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors disabled:opacity-50"
+              >
+                Limpar
+              </button>
+            </div>
+          </div>
+          <div className="mt-auto p-4 border-t border-border shrink-0">
+            <button
+              onClick={() => {
+                if (draftPolygonPoints.length >= 3) {
+                  handlePolygonChange(latLngsToCoords(draftPolygonPoints));
+                  setDrawMode('idle');
+                  setEditorOpen(true);
+                  setDraftPolygonPoints([]);
+                }
+              }}
+              disabled={draftPolygonPoints.length < 3}
+              className="w-full h-12 rounded-xl bg-status-success text-white text-sm font-black hover:bg-status-success/90 transition-all shadow-md disabled:opacity-50"
+            >
+              Concluir área
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (editorOpen) {
+      return renderEditorForm();
+    }
+
+    return (
+      <div className="flex flex-col h-full bg-card">
         <div className="p-6 pb-4 border-b border-border shrink-0">
           <h1 className="text-2xl font-black text-foreground">Zonas de Entrega</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Configure seu mapa de entregas.
+            Desenhe áreas específicas para cobrar taxas diferentes por região.
           </p>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {hasDefaultCoords && (
+            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-xl flex items-start gap-3 shadow-sm">
+              <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+              <div>
+                <div className="text-sm font-black">Endereço não configurado</div>
+                <div className="text-xs font-medium mt-0.5 opacity-90">
+                  O mapa está usando coordenadas padrão. Configure a origem real.
+                </div>
+              </div>
+            </div>
+          )}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -1449,6 +1652,14 @@ export function DeliveryZonesPageRefactored() {
           </div>
         </div>
       </div>
+    );
+  };
+
+  const renderDesktopContent = () => (
+    <div className="h-full flex overflow-hidden bg-muted/50 relative">
+      <div className="w-[360px] max-w-[380px] shrink-0 h-full border-r border-border flex flex-col z-10 shadow-sm relative overflow-hidden bg-card">
+        {renderLeftPanelContent()}
+      </div>
 
       <div className="flex-1 min-w-0 h-full bg-muted/50 relative" style={{ isolation: 'isolate' }}>
         <div className="absolute inset-0">
@@ -1618,22 +1829,20 @@ export function DeliveryZonesPageRefactored() {
                 />
               );
             })}
-            <ZoneDrawLayer
-              mode={drawMode}
+            <ZoneEditLayer
+              enabled={editorOpen && drawMode !== 'drawing'}
               color={zoneForm.color}
               seedPolygon={editorOpen ? zoneForm.polygonCoordinates : null}
               onPolygonChange={handlePolygonChange}
             />
+            <ManualDrawLayer
+              enabled={drawMode === 'drawing'}
+              points={draftPolygonPoints}
+              setPoints={setDraftPolygonPoints}
+              color={zoneForm.color}
+            />
           </MapContainer>
         </div>
-
-        {editorOpen && (
-          <div
-            className="absolute top-0 right-0 h-full w-[400px] bg-card shadow-2xl z-[2000] border-l border-input flex flex-col transition-transform"
-          >
-            {renderEditorForm()}
-          </div>
-        )}
 
         <div className="hidden lg:block absolute bottom-6 right-6 z-[1000]">
           <div className="bg-white/95 dark:bg-slate-950/95 text-slate-950 dark:text-white border border-slate-200 dark:border-white/15 rounded-2xl shadow-xl dark:shadow-2xl backdrop-blur-md absolute bottom-0 right-0 min-w-[180px] p-4 space-y-3">
@@ -1664,204 +1873,360 @@ export function DeliveryZonesPageRefactored() {
     </div>
   );
 
-  const renderMobileContent = () => (
-    <div className="h-[calc(100vh-64px)] relative" style={{ isolation: 'isolate' }}>
-      <div className="absolute inset-0 pb-32 z-0">
-        <MapContainer
-          center={mapCenter}
-          zoom={14}
-          className={"h-full w-full " + (simulationOn ? 'cursor-crosshair' : '')}
-          style={{ height: 'calc(100vh - 64px)' }}
-        >
-          <MapImperative storePosition={storePosition} fitToStoreSeq={fitToStoreSeq} />
-          <MapRefSync mapRef={mapRef} />
-          <SimulationClickLayer enabled={simulationOn} onPick={runSimulationAt} />
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <Marker
-            position={storePosition}
-            draggable
-            eventHandlers={{
-              dragend: (e) => {
-                const target = e.target;
-                if (!(target instanceof L.Marker)) return;
-                const pos = target.getLatLng();
-                setCoverageDraft((d) => ({ ...d, storeLat: pos.lat, storeLng: pos.lng }));
-              },
-            }}
-          />
-          {coverage && (
-            <Circle
-              center={[coverage.storeLat, coverage.storeLng]}
-              radius={Number(coverage.maxRadiusKm) * 1000}
-              pathOptions={{
-                color: '#3b82f6',
-                weight: simulationDecision?.matchedStrategy === 'base_radius' ? 3 : 2,
-                opacity: 0.9,
-                fillColor: '#3b82f6',
-                fillOpacity: simulationDecision?.matchedStrategy === 'base_radius' ? 0.12 : 0.08,
-                dashArray: '8, 6',
-                lineJoin: 'round',
-              }}
-            />
-          )}
-          {visibleZones.map((z) => {
-            const coords = normalizePolygonCoordinates(z.polygonCoordinates);
-            if (!coords || coords.length < 3) return null;
-            const color = z.color ?? z.geoJson?.properties?.color ?? defaultZoneColor();
-            return (
-              <Polygon
-                key={`zone-${z.id}`}
-                positions={coordsToLatLngs(coords)}
-                pathOptions={{
-                  color: color,
-                  weight: 3,
-                  opacity: 0.9,
-                  fillColor: color,
-                  fillOpacity: 0.25,
-                  lineJoin: 'round',
-                }}
+  const renderMobileContent = () => {
+    if (showMobileMap) {
+      return (
+        <div className="fixed inset-0 z-[9999] bg-background flex flex-col">
+          <div className="h-16 shrink-0 flex items-center justify-between px-4 border-b border-border bg-card">
+            <h2 className="text-lg font-black text-foreground">Visualização do Mapa</h2>
+            <button
+              type="button"
+              onClick={() => setShowMobileMap(false)}
+              className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="flex-1 relative bg-slate-100 dark:bg-slate-900">
+            <MapContainer
+              center={mapCenter}
+              zoom={14}
+              className="h-full w-full"
+              dragging={!isMobile}
+              touchZoom={!isMobile}
+              scrollWheelZoom={!isMobile}
+              doubleClickZoom={!isMobile}
+              zoomControl={false}
+            >
+              <MapImperative storePosition={storePosition} fitToStoreSeq={fitToStoreSeq} />
+              <MapRefSync mapRef={mapRef} />
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-            );
-          })}
-          {editorOpen && (
-            <ZoneDrawLayer
-              mode={drawMode}
-              color={zoneForm.color}
-              seedPolygon={editorOpen ? zoneForm.polygonCoordinates : null}
-              onPolygonChange={handlePolygonChange}
-            />
-          )}
-        </MapContainer>
-      </div>
+              <Marker position={storePosition} />
+              {coverage && (
+                <Circle
+                  center={[coverage.storeLat, coverage.storeLng]}
+                  radius={Number(coverage.maxRadiusKm) * 1000}
+                  pathOptions={{
+                    color: '#3b82f6',
+                    weight: 2,
+                    opacity: 0.9,
+                    fillColor: '#3b82f6',
+                    fillOpacity: 0.08,
+                    dashArray: '8, 6',
+                    lineJoin: 'round',
+                  }}
+                />
+              )}
+              {visibleZones.map((z) => {
+                const coords = normalizePolygonCoordinates(z.polygonCoordinates);
+                if (!coords || coords.length < 3) return null;
+                const color = z.color ?? z.geoJson?.properties?.color ?? defaultZoneColor();
+                return (
+                  <Polygon
+                    key={`zone-${z.id}`}
+                    positions={coordsToLatLngs(coords)}
+                    pathOptions={{
+                      color: color,
+                      weight: 3,
+                      opacity: 0.9,
+                      fillColor: color,
+                      fillOpacity: 0.25,
+                      lineJoin: 'round',
+                    }}
+                  />
+                );
+              })}
+            </MapContainer>
+          </div>
+        </div>
+      );
+    }
 
-      <FloatingButtons
-        onCenterStore={() => setFitToStoreSeq((v) => v + 1)}
-        onNewZone={openNewZone}
-        onSimulate={() => {
-          setSimulationOn((v) => {
-            const next = !v;
-            if (!next) clearSimulation();
-            return next;
-          });
-        }}
-        simulationActive={simulationOn}
-        editorOpen={editorOpen}
-      />
+    if (editorOpen) {
+      return (
+        <div className="h-full bg-background overflow-y-auto">
+          {renderEditorForm()}
+        </div>
+      );
+    }
 
-      <BottomSheet
-        defaultState="peeking"
-        forceState={editorOpen ? 'expanded' : undefined}
-        minHeight={80}
-        peekHeight={200}
-        maxHeight="85vh"
-        noPadding={editorOpen}
-      >
-        {editorOpen ? (
-          renderEditorForm()
-        ) : (
-          <>
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl flex items-center justify-between gap-3 mb-4">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm font-medium">{error}</span>
-                </div>
-                <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
-                  <X className="h-4 w-4" />
-                </button>
+    return (
+      <div className="h-full bg-background overflow-y-auto p-4 space-y-6 pb-24">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-black text-foreground">Zonas de Entrega</h2>
+          <p className="text-sm text-muted-foreground">
+            Configure raio, taxas e zonas sem precisar usar o mapa no celular.
+          </p>
+        </div>
+
+        {hasDefaultCoords && (
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-xl flex items-start gap-3 shadow-sm">
+            <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+            <div>
+              <div className="text-sm font-black">Endereço não configurado</div>
+              <div className="text-xs font-medium mt-0.5 opacity-90">
+                Configure a origem real da sua loja nas Configurações Gerais para que o raio funcione a partir de você.
               </div>
-            )}
-
-            <div className="mb-4">
-              <h2 className="text-xl font-black text-foreground">Zonas de Entrega</h2>
             </div>
+          </div>
+        )}
 
-            {visibleZones.length === 0 ? (
-              <div className="text-center py-8">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
-                  <MapPin className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <div className="text-sm font-semibold text-foreground mb-2">
-                  Nenhuma zona personalizada ainda
-                </div>
-                <div className="text-xs text-muted-foreground mb-6">
-                  Sua cobertura padrão (raio base) já está funcionando.
-                </div>
+        <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-200 text-blue-900 shadow-sm flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+          <div className="text-sm">
+            <strong className="block font-black mb-1">Modo Simplificado</strong>
+            Edição avançada de mapa e desenho de polígonos disponível apenas no Computador.
+          </div>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              <span className="text-sm font-medium">{error}</span>
+            </div>
+            <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        {coverageDraft && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-black text-foreground">Cobertura Principal (Raio)</h3>
+            <div className="p-5 rounded-xl border border-input bg-card shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-foreground">Entrega ativa</span>
                 <button
                   type="button"
-                  onClick={openNewZone}
-                  className="w-full h-11 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-black hover:bg-primary/90 transition-all duration-200 shadow-sm inline-flex items-center justify-center gap-2"
+                  onClick={() => setCoverageDraft(d => ({ ...d, isDeliveryEnabled: !d.isDeliveryEnabled }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
+                    coverageDraft.isDeliveryEnabled ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
                 >
-                  <Plus className="h-5 w-5" />
-                  Criar primeira zona
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      coverageDraft.isDeliveryEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
                 </button>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-foreground mb-1.5">Raio Máximo (km)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.1}
+                  value={coverageDraft.maxRadiusKm}
+                  onChange={(e) => setCoverageDraft((d) => ({ ...d, maxRadiusKm: Number(e.target.value) }))}
+                  className="w-full h-11 px-3 rounded-xl border border-input bg-card focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-foreground mb-1.5">Taxa Padrão por km (R$)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={coverageDraft.defaultPricePerKm}
+                  onChange={(e) => setCoverageDraft((d) => ({ ...d, defaultPricePerKm: Number(e.target.value) }))}
+                  className="w-full h-11 px-3 rounded-xl border border-input bg-card focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleSaveCoverage}
+                disabled={savingCoverage}
+                className="w-full h-11 rounded-xl bg-primary text-primary-foreground text-sm font-black flex items-center justify-center shadow-sm disabled:opacity-70 transition-all"
+              >
+                {savingCoverage ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                Salvar Cobertura
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <h3 className="text-lg font-black text-foreground">Entrega por distância</h3>
+            <p className="text-sm text-muted-foreground">Use faixas para cobrar valores diferentes conforme a distância.</p>
+          </div>
+          
+          <div className="p-5 rounded-xl border border-input bg-card shadow-sm space-y-4">
+            {distanceTiersDraft.length === 0 ? (
+              <div className="p-4 rounded-xl border border-dashed border-input bg-muted/30 text-center">
+                <div className="text-sm font-semibold mb-1">Nenhuma faixa configurada.</div>
+                <div className="text-xs text-muted-foreground">Você pode usar a taxa padrão acima ou adicionar faixas por KM aqui.</div>
               </div>
             ) : (
               <div className="space-y-3">
-                {visibleZones.map((z) => {
-                  return (
-                    <div
-                      key={z.id}
-                      className="p-4 rounded-xl border border-input bg-card shadow-sm"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <div
-                              className="w-3.5 h-3.5 rounded-full border border-white shadow-sm"
-                              style={{ backgroundColor: z.color ?? defaultZoneColor() }}
-                            />
-                            <span className="text-sm font-semibold text-foreground truncate">
-                              {z.name || `Zona ${visibleZones.indexOf(z) + 1}`}
-                            </span>
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {z.zoneKind === 'blocked_zone' ? 'Bloqueada' : z.pricingMode === 'free' ? 'Grátis' : 'Taxa aplicada'}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedZoneId(z.id);
-                              fitSelectedZone(z.id);
-                            }}
-                            className="p-2 rounded-lg hover:bg-muted transition-colors"
-                          >
-                            <Crosshair className="h-4 w-4 text-muted-foreground" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedZoneId(z.id);
-                              setEditorOpen(true);
-                            }}
-                            className="p-2 rounded-lg hover:bg-muted transition-colors"
-                          >
-                            <Edit2 className="h-4 w-4 text-muted-foreground" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteZone(z)}
-                            className="p-2 rounded-lg hover:bg-red-50 transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </button>
-                        </div>
-                      </div>
+                {distanceTiersDraft.map((tier, idx) => (
+                  <div key={idx} className="flex flex-col gap-2 p-3 rounded-lg border border-input bg-muted/20">
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="number" 
+                        min={0} 
+                        step={0.1} 
+                        value={tier.minDistanceKm} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          setDistanceTiersDraft(draft => draft.map((t, i) => i === idx ? { ...t, minDistanceKm: val } : t));
+                        }} 
+                        className="w-20 h-9 px-2 text-sm rounded-lg border border-input bg-card" 
+                        placeholder="De (km)"
+                      />
+                      <span className="text-sm text-muted-foreground">a</span>
+                      <input 
+                        type="number" 
+                        min={0} 
+                        step={0.1} 
+                        value={tier.maxDistanceKm} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          setDistanceTiersDraft(draft => draft.map((t, i) => i === idx ? { ...t, maxDistanceKm: val } : t));
+                        }} 
+                        className="w-20 h-9 px-2 text-sm rounded-lg border border-input bg-card" 
+                        placeholder="Até (km)"
+                      />
+                      <span className="text-sm text-muted-foreground">km</span>
                     </div>
-                  );
-                })}
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">R$</span>
+                        <input 
+                          type="number" 
+                          min={0} 
+                          step={0.01} 
+                          value={tier.fee} 
+                          onChange={e => {
+                            const val = e.target.value;
+                            setDistanceTiersDraft(draft => draft.map((t, i) => i === idx ? { ...t, fee: val } : t));
+                          }} 
+                          className="w-full h-9 pl-8 pr-3 text-sm rounded-lg border border-input bg-card" 
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDistanceTiersDraft(draft => draft.filter((_, i) => i !== idx))}
+                        className="p-2 rounded-lg text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {Number(tier.maxDistanceKm) <= Number(tier.minDistanceKm) && (
+                      <div className="text-xs font-semibold text-red-500">A distância final deve ser maior que a inicial.</div>
+                    )}
+                    {idx > 0 && Number(tier.minDistanceKm) < Number(distanceTiersDraft[idx-1].maxDistanceKm) && (
+                      <div className="text-xs font-semibold text-yellow-600">Esta faixa cruza com a faixa anterior.</div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
-          </>
-        )}
-      </BottomSheet>
-    </div>
-  );
+            
+            <button
+              type="button"
+              onClick={() => {
+                const last = distanceTiersDraft[distanceTiersDraft.length - 1];
+                const nextMin = last ? Number(last.maxDistanceKm) : 0;
+                const nextMax = nextMin + 5;
+                setDistanceTiersDraft(draft => [...draft, { minDistanceKm: String(nextMin), maxDistanceKm: String(nextMax), fee: '0' }]);
+              }}
+              className="w-full h-9 rounded-lg border border-dashed border-input hover:bg-muted text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+            >
+              <Plus className="h-4 w-4" /> Adicionar faixa
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSaveDistanceTiers}
+              disabled={savingZone}
+              className="w-full h-11 rounded-xl bg-card border border-border text-foreground hover:bg-muted text-sm font-black flex items-center justify-center shadow-sm disabled:opacity-70 transition-all mt-4"
+            >
+              {savingZone ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+              Salvar Faixas
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-black text-foreground">Zonas Avançadas</h3>
+            <button
+              type="button"
+              onClick={() => setShowMobileMap(true)}
+              className="text-xs font-bold text-primary flex items-center gap-1 hover:underline"
+            >
+              <MapPin className="h-3 w-3" /> Ver mapa
+            </button>
+          </div>
+
+          {visibleZones.length === 0 ? (
+            <div className="p-6 rounded-xl border border-dashed border-input bg-muted/30 text-center">
+              <div className="text-sm font-semibold mb-1">Nenhuma zona avançada criada.</div>
+              <div className="text-xs text-muted-foreground mb-4">Você pode usar a cobertura por raio agora e criar polígonos depois pelo computador.</div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {visibleZones.map((z) => (
+                <div key={z.id} className="p-4 rounded-xl border border-input bg-card shadow-sm">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div
+                          className="w-3 h-3 rounded-full border border-white shadow-sm shrink-0"
+                          style={{ backgroundColor: z.color ?? defaultZoneColor() }}
+                        />
+                        <span className="text-sm font-bold text-foreground truncate">
+                          {z.name || `Zona ${visibleZones.indexOf(z) + 1}`}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-[10px] uppercase font-bold tracking-wider">
+                        <span className={z.isActive ? 'text-status-success' : 'text-muted-foreground'}>
+                          {z.isActive ? 'Ativa' : 'Inativa'}
+                        </span>
+                        <span className="text-muted-foreground">•</span>
+                        <span className="text-blue-600 dark:text-blue-400">
+                           {z.zoneKind === 'blocked_zone' ? 'Bloqueada' : z.pricingMode === 'free' ? 'Grátis' : 'Com Taxa'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedZoneId(z.id);
+                        setEditorOpen(true);
+                      }}
+                      className="flex-1 h-9 rounded-lg border border-input bg-card hover:bg-muted text-xs font-black transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Edit2 className="h-3 w-3" /> Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowMobileMap(true)}
+                      className="flex-1 h-9 rounded-lg border border-input bg-card hover:bg-muted text-xs font-black transition-colors flex items-center justify-center gap-2"
+                    >
+                      <MapPin className="h-3 w-3" /> Ver mapa
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="h-[calc(100vh-64px)] min-h-[720px]">

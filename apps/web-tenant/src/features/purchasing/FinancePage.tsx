@@ -83,17 +83,17 @@ export function FinancePage() {
     <div className="p-6 max-w-7xl mx-auto text-left">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 tracking-tight flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-foreground tracking-tight flex items-center gap-3">
             <Wallet className="h-8 w-8 text-primary-600" />
             Gestão Financeira
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Controle seu fluxo de caixa, DRE e saúde financeira do negócio.</p>
+          <p className="text-muted-foreground mt-1">Controle seu fluxo de caixa, DRE e saúde financeira do negócio.</p>
         </div>
         <div className="flex items-center gap-3">
           <button 
             onClick={handleExport}
             disabled={transactions.length === 0}
-            className="p-2.5 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50 disabled:opacity-50 transition-all font-semibold text-sm flex items-center gap-2 shadow-sm"
+            className="p-2.5 bg-card border border-border rounded-xl text-muted-foreground hover:bg-muted disabled:opacity-50 transition-all font-semibold text-sm flex items-center gap-2 shadow-sm"
           >
             <Download className="h-4 w-4" /> Exportar
           </button>
@@ -113,31 +113,31 @@ export function FinancePage() {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 relative overflow-hidden group">
+        <div className="bg-card p-6 rounded-2xl shadow-sm border border-border relative overflow-hidden group">
           <div className="absolute right-0 top-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
             <Building className="h-16 w-16" />
           </div>
-          <div className="text-xs font-bold text-gray-400 uppercase mb-1">Saldo em Contas</div>
-          <div className="text-2xl font-black text-gray-900 dark:text-gray-100">R$ {metrics?.financial?.cashBalance?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}</div>
+          <div className="text-xs font-bold text-muted-foreground uppercase mb-1">Saldo em Contas</div>
+          <div className="text-2xl font-black text-foreground">R$ {metrics?.financial?.cashBalance?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}</div>
           <div className="mt-3 flex items-center gap-2 text-xs">
             <span className="text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded-full">↑ 4.2%</span>
             <span className="text-gray-400">vs última semana</span>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
-          <div className="text-xs font-bold text-gray-400 uppercase mb-1">Entradas (Mês)</div>
+        <div className="bg-card p-6 rounded-2xl shadow-sm border border-border">
+          <div className="text-xs font-bold text-muted-foreground uppercase mb-1">Entradas (Mês)</div>
           <div className="text-2xl font-black text-green-600">R$ {metrics?.financial?.totalIncome?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}</div>
-          <div className="mt-3 text-xs text-gray-400">Vendas: R$ {metrics?.commercial?.totalRevenue?.toLocaleString('pt-BR')}</div>
+          <div className="mt-3 text-xs text-muted-foreground">Vendas: R$ {metrics?.commercial?.totalRevenue?.toLocaleString('pt-BR')}</div>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
-          <div className="text-xs font-bold text-gray-400 uppercase mb-1">Saídas (Mês)</div>
+        <div className="bg-card p-6 rounded-2xl shadow-sm border border-border">
+          <div className="text-xs font-bold text-muted-foreground uppercase mb-1">Saídas (Mês)</div>
           <div className="text-2xl font-black text-red-600">R$ {metrics?.financial?.totalExpenses?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}</div>
-          <div className="mt-3 text-xs text-gray-400">CMV Estimado: R$ {metrics?.costs?.estimatedCMV?.toLocaleString('pt-BR')}</div>
+          <div className="mt-3 text-xs text-muted-foreground">CMV Estimado: R$ {metrics?.costs?.estimatedCMV?.toLocaleString('pt-BR')}</div>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 bg-primary-600 border-none">
+        <div className="bg-primary p-6 rounded-2xl shadow-sm border-none">
           <div className="text-xs font-bold text-primary-200 uppercase mb-1">Lucro Operacional</div>
           <div className="text-2xl font-black text-white">R$ {( (metrics?.financial?.totalIncome || 0) - (metrics?.financial?.totalExpenses || 0) ).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
           <div className="mt-3 text-xs text-primary-200">
@@ -151,25 +151,25 @@ export function FinancePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
           {/* DRE Simplificada */}
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
-            <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-6 flex items-center gap-2">
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <h3 className="font-bold text-foreground mb-6 flex items-center gap-2">
               <Plus className="h-5 w-5 text-primary-600" /> DRE Gerencial (Mês Atual)
             </h3>
             <div className="space-y-3">
-              <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
-                <span className="text-gray-600 dark:text-gray-400 font-medium">1. Receita Operacional Bruta</span>
-                <span className="font-bold text-gray-900 dark:text-gray-100">R$ {metrics?.commercial?.totalRevenue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+              <div className="flex justify-between items-center text-sm border-b border-border pb-2">
+                <span className="text-muted-foreground font-medium">1. Receita Operacional Bruta</span>
+                <span className="font-bold text-foreground">R$ {metrics?.commercial?.totalRevenue?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
               </div>
-              <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
-                <span className="text-gray-600 dark:text-gray-400 font-medium ml-4">(-) CMV (Custo de Mercadoria Vendida)</span>
+              <div className="flex justify-between items-center text-sm border-b border-border pb-2">
+                <span className="text-muted-foreground font-medium ml-4">(-) CMV (Custo de Mercadoria Vendida)</span>
                 <span className="font-bold text-red-600">- R$ {metrics?.costs?.estimatedCMV?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
               </div>
-              <div className="flex justify-between items-center text-sm bg-gray-50 dark:bg-gray-900/50 p-2 rounded-lg mb-2">
-                <span className="text-gray-900 dark:text-gray-100 font-bold">= MARGEM BRUTA</span>
+              <div className="flex justify-between items-center text-sm bg-muted p-2 rounded-lg mb-2">
+                <span className="text-foreground font-bold">= MARGEM BRUTA</span>
                 <span className="font-black text-primary-700">R$ {metrics?.costs?.estimatedGrossMargin?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ({metrics?.costs?.grossMarginPercentage?.toFixed(1)}%)</span>
               </div>
-              <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
-                <span className="text-gray-600 dark:text-gray-400 font-medium ml-4">(-) Despesas Operacionais (Fixas/Variáveis)</span>
+              <div className="flex justify-between items-center text-sm border-b border-border pb-2">
+                <span className="text-muted-foreground font-medium ml-4">(-) Despesas Operacionais (Fixas/Variáveis)</span>
                 <span className="font-bold text-red-600">- R$ {metrics?.financial?.totalExpenses?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between items-center text-sm bg-primary-600 p-3 rounded-xl">
@@ -179,28 +179,28 @@ export function FinancePage() {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+          <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
             <div className="p-6 border-b border-gray-50 flex items-center justify-between">
-              <h3 className="font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+              <h3 className="font-bold text-foreground flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary-600" /> Últimos Lançamentos
               </h3>
             </div>
-            <div className="divide-y divide-gray-50">
+            <div className="divide-y divide-border">
               {isLoading ? (
-                <div className="p-10 text-center text-gray-400">Carregando lançamentos...</div>
+                <div className="p-10 text-center text-muted-foreground">Carregando lançamentos...</div>
               ) : transactions.length === 0 ? (
-                <div className="p-10 text-center text-gray-400">Nenhum lançamento encontrado.</div>
+                <div className="p-10 text-center text-muted-foreground">Nenhum lançamento encontrado.</div>
               ) : (
                 transactions.slice(0, 10).map((t) => (
-                  <div key={t.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-900/50/50 transition-all flex items-center justify-between group">
+                  <div key={t.id} className="p-4 hover:bg-muted transition-all flex items-center justify-between group">
                     <div className="flex items-center gap-4">
                       <div className={`p-2.5 rounded-xl ${t.type === 'expense' ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-500'}`}>
                         {t.type === 'expense' ? <ArrowDownCircle className="h-5 w-5" /> : <ArrowUpCircle className="h-5 w-5" />}
                       </div>
                       <div>
-                        <div className="font-bold text-gray-900 dark:text-gray-100 text-sm">{t.description || t.category}</div>
-                        <div className="text-xs text-gray-400 flex items-center gap-2 mt-0.5">
-                          <span className="font-medium text-gray-500 dark:text-gray-400 capitalize">{t.category}</span>
+                        <div className="font-bold text-foreground text-sm">{t.description || t.category}</div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                          <span className="font-medium text-muted-foreground capitalize">{t.category}</span>
                           <span>•</span>
                           <span>{format(new Date(t.paymentDate || t.createdAt), 'dd/MM/yyyy')}</span>
                         </div>
@@ -211,12 +211,12 @@ export function FinancePage() {
                         <div className={`text-sm font-bold ${t.type === 'expense' ? 'text-red-600' : 'text-green-600'}`}>
                           {t.type === 'expense' ? '-' : '+'} R$ { Number(t.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }
                         </div>
-                        <div className={`text-[10px] uppercase font-bold tracking-wider ${t.status === 'paid' ? 'text-green-500' : 'text-amber-500'}`}>
+                        <div className={`text-[10px] uppercase font-bold tracking-wider ${t.status === 'paid' ? 'text-emerald-500' : 'text-amber-500'}`}>
                           {t.status === 'paid' ? 'Pago' : 'Pendente'}
                         </div>
                       </div>
-                      <button className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-gray-200 rounded-lg transition-all">
-                        <MoreVertical className="h-4 w-4 text-gray-400" />
+                      <button className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-muted rounded-lg transition-all">
+                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
                       </button>
                     </div>
                   </div>
@@ -233,38 +233,38 @@ export function FinancePage() {
             </h3>
             <div className="space-y-4">
               <div className="p-4 bg-primary-50/30 rounded-2xl border border-primary-100/50 flex items-center gap-4">
-                <div className="p-3 bg-white dark:bg-gray-900 rounded-xl shadow-sm text-primary-600">
+                <div className="p-3 bg-card rounded-xl shadow-sm text-primary-600">
                   <Banknote className="h-5 w-5" />
                 </div>
                 <div className="flex-1">
                   <div className="text-xs font-bold text-primary-700 uppercase tracking-wider">Caixa Interno</div>
-                  <div className="text-lg font-black text-gray-900 dark:text-gray-100">R$ {metrics?.financial?.cashBalance?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}</div>
+                  <div className="text-lg font-black text-foreground">R$ {metrics?.financial?.cashBalance?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}</div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
-            <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+          <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+            <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
               <Share2 className="h-5 w-5 text-primary-600" /> Contas a Pagar (Próximos)
             </h3>
             <div className="space-y-3">
               {transactions.filter(t => t.type === 'expense' && t.status !== 'paid').length === 0 ? (
-                <p className="text-sm text-gray-400">Nenhuma conta pendente.</p>
+                <p className="text-sm text-muted-foreground">Nenhuma conta pendente.</p>
               ) : (
                 transactions
                   .filter(t => t.type === 'expense' && t.status !== 'paid')
                   .slice(0, 5)
                   .map(t => (
                     <div key={t.id} className="flex justify-between items-center text-sm p-1">
-                      <div className="text-gray-600 dark:text-gray-400 truncate mr-2">{t.description || t.category}</div>
-                      <div className="font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap">R$ {Number(t.amount).toLocaleString('pt-BR')}</div>
+                      <div className="text-muted-foreground truncate mr-2">{t.description || t.category}</div>
+                      <div className="font-bold text-foreground whitespace-nowrap">R$ {Number(t.amount).toLocaleString('pt-BR')}</div>
                     </div>
                   ))
               )}
-              <div className="pt-3 mt-3 border-t border-gray-50 flex justify-between text-xs font-bold uppercase text-red-600">
+              <div className="pt-3 mt-3 border-t border-border flex justify-between text-xs font-bold uppercase text-destructive">
                 <span>Total a Vencer</span>
-                <span>R$ 900,00</span>
+                <span>R$ {transactions.filter(t => t.type === 'expense' && t.status !== 'paid').reduce((acc, t) => acc + Number(t.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
               </div>
             </div>
           </div>

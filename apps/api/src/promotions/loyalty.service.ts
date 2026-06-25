@@ -116,6 +116,16 @@ export class LoyaltyService {
     });
   }
 
+  async add(tenantId: string, customerId: string, points: number, description?: string) {
+    return this.createTransaction({
+      tenantId,
+      customerId,
+      type: 'earned',
+      points,
+      description: description ?? 'Bônus manual de pontos',
+    });
+  }
+
   getBadges(totalOrders: number, totalSpent: number) {
     const badges: string[] = [];
     if (totalOrders >= 1) badges.push('Primeira Compra');

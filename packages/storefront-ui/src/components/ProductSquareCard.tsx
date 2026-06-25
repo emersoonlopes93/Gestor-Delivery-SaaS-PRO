@@ -1,5 +1,6 @@
 import { ProductCardProps } from './ProductGridCard';
 import { StorefrontBadge } from './StorefrontBadge';
+import { ImageOff } from 'lucide-react';
 import { cn } from '../cn';
 
 export function ProductSquareCard({
@@ -28,17 +29,20 @@ export function ProductSquareCard({
             imageMode === 'cover' ? 'object-cover' : 'object-contain'
           )}
         />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center bg-[var(--storefront-muted)]">
-          <span className="text-[var(--storefront-muted-foreground)] text-[10px] uppercase font-bold tracking-widest">Sem imagem</span>
+      ) : imageMode !== 'hidden' ? (
+        <div className="w-full h-full flex items-center justify-center bg-[var(--storefront-muted)] relative z-0">
+          <ImageOff className="w-10 h-10 text-[var(--storefront-muted-foreground)] opacity-50" />
         </div>
-      )}
+      ) : null}
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-3">
         <div className="flex flex-wrap gap-1 mb-1">
-          {showBadges && product.badges?.map((badge, idx) => (
-            <StorefrontBadge key={idx} variant="primary" className="bg-white text-black border-none">{badge}</StorefrontBadge>
-          ))}
+          {showBadges && product.badges?.map((badge, idx) => {
+            let badgeVariant: 'primary' | 'secondary' | 'outline' = 'primary';
+            if (badge.variant === 'danger') badgeVariant = 'secondary';
+            if (badge.variant === 'neutral') badgeVariant = 'outline';
+            return <StorefrontBadge key={idx} variant={badgeVariant}>{badge.label}</StorefrontBadge>;
+          })}
         </div>
 
         <h3 className="font-bold text-white text-sm line-clamp-2 leading-tight">

@@ -6,7 +6,7 @@ import { api } from '../../../lib/api-client';
 import { Tenant, TenantSettings } from '@gestor/types';
 
 export function useOrderNotifications(orders: OrderBoardItemDTO[]) {
-  const [isAudioEnabled, setIsAudioEnabled] = useState(false);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isInteractionAllowed, setIsInteractionAllowed] = useState(false);
   const prevOrdersRef = useRef<OrderBoardItemDTO[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -49,7 +49,7 @@ export function useOrderNotifications(orders: OrderBoardItemDTO[]) {
 
   const playNotification = useCallback(() => {
     // Only play if audio is enabled in settings AND user has interacted
-    if (settingsRef.current?.audioNotificationEnabled && isInteractionAllowed && audioRef.current) {
+    if ((settingsRef.current?.audioNotificationEnabled ?? true) && isInteractionAllowed && audioRef.current) {
       // Update volume in case it changed
       audioRef.current.volume = Math.max(0, Math.min(1, settingsRef.current?.notificationVolume ?? 1.0));
       

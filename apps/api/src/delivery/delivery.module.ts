@@ -34,6 +34,6 @@ import { GeocodingService } from './geocoding.service';
     GeocodingService,
     DeliveryRateService,
   ],
-  exports: [DeliveryRateService, DriversService, GeocodingService],
+  exports: [DeliveryRateService, DriversService, GeocodingService, DeliveryTrackingGateway],
 })
 export class DeliveryModule {}

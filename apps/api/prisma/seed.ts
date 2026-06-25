@@ -9,6 +9,7 @@ import {
 } from '@gestor/core';
 import { TenantDefaultRole, AdminDefaultRole } from '@gestor/core';
 import { seedDemoAiAgentAccess } from '../src/seed/demo-ai-agent.seed';
+import { seedBaseMenuTemplates } from '../src/catalog/menu-import/base-menu-bootstrap';
 
 const prisma = new PrismaClient();
 
@@ -178,7 +179,7 @@ async function seedBillingFoundation() {
       isActive: true,
       isPublic: true,
       currency: 'BRL',
-      trialDays: 7,
+      trialDays: 0,
       requiresPaymentMethod: false,
       allowAllModules: true,
     },
@@ -191,9 +192,38 @@ async function seedBillingFoundation() {
       isActive: true,
       isPublic: true,
       currency: 'BRL',
-      trialDays: 7,
+      trialDays: 0,
       requiresPaymentMethod: false,
       allowAllModules: true,
+    },
+  });
+
+  const mvpPlan = await prisma.billingPlan.upsert({
+    where: { slug: 'mvp-starter' },
+    update: {
+      name: 'MVP Starter',
+      description: 'Plano inicial (apenas funcionalidades essenciais)',
+      type: 'fixed',
+      cycleInterval: 'monthly',
+      isActive: true,
+      isPublic: true,
+      currency: 'BRL',
+      trialDays: 0,
+      requiresPaymentMethod: false,
+      allowAllModules: false, // Bloqueia módulos avançados
+    },
+    create: {
+      name: 'MVP Starter',
+      slug: 'mvp-starter',
+      description: 'Plano inicial (apenas funcionalidades essenciais)',
+      type: 'fixed',
+      cycleInterval: 'monthly',
+      isActive: true,
+      isPublic: true,
+      currency: 'BRL',
+      trialDays: 0,
+      requiresPaymentMethod: false,
+      allowAllModules: false,
     },
   });
 
@@ -235,32 +265,76 @@ async function seedBillingFoundation() {
       includeDeliveryFeeByDefault: false,
       includeServiceFeeByDefault: false,
       countStorefrontOrders: true,
+      countDirectOnlineOrders: true,
       countPosOrders: true,
       countWhatsappAiOrders: true,
       countManualOrders: false,
+      countMarketplaceIfoodOrders: true,
       countConfirmedOrders: true,
       countCompletedOrders: true,
       excludeCancelledOrders: true,
       discountReducesRevenue: true,
       defaultGracePeriodDays: 7,
-      defaultTrialDays: 7,
+      defaultTrialDays: 0,
       requirePaymentMethodForPaidPlans: false,
+      trialProEnabled: false,
+      trialIncludesAi: true,
+      trialIncludesIfood: true,
+      trialIncludesAdvancedReports: true,
+      trialAutoConvertToBilling: false,
+      aiIncludedForPaidTenants: true,
+      aiIncludedMonthlyMessages: 200,
+      aiFreeTrialMessages: 0,
+      aiHardLimitMonthlyMessages: 1000,
     },
     create: {
       id: 'global',
       includeDeliveryFeeByDefault: false,
       includeServiceFeeByDefault: false,
       countStorefrontOrders: true,
+      countDirectOnlineOrders: true,
       countPosOrders: true,
       countWhatsappAiOrders: true,
       countManualOrders: false,
+      countMarketplaceIfoodOrders: true,
       countConfirmedOrders: true,
       countCompletedOrders: true,
       excludeCancelledOrders: true,
       discountReducesRevenue: true,
       defaultGracePeriodDays: 7,
-      defaultTrialDays: 7,
+      defaultTrialDays: 0,
       requirePaymentMethodForPaidPlans: false,
+      trialProEnabled: false,
+      trialIncludesAi: true,
+      trialIncludesIfood: true,
+      trialIncludesAdvancedReports: true,
+      trialAutoConvertToBilling: false,
+      aiIncludedForPaidTenants: true,
+      aiIncludedMonthlyMessages: 200,
+      aiFreeTrialMessages: 0,
+      aiHardLimitMonthlyMessages: 1000,
+    },
+  });
+
+  await prisma.billingModuleAddon.upsert({
+    where: { addonKey: 'ai_agent' },
+    update: {
+      addonKey: 'ai_agent',
+      moduleKey: 'ai_agent',
+      name: 'Add-on Agente IA',
+      description: 'Libera o Agente IA com cota controlada.',
+      pricingType: 'fixed',
+      price: 70,
+      isActive: true,
+    },
+    create: {
+      addonKey: 'ai_agent',
+      moduleKey: 'ai_agent',
+      name: 'Add-on Agente IA',
+      description: 'Libera o Agente IA com cota controlada.',
+      pricingType: 'fixed',
+      price: 70,
+      isActive: true,
     },
   });
 
@@ -306,6 +380,22 @@ async function seedAiPlanPresets() {
   }
 
   console.log(`   ✅ ${presets.length} AI plan presets seeded (basic / pro / premium)`);
+}
+
+async function seedBaseMenus() {
+  console.log('Seeding base menu templates...');
+  const summary = await seedBaseMenuTemplates(prisma);
+  for (const message of summary.messages) {
+    console.log(`   ${message}`);
+  }
+  for (const warning of summary.warnings) {
+    console.warn(`   ${warning}`);
+  }
+  console.log(
+    `   Base menus: ${summary.templatesCreated} created, ${summary.templatesPreserved} preserved, ` +
+      `${summary.versionsCreated} versions created, ${summary.versionsOverwritten} versions overwritten, ` +
+      `${summary.productsOverwritten} products overwritten`,
+  );
 }
 
 async function seedDemoTenant() {
@@ -368,6 +458,8 @@ async function seedDemoTenant() {
         street: 'Av. Paulista',
         number: '1000',
         neighborhood: 'Bela Vista',
+
+
         city: 'São Paulo',
         state: 'SP',
         zipCode: '01310-100',
@@ -463,8 +555,8 @@ async function seedDemoTenant() {
       });
     }
 
-    console.log(`   ? Demo tenant created: ${tenant.name}`);
-    console.log(`   ? Tenant owner: ${ownerEmail}`);
+    console.log(`   👤 Demo tenant created: ${tenant.name}`);
+    console.log(`   👤 Tenant owner: ${ownerEmail}`);
 
     // Create default delivery coverage config
     await prisma.deliveryCoverageConfig.upsert({
@@ -484,26 +576,20 @@ async function seedDemoTenant() {
 
     // Create default tenant operating hours (08:00 to 22:00 for Sun-Sat)
     for (let day = 0; day <= 6; day++) {
-      await prisma.tenantOperatingHours.upsert({
-        where: {
-          tenantId_dayOfWeek: {
+      const existingHours = await prisma.tenantOperatingHours.findFirst({
+        where: { tenantId: tenant.id, dayOfWeek: day }
+      });
+      if (!existingHours) {
+        await prisma.tenantOperatingHours.create({
+          data: {
             tenantId: tenant.id,
             dayOfWeek: day,
-          },
-        },
-        update: {
-          isOpen: true,
-          openTime: '08:00',
-          closeTime: '22:00',
-        },
-        create: {
-          tenantId: tenant.id,
-          dayOfWeek: day,
-          isOpen: true,
-          openTime: '08:00',
-          closeTime: '22:00',
-        },
-      });
+            isOpen: true,
+            openTime: '08:00',
+            closeTime: '22:00',
+          }
+        });
+      }
     }
 
     // Create delivery rate rules
@@ -544,35 +630,8 @@ async function seedDemoTenant() {
       },
     });
 
-    // Create complement group (ProductComplementGroup)
-    const group = await prisma.productComplementGroup.upsert({
-      where: { id: 'demo-group-id' },
-      update: {},
-      create: {
-        id: 'demo-group-id',
-        tenantId: tenant.id,
-        name: 'Escolha a Borda',
-        minSelect: 1,
-        maxSelect: 1,
-        isRequired: true,
-      },
-    });
-
-    // Create complement items (ProductComplementItem)
-    await prisma.productComplementItem.upsert({
-      where: { id: 'demo-item-catupiry' },
-      update: {},
-      create: {
-        id: 'demo-item-catupiry',
-        tenantId: tenant.id,
-        groupId: group.id,
-        name: 'Catupiry',
-        additionalPrice: 5.0,
-      },
-    });
-
     // Create product
-    const product = await prisma.product.upsert({
+    await prisma.product.upsert({
       where: { tenantId_slug: { tenantId: tenant.id, slug: 'pizza-de-calabresa' } },
       update: {},
       create: {
@@ -583,23 +642,6 @@ async function seedDemoTenant() {
         basePrice: 45.0,
         isAvailable: true,
         sellableOnline: true,
-      },
-    });
-
-    // Link product to complement group (ProductComplementGroupLink)
-    await prisma.productComplementGroupLink.upsert({
-      where: {
-        productId_complementGroupId: {
-          productId: product.id,
-          complementGroupId: group.id,
-        },
-      },
-      update: {},
-      create: {
-        tenantId: tenant.id,
-        productId: product.id,
-        complementGroupId: group.id,
-        order: 0,
       },
     });
 
@@ -629,48 +671,7 @@ async function seedDemoTenant() {
       },
     });
 
-    // Create combo (ProductCombo)
-    const combo = await prisma.productCombo.upsert({
-      where: { tenantId_slug: { tenantId: tenant.id, slug: 'combo-casal' } },
-      update: {},
-      create: {
-        tenantId: tenant.id,
-        name: 'Combo Casal',
-        slug: 'combo-casal',
-        basePrice: 85.0,
-        isActive: true,
-      },
-    });
-
-    // Create combo block (ProductComboBlock)
-    const block = await prisma.productComboBlock.upsert({
-      where: { id: 'demo-block-id' },
-      update: {},
-      create: {
-        id: 'demo-block-id',
-        tenantId: tenant.id,
-        comboId: combo.id,
-        name: 'Escolha seu sabor',
-        minSelect: 1,
-        maxSelect: 1,
-        order: 0,
-      },
-    });
-
-    // Link product to combo block (ProductComboBlockItem)
-    await prisma.productComboBlockItem.upsert({
-      where: { blockId_productId: { blockId: block.id, productId: product.id } },
-      update: {},
-      create: {
-        tenantId: tenant.id,
-        blockId: block.id,
-        productId: product.id,
-        additionalPrice: 0,
-        order: 0,
-      },
-    });
-
-    console.log(`   ✅ Catalog data seeded for ${TENANT_SLUG}`);
+    console.log('   ✅ Catalog data seeded');
   } catch (err) {
     console.error('❌ Error inside seedDemoTenant:', err);
     throw err;
@@ -710,6 +711,7 @@ async function main() {
   await seedSystemConfig();
   await seedBillingFoundation();
   await seedAiPlanPresets();
+  await seedBaseMenus();
   await seedDemoTenant();
   await seedDineInTables();
 

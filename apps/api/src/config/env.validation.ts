@@ -20,20 +20,30 @@ const baseEnvSchema = z.object({
   SWAGGER_ENABLED: z.enum(['true', 'false']).default('false'),
   SWAGGER_PATH: z.string().min(1).default('/docs'),
 
+  // Email & Security
+  SMTP_HOST: z.string().default(''),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_USER: z.string().default(''),
+  SMTP_PASS: z.string().default(''),
+  SMTP_FROM: z.string().default('noreply@pedehub.com.br'),
+  FRONTEND_URL: z.string().default('http://localhost:3000'),
+
   // WhatsApp Cloud API (Customer OTP + Notifications)
   WHATSAPP_CLOUD_ACCESS_TOKEN: z.string().default(''),
   WHATSAPP_CLOUD_PHONE_NUMBER_ID: z.string().default(''),
   WHATSAPP_CLOUD_GRAPH_API_VERSION: z.string().default('v19.0'),
-  WHATSAPP_OTP_MESSAGE_TEMPLATE: z.string().default('Seu código de acesso é: {{CODE}}'),
+  WHATSAPP_OTP_MESSAGE_TEMPLATE: z.string().default('Seu código de acesso é: {CODE}'),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().default(''),
 
   // Web Push (VAPID)
   VAPID_PUBLIC_KEY: z.string().default(''),
   VAPID_PRIVATE_KEY: z.string().default(''),
-  VAPID_SUBJECT: z.string().default('mailto:admin@gestordelivery.com.br'),
+  VAPID_SUBJECT: z.string().default('mailto:admin@pedehub.com.br'),
 
   // Mercado Pago
   MERCADO_PAGO_WEBHOOK_SECRET: z.string().default(''),
+
+
 
   // AI Providers. SaaS Admin database config has runtime priority; ENV is fallback.
   OPENAI_API_KEY: z.string().default(''),
@@ -45,6 +55,9 @@ const baseEnvSchema = z.object({
   GEMINI_API_KEY: z.string().default(''),
   GOOGLE_AI_MODEL: z.string().default(''),
   GOOGLE_AI_BASE_URL: z.string().default('https://generativelanguage.googleapis.com/v1beta'),
+  OPENROUTER_API_KEY: z.string().default(''),
+  OPENROUTER_MODEL: z.string().default(''),
+  OPENROUTER_BASE_URL: z.string().default('https://openrouter.ai/api/v1'),
 
   // Redis
   REDIS_ENABLED: z.enum(['true', 'false']).default('true'),
@@ -52,6 +65,7 @@ const baseEnvSchema = z.object({
   REDIS_PORT: z.coerce.number().int().positive().default(6379),
   REDIS_PASSWORD: z.string().default(''),
   REDIS_TLS: z.enum(['true', 'false']).default('false'),
+  REDIS_TLS_REJECT_UNAUTHORIZED: z.enum(['true', 'false']).default('true'),
 
   // Feature Flags
   BULLMQ_ENABLED: z.enum(['true', 'false']).default('false'),
@@ -64,6 +78,10 @@ const baseEnvSchema = z.object({
   ASAAS_BILLING_BASE_URL: z.string().default('https://api-sandbox.asaas.com/v3'),
   ASAAS_BILLING_WEBHOOK_SECRET: z.string().default(''),
   ASAAS_WEBHOOK_TOKEN: z.string().default(''),
+  ASAAS_WEBHOOK_HMAC_SECRET: z.string().default(''),
+  ASAAS_WEBHOOK_ALLOW_LEGACY_TOKEN: z.enum(['true', 'false']).default('false'),
+  WEBHOOK_SECURITY_SMOKE_ENABLED: z.enum(['true', 'false']).default('false'),
+  WEBHOOK_REPLAY_WINDOW_SECONDS: z.coerce.number().int().positive().default(300),
 
   // Storage Driver & Cloudflare R2
   STORAGE_DRIVER: z.enum(['local', 'r2']).optional(),
@@ -183,6 +201,62 @@ const envSchema = baseEnvSchema
     }
 
     if (isProduction) {
+      if (data.JWT_SECRET === data.JWT_REFRESH_SECRET) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['JWT_REFRESH_SECRET'],
+          message: `JWT_REFRESH_SECRET deve ser diferente de JWT_SECRET em producao.`,
+        });
+      }
+
+      if (data.JWT_SECRET.length < 32 || data.JWT_REFRESH_SECRET.length < 32) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['JWT_SECRET'],
+          message: `JWT_SECRET e JWT_REFRESH_SECRET devem ter pelo menos 32 caracteres em producao.`,
+        });
+      }
+
+      if (!data.CORS_ORIGINS.trim() || data.CORS_ORIGINS.includes('localhost')) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['CORS_ORIGINS'],
+          message: `CORS_ORIGINS deve ser restrito a dominios reais em producao e nao pode conter localhost.`,
+        });
+      }
+
+      if (data.SWAGGER_ENABLED !== 'false') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['SWAGGER_ENABLED'],
+          message: `SWAGGER_ENABLED deve ser 'false' em producao.`,
+        });
+      }
+
+      if (!data.ASAAS_WEBHOOK_HMAC_SECRET.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['ASAAS_WEBHOOK_HMAC_SECRET'],
+          message: `ASAAS_WEBHOOK_HMAC_SECRET e obrigatorio em producao.`,
+        });
+      }
+
+      if (data.ASAAS_WEBHOOK_ALLOW_LEGACY_TOKEN !== 'false') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['ASAAS_WEBHOOK_ALLOW_LEGACY_TOKEN'],
+          message: `ASAAS_WEBHOOK_ALLOW_LEGACY_TOKEN deve ser 'false' em producao.`,
+        });
+      }
+
+      if (data.WEBHOOK_SECURITY_SMOKE_ENABLED !== 'false') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['WEBHOOK_SECURITY_SMOKE_ENABLED'],
+          message: `WEBHOOK_SECURITY_SMOKE_ENABLED deve ser 'false' em producao.`,
+        });
+      }
+
       if (data.REDIS_ENABLED === 'false') {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -196,6 +270,14 @@ const envSchema = baseEnvSchema
           code: z.ZodIssueCode.custom,
           path: ['REDIS_HOST'],
           message: `REDIS_HOST não pode ser localhost ou vazio em produção.`,
+        });
+      }
+
+      if (data.BULLMQ_ENABLED !== 'true') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['BULLMQ_ENABLED'],
+          message: `BULLMQ_ENABLED must be 'true' in production.`,
         });
       }
     }

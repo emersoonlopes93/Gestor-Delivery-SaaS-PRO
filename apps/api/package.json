@@ -1,205 +1,130 @@
 {
-
-  "name": "@gestor/api",
-
-  "version": "0.1.0",
-
-  "private": true,
-
-  "scripts": {
-
-    "dev": "ts-node-dev -r tsconfig-paths/register --respawn --transpile-only src/main.ts",
-
-    "dev:watch": "nest start --watch",
-
-    "build": "nest build -p tsconfig.build.json",
-
-    "start": "nest start",
-
-    "start:prod": "node --max-old-space-size=512 dist/apps/api/src/main.js",
-
-    "lint": "eslint \"{src,test}/**/*.ts\"",
-    "test": "jest --config jest.config.js --runInBand",
-
-    "smoke:auth": "ts-node scripts/smoke-test-auth.ts",
-    "smoke:p1": "ts-node -r tsconfig-paths/register scripts/smoke-test-p1.ts",
-    "smoke:media": "ts-node -r tsconfig-paths/register scripts/smoke-test-media.ts",
-
-    "smoke:combos": "ts-node scripts/smoke-test-combos.ts",
-
-    "smoke:delivery-rate": "ts-node scripts/smoke-test-delivery-rate.ts",
-
-    "smoke:inventory": "ts-node scripts/smoke-test-inventory.ts",
-
-    "smoke:orders": "ts-node scripts/smoke-test-orders.ts",
-
-    "smoke:billing": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-domain.ts",
-    "smoke:billing-usage": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-usage.ts",
-    "smoke:billing-cycle": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-cycle.ts",
-    "smoke:billing-payment": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-payment.ts",
-    "smoke:billing-ledger-flow": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-ledger-flow.ts",
-    "smoke:billing-ledger-http-flow": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-ledger-http-flow.ts",
-    "smoke:session-security-http-flow": "ts-node -r tsconfig-paths/register scripts/smoke-test-session-security-http-flow.ts",
-    "smoke:webhook-security-flow": "ts-node -r tsconfig-paths/register scripts/smoke-test-webhook-security-flow.ts",
-    "smoke:tenant-billing-v2": "ts-node -r tsconfig-paths/register scripts/smoke-test-tenant-billing-v2.ts",
-    "smoke:tenant-billing-portal": "ts-node -r tsconfig-paths/register scripts/smoke-test-tenant-billing-portal.ts",
-    "smoke:billing-asaas-sandbox": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-asaas-sandbox.ts",
-    "migrate:tenant-billing-v2": "ts-node -r tsconfig-paths/register scripts/migrate-tenant-billing-v2.ts",
-    "diagnose:env": "ts-node -r tsconfig-paths/register scripts/diagnose-env.ts",
-    "check:billing-db": "ts-node -r tsconfig-paths/register scripts/check-billing-db.ts",
-
-    "smoke:logistics": "ts-node -r tsconfig-paths/register scripts/smoke-test-logistics-flow.ts",
-
-    "smoke:all": "pnpm smoke:auth && pnpm smoke:combos && pnpm smoke:delivery-rate && pnpm smoke:inventory && pnpm smoke:orders",
-
-    "test:delivery-rate-engine": "ts-node scripts/unit-test-delivery-rate-engine.ts",
-
-    "prisma:generate": "prisma generate",
-
-    "prisma:migrate": "prisma migrate dev",
-
-    "prisma:migrate:deploy": "prisma migrate deploy",
-
-    "prisma:seed": "ts-node -r tsconfig-paths/register prisma/seed.ts",
-
-    "enable:ai-agent-demo": "ts-node -r tsconfig-paths/register scripts/enable-ai-agent-demo.ts",
-
-    "ai:e2e:order": "ts-node -r tsconfig-paths/register scripts/e2e-ai-agent-order.ts",
-
-    "e2e:ops": "ts-node -r tsconfig-paths/register scripts/e2e-certification-ops.ts",
-    "e2e:commercial-ai": "ts-node --transpile-only -r tsconfig-paths/register scripts/e2e-certification-commercial-ai.ts",
-    "e2e:phase10": "ts-node --transpile-only -r tsconfig-paths/register scripts/e2e-phase10-loyalty.ts",
-    "e2e:phase13-bi": "ts-node --transpile-only -r tsconfig-paths/register scripts/e2e-certification-phase13-bi.ts",
-
-    "prisma:studio": "prisma studio",
-
-    "clean": "pnpm exec rimraf dist"
-
-  },
-
-  "dependencies": {
-
-    "@aws-sdk/client-s3": "^3.1048.0",
-
-    "@gestor/auth": "workspace:*",
-
-    "@gestor/config": "workspace:*",
-
-    "@gestor/core": "workspace:*",
-
-    "@gestor/theme": "workspace:*",
-
-    "@gestor/types": "workspace:*",
-
-    "@gestor/utils": "workspace:*",
-
-    "@nestjs/bullmq": "^11.0.4",
-
-    "@nestjs/cache-manager": "^3.1.2",
-
-    "@nestjs/common": "^10.4.0",
-
-    "@nestjs/config": "^3.2.0",
-
-    "@nestjs/core": "^10.4.0",
-
-    "@nestjs/jwt": "^10.2.0",
-
-    "@nestjs/mapped-types": "^2.0.5",
-
-    "@nestjs/passport": "^10.0.3",
-
-    "@nestjs/platform-express": "^10.4.0",
-
-    "@nestjs/platform-socket.io": "^10.4.0",
-
-    "@nestjs/swagger": "^7.4.2",
-
-    "@nestjs/throttler": "^5.2.0",
-
-    "@nestjs/websockets": "^10.4.0",
-
-    "@prisma/client": "^5.20.0",
-
-    "axios": "^1.7.7",
-
-    "bcryptjs": "^2.4.3",
-
-    "bullmq": "^5.76.5",
-
-    "cache-manager": "^7.2.8",
-
-    "cache-manager-redis-yet": "^5.1.5",
-
-    "class-transformer": "^0.5.1",
-
-    "class-validator": "^0.14.1",
-
-    "date-fns": "^4.1.0",
-
-    "luxon": "^3.0.0",
-
-    "express": "^4.21.2",
-
-    "helmet": "^7.1.0",
-
-    "multer": "^1.4.5-lts.1",
-
-    "passport": "^0.7.0",
-
-    "passport-jwt": "^4.0.1",
-
-    "reflect-metadata": "^0.2.2",
-
-    "rxjs": "^7.8.1",
-
-    "sharp": "^0.34.5",
-
-    "socket.io": "^4.8.3",
-
-    "swagger-ui-express": "^5.0.1",
-
-    "zod": "^3.23.0"
-
-  },
-
-  "devDependencies": {
-
-    "@nestjs/cli": "^10.4.0",
-
-    "@nestjs/schematics": "^10.1.0",
-
-    "@types/bcryptjs": "^2.4.6",
-
-    "@types/express": "^4.17.21",
-
-    "@types/multer": "^1.4.12",
-
-    "@types/node": "^22.0.0",
-
-    "@types/passport-jwt": "^4.0.1",
-    "@types/jest": "^29.5.4",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.1.0",
-    "@nestjs/testing": "^10.4.22",
-
-    "@types/sharp": "^0.32.0",
-
-    "@typescript-eslint/eslint-plugin": "^8.59.1",
-
-    "@typescript-eslint/parser": "^8.59.1",
-
-    "eslint": "^8.57.1",
-
-    "prisma": "^5.20.0",
-
-    "ts-node": "^10.9.2",
-
-    "ts-node-dev": "^2.0.0",
-
-    "typescript": "^5.5.0"
-
-  }
-
+    "name": "@gestor/api",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "ts-node-dev -r tsconfig-paths/register --respawn --transpile-only src/main.ts",
+        "dev:watch": "nest start --watch",
+        "build": "nest build -p tsconfig.build.json",
+        "start": "nest start",
+        "start:prod": "node --max-old-space-size=512 dist/apps/api/src/main.js",
+        "lint": "eslint \"{src,test}/**/*.ts\"",
+        "test": "jest --config jest.config.js --runInBand",
+        "smoke:auth": "ts-node scripts/smoke-test-auth.ts",
+        "smoke:p1": "ts-node -r tsconfig-paths/register scripts/smoke-test-p1.ts",
+        "smoke:media": "ts-node -r tsconfig-paths/register scripts/smoke-test-media.ts",
+        "media:generate-base": "ts-node -r tsconfig-paths/register scripts/generate-global-menu-media.ts",
+        "media:export-base-prompts": "ts-node -r tsconfig-paths/register scripts/generate-global-menu-media.ts --export-manifest",
+        "media:import-generated-base": "ts-node -r tsconfig-paths/register scripts/import-generated-base-media.ts",
+        "media:validate-base-manifest": "ts-node -r tsconfig-paths/register scripts/validate-base-menu-manifest.ts",
+        "base-menu:seed": "ts-node -r tsconfig-paths/register scripts/seed-base-menu-templates.ts",
+        "base-menu:apply-options-curation": "ts-node -r tsconfig-paths/register scripts/apply-base-menu-options-curation.ts",
+        "smoke:combos": "ts-node scripts/smoke-test-combos.ts",
+        "smoke:delivery-rate": "ts-node scripts/smoke-test-delivery-rate.ts",
+        "smoke:inventory": "ts-node scripts/smoke-test-inventory.ts",
+        "smoke:orders": "ts-node scripts/smoke-test-orders.ts",
+        "smoke:billing": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-domain.ts",
+        "smoke:billing-usage": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-usage.ts",
+        "smoke:billing-cycle": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-cycle.ts",
+        "smoke:billing-payment": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-payment.ts",
+        "smoke:billing-ledger-flow": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-ledger-flow.ts",
+        "smoke:billing-ledger-http-flow": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-ledger-http-flow.ts",
+        "smoke:database-restore": "ts-node -r tsconfig-paths/register scripts/smoke-test-database-restore.ts",
+        "smoke:production-infra": "ts-node -r tsconfig-paths/register scripts/smoke-test-production-infra.ts",
+        "smoke:queues": "ts-node -r tsconfig-paths/register scripts/smoke-test-queues.ts",
+        "smoke:session-security-http-flow": "ts-node -r tsconfig-paths/register scripts/smoke-test-session-security-http-flow.ts",
+        "smoke:webhook-security-flow": "ts-node -r tsconfig-paths/register scripts/smoke-test-webhook-security-flow.ts",
+        "smoke:marketplace-ifood-p1": "ts-node -r tsconfig-paths/register scripts/smoke-test-marketplace-ifood-p1-flow.ts",
+        "smoke:monetization-p1": "ts-node -r tsconfig-paths/register scripts/smoke-test-monetization-p1-flow.ts",
+        "smoke:setup-ifood": "ts-node -r tsconfig-paths/register scripts/smoke-setup-ifood.ts",
+        "smoke:tenant-billing-v2": "ts-node -r tsconfig-paths/register scripts/smoke-test-tenant-billing-v2.ts",
+        "smoke:tenant-billing-portal": "ts-node -r tsconfig-paths/register scripts/smoke-test-tenant-billing-portal.ts",
+        "smoke:billing-asaas-sandbox": "ts-node -r tsconfig-paths/register scripts/smoke-test-billing-asaas-sandbox.ts",
+        "migrate:tenant-billing-v2": "ts-node -r tsconfig-paths/register scripts/migrate-tenant-billing-v2.ts",
+        "diagnose:env": "ts-node -r tsconfig-paths/register scripts/diagnose-env.ts",
+        "rbac:diagnose": "ts-node -r tsconfig-paths/register scripts/diagnose-rbac.ts",
+        "check:billing-db": "ts-node -r tsconfig-paths/register scripts/check-billing-db.ts",
+        "smoke:logistics": "ts-node -r tsconfig-paths/register scripts/smoke-test-logistics-flow.ts",
+        "smoke:all": "pnpm smoke:auth && pnpm smoke:combos && pnpm smoke:delivery-rate && pnpm smoke:inventory && pnpm smoke:orders",
+        "test:delivery-rate-engine": "ts-node scripts/unit-test-delivery-rate-engine.ts",
+        "prisma:generate": "prisma generate",
+        "prisma:migrate": "prisma migrate dev",
+        "prisma:migrate:deploy": "prisma migrate deploy",
+        "prisma:seed": "ts-node -r tsconfig-paths/register prisma/seed.ts",
+        "enable:ai-agent-demo": "ts-node -r tsconfig-paths/register scripts/enable-ai-agent-demo.ts",
+        "ai:e2e:order": "ts-node -r tsconfig-paths/register scripts/e2e-ai-agent-order.ts",
+        "e2e:ops": "ts-node -r tsconfig-paths/register scripts/e2e-certification-ops.ts",
+        "e2e:commercial-ai": "ts-node --transpile-only -r tsconfig-paths/register scripts/e2e-certification-commercial-ai.ts",
+        "e2e:phase10": "ts-node --transpile-only -r tsconfig-paths/register scripts/e2e-phase10-loyalty.ts",
+        "e2e:phase13-bi": "ts-node --transpile-only -r tsconfig-paths/register scripts/e2e-certification-phase13-bi.ts",
+        "prisma:studio": "prisma studio",
+        "clean": "pnpm exec rimraf dist"
+    },
+    "dependencies": {
+        "@aws-sdk/client-s3": "^3.1048.0",
+        "@gestor/auth": "workspace:*",
+        "@gestor/config": "workspace:*",
+        "@gestor/core": "workspace:*",
+        "@gestor/theme": "workspace:*",
+        "@gestor/types": "workspace:*",
+        "@gestor/utils": "workspace:*",
+        "@nestjs/bullmq": "^11.0.4",
+        "@nestjs/cache-manager": "^3.1.2",
+        "@nestjs/common": "^10.4.0",
+        "@nestjs/config": "^3.2.0",
+        "@nestjs/core": "^10.4.0",
+        "@nestjs/event-emitter": "^3.1.0",
+        "@nestjs/jwt": "^10.2.0",
+        "@nestjs/mapped-types": "^2.0.5",
+        "@nestjs/passport": "^10.0.3",
+        "@nestjs/platform-express": "^10.4.0",
+        "@nestjs/platform-socket.io": "^10.4.0",
+        "@nestjs/swagger": "^7.4.2",
+        "@nestjs/throttler": "^5.2.0",
+        "@nestjs/websockets": "^10.4.0",
+        "@prisma/client": "^5.20.0",
+        "axios": "^1.7.7",
+        "bcryptjs": "^2.4.3",
+        "bullmq": "^5.76.5",
+        "cache-manager": "^7.2.8",
+        "cache-manager-redis-yet": "^5.1.5",
+        "class-transformer": "^0.5.1",
+        "class-validator": "^0.14.1",
+        "date-fns": "^4.1.0",
+        "express": "^4.21.2",
+        "helmet": "^7.1.0",
+        "luxon": "^3.0.0",
+        "multer": "^1.4.5-lts.1",
+        "nodemailer": "^8.0.11",
+        "passport": "^0.7.0",
+        "passport-jwt": "^4.0.1",
+        "reflect-metadata": "^0.2.2",
+        "rxjs": "^7.8.1",
+        "sharp": "^0.34.5",
+        "socket.io": "^4.8.3",
+        "swagger-ui-express": "^5.0.1",
+        "zod": "^3.23.0"
+    },
+    "devDependencies": {
+        "@nestjs/cli": "^10.4.0",
+        "@nestjs/schematics": "^10.1.0",
+        "@nestjs/testing": "^10.4.22",
+        "@types/bcryptjs": "^2.4.6",
+        "@types/express": "^4.17.21",
+        "@types/jest": "^29.5.4",
+        "@types/multer": "^1.4.12",
+        "@types/node": "^22.0.0",
+        "@types/nodemailer": "^8.0.1",
+        "@types/passport-jwt": "^4.0.1",
+        "@types/sharp": "^0.32.0",
+        "@typescript-eslint/eslint-plugin": "^8.59.1",
+        "@typescript-eslint/parser": "^8.59.1",
+        "eslint": "^8.57.1",
+        "jest": "^29.7.0",
+        "prisma": "^5.20.0",
+        "ts-jest": "^29.1.0",
+        "ts-node": "^10.9.2",
+        "ts-node-dev": "^2.0.0",
+        "typescript": "^5.5.0"
+    }
 }
-

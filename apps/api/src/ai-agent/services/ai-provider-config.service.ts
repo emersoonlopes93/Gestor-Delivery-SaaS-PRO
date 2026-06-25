@@ -19,6 +19,7 @@ const DEFAULT_MODELS: Record<AiProviderType, string> = {
   openai: 'gpt-4o',
   anthropic: 'claude-3-5-sonnet-20240620',
   google_ai: 'gemini-2.0-flash',
+  openrouter: 'openrouter/auto',
 };
 
 @Injectable()
@@ -55,9 +56,11 @@ export class AiProviderConfigService {
         openaiApiKey: true,
         anthropicApiKey: true,
         googleAiApiKey: true,
+        openrouterApiKey: true,
         openaiModel: true,
         anthropicModel: true,
         googleAiModel: true,
+        openrouterModel: true,
       },
     });
 
@@ -128,6 +131,7 @@ export class AiProviderConfigService {
       openaiApiKey: string | null;
       anthropicApiKey: string | null;
       googleAiApiKey: string | null;
+      openrouterApiKey: string | null;
     } | null,
   ): { value: string; source: AiProviderRuntimeConfig['apiKeySource'] } {
     const dbKey = this.dbApiKey(provider, systemConfig);
@@ -145,6 +149,7 @@ export class AiProviderConfigService {
       openaiModel: string | null;
       anthropicModel: string | null;
       googleAiModel: string | null;
+      openrouterModel: string | null;
     } | null,
     modelOverride?: string,
     modelOverrideSource: AiConfigSource = 'request',
@@ -167,10 +172,13 @@ export class AiProviderConfigService {
       openaiApiKey: string | null;
       anthropicApiKey: string | null;
       googleAiApiKey: string | null;
+      openrouterApiKey: string | null;
     } | null,
   ): string {
     const value =
-      provider === 'google_ai'
+      provider === 'openrouter'
+        ? systemConfig?.openrouterApiKey
+        : provider === 'google_ai'
         ? systemConfig?.googleAiApiKey
         : provider === 'anthropic'
           ? systemConfig?.anthropicApiKey
@@ -179,6 +187,8 @@ export class AiProviderConfigService {
   }
 
   private envApiKey(provider: AiProviderType): string {
+    if (provider === 'openrouter') return process.env.OPENROUTER_API_KEY?.trim() || '';
+
     if (provider === 'google_ai') {
       return (
         process.env.GOOGLE_AI_API_KEY?.trim() ||
@@ -200,10 +210,13 @@ export class AiProviderConfigService {
       openaiModel: string | null;
       anthropicModel: string | null;
       googleAiModel: string | null;
+      openrouterModel: string | null;
     } | null,
   ): string {
     const value =
-      provider === 'google_ai'
+      provider === 'openrouter'
+        ? systemConfig?.openrouterModel
+        : provider === 'google_ai'
         ? systemConfig?.googleAiModel
         : provider === 'anthropic'
           ? systemConfig?.anthropicModel
@@ -212,6 +225,7 @@ export class AiProviderConfigService {
   }
 
   private envModel(provider: AiProviderType): string {
+    if (provider === 'openrouter') return process.env.OPENROUTER_MODEL?.trim() || '';
     if (provider === 'google_ai') return process.env.GOOGLE_AI_MODEL?.trim() || '';
     if (provider === 'anthropic') return process.env.ANTHROPIC_MODEL?.trim() || '';
     return process.env.OPENAI_MODEL?.trim() || '';

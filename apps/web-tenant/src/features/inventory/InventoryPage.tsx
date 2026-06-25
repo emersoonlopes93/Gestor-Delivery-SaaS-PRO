@@ -3,6 +3,8 @@ import { api } from '../../lib/api-client';
 import { IngredientDTO, CreateIngredientDTO, UnitType } from '@gestor/types';
 import { IngredientModal } from './IngredientModal';
 import { MovementsTable } from './SubComponents/MovementsTable';
+import { LossesPage } from './SubComponents/LossesPage';
+import { InventoryCountPage } from './SubComponents/InventoryCountPage';
 import { Package, RefreshCcw, TrendingDown, DollarSign, Search, Filter, AlertTriangle } from 'lucide-react';
 
 type InventoryTab = 'ingredients' | 'movements' | 'losses' | 'counts';
@@ -224,17 +226,9 @@ export function InventoryPage() {
 
         {activeTab === 'movements' && <MovementsTable />}
         
-        {activeTab === 'losses' && (
-          <div className="p-12 text-center text-gray-400 italic">
-            Módulo de Perdas em fase de integração ao hub.
-          </div>
-        )}
+        {activeTab === 'losses' && <LossesPage />}
         
-        {activeTab === 'counts' && (
-          <div className="p-12 text-center text-gray-400 italic">
-            Módulo de Inventário em fase de integração ao hub.
-          </div>
-        )}
+        {activeTab === 'counts' && <InventoryCountPage />}
       </div>
 
       <IngredientModal

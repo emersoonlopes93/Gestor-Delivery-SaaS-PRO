@@ -12,6 +12,10 @@ export interface ProductTemplate {
   searchTags: string[];
   /** Chave específica para busca de imagem na Biblioteca Global */
   mediaLookupKey?: string;
+  /** Categoria sugerida para assets globais gerados automaticamente */
+  mediaCategory?: string;
+  /** Prompt base para geracao de imagem comercial generica */
+  mediaPrompt?: string;
 }
 
 export interface CategoryTemplate {
@@ -26,12 +30,18 @@ export interface MenuTemplate {
   description: string;
   /** Valor que pode estar em tenant.settings.businessCategory */
   businessSegment: string;
+  /** Valores alternativos para recomendacao automatica */
+  businessSegments?: string[];
   /** Ícone emoji para exibição no frontend */
   emoji: string;
   categories: CategoryTemplate[];
 }
 
 // ─── Templates ────────────────────────────────────────────────────────────────
+
+function commercialFoodPrompt(subject: string): string {
+  return `Foto comercial realista de ${subject}, apresentacao limpa e apetitosa, iluminacao profissional, foco no produto, fundo neutro ou levemente comercial, sem texto visivel, sem logotipos, sem marcas, sem pessoas, sem embalagens com marca, estilo de fotografia gastronomica para cardapio de delivery.`;
+}
 
 export const MENU_TEMPLATES: MenuTemplate[] = [
   // ── Pizzaria ────────────────────────────────────────────────────────────────
@@ -449,6 +459,481 @@ export const MENU_TEMPLATES: MenuTemplate[] = [
       },
     ],
   },
+  {
+    id: 'acai',
+    name: 'Açaí',
+    description: 'Açaís tradicionais, especiais, complementos, cremes e bebidas',
+    businessSegment: 'acai',
+    emoji: '🍧',
+    categories: [
+      {
+        name: 'Açaís Tradicionais',
+        order: 1,
+        products: [
+          {
+            name: 'Açaí 300ml',
+            shortDescription: 'Açaí cremoso servido em copo de 300ml',
+            basePrice: 16.9,
+            searchTags: ['tag:acai', 'tag:sobremesa', 'tag:frio'],
+            mediaLookupKey: 'lookup:acai_300ml',
+            mediaCategory: 'Açaí',
+            mediaPrompt: commercialFoodPrompt('um acai de 300ml servido em copo transparente, textura cremosa e cobertura simples'),
+          },
+          {
+            name: 'Açaí 500ml',
+            shortDescription: 'Açaí cremoso servido em copo de 500ml',
+            basePrice: 22.9,
+            searchTags: ['tag:acai', 'tag:sobremesa', 'tag:frio'],
+            mediaLookupKey: 'lookup:acai_500ml',
+            mediaCategory: 'Açaí',
+            mediaPrompt: commercialFoodPrompt('um acai de 500ml servido em copo transparente, textura cremosa e cobertura apetitosa'),
+          },
+          {
+            name: 'Açaí 700ml',
+            shortDescription: 'Açaí cremoso em porção grande de 700ml',
+            basePrice: 29.9,
+            searchTags: ['tag:acai', 'tag:sobremesa', 'tag:frio'],
+            mediaLookupKey: 'lookup:acai_700ml',
+            mediaCategory: 'Açaí',
+            mediaPrompt: commercialFoodPrompt('um acai de 700ml servido em copo grande transparente, textura cremosa e visual premium'),
+          },
+        ],
+      },
+      {
+        name: 'Açaís Especiais',
+        order: 2,
+        products: [
+          {
+            name: 'Açaí com Banana e Granola',
+            shortDescription: 'Açaí cremoso com banana fatiada e granola crocante',
+            basePrice: 24.9,
+            searchTags: ['tag:acai', 'tag:sobremesa', 'tag:frio'],
+            mediaLookupKey: 'lookup:acai_banana_granola',
+            mediaCategory: 'Açaí',
+            mediaPrompt: commercialFoodPrompt('um copo de acai com banana fatiada e granola crocante por cima'),
+          },
+          {
+            name: 'Açaí com Leite Ninho',
+            shortDescription: 'Açaí cremoso com leite em pó e leite condensado',
+            basePrice: 25.9,
+            searchTags: ['tag:acai', 'tag:sobremesa', 'tag:frio'],
+            mediaLookupKey: 'lookup:acai_ninho',
+            mediaCategory: 'Açaí',
+            mediaPrompt: commercialFoodPrompt('um copo de acai coberto com leite em po, textura cremosa e visual de delivery premium'),
+          },
+          {
+            name: 'Açaí com Morango',
+            shortDescription: 'Açaí cremoso com morangos frescos fatiados',
+            basePrice: 25.9,
+            searchTags: ['tag:acai', 'tag:sobremesa', 'tag:frio'],
+            mediaLookupKey: 'lookup:acai_morango',
+            mediaCategory: 'Açaí',
+            mediaPrompt: commercialFoodPrompt('um copo de acai com morangos frescos fatiados por cima'),
+          },
+          {
+            name: 'Açaí com Paçoca',
+            shortDescription: 'Açaí cremoso com paçoca esfarelada',
+            basePrice: 24.9,
+            searchTags: ['tag:acai', 'tag:sobremesa', 'tag:frio'],
+            mediaLookupKey: 'lookup:acai_pacoca',
+            mediaCategory: 'Açaí',
+            mediaPrompt: commercialFoodPrompt('um copo de acai com pacoca esfarelada e acabamento apetitoso'),
+          },
+          {
+            name: 'Açaí Completo',
+            shortDescription: 'Açaí com banana, morango, granola, leite em pó e leite condensado',
+            basePrice: 32.9,
+            searchTags: ['tag:acai', 'tag:sobremesa', 'tag:frio'],
+            mediaLookupKey: 'lookup:acai_completo',
+            mediaCategory: 'Açaí',
+            mediaPrompt: commercialFoodPrompt('um acai completo em copo transparente com banana, morango, granola, leite em po e leite condensado'),
+          },
+        ],
+      },
+      {
+        name: 'Complementos',
+        order: 3,
+        products: [
+          {
+            name: 'Granola',
+            shortDescription: 'Porção extra de granola crocante',
+            basePrice: 3.5,
+            searchTags: ['tag:acai', 'tag:complemento'],
+            mediaLookupKey: 'lookup:granola',
+            mediaCategory: 'Complementos',
+            mediaPrompt: commercialFoodPrompt('uma porcao de granola crocante em pote pequeno para acompanhamento'),
+          },
+          {
+            name: 'Leite Condensado',
+            shortDescription: 'Porção extra de leite condensado',
+            basePrice: 3.5,
+            searchTags: ['tag:acai', 'tag:complemento', 'tag:doce'],
+            mediaLookupKey: 'lookup:leite_condensado',
+            mediaCategory: 'Complementos',
+            mediaPrompt: commercialFoodPrompt('uma porcao de leite condensado cremoso em pote pequeno para acompanhamento'),
+          },
+          {
+            name: 'Leite em Pó',
+            shortDescription: 'Porção extra de leite em pó',
+            basePrice: 3.5,
+            searchTags: ['tag:acai', 'tag:complemento', 'tag:doce'],
+            mediaLookupKey: 'lookup:leite_em_po',
+            mediaCategory: 'Complementos',
+            mediaPrompt: commercialFoodPrompt('uma porcao de leite em po em pote pequeno para acompanhamento de sobremesa'),
+          },
+          {
+            name: 'Paçoca',
+            shortDescription: 'Porção extra de paçoca esfarelada',
+            basePrice: 3.5,
+            searchTags: ['tag:acai', 'tag:complemento', 'tag:doce'],
+            mediaLookupKey: 'lookup:pacoca',
+            mediaCategory: 'Complementos',
+            mediaPrompt: commercialFoodPrompt('uma porcao de pacoca esfarelada em pote pequeno para acompanhamento'),
+          },
+          {
+            name: 'Banana',
+            shortDescription: 'Porção extra de banana fatiada',
+            basePrice: 3.5,
+            searchTags: ['tag:acai', 'tag:complemento', 'tag:fruta'],
+            mediaLookupKey: 'lookup:banana',
+            mediaCategory: 'Complementos',
+            mediaPrompt: commercialFoodPrompt('uma porcao de banana fatiada em pote pequeno para acompanhamento'),
+          },
+          {
+            name: 'Morango',
+            shortDescription: 'Porção extra de morangos fatiados',
+            basePrice: 4.5,
+            searchTags: ['tag:acai', 'tag:complemento', 'tag:fruta'],
+            mediaLookupKey: 'lookup:morango',
+            mediaCategory: 'Complementos',
+            mediaPrompt: commercialFoodPrompt('uma porcao de morangos frescos fatiados em pote pequeno para acompanhamento'),
+          },
+          {
+            name: 'Nutella',
+            shortDescription: 'Porção extra de creme de avelã',
+            basePrice: 5.5,
+            searchTags: ['tag:acai', 'tag:complemento', 'tag:doce'],
+            mediaLookupKey: 'lookup:nutella',
+            mediaCategory: 'Complementos',
+            mediaPrompt: commercialFoodPrompt('uma porcao generica de creme de avela em pote pequeno, sem marca visivel'),
+          },
+        ],
+      },
+      {
+        name: 'Cremes / Sorvetes',
+        order: 4,
+        products: [
+          {
+            name: 'Creme de Cupuaçu',
+            shortDescription: 'Creme gelado de cupuaçu em porção individual',
+            basePrice: 18.9,
+            searchTags: ['tag:creme', 'tag:sobremesa', 'tag:frio'],
+            mediaLookupKey: 'lookup:creme_cupuacu',
+            mediaCategory: 'Açaí',
+            mediaPrompt: commercialFoodPrompt('um creme de cupuacu servido em copo transparente, textura gelada e cremosa'),
+          },
+          {
+            name: 'Creme de Ninho',
+            shortDescription: 'Creme gelado de leite em pó em porção individual',
+            basePrice: 18.9,
+            searchTags: ['tag:creme', 'tag:sobremesa', 'tag:frio'],
+            mediaLookupKey: 'lookup:creme_ninho',
+            mediaCategory: 'Açaí',
+            mediaPrompt: commercialFoodPrompt('um creme branco de leite em po servido em copo transparente, textura gelada e cremosa'),
+          },
+          {
+            name: 'Sorvete de Creme',
+            shortDescription: 'Sorvete de creme em porção individual',
+            basePrice: 16.9,
+            searchTags: ['tag:sorvete', 'tag:sobremesa', 'tag:frio'],
+            mediaLookupKey: 'lookup:sorvete_creme',
+            mediaCategory: 'Sobremesas',
+            mediaPrompt: commercialFoodPrompt('uma porcao de sorvete de creme em pote individual, textura cremosa e visual apetitoso'),
+          },
+        ],
+      },
+      {
+        name: 'Bebidas',
+        order: 5,
+        products: [
+          {
+            name: 'Água Mineral',
+            shortDescription: 'Garrafa de água mineral 500ml com ou sem gás',
+            basePrice: 4.0,
+            searchTags: ['tag:bebida', 'tag:agua'],
+            mediaLookupKey: 'lookup:acai_agua_mineral',
+            mediaCategory: 'Bebidas',
+            mediaPrompt: commercialFoodPrompt('uma garrafa generica de agua mineral sem marca visivel'),
+          },
+          {
+            name: 'Refrigerante Lata',
+            shortDescription: 'Refrigerante lata 350ml em sabores variados',
+            basePrice: 6.0,
+            searchTags: ['tag:bebida', 'tag:refrigerante'],
+            mediaLookupKey: 'lookup:acai_refrigerante_lata',
+            mediaCategory: 'Bebidas',
+            mediaPrompt: commercialFoodPrompt('uma lata generica de refrigerante gelado sem marca, sem logotipo e sem texto'),
+          },
+          {
+            name: 'Suco Natural',
+            shortDescription: 'Suco natural em copo de 300ml',
+            basePrice: 10.0,
+            searchTags: ['tag:bebida', 'tag:suco'],
+            mediaLookupKey: 'lookup:acai_suco_natural',
+            mediaCategory: 'Bebidas',
+            mediaPrompt: commercialFoodPrompt('um copo de suco natural fresco com visual limpo e comercial'),
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'padaria-cafeteria',
+    name: 'Padaria & Cafeteria',
+    description: 'Pães, salgados, doces, cafés, bebidas e combos',
+    businessSegment: 'padaria',
+    businessSegments: ['padaria', 'cafeteria', 'padaria-cafeteria', 'padaria_cafeteria'],
+    emoji: '☕',
+    categories: [
+      {
+        name: 'Pães e Salgados',
+        order: 1,
+        products: [
+          {
+            name: 'Pão Francês',
+            shortDescription: 'Unidade de pão francês fresco e crocante',
+            basePrice: 1.2,
+            searchTags: ['tag:padaria', 'tag:pao'],
+            mediaLookupKey: 'lookup:pao_frances',
+            mediaCategory: 'Padaria',
+            mediaPrompt: commercialFoodPrompt('paes franceses frescos e dourados, casca crocante e miolo macio'),
+          },
+          {
+            name: 'Pão de Queijo',
+            shortDescription: 'Porção de pão de queijo dourado',
+            basePrice: 8.9,
+            searchTags: ['tag:padaria', 'tag:salgado', 'tag:lanche'],
+            mediaLookupKey: 'lookup:pao_de_queijo',
+            mediaCategory: 'Padaria',
+            mediaPrompt: commercialFoodPrompt('uma porcao de pao de queijo dourado e apetitoso'),
+          },
+          {
+            name: 'Misto Quente',
+            shortDescription: 'Sanduíche quente de presunto e queijo',
+            basePrice: 13.9,
+            searchTags: ['tag:padaria', 'tag:lanche', 'tag:salgado'],
+            mediaLookupKey: 'lookup:misto_quente',
+            mediaCategory: 'Lanches',
+            mediaPrompt: commercialFoodPrompt('um misto quente dourado com queijo derretido, cortado ao meio'),
+          },
+          {
+            name: 'Croissant de Presunto e Queijo',
+            shortDescription: 'Croissant recheado com presunto e queijo',
+            basePrice: 15.9,
+            searchTags: ['tag:padaria', 'tag:lanche', 'tag:salgado'],
+            mediaLookupKey: 'lookup:croissant_presunto_queijo',
+            mediaCategory: 'Padaria',
+            mediaPrompt: commercialFoodPrompt('um croissant dourado recheado com presunto e queijo, apresentacao de cafeteria'),
+          },
+          {
+            name: 'Coxinha',
+            shortDescription: 'Coxinha de frango crocante',
+            basePrice: 9.9,
+            searchTags: ['tag:padaria', 'tag:salgado', 'tag:lanche'],
+            mediaLookupKey: 'lookup:coxinha',
+            mediaCategory: 'Salgados',
+            mediaPrompt: commercialFoodPrompt('uma coxinha de frango dourada e crocante em apresentacao limpa'),
+          },
+          {
+            name: 'Esfiha de Carne',
+            shortDescription: 'Esfiha assada com recheio de carne temperada',
+            basePrice: 8.9,
+            searchTags: ['tag:padaria', 'tag:salgado', 'tag:lanche'],
+            mediaLookupKey: 'lookup:esfiha_carne',
+            mediaCategory: 'Salgados',
+            mediaPrompt: commercialFoodPrompt('uma esfiha de carne assada, dourada e apetitosa'),
+          },
+          {
+            name: 'Enroladinho de Salsicha',
+            shortDescription: 'Salgado assado recheado com salsicha',
+            basePrice: 8.9,
+            searchTags: ['tag:padaria', 'tag:salgado', 'tag:lanche'],
+            mediaLookupKey: 'lookup:enroladinho_salsicha',
+            mediaCategory: 'Salgados',
+            mediaPrompt: commercialFoodPrompt('um enroladinho de salsicha assado e dourado, estilo vitrine de padaria'),
+          },
+        ],
+      },
+      {
+        name: 'Doces e Bolos',
+        order: 2,
+        products: [
+          {
+            name: 'Bolo de Cenoura',
+            shortDescription: 'Fatia de bolo de cenoura com cobertura de chocolate',
+            basePrice: 10.9,
+            searchTags: ['tag:padaria', 'tag:doce', 'tag:bolo'],
+            mediaLookupKey: 'lookup:bolo_cenoura',
+            mediaCategory: 'Doces e Bolos',
+            mediaPrompt: commercialFoodPrompt('uma fatia de bolo de cenoura com cobertura de chocolate brilhante'),
+          },
+          {
+            name: 'Bolo de Chocolate',
+            shortDescription: 'Fatia de bolo de chocolate úmido com cobertura',
+            basePrice: 11.9,
+            searchTags: ['tag:padaria', 'tag:doce', 'tag:bolo'],
+            mediaLookupKey: 'lookup:bolo_chocolate',
+            mediaCategory: 'Doces e Bolos',
+            mediaPrompt: commercialFoodPrompt('uma fatia de bolo de chocolate com cobertura cremosa'),
+          },
+          {
+            name: 'Sonho',
+            shortDescription: 'Sonho recheado com creme e açúcar',
+            basePrice: 9.9,
+            searchTags: ['tag:padaria', 'tag:doce'],
+            mediaLookupKey: 'lookup:sonho',
+            mediaCategory: 'Doces e Bolos',
+            mediaPrompt: commercialFoodPrompt('um sonho de padaria recheado com creme e finalizacao delicada de acucar'),
+          },
+          {
+            name: 'Donut',
+            shortDescription: 'Donut macio com cobertura doce',
+            basePrice: 9.9,
+            searchTags: ['tag:padaria', 'tag:doce'],
+            mediaLookupKey: 'lookup:donut',
+            mediaCategory: 'Doces e Bolos',
+            mediaPrompt: commercialFoodPrompt('um donut macio com cobertura doce generica e sem texto'),
+          },
+          {
+            name: 'Cookie',
+            shortDescription: 'Cookie com gotas de chocolate',
+            basePrice: 7.9,
+            searchTags: ['tag:padaria', 'tag:doce'],
+            mediaLookupKey: 'lookup:cookie',
+            mediaCategory: 'Doces e Bolos',
+            mediaPrompt: commercialFoodPrompt('cookies com gotas de chocolate em apresentacao comercial limpa'),
+          },
+          {
+            name: 'Fatia de Torta',
+            shortDescription: 'Fatia de torta doce do dia',
+            basePrice: 13.9,
+            searchTags: ['tag:padaria', 'tag:doce', 'tag:sobremesa'],
+            mediaLookupKey: 'lookup:fatia_torta',
+            mediaCategory: 'Doces e Bolos',
+            mediaPrompt: commercialFoodPrompt('uma fatia de torta doce com acabamento premium de confeitaria'),
+          },
+        ],
+      },
+      {
+        name: 'Cafés',
+        order: 3,
+        products: [
+          {
+            name: 'Café Expresso',
+            shortDescription: 'Café expresso curto servido na hora',
+            basePrice: 5.9,
+            searchTags: ['tag:cafe', 'tag:bebida', 'tag:padaria'],
+            mediaLookupKey: 'lookup:cafe_expresso',
+            mediaCategory: 'Cafés',
+            mediaPrompt: commercialFoodPrompt('um cafe expresso servido em xicara pequena, visual elegante e apetitoso'),
+          },
+          {
+            name: 'Café com Leite',
+            shortDescription: 'Café com leite cremoso em copo médio',
+            basePrice: 7.9,
+            searchTags: ['tag:cafe', 'tag:bebida', 'tag:padaria'],
+            mediaLookupKey: 'lookup:cafe_com_leite',
+            mediaCategory: 'Cafés',
+            mediaPrompt: commercialFoodPrompt('um cafe com leite cremoso servido em xicara ou copo de cafeteria'),
+          },
+          {
+            name: 'Capuccino',
+            shortDescription: 'Capuccino cremoso com espuma de leite',
+            basePrice: 10.9,
+            searchTags: ['tag:cafe', 'tag:bebida', 'tag:padaria'],
+            mediaLookupKey: 'lookup:capuccino',
+            mediaCategory: 'Cafés',
+            mediaPrompt: commercialFoodPrompt('um capuccino cremoso com espuma de leite em xicara de cafeteria'),
+          },
+          {
+            name: 'Chocolate Quente',
+            shortDescription: 'Chocolate quente cremoso servido em copo médio',
+            basePrice: 10.9,
+            searchTags: ['tag:cafe', 'tag:bebida', 'tag:doce'],
+            mediaLookupKey: 'lookup:chocolate_quente',
+            mediaCategory: 'Cafés',
+            mediaPrompt: commercialFoodPrompt('um chocolate quente cremoso servido em xicara, visual aconchegante e comercial'),
+          },
+        ],
+      },
+      {
+        name: 'Bebidas',
+        order: 4,
+        products: [
+          {
+            name: 'Suco de Laranja',
+            shortDescription: 'Suco de laranja natural em copo de 300ml',
+            basePrice: 9.9,
+            searchTags: ['tag:bebida', 'tag:suco', 'tag:padaria'],
+            mediaLookupKey: 'lookup:suco_laranja',
+            mediaCategory: 'Bebidas',
+            mediaPrompt: commercialFoodPrompt('um copo de suco de laranja natural fresco'),
+          },
+          {
+            name: 'Refrigerante Lata',
+            shortDescription: 'Refrigerante lata 350ml em sabores variados',
+            basePrice: 6.0,
+            searchTags: ['tag:bebida', 'tag:refrigerante'],
+            mediaLookupKey: 'lookup:padaria_refrigerante_lata',
+            mediaCategory: 'Bebidas',
+            mediaPrompt: commercialFoodPrompt('uma lata generica de refrigerante gelado sem marca, sem logotipo e sem texto'),
+          },
+          {
+            name: 'Água Mineral',
+            shortDescription: 'Garrafa de água mineral 500ml com ou sem gás',
+            basePrice: 4.0,
+            searchTags: ['tag:bebida', 'tag:agua'],
+            mediaLookupKey: 'lookup:padaria_agua_mineral',
+            mediaCategory: 'Bebidas',
+            mediaPrompt: commercialFoodPrompt('uma garrafa generica de agua mineral sem marca visivel'),
+          },
+        ],
+      },
+      {
+        name: 'Combos',
+        order: 5,
+        products: [
+          {
+            name: 'Café da Manhã Simples',
+            shortDescription: 'Café com leite, pão francês e manteiga',
+            basePrice: 14.9,
+            searchTags: ['tag:cafe', 'tag:padaria', 'tag:combo'],
+            mediaLookupKey: 'lookup:cafe_manha_simples',
+            mediaCategory: 'Combos',
+            mediaPrompt: commercialFoodPrompt('um combo simples de cafe da manha com cafe com leite, pao frances e manteiga'),
+          },
+          {
+            name: 'Combo Café + Pão de Queijo',
+            shortDescription: 'Café expresso ou café com leite acompanhado de pão de queijo',
+            basePrice: 13.9,
+            searchTags: ['tag:cafe', 'tag:padaria', 'tag:combo'],
+            mediaLookupKey: 'lookup:combo_cafe_pao_queijo',
+            mediaCategory: 'Combos',
+            mediaPrompt: commercialFoodPrompt('um combo de cafe com pao de queijo dourado em apresentacao de delivery'),
+          },
+          {
+            name: 'Combo Café + Salgado',
+            shortDescription: 'Café expresso ou café com leite acompanhado de salgado',
+            basePrice: 15.9,
+            searchTags: ['tag:cafe', 'tag:padaria', 'tag:combo', 'tag:salgado'],
+            mediaLookupKey: 'lookup:combo_cafe_salgado',
+            mediaCategory: 'Combos',
+            mediaPrompt: commercialFoodPrompt('um combo de cafe com salgado assado ou frito em apresentacao comercial limpa'),
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 /**
@@ -478,5 +963,8 @@ export function getTemplateById(id: string): MenuTemplate | undefined {
  */
 export function getTemplateBySegment(segment: string): MenuTemplate | undefined {
   const normalized = segment.toLowerCase().trim();
-  return MENU_TEMPLATES.find((t) => t.businessSegment === normalized);
+  return MENU_TEMPLATES.find((t) => {
+    const segments = t.businessSegments ?? [t.businessSegment];
+    return segments.includes(normalized);
+  });
 }

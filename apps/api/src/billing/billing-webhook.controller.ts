@@ -1,4 +1,5 @@
 import { Controller, Post, Body, Headers, Logger, Req } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { PrismaService } from '../database/prisma.service';
 import { SubscriptionStatus } from '@prisma/client';
 import { Public } from '../common/decorators';
@@ -16,6 +17,7 @@ export class BillingWebhookController {
   ) {}
 
   @Public()
+  @Throttle({ public: { limit: 120, ttl: 60 } })
   @Post('asaas')
   async handleAsaasWebhook(
     @Body() body: unknown,

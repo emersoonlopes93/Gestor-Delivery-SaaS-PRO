@@ -134,7 +134,12 @@ export function CampaignsPage() {
             {campaigns.map(c => (
               <TableRow key={c.id}>
                 <TableCell>
-                  <span className="font-medium text-foreground">{c.name}</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="font-medium text-foreground">{c.name}</span>
+                    {c.type === 'whatsapp_status' && (
+                      <span className="text-xs text-primary-600 bg-primary-50 dark:bg-primary-900/20 px-2 py-0.5 rounded w-max">Status do WhatsApp</span>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <StatusBadge
@@ -154,15 +159,36 @@ export function CampaignsPage() {
                   </StatusBadge>
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary rounded-full" 
-                        style={{ width: `${c.totalAudience > 0 ? (c.totalSent / c.totalAudience) * 100 : 0}%` }}
-                      />
+                  {c.type === 'whatsapp_status' ? (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm font-medium text-foreground">
+                        {c.status === 'completed' ? 'Publicado' : c.status === 'cancelled' ? 'Falhou' : 'Aguardando'}
+                      </span>
+                      {c.status === 'completed' && c.completedAt && (
+                        <span className="text-xs text-muted-foreground">
+                          Publicado em {new Date(c.completedAt).toLocaleString('pt-BR')}
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground mt-1">Disparo único de status</span>
                     </div>
-                    <span className="text-sm text-muted-foreground">{c.totalSent}/{c.totalAudience}</span>
-                  </div>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary rounded-full" 
+                            style={{ width: `${c.totalAudience > 0 ? (c.totalSent / c.totalAudience) * 100 : 0}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-foreground">{c.totalSent}/{c.totalAudience}</span>
+                      </div>
+                      <div className="flex gap-3 text-xs text-muted-foreground mt-1">
+                        <span title="Entregues" className="text-status-success">{c.totalDelivered} entregues</span>
+                        <span title="Falhas" className="text-status-error">{(c as Campaign & { _count?: { dispatches: number } })._count?.dispatches || 0} falhas</span>
+                        <span title="Opt-outs" className="text-status-warning">{c.totalOptOut} saíram</span>
+                      </div>
+                    </div>
+                  )}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{new Date(c.createdAt).toLocaleDateString('pt-BR')}</TableCell>
                 <TableCell className="text-right">

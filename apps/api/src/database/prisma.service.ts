@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient, Prisma } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TenantContextService } from '../common/context/tenant-context.service';
 import {
   resolveBillingDatabasePreflightMode,
@@ -19,7 +20,10 @@ export class PrismaService
    */
   public readonly tenantClient: PrismaClient;
 
-  constructor(public readonly tenantContext: TenantContextService) {
+  constructor(
+    public readonly tenantContext: TenantContextService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {
     const options: Prisma.PrismaClientOptions = {
       log: [
         { level: 'error', emit: 'stdout' },
@@ -60,6 +64,11 @@ export class PrismaService
         'MediaCategory',
         'AuthSession',
         'ExternalWebhookEvent',
+        'BillingRuleVersion',
+        'BaseMenuTemplate',
+        'BaseMenuTemplateVersion',
+        'BaseMenuCategory',
+        'BaseMenuProduct',
       ];
 
       const model = params.model ?? '';
@@ -92,7 +101,7 @@ export class PrismaService
         // Achata chaves compostas no where (ex: tenantId_phone: { tenantId, phone } -> { tenantId, phone })
         for (const key of Object.keys(where)) {
           const val = where[key];
-          if (val && typeof val === 'object' && !Array.isArray(val)) {
+          if (key.includes('_') && val && typeof val === 'object' && !Array.isArray(val)) {
             const valKeys = Object.keys(val);
             const isPrismaFilter = valKeys.some(k => ['equals', 'in', 'not', 'notIn', 'lt', 'lte', 'gt', 'gte', 'contains', 'startsWith', 'endsWith', 'mode'].includes(k));
             if (!isPrismaFilter) {
@@ -117,7 +126,7 @@ export class PrismaService
         // Achata chaves compostas no where para operações de escrita também
         for (const key of Object.keys(where)) {
           const val = where[key];
-          if (val && typeof val === 'object' && !Array.isArray(val)) {
+          if (key.includes('_') && val && typeof val === 'object' && !Array.isArray(val)) {
             const valKeys = Object.keys(val);
             const isPrismaFilter = valKeys.some(k => ['equals', 'in', 'not', 'notIn', 'lt', 'lte', 'gt', 'gte', 'contains', 'startsWith', 'endsWith', 'mode'].includes(k));
             if (!isPrismaFilter) {
@@ -146,7 +155,29 @@ export class PrismaService
       }
 
       params.args = argsRecord;
-      return next(params);
+      
+      const result = await next(params);
+
+      // Cache invalidation for public storefront
+      if (['create', 'createMany', 'update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(params.action)) {
+        const cacheInvalidationModels = [
+          'Product', 'ProductCategory', 'ProductOptionGroup', 'OptionGroup', 'OptionGroupItem', 
+          'ComboSlot', 'ComboBundleItem', 'ComboAllowedItem', 'CatalogPublication', 
+          'CatalogAvailabilityRule', 'TenantSettings', 'TenantSchedulingSettings', 'DeliveryZone', 'Upsell', 'Tenant'
+        ];
+        
+        if (cacheInvalidationModels.includes(model)) {
+          // Se for o próprio Tenant, o ID dele é o tenantId
+          const resultRecord = (result && typeof result === 'object') ? (result as Record<string, unknown>) : {};
+          const targetTenantId = model === 'Tenant' ? (resultRecord['id'] || argsRecord.where?.['id']) : tenantId;
+          
+          if (typeof targetTenantId === 'string' && targetTenantId) {
+            this.eventEmitter.emit('storefront.invalidate', { tenantId: targetTenantId });
+          }
+        }
+      }
+
+      return result;
     });
 
     this.tenantClient = this;

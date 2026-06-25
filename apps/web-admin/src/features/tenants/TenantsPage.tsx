@@ -29,15 +29,14 @@ export function TenantsPage() {
       .finally(() => setLoading(false));
   };
 
-  const handleStatusChange = async (tenantId: string, newStatus: string) => {
-    try {
-      await api.patch(`/admin/tenants/${tenantId}/status`, { status: newStatus });
-      setTenants((prev) => prev.map((tenant) => tenant.id === tenantId ? { ...tenant, status: newStatus as Tenant['status'] } : tenant));
-    } catch (error) {
-      console.error('Erro ao atualizar status:', error);
-      alert('Erro ao atualizar status do tenant');
-    }
-  };
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
+  const filteredTenants = tenants.filter((t) => {
+    const matchesSearch = searchTerm ? t.name.toLowerCase().includes(searchTerm.toLowerCase()) || t.slug.toLowerCase().includes(searchTerm.toLowerCase()) : true;
+    const matchesStatus = statusFilter ? t.status === statusFilter : true;
+    return matchesSearch && matchesStatus;
+  });
 
   const handleImpersonate = async (tenantId: string) => {
     const reason = window.prompt('Informe o motivo do acesso de suporte:')?.trim();
@@ -46,7 +45,8 @@ export function TenantsPage() {
     try {
       const res = await api.post<{ accessToken: string }>(`/admin/tenants/${tenantId}/impersonate`, { reason });
       if (res.success && res.data.accessToken) {
-        window.open(`http://localhost:5173?impersonate_token=${res.data.accessToken}`, '_blank');
+        const tenantUrl = import.meta.env.VITE_TENANT_URL || 'http://localhost:5173';
+        window.open(`${tenantUrl}?impersonate_token=${res.data.accessToken}`, '_blank');
       }
     } catch (error) {
       console.error('Erro ao impersonar:', error);
@@ -78,13 +78,35 @@ export function TenantsPage() {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Tenants</h1>
-        <p className="text-muted-foreground mt-1">Lojas cadastradas na plataforma</p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Tenants</h1>
+          <p className="text-muted-foreground mt-1">Lojas cadastradas na plataforma</p>
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Buscar loja ou slug..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="text-sm border border-border bg-card text-foreground rounded-md px-3 py-2 focus:ring-primary focus:border-primary"
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="text-sm border border-border bg-card text-foreground rounded-md px-3 py-2 focus:ring-primary focus:border-primary"
+          >
+            <option value="">Todos Status</option>
+            <option value="active">Ativo</option>
+            <option value="trial">Trial</option>
+            <option value="suspended">Suspenso</option>
+            <option value="inactive">Inativo</option>
+          </select>
+        </div>
       </div>
 
-      <div className="hidden md:block bg-card rounded-xl border border-border overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="hidden md:block bg-card rounded-xl border border-border overflow-x-auto">
+        <table className="w-full min-w-[800px] text-sm">
           <thead className="bg-muted/50 border-b border-border">
             <tr>
               <th className="text-left px-6 py-3 font-semibold text-foreground">Nome</th>
@@ -96,14 +118,14 @@ export function TenantsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
-            {tenants.length === 0 ? (
+            {filteredTenants.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
                   Nenhum tenant encontrado
                 </td>
               </tr>
             ) : (
-              tenants.map((tenant) => (
+              filteredTenants.map((tenant) => (
                 <tr key={tenant.id} className="hover:bg-muted/30 transition-colors">
                   <td className="px-6 py-4 font-medium text-foreground">{tenant.name}</td>
                   <td className="px-6 py-4 text-muted-foreground font-mono text-xs">{tenant.slug}</td>
@@ -127,48 +149,11 @@ export function TenantsPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => navigate(`/tenants/${tenant.id}/modules`)}
-                        className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 text-sm font-medium"
+                        onClick={() => navigate(`/tenants/${tenant.id}`)}
+                        className="text-primary hover:underline text-sm font-bold ml-2"
                       >
-                        Módulos
+                        Ver Detalhes &rarr;
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/tenants/${tenant.id}/scheduling`)}
-                        className="text-cyan-600 hover:text-cyan-700 dark:text-cyan-400 dark:hover:text-cyan-300 text-sm font-medium"
-                      >
-                        Agendamento
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/tenants/${tenant.id}/ai-agent`)}
-                        className="text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 text-sm font-medium flex items-center gap-1"
-                        title="Configurar Agente IA"
-                      >
-                        <Bot size={14} />
-                        Agente IA
-                      </button>
-                      {!tenant.billingSubscriptions?.[0] ? (
-                        <button
-                          type="button"
-                          onClick={() => handleCreateBillingV2(tenant.id)}
-                          className="text-amber-700 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 text-sm font-medium flex items-center gap-1"
-                          title="Criar assinatura Billing V2 sem gateway"
-                        >
-                          <CreditCard size={14} />
-                          Billing V2
-                        </button>
-                      ) : null}
-                      <select
-                        value={tenant.status}
-                        onChange={(event) => handleStatusChange(tenant.id, event.target.value)}
-                        className="text-sm border-border bg-card text-foreground rounded-md focus:ring-primary focus:border-primary"
-                      >
-                        <option value="active">Ativo</option>
-                        <option value="trial">Trial</option>
-                        <option value="suspended">Suspenso</option>
-                        <option value="inactive">Inativo</option>
-                      </select>
                     </div>
                   </td>
                 </tr>
@@ -179,12 +164,12 @@ export function TenantsPage() {
       </div>
 
       <div className="md:hidden space-y-4">
-        {tenants.length === 0 ? (
+        {filteredTenants.length === 0 ? (
           <div className="bg-card rounded-xl border border-border p-8 text-center text-muted-foreground text-sm">
             Nenhum tenant encontrado
           </div>
         ) : (
-          tenants.map((tenant) => (
+          filteredTenants.map((tenant) => (
             <div key={tenant.id} className="bg-card rounded-xl border border-border p-4 space-y-3">
               <div className="flex justify-between items-start">
                 <div>
@@ -212,52 +197,12 @@ export function TenantsPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate(`/tenants/${tenant.id}/modules`)}
-                  className="flex-1 py-2.5 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 rounded-lg text-xs font-bold"
+                  onClick={() => navigate(`/tenants/${tenant.id}`)}
+                  className="flex-1 py-2.5 bg-primary/10 text-primary rounded-lg text-xs font-bold"
                 >
-                  Módulos
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/tenants/${tenant.id}/scheduling`)}
-                  className="flex-1 py-2.5 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 rounded-lg text-xs font-bold"
-                >
-                  Agendamento
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/tenants/${tenant.id}/ai-agent`)}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-purple-500/10 text-purple-700 dark:text-purple-400 rounded-lg text-xs font-bold"
-                >
-                  <Bot size={14} />
-                  Agente IA
+                  Ver Detalhes
                 </button>
               </div>
-
-              {!tenant.billingSubscriptions?.[0] ? (
-                <button
-                  type="button"
-                  onClick={() => handleCreateBillingV2(tenant.id)}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-lg text-xs font-bold"
-                >
-                  <CreditCard size={14} />
-                  Criar Billing V2
-                </button>
-              ) : null}
-
-              <label className="block pt-2">
-                <span className="block text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest mb-1.5">Alterar status</span>
-                <select
-                  value={tenant.status}
-                  onChange={(event) => handleStatusChange(tenant.id, event.target.value)}
-                  className="w-full text-sm border-border rounded-lg focus:ring-primary focus:border-primary bg-muted/50 text-foreground"
-                >
-                  <option value="active">Ativo</option>
-                  <option value="trial">Trial</option>
-                  <option value="suspended">Suspenso</option>
-                  <option value="inactive">Inativo</option>
-                </select>
-              </label>
             </div>
           ))
         )}

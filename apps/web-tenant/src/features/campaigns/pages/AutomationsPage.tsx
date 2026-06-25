@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Bot, Clock, DollarSign, Megaphone, PauseCircle, RefreshCw, Send, ShoppingCart, Sparkles, Users } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -64,12 +65,110 @@ type InsightsPayload = {
   insights: Array<{ type: string; severity: 'info' | 'success' | 'warning'; message: string; value?: number }>;
 };
 
+type FeedbackPayload = {
+  id: string;
+  rating: number;
+  comment?: string;
+  publicReviewClicked: boolean;
+  clickedChannel?: string;
+  createdAt: string;
+  order?: { orderNumber: string };
+  customer?: { name: string; phone: string };
+};
+
+type FeedbackMetricsPayload = {
+  feedbacks: FeedbackPayload[];
+  total: number;
+  averageRating: number;
+};
+
 function formatCurrency(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function formatPercent(value: number) {
   return `${(value * 100).toFixed(1)}%`;
+}
+
+export function AutomationConfigCard({ 
+  title, 
+  description, 
+  type, 
+  configs, 
+  onSave, 
+  defaultTemplate,
+  extraConfigUI,
+  variables = ['{nome}', '{link_cardapio}', '{cupom}', '{pedido}', '{total}'],
+}: {
+  title: string;
+  description: string;
+  type: string;
+  configs?: Array<{ type: string; enabled: boolean; messageTemplate: string; config: Record<string, unknown> }>;
+  onSave: (data: { type: string; payload: { enabled: boolean; messageTemplate: string; config: Record<string, unknown> } }) => void;
+  defaultTemplate: string;
+  variables?: string[];
+  extraConfigUI: (config: Record<string, unknown>, setConfig: (c: Record<string, unknown>) => void) => React.ReactNode;
+}) {
+  const config = configs?.find(c => c.type === type);
+  const [enabled, setEnabled] = useState(config?.enabled ?? false);
+  const [template, setTemplate] = useState(config?.messageTemplate ?? defaultTemplate);
+  const [localConfig, setLocalConfig] = useState(config?.config ?? {});
+  const templateRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const insertVariable = (variable: string) => {
+    const textarea = templateRef.current;
+    setTemplate(prev => {
+      if (!textarea) {
+        return `${prev}${prev ? ' ' : ''}${variable}`;
+      }
+      const start = textarea.selectionStart ?? prev.length;
+      const end = textarea.selectionEnd ?? prev.length;
+      const nextValue = `${prev.slice(0, start)}${variable}${prev.slice(end)}`;
+      window.requestAnimationFrame(() => {
+        textarea.focus();
+        const nextCursor = start + variable.length;
+        textarea.setSelectionRange(nextCursor, nextCursor);
+      });
+      return nextValue;
+    });
+  };
+
+  return (
+    <Card className="flex flex-col gap-4">
+      <div>
+        <h3 className="font-semibold">{title}</h3>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+        <span className="text-sm">Habilitado</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="font-semibold text-muted-foreground">Variáveis:</span>
+        {variables.map((variable) => (
+          <button
+            key={variable}
+            type="button"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => insertVariable(variable)}
+            className="rounded-full border border-border bg-background px-3 py-1 font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
+          >
+            {variable}
+          </button>
+        ))}
+      </div>
+      <textarea
+        ref={templateRef}
+        className="w-full p-2 border rounded-md text-sm min-h-[80px]"
+        value={template}
+        onChange={(e) => setTemplate(e.target.value)}
+      />
+      {extraConfigUI(localConfig, setLocalConfig)}
+      <Button size="sm" onClick={() => onSave({ type, payload: { enabled, messageTemplate: template, config: localConfig } })}>
+        Salvar
+      </Button>
+    </Card>
+  );
 }
 
 export function AutomationsPage() {
@@ -99,6 +198,14 @@ export function AutomationsPage() {
     },
   });
 
+  const { data: feedbacksData } = useQuery({
+    queryKey: ['automation-feedbacks'],
+    queryFn: async () => {
+      const res = await api.get<FeedbackMetricsPayload>('/campaigns/automations/feedbacks');
+      return res.success ? res.data : null;
+    },
+  });
+
   const recoveryMutation = useMutation({
     mutationFn: async (days: 30 | 60 | 90) => {
       await api.post(`/campaigns/recovery/${days}`);
@@ -111,6 +218,21 @@ export function AutomationsPage() {
       await api.post('/campaigns/abandoned-cart/dispatch', { limit: 20 });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['marketing-automations'] }),
+  });
+
+  const { data: configs } = useQuery({
+    queryKey: ['automation-configs'],
+    queryFn: async () => {
+      const res = await api.get<{ id: string; type: string; enabled: boolean; messageTemplate: string; config: Record<string, unknown> }[]>('/campaigns/automations/config');
+      return res.success ? res.data : [];
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async ({ type, payload }: { type: string; payload: { enabled: boolean; messageTemplate: string; config: Record<string, unknown> } }) => {
+      await api.put(`/campaigns/automations/config/${type}`, payload);
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['automation-configs'] }),
   });
 
   const recoveryScenarios = automations?.recovery ?? [];
@@ -249,21 +371,142 @@ export function AutomationsPage() {
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
             </div>
           ) : abandonedCarts.length ? (
-            <div className="space-y-3">
-              {abandonedCarts.slice(0, 5).map((cart) => (
-                <div key={cart.sessionId} className="border border-border rounded-lg p-4 flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{cart.displayName || cart.phone}</p>
-                    <p className="text-sm text-muted-foreground">{cart.minutesInactive} min parado</p>
-                  </div>
-                  <StatusBadge status="warning">{cart.step}</StatusBadge>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState icon={Clock} title="Nenhum carrinho pendente" description="Os lembretes aparecem aqui quando houver abandono detectado." />
-          )}
+             <div className="space-y-3">
+               {abandonedCarts.slice(0, 5).map((cart, i) => (
+                 <div key={i} className="border border-border rounded-lg p-3 flex items-center justify-between gap-4">
+                   <div className="min-w-0">
+                     <p className="font-medium text-sm truncate">{cart.phone} {cart.displayName && `(${cart.displayName})`}</p>
+                     <p className="text-xs text-muted-foreground mt-1">Inativo há {cart.minutesInactive} min</p>
+                   </div>
+                   <StatusBadge status="warning">Passo: {cart.step}</StatusBadge>
+                 </div>
+               ))}
+             </div>
+           ) : (
+             <EmptyState icon={Clock} title="Nenhum carrinho pendente" description="Os lembretes aparecem aqui quando houver abandono detectado." />
+           )}
         </Card>
+      </div>
+
+      <div className="pt-6">
+        <h2 className="text-xl font-bold mb-4">Automações P1</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <AutomationConfigCard
+            title="Pós-pedido / Avaliação"
+            description="Envia mensagem X horas após o pedido ser entregue."
+            type="post_order_review"
+            configs={configs}
+            onSave={saveMutation.mutate}
+            defaultTemplate="Olá {nome}, recebemos seu pedido {pedido}! O que achou? Avalie nossa loja!"
+            extraConfigUI={(config: Record<string, unknown>, setConfig: (c: Record<string, unknown>) => void) => (
+              <div className="flex flex-col gap-4 mt-2">
+                <div>
+                  <label className="text-sm font-medium">Aguardar (horas)</label>
+                  <input
+                    type="number"
+                    className="w-full mt-1 p-2 border rounded-md text-sm"
+                    value={config.delayHours as number ?? 2}
+                    onChange={(e) => setConfig({ ...config, delayHours: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="pt-3 border-t border-border">
+                  <h4 className="text-sm font-semibold mb-2">Links para Avaliação Pública (Notas 4 e 5)</h4>
+                  <div className="space-y-2">
+                    <input
+                      type="url"
+                      placeholder="URL Google Meu Negócio"
+                      className="w-full p-2 border rounded-md text-sm"
+                      value={(config.googleReviewUrl as string) || ''}
+                      onChange={(e) => setConfig({ ...config, googleReviewUrl: e.target.value })}
+                    />
+                    <input
+                      type="url"
+                      placeholder="URL Instagram"
+                      className="w-full p-2 border rounded-md text-sm"
+                      value={(config.instagramUrl as string) || ''}
+                      onChange={(e) => setConfig({ ...config, instagramUrl: e.target.value })}
+                    />
+                    <input
+                      type="url"
+                      placeholder="URL Facebook"
+                      className="w-full p-2 border rounded-md text-sm"
+                      value={(config.facebookUrl as string) || ''}
+                      onChange={(e) => setConfig({ ...config, facebookUrl: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="pt-3 border-t border-border">
+                  <h4 className="text-sm font-semibold mb-2">Mensagens da Tela de Agradecimento</h4>
+                  <div className="space-y-2">
+                    <textarea
+                      placeholder="Mensagem para notas baixas (1 a 3)"
+                      className="w-full p-2 border rounded-md text-sm min-h-[60px]"
+                      value={(config.lowRatingMessage as string) || ''}
+                      onChange={(e) => setConfig({ ...config, lowRatingMessage: e.target.value })}
+                    />
+                    <textarea
+                      placeholder="Mensagem para notas altas (4 a 5)"
+                      className="w-full p-2 border rounded-md text-sm min-h-[60px]"
+                      value={(config.highRatingMessage as string) || ''}
+                      onChange={(e) => setConfig({ ...config, highRatingMessage: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          />
+
+          <AutomationConfigCard
+            title="Cliente Inativo"
+            description="Traz de volta clientes que não compram há Y dias."
+            type="inactive_customer_winback"
+            configs={configs}
+            onSave={saveMutation.mutate}
+            defaultTemplate="Faz tempo que não te vemos, {nome}! Que tal um pedido com o cupom {cupom}?"
+            extraConfigUI={(config: Record<string, unknown>, setConfig: (c: Record<string, unknown>) => void) => (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-sm font-medium">Dias Inativo</label>
+                  <input
+                    type="number"
+                    className="w-full mt-1 p-2 border rounded-md text-sm"
+                    value={config.daysInactive as number ?? 30}
+                    onChange={(e) => setConfig({ ...config, daysInactive: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Cupom</label>
+                  <input
+                    type="text"
+                    className="w-full mt-1 p-2 border rounded-md text-sm"
+                    value={config.couponCode as string ?? ''}
+                    onChange={(e) => setConfig({ ...config, couponCode: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
+          />
+
+          <AutomationConfigCard
+            title="Aniversário"
+            description="Envia mensagem no aniversário do cliente (se houver birthDate)."
+            type="birthday_greeting"
+            configs={configs}
+            onSave={saveMutation.mutate}
+            defaultTemplate="Feliz aniversário, {nome}! Aproveite seu dia com {cupom} no nosso cardápio: {link_cardapio}"
+            extraConfigUI={(config: Record<string, unknown>, setConfig: (c: Record<string, unknown>) => void) => (
+              <div>
+                <label className="text-sm font-medium">Cupom</label>
+                <input
+                  type="text"
+                  className="w-full mt-1 p-2 border rounded-md text-sm"
+                  value={config.couponCode as string ?? ''}
+                  onChange={(e) => setConfig({ ...config, couponCode: e.target.value })}
+                />
+              </div>
+            )}
+          />
+        </div>
       </div>
 
       <Card>
@@ -307,6 +550,57 @@ export function AutomationsPage() {
           ))}
         </div>
       </Card>
+
+      {feedbacksData && (
+        <div className="pt-6 border-t border-border">
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="text-xl font-bold">Feedbacks Recentes</h2>
+            <StatusBadge status="info">Média {feedbacksData.averageRating.toFixed(1)} / 5.0 ({feedbacksData.total} avaliações)</StatusBadge>
+          </div>
+          {feedbacksData.feedbacks.length > 0 ? (
+            <Card className="p-0 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-muted text-muted-foreground uppercase text-xs">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Data</th>
+                      <th className="px-4 py-3 font-semibold">Pedido</th>
+                      <th className="px-4 py-3 font-semibold">Cliente</th>
+                      <th className="px-4 py-3 font-semibold">Nota</th>
+                      <th className="px-4 py-3 font-semibold">Comentário</th>
+                      <th className="px-4 py-3 font-semibold">Avaliação Pública</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {feedbacksData.feedbacks.map((fb: FeedbackPayload) => (
+                      <tr key={fb.id} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{new Date(fb.createdAt).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 font-medium">#{fb.order?.orderNumber}</td>
+                        <td className="px-4 py-3">{fb.customer?.name || 'Cliente Oculto'}</td>
+                        <td className="px-4 py-3">
+                          <StatusBadge status={fb.rating >= 4 ? 'success' : fb.rating === 3 ? 'warning' : 'error'}>{fb.rating} Estrelas</StatusBadge>
+                        </td>
+                        <td className="px-4 py-3 max-w-[200px] truncate" title={fb.comment}>{fb.comment || '-'}</td>
+                        <td className="px-4 py-3">
+                          {fb.publicReviewClicked ? (
+                            <StatusBadge status="success">Clicou ({fb.clickedChannel})</StatusBadge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          ) : (
+            <Card className="text-center py-8">
+              <p className="text-muted-foreground">Nenhum feedback recebido ainda.</p>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   );
 }

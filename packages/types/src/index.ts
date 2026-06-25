@@ -24,29 +24,29 @@ export {
   FractionalPricingRule,
 } from './enums';
 
-export type * from './auth';
-export type * from './tenant';
-export type * from './billing';
-export type * from './purchasing';
-export type * from './finance';
-export type * from './rbac';
-export type * from './api';
-export type * from './catalog';
+export * from './auth';
+export * from './tenant';
+export * from './billing';
+export * from './purchasing';
+export * from './finance';
+export * from './rbac';
+export * from './api';
+export * from './catalog';
 export { PizzaTemplateConfigSchema, CategoryTemplateConfigSchema } from './catalog';
-export type * from './storefront';
-export type * from './customer';
-export type * from './promotions';
-export type * from './inventory';
-export type * from './analytics';
-export type * from './goals';
-export type * from './campaigns';
-export type * from './chat';
-export type * from './realtime';
-export type * from './split-payment';
+export * from './storefront';
+export * from './customer';
+export * from './promotions';
+export * from './inventory';
+export * from './analytics';
+export * from './goals';
+export * from './campaigns';
+export * from './chat';
+export * from './realtime';
+export * from './split-payment';
 export * from './kds';
-export type * from './notifications';
-export type * from './employees';
-export type * from './settings';
+export * from './notifications';
+export * from './employees';
+export * from './settings';
 
 // Modules with classes or constants (explicit values)
 export type { 
@@ -64,6 +64,11 @@ export type {
   OrderBoardItemDTO,
   OrderListItemDTO,
   OrderDispatchItemDTO,
+} from './order';
+
+export {
+  FULFILLMENT_TYPE_LABELS,
+  formatFulfillmentTypeLabel,
 } from './order';
 
 export { 
@@ -85,18 +90,19 @@ export {
   PaymentInput,
 } from './order';
 
-export type * from './delivery';
+export * from './delivery';
 export { CreateDriverDTO, UpdateDriverDTO } from './delivery';
-export type * from './delivery-rate';
+export * from './delivery-rate';
 export {
   CreateDeliveryRateRuleDTO,
   DeliveryRateDistanceTierDTO,
 } from './delivery-rate';
 
-export type * from './cash';
+export * from './cash';
 export { OpenCashSessionDTO, CloseCashSessionDTO, CreateCashMovementDTO } from './cash';
 
-export type * from './pos';
+export * from './pos';
+export * from './source-channel';
 export { CreatePosOrderDTO, PosFulfillmentType } from './pos';
 
 export { UpdateCustomerDTO } from './customer';

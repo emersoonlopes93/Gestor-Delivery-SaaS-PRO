@@ -4,9 +4,16 @@ import { BillingUsageService } from './billing-usage.service';
 describe('BillingUsageService ledger snapshots', () => {
   const defaultSettings = {
     countStorefrontOrders: true,
+    countDirectOnlineOrders: true,
     countPosOrders: false,
     countWhatsappAiOrders: false,
     countManualOrders: false,
+    countMarketplaceIfoodOrders: false,
+    countMarketplaceRappiOrders: false,
+    countMarketplaceUbereatsOrders: false,
+    countMarketplace99foodOrders: false,
+    countMarketplaceKettaOrders: false,
+    countMarketplaceZeDeliveryOrders: false,
     countConfirmedOrders: false,
     countCompletedOrders: true,
     excludeCancelledOrders: true,
@@ -74,7 +81,7 @@ describe('BillingUsageService ledger snapshots', () => {
   };
 
   it('uses ledger as primary source when events exist', async () => {
-    const { service, prisma } = makeService({
+    const { service, prisma, ledger } = makeService({
       ledgerPreview: {
         eventsCount: 2,
         totalOrders: 1,
@@ -98,6 +105,9 @@ describe('BillingUsageService ledger snapshots', () => {
       billingRuleVersionId: 'rule-1',
       totalAdjustments: new Prisma.Decimal(-10),
       checksum: 'abc123',
+    }));
+    expect(ledger.getLedgerPreview).toHaveBeenCalledWith(expect.objectContaining({
+      includedChannels: ['direct_online', 'storefront'],
     }));
     expect(prisma.order.aggregate).not.toHaveBeenCalled();
   });
@@ -153,5 +163,29 @@ describe('BillingUsageService ledger snapshots', () => {
 
     expect(snapshot).toBe(existing);
     expect(prisma.billingUsageSnapshot.update).not.toHaveBeenCalled();
+  });
+
+  it('includes marketplace_ifood in billing only when enabled', async () => {
+    const { service, settings, ledger } = makeService({
+      ledgerPreview: {
+        eventsCount: 1,
+        totalOrders: 1,
+        totalRevenue: new Prisma.Decimal(25),
+      },
+    });
+    settings.ensureDefaultSettings.mockResolvedValue({
+      ...defaultSettings,
+      countMarketplaceIfoodOrders: true,
+    });
+
+    await service.getBillableRevenuePreview({
+      tenantId: 'tenant-1',
+      periodStart: new Date('2026-06-01T00:00:00.000Z'),
+      periodEnd: new Date('2026-07-01T00:00:00.000Z'),
+    });
+
+    expect(ledger.getLedgerPreview).toHaveBeenCalledWith(expect.objectContaining({
+      includedChannels: ['direct_online', 'storefront', 'marketplace_ifood'],
+    }));
   });
 });

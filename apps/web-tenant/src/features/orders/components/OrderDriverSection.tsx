@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Truck, Phone, UserMinus, UserPlus } from 'lucide-react';
 
 interface OrderDriverSectionProps {
+  fulfillmentType?: string;
   driverId?: string | null;
   driverName?: string | null;
   driverPhone?: string | null;
@@ -10,12 +11,16 @@ interface OrderDriverSectionProps {
 }
 
 export const OrderDriverSection = memo(function OrderDriverSection({ 
+  fulfillmentType,
   driverId, 
   driverName, 
   driverPhone,
   driverStatus,
   onAssignDriver
 }: OrderDriverSectionProps) {
+  if (fulfillmentType && fulfillmentType !== 'delivery') {
+    return null;
+  }
   
   return (
     <section>

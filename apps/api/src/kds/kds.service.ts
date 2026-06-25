@@ -452,6 +452,7 @@ export class KdsService {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId, tenantId },
         include: {
+          deliveryAddress: true,
           items: {
             include: {
               product: {
@@ -470,6 +471,79 @@ export class KdsService {
       }
 
       // Agrupar itens por estação
+      const mapItemsToTicket = (items: OrderWithItems['items']) => items.map(item => {
+        const orderItem = item as OrderWithItems['items'][number];
+
+        return {
+          id: orderItem.id,
+          lineType: orderItem.lineType as 'product' | 'combo',
+          productId: orderItem.productId,
+          comboId: orderItem.comboId,
+          quantity: orderItem.quantity,
+          unitPrice: Number(orderItem.unitPrice),
+          lineTotal: Number(orderItem.lineTotal),
+          notes: orderItem.notes,
+          snapshotName: orderItem.snapshotName,
+          snapshotImage: orderItem.snapshotImage,
+          snapshotBasePrice: Number(orderItem.snapshotBasePrice),
+          snapshotExtrasTotal: Number(orderItem.snapshotExtrasTotal),
+          snapshotComposition: orderItem.snapshotComposition,
+          snapshotCatalogV2Json: orderItem.snapshotCatalogV2Json,
+        };
+      });
+
+      const jobs = [];
+      const primaryPrinter = await this.prisma.printerDevice.findFirst({
+        where: {
+          tenantId,
+          isPrimary: true,
+          isActive: true,
+          autoPrintEnabled: true,
+        },
+        select: { id: true },
+      });
+
+      if (primaryPrinter) {
+        const orderWithAddress = order as OrderWithItems & { deliveryAddress?: OrderResponseDTO['deliveryAddress'] };
+        const mainReceiptOrder: OrderResponseDTO = {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          status: order.status as OrderStatus,
+          fulfillmentType: order.fulfillmentType as FulfillmentType,
+          customerName: order.customerName,
+          customerPhone: order.customerPhone,
+          customerEmail: order.customerEmail,
+          deliveryAddress: orderWithAddress.deliveryAddress ?? null,
+          tableNumber: order.tableNumber,
+          notes: order.notes,
+          items: mapItemsToTicket((order as OrderWithItems).items),
+          total: Number(order.total),
+          itemsSubtotal: Number(order.itemsSubtotal),
+          discountTotal: Number(order.discountTotal),
+          deliveryFee: Number(order.deliveryFee),
+          serviceFee: Number(order.serviceFee),
+          sourceChannel: order.sourceChannel,
+          paymentMethod: (order.paymentMethod || 'cash') as PaymentMethod,
+          changeFor: order.changeFor ? Number(order.changeFor) : null,
+          timeline: [],
+          createdAt: order.createdAt.toISOString(),
+          updatedAt: order.updatedAt.toISOString(),
+        };
+        const content = await this.printerService.formatTicket(mainReceiptOrder, 'customer');
+
+        jobs.push(this.prisma.printJob.create({
+          data: {
+            tenantId,
+            orderId,
+            station: 'MAIN',
+            type: PrismaPrintType.customer,
+            content,
+            idempotencyKey: `auto_print_${orderId}_${PrismaPrintType.customer}_MAIN`,
+            status: PrismaPrintJobStatus.pending,
+          },
+        }));
+      }
+
       const stationGroups: Record<string, OrderItem[]> = {};
       
       for (const item of (order as OrderWithItems).items) {
@@ -493,7 +567,6 @@ export class KdsService {
       }
 
       // Para cada estação, criar um job
-      const jobs = [];
       for (const [station, items] of Object.entries(stationGroups)) {
         // Map OrderItem and its relations to OrderItemResponseDTO
         const mappedItems = items.map(item => {
@@ -538,7 +611,7 @@ export class KdsService {
           updatedAt: order.updatedAt.toISOString(),
         };
 
-        const content = await this.printerService.formatTicket(pseudoOrder, PrintType.kitchen, station);
+        const content = await this.printerService.formatTicket(pseudoOrder, 'kitchen', station);
 
         jobs.push(this.prisma.printJob.create({
           data: {
@@ -547,6 +620,7 @@ export class KdsService {
             station,
             type: PrismaPrintType.kitchen,
             content,
+            idempotencyKey: `auto_print_${orderId}_${PrismaPrintType.kitchen}_${station}`,
             status: PrismaPrintJobStatus.pending,
           },
         }));

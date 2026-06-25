@@ -3,6 +3,7 @@ import { ShoppingBag, Plus, CheckCircle2, Package } from 'lucide-react';
 import { api } from '../../../lib/api-client';
 import { ImagePickerModal } from '../../../components/ImagePickerModal';
 import { Step5ImportMenu } from './Step5ImportMenu';
+import { maskCurrency, unmaskCurrency } from '@gestor/utils';
 
 interface ProductCategory {
   id: string;
@@ -94,7 +95,7 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
 
   const handleCreateProduct = async () => {
     if (!draft.name.trim()) { alert('Informe o nome do produto.'); return; }
-    if (!draft.basePrice || Number(draft.basePrice) <= 0) { alert('Informe um preço válido.'); return; }
+    if (!draft.basePrice || unmaskCurrency(draft.basePrice) <= 0) { alert('Informe um preço válido.'); return; }
 
     setSaving(true);
     try {
@@ -115,7 +116,7 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
 
       const res = await api.post<{ id: string; name: string; basePrice: number }>('/catalog/products', {
         name: draft.name.trim(),
-        basePrice: Number(draft.basePrice),
+        basePrice: unmaskCurrency(draft.basePrice),
         shortDescription: draft.shortDescription.trim() || undefined,
         categoryId: categoryId || undefined,
         image: draft.imageUrl || undefined,
@@ -262,12 +263,10 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
           <div>
             <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5">Preço (R$) *</label>
             <input
-              type="number"
-              min="0"
-              step="0.01"
+              type="text"
               value={draft.basePrice}
-              onChange={e => setDraft(f => ({ ...f, basePrice: e.target.value }))}
-              placeholder="0.00"
+              onChange={e => setDraft(f => ({ ...f, basePrice: maskCurrency(e.target.value) }))}
+              placeholder="R$ 0,00"
               className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-sm"
             />
           </div>

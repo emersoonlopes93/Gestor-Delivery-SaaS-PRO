@@ -5,10 +5,13 @@ import type { StorefrontPayload } from '@gestor/types';
 import { StorefrontShell } from '@gestor/storefront-ui';
 import { useStorefrontThemeStore } from '../stores/theme.store';
 import type { StorefrontThemeSettings } from '@gestor/theme';
+import { useDynamicManifest } from '../hooks/useDynamicManifest';
 
 export function StorefrontLayout() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const storefrontTheme = useStorefrontThemeStore(s => s.theme);
+
+
 
   const { data, isLoading } = useQuery({
     queryKey: ['storefront', tenantSlug],
@@ -20,6 +23,9 @@ export function StorefrontLayout() {
     },
     enabled: !!tenantSlug,
   });
+
+  // Ativa o manifesto dinâmico baseado no slug e nos dados do lojista
+  useDynamicManifest(tenantSlug, data?.tenant);
 
   if (isLoading) {
     return (

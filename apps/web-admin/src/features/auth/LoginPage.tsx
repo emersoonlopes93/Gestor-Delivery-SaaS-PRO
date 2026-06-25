@@ -78,7 +78,7 @@ export function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="input-premium pl-12"
-                placeholder="admin@gestorpro.com"
+                placeholder="admin@pedehub.com"
                 autoComplete="email"
               />
             </div>

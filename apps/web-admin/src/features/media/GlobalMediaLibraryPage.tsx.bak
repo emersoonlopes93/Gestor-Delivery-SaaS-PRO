@@ -1,0 +1,396 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Folder, Image, RefreshCw, Search, Trash2, UploadCloud } from 'lucide-react';
+import { api } from '../../lib/api-client';
+
+type MediaAsset = {
+  id: string;
+  title: string | null;
+  originalName: string | null;
+  publicUrl: string;
+  altText: string | null;
+  publicationStatus: string;
+  status: string;
+  createdAt: string;
+  category?: string | null;
+  categoryId?: string | null;
+};
+
+type MediaCategory = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+export function GlobalMediaLibraryPage() {
+  const [assets, setAssets] = useState<MediaAsset[]>([]);
+  const [categories, setCategories] = useState<MediaCategory[]>([]);
+  const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState('');
+  const [uploadCategory, setUploadCategory] = useState<string>('');
+  const [publicationStatus, setPublicationStatus] = useState<'published' | 'draft'>('published');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Estados de Gerenciamento de Categorias
+  const [showCategoriesModal, setShowCategoriesModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryDesc, setNewCategoryDesc] = useState('');
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
+
+  async function loadCategories() {
+    try {
+      const response = await api.get<MediaCategory[]>('/admin/media/categories');
+      setCategories(response.data);
+    } catch (error) {
+      console.error('Failed to load categories:', error);
+    }
+  }
+
+  async function handleCreateCategory() {
+    if (!newCategoryName.trim()) return;
+    setIsSavingCategory(true);
+    try {
+      await api.post('/admin/media/categories', {
+        name: newCategoryName.trim(),
+        description: newCategoryDesc.trim() || undefined,
+      });
+      setNewCategoryName('');
+      setNewCategoryDesc('');
+      await loadCategories();
+    } catch (error) {
+      console.error('Failed to create category:', error);
+      alert('Erro ao criar categoria.');
+    } finally {
+      setIsSavingCategory(false);
+    }
+  }
+
+  async function handleDeleteCategory(id: string) {
+    if (!window.confirm('Tem certeza que deseja excluir esta categoria? As imagens vinculadas a ela não serão excluídas, mas ficarão sem categoria.')) return;
+    try {
+      await api.delete(`/admin/media/categories/${id}`);
+      await loadCategories();
+    } catch (error) {
+      console.error('Failed to delete category:', error);
+      alert('Erro ao excluir categoria.');
+    }
+  }
+
+  const filteredAssets = useMemo(() => {
+    let filtered = [...assets];
+
+    // Search filter
+    const term = search.trim().toLowerCase();
+    if (term) {
+      filtered = filtered.filter((asset) => {
+        return [asset.title, asset.originalName, asset.altText]
+          .filter((value): value is string => typeof value === 'string')
+          .some((value) => value.toLowerCase().includes(term));
+      });
+    }
+
+    // Category filter
+    if (selectedCategory) {
+      filtered = filtered.filter((asset) => asset.categoryId === selectedCategory);
+    }
+
+    // Status filter
+    if (selectedStatus) {
+      filtered = filtered.filter((asset) => asset.publicationStatus === selectedStatus);
+    }
+
+    return filtered;
+  }, [assets, search, selectedCategory, selectedStatus]);
+
+  async function loadAssets() {
+    setIsLoading(true);
+    try {
+      const response = await api.get<MediaAsset[]>('/admin/media/gallery');
+      setAssets(response.data);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleUpload() {
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.set('file', file);
+      formData.set('title', title || file.name);
+      formData.set('categoryId', uploadCategory);
+      formData.set('publicationStatus', publicationStatus);
+      formData.set('altText', title || file.name);
+      await api.upload<MediaAsset>('/admin/media/gallery/upload', formData);
+      setFile(null);
+      setTitle('');
+      setUploadCategory('');
+      await loadAssets();
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    await api.delete<MediaAsset>(`/admin/media/gallery/${id}`);
+    await loadAssets();
+  }
+
+  useEffect(() => {
+    void loadAssets();
+    void loadCategories();
+  }, []);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-foreground">Biblioteca Global</h1>
+          <p className="text-sm font-bold text-muted-foreground mt-1">Imagens publicadas aqui ficam disponíveis para todos os tenants.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowCategoriesModal(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-card border border-border px-4 py-2 text-sm font-black text-foreground hover:bg-muted transition-colors"
+          >
+            <Folder className="h-4 w-4 text-primary" />
+            Categorias
+          </button>
+          <button
+            type="button"
+            onClick={loadAssets}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-card border border-border px-4 py-2 text-sm font-black text-foreground hover:bg-muted"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Atualizar
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6">
+        <section className="bg-card border border-border rounded-2xl p-5 space-y-4">
+          <div className="flex items-center gap-2 text-sm font-black text-foreground uppercase tracking-wider">
+            <UploadCloud className="h-4 w-4 text-primary" />
+            Upload
+          </div>
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-xl file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-black file:text-primary-foreground"
+          />
+          <input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-ring"
+            placeholder="Titulo / alt text *"
+          />
+          <select
+            value={uploadCategory}
+            onChange={(event) => setUploadCategory(event.target.value)}
+            className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="">Selecionar Categoria *</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.name}
+              </option>
+            ))}
+          </select>
+          <div className="grid grid-cols-2 gap-2">
+            {(['published', 'draft'] as const).map((status) => (
+              <button
+                key={status}
+                type="button"
+                onClick={() => setPublicationStatus(status)}
+                className={`rounded-xl px-3 py-2 text-xs font-black uppercase ${
+                  publicationStatus === status ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {status === 'published' ? 'Publicado' : 'Rascunho'}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={handleUpload}
+            disabled={!file || !uploadCategory || isUploading}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-black text-primary-foreground disabled:opacity-60"
+          >
+            <UploadCloud className="h-4 w-4" />
+            {isUploading ? 'Enviando...' : 'Enviar imagem'}
+          </button>
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-3">
+            <div className="flex-1">
+              <label className="text-xs font-black uppercase text-muted-foreground mb-1.5 block">Buscar</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  className="w-full h-10 pl-10 pr-3 bg-card border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="Nome, descrição..."
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-black uppercase text-muted-foreground mb-1.5 block">Categoria</label>
+              <select
+                value={selectedCategory}
+                onChange={(event) => setSelectedCategory(event.target.value)}
+                className="h-10 px-3 bg-card border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-ring min-w-[200px]"
+              >
+                <option value="">Todas</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-black uppercase text-muted-foreground mb-1.5 block">Status</label>
+              <select
+                value={selectedStatus}
+                onChange={(event) => setSelectedStatus(event.target.value)}
+                className="h-10 px-3 bg-card border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-ring min-w-[150px]"
+              >
+                <option value="">Todos</option>
+                <option value="published">Publicado</option>
+                <option value="draft">Rascunho</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-5 gap-4">
+            {filteredAssets.map((asset) => {
+              const categoryName = categories.find((c) => c.id === asset.categoryId)?.name;
+              return (
+                <article key={asset.id} className="bg-card border border-border rounded-2xl overflow-hidden">
+                  <div className="aspect-square bg-muted">
+                    <img src={asset.publicUrl} alt={asset.altText ?? asset.title ?? 'Media'} className="h-full w-full object-cover" />
+                  </div>
+                  <div className="p-3 space-y-2">
+                    <div>
+                      <p className="text-sm font-black text-foreground truncate">{asset.title ?? asset.originalName ?? 'Imagem'}</p>
+                      {categoryName && (
+                        <p className="text-[10px] font-bold text-muted-foreground">Categoria: {categoryName}</p>
+                      )}
+                      <p className="text-[10px] font-black uppercase text-muted-foreground">{asset.publicationStatus}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(asset.id)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
+                      title="Remover"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+            {!isLoading && filteredAssets.length === 0 ? (
+              <div className="col-span-full rounded-2xl border border-dashed border-border p-10 text-center text-muted-foreground">
+                <Image className="mx-auto h-8 w-8 mb-3" />
+                <p className="text-sm font-bold">Nenhuma imagem encontrada.</p>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      </div>
+
+      {showCategoriesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border rounded-2xl max-w-md w-full p-6 shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-4 border-b border-border">
+              <h2 className="text-lg font-black text-foreground flex items-center gap-2">
+                <Folder className="h-5 w-5 text-primary" />
+                Gerenciar Categorias
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowCategoriesModal(false)}
+                className="text-muted-foreground hover:text-foreground font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+              <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
+                <p className="text-xs font-black uppercase text-muted-foreground">Nova Categoria</p>
+                <input
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-ring text-foreground"
+                  placeholder="Nome da categoria *"
+                />
+                <input
+                  value={newCategoryDesc}
+                  onChange={(e) => setNewCategoryDesc(e.target.value)}
+                  className="w-full h-10 px-3 bg-background border border-input rounded-xl text-sm outline-none focus:ring-2 focus:ring-ring text-foreground"
+                  placeholder="Descrição (opcional)"
+                />
+                <button
+                  type="button"
+                  onClick={handleCreateCategory}
+                  disabled={!newCategoryName.trim() || isSavingCategory}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary h-10 text-sm font-black text-primary-foreground disabled:opacity-60"
+                >
+                  Adicionar
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-black uppercase text-muted-foreground">Categorias Existentes</p>
+                {categories.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">Nenhuma categoria cadastrada.</p>
+                ) : (
+                  <div className="divide-y divide-border/50 border border-border rounded-xl overflow-hidden bg-background max-h-[30vh] overflow-y-auto">
+                    {categories.map((cat) => (
+                      <div key={cat.id} className="flex items-center justify-between p-3 hover:bg-muted/10 transition-colors">
+                        <div>
+                          <p className="text-sm font-bold text-foreground">{cat.name}</p>
+                          <p className="text-[10px] text-muted-foreground font-mono">{cat.slug}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCategory(cat.id)}
+                          className="text-destructive hover:bg-destructive/10 p-2 rounded-lg transition-colors"
+                          title="Excluir"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-border flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowCategoriesModal(false)}
+                className="rounded-xl border border-border px-4 py-2 text-sm font-black text-foreground hover:bg-muted"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

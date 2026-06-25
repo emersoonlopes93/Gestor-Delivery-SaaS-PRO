@@ -14,6 +14,7 @@ import { RbacModule } from '../rbac/rbac.module';
 import { CrmModule } from '../crm/crm.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { PromotionsModule } from '../promotions/promotions.module';
+import { BillingDomainModule } from '../billing/billing-domain.module';
 
 const enableCampaignDispatch = 
   process.env.REDIS_ENABLED !== 'false' && 
@@ -34,6 +35,7 @@ if (!enableCampaignDispatch && process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true'
     forwardRef(() => CrmModule),
     forwardRef(() => AnalyticsModule),
     PromotionsModule,
+    BillingDomainModule,
     ...(enableCampaignDispatch
       ? [
           BullModule.registerQueue({

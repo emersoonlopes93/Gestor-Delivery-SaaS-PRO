@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException, Inject } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
+import { StorefrontCacheService } from './services/storefront-cache.service';
 import { DateTime } from 'luxon';
 import { PrismaService } from '../database/prisma.service';
 import { 
@@ -8,7 +7,8 @@ import {
   StorefrontCategoryPayload, 
   StorefrontComboPayload, 
   StorefrontProductPayload,
-  StorefrontCustomizationPayload
+  StorefrontCustomizationPayload,
+  ProductBadge,
 } from '@gestor/types';
 import { 
   normalizeStorefrontTheme,
@@ -20,6 +20,7 @@ import { UpsellsService } from '../catalog/upsells.service';
 import { MediaLibraryService } from '../upload/media-library.service';
 
 import { SchedulingService } from '../scheduling/scheduling.service';
+import { BusinessIntelligenceService } from '../analytics/business-intelligence.service';
 
 @Injectable()
 export class StorefrontService {
@@ -29,8 +30,20 @@ export class StorefrontService {
     private readonly upsellsService: UpsellsService,
     private readonly mediaLibrary: MediaLibraryService,
     private readonly schedulingService: SchedulingService,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private readonly biService: BusinessIntelligenceService,
+    private readonly storefrontCache: StorefrontCacheService,
   ) {}
+
+  private normalizeBrazilWhatsappNumber(raw?: string | null): string | null {
+    if (!raw) return null;
+    const digits = raw.replace(/\D/g, '');
+    if (!digits) return null;
+
+    if (digits.length >= 12 && digits.startsWith('55')) return digits;
+    if (digits.length === 10 || digits.length === 11) return `55${digits}`;
+
+    return null;
+  }
 
   async getStorefrontPayload(
     slug: string,
@@ -39,8 +52,7 @@ export class StorefrontService {
     const channel: SalesChannel =
       fulfillmentType === 'pickup' ? 'storefront_pickup' : 'storefront_delivery';
 
-    const cacheKey = `storefront:${slug}:${fulfillmentType}`;
-    const cachedPayload = await this.cacheManager.get<StorefrontPayload>(cacheKey);
+    const cachedPayload = await this.storefrontCache.getPayload(slug, fulfillmentType);
     if (cachedPayload) {
       return cachedPayload;
     }
@@ -48,7 +60,7 @@ export class StorefrontService {
     // 1. Resolve Tenant
     const tenant = await this.prisma.tenant.findFirst({
       where: { slug, status: 'active' }, // only active tenants
-      include: { settings: true },
+      include: { settings: true, schedulingSettings: true },
     });
 
     if (!tenant) {
@@ -191,6 +203,9 @@ export class StorefrontService {
         slug: cat.slug,
         order: cat.order ?? 0,
         templateType: cat.templateType,
+        templateConfig: (cat.templateConfig !== null && typeof cat.templateConfig === 'object' && !Array.isArray(cat.templateConfig))
+          ? (cat.templateConfig as Record<string, unknown>)
+          : undefined,
         products: cat.products
           .map((p) => {
             const canSell = availabilityMap.get(p.id) ?? true;
@@ -205,11 +220,13 @@ export class StorefrontService {
               description: p.longDescription,
               longDescription: p.longDescription,
               basePrice: Number(p.basePrice),
+              compareAtPrice: p.compareAtPrice ? Number(p.compareAtPrice) : null,
               image: image.imageUrl,
               imageUrl: image.imageUrl,
               imageAltText: image.imageAltText,
               imageSource: image.imageSource,
               isAvailable,
+              badges: [], // Populated below
 
               optionGroupLinks: (p.optionGroupLinks || []).map((ol) => ({
                 id: ol.id,
@@ -269,6 +286,43 @@ export class StorefrontService {
                 },
               })),
             };
+          })
+          .map((p) => {
+            const badges: ProductBadge[] = [];
+            
+            // Promo badge
+            if (p.compareAtPrice && p.compareAtPrice > p.basePrice) {
+              badges.push({ id: 'promotion', label: 'Promoção', variant: 'success', priority: 1 });
+            }
+            // New badge (created in last 30 days)
+            const origProd = cat.products.find(op => op.id === p.id);
+            if (origProd && origProd.createdAt) {
+              const isNew = (new Date().getTime() - new Date(origProd.createdAt).getTime()) < 30 * 24 * 60 * 60 * 1000;
+              if (isNew) {
+                badges.push({ id: 'new', label: 'Novidade', variant: 'info', priority: 2 });
+              }
+            }
+            // Featured
+            if (origProd?.isFeatured) {
+              badges.push({ id: 'featured', label: 'Destaque', variant: 'warning', priority: 3 });
+            }
+            // Combo
+            if (p.type === 'combo') {
+              badges.push({ id: 'combo', label: 'Combo', variant: 'neutral', priority: 4 });
+            }
+            // Cashback
+            if (tenant.settings?.cashbackEnabled && (tenant.settings?.cashbackPercent ?? 0) > 0) {
+              badges.push({ id: 'cashback', label: 'Cashback', variant: 'success', priority: 5 });
+            }
+            // Unavailable
+            if (!p.isAvailable) {
+              badges.push({ id: 'unavailable', label: 'Indisponível', variant: 'danger', priority: 0 });
+            }
+
+            badges.sort((a, b) => a.priority - b.priority);
+            p.badges = badges;
+
+            return p;
           })
           .filter((p) => p.isAvailable) as StorefrontProductPayload[],
       }))
@@ -347,9 +401,25 @@ export class StorefrontService {
             : [],
         };
       })
+      .map((c) => {
+        const badges: ProductBadge[] = [];
+        badges.push({ id: 'combo', label: 'Combo', variant: 'neutral', priority: 4 });
+        if (tenant.settings?.cashbackEnabled && (tenant.settings?.cashbackPercent ?? 0) > 0) {
+          badges.push({ id: 'cashback', label: 'Cashback', variant: 'success', priority: 5 });
+        }
+        if (!c.isAvailable) {
+          badges.push({ id: 'unavailable', label: 'Indisponível', variant: 'danger', priority: 0 });
+        }
+        badges.sort((a, b) => a.priority - b.priority);
+        return { ...c, badges };
+      })
       .filter((c) => c.isAvailable);
 
     const storeStatus = await this.availabilityService.getStoreStatus(tenant.id);
+
+    const storefrontWhatsappNumber = this.normalizeBrazilWhatsappNumber(
+      tenant.settings?.orderWhatsappNumber || tenant.settings?.businessPhone || null,
+    );
 
     const tenantInfo = {
       id: tenant.id,
@@ -360,6 +430,7 @@ export class StorefrontService {
       statusMessage: storeStatus.message,
       nextOpenAt: storeStatus.nextOpenAt,
       paymentMethods: (tenant.settings?.paymentMethods as string[]) || [],
+      whatsappNumber: storefrontWhatsappNumber,
       address: tenant.settings ? {
         street: tenant.settings.street || '',
         number: tenant.settings.number || '',
@@ -370,7 +441,97 @@ export class StorefrontService {
         lat: tenant.settings.lat || undefined,
         lng: tenant.settings.lng || undefined,
       } : undefined,
+      minimumOrderValue: tenant.settings?.minimumOrderValue ? Number(tenant.settings.minimumOrderValue) : null,
+      cashback: tenant.settings?.cashbackEnabled && Number(tenant.settings?.cashbackPercent || 0) > 0 ? {
+        enabled: tenant.settings.cashbackEnabled,
+        percent: Number(tenant.settings.cashbackPercent || 0),
+      } : undefined,
+      loyalty: tenant.settings?.loyaltyEnabled && Number(tenant.settings?.loyaltyPointsPerReal || 0) > 0 ? {
+        enabled: tenant.settings.loyaltyEnabled,
+        pointsPerReal: Number(tenant.settings.loyaltyPointsPerReal || 0),
+      } : undefined,
+      scheduling: {
+        enabled: Boolean(tenant.schedulingSettings?.enabled)
+      }
     };
+
+    const bestSellerIds = await this.biService.getStorefrontBestSellers(tenant.id);
+
+    // Build virtual sections
+    const virtualSections: StorefrontCategoryPayload[] = [];
+    const allProducts = categories.flatMap(c => c.products);
+
+    const uniqueProductsMap = new Map<string, StorefrontProductPayload>();
+    for (const p of allProducts) {
+      if (!uniqueProductsMap.has(p.id)) uniqueProductsMap.set(p.id, p);
+    }
+
+    // 0. Best Sellers (Mais Pedidos)
+    const bestSellerProducts = bestSellerIds
+      .map(id => uniqueProductsMap.get(id))
+      .filter((p): p is StorefrontProductPayload => p !== undefined && p.isAvailable);
+
+    if (bestSellerProducts.length > 0) {
+      virtualSections.push({
+        id: 'best_sellers',
+        name: 'Mais Pedidos',
+        slug: 'mais-pedidos',
+        order: -4,
+        type: 'best_sellers',
+        isVirtual: true,
+        products: bestSellerProducts
+      });
+    }
+
+    // 1. Featured (Destaques da Loja)
+    const featuredProducts = Array.from(uniqueProductsMap.values()).filter(p => p.badges.some(b => b.id === 'featured'));
+    if (featuredProducts.length > 0) {
+      virtualSections.push({
+        id: 'virtual-featured',
+        name: 'Destaques da Loja',
+        slug: 'destaques',
+        order: -3,
+        type: 'featured',
+        isVirtual: true,
+        products: featuredProducts
+      });
+    }
+
+    // 2. Promotions
+    const promoProducts = Array.from(uniqueProductsMap.values()).filter(p => p.badges.some(b => b.id === 'promotion'));
+    if (promoProducts.length > 0) {
+      virtualSections.push({
+        id: 'virtual-promotions',
+        name: 'Promoções do Dia',
+        slug: 'promocoes',
+        order: -2,
+        type: 'promotions',
+        isVirtual: true,
+        products: promoProducts
+      });
+    }
+
+    // 3. New
+    const newProducts = Array.from(uniqueProductsMap.values()).filter(p => p.badges.some(b => b.id === 'new'));
+    if (newProducts.length > 0) {
+      virtualSections.push({
+        id: 'virtual-new',
+        name: 'Novidades',
+        slug: 'novidades',
+        order: -1,
+        type: 'new',
+        isVirtual: true,
+        products: newProducts
+      });
+    }
+
+    // Adjust categories type
+    categories.forEach(c => {
+      c.type = 'category';
+      c.isVirtual = false;
+    });
+
+    const finalCategories = [...virtualSections, ...categories];
 
     // 4. Global Upsells
     const globalUpsellRows = await this.prisma.upsell.findMany({
@@ -420,15 +581,13 @@ export class StorefrontService {
 
     const payload: StorefrontPayload = {
       tenant: tenantInfo,
-      categories,
+      categories: finalCategories,
       combos,
       upsells: globalUpsells,
       customization,
     };
 
-    // Cache for configurable TTL (default 60 seconds)
-    const cacheTtl = Number(process.env.STOREFRONT_CACHE_TTL || 60000);
-    await this.cacheManager.set(cacheKey, payload, cacheTtl);
+    await this.storefrontCache.setPayload(slug, fulfillmentType, payload);
 
     return payload;
   }
@@ -459,5 +618,86 @@ export class StorefrontService {
     }
 
     return this.schedulingService.getAvailableTimeSlots(targetDate, tenant.id);
+  }
+
+  async getStorefrontManifest(slug: string): Promise<Record<string, unknown>> {
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { slug, status: 'active' },
+      select: { name: true, settings: { select: { logoUrl: true } } },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Loja inativa ou não encontrada.');
+    }
+
+    const tenantName = tenant.name;
+    const shortName = tenantName.substring(0, 12);
+    const rawLogoUrl = tenant.settings?.logoUrl ?? null;
+
+    // Base URL do frontend para garantir que ícones relativos se tornem absolutos.
+    // O manifest é servido pela API mas o scope é o frontend; ícones relativos
+    // são resolvidos em relação ao scope, portanto precisam ser absolutos quando
+    // apontam para recursos da API (uploads).
+    const frontendBase = (process.env.FRONTEND_URL ?? '').replace(/\/$/, '');
+
+    // Normaliza a URL da logo para absoluta
+    let absoluteLogoUrl: string | null = null;
+    if (rawLogoUrl) {
+      absoluteLogoUrl = rawLogoUrl.startsWith('http')
+        ? rawLogoUrl
+        : `${frontendBase}${rawLogoUrl}`;
+    }
+
+    // Ícones: se a loja tem logo, usa ela como ícone principal.
+    // Sempre inclui os ícones SVG genéricos como fallback.
+    const icons: Record<string, unknown>[] = [];
+
+    if (absoluteLogoUrl) {
+      const ext = absoluteLogoUrl.split('.').pop()?.split('?')[0]?.toLowerCase() ?? '';
+      const mimeMap: Record<string, string> = {
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        webp: 'image/webp',
+      };
+      const mimeType = mimeMap[ext] ?? 'image/png';
+      icons.push(
+        { src: absoluteLogoUrl, sizes: '192x192', type: mimeType, purpose: 'any' },
+        { src: absoluteLogoUrl, sizes: '512x512', type: mimeType, purpose: 'maskable' },
+      );
+    }
+
+    // Fallback SVG genérico sempre presente (ícones públicos do frontend)
+    const svgBase = frontendBase || '';
+    icons.push(
+      { src: `${svgBase}/icons/app-icon.svg`, sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+      { src: `${svgBase}/icons/app-maskable.svg`, sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
+    );
+
+    return {
+      id: `/${slug}`,
+      name: tenantName,
+      short_name: shortName,
+      description: 'Cardapio, pedidos, carteira, fidelidade e tracking em tempo real.',
+      start_url: `/${slug}`,
+      scope: `/${slug}`,
+      display: 'standalone',
+      display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
+      orientation: 'portrait',
+      background_color: '#ffffff',
+      theme_color: '#111827',
+      categories: ['food', 'shopping', 'business'],
+      lang: 'pt-BR',
+      icons,
+      shortcuts: [
+        {
+          name: 'Meus pedidos',
+          short_name: 'Pedidos',
+          description: 'Abrir historico de pedidos do cliente.',
+          url: `/${slug}/orders`,
+          icons: [{ src: '/icons/app-icon.svg', sizes: 'any', type: 'image/svg+xml' }],
+        },
+      ],
+    };
   }
 }

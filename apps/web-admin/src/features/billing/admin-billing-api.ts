@@ -35,12 +35,30 @@ export type BillingPlanV2 = {
 
 export type BillingSettings = {
   id: string;
+  freeTierRevenueLimit: DecimalLike;
+  maxMonthlyCharge: DecimalLike;
+  trialProEnabled: boolean;
+  trialProDays: number;
+  trialRequiresPaymentMethod: boolean;
+  trialIncludesAi: boolean;
+  trialIncludesIfood: boolean;
+  trialIncludesAdvancedReports: boolean;
+  trialAutoConvertToBilling: boolean;
+  aiAddonEnabled: boolean;
+  aiAddonPrice: DecimalLike;
+  aiFreeTrialMessages: number;
+  aiIncludedForPaidTenants: boolean;
+  aiIncludedMonthlyMessages: number;
+  aiHardLimitMonthlyMessages: number;
+  countMarketplaceOrdersDefault: boolean;
   includeDeliveryFeeByDefault: boolean;
   includeServiceFeeByDefault: boolean;
   countStorefrontOrders: boolean;
+  countDirectOnlineOrders: boolean;
   countPosOrders: boolean;
   countWhatsappAiOrders: boolean;
   countManualOrders: boolean;
+  countMarketplaceIfoodOrders: boolean;
   countConfirmedOrders: boolean;
   countCompletedOrders: boolean;
   excludeCancelledOrders: boolean;
@@ -48,6 +66,13 @@ export type BillingSettings = {
   defaultGracePeriodDays: number;
   defaultTrialDays: number;
   requirePaymentMethodForPaidPlans: boolean;
+  partnerLinksJson?: Array<{
+    key: string;
+    title: string;
+    description: string;
+    ctaLabel: string;
+    url: string;
+  }> | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -72,12 +97,30 @@ export type UpdateBillingPlanV2Body = {
 };
 
 export type UpdateBillingSettingsBody = {
+  freeTierRevenueLimit?: DecimalLike;
+  maxMonthlyCharge?: DecimalLike;
+  trialProEnabled?: boolean;
+  trialProDays?: number;
+  trialRequiresPaymentMethod?: boolean;
+  trialIncludesAi?: boolean;
+  trialIncludesIfood?: boolean;
+  trialIncludesAdvancedReports?: boolean;
+  trialAutoConvertToBilling?: boolean;
+  aiAddonEnabled?: boolean;
+  aiAddonPrice?: DecimalLike;
+  aiFreeTrialMessages?: number;
+  aiIncludedForPaidTenants?: boolean;
+  aiIncludedMonthlyMessages?: number;
+  aiHardLimitMonthlyMessages?: number;
+  countMarketplaceOrdersDefault?: boolean;
   includeDeliveryFeeByDefault: boolean;
   includeServiceFeeByDefault: boolean;
   countStorefrontOrders: boolean;
+  countDirectOnlineOrders: boolean;
   countPosOrders: boolean;
   countWhatsappAiOrders: boolean;
   countManualOrders: boolean;
+  countMarketplaceIfoodOrders?: boolean;
   countConfirmedOrders: boolean;
   countCompletedOrders: boolean;
   excludeCancelledOrders: boolean;
@@ -85,6 +128,7 @@ export type UpdateBillingSettingsBody = {
   defaultGracePeriodDays: number;
   defaultTrialDays: number;
   requirePaymentMethodForPaidPlans: boolean;
+  partnerLinksJson?: BillingSettings['partnerLinksJson'];
 };
 
 export type AdminTenantListItem = {

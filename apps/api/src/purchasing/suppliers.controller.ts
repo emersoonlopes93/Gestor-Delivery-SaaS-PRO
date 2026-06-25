@@ -4,9 +4,11 @@ import { CreateSupplierDTO, UpdateSupplierDTO, SupplierDTO } from '@gestor/types
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { CurrentTenant, RequirePermissions } from '../common/decorators';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 
-@Controller('suppliers')
+@Controller('purchasing/suppliers')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
+@RequiresFeature('purchasing')
 export class SuppliersController {
   constructor(private readonly suppliersService: SuppliersService) {}
 

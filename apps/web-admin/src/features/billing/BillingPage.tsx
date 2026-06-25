@@ -179,36 +179,36 @@ export function BillingPage() {
       </div>
 
       {/* Stats Section Placeholder */}
-      <div className="bg-slate-900 dark:bg-card rounded-[32px] p-8 text-white relative overflow-hidden border border-white/10 dark:border-border">
+      <div className="bg-card rounded-[32px] p-8 text-foreground relative overflow-hidden border border-border">
         <div className="relative z-10">
           <h2 className="text-2xl font-black mb-2 flex items-center gap-2">
             <TrendingUp className="w-6 h-6 text-primary" />
             Performance de Assinaturas
           </h2>
-          <p className="text-slate-400 dark:text-muted-foreground text-sm mb-8">Visão geral do faturamento recorrente da plataforma</p>
+          <p className="text-muted-foreground text-sm mb-8">Visão geral do faturamento recorrente da plataforma</p>
           
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-            <div className="bg-white/5 dark:bg-muted/50 p-6 rounded-2xl border border-white/10 dark:border-border">
-              <p className="text-slate-500 dark:text-muted-foreground/60 text-xs font-bold uppercase tracking-widest mb-1">Total de Tenants</p>
-              <p className="text-3xl font-black text-white dark:text-foreground">---</p>
+            <div className="bg-muted p-6 rounded-2xl border border-border">
+              <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest mb-1">Total de Tenants</p>
+              <p className="text-3xl font-black text-foreground">---</p>
             </div>
-            <div className="bg-white/5 dark:bg-muted/50 p-6 rounded-2xl border border-white/10 dark:border-border">
-              <p className="text-slate-500 dark:text-muted-foreground/60 text-xs font-bold uppercase tracking-widest mb-1">MRR Estimado</p>
-              <p className="text-3xl font-black text-white dark:text-foreground">R$ 0,00</p>
+            <div className="bg-muted p-6 rounded-2xl border border-border">
+              <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest mb-1">MRR Estimado</p>
+              <p className="text-3xl font-black text-foreground">R$ 0,00</p>
             </div>
-            <div className="bg-white/5 dark:bg-muted/50 p-6 rounded-2xl border border-white/10 dark:border-border">
-              <p className="text-slate-500 dark:text-muted-foreground/60 text-xs font-bold uppercase tracking-widest mb-1">Churn Rate</p>
-              <p className="text-3xl font-black text-white dark:text-foreground">0%</p>
+            <div className="bg-muted p-6 rounded-2xl border border-border">
+              <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest mb-1">Churn Rate</p>
+              <p className="text-3xl font-black text-foreground">0%</p>
             </div>
           </div>
         </div>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 blur-[120px] rounded-full -mr-20 -mt-20"></div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 blur-[120px] rounded-full -mr-20 -mt-20"></div>
       </div>
 
       {/* Modal */}
       {isModalOpen && selectedPlan && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}></div>
           <div className="bg-card rounded-[32px] shadow-2xl w-full max-w-xl relative z-10 overflow-hidden animate-in fade-in zoom-in duration-200 border border-border">
             <div className="p-8 border-b border-border flex items-center justify-between">
               <h2 className="text-2xl font-black text-foreground">

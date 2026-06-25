@@ -54,8 +54,8 @@ export const TransferTableModal: React.FC<TransferTableModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="bg-card border border-border w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 safe-modal bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="bg-card border border-border w-full max-w-md max-h-[calc(100dvh-var(--safe-area-top)-var(--safe-area-bottom)-2rem)] rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
         
         {/* Header */}
         <div className="p-6 border-b border-border flex items-center justify-between bg-card">

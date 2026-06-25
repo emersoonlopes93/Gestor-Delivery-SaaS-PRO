@@ -218,6 +218,38 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     }
   }
 
+  async deleteInstance(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+  ): Promise<void> {
+    const client = axios.create({
+      baseURL: apiUrl.replace(/\/+$/, ''),
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: apiKey,
+        instanceId,
+      },
+      timeout: 30_000,
+    });
+
+    try {
+      await client.post('/instance/logout');
+    } catch (logoutError) {
+      const message = logoutError instanceof Error ? logoutError.message : 'Unknown error';
+      this.logger.warn(`[WHATSAPP_WARN] step=delete_instance instanceId=${instanceId} logout failed: ${message}`);
+    }
+
+    try {
+      await client.delete(`/instance/delete/${instanceId}`);
+      this.logger.log(`[WHATSAPP_DELETE_INSTANCE] instanceId=${instanceId} deleted_remote=true`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`[WHATSAPP_WARN] step=delete_instance instanceId=${instanceId} delete failed: ${message}`);
+      throw error;
+    }
+  }
+
   async generatePairingCode(
     apiUrl: string,
     apiKey: string,
@@ -342,7 +374,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       return {
         success: true,
-        messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id),
+        messageId: (responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) ? String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) : undefined,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -377,7 +409,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       return {
         success: true,
-        messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id),
+        messageId: (responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) ? String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) : undefined,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -410,7 +442,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       return {
         success: true,
-        messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id),
+        messageId: (responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) ? String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) : undefined,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -445,11 +477,146 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       return {
         success: true,
-        messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id),
+        messageId: (responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) ? String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) : undefined,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`sendButtons failed: ${message}`);
+      return { success: false, error: message };
+    }
+  }
+
+  async publishWhatsAppStatus(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+    input: {
+      text?: string;
+      mediaUrl?: string;
+      mediaType?: string;
+      caption?: string;
+    },
+  ): Promise<WhatsAppSendResult> {
+    const client = this.buildInstanceClient(apiUrl, apiKey, instanceId);
+    const kind = input.mediaUrl ? 'media' : 'text';
+    const contentLength = (input.text || input.caption || '').length;
+    this.logger.log(
+      `[STATUS_PUBLISH] instanceId=${instanceId} kind=${kind} hasMedia=${Boolean(input.mediaUrl)} mediaType=${input.mediaType || 'text'} contentLength=${contentLength} target=status@broadcast`,
+    );
+
+    try {
+      if (input.mediaUrl) {
+        const mediaType = input.mediaType === 'video' ? 'video' : 'image';
+        const mediaBody: { number: string; type: 'image' | 'video'; media: string; caption: string } = {
+          number: 'status@broadcast',
+          type: mediaType,
+          media: input.mediaUrl,
+          caption: input.text || input.caption || '',
+        };
+        const result = await this.postStatusMedia(client, mediaBody);
+        return result;
+      } else if (input.text) {
+        const textBody = {
+          number: 'status@broadcast',
+          text: input.text,
+        };
+        const result = await this.postStatusText(client, textBody);
+        return result;
+      } else {
+        return { success: false, error: 'No content provided for status' };
+      }
+    } catch (error: unknown) {
+      const message = isAxiosError(error) ? error.response?.data?.message || error.message : (error as Error).message;
+      this.logger.error(`publishWhatsAppStatus failed: ${message}`);
+      return { success: false, error: message };
+    }
+  }
+
+  private async postStatusText(
+    client: AxiosInstance,
+    body: { number: string; text: string },
+  ): Promise<WhatsAppSendResult> {
+    try {
+      const { data } = await client.post('/send/text', body);
+      const responseData = (data && typeof data === 'object' && 'data' in data)
+        ? (data as { data: Record<string, unknown> }).data
+        : (data as Record<string, unknown>);
+
+      return {
+        success: true,
+        messageId: (responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) ? String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) : undefined,
+      };
+    } catch (error: unknown) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        this.logger.warn('publishWhatsAppStatus primary route /send/text returned 404, retrying legacy /message/sendText.');
+        try {
+          const { data } = await client.post('/message/sendText', body);
+          return {
+            success: true,
+            messageId: (data?.key?.id || data?.id) ? String(data?.key?.id || data?.id) : undefined,
+          };
+        } catch (legacyError: unknown) {
+          const legacyMessage = isAxiosError(legacyError)
+            ? legacyError.response?.data?.message || legacyError.message
+            : (legacyError as Error).message;
+          this.logger.error(`publishWhatsAppStatus fallback /message/sendText failed: ${legacyMessage}`);
+          return { success: false, error: legacyMessage };
+        }
+      }
+
+      const message = isAxiosError(error) ? error.response?.data?.message || error.message : (error as Error).message;
+      this.logger.error(`publishWhatsAppStatus failed: ${message}`);
+      return { success: false, error: message };
+    }
+  }
+
+  private async postStatusMedia(
+    client: AxiosInstance,
+    body: { number: string; type: 'image' | 'video'; media: string; caption: string },
+  ): Promise<WhatsAppSendResult> {
+    const mediaBody = {
+      number: body.number,
+      type: body.type,
+      url: body.media,
+      caption: body.caption,
+    };
+
+    try {
+      const { data } = await client.post('/send/media', mediaBody);
+      const responseData = (data && typeof data === 'object' && 'data' in data)
+        ? (data as { data: Record<string, unknown> }).data
+        : (data as Record<string, unknown>);
+
+      return {
+        success: true,
+        messageId: (responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) ? String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) : undefined,
+      };
+    } catch (error: unknown) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        this.logger.warn('publishWhatsAppStatus primary route /send/media returned 404, retrying legacy /message/sendMedia.');
+        try {
+          const { data } = await client.post('/message/sendMedia', {
+            number: body.number,
+            mediatype: body.type,
+            mimetype: body.type === 'video' ? 'video/mp4' : 'image/jpeg',
+            caption: body.caption,
+            media: body.media,
+          });
+          return {
+            success: true,
+            messageId: (data?.key?.id || data?.id) ? String(data?.key?.id || data?.id) : undefined,
+          };
+        } catch (legacyError: unknown) {
+          const legacyMessage = isAxiosError(legacyError)
+            ? legacyError.response?.data?.message || legacyError.message
+            : (legacyError as Error).message;
+          this.logger.error(`publishWhatsAppStatus fallback /message/sendMedia failed: ${legacyMessage}`);
+          return { success: false, error: legacyMessage };
+        }
+      }
+
+      const message = isAxiosError(error) ? error.response?.data?.message || error.message : (error as Error).message;
+      this.logger.error(`publishWhatsAppStatus failed: ${message}`);
       return { success: false, error: message };
     }
   }
@@ -670,6 +837,43 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     return null;
   }
 
+  async getProfilePictureUrl(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+    phone: string,
+  ): Promise<string | null> {
+    try {
+      const client = this.buildInstanceClient(apiUrl, apiKey, instanceId);
+      // Alguns endpoints em Evolution Go para foto são GET /chat/fetchProfilePictureUrl
+      // ou POST /chat/profilePic. Tentaremos o GET por padrão passando number.
+      // O number pode ser com ou sem @s.whatsapp.net, o provider Evolution Go normalmente lida com isso.
+      const normalizedNumber = normalizeWhatsAppSendNumber(phone);
+      
+      const { data } = await client.get('/chat/fetchProfilePictureUrl', {
+        params: { number: normalizedNumber },
+      });
+
+      const responseData = (data && typeof data === 'object' && 'data' in data)
+        ? (data as { data: Record<string, unknown> }).data
+        : (data as Record<string, unknown>);
+
+      const url = responseData?.profilePictureUrl || responseData?.picture || responseData?.url;
+      if (typeof url === 'string' && url.trim()) {
+        return url.trim();
+      }
+
+      return null;
+    } catch (error: unknown) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        // Contato sem foto ou endpoint diferente
+        return null;
+      }
+      this.logger.debug(`Falha ao buscar foto de perfil para ${phone}: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      return null; // Silencia o erro para não quebrar o fluxo
+    }
+  }
+
   private extractFlowContext(
     payload: Record<string, unknown>,
     tenantId: string,
@@ -785,10 +989,37 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     const rawQr = this.extractQrFromObject(data);
     const normalizedQr = this.normalizeQrCode(rawQr);
 
+    // Tenta encontrar o phoneNumber em vários locais possíveis da resposta da Evolution API
+    let foundPhoneNumber: string | undefined;
+
+    if (data?.phoneNumber) foundPhoneNumber = String(data.phoneNumber);
+    else if (data?.phone) foundPhoneNumber = String(data.phone);
+    else if (data?.jid) foundPhoneNumber = String(data.jid);
+    else if (data?.number) foundPhoneNumber = String(data.number);
+    else if (data?.ownerJid) foundPhoneNumber = String(data.ownerJid);
+    else if (data?.owner) foundPhoneNumber = String(data.owner);
+
+    // connection.user.id ou connection.user.number
+    if (!foundPhoneNumber && data?.connection && typeof data.connection === 'object') {
+      const conn = data.connection as Record<string, unknown>;
+      if (conn.user && typeof conn.user === 'object') {
+        const user = conn.user as Record<string, unknown>;
+        if (user.id) foundPhoneNumber = String(user.id);
+        else if (user.number) foundPhoneNumber = String(user.number);
+      }
+    }
+
+    // instance.owner ou instance.phoneNumber
+    if (!foundPhoneNumber && data?.instance && typeof data.instance === 'object') {
+      const inst = data.instance as Record<string, unknown>;
+      if (inst.owner) foundPhoneNumber = String(inst.owner);
+      else if (inst.phoneNumber) foundPhoneNumber = String(inst.phoneNumber);
+    }
+
     const result = {
       connected: state === 'connected',
       state,
-      phoneNumber: (data?.phoneNumber || data?.phone || data?.jid || data?.number) as string | undefined,
+      phoneNumber: this.normalizeConnectedPhoneNumber(foundPhoneNumber),
       qrCode: normalizedQr,
     };
 
@@ -800,5 +1031,11 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
     this.logger.log(`[WHATSAPP_QR] qrPresent=${!!normalizedQr} keys=[${keysFiltered.join(', ')}]`);
 
     return result;
+  }
+
+  private normalizeConnectedPhoneNumber(value?: string): string | undefined {
+    if (!value) return undefined;
+    const normalized = normalizeWhatsAppSendNumber(value);
+    return normalized || undefined;
   }
 }

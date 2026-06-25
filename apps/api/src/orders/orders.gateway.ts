@@ -17,9 +17,14 @@ import { OrderListItemDTO, OrderStatusUpdatedEvent, OrderStatus } from '@gestor/
 })
 export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger('OrdersGateway');
+  static instance: OrdersGateway | null = null;
 
   @WebSocketServer()
   server!: Server;
+
+  constructor() {
+    OrdersGateway.instance = this;
+  }
 
   handleConnection(client: Socket) {
     this.logger.debug(`Client connected to orders namespace: ${client.id}`);

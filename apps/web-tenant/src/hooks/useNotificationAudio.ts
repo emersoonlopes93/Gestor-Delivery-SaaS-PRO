@@ -1,6 +1,8 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import toast from 'react-hot-toast';
+import { requestNotificationPermission, showWebNotification } from '../lib/notification-support';
+import { requestNativeNotificationPermission, showNewOrderNotification } from '../lib/native-notifications';
 
 /** Sons disponíveis (devem existir em public/sounds/) */
 export const AVAILABLE_SOUNDS = [
@@ -96,7 +98,7 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
   useEffect(() => { readyUrlRef.current = readyUrl; }, [readyUrl]);
 
   useEffect(() => {
-    if (!tenantId || !settings.enabled) {
+    if (!tenantId) {
       if (socketRef.current) {
         console.log('[Websocket] Disconnecting orders namespace');
         socketRef.current.disconnect();
@@ -105,15 +107,16 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
       return;
     }
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3333';
-    const socketUrl = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
-    console.log(`[Websocket] Connecting to orders namespace at: ${socketUrl}/orders`);
+    const API_URL = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '';
+    const socketUrlBase = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
+    const socketPath = socketUrlBase ? `${socketUrlBase}/orders` : '/orders';
+    console.log(`[Websocket] Connecting to orders namespace at: ${socketPath}`);
     
-    const socket = io(`${socketUrl}/orders`, {
+    const socket = io(socketPath, {
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 3,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
+      reconnectionDelayMax: 4000,
     });
 
     socket.on('connect', () => {
@@ -144,12 +147,18 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
         style: { fontWeight: 'bold', maxWidth: '340px' },
       });
 
-      if (Notification.permission === 'granted') {
-        new Notification(`Novo Pedido ${data.order.orderNumber}`, {
-          body: `Cliente: ${data.order.customerName}\nTotal: ${totalFmt}`,
-          icon: '/favicon.ico',
-        });
-      }
+      showWebNotification(`Novo Pedido ${data.order.orderNumber}`, {
+        body: `Cliente: ${data.order.customerName}\nTotal: ${totalFmt}`,
+        icon: '/favicon.ico',
+      });
+
+      showNewOrderNotification({
+        orderNumber: data.order.orderNumber,
+        customerName: data.order.customerName,
+        total: data.order.total,
+      }).catch((err) => {
+        console.warn('[NativeNotifications] Falha ao exibir notificacao de novo pedido:', err);
+      });
     });
 
     socket.on('orderCancelled', (data: { orderNumber?: string }) => {
@@ -178,13 +187,11 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
         style: { fontWeight: 'bold' },
       });
 
-      if (Notification.permission === 'granted') {
-        new Notification('Transferência de Atendimento', {
-          body: `${data.customerName || 'Cliente'} aguardando atendimento humano.\nSessão: #${data.sessionId}`,
-          icon: '/favicon.ico',
-          tag: `handoff-${data.sessionId}`,
-        });
-      }
+      showWebNotification('Transferência de Atendimento', {
+        body: `${data.customerName || 'Cliente'} aguardando atendimento humano.\nSessão: #${data.sessionId}`,
+        icon: '/favicon.ico',
+        tag: `handoff-${data.sessionId}`,
+      });
     });
 
     // Order Ready: Order marked as ready for pickup/delivery
@@ -202,13 +209,11 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
         style: { fontWeight: 'bold' },
       });
 
-      if (Notification.permission === 'granted') {
-        new Notification(`Pedido #${data.orderNumber} Pronto`, {
-          body: `${data.customerName || 'Cliente'} — Pedido está pronto ${fulfillmentText}`,
-          icon: '/favicon.ico',
-          tag: `ready-${data.orderNumber}`,
-        });
-      }
+      showWebNotification(`Pedido #${data.orderNumber} Pronto`, {
+        body: `${data.customerName || 'Cliente'} — Pedido está pronto ${fulfillmentText}`,
+        icon: '/favicon.ico',
+        tag: `ready-${data.orderNumber}`,
+      });
     });
 
     socketRef.current = socket;
@@ -223,9 +228,10 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
   }, [tenantId, settings.enabled]);
 
   const requestPermission = useCallback(() => {
-    if (typeof Notification !== 'undefined') {
-      Notification.requestPermission();
-    }
+    requestNotificationPermission();
+    requestNativeNotificationPermission().catch((err) => {
+      console.warn('[NativeNotifications] Falha ao solicitar permissao:', err);
+    });
   }, []);
 
   /** Testa o som de novo pedido com o volume e som actuais */

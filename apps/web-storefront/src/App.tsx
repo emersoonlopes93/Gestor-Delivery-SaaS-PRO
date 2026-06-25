@@ -4,6 +4,7 @@ import { StorefrontPage } from './pages/StorefrontPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { OrderConfirmationPage } from './pages/OrderConfirmationPage';
 import { PublicTrackingPage } from './pages/PublicTrackingPage';
+import { PublicFeedbackPage } from './pages/PublicFeedbackPage';
 import { OrderTrackingPage } from './pages/OrderTrackingPage';
 import { OrdersHistoryPage } from './pages/OrdersHistoryPage';
 import { CustomerProfilePage } from './pages/CustomerProfilePage';
@@ -48,6 +49,7 @@ export function App() {
             <Route path="/:tenantSlug/orders" element={<OrdersHistoryPage />} />
             <Route path="/:tenantSlug/profile" element={<CustomerProfilePage />} />
             <Route path="/:tenantSlug/tracking/:token" element={<PublicTrackingPage />} />
+            <Route path="/:tenantSlug/feedback/:token" element={<PublicFeedbackPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

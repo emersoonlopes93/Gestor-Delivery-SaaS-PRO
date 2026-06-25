@@ -14,6 +14,7 @@ export class SystemConfigService implements OnModuleInit {
       where: { id: 'global' },
       create: {
         id: 'global',
+        appName: 'PedeHub',
         defaultWhatsAppProvider: WhatsAppProviderType.evolution_go,
         defaultAiProvider: AiProviderType.openai,
       },
@@ -37,6 +38,9 @@ export class SystemConfigService implements OnModuleInit {
 
     // Removemos campos que não devem ser atualizados manualmente
     const { id: _id, updatedAt: _updatedAt, createdAt: _createdAt, ...updateData } = data;
+    if (typeof updateData.appName === 'string') {
+      updateData.appName = updateData.appName.trim() || 'PedeHub';
+    }
 
     try {
       const result = await this.prisma.systemConfig.upsert({

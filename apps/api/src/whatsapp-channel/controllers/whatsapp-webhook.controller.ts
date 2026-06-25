@@ -22,6 +22,7 @@ import {
   isNonActionableWebhookEvent,
 } from '../../common/utils/whatsapp-presence.util';
 import { isExitCommand } from '../../ai-agent/constants/session.constants';
+import { ChatGateway } from '../../chat/chat.gateway';
 
 
 /**
@@ -226,6 +227,9 @@ export class WhatsAppWebhookController {
     trace.chatJid = chatJid;
     if (externalId) trace.messageId = externalId;
 
+    this.logger.log(`[WA_WEBHOOK] received traceId=${trace.traceId} tenantId=${tenantId}`);
+    this.logger.log(`[WA_WEBHOOK] message_event fromMe=${isFromMe} externalId=${externalId} contentPreview=${content?.substring(0, 20)}`);
+
     AiFlowLogger.flow('handle_message_start', trace, {
       hasChatJid: Boolean(chatJid),
       textLength: content?.length ?? 0,
@@ -245,7 +249,12 @@ export class WhatsAppWebhookController {
         where: { externalId },
       });
       if (existing) {
-        AiFlowLogger.ignored('duplicate_message_id', trace, {
+        this.logger.log(`[WA_WEBHOOK] duplicate_found updating externalId=${externalId} sessionId=${existing.sessionId}`);
+        await this.prisma.chatMessage.update({
+          where: { id: existing.id },
+          data: { externalStatus: 'sent' } // Atualiza o status
+        });
+        AiFlowLogger.ignored('duplicate_message_id_updated', trace, {
           sessionId: existing.sessionId,
         });
         return;
@@ -259,8 +268,9 @@ export class WhatsAppWebhookController {
     try {
       // Resolve or update Customer with pushName if available
       let customerId: string | undefined;
+      let currentCustomer: { id: string; profilePictureUrl: string | null; profilePictureUpdatedAt: Date | null } | null = null;
       if (pushName && pushName.trim()) {
-        const customer = await this.prisma.customer.upsert({
+        currentCustomer = await this.prisma.customer.upsert({
           where: {
             tenantId_phone: { tenantId, phone },
           },
@@ -272,27 +282,35 @@ export class WhatsAppWebhookController {
           update: {
             name: pushName.trim(),
           },
-          select: { id: true },
+          select: { id: true, profilePictureUrl: true, profilePictureUpdatedAt: true },
         });
-        customerId = customer.id;
+        customerId = currentCustomer.id;
         AiFlowLogger.flow('contact_resolved', trace, {
           source: 'pushName',
           customerId,
         });
       } else {
         // Try to find existing customer
-        const existingCustomer = await this.prisma.customer.findUnique({
+        currentCustomer = await this.prisma.customer.findUnique({
           where: {
             tenantId_phone: { tenantId, phone },
           },
-          select: { id: true, name: true },
+          select: { id: true, name: true, profilePictureUrl: true, profilePictureUpdatedAt: true },
         });
-        if (existingCustomer) {
-          customerId = existingCustomer.id;
+        if (currentCustomer) {
+          customerId = currentCustomer.id;
           AiFlowLogger.flow('contact_resolved', trace, {
             source: 'existing_customer',
             customerId,
           });
+        }
+      }
+
+      if (currentCustomer) {
+        const now = new Date();
+        const lastUpdated = currentCustomer.profilePictureUpdatedAt;
+        if (!currentCustomer.profilePictureUrl || !lastUpdated || (now.getTime() - lastUpdated.getTime() > 24 * 60 * 60 * 1000)) {
+          this.refreshCustomerProfilePicture(tenantId, phone, currentCustomer.id);
         }
       }
 
@@ -316,6 +334,8 @@ export class WhatsAppWebhookController {
         remoteJid: chatJid,
         sessionTimeoutMin: config.sessionTimeoutMin,
       });
+      
+      this.logger.log(`[WA_WEBHOOK] session_resolved sessionId=${session.id}`);
 
       const updateSessionData: Record<string, unknown> = {
         customerId: customerId || undefined,
@@ -342,6 +362,7 @@ export class WhatsAppWebhookController {
         }
       } else {
         updateSessionData.unreadCount = { increment: 1 };
+        updateSessionData.lastMessageAt = new Date(); // Reset expiration timer for customer messages
       }
 
       await this.prisma.chatSession.update({
@@ -366,11 +387,14 @@ export class WhatsAppWebhookController {
         // Se duas requisições simultâneas tentarem criar o mesmo externalId, apenas ignorar a duplicata.
         const msg = err instanceof Error ? err.message : 'Unknown error';
         if (msg.toLowerCase().includes('unique') && externalId) {
+          this.logger.log(`[WA_WEBHOOK] duplicate_skipped (race condition) externalId=${externalId}`);
           AiFlowLogger.ignored('duplicate_message_id_race', trace, { sessionId: session.id });
           return;
         }
         throw err;
       }
+      
+      this.logger.log(`[WA_WEBHOOK] message_persist_success sessionId=${session.id} externalId=${externalId}`);
 
       AiFlowLogger.flow('message_persist_success', trace, {
         sessionId: session.id,
@@ -379,7 +403,34 @@ export class WhatsAppWebhookController {
         senderType: 'customer',
       });
 
-      if (session.handoffActive || isFromMe) {
+      // Emite evento de socket para atualizar o Inbox em tempo real
+      try {
+        const savedMessages = await this.prisma.chatMessage.findMany({
+          where: { sessionId: session.id },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        });
+        const lastMessage = savedMessages[0];
+        if (lastMessage) {
+          ChatGateway.instance?.emitMessageCreated(tenantId, session.id, lastMessage);
+          this.logger.log(`[WA_WEBHOOK] socket_emit_success event=messageCreated sessionId=${session.id}`);
+        }
+        // Atualiza contadores e lista lateral
+        const updatedSession = await this.prisma.chatSession.findUnique({ where: { id: session.id } });
+        if (updatedSession) {
+          ChatGateway.instance?.emitSessionUpdated(tenantId, updatedSession);
+          this.logger.log(`[WA_WEBHOOK] socket_emit_success event=sessionUpdated sessionId=${session.id}`);
+        }
+      } catch (emitErr) {
+        this.logger.error(`[WA_WEBHOOK] error stage=socket_emit message=${emitErr instanceof Error ? emitErr.message : 'unknown'}`);
+      }
+
+      // [AI_GUARD] Check handoffActive state immediately before dispatching to AI
+      const freshSession = await this.prisma.chatSession.findUnique({ where: { id: session.id }, select: { handoffActive: true } });
+      const isHandoffActive = freshSession?.handoffActive ?? session.handoffActive;
+
+      if (isHandoffActive || isFromMe) {
+        this.logger.log(`[AI_GUARD] Ignoring message dispatch for sessionId=${session.id} (handoffActive=${isHandoffActive}, isFromMe=${isFromMe})`);
         AiFlowLogger.ignored('human_handoff', trace, { sessionId: session.id, isFromMe });
         return;
       }
@@ -443,5 +494,37 @@ export class WhatsAppWebhookController {
 
   private async handleNormalizedAck(event: WhatsAppWebhookEvent) {
     this.logger.debug(`ACK received for ${event.externalId}: ${event.status}`);
+  }
+
+  private refreshCustomerProfilePicture(tenantId: string, phone: string, customerId: string) {
+    // Fire and forget
+    void (async () => {
+      try {
+        const instance = await this.prisma.whatsAppInstance.findUnique({
+          where: { tenantId },
+          select: { providerType: true, apiUrl: true, apiKey: true, evolutionInstanceId: true },
+        });
+        if (!instance || !instance.apiUrl || !instance.apiKey || !instance.evolutionInstanceId) return;
+
+        const provider = this.providerRegistry.getProvider(instance.providerType);
+        if (typeof provider.getProfilePictureUrl !== 'function') return;
+
+        const url = await provider.getProfilePictureUrl(instance.apiUrl, instance.apiKey, instance.evolutionInstanceId, phone);
+        if (url) {
+          await this.prisma.customer.update({
+            where: { id: customerId },
+            data: { profilePictureUrl: url, profilePictureUpdatedAt: new Date() },
+          });
+        } else {
+          // Atualiza a data para não tentar na próxima mensagem
+          await this.prisma.customer.update({
+            where: { id: customerId },
+            data: { profilePictureUpdatedAt: new Date() },
+          });
+        }
+      } catch (err) {
+        this.logger.debug(`Erro background ao atualizar foto de perfil do customer ${customerId}`);
+      }
+    })();
   }
 }

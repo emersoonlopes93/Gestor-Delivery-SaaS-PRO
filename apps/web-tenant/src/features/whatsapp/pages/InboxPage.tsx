@@ -172,56 +172,56 @@ export function InboxPage() {
   return (
     <div className="h-[calc(100vh-theme(spacing.16))] flex flex-col md:flex-row bg-background dark:bg-background overflow-hidden">
       {/* Sidebar de conversas */}
-      <div className={`w-full md:w-96 border-r border-border bg-card dark:bg-card flex flex-col ${selectedSession ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`w-full md:w-80 lg:w-96 border-r border-border bg-card/50 flex flex-col ${selectedSession ? 'hidden md:flex' : 'flex'}`}>
         {/* Header e Filtros */}
-        <div className="p-4 border-b border-border flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-foreground">Inbox</h2>
+        <div className="p-4 border-b border-border bg-card flex flex-col gap-3 z-10 shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-lg font-bold text-foreground tracking-tight">Inbox</h2>
             <div className="flex items-center gap-2">
               <span className={`h-2 w-2 rounded-full ${socketConnected ? 'bg-status-success animate-pulse' : 'bg-muted'}`} title={socketConnected ? 'Online' : 'Offline'} />
             </div>
           </div>
 
           {/* Stats Bar */}
-          <div className="grid grid-cols-4 gap-2 text-center text-xs">
-            <div className="bg-muted/50 rounded-lg p-2 border border-border">
-              <span className="block font-bold text-foreground text-sm">{stats?.unread || 0}</span>
-              <span className="text-muted-foreground">Ñ Lidas</span>
+          <div className="flex gap-2 text-center text-xs overflow-x-auto pb-1 scrollbar-none">
+            <div className="flex-1 bg-muted/50 rounded-md py-1.5 px-2 border border-border flex flex-col items-center justify-center min-w-[60px]">
+              <span className="font-bold text-foreground leading-none mb-0.5">{stats?.unread || 0}</span>
+              <span className="text-muted-foreground text-[9px] uppercase tracking-wider">Ñ Lidas</span>
             </div>
-            <div className="bg-destructive/5 rounded-lg p-2 border border-destructive/10">
-              <span className="block font-bold text-destructive text-sm">{stats?.human || 0}</span>
-              <span className="text-muted-foreground text-[10px]">Espera</span>
+            <div className="flex-1 bg-destructive/5 rounded-md py-1.5 px-2 border border-destructive/10 flex flex-col items-center justify-center min-w-[60px]">
+              <span className="font-bold text-destructive leading-none mb-0.5">{stats?.human || 0}</span>
+              <span className="text-muted-foreground text-[9px] uppercase tracking-wider">Espera</span>
             </div>
-            <div className="bg-primary/5 rounded-lg p-2 border border-primary/10">
-              <span className="block font-bold text-primary text-sm">{stats?.ai || 0}</span>
-              <span className="text-muted-foreground">Bot</span>
+            <div className="flex-1 bg-primary/5 rounded-md py-1.5 px-2 border border-primary/10 flex flex-col items-center justify-center min-w-[60px]">
+              <span className="font-bold text-primary leading-none mb-0.5">{stats?.ai || 0}</span>
+              <span className="text-muted-foreground text-[9px] uppercase tracking-wider">Bot</span>
             </div>
-            <div className="bg-muted/50 rounded-lg p-2 border border-border">
-              <span className="block font-bold text-foreground text-sm">{stats?.closedToday || 0}</span>
-              <span className="text-muted-foreground text-[10px]">Fechados</span>
+            <div className="flex-1 bg-muted/50 rounded-md py-1.5 px-2 border border-border flex flex-col items-center justify-center min-w-[60px]">
+              <span className="font-bold text-foreground leading-none mb-0.5">{stats?.closedToday || 0}</span>
+              <span className="text-muted-foreground text-[9px] uppercase tracking-wider">Fechados</span>
             </div>
           </div>
 
           {/* Barra de Busca */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <div className="relative mt-1">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <input 
               type="text" 
-              placeholder="Buscar por nome ou número..." 
-              className="w-full pl-9 pr-4 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              placeholder="Buscar contato..." 
+              className="w-full pl-8 pr-3 py-1.5 bg-background border border-input rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-primary/50 transition-colors"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
           {/* Filtros Operacionais */}
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <div className="flex gap-2">
             <select 
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as "closed" | "human" | "waiting" | "all" | "ai_active")}
-              className="bg-background border border-border rounded-lg text-xs py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="flex-1 bg-background border border-input rounded-md text-[11px] py-1 px-1.5 focus:outline-none focus:ring-1 focus:ring-primary/50 text-foreground cursor-pointer"
             >
-              <option value="all">Todos Status</option>
+              <option value="all">Status: Todos</option>
               <option value="waiting">Aguardando Humano</option>
               <option value="ai_active">IA Ativa</option>
               <option value="closed">Encerrados</option>
@@ -230,66 +230,91 @@ export function InboxPage() {
             <select 
               value={periodFilter}
               onChange={(e) => setPeriodFilter(e.target.value as "all" | "today" | "yesterday" | "7days")}
-              className="bg-background border border-border rounded-lg text-xs py-1.5 px-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="flex-1 bg-background border border-input rounded-md text-[11px] py-1 px-1.5 focus:outline-none focus:ring-1 focus:ring-primary/50 text-foreground cursor-pointer"
             >
-              <option value="all">Todo Período</option>
+              <option value="all">Tempo: Todos</option>
               <option value="today">Hoje</option>
               <option value="yesterday">Ontem</option>
-              <option value="7days">Últimos 7 dias</option>
+              <option value="7days">Últ. 7 dias</option>
             </select>
           </div>
         </div>
         
         {/* Lista de Sessões */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto bg-muted/10">
           {isLoading ? (
             <div className="flex justify-center items-center h-32">
-              <Loader2 className="animate-spin text-muted-foreground h-6 w-6" />
+              <Loader2 className="animate-spin text-muted-foreground h-5 w-5" />
             </div>
           ) : sessions.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full p-6 text-center text-muted-foreground">
-              <UserCircle size={48} className="mb-4 opacity-20" />
-              <p>Nenhuma conversa encontrada</p>
-              <p className="text-xs mt-1">Tente ajustar seus filtros.</p>
+              <div className="bg-muted p-3 rounded-full mb-3">
+                <UserCircle size={32} className="opacity-50" />
+              </div>
+              <p className="text-sm font-medium">Nenhuma conversa encontrada</p>
+              <p className="text-xs mt-1 opacity-70">Tente ajustar seus filtros.</p>
             </div>
           ) : (
-            <>
+            <div className="divide-y divide-border/50">
               {sessions.map((s, i) => {
                 const isActive = selectedSession?.customerPhone === s.customerPhone; // Usando phone como âncora agora
                 const isLast = i === sessions.length - 1;
+                const displayName = s.displayName || s.name || `Cliente ${s.customerPhone}`;
+                const initial = displayName.charAt(0).toUpperCase();
                 
                 return (
                   <div 
                     key={s.id} 
                     ref={isLast ? lastSessionElementRef : null}
                     onClick={() => handleSessionSelect(s)}
-                    className={`p-4 border-b cursor-pointer transition-colors relative group ${
+                    className={`p-3.5 cursor-pointer transition-all relative group ${
                       isActive
-                        ? 'bg-primary/5 text-foreground border-primary/20'
-                        : 'bg-card text-card-foreground hover:bg-muted/40 border-border'
+                        ? 'bg-primary/[0.08] border-l-2 border-l-primary'
+                        : 'bg-card hover:bg-muted/50 border-l-2 border-l-transparent'
                     }`}
                   >
-                    {s.handoffActive && (
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-destructive" />
+                    {s.handoffActive && !isActive && (
+                      <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-status-warning" />
                     )}
-                    <div className="flex items-start justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-foreground flex items-center gap-1">
-                          {s.displayName || s.name || `Cliente ${s.customerPhone}`}
-                        </h3>
-                        {s.unreadCount && s.unreadCount > 0 ? (
-                          <span className="bg-destructive text-destructive-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
-                            {s.unreadCount}
-                          </span>
-                        ) : null}
+                    <div className="flex items-start gap-3">
+                      {/* Avatar */}
+                      <div className={`relative shrink-0 w-10 h-10 rounded-full overflow-hidden flex items-center justify-center font-bold text-sm ${
+                        isActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {s.profilePictureUrl && (
+                          <img 
+                            src={s.profilePictureUrl} 
+                            alt={displayName} 
+                            className="absolute inset-0 w-full h-full object-cover"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
+                        )}
+                        <span>{initial}</span>
                       </div>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {s.time || new Date(s.lastMessageAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground truncate mb-3">{s.lastMessage || 'Sem mensagens'}</p>
-                    <div className="flex items-center gap-2">
-                      {renderBadge(s)}
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-1 gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <h3 className={`text-[13px] truncate ${isActive ? 'font-bold text-foreground' : 'font-semibold text-foreground/90'}`}>
+                              {displayName}
+                            </h3>
+                            {s.unreadCount && s.unreadCount > 0 ? (
+                              <span className="bg-destructive text-destructive-foreground text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm shrink-0 leading-none">
+                                {s.unreadCount}
+                              </span>
+                            ) : null}
+                          </div>
+                          <span className={`text-[10px] whitespace-nowrap shrink-0 ${isActive ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
+                            {s.time || new Date(s.lastMessageAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className={`text-[12px] truncate mb-2 ${s.unreadCount && s.unreadCount > 0 ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                          {s.lastMessage || 'Sem mensagens'}
+                        </p>
+                        <div className="flex items-center gap-1.5">
+                          {renderBadge(s)}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
@@ -297,10 +322,10 @@ export function InboxPage() {
               
               {isFetchingNextPage && (
                 <div className="p-4 flex justify-center">
-                  <Loader2 className="animate-spin text-muted-foreground h-5 w-5" />
+                  <Loader2 className="animate-spin text-muted-foreground h-4 w-4" />
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
       </div>

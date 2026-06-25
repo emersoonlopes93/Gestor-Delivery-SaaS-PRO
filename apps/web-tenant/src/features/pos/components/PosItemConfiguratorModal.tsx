@@ -441,8 +441,8 @@ export function PosItemConfiguratorModal(props: {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4">
-      <div className="bg-card dark:bg-muted900 w-full max-w-2xl sm:rounded-3xl flex flex-col max-h-[92vh] border border-border dark:border-border800 shadow-2xl">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 safe-modal">
+      <div className="bg-card dark:bg-muted900 w-full max-w-2xl sm:rounded-3xl flex flex-col max-h-[calc(100dvh-var(--safe-area-top)-var(--safe-area-bottom)-1rem)] safe-sheet border border-border dark:border-border800 shadow-2xl">
         <div className="px-6 py-4 border-b border-border dark:border-border800 flex items-center gap-3 bg-card">
           <div className="flex-1 min-w-0">
             <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground leading-none">Configurar item</div>

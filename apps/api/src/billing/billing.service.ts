@@ -118,7 +118,7 @@ export class BillingService {
       value: Number(plan.price),
       nextDueDate: trialEndsAt.toISOString().split('T')[0],
       cycle: plan.billingCycle === BillingCycle.yearly ? 'YEARLY' : 'MONTHLY',
-      description: `Assinatura Plano ${plan.name} - Gestor Delivery PRO`,
+      description: `Assinatura Plano ${plan.name} - PedeHub`,
     });
 
     const subscription = await this.prisma.tenantSubscription.upsert({

@@ -8,9 +8,13 @@ import { DriverAuthController } from './driver-auth.controller';
 import { DriverAuthService } from './driver-auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { AuthSessionService } from './auth-session.service';
+import { MailModule } from '../mail/mail.module';
+import { BillingDomainModule } from '../billing/billing-domain.module';
 
 @Module({
   imports: [
+    MailModule,
+    BillingDomainModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

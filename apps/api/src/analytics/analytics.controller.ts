@@ -5,10 +5,12 @@ import { BusinessIntelligenceService } from './business-intelligence.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions, CurrentTenant } from '../common/decorators';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { MetricFilterDTO, DashboardStatsDTO } from '@gestor/types';
 
 @Controller('analytics')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
+@RequiresFeature('reports')
 export class AnalyticsController {
   constructor(
     private readonly analyticsService: AnalyticsService,

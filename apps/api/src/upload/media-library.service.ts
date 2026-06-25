@@ -33,6 +33,7 @@ export interface MediaMetadataInput {
   tags?: string[];
   status?: 'active' | 'inactive';
   publicationStatus?: 'draft' | 'published' | 'unpublished';
+  metadata?: Prisma.InputJsonValue;
 }
 
 @Injectable()
@@ -57,6 +58,7 @@ export class MediaLibraryService {
       categoryId: category?.id ?? null,
       category: category?.name ?? input.category ?? undefined,
       tagsJson: normalizeTags(input.tags),
+      metadataJson: input.metadata,
       publicationStatus: input.publicationStatus ?? 'draft',
       createdByUserId: adminUserId,
     });
@@ -74,6 +76,7 @@ export class MediaLibraryService {
       categoryId: category?.id ?? null,
       category: category?.name ?? input.category ?? undefined,
       tagsJson: normalizeTags(input.tags),
+      metadataJson: input.metadata,
       publicationStatus: 'published',
       createdByUserId: userId,
     });
@@ -247,14 +250,23 @@ export class MediaLibraryService {
       });
     }
 
-    return this.prisma.mediaCategory.upsert({
-      where: { tenantId_scope_slug: { tenantId, scope, slug } },
-      update: {
-        name: input.name,
-        description: input.description ?? undefined,
-        isActive: input.isActive ?? true,
-      },
-      create: {
+    const existingBySlug = await this.prisma.mediaCategory.findFirst({
+      where: { tenantId, scope, slug },
+    });
+
+    if (existingBySlug) {
+      return this.prisma.mediaCategory.update({
+        where: { id: existingBySlug.id },
+        data: {
+          name: input.name,
+          description: input.description ?? undefined,
+          isActive: input.isActive ?? true,
+        },
+      });
+    }
+
+    return this.prisma.mediaCategory.create({
+      data: {
         tenantId,
         scope,
         name: input.name,
@@ -373,6 +385,7 @@ export class MediaLibraryService {
       data.category = category?.name ?? null;
     }
     if (input.tags !== undefined) data.tagsJson = normalizeTags(input.tags);
+    if (input.metadata !== undefined) data.metadataJson = input.metadata;
     if (input.status !== undefined) {
       data.status = input.status;
       data.isActive = input.status === 'active';

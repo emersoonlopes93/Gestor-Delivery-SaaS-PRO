@@ -14,6 +14,9 @@ import { BillingGatewayMode, PaymentProvider, Prisma } from '@prisma/client';
 import { TenantBillingResolverService } from '../../billing/tenant-billing-resolver.service';
 import { normalizeSeededRevenueTierLabel } from '../../billing/revenue-tier-label';
 import { RevenueLedgerService } from '../../billing/revenue-ledger.service';
+import { BillingAddonService } from '../../billing/billing-addon.service';
+import * as bcrypt from 'bcryptjs';
+import { TenantDefaultRole } from '@gestor/core';
 
 type BillingRevenueTierInput = {
   id?: string;
@@ -35,12 +38,36 @@ type UpdateBillingPlanV2Body = {
 };
 
 type UpdateBillingSettingsBody = {
+  freeTierRevenueLimit?: string | number;
+  maxMonthlyCharge?: string | number;
+  trialProEnabled?: boolean;
+  trialProDays?: number;
+  trialRequiresPaymentMethod?: boolean;
+  trialIncludesAi?: boolean;
+  trialIncludesIfood?: boolean;
+  trialIncludesAdvancedReports?: boolean;
+  trialAutoConvertToBilling?: boolean;
+  aiAddonEnabled?: boolean;
+  aiAddonPrice?: string | number;
+  aiFreeTrialMessages?: number;
+  aiIncludedForPaidTenants?: boolean;
+  aiIncludedMonthlyMessages?: number;
+  aiHardLimitMonthlyMessages?: number;
+  countMarketplaceOrdersDefault?: boolean;
+  partnerLinksJson?: Prisma.InputJsonValue;
   includeDeliveryFeeByDefault?: boolean;
   includeServiceFeeByDefault?: boolean;
   countStorefrontOrders?: boolean;
+  countDirectOnlineOrders?: boolean;
   countPosOrders?: boolean;
   countWhatsappAiOrders?: boolean;
   countManualOrders?: boolean;
+  countMarketplaceIfoodOrders?: boolean;
+  countMarketplaceRappiOrders?: boolean;
+  countMarketplaceUbereatsOrders?: boolean;
+  countMarketplace99foodOrders?: boolean;
+  countMarketplaceKettaOrders?: boolean;
+  countMarketplaceZeDeliveryOrders?: boolean;
   countConfirmedOrders?: boolean;
   countCompletedOrders?: boolean;
   excludeCancelledOrders?: boolean;
@@ -48,6 +75,19 @@ type UpdateBillingSettingsBody = {
   defaultGracePeriodDays?: number;
   defaultTrialDays?: number;
   requirePaymentMethodForPaidPlans?: boolean;
+};
+
+type MonetizationSmokeSetupBody = {
+  tenantSlug?: string;
+  tenantEmail?: string;
+  tenantPassword?: string;
+  tenantName?: string;
+  runId?: string;
+  allowReset?: boolean;
+};
+
+type MonetizationSmokeCleanupBody = {
+  tenantSlug?: string;
 };
 
 type NormalizedBillingRevenueTier = {
@@ -58,6 +98,8 @@ type NormalizedBillingRevenueTier = {
   label: string | null;
   sortOrder: number;
 };
+
+const ZERO = new Prisma.Decimal(0);
 
 @Controller('admin/billing')
 @UseGuards(AdminAuthGuard, AdminPermissionsGuard)
@@ -72,6 +114,7 @@ export class AdminBillingController {
     private readonly billingPaymentGatewayService: BillingPaymentGatewayService,
     private readonly tenantBillingResolver: TenantBillingResolverService,
     private readonly revenueLedgerService: RevenueLedgerService,
+    private readonly billingAddonService: BillingAddonService,
   ) {}
 
   @Get('plans')
@@ -265,31 +308,107 @@ export class AdminBillingController {
   @Get('settings')
   @RequireAdminPermissions('saas.billing.read')
   async getBillingSettings() {
-    return this.billingSettingsService.ensureDefaultSettings();
+    const settings = await this.billingSettingsService.ensureDefaultSettings();
+    const [plan, addon] = await Promise.all([
+      this.tenantBillingResolver.getDefaultBillingPlan(),
+      this.billingAddonService.ensureAiAddonDefinition(),
+    ]);
+    return this.buildBillingSettingsResponse(settings, plan, addon);
   }
 
   @Put('settings')
   @RequireAdminPermissions('saas.billing.manage')
   async updateBillingSettings(@Body() body: UpdateBillingSettingsBody) {
     const current = await this.billingSettingsService.ensureDefaultSettings();
-    return this.prisma.billingSettings.update({
-      where: { id: current.id },
-      data: {
-        ...(body.includeDeliveryFeeByDefault !== undefined ? { includeDeliveryFeeByDefault: this.requireBoolean(body.includeDeliveryFeeByDefault, 'includeDeliveryFeeByDefault') } : {}),
-        ...(body.includeServiceFeeByDefault !== undefined ? { includeServiceFeeByDefault: this.requireBoolean(body.includeServiceFeeByDefault, 'includeServiceFeeByDefault') } : {}),
-        ...(body.countStorefrontOrders !== undefined ? { countStorefrontOrders: this.requireBoolean(body.countStorefrontOrders, 'countStorefrontOrders') } : {}),
-        ...(body.countPosOrders !== undefined ? { countPosOrders: this.requireBoolean(body.countPosOrders, 'countPosOrders') } : {}),
-        ...(body.countWhatsappAiOrders !== undefined ? { countWhatsappAiOrders: this.requireBoolean(body.countWhatsappAiOrders, 'countWhatsappAiOrders') } : {}),
-        ...(body.countManualOrders !== undefined ? { countManualOrders: this.requireBoolean(body.countManualOrders, 'countManualOrders') } : {}),
-        ...(body.countConfirmedOrders !== undefined ? { countConfirmedOrders: this.requireBoolean(body.countConfirmedOrders, 'countConfirmedOrders') } : {}),
-        ...(body.countCompletedOrders !== undefined ? { countCompletedOrders: this.requireBoolean(body.countCompletedOrders, 'countCompletedOrders') } : {}),
-        ...(body.excludeCancelledOrders !== undefined ? { excludeCancelledOrders: this.requireBoolean(body.excludeCancelledOrders, 'excludeCancelledOrders') } : {}),
-        ...(body.discountReducesRevenue !== undefined ? { discountReducesRevenue: this.requireBoolean(body.discountReducesRevenue, 'discountReducesRevenue') } : {}),
-        ...(body.defaultGracePeriodDays !== undefined ? { defaultGracePeriodDays: this.parseIntegerRange(body.defaultGracePeriodDays, 'defaultGracePeriodDays', 0, 365) } : {}),
-        ...(body.defaultTrialDays !== undefined ? { defaultTrialDays: this.parseIntegerRange(body.defaultTrialDays, 'defaultTrialDays', 0, 365) } : {}),
-        ...(body.requirePaymentMethodForPaidPlans !== undefined ? { requirePaymentMethodForPaidPlans: this.requireBoolean(body.requirePaymentMethodForPaidPlans, 'requirePaymentMethodForPaidPlans') } : {}),
-      },
+    const plan = await this.tenantBillingResolver.getDefaultBillingPlan();
+
+    const [updatedSettings] = await this.prisma.$transaction(async (tx) => {
+      if (body.trialProDays !== undefined || body.trialRequiresPaymentMethod !== undefined || body.freeTierRevenueLimit !== undefined || body.maxMonthlyCharge !== undefined) {
+        const planUpdate: Prisma.BillingPlanUpdateInput = {};
+        if (body.trialProDays !== undefined) planUpdate.trialDays = this.parseIntegerRange(body.trialProDays, 'trialProDays', 0, 365);
+        if (body.trialRequiresPaymentMethod !== undefined) planUpdate.requiresPaymentMethod = this.requireBoolean(body.trialRequiresPaymentMethod, 'trialRequiresPaymentMethod');
+
+        if (body.freeTierRevenueLimit !== undefined || body.maxMonthlyCharge !== undefined) {
+          const existingTiers = await tx.billingRevenueTier.findMany({
+            where: { planId: plan.id },
+            orderBy: [{ sortOrder: 'asc' }],
+          });
+          const freeTierLimit = body.freeTierRevenueLimit !== undefined
+            ? this.parseDecimal(body.freeTierRevenueLimit, 'freeTierRevenueLimit')
+            : new Prisma.Decimal(existingTiers[0]?.maxRevenue ?? 1500);
+          const maxMonthlyCharge = body.maxMonthlyCharge !== undefined
+            ? this.parseDecimal(body.maxMonthlyCharge, 'maxMonthlyCharge')
+            : existingTiers.reduce((highest, tier) => new Prisma.Decimal(tier.price).gt(highest) ? new Prisma.Decimal(tier.price) : highest, ZERO);
+          if (existingTiers.length >= 4) {
+            await tx.billingRevenueTier.update({ where: { id: existingTiers[0].id }, data: { maxRevenue: freeTierLimit, price: ZERO } });
+            await tx.billingRevenueTier.update({ where: { id: existingTiers[1].id }, data: { minRevenue: freeTierLimit.plus(0.01) } });
+            const topTier = existingTiers[existingTiers.length - 1];
+            await tx.billingRevenueTier.update({ where: { id: topTier.id }, data: { price: maxMonthlyCharge } });
+          }
+        }
+
+        if (Object.keys(planUpdate).length) {
+          await tx.billingPlan.update({ where: { id: plan.id }, data: planUpdate });
+        }
+      }
+
+      if (body.aiAddonEnabled !== undefined || body.aiAddonPrice !== undefined) {
+        const addon = await this.billingAddonService.ensureAiAddonDefinition(tx);
+        await tx.billingModuleAddon.update({
+          where: { id: addon.id },
+          data: {
+            ...(body.aiAddonEnabled !== undefined ? { isActive: this.requireBoolean(body.aiAddonEnabled, 'aiAddonEnabled') } : {}),
+            ...(body.aiAddonPrice !== undefined ? { price: this.parseDecimal(body.aiAddonPrice, 'aiAddonPrice') } : {}),
+          },
+        });
+      }
+
+      const updated = await tx.billingSettings.update({
+        where: { id: current.id },
+        data: {
+          ...(body.includeDeliveryFeeByDefault !== undefined ? { includeDeliveryFeeByDefault: this.requireBoolean(body.includeDeliveryFeeByDefault, 'includeDeliveryFeeByDefault') } : {}),
+          ...(body.includeServiceFeeByDefault !== undefined ? { includeServiceFeeByDefault: this.requireBoolean(body.includeServiceFeeByDefault, 'includeServiceFeeByDefault') } : {}),
+          ...(body.countStorefrontOrders !== undefined ? { countStorefrontOrders: this.requireBoolean(body.countStorefrontOrders, 'countStorefrontOrders') } : {}),
+          ...(body.countDirectOnlineOrders !== undefined ? { countDirectOnlineOrders: this.requireBoolean(body.countDirectOnlineOrders, 'countDirectOnlineOrders') } : {}),
+          ...(body.countPosOrders !== undefined ? { countPosOrders: this.requireBoolean(body.countPosOrders, 'countPosOrders') } : {}),
+          ...(body.countWhatsappAiOrders !== undefined ? { countWhatsappAiOrders: this.requireBoolean(body.countWhatsappAiOrders, 'countWhatsappAiOrders') } : {}),
+          ...(body.countManualOrders !== undefined ? { countManualOrders: this.requireBoolean(body.countManualOrders, 'countManualOrders') } : {}),
+          ...(body.countMarketplaceIfoodOrders !== undefined ? { countMarketplaceIfoodOrders: this.requireBoolean(body.countMarketplaceIfoodOrders, 'countMarketplaceIfoodOrders') } : {}),
+          ...(body.countMarketplaceOrdersDefault !== undefined ? { countMarketplaceIfoodOrders: this.requireBoolean(body.countMarketplaceOrdersDefault, 'countMarketplaceOrdersDefault') } : {}),
+          ...(body.countMarketplaceRappiOrders !== undefined ? { countMarketplaceRappiOrders: this.requireBoolean(body.countMarketplaceRappiOrders, 'countMarketplaceRappiOrders') } : {}),
+          ...(body.countMarketplaceUbereatsOrders !== undefined ? { countMarketplaceUbereatsOrders: this.requireBoolean(body.countMarketplaceUbereatsOrders, 'countMarketplaceUbereatsOrders') } : {}),
+          ...(body.countMarketplace99foodOrders !== undefined ? { countMarketplace99foodOrders: this.requireBoolean(body.countMarketplace99foodOrders, 'countMarketplace99foodOrders') } : {}),
+          ...(body.countMarketplaceKettaOrders !== undefined ? { countMarketplaceKettaOrders: this.requireBoolean(body.countMarketplaceKettaOrders, 'countMarketplaceKettaOrders') } : {}),
+          ...(body.countMarketplaceZeDeliveryOrders !== undefined ? { countMarketplaceZeDeliveryOrders: this.requireBoolean(body.countMarketplaceZeDeliveryOrders, 'countMarketplaceZeDeliveryOrders') } : {}),
+          ...(body.countConfirmedOrders !== undefined ? { countConfirmedOrders: this.requireBoolean(body.countConfirmedOrders, 'countConfirmedOrders') } : {}),
+          ...(body.countCompletedOrders !== undefined ? { countCompletedOrders: this.requireBoolean(body.countCompletedOrders, 'countCompletedOrders') } : {}),
+          ...(body.excludeCancelledOrders !== undefined ? { excludeCancelledOrders: this.requireBoolean(body.excludeCancelledOrders, 'excludeCancelledOrders') } : {}),
+          ...(body.discountReducesRevenue !== undefined ? { discountReducesRevenue: this.requireBoolean(body.discountReducesRevenue, 'discountReducesRevenue') } : {}),
+          ...(body.defaultGracePeriodDays !== undefined ? { defaultGracePeriodDays: this.parseIntegerRange(body.defaultGracePeriodDays, 'defaultGracePeriodDays', 0, 365) } : {}),
+          ...(body.defaultTrialDays !== undefined ? { defaultTrialDays: this.parseIntegerRange(body.defaultTrialDays, 'defaultTrialDays', 0, 365) } : {}),
+          ...(body.requirePaymentMethodForPaidPlans !== undefined ? { requirePaymentMethodForPaidPlans: this.requireBoolean(body.requirePaymentMethodForPaidPlans, 'requirePaymentMethodForPaidPlans') } : {}),
+          ...(body.trialProEnabled !== undefined ? { trialProEnabled: this.requireBoolean(body.trialProEnabled, 'trialProEnabled') } : {}),
+          ...(body.trialIncludesAi !== undefined ? { trialIncludesAi: this.requireBoolean(body.trialIncludesAi, 'trialIncludesAi') } : {}),
+          ...(body.trialIncludesIfood !== undefined ? { trialIncludesIfood: this.requireBoolean(body.trialIncludesIfood, 'trialIncludesIfood') } : {}),
+          ...(body.trialIncludesAdvancedReports !== undefined ? { trialIncludesAdvancedReports: this.requireBoolean(body.trialIncludesAdvancedReports, 'trialIncludesAdvancedReports') } : {}),
+          ...(body.trialAutoConvertToBilling !== undefined ? { trialAutoConvertToBilling: this.requireBoolean(body.trialAutoConvertToBilling, 'trialAutoConvertToBilling') } : {}),
+          ...(body.aiIncludedForPaidTenants !== undefined ? { aiIncludedForPaidTenants: this.requireBoolean(body.aiIncludedForPaidTenants, 'aiIncludedForPaidTenants') } : {}),
+          ...(body.aiIncludedMonthlyMessages !== undefined ? { aiIncludedMonthlyMessages: this.parseIntegerRange(body.aiIncludedMonthlyMessages, 'aiIncludedMonthlyMessages', 0, 1000000) } : {}),
+          ...(body.aiFreeTrialMessages !== undefined ? { aiFreeTrialMessages: this.parseIntegerRange(body.aiFreeTrialMessages, 'aiFreeTrialMessages', 0, 1000000) } : {}),
+          ...(body.aiHardLimitMonthlyMessages !== undefined ? { aiHardLimitMonthlyMessages: this.parseIntegerRange(body.aiHardLimitMonthlyMessages, 'aiHardLimitMonthlyMessages', 1, 1000000) } : {}),
+          ...(body.partnerLinksJson !== undefined ? { partnerLinksJson: body.partnerLinksJson } : {}),
+        },
+      });
+
+      return [updated];
     });
+
+    const [nextPlan, nextAddon] = await Promise.all([
+      this.tenantBillingResolver.getDefaultBillingPlan(),
+      this.billingAddonService.ensureAiAddonDefinition(),
+    ]);
+
+    return this.buildBillingSettingsResponse(updatedSettings, nextPlan, nextAddon);
   }
 
   @Get('payment-config')
@@ -616,6 +735,342 @@ export class AdminBillingController {
     });
   }
 
+  @Post('tenants/:tenantId/trial-pro/activate')
+  @RequireAdminPermissions('saas.billing.manage')
+  async activateTrialProAssisted(@Param('tenantId') tenantId: string) {
+    const settings = await this.billingSettingsService.ensureDefaultSettings();
+    if (!settings.trialProEnabled) {
+      throw new BadRequestException('Trial Pro desativado no SaaS Admin.');
+    }
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true },
+    });
+    if (!tenant) {
+      throw new NotFoundException('Tenant nao encontrado.');
+    }
+
+    const plan = await this.tenantBillingResolver.getDefaultBillingPlan();
+    const subscription = await this.tenantBillingResolver.getOrCreateTenantBillingSubscription(tenantId, plan.id);
+    const now = new Date();
+    const trialEndsAt = new Date(now);
+    trialEndsAt.setDate(trialEndsAt.getDate() + Math.max(0, plan.trialDays));
+
+    await this.prisma.tenantBillingSubscription.update({
+      where: { id: subscription.id },
+      data: {
+        status: 'trialing',
+        trialStartedAt: now,
+        trialEndsAt,
+        requiresPaymentMethod: false,
+      },
+    });
+
+    return {
+      tenantId,
+      activationMode: 'assisted_admin',
+      trialEndsAt,
+      autoConvertEnabled: settings.trialAutoConvertToBilling,
+      state: await this.tenantBillingResolver.getTenantBillingState(tenantId),
+    };
+  }
+
+  @Post('smoke/monetization/setup')
+  @RequireAdminPermissions('saas.billing.manage')
+  async setupMonetizationSmoke(@Body() body: MonetizationSmokeSetupBody) {
+    this.assertMonetizationSmokeEnabled();
+
+    const tenantSlug = this.requireSmokeTenantSlug(body.tenantSlug);
+    const tenantEmail = this.requireSmokeString(body.tenantEmail, 'tenantEmail');
+    const tenantPassword = this.requireSmokeString(body.tenantPassword, 'tenantPassword');
+    const tenantName = body.tenantName?.trim() || 'Smoke Monetization';
+    const runId = body.runId?.trim() || `monetization-smoke-${Date.now()}`;
+
+    if (body.allowReset !== true || (process.env.ALLOW_SMOKE_RESET ?? 'false').toLowerCase() !== 'true') {
+      throw new BadRequestException('ALLOW_SMOKE_RESET=true e allowReset=true sao obrigatorios para o smoke de monetizacao.');
+    }
+
+    const tenant = await this.prisma.$transaction(async (tx) => {
+      const existingTenant = await tx.tenant.findUnique({
+        where: { slug: tenantSlug },
+      });
+
+      const createdTenant = existingTenant ?? await tx.tenant.create({
+        data: {
+          name: tenantName,
+          slug: tenantSlug,
+          status: 'active',
+          onboarding: { create: {} },
+          settings: { create: {} },
+          aiAgentConfig: {
+            create: {
+              isEnabled: false,
+              useGlobalDefaults: true,
+              humanInterventionEnabled: true,
+              humanInterventionMinutes: 15,
+              resumeAutomatically: true,
+            },
+          },
+          schedulingSettings: {
+            create: {
+              enabled: false,
+              maximumAdvanceDays: 7,
+              timezone: 'America/Sao_Paulo',
+            },
+          },
+        },
+      });
+
+      await tx.tenant.update({
+        where: { id: createdTenant.id },
+        data: {
+          name: tenantName,
+          slug: tenantSlug,
+          status: 'active',
+        },
+      });
+
+      await tx.tenantSettings.upsert({
+        where: { tenantId: createdTenant.id },
+        create: { tenantId: createdTenant.id },
+        update: {},
+      });
+
+      await tx.tenantOnboarding.upsert({
+        where: { tenantId: createdTenant.id },
+        create: { tenantId: createdTenant.id },
+        update: {},
+      });
+
+      await tx.schedulingSettings.upsert({
+        where: { tenantId: createdTenant.id },
+        create: {
+          tenantId: createdTenant.id,
+          enabled: false,
+          maximumAdvanceDays: 7,
+          timezone: 'America/Sao_Paulo',
+        },
+        update: {
+          enabled: false,
+          maximumAdvanceDays: 7,
+          timezone: 'America/Sao_Paulo',
+        },
+      });
+
+      const passwordHash = await bcrypt.hash(tenantPassword, 12);
+      const tenantUser = await tx.tenantUser.upsert({
+        where: {
+          tenantId_email: {
+            tenantId: createdTenant.id,
+            email: tenantEmail.toLowerCase(),
+          },
+        },
+        create: {
+          tenantId: createdTenant.id,
+          email: tenantEmail.toLowerCase(),
+          name: tenantName,
+          passwordHash,
+          isActive: true,
+        },
+        update: {
+          name: tenantName,
+          passwordHash,
+          isActive: true,
+        },
+      });
+
+      let ownerRole = await tx.tenantRole.findFirst({
+        where: {
+          tenantId: createdTenant.id,
+          slug: TenantDefaultRole.TENANT_OWNER,
+        },
+      });
+
+      if (!ownerRole) {
+        ownerRole = await tx.tenantRole.create({
+          data: {
+            tenantId: createdTenant.id,
+            name: 'Dono',
+            slug: TenantDefaultRole.TENANT_OWNER,
+            isSystem: true,
+          },
+        });
+      }
+
+      await tx.tenantUserRole.deleteMany({
+        where: { userId: tenantUser.id },
+      });
+
+      const permissions = await tx.tenantPermission.findMany({
+        select: { id: true },
+      });
+
+      if (permissions.length > 0) {
+        await tx.tenantRolePermission.deleteMany({
+          where: { roleId: ownerRole.id },
+        });
+        await tx.tenantRolePermission.createMany({
+          data: permissions.map((permission) => ({
+            roleId: ownerRole.id,
+            permissionId: permission.id,
+          })),
+        });
+      }
+
+      await tx.tenantUserRole.create({
+        data: {
+          userId: tenantUser.id,
+          roleId: ownerRole.id,
+        },
+      });
+
+      return createdTenant;
+    });
+
+    const plan = await this.tenantBillingResolver.getDefaultBillingPlan();
+    const subscription = await this.tenantBillingResolver.getOrCreateTenantBillingSubscription(tenant.id, plan.id);
+    const settings = await this.billingSettingsService.ensureDefaultSettings();
+    await this.billingAddonService.ensureAiAddonDefinition();
+
+    const seedBase = new Date(Date.now() - 10 * 60 * 1000);
+    const seed1 = new Date(seedBase.getTime());
+    const seed2 = new Date(seedBase.getTime() + 60_000);
+    const seed3 = new Date(seedBase.getTime() + 120_000);
+    const seed4 = new Date(seedBase.getTime() + 180_000);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.paymentAttempt.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.invoiceItem.deleteMany({
+        where: {
+          invoice: {
+            tenantId: tenant.id,
+          },
+        },
+      });
+      await tx.invoice.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.billingUsageSnapshot.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.billingCycleRecord.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.subscriptionStatusHistory.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.tenantAddon.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.billingPaymentMethod.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.revenueEvent.deleteMany({
+        where: {
+          tenantId: tenant.id,
+          idempotencyKey: {
+            startsWith: `${runId}:`,
+          },
+        },
+      });
+    });
+
+    const seededEvents = [
+      {
+        orderId: `${runId}:baseline-direct-online`,
+        amount: 1400,
+        sourceChannel: 'direct_online',
+        occurredAt: seed1,
+      },
+      {
+        orderId: `${runId}:alias-storefront`,
+        amount: 200,
+        sourceChannel: 'storefront',
+        occurredAt: seed2,
+      },
+      {
+        orderId: `${runId}:cap-direct-online`,
+        amount: 5000,
+        sourceChannel: 'direct_online',
+        occurredAt: seed3,
+      },
+      {
+        orderId: `${runId}:ifood-marketplace`,
+        amount: 250,
+        sourceChannel: 'marketplace_ifood',
+        occurredAt: seed4,
+      },
+    ] as const;
+
+    for (const seed of seededEvents) {
+      await this.revenueLedgerService.recordOrderStatusEvent({
+        tenantId: tenant.id,
+        orderId: seed.orderId,
+        orderStatus: 'completed',
+        orderTotal: new Prisma.Decimal(seed.amount),
+        sourceChannel: seed.sourceChannel,
+        occurredAt: seed.occurredAt,
+        actorType: 'system',
+        actorId: 'smoke-monetization',
+        reason: `smoke_seed_${seed.orderId}`,
+      });
+    }
+
+    return {
+      tenantId: tenant.id,
+      tenantSlug,
+      tenantEmail: tenantEmail.toLowerCase(),
+      planId: plan.id,
+      subscriptionId: subscription.id,
+      settings,
+      seedTimeline: {
+        baselineEnd: new Date(seed2.getTime() - 1),
+        progressiveEnd: new Date(seed3.getTime() - 1),
+        capEnd: new Date(seed4.getTime() - 1),
+        fullEnd: new Date(seed4.getTime() + 1),
+      },
+      seededEvents: seededEvents.map((seed) => ({
+        orderId: seed.orderId,
+        sourceChannel: seed.sourceChannel,
+        amount: seed.amount,
+        occurredAt: seed.occurredAt,
+      })),
+      state: await this.tenantBillingResolver.getTenantBillingState(tenant.id),
+    };
+  }
+
+  @Post('smoke/monetization/cleanup')
+  @RequireAdminPermissions('saas.billing.manage')
+  async cleanupMonetizationSmoke(@Body() body: MonetizationSmokeCleanupBody) {
+    this.assertMonetizationSmokeEnabled();
+
+    const tenantSlug = this.requireSmokeTenantSlug(body.tenantSlug);
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
+      select: { id: true, slug: true },
+    });
+
+    if (!tenant) {
+      return {
+        tenantSlug,
+        cleaned: false,
+        reason: 'tenant_not_found',
+      };
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.paymentAttempt.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.invoiceItem.deleteMany({
+        where: {
+          invoice: {
+            tenantId: tenant.id,
+          },
+        },
+      });
+      await tx.invoice.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.billingUsageSnapshot.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.billingCycleRecord.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.subscriptionStatusHistory.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.tenantAddon.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.billingPaymentMethod.deleteMany({ where: { tenantId: tenant.id } });
+      await tx.revenueEvent.deleteMany({ where: { tenantId: tenant.id } });
+    });
+
+    return {
+      tenantSlug,
+      cleaned: true,
+    };
+  }
+
   @Post('usage-snapshots')
   @RequireAdminPermissions('saas.billing.manage')
   async createUsageSnapshot(
@@ -703,6 +1158,36 @@ export class AdminBillingController {
       cycleId,
       planId,
     });
+  }
+
+  private assertMonetizationSmokeEnabled(): void {
+    const enabled =
+      process.env.NODE_ENV !== 'production' ||
+      process.env.BILLING_SMOKE_ENABLED === 'true' ||
+      process.env.SMOKE_ENABLED === 'true';
+
+    if (!enabled) {
+      throw new BadRequestException('Smoke de monetizacao desabilitado neste ambiente.');
+    }
+  }
+
+  private requireSmokeTenantSlug(slug?: string): string {
+    const tenantSlug = slug?.trim();
+    if (!tenantSlug) {
+      throw new BadRequestException('tenantSlug e obrigatorio.');
+    }
+    if (!tenantSlug.startsWith('smoke-')) {
+      throw new BadRequestException('tenantSlug deve comecar com smoke-.');
+    }
+    return tenantSlug;
+  }
+
+  private requireSmokeString(value: string | undefined, field: string): string {
+    const normalized = value?.trim();
+    if (!normalized) {
+      throw new BadRequestException(`${field} e obrigatorio.`);
+    }
+    return normalized;
   }
 
   private normalizeRevenueTiers(tiers: BillingRevenueTierInput[]): NormalizedBillingRevenueTier[] {
@@ -889,6 +1374,31 @@ export class AdminBillingController {
       return 'grace_period_expired_not_enforced';
     }
     return subscription.status;
+  }
+
+  private buildBillingSettingsResponse(
+    settings: Awaited<ReturnType<BillingSettingsService['ensureDefaultSettings']>>,
+    plan: Awaited<ReturnType<TenantBillingResolverService['getDefaultBillingPlan']>>,
+    addon: Awaited<ReturnType<BillingAddonService['ensureAiAddonDefinition']>>,
+  ) {
+    const freeTier = [...plan.revenueTiers]
+      .sort((left, right) => left.sortOrder - right.sortOrder)
+      .find((tier) => new Prisma.Decimal(tier.price).eq(ZERO));
+    const maxMonthlyCharge = plan.revenueTiers.reduce(
+      (highest, tier) => new Prisma.Decimal(tier.price).gt(highest) ? new Prisma.Decimal(tier.price) : highest,
+      ZERO,
+    );
+
+    return {
+      ...settings,
+      freeTierRevenueLimit: freeTier?.maxRevenue ?? 0,
+      maxMonthlyCharge,
+      trialProDays: plan.trialDays,
+      trialRequiresPaymentMethod: plan.requiresPaymentMethod,
+      aiAddonEnabled: addon.isActive,
+      aiAddonPrice: addon.price,
+      countMarketplaceOrdersDefault: settings.countMarketplaceIfoodOrders,
+    };
   }
 }
 

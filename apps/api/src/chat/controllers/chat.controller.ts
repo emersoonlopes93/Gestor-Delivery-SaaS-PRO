@@ -232,6 +232,7 @@ export class ChatController {
       skip,
       take: limit,
       include: {
+        customer: { select: { profilePictureUrl: true } },
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 5,
@@ -265,6 +266,7 @@ export class ChatController {
           aiBlockedTools: aiSummary.blockedTools,
           aiLastFailureAt: aiSummary.lastFailureAt,
           aiToolFailures: aiSummary.failures,
+          profilePictureUrl: s.customer?.profilePictureUrl || null,
         };
       }),
       meta: {
@@ -281,8 +283,15 @@ export class ChatController {
   async getSession(@Request() req: TenantRequest, @Param('id') sessionId: string) {
     const session = await this.prisma.chatSession.findFirst({
       where: { id: sessionId, tenantId: req.user.tenantId },
+      include: { customer: { select: { profilePictureUrl: true } } },
     });
-    return session;
+    if (!session) return null;
+    // Achata profilePictureUrl para o nível raiz para que o frontend possa acessar
+    const { customer, ...rest } = session;
+    return {
+      ...rest,
+      profilePictureUrl: customer?.profilePictureUrl ?? null,
+    };
   }
 
   @Get('sessions/:id/messages')
@@ -295,12 +304,18 @@ export class ChatController {
 
     const messages = await this.prisma.chatMessage.findMany({
       where: {
-        session: { tenantId: req.user.tenantId, customerPhone: session.customerPhone },
+        sessionId: sessionId,
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
       take: 200,
     });
-    return messages.filter((msg) => this.isInboxMessage(msg));
+    
+    const finalMessages = messages.reverse().filter((msg) => this.isInboxMessage(msg));
+    
+    const marker = finalMessages.find(m => typeof m.content === 'string' && m.content.includes('TESTE-HISTORICO-OPERADOR-2406-001'));
+    this.logger.log(`[CHAT_HISTORY] sessionId=${sessionId} count=${finalMessages.length} containsMarker=${!!marker} markerMessageId=${marker?.id || ''} markerDirection=${marker?.direction || ''} markerSenderType=${marker?.senderType || ''} markerFromMe=${marker?.direction === 'outbound'} order=desc take=200`);
+
+    return finalMessages;
   }
 
   @Get('sessions/:id/ai/summary')
@@ -363,63 +378,99 @@ export class ChatController {
     @Param('id') sessionId: string,
     @Body() dto: CreateMessageDto,
   ) {
-    const session = await this.prisma.chatSession.findFirst({
-      where: { id: sessionId, tenantId: req.user.tenantId },
-      select: { id: true, tenantId: true, customerPhone: true, handoffActive: true },
-    });
-    if (!session) {
-      return { error: 'Sessão não encontrada' };
-    }
+    const tenantId = req.user.tenantId;
+    // Generate a simple requestId for tracing
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    this.logger.log(`[CHAT_SEND] start requestId=${requestId} tenantId=${tenantId} sessionId=${sessionId}`);
 
-    // Envio real para WhatsApp
-    const sendResult = await this.whatsappSender.sendText(session.tenantId, {
-      to: session.customerPhone,
-      text: dto.content,
-    });
+    try {
+      const session = await this.prisma.chatSession.findFirst({
+        where: { id: sessionId, tenantId },
+        select: { id: true, tenantId: true, customerPhone: true, handoffActive: true },
+      });
+      if (!session) {
+        this.logger.warn(`[CHAT_SEND] error stage=session_not_found requestId=${requestId}`);
+        return { error: 'Sessão não encontrada' };
+      }
+      this.logger.log(`[CHAT_SEND] session_loaded requestId=${requestId}`);
 
-    const externalId = sendResult.success ? sendResult.messageId : undefined;
+      // Envio real para WhatsApp
+      this.logger.log(`[CHAT_SEND] evolution_send_start requestId=${requestId}`);
+      const sendResult = await this.whatsappSender.sendText(session.tenantId, {
+        to: session.customerPhone,
+        text: dto.content,
+      });
+      this.logger.log(`[CHAT_SEND] evolution_send_success requestId=${requestId} status=${sendResult.success ? 'success' : 'failed'}`);
 
-    const message = await this.conversationService.addMessage({
-      sessionId,
-      direction: 'outbound',
-      senderType: 'human',
-      content: dto.content,
-      messageType: dto.messageType || 'text',
-      externalId,
-      externalStatus: sendResult.success ? 'sent' : 'failed',
-      timestamp: new Date(),
-      metadata: {
-        ...(dto.metadata && typeof dto.metadata === 'object' ? dto.metadata : {}),
-        whatsapp: {
-          sent: sendResult.success,
-          error: sendResult.success ? null : sendResult.error,
+      const externalId = sendResult.success ? sendResult.messageId : undefined;
+
+      this.logger.log(`[CHAT_SEND] message_persist_start requestId=${requestId} externalId=${externalId}`);
+      const message = await this.conversationService.addMessage({
+        sessionId,
+        direction: 'outbound',
+        senderType: 'human',
+        content: dto.content,
+        messageType: dto.messageType || 'text',
+        externalId,
+        externalStatus: sendResult.success ? 'sent' : 'failed',
+        timestamp: new Date(),
+        metadata: {
+          ...(dto.metadata && typeof dto.metadata === 'object' ? dto.metadata : {}),
+          whatsapp: {
+            sent: sendResult.success,
+            error: sendResult.success ? null : sendResult.error,
+          },
         },
-      },
-    });
+      });
+      this.logger.log(`[CHAT_SEND] message_persist_success requestId=${requestId} messageId=${message.id}`);
 
-    const config = await this.prisma.aiAgentConfig.findUnique({
-      where: { tenantId: session.tenantId },
-      select: { humanInterventionEnabled: true, humanInterventionMinutes: true },
-    });
+      this.logger.log(`[CHAT_SEND] session_update_start requestId=${requestId}`);
+      const config = await this.prisma.aiAgentConfig.findUnique({
+        where: { tenantId: session.tenantId },
+        select: { humanInterventionEnabled: true, humanInterventionMinutes: true },
+      });
 
-    const updateData: Prisma.ChatSessionUpdateInput = { lastMessageAt: new Date() };
+      const updateData: Prisma.ChatSessionUpdateInput = { 
+        lastMessageAt: new Date(),
+        state: 'handoff_human',
+        closedAt: null, // Always reopen the session
+      };
 
-    if (config?.humanInterventionEnabled) {
-      updateData.handoffActive = true;
-      updateData.handoffOperator = 'human';
-      updateData.handoffReason = 'Intervenção humana (mensagem enviada pelo atendente)';
-      updateData.handoffAt = new Date();
-      const until = new Date();
-      until.setMinutes(until.getMinutes() + (config.humanInterventionMinutes || 15));
-      updateData.handoffUntil = until;
+      if (config?.humanInterventionEnabled) {
+        updateData.handoffActive = true;
+        const minutes = config.humanInterventionMinutes || 60;
+        updateData.handoffUntil = new Date(Date.now() + minutes * 60000);
+      }
+
+      await this.prisma.chatSession.update({
+        where: { id: sessionId },
+        data: updateData,
+      });
+      this.logger.log(`[CHAT_SEND] session_update_success requestId=${requestId}`);
+
+      this.logger.log(`[CHAT_SEND] socket_emit_start requestId=${requestId}`);
+      try {
+        this.chatGateway.emitMessageCreated(session.tenantId, sessionId, message);
+        this.logger.log(`[CHAT_SEND] socket_emit_success requestId=${requestId}`);
+      } catch (wsErr: unknown) {
+        this.logger.error(`[CHAT_SEND] socket_emit_failed requestId=${requestId} error=${wsErr instanceof Error ? wsErr.message : String(wsErr)}`);
+      }
+
+      const emittedSessionId = sessionId; // Always the URL's sessionId
+      this.logger.log(`[CHAT_SEND] sessionIdFromUrl=${sessionId} persistedSessionId=${message.sessionId} emittedSessionId=${emittedSessionId}`);
+      this.logger.log(`[CHAT_SEND] complete requestId=${requestId}`);
+
+      const responseShape = message?.id ? 'raw_message' : 'wrapped_object';
+      this.logger.log(`[CHAT_SEND_RESPONSE] sessionId=${message.sessionId} messageId=${message.id} externalId=${message.externalId || ''} direction=${message.direction} senderType=${message.senderType} fromMe=${message.direction === 'outbound'} contentLength=${typeof message.content === 'string' ? message.content.length : 0} createdAt=${message.createdAt} deletedAt=${message.deletedAt || ''} status=${message.externalStatus || ''} shape=${responseShape}`);
+
+      return message;
+    } catch (error: unknown) {
+      const errName = error instanceof Error ? error.name : 'Unknown';
+      const errMsg = error instanceof Error ? error.message : String(error);
+      const errCode = error && typeof error === 'object' && 'code' in error ? String(error.code) : 'unknown';
+      this.logger.error(`[CHAT_SEND] error requestId=${requestId} tenantId=${tenantId} sessionId=${sessionId} errorName=${errName} errorMessage=${errMsg} prismaCode=${errCode}`);
+      throw error;
     }
-
-    await this.prisma.chatSession.update({
-      where: { id: sessionId },
-      data: updateData,
-    });
-
-    return message;
   }
 
   @Post('sessions/:id/read')

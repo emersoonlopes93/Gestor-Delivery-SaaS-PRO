@@ -1,4 +1,5 @@
 import { Body, Controller, ForbiddenException, Post, Req } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { Public } from '../common/decorators';
 import { WebhookSecurityService } from './webhook-security.service';
@@ -13,6 +14,7 @@ export class WebhookSecuritySmokeController {
   constructor(private readonly webhookSecurity: WebhookSecurityService) {}
 
   @Public()
+  @Throttle({ public: { limit: 60, ttl: 60 } })
   @Post('security-smoke')
   async handleSecuritySmoke(@Body() body: SmokeWebhookPayload, @Req() req: Request) {
     const enabled =

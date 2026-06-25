@@ -5,6 +5,7 @@ import type { LucideIcon } from 'lucide-react';
 import { api } from '../lib/api-client';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { useEffect } from 'react';
 
 type CustomerProfilePayload = {
   profile: { name: string; phone: string; email?: string | null; birthDate?: string | null; totalOrders: number; totalSpent: string | number };
@@ -25,14 +26,19 @@ function money(value: number) {
 
 export function CustomerProfilePage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
-  const { isLoggedIn, logout, customer } = useCustomerStore();
+  const { isLoggedIn, logout, customer, tenantSlug: customerTenantSlug, setTenantSlug } = useCustomerStore();
   const navigate = useNavigate();
   const { isSupported: pushSupported, isSubscribed, subscribeUser } = usePushNotifications();
+
+  useEffect(() => {
+    if (!tenantSlug) return;
+    setTenantSlug(tenantSlug);
+  }, [tenantSlug, setTenantSlug]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['customer-profile', tenantSlug],
     queryFn: async () => (await api.get<CustomerProfilePayload>('/public/customer-profile')).data,
-    enabled: isLoggedIn,
+    enabled: isLoggedIn && customerTenantSlug === tenantSlug,
   });
 
   const usedCouponOrders = data?.orders.filter((order) => order.couponId) ?? [];
@@ -42,7 +48,7 @@ export function CustomerProfilePage() {
     data?.coupons.filter((coupon) => coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) ?? [];
   const nextAchievement = getNextAchievement(data?.profile.totalOrders ?? 0, data?.loyalty.badges ?? []);
 
-  if (!isLoggedIn) {
+  if (!isLoggedIn || customerTenantSlug !== tenantSlug) {
     return (
       <div className="min-h-screen bg-gray-50 px-4 py-12 text-center">
         <User className="w-14 h-14 mx-auto text-gray-300" />

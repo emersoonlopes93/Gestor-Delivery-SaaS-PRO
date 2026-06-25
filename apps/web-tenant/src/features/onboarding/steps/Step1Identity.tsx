@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Store, Image as ImageIcon, Phone, ChevronDown } from 'lucide-react';
 import { api } from '../../../lib/api-client';
 import { ImagePickerModal } from '../../../components/ImagePickerModal';
+import { maskPhone, unmask } from '@gestor/utils';
 
 const STORE_CATEGORIES = [
   'Restaurante', 'Hamburgueria', 'Pizzaria', 'Padaria / Confeitaria',
@@ -93,7 +94,7 @@ export function Step1Identity({ onNext, onMarkValid }: Step1Props) {
     onNext(async () => {
       await api.patch('/tenant/settings', {
         logoUrl: form.logoUrl || undefined,
-        businessPhone: form.businessPhone.trim(),
+        businessPhone: unmask(form.businessPhone),
       });
     });
   };
@@ -194,7 +195,7 @@ export function Step1Identity({ onNext, onMarkValid }: Step1Props) {
         </label>
         <input
           type="tel"
-          value={form.businessPhone}
+          value={maskPhone(form.businessPhone)}
           onChange={e => setForm(f => ({ ...f, businessPhone: e.target.value }))}
           placeholder="(11) 99999-9999"
           className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-sm"
@@ -222,3 +223,4 @@ export function Step1Identity({ onNext, onMarkValid }: Step1Props) {
     </div>
   );
 }
+

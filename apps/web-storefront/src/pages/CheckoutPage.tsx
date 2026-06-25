@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { ArrowLeft, MapPin, User, FileText, Loader2, AlertCircle, Truck, Store, CreditCard, Banknote, QrCode } from 'lucide-react';
 import { useCartStore } from '../store/use-cart-store';
 import { api } from '../lib/api-client';
+import { useQuery } from '@tanstack/react-query';
 import { 
   CreateOrderDTO, 
   CreateOrderItemDTO, 
@@ -13,7 +14,8 @@ import {
   DeliveryAddressDTO,
   CheckoutValidationResult,
   StorefrontPayload,
-  StorefrontTenantInfo
+  StorefrontTenantInfo,
+  PublicCustomerProfileAddressDTO
 } from '@gestor/types';
 import { AddressAutocomplete } from '../components/AddressAutocomplete';
 import { StructuredAddress, fetchAddressByCep, geocodeAddress } from '../lib/maps-service';
@@ -24,6 +26,7 @@ import { CouponInput } from '../components/CouponInput';
 import { CashbackSelector } from '../components/CashbackSelector';
 import { SchedulingSelector } from '../components/SchedulingSelector';
 import { CardPayment } from '../components/CardPayment';
+import { maskPhone, maskCEP, unmask } from '@gestor/utils';
 
 interface MercadoPagoCardFormData {
   token: string;
@@ -42,9 +45,11 @@ export function CheckoutPage() {
   const subtotal = useCartStore(s => s.subtotal);
   const tableId = useCartStore(s => s.tableId);
   const clearCart = useCartStore(s => s.clearCart);
+  const setCartTenantSlug = useCartStore(s => s.setTenantSlug);
 
-  const { customer, isLoggedIn } = useCustomerStore();
+  const { customer, isLoggedIn, setTenantSlug } = useCustomerStore();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const cartTenantSlug = useCartStore(s => s.tenantSlug);
 
   // Form state
   const [customerName, setCustomerName] = useState('');
@@ -90,6 +95,20 @@ export function CheckoutPage() {
   const [discountTotal, setDiscountTotal] = useState(0);
   const [isValidating, setIsValidating] = useState(false);
   const [tenantInfo, setTenantInfo] = useState<StorefrontTenantInfo | null>(null);
+  const safeCustomerCashbackBalance = Number(customer?.cashbackBalance ?? 0);
+  const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<string | null>(null);
+
+  const { data: customerProfile } = useQuery({
+    queryKey: ['customer-profile', tenantSlug],
+    queryFn: async () => (await api.get<{ profile?: { name?: string | null; email?: string | null }; wallet?: { cashbackBalance?: number | null }; addresses?: PublicCustomerProfileAddressDTO[] }>('/public/customer-profile')).data,
+    enabled: isLoggedIn && !!tenantSlug,
+  });
+
+  useEffect(() => {
+    if (!tenantSlug) return;
+    setTenantSlug(tenantSlug);
+    setCartTenantSlug(tenantSlug);
+  }, [tenantSlug, setTenantSlug, setCartTenantSlug]);
 
   useEffect(() => {
     async function loadTenant() {
@@ -101,7 +120,7 @@ export function CheckoutPage() {
         // Auto-select first available payment method if current is not available
         const methods = (data.tenant.paymentMethods as PaymentMethod[]) || [];
         if (methods.length > 0 && !methods.includes(payment.method)) {
-          setPayment({ method: methods[0] });
+          setPayment((prev) => ({ ...prev, method: methods[0] }));
         }
       } catch (err) {
         console.error('Error loading tenant info', err);
@@ -113,11 +132,20 @@ export function CheckoutPage() {
   // Pre-fill customer data
   useEffect(() => {
     if (isLoggedIn && customer) {
-      setCustomerName(prev => prev || customer.name);
+      const displayName = customer.name && customer.name !== 'Cliente Novo' ? customer.name : '';
+      setCustomerName(prev => prev || displayName || customerProfile?.profile?.name || '');
       setCustomerPhone(prev => prev || customer.phone);
-      setCustomerEmail(prev => prev || customer?.email || '');
+      setCustomerEmail(prev => prev || customer?.email || customerProfile?.profile?.email || '');
     }
-  }, [isLoggedIn, customer]);
+  }, [isLoggedIn, customer, customerProfile]);
+
+  useEffect(() => {
+    if (!customerProfile) return;
+    if (!customerName.trim() && customerProfile.profile?.name && customerProfile.profile.name !== 'Cliente Novo') {
+      setCustomerName(customerProfile.profile.name);
+    }
+    setCustomerEmail(prev => prev || customerProfile.profile?.email || '');
+  }, [customerProfile]);
 
   // Set default fulfillment to table if tableId exists
   useEffect(() => {
@@ -202,7 +230,7 @@ export function CheckoutPage() {
         // Safe payment for validation: if cash and no/invalid change, use a large dummy value
         // to avoid validation failure on the backend while just checking delivery fees/items.
         const validationPayment = { ...payment };
-        if (payment.method === 'cash' && (!payment.changeFor || payment.changeFor < total)) {
+        if (payment.method === 'cash' && (payment.changeFor == null || payment.changeFor < total)) {
           validationPayment.changeFor = 9999; 
         }
 
@@ -243,6 +271,12 @@ export function CheckoutPage() {
   }, [debouncedAddress, fulfillmentType, items, tenantSlug, payment, appliedCoupon, usedCashback, isScheduled, scheduledFor, timeSlotId]);
 
   const total = Math.round((subtotal + deliveryFee - discountTotal) * 100) / 100;
+  const effectiveCashbackBalance = Number(customerProfile?.wallet?.cashbackBalance ?? safeCustomerCashbackBalance);
+  const savedAddresses = customerProfile?.addresses ?? [];
+  const selectedSavedAddress = savedAddresses.find((address) => address.id === selectedSavedAddressId)
+    ?? savedAddresses.find((address) => address.isDefault)
+    ?? savedAddresses[0]
+    ?? null;
 
   const handleAddressSelected = (addr: StructuredAddress) => {
     setStreet(addr.street);
@@ -257,7 +291,7 @@ export function CheckoutPage() {
 
   // CEP Autocomplete logic
   useEffect(() => {
-    const cleanCep = zipCode.replace(/\D/g, '');
+    const cleanCep = unmask(zipCode);
     if (cleanCep.length === 8) {
       const triggerCepLookup = async () => {
         setIsFetchingCep(true);
@@ -298,13 +332,52 @@ export function CheckoutPage() {
 
     if (!payment.method) return false;
     if (payment.method === 'cash') {
-      if (!payment.changeFor || payment.changeFor < total) return false;
+      if (payment.changeFor == null) return false;
+      if (payment.changeFor > 0 && payment.changeFor < total) return false;
     }
 
     if (isScheduled && !timeSlotId) return false;
 
     return true;
   }, [customerName, customerPhone, items, fulfillmentType, street, number, neighborhood, city, state, zipCode, lat, lng, payment, total, isScheduled, timeSlotId]);
+
+  useEffect(() => {
+    if (!tenantSlug) return;
+    if (cartTenantSlug && cartTenantSlug !== tenantSlug) {
+      navigate(`/${tenantSlug}`, { replace: true });
+      return;
+    }
+
+    if (items.length === 0) {
+      showEmptyCartMessageOnce();
+      navigate(`/${tenantSlug}`, { replace: true });
+    }
+  }, [items.length, tenantSlug, cartTenantSlug, navigate]);
+
+  useEffect(() => {
+    if (fulfillmentType !== 'delivery') return;
+    if (!savedAddresses.length) return;
+    if (street || number || neighborhood) return;
+    applySavedAddress(selectedSavedAddress);
+  }, [fulfillmentType, savedAddresses.length]);
+
+  function showEmptyCartMessageOnce() {
+    setSubmitError((prev) => prev ?? 'Seu carrinho está vazio. Adicione itens antes de finalizar.');
+  }
+
+  function applySavedAddress(address: PublicCustomerProfileAddressDTO | null) {
+    if (!address) return;
+    setStreet(address.street);
+    setNumber(address.number);
+    setComplement(address.complement || '');
+    setNeighborhood(address.neighborhood);
+    setCity(address.city);
+    setState(address.state);
+    setZipCode(address.zipCode);
+    setLat(address.lat ?? undefined);
+    setLng(address.lng ?? undefined);
+    setSelectedSavedAddressId(address.id);
+  }
 
   const handleCardSubmit = async (formData: MercadoPagoCardFormData) => {
     if (isSubmitting) return;
@@ -355,7 +428,7 @@ export function CheckoutPage() {
 
       const payload: CreateOrderDTO = {
         customerName: customerName.trim(),
-        customerPhone: customerPhone.trim().replace(/\D/g, ''),
+        customerPhone: unmask(customerPhone.trim()),
         customerEmail: formData.payer?.email || customerEmail.trim() || customer?.email || undefined,
         fulfillmentType,
         items: orderItems,
@@ -368,6 +441,7 @@ export function CheckoutPage() {
           issuerId: formData.issuer_id,
           installments: formData.installments,
         },
+        sourceChannel: 'direct_online',
         couponCode: appliedCoupon || undefined,
         useCashbackAmount: usedCashback || undefined,
         deliveryAddress: fulfillmentType === 'delivery' ? {
@@ -377,7 +451,7 @@ export function CheckoutPage() {
           neighborhood,
           city,
           state,
-          zipCode,
+          zipCode: unmask(zipCode),
           reference: reference || undefined,
           lat: lat ?? 0,
           lng: lng ?? 0,
@@ -461,7 +535,7 @@ export function CheckoutPage() {
 
       const payload: CreateOrderDTO = {
         customerName: customerName.trim(),
-        customerPhone: customerPhone.trim().replace(/\D/g, ''),
+        customerPhone: unmask(customerPhone.trim()),
         customerEmail: customerEmail.trim() || customer?.email || undefined,
         fulfillmentType,
         items: orderItems,
@@ -469,8 +543,9 @@ export function CheckoutPage() {
         notes: notes.trim() || undefined,
         payment: {
           ...payment,
-          changeFor: payment.method === 'cash' ? payment.changeFor || undefined : undefined,
+          changeFor: payment.method === 'cash' ? (payment.changeFor ?? undefined) : undefined,
         },
+        sourceChannel: 'direct_online',
         couponCode: appliedCoupon || undefined,
         useCashbackAmount: usedCashback || undefined,
         deliveryAddress: fulfillmentType === 'delivery' ? {
@@ -480,7 +555,7 @@ export function CheckoutPage() {
           neighborhood: neighborhood.trim(),
           city: city.trim(),
           state: state.trim(),
-          zipCode: zipCode.replace(/\D/g, ''),
+          zipCode: unmask(zipCode),
           reference: reference?.trim() || undefined,
           lat: lat ?? 0,
           lng: lng ?? 0,
@@ -538,7 +613,7 @@ export function CheckoutPage() {
             <div key={idx} className="flex justify-between text-sm">
               <span className="text-gray-600">{item.quantity}x {item.snapshot.productName}</span>
               <span className="font-medium text-gray-900">
-                {item.snapshot.lineSubtotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                {Number(item.snapshot.lineSubtotal ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
               </span>
             </div>
           ))}
@@ -588,7 +663,7 @@ export function CheckoutPage() {
           
           {customer && (
             <CashbackSelector
-              availableBalance={customer.cashbackBalance}
+              availableBalance={effectiveCashbackBalance}
               usedAmount={usedCashback}
               onUseCashback={setUsedCashback}
               onRemoveCashback={() => setUsedCashback(0)}
@@ -605,7 +680,7 @@ export function CheckoutPage() {
         <div className="space-y-3">
           <input type="text" placeholder="Seu nome completo" value={customerName} onChange={e => setCustomerName(e.target.value)}
             className="input-premium" />
-          <input type="tel" placeholder="Seu WhatsApp (apenas números)" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)}
+          <input type="tel" placeholder="Seu WhatsApp (apenas números)" value={maskPhone(customerPhone)} onChange={e => setCustomerPhone(e.target.value)}
             className="input-premium" />
           <input type="email" placeholder="Seu e-mail (opcional)" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
             className="input-premium" />
@@ -680,6 +755,36 @@ export function CheckoutPage() {
             <MapPin className="w-4 h-4" /> Endereço de Entrega
           </h2>
           
+          {savedAddresses.length > 0 && (
+            <div className="mb-4 space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-wider text-gray-400">Endereços salvos</p>
+              <div className="grid gap-2">
+                {savedAddresses.map((address) => (
+                  <button
+                    key={address.id}
+                    type="button"
+                    onClick={() => applySavedAddress(address)}
+                    className={`rounded-xl border px-3 py-2 text-left text-xs transition-colors ${selectedSavedAddressId === address.id ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 bg-white text-gray-700'}`}
+                  >
+                    <span className="font-bold">{address.label || (address.isDefault ? 'Principal' : 'Salvo')}</span>
+                    <span className="block text-[11px] text-gray-500">
+                      {address.street}, {address.number} - {address.neighborhood}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {selectedSavedAddress && (
+                <button
+                  type="button"
+                  onClick={() => applySavedAddress(selectedSavedAddress)}
+                  className="text-xs font-bold text-primary-600 underline underline-offset-2"
+                >
+                  Usar este endereço salvo
+                </button>
+              )}
+            </div>
+          )}
+          
           <AddressAutocomplete 
             onAddressSelected={handleAddressSelected}
             placeholder="Comece digitando sua rua e número..."
@@ -694,15 +799,8 @@ export function CheckoutPage() {
                   <input 
                     type="text" 
                     placeholder="00000-000" 
-                    value={zipCode} 
-                    onChange={e => {
-                      let val = e.target.value.replace(/\D/g, '');
-                      if (val.length > 8) val = val.substring(0, 8);
-                      if (val.length > 5) {
-                        val = val.substring(0, 5) + '-' + val.substring(5);
-                      }
-                      setZipCode(val);
-                    }}
+                    value={maskCEP(zipCode)} 
+                    onChange={e => setZipCode(e.target.value)}
                     className="input-premium py-2 text-xs" 
                   />
                   {isFetchingCep && (
@@ -754,35 +852,35 @@ export function CheckoutPage() {
         </h2>
         <div className="grid grid-cols-3 gap-2">
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('pix')) && (
-            <button onClick={() => setPayment({ method: PaymentMethod.pix })}
+            <button onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.pix }))}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'pix' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <QrCode className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase">PIX</span>
             </button>
           )}
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('credit_card')) && (
-            <button onClick={() => setPayment({ method: PaymentMethod.credit_card })}
+            <button onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.credit_card }))}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'credit_card' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <CreditCard className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase text-center leading-none">Crédito<br/>On-line</span>
             </button>
           )}
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('debit_card')) && (
-            <button onClick={() => setPayment({ method: PaymentMethod.debit_card })}
+            <button onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.debit_card }))}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'debit_card' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <CreditCard className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase text-center leading-none">Débito<br/>On-line</span>
             </button>
           )}
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('card_on_delivery')) && (
-            <button onClick={() => setPayment({ method: PaymentMethod.card_on_delivery })}
+            <button onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.card_on_delivery }))}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'card_on_delivery' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <CreditCard className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase tracking-tight text-center leading-none">Cartão na<br/>Entrega</span>
             </button>
           )}
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('cash')) && (
-            <button onClick={() => setPayment({ method: PaymentMethod.cash, changeFor: null })}
+            <button onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.cash, changeFor: 0 }))}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'cash' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <Banknote className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase mt-2">Dinheiro</span>
@@ -795,11 +893,11 @@ export function CheckoutPage() {
             <label className="block text-xs font-semibold text-gray-700 mb-2">Troco para quanto?</label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">R$</span>
-              <input type="number" placeholder="0,00" value={payment.changeFor || ''} 
-                onChange={e => setPayment({ ...payment, changeFor: Number(e.target.value) })}
+              <input type="number" placeholder="0,00" value={payment.changeFor ?? ''} 
+                onChange={e => setPayment(prev => ({ ...prev, changeFor: e.target.value === '' ? null : Number(e.target.value) }))}
                 className="input-premium pl-10" />
             </div>
-            {payment.changeFor !== null && payment.changeFor < total && (
+            {payment.changeFor != null && payment.changeFor > 0 && payment.changeFor < total && (
               <p className="mt-2 text-[10px] text-red-500 font-bold uppercase tracking-wider flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" /> O troco deve ser maior que o total
               </p>
@@ -808,11 +906,17 @@ export function CheckoutPage() {
         )}
 
         {payment.method === PaymentMethod.credit_card && tenantInfo?.mercadoPagoPublicKey && (
+          customerEmail.trim() ? (
           <CardPayment
             publicKey={tenantInfo.mercadoPagoPublicKey}
             amount={total}
             onSubmit={handleCardSubmit}
           />
+          ) : (
+            <div className="mt-4 p-4 rounded-2xl border border-amber-200 bg-amber-50 text-amber-800 text-sm">
+              Para pagamento com cartão, informe um e-mail válido antes de continuar.
+            </div>
+          )
         )}
       </section>
 

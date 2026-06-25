@@ -81,4 +81,59 @@ pnpm typecheck
 pnpm --filter @gestor/api test
 pnpm lint
 pnpm build
+pnpm --filter @gestor/api smoke:queues
+pnpm --filter @gestor/api smoke:database-restore
 ```
+
+## Production Release Gates
+
+Ultima evidencia Redis/BullMQ: 2026-06-10 21:11 BRT.
+
+- Redis/BullMQ no ambiente alvo: validated.
+- `smoke:queues`: `QUEUES_SMOKE_GO`.
+- `smoke:production-infra` estrito: `PRODUCTION_INFRA_SMOKE_GO`, `productionReady=true`.
+- Risco: Redis inferido como Upstash, mas plano/cota ainda nao comprovados. Se for free-tier, liberar apenas GO parcial operacional.
+
+Gates obrigatorios para promover producao controlada:
+
+- typecheck verde;
+- lint verde ou com warnings nao bloqueantes documentados;
+- testes unitarios/integracao verdes;
+- build verde;
+- `pnpm prisma:validate` verde;
+- `pnpm --filter @gestor/api prisma:generate` verde;
+- `pnpm --filter @gestor/api prisma:migrate:deploy` aplicado em staging;
+- Staging Smoke Gate verde;
+- backup recente confirmado;
+- restore testado nos ultimos 7 dias;
+- `pnpm --filter @gestor/api smoke:database-restore` com `DATABASE_RESTORE_SMOKE_GO` contra banco/branch restore isolado;
+- health staging `ok`;
+- Redis remoto ativo, pago/production-grade e separado por ambiente;
+- BullMQ ativo e conectado;
+- `pnpm --filter @gestor/api smoke:queues` com `QUEUES_SMOKE_GO`;
+- `pnpm --filter @gestor/api smoke:production-infra` em modo estrito com `PRODUCTION_INFRA_SMOKE_GO` e `productionReady=true`;
+- storage remoto/CDN configurados;
+- secrets/env hardening revisado;
+- aprovacao manual de release;
+- deploy producao;
+- health producao publico/admin `ok`;
+- smoke minimo pos-producao sem dados reais indevidos.
+
+Bloqueie o release se qualquer item abaixo acontecer:
+
+- migration falha;
+- billing smoke falha;
+- backup ou restore indisponivel;
+- backup automatico sem evidencia do provedor;
+- restore real sem teste nos ultimos 7 dias;
+- `smoke:database-restore` sem `DATABASE_RESTORE_SMOKE_GO`;
+- ausencia de PITR sem risco aceito explicitamente;
+- `WEBHOOK_SECURITY_SMOKE_ENABLED=true` em producao;
+- `ASAAS_WEBHOOK_ALLOW_LEGACY_TOKEN=true` em producao;
+- Redis/BullMQ degradado antes do go-live;
+- Redis em free-tier sem garantia/cota adequada;
+- `REDIS_ENABLED=false` ou `BULLMQ_ENABLED=false` em producao;
+- `smoke:production-infra` retornando apenas `GO parcial`;
+- `smoke:queues` retornando `QUEUES_SMOKE_NO_GO`;
+- storage local configurado em producao;
+- plano de rollback ausente.

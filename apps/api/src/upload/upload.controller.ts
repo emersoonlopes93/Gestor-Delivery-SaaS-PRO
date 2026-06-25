@@ -10,6 +10,7 @@ import {
   Delete,
   Param,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request as ExpressRequest } from 'express';
 import { memoryStorage } from 'multer';
@@ -44,6 +45,7 @@ export class UploadController {
    * Leverages the new MediaAsset architecture.
    */
   @Post('storefront-background')
+  @Throttle({ public: { limit: 20, ttl: 60 } })
   @RequirePermissions('settings.manage')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -93,6 +95,7 @@ export class UploadController {
   }
 
   @Post('image')
+  @Throttle({ public: { limit: 30, ttl: 60 } })
   @RequirePermissions('catalog.update')
   @UseInterceptors(
     FileInterceptor('file', {

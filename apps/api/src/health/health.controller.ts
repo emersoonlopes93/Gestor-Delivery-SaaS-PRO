@@ -1,116 +1,59 @@
-import { Controller, Get, Param, UseGuards, Inject } from '@nestjs/common';
-import { PrismaService } from '../database/prisma.service';
+import { Controller, Get, Param, UseGuards, HttpStatus, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { Public } from '../common/decorators';
 import { TenantHealthService } from './tenant-health.service';
+import { HealthService } from './health.service';
 import { AdminAuthGuard } from '../admin/auth/admin-auth.guard';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
 
 @Controller('health')
 export class HealthController {
   constructor(
-    private readonly prisma: PrismaService,
     private readonly tenantHealthService: TenantHealthService,
-    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+    private readonly healthService: HealthService,
   ) {}
 
+  /**
+   * GET /health
+   * Liveness Check extremamente simples. Serve apenas para atestar que o processo HTTP está ativo.
+   */
   @Public()
   @Get()
-  async check() {
-    const startedAt = Date.now();
+  checkLiveness() {
+    return { status: 'ok' };
+  }
 
-    const dbStartedAt = Date.now();
-    const dbHealthy = await this.prisma.isHealthy();
-    const dbLatencyMs = Date.now() - dbStartedAt;
-
-    const totalLatencyMs = Date.now() - startedAt;
-
-    const mem = process.memoryUsage();
-    // Redis / Cache diagnostics (do not expose secrets)
-    const redisEnvEnabled = process.env.REDIS_ENABLED !== 'false';
-    let cacheDriver: 'redis' | 'memory' = 'memory';
-    let redisConnected = false;
-    let redisLatencyMs: number | null = null;
-
-    try {
-      if (!redisEnvEnabled) {
-        cacheDriver = 'memory';
-      } else {
-        const cmObj: unknown = this.cacheManager;
-        let store: unknown = undefined;
-        if (cmObj && typeof cmObj === 'object' && 'store' in cmObj) {
-          store = (cmObj as { store?: unknown }).store;
-        }
-
-        if (store && typeof store === 'object') {
-          const s = store as { client?: unknown; getClient?: unknown };
-          const client = s.client ?? (typeof s.getClient === 'function' ? (s.getClient as () => unknown)() : undefined);
-          if (client && typeof (client as { ping?: unknown }).ping === 'function') {
-            cacheDriver = 'redis';
-            const pingStart = Date.now();
-            const pingResult = await Promise.race([
-              (client as { ping: () => Promise<unknown> }).ping(),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500)),
-            ]);
-            if (typeof pingResult === 'string') {
-              redisConnected = true;
-              redisLatencyMs = Date.now() - pingStart;
-            }
-          } else {
-            cacheDriver = 'memory';
-          }
-        } else {
-          cacheDriver = 'memory';
-        }
-      }
-    } catch {
-      cacheDriver = 'memory';
-      redisConnected = false;
+  /**
+   * GET /health/ready
+   * Readiness Check real avaliando infraestrutura de banco de dados, Redis, BullMQ e WebSockets.
+   * HTTP 200 para ok/degraded e HTTP 503 para down.
+   */
+  @Public()
+  @Get('ready')
+  async checkReadiness(@Res() res: Response) {
+    const payload = await this.healthService.getReadiness();
+    if (payload.status === 'down') {
+      return res.status(HttpStatus.SERVICE_UNAVAILABLE).json(payload);
     }
+    return res.status(HttpStatus.OK).json(payload);
+  }
 
-    // BullMQ / Campaigns flags depend on env + redis connectivity
-    const bullmqEnabled = process.env.BULLMQ_ENABLED === 'true' && redisEnvEnabled;
-    const campaignsEnabled = process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true' && redisEnvEnabled;
-    const bullmqConnected = bullmqEnabled && redisConnected;
-
+  /**
+   * GET /health/ready/websocket
+   * Diagnóstico específico dos Gateways de WebSocket ativos da API.
+   */
+  @Public()
+  @Get('ready/websocket')
+  async checkWebSocketReady() {
+    const payload = await this.healthService.getReadiness();
+    const ws = payload.details.websocket;
+    const allActive = ws.ordersGateway.active && ws.deliveryGateway.active && ws.chatGateway.active;
     return {
-      status: dbHealthy ? 'ok' : 'degraded',
-      version: '0.1.0',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      latencyMs: totalLatencyMs,
-      memory: {
-        rss: mem.rss,
-        heapTotal: mem.heapTotal,
-        heapUsed: mem.heapUsed,
-      },
-      services: {
-        database: dbHealthy ? 'ok' : 'error',
-        redis: redisConnected ? 'ok' : redisEnvEnabled ? 'degraded' : 'disabled',
-        bullmq: bullmqEnabled ? (bullmqConnected ? 'ok' : 'degraded') : 'disabled',
-        campaignsDispatch: campaignsEnabled ? (bullmqConnected ? 'ok' : 'degraded') : 'disabled',
-      },
-      checks: {
-        database: {
-          ok: dbHealthy,
-          latencyMs: dbLatencyMs,
-        },
-        redis: {
-          enabled: redisEnvEnabled,
-          connected: redisConnected,
-          latencyMs: redisLatencyMs,
-        },
-        bullmq: {
-          enabled: bullmqEnabled,
-          connected: bullmqConnected,
-        },
-        campaignsDispatch: {
-          enabled: campaignsEnabled,
-          connected: bullmqConnected,
-        },
-        cache: {
-          driver: cacheDriver,
-        },
+      status: allActive ? 'ok' : 'degraded',
+      timestamp: payload.timestamp,
+      gateways: {
+        orders: { active: ws.ordersGateway.active, connections: ws.ordersGateway.clientsCount },
+        delivery: { active: ws.deliveryGateway.active, connections: ws.deliveryGateway.clientsCount },
+        chat: { active: ws.chatGateway.active, connections: ws.chatGateway.clientsCount },
       },
     };
   }

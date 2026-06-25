@@ -10,9 +10,24 @@ export class AdminHealthService {
   async getSystemHealth() {
     const dbStartedAt = Date.now();
     const databaseOk = await this.prisma.isHealthy();
+    const redisEnabled = process.env.REDIS_ENABLED !== 'false';
+    const redisHost = process.env.REDIS_HOST;
+    const redisConfigured = Boolean(redisHost && redisHost !== 'localhost' && redisHost !== '127.0.0.1');
+    const bullmqEnabled = process.env.BULLMQ_ENABLED === 'true';
+    const campaignsDispatchEnabled = process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true';
+    const readinessReasons = [
+      !databaseOk ? 'Database health check failed' : null,
+      !redisEnabled ? 'REDIS_ENABLED=false' : null,
+      redisEnabled && !redisHost ? 'REDIS_HOST missing' : null,
+      redisEnabled && redisHost && !redisConfigured ? 'REDIS_HOST points to localhost' : null,
+      !bullmqEnabled ? 'BULLMQ_ENABLED=false' : null,
+      process.env.NODE_ENV === 'production' && !redisEnabled ? 'Production requires REDIS_ENABLED=true' : null,
+      process.env.NODE_ENV === 'production' && !bullmqEnabled ? 'Production requires BULLMQ_ENABLED=true' : null,
+    ].filter((reason): reason is string => Boolean(reason));
+    const productionReady = databaseOk && redisEnabled && redisConfigured && bullmqEnabled && readinessReasons.length === 0;
 
     return {
-      status: databaseOk ? 'ok' : 'degraded',
+      status: productionReady ? 'ok' : 'degraded',
       checkedAt: new Date().toISOString(),
       services: {
         database: {
@@ -20,22 +35,50 @@ export class AdminHealthService {
           latencyMs: Date.now() - dbStartedAt,
         },
         redis: {
-          enabled: process.env.REDIS_ENABLED !== 'false',
-          configured: Boolean(process.env.REDIS_HOST && process.env.REDIS_HOST !== 'localhost'),
+          enabled: redisEnabled,
+          configured: redisConfigured,
+          connected: null,
+          lastError: redisEnabled && !redisConfigured ? 'Redis is enabled but not production configured' : null,
         },
         bullmq: {
-          enabled: process.env.BULLMQ_ENABLED === 'true',
+          enabled: bullmqEnabled,
+          connected: null,
+          productionReady: bullmqEnabled && redisConfigured,
+          reason: bullmqEnabled ? null : 'BULLMQ_ENABLED=false',
         },
         campaignsDispatch: {
-          enabled: process.env.CAMPAIGNS_DISPATCH_ENABLED === 'true',
+          enabled: campaignsDispatchEnabled,
         },
       },
       productionReadiness: {
+        productionReady,
+        reasons: readinessReasons,
         nodeEnv: process.env.NODE_ENV ?? 'development',
         storageDriver: process.env.MEDIA_STORAGE_PROVIDER || process.env.MEDIA_STORAGE_DRIVER || process.env.STORAGE_DRIVER || 'local',
         billingPaymentsEnabled: process.env.BILLING_PAYMENTS_ENABLED === 'true',
         billingGatewayProvider: process.env.BILLING_GATEWAY_PROVIDER ?? 'manual',
         billingGatewayMode: process.env.BILLING_GATEWAY_MODE ?? 'disabled',
+        redis: {
+          configured: redisConfigured,
+          enabled: redisEnabled,
+          hostClass: redisConfigured ? 'remote' : redisHost ? 'local_or_invalid' : 'missing',
+        },
+        bullmq: {
+          enabled: bullmqEnabled,
+          productionReady: bullmqEnabled && redisConfigured,
+        },
+        queues: [
+          {
+            name: 'campaign-dispatch',
+            critical: false,
+            status: campaignsDispatchEnabled ? (bullmqEnabled && redisConfigured ? 'configured' : 'blocked') : 'disabled',
+            waiting: null,
+            active: null,
+            failed: null,
+            delayed: null,
+            lastError: campaignsDispatchEnabled && (!bullmqEnabled || !redisConfigured) ? 'Queue cannot run without BullMQ and production Redis' : null,
+          },
+        ],
       },
     };
   }

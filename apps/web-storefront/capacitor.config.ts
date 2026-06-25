@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'br.com.gestordelivery.storefront',
-  appName: 'Gestor Delivery',
+  appName: 'PedeHub',
   webDir: 'dist',
   bundledWebRuntime: false,
   server: {

@@ -9,6 +9,7 @@ import {
 import { PrismaService } from '../database/prisma.service';
 import { BillingUsagePreview, BillingUsageService } from './billing-usage.service';
 import { DraftInvoiceItemPreview, InvoiceService } from './invoice.service';
+import { BillingAddonService } from './billing-addon.service';
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -51,6 +52,7 @@ export class BillingCycleService {
     private readonly prisma: PrismaService,
     private readonly billingUsageService: BillingUsageService,
     private readonly invoiceService: InvoiceService,
+    private readonly billingAddonService: BillingAddonService,
   ) {}
 
   async getOrCreateCurrentCycle(input: {
@@ -115,10 +117,11 @@ export class BillingCycleService {
 
     const selectedTier = usage.rating?.selectedTier ?? null;
     const baseAmount = usage.rating?.currentMonthlyPrice ?? ZERO;
-    const addonsAmount = ZERO;
+    const addonsAmount = await this.billingAddonService.calculateActiveAddonsAmount(input.tenantId);
     const totalAmount = baseAmount.plus(addonsAmount);
     const currency = usage.rating?.currency ?? cycle.currency;
     const invoiceItems = await this.invoiceService.buildDraftInvoiceItemsPreview({
+      tenantId: input.tenantId,
       planId,
       periodStart: cycle.startedAt,
       periodEnd,

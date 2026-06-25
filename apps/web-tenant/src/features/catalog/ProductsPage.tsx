@@ -4,7 +4,7 @@ import { Product, ProductCategory, CreateProductDto } from '@gestor/types';
 import { RecipeModal } from '../inventory/RecipeModal';
 import { Modal } from '../../components/Modal';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, PauseCircle, Pencil, Trash2, FileText, Search, ChevronDown, Copy, Plus } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, PauseCircle, Pencil, Trash2, FileText, Search, ChevronDown, Copy, Plus, ChefHat, X } from 'lucide-react';
 
 
 
@@ -54,6 +54,35 @@ export function ProductsPage() {
   const tableScrollRef = React.useRef<HTMLDivElement | null>(null);
   const [tableScrollTop, setTableScrollTop] = useState(0);
   const [savingMap, setSavingMap] = useState<Record<string, boolean>>({});
+  
+  const [showSuccessBanner, setShowSuccessBanner] = useState(false);
+  const [bannerStats, setBannerStats] = useState({ categories: 0, products: 0, skipped: 0 });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const source = params.get('source');
+    if (source === 'base-menu') {
+      setShowSuccessBanner(true);
+      setBannerStats({
+        categories: parseInt(params.get('categories') || '0', 10),
+        products: parseInt(params.get('products') || '0', 10),
+        skipped: parseInt(params.get('skipped') || '0', 10),
+      });
+    }
+  }, [location.search]);
+
+  const isRecentlyImported = useCallback((product: Product) => {
+    if (!product.createdAt) return false;
+    const createdTime = new Date(product.createdAt).getTime();
+    const now = Date.now();
+    // 5 minutos = 300000ms
+    return now - createdTime < 300000;
+  }, []);
+
+  const handleCloseBanner = () => {
+    setShowSuccessBanner(false);
+    navigate(location.pathname, { replace: true });
+  };
   
 
   const loadData = useCallback(async () => {
@@ -263,6 +292,11 @@ export function ProductsPage() {
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${BUSINESS_STATUS_BADGE[businessStatus]}`}>
                     {BUSINESS_STATUS_LABEL[businessStatus]}
                   </span>
+                  {isRecentlyImported(product) && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                      Importado
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -376,6 +410,11 @@ export function ProductsPage() {
                   <span className={`px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest border ${BUSINESS_STATUS_BADGE[businessStatus]}`}>
                     {BUSINESS_STATUS_LABEL[businessStatus]}
                   </span>
+                  {isRecentlyImported(product) && (
+                    <span className="px-1.5 py-0.5 rounded-full text-[8px] md:text-[9px] font-black uppercase tracking-widest border bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                      Importado
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -497,6 +536,41 @@ export function ProductsPage() {
 
   return (
     <div className="p-3 md:p-6 max-w-7xl mx-auto text-left">
+      {/* Banner de Sucesso */}
+      {showSuccessBanner && (
+        <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 flex items-start justify-between gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="flex items-start gap-3 text-left">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="font-bold text-sm text-emerald-900 dark:text-emerald-200">
+                Cardápio pronto importado com sucesso! 🎉
+              </h4>
+              <p className="text-xs mt-1 text-emerald-800/90 dark:text-emerald-400 font-medium">
+                Foram criados <span className="font-bold">{bannerStats.categories}</span> categorias e <span className="font-bold">{bannerStats.products}</span> produtos.
+                {bannerStats.skipped > 0 && (
+                  <> Adicionalmente, <span className="font-bold">{bannerStats.skipped}</span> itens existentes foram pulados.</>
+                )}
+                {" "}Revise preços, imagens e disponibilidade antes de começar a vender.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={handleCloseBanner}
+                  className="text-[11px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300 hover:underline"
+                >
+                  Revisar produtos
+                </button>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={handleCloseBanner}
+            className="p-1 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="page-header mb-5 md:mb-6">
         <div>
@@ -505,15 +579,6 @@ export function ProductsPage() {
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto">
-          <button
-            onClick={() => navigate('/catalog/simulation')}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 h-10 px-4 text-xs font-black uppercase tracking-wider rounded-2xl border border-border bg-card text-foreground hover:bg-muted transition-colors shadow-sm"
-            type="button"
-          >
-            <Search size={14} className="hidden sm:block" />
-            <span>Simulador</span>
-          </button>
-
           <button
             onClick={() => navigate('/catalog/products/new/v2')}
             className="flex-1 md:flex-none flex items-center justify-center gap-2 h-10 px-4 text-xs font-black uppercase tracking-wider rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
@@ -525,109 +590,124 @@ export function ProductsPage() {
         </div>
       </div>
 
-      {/* Barra de Busca e Filtros */}
-      <div className="toolbar-bar mb-6 p-3 md:p-4">
-        <div className="flex flex-col gap-3 md:gap-4">
-          {/* Linha 1: Busca e ViewMode */}
-          <div className="flex flex-col md:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="input-premium pl-10 h-10 md:h-11"
-                placeholder="Buscar produtos..."
-                type="text"
-              />
-            </div>
-
-            <div className="flex items-center p-1 rounded-xl w-full md:w-auto shrink-0 bg-muted border border-border">
-              <button
-                onClick={() => setViewMode('all')}
-                className={`flex-1 md:flex-none md:px-6 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
-                  viewMode === 'all'
-                    ? 'bg-card text-foreground shadow-sm ring-1 ring-inset ring-border'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
-                type="button"
-              >
-                Lista
-              </button>
-              <button
-                onClick={() => setViewMode('grouped')}
-                className={`flex-1 md:flex-none md:px-6 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
-                  viewMode === 'grouped'
-                    ? 'bg-card text-foreground shadow-sm ring-1 ring-inset ring-border'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
-                type="button"
-              >
-                Categorias
-              </button>
-            </div>
-          </div>
-
-          {/* Linha 2: Filtros de Tipo, Status e Categoria */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 -mx-3 px-3 sm:mx-0 sm:px-0">
-              {[
-                { id: 'all', label: 'Todos' },
-                { id: 'simple', label: 'Individuais' },
-                { id: 'configurable', label: 'Personalizados' },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setTypeFilter(t.id as ProductTypeFilter)}
-                  className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all ${
-                    typeFilter === t.id
-                      ? 'bg-primary text-primary-foreground border border-primary shadow-sm'
-                      : 'bg-card border border-border text-foreground hover:bg-muted'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            <div
-              className="h-5 w-px hidden lg:block"
-              style={{ background: 'var(--border-default)' }}
-            />
-
-            <div className="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto no-scrollbar pb-1">
-              <select
-                value={selectedCategoryId ?? ''}
-                onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : null)}
-                className="h-8 pl-2 pr-6 bg-card text-foreground border border-input text-[10px] font-black uppercase tracking-widest focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-inset hover:bg-muted rounded-lg cursor-pointer transition-all"
-              >
-                <option value="">Categorias</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-                <option value="__uncategorized__">Sem categoria</option>
-              </select>
-
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as ProductStatusFilter)}
-                className="h-8 pl-2 pr-6 bg-card text-foreground border border-input text-[10px] font-black uppercase tracking-widest focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-inset hover:bg-muted rounded-lg cursor-pointer transition-all"
-              >
-                <option value="all">Status</option>
-                <option value="active">Ativos</option>
-                <option value="paused">Pausados</option>
-                <option value="sold_out">Esgotados</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
+      ) : products.length === 0 ? (
+        <div className="max-w-md mx-auto my-12 text-center py-10 px-6 card-premium border border-border bg-card shadow-lg flex flex-col items-center gap-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/25">
+            <ChefHat className="w-8 h-8 text-white" />
+          </div>
+          <div>
+            <h2 className="text-lg font-black text-foreground uppercase tracking-tight mb-2">
+              Seu catálogo está vazio
+            </h2>
+            <p className="text-sm text-muted-foreground font-medium">
+              Você ainda não tem produtos cadastrados. Comece mais rápido importando um cardápio pronto ou adicione manualmente.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 w-full mt-2">
+            <button
+              onClick={() => navigate('/settings/menu-import')}
+              className="flex-1 py-3 px-4 text-xs font-black uppercase tracking-wider bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl transition-all shadow-md shadow-indigo-500/25 flex items-center justify-center gap-2"
+              type="button"
+            >
+              <ChefHat className="w-4 h-4" />
+              <span>Importar Cardápio Pronto</span>
+            </button>
+            <button
+              onClick={() => navigate('/catalog/products/new/v2')}
+              className="flex-1 py-3 px-4 text-xs font-black uppercase tracking-wider bg-card hover:bg-muted text-foreground border border-border rounded-xl transition-all flex items-center justify-center gap-2"
+              type="button"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Cadastrar Manualmente</span>
+            </button>
+          </div>
+        </div>
       ) : (
         <>
+          {/* Barra de Busca e Filtros */}
+          <div className="toolbar-bar mb-6 p-3 md:p-4">
+            <div className="flex flex-col gap-3 md:gap-4">
+              {/* Linha 1: Busca e ViewMode */}
+              <div className="flex flex-col md:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="input-premium pl-10 h-10 md:h-11"
+                    placeholder="Buscar produtos..."
+                    type="text"
+                  />
+                </div>
+
+                <div className="flex items-center p-1 rounded-xl w-full md:w-auto shrink-0 bg-muted border border-border">
+                  <button
+                    onClick={() => setViewMode('all')}
+                    className={`flex-1 md:flex-none md:px-6 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                      viewMode === 'all'
+                        ? 'bg-card text-foreground shadow-sm ring-1 ring-inset ring-border'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    }`}
+                    type="button"
+                  >
+                    Lista
+                  </button>
+                  <button
+                    onClick={() => setViewMode('grouped')}
+                    className={`flex-1 md:flex-none md:px-6 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${
+                      viewMode === 'grouped'
+                        ? 'bg-card text-foreground shadow-sm ring-1 ring-inset ring-border'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                    }`}
+                    type="button"
+                  >
+                    Categorias
+                  </button>
+                </div>
+              </div>
+
+              {/* Linha 2: Filtros de Tipo, Status e Categoria */}
+              <div className="grid grid-cols-2 md:flex md:flex-wrap items-center gap-2">
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value as ProductTypeFilter)}
+                  className="h-8 pl-2 pr-6 bg-card text-foreground border border-input text-[10px] font-black uppercase tracking-widest focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-inset hover:bg-muted rounded-lg cursor-pointer transition-all"
+                >
+                  <option value="all">Tipos</option>
+                  <option value="simple">Individuais</option>
+                  <option value="configurable">Personalizados</option>
+                </select>
+
+                <select
+                  value={selectedCategoryId ?? ''}
+                  onChange={(e) => setCategoryFilter(e.target.value ? e.target.value : null)}
+                  className="h-8 pl-2 pr-6 bg-card text-foreground border border-input text-[10px] font-black uppercase tracking-widest focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-inset hover:bg-muted rounded-lg cursor-pointer transition-all"
+                >
+                  <option value="">Categorias</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                  <option value="__uncategorized__">Sem categoria</option>
+                </select>
+
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as ProductStatusFilter)}
+                  className="h-8 pl-2 pr-6 bg-card text-foreground border border-input text-[10px] font-black uppercase tracking-widest focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-inset hover:bg-muted rounded-lg cursor-pointer transition-all col-span-2 md:col-span-1"
+                >
+                  <option value="all">Status</option>
+                  <option value="active">Ativos</option>
+                  <option value="paused">Pausados</option>
+                  <option value="sold_out">Esgotados</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           {viewMode === 'all' ? (
             <>
               <div className="space-y-3 md:hidden">
@@ -640,7 +720,6 @@ export function ProductsPage() {
                   </div>
                 ) : null}
               </div>
-
 
               <div className="card-premium hidden md:block overflow-hidden bg-card border border-border">
                 <div ref={tableScrollRef} className="max-h-[70vh] overflow-auto custom-scrollbar">
@@ -747,7 +826,6 @@ export function ProductsPage() {
               )}
             </div>
           )}
-
         </>
       )}
 

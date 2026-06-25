@@ -35,7 +35,7 @@ export class MenuImportController {
    */
   @Get('templates')
   @RequirePermissions('catalog.read')
-  listTemplates() {
+  async listTemplates() {
     return this.menuImportService.listTemplates();
   }
 
@@ -56,8 +56,8 @@ export class MenuImportController {
    */
   @Get('templates/:id')
   @RequirePermissions('catalog.read')
-  getTemplate(@Param('id') id: string) {
-    const template = this.menuImportService.getTemplate(id);
+  async getTemplate(@Param('id') id: string) {
+    const template = await this.menuImportService.getTemplate(id);
     if (!template) {
       throw new NotFoundException(`Template "${id}" não encontrado.`);
     }
@@ -77,6 +77,10 @@ export class MenuImportController {
     const options: MenuImportOptions = {
       skipExisting: dto.skipExisting ?? true,
     };
-    return this.menuImportService.importTemplate(dto.templateId, options);
+    const result = await this.menuImportService.importTemplate(dto.templateId, options);
+    return {
+      success: true,
+      data: result,
+    };
   }
 }

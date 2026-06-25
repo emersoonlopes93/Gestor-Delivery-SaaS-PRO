@@ -5,10 +5,12 @@ import { CustomerAuthGuard } from '../auth/guards/customer-auth.guard';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { LoyaltyService } from './loyalty.service';
 
 @Controller('loyalty')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
+@RequiresFeature('crm')
 export class LoyaltyController {
   constructor(private readonly loyaltyService: LoyaltyService) {}
 
@@ -26,6 +28,16 @@ export class LoyaltyController {
     @Body() body: { points: number; description?: string },
   ) {
     return this.loyaltyService.redeem(req.user.tenantId, customerId, body.points, body.description);
+  }
+
+  @Post('customer/:customerId/add')
+  @RequirePermissions('crm.manage_loyalty_cashback')
+  add(
+    @Request() req: { user: { tenantId: string } },
+    @Param('customerId') customerId: string,
+    @Body() body: { points: number; description?: string },
+  ) {
+    return this.loyaltyService.add(req.user.tenantId, customerId, body.points, body.description);
   }
 }
 

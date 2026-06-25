@@ -71,6 +71,14 @@ export class MetaCloudProvider implements IWhatsAppProvider {
     // No-op para Meta Cloud
   }
 
+  async deleteInstance(
+    _apiUrl: string,
+    _apiKey: string,
+    _instanceId: string,
+  ): Promise<void> {
+    // No-op para Meta Cloud
+  }
+
   async getConnectionStatus(
     apiUrl: string,
     apiKey: string,
@@ -243,6 +251,22 @@ export class MetaCloudProvider implements IWhatsAppProvider {
     }
   }
 
+  async publishWhatsAppStatus(
+    _apiUrl: string,
+    _apiKey: string,
+    _instanceId: string,
+    _input: {
+      text?: string;
+      mediaUrl?: string;
+      mediaType?: string;
+      caption?: string;
+    },
+  ): Promise<WhatsAppSendResult> {
+    // Meta Cloud API não suporta envio direto para "Status" da mesma forma que o WhatsApp Business App/Web via Evolution Go.
+    return { success: false, error: 'Meta Cloud does not support Status updates' };
+  }
+
+
   async sendPresence(
     _apiUrl: string,
     _apiKey: string,
@@ -276,6 +300,16 @@ export class MetaCloudProvider implements IWhatsAppProvider {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`markAsRead failed: ${message}`);
     }
+  }
+
+  async getProfilePictureUrl(
+    _apiUrl: string,
+    _apiKey: string,
+    _instanceId: string,
+    _phone: string,
+  ): Promise<string | null> {
+    // Não suportado ou não implementado nativamente pelo Meta Cloud Provider da mesma forma
+    return null;
   }
 
   parseWebhook(_payload: unknown, _tenantId: string): WhatsAppWebhookEvent | null {

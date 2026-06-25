@@ -57,7 +57,7 @@ export interface IAiProvider {
   /**
    * Identifica o tipo do provider
    */
-  readonly providerType: 'openai' | 'anthropic' | 'google_ai';
+  readonly providerType: 'openai' | 'anthropic' | 'google_ai' | 'openrouter';
 
   /**
    * Envia mensagens para o LLM e recebe resposta

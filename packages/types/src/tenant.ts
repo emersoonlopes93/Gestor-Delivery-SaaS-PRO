@@ -11,9 +11,59 @@ export interface Tenant {
   name: string;
   slug: string;
   status: TenantStatus;
+  businessGroupId?: string | null;
+  businessGroupRole?: BusinessGroupRole | null;
   settings?: TenantSettings;
+  businessGroup?: BusinessGroupContext | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export type BusinessGroupRole = 'headquarters' | 'branch';
+
+export interface BusinessGroupTenantSummary {
+  id: string;
+  name: string;
+  slug: string;
+  status: TenantStatus;
+  businessGroupRole?: BusinessGroupRole | null;
+}
+
+export interface BusinessGroupContext {
+  id: string;
+  name: string;
+  ownerId?: string | null;
+  headquartersTenantId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  tenants?: BusinessGroupTenantSummary[];
+  _count?: {
+    tenants: number;
+  };
+}
+
+export interface TenantNetworkStoreSummary {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+  isHeadquarters: boolean;
+  city?: string | null;
+  state?: string | null;
+}
+
+export interface TenantNetworkContext {
+  groupId: string | null;
+  groupName: string;
+  role: BusinessGroupRole;
+  ownerEmail: string;
+  currentTenantId: string;
+  stores: TenantNetworkStoreSummary[];
+}
+
+export interface CreateBranchRequest {
+  name: string;
+  slug?: string;
 }
 
 export interface TenantSettings {
@@ -23,6 +73,7 @@ export interface TenantSettings {
   currency: string;
   language: string;
   businessPhone?: string;
+  orderWhatsappNumber?: string;
   businessEmail?: string;
   address?: string; // Legacy/Plain text
 
@@ -41,6 +92,7 @@ export interface TenantSettings {
 
   // Payment Methods
   paymentMethods?: string[];
+  minimumOrderValue?: number | null;
 
   // Financial / Pix
   pixKey?: string;
@@ -58,7 +110,6 @@ export interface TenantSettings {
   taxRegime?: string;
   standardCfop?: string;
   standardNcm?: string;
-
   businessGroupId?: string | null;
 
   isStorePaused: boolean;
@@ -72,6 +123,11 @@ export interface TenantSettings {
   readySound?: string;
   notificationVolume?: number;
   browserNotificationsEnabled?: boolean;
+  loyaltyEnabled?: boolean;
+  loyaltyPointsPerReal?: number;
+  cashbackEnabled?: boolean;
+  cashbackPercent?: number;
+  cashbackValidityDays?: number;
   createdAt: string;
   updatedAt: string;
 }

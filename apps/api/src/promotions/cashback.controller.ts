@@ -3,10 +3,12 @@ import { CashbackService } from './cashback.service';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { CashbackTransactionType } from '@prisma/client';
 
 @Controller(['promotions/cashback', 'cashback'])
 @UseGuards(TenantAuthGuard, PermissionsGuard)
+@RequiresFeature('crm')
 export class CashbackController {
   constructor(private readonly cashbackService: CashbackService) {}
 

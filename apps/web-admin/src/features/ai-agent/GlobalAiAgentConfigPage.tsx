@@ -69,6 +69,7 @@ interface GlobalAiConfig {
   googleAiModel?: string;
   openaiModel?: string;
   anthropicModel?: string;
+  openrouterModel?: string;
   fallbackAiProvider?: string | null;
   fallbackAiModel?: string | null;
 }
@@ -270,7 +271,8 @@ export function GlobalAiAgentConfigPage() {
     const model = isFallback ? config?.fallbackAiModel : (
       config?.defaultAiProvider === 'google_ai' ? config.googleAiModel :
       config?.defaultAiProvider === 'openai' ? config.openaiModel :
-      config?.defaultAiProvider === 'anthropic' ? config.anthropicModel : undefined
+      config?.defaultAiProvider === 'anthropic' ? config.anthropicModel :
+      config?.defaultAiProvider === 'openrouter' ? config.openrouterModel : undefined
     );
 
     if (!provider) return;
@@ -383,6 +385,7 @@ export function GlobalAiAgentConfigPage() {
         googleAiModel: config.googleAiModel,
         openaiModel: config.openaiModel,
         anthropicModel: config.anthropicModel,
+        openrouterModel: config.openrouterModel,
         fallbackAiProvider: config.fallbackAiProvider,
         fallbackAiModel: config.fallbackAiModel,
         aiSessionTimeoutMin: config.aiSessionTimeoutMin,
@@ -572,6 +575,7 @@ export function GlobalAiAgentConfigPage() {
                   <option value="openai">OpenAI (GPT)</option>
                   <option value="anthropic">Anthropic (Claude)</option>
                   <option value="google_ai">Google AI (Gemini)</option>
+                  <option value="openrouter">OpenRouter</option>
                 </select>
               </Field>
 
@@ -659,6 +663,18 @@ export function GlobalAiAgentConfigPage() {
                 </Field>
               )}
 
+              {config.defaultAiProvider === 'openrouter' && (
+                <Field label="Modelo OpenRouter">
+                  <input 
+                    type="text"
+                    value={config.openrouterModel || ''} 
+                    placeholder="ex: anthropic/claude-3.5-sonnet"
+                    onChange={(e) => updateConfig('openrouterModel', e.target.value)}
+                    className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  />
+                </Field>
+              )}
+
               <div className="pt-2 flex flex-col gap-2">
                 <button
                   type="button"
@@ -704,6 +720,7 @@ export function GlobalAiAgentConfigPage() {
                   <option value="openai">OpenAI (GPT)</option>
                   <option value="anthropic">Anthropic (Claude)</option>
                   <option value="google_ai">Google AI (Gemini)</option>
+                  <option value="openrouter">OpenRouter</option>
                 </select>
               </Field>
 
@@ -749,6 +766,18 @@ export function GlobalAiAgentConfigPage() {
                   >
                     {ANTHROPIC_MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                   </select>
+                </Field>
+              )}
+
+              {config.fallbackAiProvider === 'openrouter' && (
+                <Field label="Modelo de Fallback (OpenRouter)">
+                  <input 
+                    type="text"
+                    value={config.fallbackAiModel || ''} 
+                    placeholder="ex: anthropic/claude-3.5-sonnet"
+                    onChange={(e) => updateConfig('fallbackAiModel', e.target.value)}
+                    className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  />
                 </Field>
               )}
 

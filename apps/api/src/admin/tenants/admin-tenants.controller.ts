@@ -1,9 +1,10 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { AdminTenantsService } from './admin-tenants.service';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
 import { AdminPermissionsGuard } from '../rbac/admin-permissions.guard';
 import { RequireAdminPermissions, CurrentUser } from '../../common/decorators';
 import { TenantAuthService } from '../../auth/tenant-auth.service';
+import { BillingEntitlementsService, TenantFeatureKey } from '../../billing/billing-entitlements.service';
 
 @Controller('admin/tenants')
 @UseGuards(AdminAuthGuard, AdminPermissionsGuard)
@@ -11,7 +12,10 @@ export class AdminTenantsController {
   constructor(
     private readonly tenantsService: AdminTenantsService,
     private readonly tenantAuthService: TenantAuthService,
+    private readonly billingEntitlementsService: BillingEntitlementsService,
   ) {}
+
+
 
   @Get()
   @RequireAdminPermissions('saas.tenants.read')
@@ -20,6 +24,21 @@ export class AdminTenantsController {
     @Query('pageSize') pageSize?: number,
   ) {
     return this.tenantsService.findAll(page || 1, pageSize || 20);
+  }
+
+  @Get('health')
+  @RequireAdminPermissions('saas.tenants.read')
+  async getHealthOverview(
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('search') search?: string,
+    @Query('operationalStatus') operationalStatus?: string,
+    @Query('billingStatus') billingStatus?: string,
+    @Query('whatsappStatus') whatsappStatus?: string,
+  ) {
+    const p = page ? parseInt(page, 10) : 1;
+    const size = pageSize ? parseInt(pageSize, 10) : 20;
+    return this.tenantsService.getHealthOverview(p, size, search, operationalStatus, billingStatus, whatsappStatus);
   }
 
   @Get(':id')
@@ -40,10 +59,10 @@ export class AdminTenantsController {
   @RequireAdminPermissions('saas.tenants.update')
   async updateStatus(
     @Param('id') id: string,
-    @Body() body: { status: 'active' | 'inactive' | 'suspended' | 'trial' },
-    @CurrentUser('id') adminId: string,
+    @Body() body: { status: 'active' | 'inactive' | 'suspended' | 'trial'; reason?: string },
+    @CurrentUser('sub') adminId: string,
   ) {
-    return this.tenantsService.updateStatus(id, body.status, adminId);
+    return this.tenantsService.updateStatus(id, body.status, adminId, body.reason);
   }
 
   @Put(':id')
@@ -63,12 +82,76 @@ export class AdminTenantsController {
   ) {
     return this.tenantsService.createBillingV2Subscription(id, body.billingPlanId);
   }
+
+  @Get(':id/entitlements')
+  @RequireAdminPermissions('saas.tenants.read')
+  async getTenantEntitlements(@Param('id') id: string) {
+    return this.billingEntitlementsService.resolveTenantEntitlements(id);
+  }
+
+  @Put(':id/entitlements/:featureKey')
+  @RequireAdminPermissions('saas.tenants.update')
+  async upsertTenantEntitlementOverride(
+    @Param('id') id: string,
+    @Param('featureKey') featureKey: string,
+    @Body() body: { enabled?: boolean; reason?: string; expiresAt?: string | null },
+    @CurrentUser('sub') adminId: string,
+  ) {
+    const parsedKey = this.requireFeatureKey(featureKey);
+    const enabled = typeof body.enabled === 'boolean' ? body.enabled : null;
+    if (enabled === null) {
+      throw new BadRequestException('enabled e obrigatorio.');
+    }
+    const reason = body.reason?.trim();
+    if (!reason) {
+      throw new BadRequestException('reason e obrigatorio.');
+    }
+    const expiresAt = body.expiresAt?.trim() ? new Date(body.expiresAt) : null;
+    if (body.expiresAt?.trim() && Number.isNaN(expiresAt.getTime())) {
+      throw new BadRequestException('expiresAt invalido.');
+    }
+
+    await this.billingEntitlementsService.upsertTenantFeatureOverride({
+      tenantId: id,
+      featureKey: parsedKey,
+      enabled,
+      reason,
+      expiresAt,
+      adminId,
+    });
+
+    return this.billingEntitlementsService.resolveTenantEntitlements(id);
+  }
+
+  @Delete(':id/entitlements/:featureKey')
+  @RequireAdminPermissions('saas.tenants.update')
+  async deleteTenantEntitlementOverride(
+    @Param('id') id: string,
+    @Param('featureKey') featureKey: string,
+    @Body() body: { reason?: string },
+    @CurrentUser('sub') adminId: string,
+  ) {
+    const parsedKey = this.requireFeatureKey(featureKey);
+    const reason = body.reason?.trim();
+    if (!reason) {
+      throw new BadRequestException('reason e obrigatorio.');
+    }
+
+    await this.billingEntitlementsService.deleteTenantFeatureOverride({
+      tenantId: id,
+      featureKey: parsedKey,
+      reason,
+      adminId,
+    });
+
+    return this.billingEntitlementsService.resolveTenantEntitlements(id);
+  }
   
   @Post(':id/impersonate')
   @RequireAdminPermissions('saas.support.impersonate')
   async impersonate(
     @Param('id') id: string,
-    @CurrentUser('id') adminId: string,
+    @CurrentUser('sub') adminId: string,
     @Body() body: { reason?: string },
   ) {
     const reason = body.reason?.trim();
@@ -76,5 +159,21 @@ export class AdminTenantsController {
       throw new BadRequestException('Motivo da impersonation e obrigatorio.');
     }
     return this.tenantAuthService.impersonate(id, adminId, reason);
+  }
+
+  private requireFeatureKey(featureKey: string): TenantFeatureKey {
+    const normalized = featureKey.trim() as TenantFeatureKey;
+    const allowed: TenantFeatureKey[] = [
+      'ai_agent',
+      'campaigns',
+      'ifood_integration',
+      'advanced_reports',
+      'custom_domain',
+      'priority_support',
+    ];
+    if (!allowed.includes(normalized)) {
+      throw new BadRequestException('featureKey invalida.');
+    }
+    return normalized;
   }
 }

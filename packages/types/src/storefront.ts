@@ -11,6 +11,7 @@ export interface StorefrontTenantInfo {
   primaryColor?: string | null;
   paymentMethods?: string[];
   mercadoPagoPublicKey?: string | null;
+  whatsappNumber?: string | null;
   address?: {
     street: string;
     number: string;
@@ -20,6 +21,18 @@ export interface StorefrontTenantInfo {
     zipCode: string;
     lat?: number;
     lng?: number;
+  };
+  minimumOrderValue?: number | null;
+  cashback?: {
+    enabled: boolean;
+    percent: number;
+  };
+  loyalty?: {
+    enabled: boolean;
+    pointsPerReal: number;
+  };
+  scheduling?: {
+    enabled: boolean;
   };
 }
 
@@ -88,6 +101,13 @@ export interface StorefrontComplementGroupLinkPayload {
   order: number;
 }
 
+export interface ProductBadge {
+  id: string;
+  label: string;
+  variant: 'success' | 'danger' | 'warning' | 'info' | 'neutral';
+  priority: number;
+}
+
 export interface StorefrontProductPayload {
   id: string;
   name: string;
@@ -112,6 +132,9 @@ export interface StorefrontProductPayload {
     upsell: StorefrontUpsellPayload;
   }>;
   upsells?: StorefrontUpsellPayload[]; // Legacy support
+
+  badges: ProductBadge[];
+  compareAtPrice?: number | null;
 }
 
 export interface StorefrontCategoryPayload {
@@ -120,6 +143,9 @@ export interface StorefrontCategoryPayload {
   slug: string;
   order: number;
   templateType?: string; // Added for compatibility
+  templateConfig?: Record<string, unknown>;
+  type?: 'category' | 'featured' | 'promotions' | 'new' | 'combos' | 'best_sellers';
+  isVirtual?: boolean;
   products: StorefrontProductPayload[];
 }
 

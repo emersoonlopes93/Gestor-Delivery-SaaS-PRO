@@ -62,10 +62,30 @@ export class PrinterService {
 
     // Info
     if (order.customerName) lines.push(`CLIENTE: ${order.customerName.toUpperCase()}`);
+    if (order.customerPhone) lines.push(`FONE: ${order.customerPhone}`);
     if (order.fulfillmentType === 'table' && order.tableNumber) {
       if (format === 'escpos') lines.push(BOLD_ON);
       lines.push(`MESA: ${order.tableNumber}`);
       if (format === 'escpos') lines.push(BOLD_OFF);
+    }
+    if (type === 'customer' && order.deliveryAddress) {
+      const address = order.deliveryAddress;
+      lines.push(thinSeparator);
+      lines.push('ENTREGA');
+      lines.push(`${address.street}, ${address.number}`);
+      if (address.complement) lines.push(`${address.complement}`);
+      lines.push(`${address.neighborhood} - ${address.city}/${address.state}`);
+      if (address.reference) lines.push(`REF: ${address.reference}`);
+    }
+    if (type === 'customer') {
+      lines.push(thinSeparator);
+      lines.push(`PAGAMENTO: ${String(order.paymentMethod || 'NAO INFORMADO').toUpperCase()}`);
+      if (order.changeFor) {
+        lines.push(`TROCO PARA: ${order.changeFor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
+      }
+      if (order.notes) {
+        lines.push(`OBS PEDIDO: ${order.notes.toUpperCase()}`);
+      }
     }
     lines.push(separator);
 

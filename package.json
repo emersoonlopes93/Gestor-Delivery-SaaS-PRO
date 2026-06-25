@@ -38,7 +38,7 @@
     "qa:visual:update": "ts-node --project apps/api/tsconfig.json -r tsconfig-paths/register scripts/qa-visual.ts"
   },
   "engines": {
-    "node": ">=20.0.0",
+    "node": ">=22.0.0",
     "pnpm": ">=9.0.0"
   },
   "packageManager": "pnpm@9.0.0",
@@ -46,6 +46,7 @@
     "@playwright/test": "^1.60.0",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "~4.2.0",
+    "turbo": "2.7.4",
     "typescript": "~5.5.4"
   }
 }

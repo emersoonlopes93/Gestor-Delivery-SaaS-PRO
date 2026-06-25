@@ -5,11 +5,20 @@ import { AuthSessionStatus, AuthSubjectType } from '@prisma/client';
 import { AuthSessionService } from './auth-session.service';
 
 describe('AuthSessionService', () => {
-  let prisma: any;
+  let mockPrismaService: {
+    authSession: {
+      create: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
+      findMany: jest.Mock;
+    };
+    $transaction: jest.Mock;
+  };
   let service: AuthSessionService;
 
   beforeEach(() => {
-    prisma = {
+    mockPrismaService = {
       authSession: {
         create: jest.fn(),
         findUnique: jest.fn(),
@@ -17,15 +26,16 @@ describe('AuthSessionService', () => {
         updateMany: jest.fn(),
         findMany: jest.fn(),
       },
-      $transaction: jest.fn((callback) => callback(prisma)),
+      $transaction: jest.fn((callback: (tx: typeof mockPrismaService) => unknown) => callback(mockPrismaService)),
     };
+    const mockConfig = new ConfigService({
+      JWT_REFRESH_SECRET: 'test-refresh-secret',
+      JWT_REFRESH_EXPIRES_IN: '7d',
+    });
     service = new AuthSessionService(
-      prisma,
+      mockPrismaService as never,
       new JwtService(),
-      { get: jest.fn((key: string, fallback?: string) => ({
-        JWT_REFRESH_SECRET: 'test-refresh-secret',
-        JWT_REFRESH_EXPIRES_IN: '7d',
-      }[key] ?? fallback)) } as unknown as ConfigService,
+      mockConfig,
     );
   });
 
@@ -39,8 +49,8 @@ describe('AuthSessionService', () => {
     });
 
     expect(result.refreshToken).toEqual(expect.any(String));
-    expect(prisma.authSession.create).toHaveBeenCalledTimes(1);
-    const data = prisma.authSession.create.mock.calls[0][0].data;
+    expect(mockPrismaService.authSession.create).toHaveBeenCalledTimes(1);
+    const data = mockPrismaService.authSession.create.mock.calls[0][0].data;
     expect(data.refreshTokenHash).toEqual(expect.any(String));
     expect(data.refreshTokenHash).not.toBe(result.refreshToken);
     expect(data.status).toBeUndefined();
@@ -54,8 +64,8 @@ describe('AuthSessionService', () => {
       userId: 'user-1',
       payload: { sub: 'user-1', tenantId: 'tenant-1', type: 'tenant' },
     });
-    const sessionData = prisma.authSession.create.mock.calls[0][0].data;
-    prisma.authSession.findUnique.mockResolvedValueOnce({
+    const sessionData = mockPrismaService.authSession.create.mock.calls[0][0].data;
+    mockPrismaService.authSession.findUnique.mockResolvedValueOnce({
       ...sessionData,
       id: sessionData.id,
       status: AuthSessionStatus.active,
@@ -69,11 +79,11 @@ describe('AuthSessionService', () => {
 
     expect(rotated.refreshToken).toEqual(expect.any(String));
     expect(rotated.refreshToken).not.toBe(created.refreshToken);
-    expect(prisma.authSession.update).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mockPrismaService.authSession.update).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: sessionData.id },
       data: expect.objectContaining({ status: AuthSessionStatus.rotated }),
     }));
-    expect(prisma.authSession.create).toHaveBeenCalledTimes(2);
+    expect(mockPrismaService.authSession.create).toHaveBeenCalledTimes(2);
   });
 
   it('marks the token family compromised when a rotated token is reused', async () => {
@@ -83,8 +93,8 @@ describe('AuthSessionService', () => {
       adminUserId: 'admin-1',
       payload: { sub: 'admin-1', type: 'admin' },
     });
-    const sessionData = prisma.authSession.create.mock.calls[0][0].data;
-    prisma.authSession.findUnique.mockResolvedValueOnce({
+    const sessionData = mockPrismaService.authSession.create.mock.calls[0][0].data;
+    mockPrismaService.authSession.findUnique.mockResolvedValueOnce({
       ...sessionData,
       status: AuthSessionStatus.rotated,
     });
@@ -94,7 +104,7 @@ describe('AuthSessionService', () => {
       expectedSubjectType: AuthSubjectType.admin,
     })).rejects.toBeInstanceOf(UnauthorizedException);
 
-    expect(prisma.authSession.updateMany).toHaveBeenCalledWith({
+    expect(mockPrismaService.authSession.updateMany).toHaveBeenCalledWith({
       where: { refreshTokenFamilyId: sessionData.refreshTokenFamilyId },
       data: expect.objectContaining({
         status: AuthSessionStatus.compromised,

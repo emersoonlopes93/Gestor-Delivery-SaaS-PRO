@@ -6,6 +6,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import type { DriverLoginRequest, RefreshTokenRequest } from '@gestor/types';
 import { DriverAuthGuard } from './guards/driver-auth.guard';
@@ -16,11 +17,13 @@ export class DriverAuthController {
   constructor(private readonly driverAuthService: DriverAuthService) {}
 
   @Post('login')
+  @Throttle({ auth: { limit: 10, ttl: 60 } })
   async login(@Body() body: DriverLoginRequest, @Req() req: Request) {
     return this.driverAuthService.login(body.phone, body.pin, body.tenantSlug, sessionContext(req));
   }
 
   @Post('refresh')
+  @Throttle({ auth: { limit: 10, ttl: 60 } })
   async refresh(@Body() body: RefreshTokenRequest, @Req() req: Request) {
     return this.driverAuthService.refreshToken(body.refreshToken, sessionContext(req));
   }

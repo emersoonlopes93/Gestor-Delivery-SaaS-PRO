@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { api } from '../../lib/api-client';
+import { api } from '@/lib/api-client';
 import { IngredientDTO } from '@gestor/types';
 import { Trash2, Plus } from 'lucide-react';
 import { format } from 'date-fns';
-import { Modal } from '../../components/Modal';
+import { Modal } from '@/components/Modal';
 
 interface LossEntry {
   id: string;

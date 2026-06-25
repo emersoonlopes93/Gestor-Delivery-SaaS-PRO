@@ -352,6 +352,72 @@ export class CustomerService {
     await this.db.customerAddress.delete({ where: { id: addressId } });
   }
 
+  async saveDeliveryAddressFromOrder(
+    tenantId: string,
+    customerId: string,
+    address: {
+      street: string;
+      number: string;
+      complement?: string | null;
+      neighborhood: string;
+      city: string;
+      state: string;
+      zipCode: string;
+      reference?: string | null;
+      lat?: number | null;
+      lng?: number | null;
+    },
+  ): Promise<void> {
+    await this.assertCustomerBelongsToTenant(tenantId, customerId);
+
+    const existing = await this.db.customerAddress.findFirst({
+      where: {
+        tenantId,
+        customerId,
+        street: address.street,
+        number: address.number,
+        zipCode: this.normalizeZipCode(address.zipCode),
+      },
+      select: { id: true },
+    });
+
+    if (existing) {
+      await this.db.customerAddress.update({
+        where: { id: existing.id },
+        data: {
+          complement: address.complement ?? null,
+          neighborhood: address.neighborhood,
+          city: address.city,
+          state: this.normalizeState(address.state),
+          reference: address.reference ?? null,
+          lat: address.lat ?? null,
+          lng: address.lng ?? null,
+          isDefault: true,
+        },
+      });
+      return;
+    }
+
+    await this.db.customerAddress.create({
+      data: {
+        tenantId,
+        customerId,
+        label: 'Principal',
+        street: address.street,
+        number: address.number,
+        complement: address.complement ?? null,
+        neighborhood: address.neighborhood,
+        city: address.city,
+        state: this.normalizeState(address.state),
+        zipCode: this.normalizeZipCode(address.zipCode),
+        reference: address.reference ?? null,
+        lat: address.lat ?? null,
+        lng: address.lng ?? null,
+        isDefault: true,
+      },
+    });
+  }
+
   // Called during Order creation to upsert customer explicitly using exactly tenantId and phone
   async syncCustomerOnOrderUpsert(
     tenantId: string, 

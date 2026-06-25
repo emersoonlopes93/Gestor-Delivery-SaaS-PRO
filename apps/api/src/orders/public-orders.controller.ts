@@ -1,4 +1,4 @@
-import { Controller, Get, NotFoundException, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param, Query, UseGuards, Post, Body, BadRequestException } from '@nestjs/common';
 import { Public, CurrentCustomer } from '../common/decorators';
 import { PrismaService } from '../database/prisma.service';
 import { Throttle } from '@nestjs/throttler';
@@ -92,5 +92,96 @@ export class PublicOrdersController {
             }
           : null,
     };
+  }
+
+  @Public()
+  @Get(':token/feedback-info')
+  @Throttle({ public: { limit: 30, ttl: 60 } })
+  async getFeedbackInfo(@Param('token') token: string) {
+    if (!token) throw new NotFoundException('Pedido não encontrado');
+
+    const order = await this.prisma.order.findUnique({
+      where: { publicTrackingToken: token },
+      include: { tenant: true, OrderFeedback: true },
+    });
+
+    if (!order) throw new NotFoundException('Pedido não encontrado');
+
+    const automation = await this.prisma.marketingAutomation.findUnique({
+      where: { tenantId_type: { tenantId: order.tenantId, type: 'post_order_review' } },
+    });
+
+    const config = (automation?.config as Record<string, unknown>) || {};
+
+    return {
+      storeName: order.tenant.name,
+      orderNumber: order.orderNumber,
+      alreadyResponded: !!order.OrderFeedback,
+      googleReviewUrl: config.googleReviewUrl as string | undefined,
+      facebookUrl: config.facebookUrl as string | undefined,
+      instagramUrl: config.instagramUrl as string | undefined,
+      shareText: config.shareText as string | undefined,
+      highRatingMessage: config.highRatingMessage as string | undefined,
+      lowRatingMessage: config.lowRatingMessage as string | undefined,
+    };
+  }
+
+  @Public()
+  @Post(':token/feedback')
+  @Throttle({ public: { limit: 10, ttl: 60 } })
+  async submitFeedback(
+    @Param('token') token: string,
+    @Body() body: { rating: number; comment?: string },
+  ) {
+    if (!token || !body.rating || body.rating < 1 || body.rating > 5) {
+      throw new BadRequestException('Dados inválidos');
+    }
+
+    const order = await this.prisma.order.findUnique({
+      where: { publicTrackingToken: token },
+      include: { OrderFeedback: true },
+    });
+
+    if (!order) throw new NotFoundException('Pedido não encontrado');
+    if (order.OrderFeedback) throw new BadRequestException('Feedback já registrado');
+
+    await this.prisma.orderFeedback.create({
+      data: {
+        tenantId: order.tenantId,
+        orderId: order.id,
+        customerId: order.customerId,
+        rating: body.rating,
+        comment: body.comment,
+      },
+    });
+
+    return { success: true };
+  }
+
+  @Public()
+  @Post(':token/feedback-click')
+  @Throttle({ public: { limit: 10, ttl: 60 } })
+  async registerFeedbackClick(
+    @Param('token') token: string,
+    @Body() body: { channel: string },
+  ) {
+    if (!token || !body.channel) throw new BadRequestException('Dados inválidos');
+
+    const order = await this.prisma.order.findUnique({
+      where: { publicTrackingToken: token },
+      include: { OrderFeedback: true },
+    });
+
+    if (!order || !order.OrderFeedback) throw new NotFoundException('Feedback não encontrado');
+
+    await this.prisma.orderFeedback.update({
+      where: { id: order.OrderFeedback.id },
+      data: {
+        publicReviewClicked: true,
+        clickedChannel: body.channel,
+      },
+    });
+
+    return { success: true };
   }
 }

@@ -137,6 +137,15 @@ export interface IWhatsAppProvider {
   ): Promise<void>;
 
   /**
+   * Exclui a instância remota no provider
+   */
+  deleteInstance(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+  ): Promise<void>;
+
+  /**
    * Consulta status de conexão
    */
   getConnectionStatus(
@@ -225,6 +234,31 @@ export interface IWhatsAppProvider {
     chatId: string,
     messageIds: string[],
   ): Promise<void>;
+
+  /**
+   * Busca a URL da foto de perfil de um contato
+   */
+  getProfilePictureUrl(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+    phone: string,
+  ): Promise<string | null>;
+
+  /**
+   * Publica conteúdo no Status do WhatsApp (Evolution Go).
+   */
+  publishWhatsAppStatus?(
+    apiUrl: string,
+    apiKey: string,
+    instanceId: string,
+    input: {
+      text?: string;
+      mediaUrl?: string;
+      mediaType?: string;
+      caption?: string;
+    },
+  ): Promise<WhatsAppSendResult>;
 
   /**
    * Faz o parsing de um payload de webhook específico do provider

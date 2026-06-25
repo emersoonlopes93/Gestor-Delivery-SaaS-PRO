@@ -1,4 +1,10 @@
 import { useEffect, useRef } from 'react';
+import {
+  getNotificationPermission,
+  requestNotificationPermission,
+  showWebNotification,
+  supportsWebNotifications,
+} from '../lib/notification-support';
 
 /**
  * Hook para gerenciar permissões e registro de notificações do navegador.
@@ -17,13 +23,13 @@ export function useBrowserNotifications(
     permissionCheckedRef.current = true;
 
     // Check if service workers are supported
-    if (!('serviceWorker' in navigator)) {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
       console.warn('[BrowserNotifications] Service Workers not supported');
       return;
     }
 
     // Check if Notifications API is supported
-    if (!('Notification' in window)) {
+    if (!supportsWebNotifications()) {
       console.warn('[BrowserNotifications] Notifications API not supported');
       return;
     }
@@ -39,9 +45,11 @@ export function useBrowserNotifications(
         }
 
         // Request permission if not already granted
-        if (Notification.permission === 'default') {
+        const currentPermission = getNotificationPermission();
+
+        if (currentPermission === 'default') {
           console.log('[BrowserNotifications] Requesting notification permission...');
-          const permission = await Notification.requestPermission();
+          const permission = await requestNotificationPermission();
           console.log('[BrowserNotifications] Permission result:', permission);
 
           if (permission === 'granted') {
@@ -55,7 +63,7 @@ export function useBrowserNotifications(
               });
             }
           }
-        } else if (Notification.permission === 'granted') {
+        } else if (currentPermission === 'granted') {
           console.log('[BrowserNotifications] Notification permission already granted');
         } else {
           console.warn('[BrowserNotifications] Notification permission denied');
@@ -81,15 +89,14 @@ export function useBrowserNotifications(
     options?: NotificationOptions & { soundUrl?: string; volume?: number },
   ) => {
     try {
-      if (Notification.permission !== 'granted') {
+      if (getNotificationPermission() !== 'granted') {
         console.warn('[BrowserNotifications] Permission not granted');
         return false;
       }
 
       if (!swRegistrationRef.current) {
         // Fallback to direct notification if SW not available
-        new Notification(title, options);
-        return true;
+        return showWebNotification(title, options);
       }
 
       // Send through service worker for better background handling
@@ -102,8 +109,11 @@ export function useBrowserNotifications(
   };
 
   return {
-    isSupported: 'Notification' in window && 'serviceWorker' in navigator,
-    permission: Notification.permission,
+    isSupported:
+      supportsWebNotifications() &&
+      typeof navigator !== 'undefined' &&
+      'serviceWorker' in navigator,
+    permission: getNotificationPermission(),
     sendNotification,
   };
 }

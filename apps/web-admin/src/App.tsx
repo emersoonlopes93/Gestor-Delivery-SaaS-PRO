@@ -2,6 +2,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './features/auth/LoginPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { TenantsPage } from './features/tenants/TenantsPage';
+import { TenantDetailsPage } from './features/tenants/TenantDetailsPage';
+import { TenantAccessPage } from './features/tenants/TenantAccessPage';
 import { TenantModulesPage } from './features/tenants/TenantModulesPage';
 import { TenantSchedulingPage } from './features/tenants/TenantSchedulingPage';
 import { TenantAiAgentConfigPage } from './features/tenants/TenantAiAgentConfigPage';
@@ -11,6 +13,9 @@ import { AuditLogsPage } from './features/audit/AuditLogsPage';
 import { FranchiseDashboard } from './features/franchise/FranchiseDashboard';
 import IntegrationsPage from './features/integrations/pages/IntegrationsPage';
 import { GlobalMediaLibraryPage } from './features/media/GlobalMediaLibraryPage';
+import { BaseMediaLibraryPage } from './features/base-media/BaseMediaLibraryPage';
+import { BaseMenusPage } from './features/base-menus/BaseMenusPage';
+import { HealthPage } from './features/operations/health/HealthPage';
 import { AuthLayout } from './layouts/AuthLayout';
 import { AppLayout } from './layouts/AppLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -46,10 +51,26 @@ export function App() {
             }
           />
           <Route
+            path="/tenants/:tenantId"
+            element={
+              <PermissionGate permission="saas.tenants.read">
+                <TenantDetailsPage />
+              </PermissionGate>
+            }
+          />
+          <Route
             path="/tenants/:tenantId/modules"
             element={
               <PermissionGate permission="saas.modules.read">
                 <TenantModulesPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="/tenants/:tenantId/access"
+            element={
+              <PermissionGate permission="saas.tenants.read">
+                <TenantAccessPage />
               </PermissionGate>
             }
           />
@@ -74,6 +95,16 @@ export function App() {
             element={
               <PermissionGate permission="saas.ai.read">
                 <GlobalAiAgentConfigPage />
+              </PermissionGate>
+            }
+          />
+
+          {/* Health / Operations */}
+          <Route
+            path="/health"
+            element={
+              <PermissionGate permission="saas.tenants.read">
+                <HealthPage />
               </PermissionGate>
             }
           />
@@ -122,6 +153,38 @@ export function App() {
             element={
               <PermissionGate permission="saas.settings.read">
                 <GlobalMediaLibraryPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="/base-menus"
+            element={
+              <PermissionGate permission="saas.base_menu.read">
+                <BaseMenusPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="/base-menus/:id"
+            element={
+              <PermissionGate permission="saas.base_menu.read">
+                <BaseMenusPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="/base-menus/:id/draft"
+            element={
+              <PermissionGate permission="saas.base_menu.read">
+                <BaseMenusPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="/base-media"
+            element={
+              <PermissionGate permission="saas.base_media.read">
+                <BaseMediaLibraryPage />
               </PermissionGate>
             }
           />
