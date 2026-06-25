@@ -83,7 +83,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       console.log(`[CHAT_UI] optimistic_added id=${optimisticMsg.id}`);
       return { previousMessage };
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: Partial<ChatMessage> | null) => {
       console.log(`[CHAT_UI] mutation_success_payload hasId=${!!data?.id} id=${data?.id || ''} sessionId=${data?.sessionId || ''} externalId=${data?.externalId || ''} direction=${data?.direction || ''} senderType=${data?.senderType || ''} fromMe=${data?.direction === 'outbound'} contentPreview=${typeof data?.content === 'string' ? data.content.substring(0, 20) : ''} shape=${data?.id ? 'raw_message' : 'wrapped_object'}`);
       if (!data) return;
       // Substitui a mensagem otimista pela mensagem real do servidor
