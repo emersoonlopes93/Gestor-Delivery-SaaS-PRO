@@ -50,14 +50,14 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
   });
 
   const sendMessageMutation = useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async (content: string): Promise<Partial<ChatMessage> | null> => {
       if (!session) return null;
       const res = await api.post(`/chat/sessions/${session.id}/messages`, {
         direction: 'outbound',
         content,
         messageType: 'text'
       });
-      return res.data;
+      return res.data as Partial<ChatMessage>;
     },
     onMutate: (content) => {
       console.log(`[CHAT_UI] send_clicked contentPreview=${content.substring(0, 20)}`);
@@ -96,7 +96,7 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       // Revalida do servidor para garantir sincronia
       refetchMessages();
     },
-    onError: (error: unknown, _content, context) => {
+    onError: (error: unknown, _content: string, context: { previousMessage: string } | undefined) => {
       console.error(`[CHAT_UI] mutation_error message=${error instanceof Error ? error.message : 'unknown'}`);
       // Em caso de erro, restaura o texto no input e remove a mensagem otimista
       if (context?.previousMessage) {

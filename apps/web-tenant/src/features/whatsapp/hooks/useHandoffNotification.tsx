@@ -12,9 +12,13 @@ import { Tenant, TenantSettings } from '@gestor/types';
  * Integra-se com o sistema de notificações do navegador.
  */
 export function useHandoffNotification(enabled: boolean = true) {
-  const notifiedRef = useRef<Record<string, boolean>>({});
-  const settingsRef = useRef<{ soundFile: string; volume: number }>({
-    soundFile: '/sounds/notification.mp3',
+  const previousHandoffBySession = useRef<Map<string, boolean>>(new Map());
+  const initializedSessions = useRef<Set<string>>(new Set());
+  const lastPlayedMessageIds = useRef<Set<string>>(new Set());
+
+  const settingsRef = useRef<{ handoffSound: string; messageSound: string; volume: number }>({
+    handoffSound: '/sounds/notification.mp3',
+    messageSound: '/sounds/notification.mp3',
     volume: 0.6,
   });
 
@@ -30,10 +34,11 @@ export function useHandoffNotification(enabled: boolean = true) {
   // Update settings ref when data changes
   useEffect(() => {
     if (settings) {
-      const soundFile = settings.handoffSound || 'notification.mp3';
+      const handoffSound = settings.handoffSound || 'notification.mp3';
       const volume = settings.notificationVolume || 0.6;
       settingsRef.current = {
-        soundFile: `/sounds/${soundFile}`,
+        handoffSound: `/sounds/${handoffSound}`,
+        messageSound: '/sounds/notification.mp3', // Usar som normal padrao
         volume: Math.max(0, Math.min(1, volume)),
       };
     }
@@ -42,51 +47,69 @@ export function useHandoffNotification(enabled: boolean = true) {
   useEffect(() => {
     if (!enabled) return;
 
-    const handler = (ev: CustomEvent<{ session: ChatSession }>) => {
+    const playSound = (type: 'handoff' | 'message') => {
+      try {
+        const soundFile = type === 'handoff' ? settingsRef.current.handoffSound : settingsRef.current.messageSound;
+        const audio = new Audio(soundFile);
+        audio.volume = settingsRef.current.volume;
+        audio.play().catch(() => {});
+      } catch (err) {
+        // ignore
+      }
+    };
+
+    const handleSessionUpdated = (ev: CustomEvent<{ session: ChatSession }>) => {
       const session = ev.detail?.session;
       if (!session || !session.id) return;
 
-      const already = !!notifiedRef.current[session.id];
+      const sessionId = session.id;
+      const current = Boolean(session.handoffActive);
+      const previous = previousHandoffBySession.current.get(sessionId);
 
-      if (session.handoffActive && !already) {
-        // mark notified so we don't loop
-        notifiedRef.current[session.id] = true;
+      previousHandoffBySession.current.set(sessionId, current);
 
-        // Play audio
-        try {
-          const audio = new Audio(settingsRef.current.soundFile);
-          audio.volume = settingsRef.current.volume;
-          audio.play().catch(() => {
-            // ignore autoplay block
-            console.warn('[useHandoffNotification] Autoplay blocked by browser');
-          });
-        } catch (err) {
-          console.error('[useHandoffNotification] Error playing sound:', err);
-        }
+      if (!initializedSessions.current.has(sessionId)) {
+        initializedSessions.current.add(sessionId);
+        return;
+      }
 
-        // Show toast
+      if (previous === false && current === true) {
+        playSound('handoff');
+
         toast(`👤 ${session.displayName || 'Cliente'} aguardando atendimento humano`, {
           duration: 6000,
           style: { fontWeight: 'bold' },
         });
 
-        // Show browser notification if the optional Web Notification API exists.
         showWebNotification('Transferência para Atendimento Humano', {
           body: `${session.displayName || 'Cliente'} foi transferido para um agente humano.`,
           icon: '/favicon.ico',
           tag: `handoff-${session.id}`,
         });
       }
+    };
 
-      // If handoff was deactivated, clear notified state so future handoffs can notify again
-      if (!session.handoffActive && notifiedRef.current[session.id]) {
-        delete notifiedRef.current[session.id];
+    const handleMessageCreated = (ev: CustomEvent<{ sessionId: string; message: any }>) => {
+      const { message } = ev.detail;
+      if (!message || !message.id) return;
+
+      if (lastPlayedMessageIds.current.has(message.id)) return;
+      lastPlayedMessageIds.current.add(message.id);
+
+      const isCustomerInbound = message.direction === 'inbound' || message.fromMe === false || message.senderType === 'customer';
+      const isOperatorOrAi = message.senderType === 'operator' || message.senderType === 'ai' || message.fromMe === true;
+
+      if (isCustomerInbound && !isOperatorOrAi) {
+        playSound('message');
       }
     };
 
-    window.addEventListener('chat:sessionUpdated', handler as EventListener);
+    window.addEventListener('chat:sessionUpdated', handleSessionUpdated as EventListener);
+    window.addEventListener('chat:messageCreated', handleMessageCreated as EventListener);
+
     return () => {
-      window.removeEventListener('chat:sessionUpdated', handler as EventListener);
+      window.removeEventListener('chat:sessionUpdated', handleSessionUpdated as EventListener);
+      window.removeEventListener('chat:messageCreated', handleMessageCreated as EventListener);
     };
   }, [enabled]);
 }
