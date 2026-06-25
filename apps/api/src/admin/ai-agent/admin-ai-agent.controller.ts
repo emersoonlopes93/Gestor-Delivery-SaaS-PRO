@@ -334,6 +334,61 @@ export class AdminAiAgentController {
       };
     }
   }
+
+  /**
+   * GET /admin/ai-agent/providers/openrouter/models
+   * Lista os modelos disponíveis no OpenRouter.
+   */
+  @Get('providers/openrouter/models')
+  @Permissions('saas.ai.read')
+  async listOpenRouterModels() {
+    const runtimeConfig = await this.providerConfig.resolveRuntimeConfig(
+      'openrouter' as import('@prisma/client').AiProviderType,
+      undefined,
+      { log: false },
+    );
+
+    const baseUrl = process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
+
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (runtimeConfig.apiKeyPresent && runtimeConfig.apiKey) {
+        headers['Authorization'] = `Bearer ${runtimeConfig.apiKey}`;
+      }
+
+      const { data } = await axios.get(`${baseUrl}/models`, {
+        headers,
+        timeout: 15_000,
+      });
+
+      const allModels = data?.data ?? [];
+      const formattedModels = allModels.map((m: any) => {
+        const isFree = m.pricing?.prompt === "0" && m.pricing?.completion === "0" || m.pricing?.prompt === "0.0" && m.pricing?.completion === "0.0" || m.pricing?.prompt === 0 && m.pricing?.completion === 0;
+        return {
+          id: m.id,
+          displayName: `${m.name} ${isFree ? '(Free)' : ''}`.trim(),
+          description: m.description || '',
+          contextLength: m.context_length
+        };
+      });
+
+      return {
+        success: true,
+        models: formattedModels,
+        total: formattedModels.length,
+        apiKeySource: runtimeConfig.apiKeySource,
+      };
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'Erro ao listar modelos do OpenRouter.';
+      const statusCode = axios.isAxiosError(err) ? err.response?.status : undefined;
+      return {
+        success: false,
+        error: errMsg,
+        statusCode,
+        models: [],
+      };
+    }
+  }
   @Get('recommended-prompt')
   @Permissions('saas.ai.read')
   getRecommendedPrompt() {

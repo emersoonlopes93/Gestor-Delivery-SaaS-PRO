@@ -215,6 +215,11 @@ export function GlobalAiAgentConfigPage() {
   const [googleModelsError, setGoogleModelsError] = useState<string | null>(null);
   const [googleModelsFetched, setGoogleModelsFetched] = useState(false);
 
+  // Estados de listagem dinâmica de modelos OpenRouter
+  const [openRouterModels, setOpenRouterModels] = useState<Array<{id: string, displayName: string}>>([]);
+  const [openRouterModelsLoading, setOpenRouterModelsLoading] = useState(false);
+  const [openRouterModelsError, setOpenRouterModelsError] = useState<string | null>(null);
+  const [openRouterModelsFetched, setOpenRouterModelsFetched] = useState(false);
   useEffect(() => {
     loadInitialData();
   }, []);
@@ -338,6 +343,28 @@ export function GlobalAiAgentConfigPage() {
       setFetchedGoogleModels([]);
     } finally {
       setGoogleModelsLoading(false);
+    }
+  }
+
+  async function fetchOpenRouterModels() {
+    setOpenRouterModelsLoading(true);
+    setOpenRouterModelsError(null);
+    try {
+      const res = await api.get<{success: boolean, models: Array<{id: string, displayName: string}>, error?: string}>('/admin/ai-agent/providers/openrouter/models');
+      const result = res.data ?? res;
+      if (result.success && result.models) {
+        setOpenRouterModels(result.models);
+        setOpenRouterModelsFetched(true);
+      } else {
+        setOpenRouterModelsError(result.error || 'Nenhum modelo encontrado.');
+        setOpenRouterModels([]);
+        setOpenRouterModelsFetched(true);
+      }
+    } catch (e: unknown) {
+      setOpenRouterModelsError(e instanceof ApiError ? e.message : 'Erro ao listar modelos do OpenRouter.');
+      setOpenRouterModels([]);
+    } finally {
+      setOpenRouterModelsLoading(false);
     }
   }
 
@@ -664,15 +691,48 @@ export function GlobalAiAgentConfigPage() {
               )}
 
               {config.defaultAiProvider === 'openrouter' && (
-                <Field label="Modelo OpenRouter">
-                  <input 
-                    type="text"
-                    value={config.openrouterModel || ''} 
-                    placeholder="ex: anthropic/claude-3.5-sonnet"
-                    onChange={(e) => updateConfig('openrouterModel', e.target.value)}
-                    className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                  />
-                </Field>
+                <div className="space-y-3">
+                  <Field label="Modelo OpenRouter">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input 
+                          type="text"
+                          list="openrouter-models-list-primary"
+                          value={config.openrouterModel || ''} 
+                          placeholder="ex: anthropic/claude-3.5-sonnet"
+                          onChange={(e) => updateConfig('openrouterModel', e.target.value)}
+                          className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                        />
+                        <datalist id="openrouter-models-list-primary">
+                          {openRouterModels.map(m => (
+                            <option key={m.id} value={m.id}>{m.displayName}</option>
+                          ))}
+                        </datalist>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={fetchOpenRouterModels}
+                        disabled={openRouterModelsLoading}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors whitespace-nowrap"
+                      >
+                        {openRouterModelsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <List className="h-4 w-4" />}
+                        Listar modelos
+                      </button>
+                    </div>
+                  </Field>
+                  {openRouterModelsError && (
+                    <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 flex items-start gap-2">
+                      <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                      <span>{openRouterModelsError}</span>
+                    </div>
+                  )}
+                  {openRouterModelsFetched && openRouterModels.length > 0 && !openRouterModelsError && (
+                    <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+                      <span>{openRouterModels.length} modelos disponíveis no OpenRouter.</span>
+                    </div>
+                  )}
+                </div>
               )}
 
               <div className="pt-2 flex flex-col gap-2">
@@ -770,15 +830,48 @@ export function GlobalAiAgentConfigPage() {
               )}
 
               {config.fallbackAiProvider === 'openrouter' && (
-                <Field label="Modelo de Fallback (OpenRouter)">
-                  <input 
-                    type="text"
-                    value={config.fallbackAiModel || ''} 
-                    placeholder="ex: anthropic/claude-3.5-sonnet"
-                    onChange={(e) => updateConfig('fallbackAiModel', e.target.value)}
-                    className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                  />
-                </Field>
+                <div className="space-y-3">
+                  <Field label="Modelo de Fallback (OpenRouter)">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input 
+                          type="text"
+                          list="openrouter-models-list-fallback"
+                          value={config.fallbackAiModel || ''} 
+                          placeholder="ex: anthropic/claude-3.5-sonnet"
+                          onChange={(e) => updateConfig('fallbackAiModel', e.target.value)}
+                          className="w-full rounded-md border border-border bg-card text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                        />
+                        <datalist id="openrouter-models-list-fallback">
+                          {openRouterModels.map(m => (
+                            <option key={m.id} value={m.id}>{m.displayName}</option>
+                          ))}
+                        </datalist>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={fetchOpenRouterModels}
+                        disabled={openRouterModelsLoading}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors whitespace-nowrap"
+                      >
+                        {openRouterModelsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <List className="h-4 w-4" />}
+                        Listar modelos
+                      </button>
+                    </div>
+                  </Field>
+                  {openRouterModelsError && (
+                    <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 flex items-start gap-2">
+                      <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                      <span>{openRouterModelsError}</span>
+                    </div>
+                  )}
+                  {openRouterModelsFetched && openRouterModels.length > 0 && !openRouterModelsError && (
+                    <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+                      <span>{openRouterModels.length} modelos disponíveis no OpenRouter.</span>
+                    </div>
+                  )}
+                </div>
               )}
 
               {config.fallbackAiProvider && (
