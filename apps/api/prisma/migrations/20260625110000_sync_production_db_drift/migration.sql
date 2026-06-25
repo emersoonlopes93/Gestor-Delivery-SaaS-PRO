@@ -42,7 +42,7 @@ ALTER TABLE "print_jobs"
 DO $$ BEGIN
     CREATE UNIQUE INDEX "print_jobs_idempotency_key_key" ON "print_jobs"("idempotency_key");
 EXCEPTION
-    WHEN duplicate_table OR duplicate_relation THEN null;
+    WHEN duplicate_table THEN null;
 END $$;
 
 -- AlterTable chat_sessions
@@ -67,13 +67,13 @@ CREATE TABLE IF NOT EXISTS "marketing_automations" (
 DO $$ BEGIN
     CREATE UNIQUE INDEX "marketing_automations_tenant_id_type_key" ON "marketing_automations"("tenant_id", "type");
 EXCEPTION
-    WHEN duplicate_table OR duplicate_relation THEN null;
+    WHEN duplicate_table THEN null;
 END $$;
 
 DO $$ BEGIN
     CREATE INDEX "marketing_automations_tenant_id_idx" ON "marketing_automations"("tenant_id");
 EXCEPTION
-    WHEN duplicate_table OR duplicate_relation THEN null;
+    WHEN duplicate_table THEN null;
 END $$;
 
 -- AddForeignKey marketing_automations
@@ -104,19 +104,19 @@ CREATE TABLE IF NOT EXISTS "order_feedbacks" (
 DO $$ BEGIN
     CREATE UNIQUE INDEX "order_feedbacks_order_id_key" ON "order_feedbacks"("order_id");
 EXCEPTION
-    WHEN duplicate_table OR duplicate_relation THEN null;
+    WHEN duplicate_table THEN null;
 END $$;
 
 DO $$ BEGIN
     CREATE INDEX "order_feedbacks_tenant_id_idx" ON "order_feedbacks"("tenant_id");
 EXCEPTION
-    WHEN duplicate_table OR duplicate_relation THEN null;
+    WHEN duplicate_table THEN null;
 END $$;
 
 DO $$ BEGIN
     CREATE INDEX "order_feedbacks_customer_id_idx" ON "order_feedbacks"("customer_id");
 EXCEPTION
-    WHEN duplicate_table OR duplicate_relation THEN null;
+    WHEN duplicate_table THEN null;
 END $$;
 
 -- AddForeignKeys order_feedbacks
