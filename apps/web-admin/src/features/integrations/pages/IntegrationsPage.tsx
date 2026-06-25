@@ -40,6 +40,9 @@ export default function IntegrationsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const [openRouterModels, setOpenRouterModels] = useState<Array<{id: string, displayName: string}>>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
 
   useEffect(() => {
     fetchConfig();
@@ -58,6 +61,22 @@ export default function IntegrationsPage() {
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchOpenRouterModels = async () => {
+    try {
+      setLoadingModels(true);
+      const res = await api.get<{success: boolean, models: Array<{id: string, displayName: string}>}>('/admin/ai-agent/providers/openrouter/models');
+      const data = 'data' in res ? res.data : res;
+      if (data && data.success && data.models) {
+        setOpenRouterModels(data.models);
+        showToast('success', `${data.models.length} modelos carregados`);
+      }
+    } catch (err) {
+      showToast('error', 'Erro ao carregar modelos do OpenRouter');
+    } finally {
+      setLoadingModels(false);
     }
   };
 
@@ -242,14 +261,32 @@ export default function IntegrationsPage() {
               {config?.defaultAiProvider === 'openrouter' && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">Modelo OpenRouter</label>
-                  <input
-                    type="text"
-                    placeholder="ex: anthropic/claude-3.5-sonnet"
-                    className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
-                    value={config?.openrouterModel || ''}
-                    onChange={(e) => setConfig(prev => prev ? {...prev, openrouterModel: e.target.value} : null)}
-                  />
-                  <p className="text-xs text-muted-foreground">Informe o nome completo do modelo no OpenRouter.</p>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        list="openrouter-models-list"
+                        placeholder="ex: anthropic/claude-3.5-sonnet"
+                        className="w-full h-12 px-4 rounded-xl border border-border bg-card text-foreground focus:ring-2 focus:ring-primary transition-all outline-none"
+                        value={config?.openrouterModel || ''}
+                        onChange={(e) => setConfig(prev => prev ? {...prev, openrouterModel: e.target.value} : null)}
+                      />
+                      <datalist id="openrouter-models-list">
+                        {openRouterModels.map(m => (
+                          <option key={m.id} value={m.id}>{m.displayName}</option>
+                        ))}
+                      </datalist>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={fetchOpenRouterModels}
+                      disabled={loadingModels}
+                      className="px-4 bg-muted hover:bg-muted/80 text-foreground border border-border rounded-xl whitespace-nowrap transition-colors flex items-center justify-center min-w-[140px]"
+                    >
+                      {loadingModels ? <RefreshCcw className="h-4 w-4 animate-spin" /> : 'Carregar Modelos'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Informe o nome completo ou carregue a lista para buscar por modelo.</p>
                 </div>
               )}
 
