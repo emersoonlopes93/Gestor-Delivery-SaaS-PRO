@@ -83,8 +83,8 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       console.log(`[CHAT_UI] optimistic_added id=${optimisticMsg.id}`);
       return { previousMessage };
     },
-    onSuccess: (data) => {
-      console.log(`[CHAT_UI] mutation_success`);
+    onSuccess: (data: any) => {
+      console.log(`[CHAT_UI] mutation_success_payload hasId=${!!data?.id} id=${data?.id || ''} sessionId=${data?.sessionId || ''} externalId=${data?.externalId || ''} direction=${data?.direction || ''} senderType=${data?.senderType || ''} fromMe=${data?.direction === 'outbound'} contentPreview=${typeof data?.content === 'string' ? data.content.substring(0, 20) : ''} shape=${data?.id ? 'raw_message' : 'wrapped_object'}`);
       if (!data) return;
       // Substitui a mensagem otimista pela mensagem real do servidor
       setMessages((prev) =>
@@ -161,6 +161,11 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
   });
 
   useEffect(() => {
+    const marker = sessionMessages.find(m => typeof m.content === 'string' && m.content.includes('TESTE-HISTORICO-OPERADOR-2406-001'));
+    const directionsSummary = Array.from(new Set(sessionMessages.map(m => m.direction))).join(',');
+    const senderTypesSummary = Array.from(new Set(sessionMessages.map(m => m.senderType))).join(',');
+    console.log(`[CHAT_HISTORY_UI] sessionId=${session?.id} count=${sessionMessages.length} containsMarker=${!!marker} markerMessageId=${marker?.id || ''} directionsSummary=${directionsSummary} senderTypesSummary=${senderTypesSummary}`);
+    
     setMessages(sessionMessages);
   }, [sessionMessages]);
 

@@ -309,7 +309,13 @@ export class ChatController {
       orderBy: { createdAt: 'desc' },
       take: 200,
     });
-    return messages.reverse().filter((msg) => this.isInboxMessage(msg));
+    
+    const finalMessages = messages.reverse().filter((msg) => this.isInboxMessage(msg));
+    
+    const marker = finalMessages.find(m => typeof m.content === 'string' && m.content.includes('TESTE-HISTORICO-OPERADOR-2406-001'));
+    this.logger.log(`[CHAT_HISTORY] sessionId=${sessionId} count=${finalMessages.length} containsMarker=${!!marker} markerMessageId=${marker?.id || ''} markerDirection=${marker?.direction || ''} markerSenderType=${marker?.senderType || ''} markerFromMe=${marker?.direction === 'outbound'} order=desc take=200`);
+
+    return finalMessages;
   }
 
   @Get('sessions/:id/ai/summary')
@@ -453,6 +459,9 @@ export class ChatController {
       const emittedSessionId = sessionId; // Always the URL's sessionId
       this.logger.log(`[CHAT_SEND] sessionIdFromUrl=${sessionId} persistedSessionId=${message.sessionId} emittedSessionId=${emittedSessionId}`);
       this.logger.log(`[CHAT_SEND] complete requestId=${requestId}`);
+
+      const responseShape = message?.id ? 'raw_message' : 'wrapped_object';
+      this.logger.log(`[CHAT_SEND_RESPONSE] sessionId=${message.sessionId} messageId=${message.id} externalId=${message.externalId || ''} direction=${message.direction} senderType=${message.senderType} fromMe=${message.direction === 'outbound'} contentLength=${typeof message.content === 'string' ? message.content.length : 0} createdAt=${message.createdAt} deletedAt=${message.deletedAt || ''} status=${message.externalStatus || ''} shape=${responseShape}`);
 
       return message;
     } catch (error: unknown) {

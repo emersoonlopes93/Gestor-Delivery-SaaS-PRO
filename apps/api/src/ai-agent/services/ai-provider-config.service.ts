@@ -172,6 +172,7 @@ export class AiProviderConfigService {
       openaiApiKey: string | null;
       anthropicApiKey: string | null;
       googleAiApiKey: string | null;
+      openrouterApiKey: string | null;
     } | null,
   ): string {
     const value =
@@ -209,6 +210,7 @@ export class AiProviderConfigService {
       openaiModel: string | null;
       anthropicModel: string | null;
       googleAiModel: string | null;
+      openrouterModel: string | null;
     } | null,
   ): string {
     const value =

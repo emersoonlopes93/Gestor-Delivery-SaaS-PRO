@@ -65,6 +65,7 @@ export function useChatSocket(tenantId: string | undefined) {
 
     socket.on('messageCreated', (event: MessageCreatedEvent) => {
       console.log(`[CHAT_WS] messageCreated received eventName=messageCreated sessionId=${event.sessionId}`);
+      console.log(`[CHAT_WS] messageCreated_payload messageId=${event.message?.id || ''} sessionId=${event.message?.sessionId || ''} externalId=${event.message?.externalId || ''} direction=${event.message?.direction || ''} senderType=${event.message?.senderType || ''} fromMe=${event.message?.direction === 'outbound'} contentPreview=${typeof event.message?.content === 'string' ? event.message.content.substring(0, 20) : ''}`);
 
       // Atualiza o cache de mensagens instantaneamente via setQueryData (sem aguardar refetch)
       queryClient.setQueryData<ChatMessage[]>(
