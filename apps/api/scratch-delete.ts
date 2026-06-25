@@ -3,10 +3,10 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  const badMessages = await prisma.chatMessage.findMany({
+  const result = await prisma.chatMessage.deleteMany({
     where: { externalId: 'undefined' },
   });
-  console.log('Messages with externalId = "undefined":', badMessages);
+  console.log('Deleted corrupted messages:', result);
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());

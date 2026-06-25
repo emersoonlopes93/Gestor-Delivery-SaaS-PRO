@@ -374,7 +374,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       return {
         success: true,
-        messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id),
+        messageId: (responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) ? String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) : undefined,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -409,7 +409,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       return {
         success: true,
-        messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id),
+        messageId: (responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) ? String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) : undefined,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -442,7 +442,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       return {
         success: true,
-        messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id),
+        messageId: (responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) ? String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) : undefined,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -477,7 +477,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       return {
         success: true,
-        messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id),
+        messageId: (responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) ? String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) : undefined,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -544,7 +544,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       return {
         success: true,
-        messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id || undefined),
+        messageId: (responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) ? String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) : undefined,
       };
     } catch (error: unknown) {
       if (isAxiosError(error) && error.response?.status === 404) {
@@ -553,7 +553,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
           const { data } = await client.post('/message/sendText', body);
           return {
             success: true,
-            messageId: String(data?.key?.id || data?.id || undefined),
+            messageId: (data?.key?.id || data?.id) ? String(data?.key?.id || data?.id) : undefined,
           };
         } catch (legacyError: unknown) {
           const legacyMessage = isAxiosError(legacyError)
@@ -589,7 +589,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
 
       return {
         success: true,
-        messageId: String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id || undefined),
+        messageId: (responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) ? String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) : undefined,
       };
     } catch (error: unknown) {
       if (isAxiosError(error) && error.response?.status === 404) {
@@ -604,7 +604,7 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
           });
           return {
             success: true,
-            messageId: String(data?.key?.id || data?.id || undefined),
+            messageId: (data?.key?.id || data?.id) ? String(data?.key?.id || data?.id) : undefined,
           };
         } catch (legacyError: unknown) {
           const legacyMessage = isAxiosError(legacyError)
