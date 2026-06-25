@@ -17,6 +17,7 @@ import { OpenAiProvider } from './providers/openai.provider';
 import { OpenAiImageProvider } from './providers/openai-image.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { GoogleAiProvider } from './providers/google-ai.provider';
+import { OpenRouterProvider } from './providers/openrouter.provider';
 import { AI_PROVIDER } from './interfaces/ai-provider.interface';
 import { AiProviderRegistryService } from './services/ai-provider-registry.service';
 
@@ -53,6 +54,7 @@ import { AiProviderConfigService } from './services/ai-provider-config.service';
     OpenAiImageProvider,
     AnthropicProvider,
     GoogleAiProvider,
+    OpenRouterProvider,
     AiProviderRegistryService,
     {
       provide: AI_PROVIDER,

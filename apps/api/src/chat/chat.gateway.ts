@@ -84,8 +84,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       client.data.tenantId = payload.tenantId;
       client.data.userId = payload.sub;
       this.logger.log(`[CHAT_WS] connected tenantId=${payload.tenantId} clientId=${client.id}`);
-    } catch (error: any) {
-      this.logger.error(`[CHAT_WS] auth_error clientId=${client.id} reason=exception message=${error?.message}`);
+    } catch (error: unknown) {
+      this.logger.error(`[CHAT_WS] auth_error clientId=${client.id} reason=exception message=${error instanceof Error ? error.message : String(error)}`);
       client.disconnect();
     }
   }

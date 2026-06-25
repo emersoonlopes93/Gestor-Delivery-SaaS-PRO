@@ -4,6 +4,7 @@ import { AiProviderType } from '@prisma/client';
 import { OpenAiProvider } from '../providers/openai.provider';
 import { AnthropicProvider } from '../providers/anthropic.provider';
 import { GoogleAiProvider } from '../providers/google-ai.provider';
+import { OpenRouterProvider } from '../providers/openrouter.provider';
 import { IAiProvider } from '../interfaces/ai-provider.interface';
 import { AiConfigSource, AiProviderConfigService } from './ai-provider-config.service';
 
@@ -16,6 +17,7 @@ export class AiProviderRegistryService {
     private readonly openai: OpenAiProvider,
     private readonly anthropic: AnthropicProvider,
     private readonly googleAi: GoogleAiProvider,
+    private readonly openrouter: OpenRouterProvider,
     private readonly providerConfig: AiProviderConfigService,
   ) {}
 
@@ -27,6 +29,8 @@ export class AiProviderRegistryService {
         return this.anthropic;
       case 'google_ai':
         return this.googleAi;
+      case 'openrouter':
+        return this.openrouter;
       default:
         return this.openai;
     }

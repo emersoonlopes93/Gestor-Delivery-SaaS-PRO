@@ -122,6 +122,7 @@ export class UpdateGlobalAiConfigDto {
   @IsOptional() @IsString() googleAiModel?: string;
   @IsOptional() @IsString() openaiModel?: string;
   @IsOptional() @IsString() anthropicModel?: string;
+  @IsOptional() @IsString() openrouterModel?: string;
   @IsOptional() @IsString() fallbackAiProvider?: string | null;
   @IsOptional() @IsString() fallbackAiModel?: string | null;
 }

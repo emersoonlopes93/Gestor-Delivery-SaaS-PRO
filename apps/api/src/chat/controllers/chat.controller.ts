@@ -446,8 +446,8 @@ export class ChatController {
       try {
         this.chatGateway.emitMessageCreated(session.tenantId, sessionId, message);
         this.logger.log(`[CHAT_SEND] socket_emit_success requestId=${requestId}`);
-      } catch (wsErr: any) {
-        this.logger.error(`[CHAT_SEND] socket_emit_failed requestId=${requestId} error=${wsErr?.message}`);
+      } catch (wsErr: unknown) {
+        this.logger.error(`[CHAT_SEND] socket_emit_failed requestId=${requestId} error=${wsErr instanceof Error ? wsErr.message : String(wsErr)}`);
       }
 
       const emittedSessionId = sessionId; // Always the URL's sessionId
@@ -455,8 +455,11 @@ export class ChatController {
       this.logger.log(`[CHAT_SEND] complete requestId=${requestId}`);
 
       return message;
-    } catch (error: any) {
-      this.logger.error(`[CHAT_SEND] error requestId=${requestId} tenantId=${tenantId} sessionId=${sessionId} errorName=${error?.name} errorMessage=${error?.message} prismaCode=${error?.code}`);
+    } catch (error: unknown) {
+      const errName = error instanceof Error ? error.name : 'Unknown';
+      const errMsg = error instanceof Error ? error.message : String(error);
+      const errCode = error && typeof error === 'object' && 'code' in error ? String(error.code) : 'unknown';
+      this.logger.error(`[CHAT_SEND] error requestId=${requestId} tenantId=${tenantId} sessionId=${sessionId} errorName=${errName} errorMessage=${errMsg} prismaCode=${errCode}`);
       throw error;
     }
   }

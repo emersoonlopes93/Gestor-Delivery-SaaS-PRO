@@ -96,8 +96,8 @@ export function ChatArea({ session, onBack, onSessionUpdate }: ChatAreaProps) {
       // Revalida do servidor para garantir sincronia
       refetchMessages();
     },
-    onError: (error: any, _content, context) => {
-      console.error(`[CHAT_UI] mutation_error message=${error?.message || 'unknown'}`);
+    onError: (error: unknown, _content, context) => {
+      console.error(`[CHAT_UI] mutation_error message=${error instanceof Error ? error.message : 'unknown'}`);
       // Em caso de erro, restaura o texto no input e remove a mensagem otimista
       if (context?.previousMessage) {
         setMessage(context.previousMessage);

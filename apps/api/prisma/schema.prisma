@@ -2590,6 +2590,8 @@ model SystemConfig {
   anthropicApiKey         String?              @map("anthropic_api_key")
   googleAiApiKey          String?              @map("google_ai_api_key")
   googleAiModel           String?              @default("gemini-1.5-flash") @map("google_ai_model") @db.VarChar(100)
+  openrouterApiKey        String?              @map("openrouter_api_key")
+  openrouterModel         String?              @default("openrouter/auto") @map("openrouter_model") @db.VarChar(100)
   openaiModel             String?              @default("gpt-4o") @map("openai_model") @db.VarChar(100)
   anthropicModel          String?              @default("claude-3-5-sonnet-20240620") @map("anthropic_model") @db.VarChar(100)
   fallbackAiProvider      String?              @map("fallback_ai_provider") @db.VarChar(50)
@@ -3307,6 +3309,7 @@ enum AiProviderType {
   openai
   anthropic
   google_ai
+  openrouter
 }
 
 enum ChatState {
