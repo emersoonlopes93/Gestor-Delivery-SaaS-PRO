@@ -37,7 +37,7 @@ COPY --from=builder /app/apps/api/clean_db.js ./apps/api/clean_db.js
 ENV NODE_ENV=production
 EXPOSE 3333
 
-RUN npm i -g prisma
+RUN npm i -g prisma@5.22.0
 RUN chmod +x ./apps/api/docker-entrypoint.sh
 
 WORKDIR /app/apps/api

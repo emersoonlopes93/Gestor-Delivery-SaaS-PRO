@@ -28,7 +28,7 @@ EOF
 fi
 
 echo "Rodando Prisma Migrate Deploy..."
-npx prisma migrate deploy
+npx prisma@5.22.0 migrate deploy
 
 echo "Iniciando a API..."
 exec node dist/apps/api/src/main.js
