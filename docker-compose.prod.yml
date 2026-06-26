@@ -8,7 +8,7 @@ services:
     deploy:
       labels:
         - "traefik.enable=true"
-        - "traefik.docker.network=CPNET"
+        - "traefik.docker.network=CPNET_ATTACH"
         - "traefik.http.routers.gestor-api.rule=Host(`${API_DOMAIN:-api.kigula.dpdns.org}`)"
         - "traefik.http.routers.gestor-api.entrypoints=websecure"
         - "traefik.http.routers.gestor-api.tls.certresolver=letsencryptresolver"
@@ -28,9 +28,9 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       REDIS_ENABLED: ${REDIS_ENABLED:-true}
     networks:
-      - CPNET
+      - CPNET_ATTACH
 
 networks:
-  CPNET:
+  CPNET_ATTACH:
     external: true
-    name: CPNET
+    name: CPNET_ATTACH
