@@ -3,7 +3,7 @@ import { ShoppingBag, Plus, CheckCircle2, Package } from 'lucide-react';
 import { api } from '../../../lib/api-client';
 import { ImagePickerModal } from '../../../components/ImagePickerModal';
 import { Step5ImportMenu } from './Step5ImportMenu';
-import { unmaskCurrency } from '@gestor/utils';
+
 import { CurrencyInput } from '@gestor/ui';
 
 interface ProductCategory {

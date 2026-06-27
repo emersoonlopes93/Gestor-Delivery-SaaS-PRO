@@ -13,7 +13,7 @@ type TenantBillingState = {
   hasBillingV2: boolean;
   subscriptionStatus: string | null;
   trialEndsAt: string | null;
-  source: 'billing_v2' | 'legacy_fallback' | 'none';
+  source: 'billing_v2' | 'none';
   warning: string | null;
   plan: {
     name: string;
@@ -33,10 +33,9 @@ function formatCurrency(value: DecimalLike): string {
   return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function billingSourceLabel(source: TenantBillingState['source'] | undefined): string {
+function billingSourceLabel(source: string | undefined): string {
   if (source === 'billing_v2') return 'Billing V2';
-  if (source === 'legacy_fallback') return 'Fallback legado';
-  return 'Sem assinatura';
+  return 'Nenhuma assinatura';
 }
 
 export function DashboardPage() {

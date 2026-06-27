@@ -362,7 +362,7 @@ export class AdminAiAgentController {
       });
 
       const allModels = data?.data ?? [];
-      const formattedModels = allModels.map((m: any) => {
+      const formattedModels = allModels.map((m: { id: string; name?: string; description?: string; context_length?: number; pricing?: { prompt?: string | number; completion?: string | number } }) => {
         const isFree = m.pricing?.prompt === "0" && m.pricing?.completion === "0" || m.pricing?.prompt === "0.0" && m.pricing?.completion === "0.0" || m.pricing?.prompt === 0 && m.pricing?.completion === 0;
         return {
           id: m.id,

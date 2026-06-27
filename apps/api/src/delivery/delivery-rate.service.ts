@@ -24,8 +24,7 @@ export type DeliveryMatchedStrategy =
   | 'custom_zone_free'
   | 'base_radius'
   | 'out_of_coverage'
-  | 'delivery_disabled'
-  | 'legacy_rules';
+  | 'delivery_disabled';
 
 export interface DeliveryDecision {
   canDeliver: boolean;
@@ -115,15 +114,7 @@ export class DeliveryRateService {
     ]);
 
     if (!cfg) {
-      const legacy = await this.calculateRateLegacy(input);
-      return {
-        canDeliver: true,
-        matchedStrategy: 'legacy_rules',
-        matchedZoneId: legacy.rule.id,
-        fee: legacy.fee,
-        distanceKm: input.distanceKm ?? null,
-        reason: legacy.rule.description,
-      };
+      throw new UnprocessableEntityException('Nenhuma zona de entrega configurada para este estabelecimento.');
     }
 
     if (!cfg.isDeliveryEnabled) {
@@ -509,129 +500,6 @@ export class DeliveryRateService {
     return this.normalizePolygonFromGeoJson(rule.geoJson);
   }
 
-  private async calculateRateLegacy(input: CalculateDeliveryRateInput): Promise<DeliveryFeeCalculation> {
-    const rules = await this.deliveryRateRuleRepo.findMany({
-      where: {
-        tenantId: input.tenantId,
-        isActive: true,
-      },
-      orderBy: [{ priority: 'asc' }, { createdAt: 'asc' }],
-    });
-
-    const addressNeighborhood =
-      typeof input.address?.neighborhood === 'string' && input.address.neighborhood.trim() !== ''
-        ? this.normalizeNeighborhood(input.address.neighborhood)
-        : null;
-
-    const hasPoint =
-      typeof input.address?.lat === 'number' &&
-      typeof input.address?.lng === 'number' &&
-      Number.isFinite(input.address.lat) &&
-      Number.isFinite(input.address.lng);
-    const distanceKm = input.distanceKm ?? null;
-
-    const candidates: Array<{ id: string; type: DeliveryRateRuleType }> = [];
-
-    const typeOrder: DeliveryRateRuleType[] = ['POLYGON', 'NEIGHBORHOOD', 'DISTANCE', 'FIXED'];
-
-    for (const currentType of typeOrder) {
-      for (const rule of rules) {
-        const engineType = this.mapDbTypeToEngineType(String(rule.type));
-        if (engineType !== currentType) continue;
-
-        let isMatch = false;
-        if (engineType === 'POLYGON') {
-          if (hasPoint) {
-            const poly = this.getPolygonForRule(rule);
-            if (poly && poly.length >= 3) {
-              if (input.address && typeof input.address.lat === 'number' && typeof input.address.lng === 'number') {
-                isMatch = this.isPointInsidePolygon(
-                  { lat: input.address.lat, lng: input.address.lng },
-                  poly,
-                );
-              }
-            }
-          }
-        } else if (engineType === 'NEIGHBORHOOD') {
-          if (addressNeighborhood && typeof rule.neighborhood === 'string') {
-            isMatch = this.normalizeNeighborhood(rule.neighborhood) === addressNeighborhood;
-          }
-        } else if (engineType === 'DISTANCE') {
-          if (typeof distanceKm === 'number' && Number.isFinite(distanceKm)) {
-            const distanceKmValue = distanceKm;
-            const r = (rule as unknown) as { minDistanceKm: number | null; maxDistanceKm: number | null; minKm: number | null; maxKm: number | null };
-            isMatch = this.isDistanceRuleMatch(
-              r,
-              distanceKmValue,
-            );
-          }
-        } else if (engineType === 'FIXED') {
-          isMatch = true;
-        }
-
-        if (!isMatch) continue;
-
-        candidates.push({ id: rule.id, type: engineType });
-
-        const fee =
-          engineType === 'NEIGHBORHOOD'
-            ? Number(rule.rate ?? 0)
-            : engineType === 'DISTANCE'
-              ? Number(rule.ratePerKm ?? 0) * (typeof distanceKm === 'number' ? distanceKm : 0)
-              : engineType === 'POLYGON'
-                ? Number(rule.fixedRate ?? rule.rate ?? 0)
-                : Number(rule.fixedRate ?? 0);
-
-        if (candidates.length > 1) {
-          this.logger.warn(
-            `calculateRate conflict: tenantId=${input.tenantId} candidates=${candidates
-              .map((c) => `${c.type}:${c.id}`)
-              .join(',')}`,
-          );
-        }
-
-        return {
-          fee,
-          rule: {
-            id: rule.id,
-            type: engineType,
-            description:
-              engineType === 'NEIGHBORHOOD'
-                ? `Taxa para bairro: ${rule.neighborhood ?? ''}`
-                : engineType === 'DISTANCE'
-                  ? 'Taxa por distância'
-                  : engineType === 'FIXED'
-                    ? 'Taxa fixa padrão'
-                    : 'Taxa por polígono',
-          },
-        };
-      }
-    }
-
-    const fallback = rules.find(
-      (r: (typeof rules)[number]) =>
-        'isFallback' in r && (r as { isFallback?: unknown }).isFallback === true,
-    );
-    if (fallback) {
-      const engineType = this.mapDbTypeToEngineType(String(fallback.type)) ?? 'FIXED';
-      const fee =
-        engineType === 'NEIGHBORHOOD'
-          ? Number(fallback.rate ?? 0)
-          : engineType === 'DISTANCE'
-            ? Number(fallback.ratePerKm ?? 0)
-            : Number(fallback.fixedRate ?? 0);
-      return {
-        fee,
-        rule: {
-          id: fallback.id,
-          type: engineType,
-          description: 'Taxa fallback',
-        },
-      };
-    }
-
-    throw new UnprocessableEntityException('Nenhuma regra de taxa de entrega válida e sem fallback configurado.');
-  }
 
   async calculateRate(input: CalculateDeliveryRateInput): Promise<DeliveryFeeCalculation> {
     try {
@@ -639,9 +507,7 @@ export class DeliveryRateService {
         where: { tenantId: input.tenantId },
       });
 
-      if (!cfg) {
-        return this.calculateRateLegacy(input);
-      }
+
 
       const decision = await this.calculateDeliveryDecision(input);
       return {
@@ -654,13 +520,7 @@ export class DeliveryRateService {
         resolvedCoordinates: decision.resolvedCoordinates,
       };
     } catch (error: unknown) {
-      if (error instanceof UnprocessableEntityException) {
-        try {
-          return await this.calculateRateLegacy(input);
-        } catch {
-          // Preserve the original coverage/geocoding error if legacy rules cannot resolve it either.
-        }
-      }
+
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Error calculating delivery rate: ${message}`);
       throw error;

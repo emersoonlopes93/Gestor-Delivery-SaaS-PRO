@@ -6,13 +6,12 @@ import {
   Prisma,
   TenantBillingSubscription,
   TenantStatus,
-  TenantSubscription,
   TenantSubscriptionStatus,
 } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { BillingPaymentGatewayService } from './billing-payment-gateway.service';
 
-export type TenantBillingStateSource = 'billing_v2' | 'legacy_fallback' | 'none';
+export type TenantBillingStateSource = 'billing_v2' | 'none';
 
 export type TenantBillingState = {
   hasBillingV2: boolean;
@@ -23,7 +22,6 @@ export type TenantBillingState = {
   includedModules: string[];
   source: TenantBillingStateSource;
   subscription: TenantBillingSubscription | null;
-  legacySubscriptionId: string | null;
   warning: string | null;
 };
 
@@ -33,11 +31,7 @@ export type TenantEntitlements = {
   source: TenantBillingStateSource;
 };
 
-type LegacySubscriptionWithPlan = TenantSubscription & {
-  plan: {
-    features: Prisma.JsonValue | null;
-  };
-};
+
 
 const DEFAULT_BILLING_PLAN_SLUG = 'revenue-growth';
 
@@ -101,31 +95,9 @@ export class TenantBillingResolverService {
         includedModules,
         source: 'billing_v2',
         subscription,
-        legacySubscriptionId: subscription.legacyTenantSubscriptionId,
         warning: subscription.requiresPaymentMethod
           ? 'Método de pagamento configurado como obrigatório, mas cobrança automática ainda não está ativa.'
           : null,
-      };
-    }
-
-    const legacySubscription = await this.prisma.tenantSubscription.findUnique({
-      where: { tenantId },
-      include: { plan: true },
-    });
-
-    if (legacySubscription) {
-      this.logger.warn(`Tenant ${tenantId} usando fallback legado de billing; nenhuma TenantBillingSubscription V2 encontrada.`);
-      return {
-        hasBillingV2: false,
-        subscriptionStatus: legacySubscription.status,
-        plan: null,
-        trialEndsAt: legacySubscription.trialEndsAt,
-        allowAllModules: false,
-        includedModules: this.resolveLegacyModules(legacySubscription),
-        source: 'legacy_fallback',
-        subscription: null,
-        legacySubscriptionId: legacySubscription.id,
-        warning: 'Tenant ainda usa assinatura legada como fallback temporário.',
       };
     }
 
@@ -138,8 +110,7 @@ export class TenantBillingResolverService {
       includedModules: [],
       source: 'none',
       subscription: null,
-      legacySubscriptionId: null,
-      warning: 'Tenant sem assinatura Billing V2 e sem fallback legado.',
+      warning: 'Tenant sem assinatura Billing V2 ativa.',
     };
   }
 
@@ -240,11 +211,6 @@ export class TenantBillingResolverService {
       throw new NotFoundException('Plano Billing V2 ativo não encontrado.');
     }
 
-    const legacySubscription = await this.prisma.tenantSubscription.findUnique({
-      where: { tenantId },
-      select: { id: true },
-    });
-
     const now = new Date();
     const trialDays = Math.max(0, plan.trialDays);
     const cycleEnd = new Date(now);
@@ -265,7 +231,6 @@ export class TenantBillingResolverService {
         currentCycleEndsAt: cycleEnd,
         requiresPaymentMethod: plan.requiresPaymentMethod,
         provider,
-        legacyTenantSubscriptionId: legacySubscription?.id ?? null,
       },
     });
 
@@ -346,13 +311,7 @@ export class TenantBillingResolverService {
     return plan.modules.filter((module) => module.isIncluded).map((module) => module.moduleKey);
   }
 
-  private resolveLegacyModules(subscription: LegacySubscriptionWithPlan): string[] {
-    const features = subscription.plan.features;
-    if (!features || typeof features !== 'object' || Array.isArray(features)) return [];
-    return Object.entries(features)
-      .filter(([, enabled]) => enabled === true)
-      .map(([feature]) => feature);
-  }
+
 
   private addDays(date: Date, days: number): Date {
     const copy = new Date(date);

@@ -2,7 +2,7 @@ import { api } from '../../lib/api-client';
 
 export type DecimalLike = string | number;
 
-export type TenantBillingSource = 'billing_v2' | 'legacy_fallback' | 'none';
+export type TenantBillingSource = 'billing_v2' | 'none';
 
 export type TenantBillingRevenueTier = {
   id: string;

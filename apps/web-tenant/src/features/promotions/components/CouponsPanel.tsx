@@ -220,7 +220,6 @@ export function CouponsPanel() {
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Valor</label>
               {form.type === 'fixed_amount' ? (
                 <CurrencyInput
-                  disabled={form.type === 'free_shipping'}
                   className="input-premium"
                   value={form.value}
                   onChange={(val) => setForm({ ...form, value: val || 0 })}

@@ -43,8 +43,6 @@ const baseEnvSchema = z.object({
   // Mercado Pago
   MERCADO_PAGO_WEBHOOK_SECRET: z.string().default(''),
 
-
-
   // AI Providers. SaaS Admin database config has runtime priority; ENV is fallback.
   OPENAI_API_KEY: z.string().default(''),
   OPENAI_MODEL: z.string().default(''),
@@ -71,217 +69,35 @@ const baseEnvSchema = z.object({
   BULLMQ_ENABLED: z.enum(['true', 'false']).default('false'),
   CAMPAIGNS_DISPATCH_ENABLED: z.enum(['true', 'false']).default('false'),
   BILLING_DB_PREFLIGHT: z.enum(['strict', 'warn', 'off']).optional(),
-  BILLING_PAYMENTS_ENABLED: z.enum(['true', 'false']).default('false'),
-  BILLING_GATEWAY_PROVIDER: z.enum(['manual', 'mock', 'asaas', 'mercado_pago', 'stripe']).default('manual'),
-  BILLING_GATEWAY_MODE: z.enum(['disabled', 'manual', 'sandbox', 'production']).default('disabled'),
-  ASAAS_BILLING_API_KEY: z.string().default(''),
-  ASAAS_BILLING_BASE_URL: z.string().default('https://api-sandbox.asaas.com/v3'),
-  ASAAS_BILLING_WEBHOOK_SECRET: z.string().default(''),
-  ASAAS_WEBHOOK_TOKEN: z.string().default(''),
-  ASAAS_WEBHOOK_HMAC_SECRET: z.string().default(''),
-  ASAAS_WEBHOOK_ALLOW_LEGACY_TOKEN: z.enum(['true', 'false']).default('false'),
-  WEBHOOK_SECURITY_SMOKE_ENABLED: z.enum(['true', 'false']).default('false'),
-  WEBHOOK_REPLAY_WINDOW_SECONDS: z.coerce.number().int().positive().default(300),
-
-  // Storage Driver & Cloudflare R2
-  STORAGE_DRIVER: z.enum(['local', 'r2']).optional(),
-  MEDIA_STORAGE_PROVIDER: z.enum(['local', 'r2']).optional(),
-  MEDIA_STORAGE_DRIVER: z.enum(['local', 'r2']).optional(),
-  MEDIA_LOCAL_ROOT: z.string().optional(),
-  MEDIA_UPLOAD_DIR: z.string().optional(),
-  MEDIA_PUBLIC_BASE_URL: z.string().optional(),
-  MEDIA_CDN_BASE_URL: z.string().optional(),
-  MEDIA_MAX_SIZE_BYTES: z.coerce.number().int().positive().optional(),
-  MEDIA_MAX_FILE_SIZE_MB: z.coerce.number().int().positive().optional(),
-  R2_ACCOUNT_ID: z.string().default(''),
-  R2_ACCESS_KEY_ID: z.string().default(''),
-  R2_SECRET_ACCESS_KEY: z.string().default(''),
-  R2_BUCKET: z.string().default(''),
-  R2_PUBLIC_BASE_URL: z.string().default(''),
-  R2_REGION: z.string().default('auto'),
 });
 
-const envSchema = baseEnvSchema
-  .transform((data) => {
-    const isProduction = data.NODE_ENV === 'production';
-    const resolvedDriver = data.MEDIA_STORAGE_PROVIDER || data.MEDIA_STORAGE_DRIVER || data.STORAGE_DRIVER || (isProduction ? 'r2' : 'local');
-    return {
-      ...data,
-      STORAGE_DRIVER: resolvedDriver as 'local' | 'r2',
-      MEDIA_STORAGE_PROVIDER: resolvedDriver as 'local' | 'r2',
-    };
-  })
-  .superRefine((data, ctx) => {
-    const isProduction = data.NODE_ENV === 'production';
-
-    if (data.BILLING_GATEWAY_MODE === 'production' && !isProduction) {
+export const envSchema = baseEnvSchema.superRefine((data, ctx) => {
+  if (data.NODE_ENV === 'production') {
+    if (data.REDIS_ENABLED === 'false') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['BILLING_GATEWAY_MODE'],
-        message: `BILLING_GATEWAY_MODE='production' só é permitido com NODE_ENV='production'.`,
+        path: ['REDIS_ENABLED'],
+        message: `REDIS_ENABLED must be 'true' in production.`,
       });
     }
 
-    if (data.BILLING_PAYMENTS_ENABLED === 'true' && data.BILLING_GATEWAY_MODE === 'disabled') {
+    if (!data.REDIS_HOST || data.REDIS_HOST === 'localhost' || data.REDIS_HOST === '127.0.0.1') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['BILLING_PAYMENTS_ENABLED'],
-        message: `BILLING_PAYMENTS_ENABLED='true' exige BILLING_GATEWAY_MODE='manual', 'sandbox' ou 'production'.`,
+        path: ['REDIS_HOST'],
+        message: `REDIS_HOST não pode ser localhost ou vazio em produção.`,
       });
     }
 
-    if (data.BILLING_GATEWAY_PROVIDER === 'mock' && data.BILLING_GATEWAY_MODE !== 'sandbox') {
+    if (data.BULLMQ_ENABLED !== 'true') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['BILLING_GATEWAY_PROVIDER'],
-        message: `BILLING_GATEWAY_PROVIDER='mock' exige BILLING_GATEWAY_MODE='sandbox'.`,
+        path: ['BULLMQ_ENABLED'],
+        message: `BULLMQ_ENABLED must be 'true' in production.`,
       });
     }
-
-    if (data.BILLING_GATEWAY_PROVIDER === 'manual' && data.BILLING_GATEWAY_MODE !== 'disabled' && data.BILLING_GATEWAY_MODE !== 'manual') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['BILLING_GATEWAY_PROVIDER'],
-        message: `BILLING_GATEWAY_PROVIDER='manual' exige BILLING_GATEWAY_MODE='manual' quando pagamentos estao ativos.`,
-      });
-    }
-
-    if (data.BILLING_GATEWAY_PROVIDER === 'asaas' && data.BILLING_GATEWAY_MODE !== 'sandbox') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['BILLING_GATEWAY_PROVIDER'],
-        message: `BILLING_GATEWAY_PROVIDER='asaas' esta liberado somente com BILLING_GATEWAY_MODE='sandbox' nesta fase.`,
-      });
-    }
-
-    if (data.BILLING_GATEWAY_PROVIDER === 'asaas' && data.BILLING_GATEWAY_MODE === 'sandbox') {
-      if (!data.ASAAS_BILLING_BASE_URL.startsWith('https://api-sandbox.asaas.com/v3')) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['ASAAS_BILLING_BASE_URL'],
-          message: `ASAAS_BILLING_BASE_URL deve apontar para https://api-sandbox.asaas.com/v3 nesta fase.`,
-        });
-      }
-
-      if (data.BILLING_PAYMENTS_ENABLED === 'true' && !data.ASAAS_BILLING_API_KEY.trim()) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['ASAAS_BILLING_API_KEY'],
-          message: `ASAAS_BILLING_API_KEY e obrigatoria quando Asaas billing sandbox esta ativo.`,
-        });
-      }
-    }
-
-    if (isProduction && data.STORAGE_DRIVER === 'local') {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['STORAGE_DRIVER'],
-        message: `STORAGE_DRIVER='local' não é permitido em produção. Defina STORAGE_DRIVER=r2.`,
-      });
-    }
-
-    if (data.STORAGE_DRIVER === 'r2') {
-      const requiredR2Fields = [
-        'R2_ACCOUNT_ID',
-        'R2_ACCESS_KEY_ID',
-        'R2_SECRET_ACCESS_KEY',
-        'R2_BUCKET',
-        'R2_PUBLIC_BASE_URL',
-      ] as const;
-
-      for (const field of requiredR2Fields) {
-        if (!data[field] || data[field].trim() === '') {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: [field],
-            message: `${field} é obrigatório quando STORAGE_DRIVER é 'r2' (ou em produção).`,
-          });
-        }
-      }
-    }
-
-    if (isProduction) {
-      if (data.JWT_SECRET === data.JWT_REFRESH_SECRET) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['JWT_REFRESH_SECRET'],
-          message: `JWT_REFRESH_SECRET deve ser diferente de JWT_SECRET em producao.`,
-        });
-      }
-
-      if (data.JWT_SECRET.length < 32 || data.JWT_REFRESH_SECRET.length < 32) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['JWT_SECRET'],
-          message: `JWT_SECRET e JWT_REFRESH_SECRET devem ter pelo menos 32 caracteres em producao.`,
-        });
-      }
-
-      if (!data.CORS_ORIGINS.trim() || data.CORS_ORIGINS.includes('localhost')) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['CORS_ORIGINS'],
-          message: `CORS_ORIGINS deve ser restrito a dominios reais em producao e nao pode conter localhost.`,
-        });
-      }
-
-      if (data.SWAGGER_ENABLED !== 'false') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['SWAGGER_ENABLED'],
-          message: `SWAGGER_ENABLED deve ser 'false' em producao.`,
-        });
-      }
-
-      if (!data.ASAAS_WEBHOOK_HMAC_SECRET.trim()) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['ASAAS_WEBHOOK_HMAC_SECRET'],
-          message: `ASAAS_WEBHOOK_HMAC_SECRET e obrigatorio em producao.`,
-        });
-      }
-
-      if (data.ASAAS_WEBHOOK_ALLOW_LEGACY_TOKEN !== 'false') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['ASAAS_WEBHOOK_ALLOW_LEGACY_TOKEN'],
-          message: `ASAAS_WEBHOOK_ALLOW_LEGACY_TOKEN deve ser 'false' em producao.`,
-        });
-      }
-
-      if (data.WEBHOOK_SECURITY_SMOKE_ENABLED !== 'false') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['WEBHOOK_SECURITY_SMOKE_ENABLED'],
-          message: `WEBHOOK_SECURITY_SMOKE_ENABLED deve ser 'false' em producao.`,
-        });
-      }
-
-      if (data.REDIS_ENABLED === 'false') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['REDIS_ENABLED'],
-          message: `REDIS_ENABLED must be 'true' in production.`,
-        });
-      }
-
-      if (!data.REDIS_HOST || data.REDIS_HOST === 'localhost' || data.REDIS_HOST === '127.0.0.1') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['REDIS_HOST'],
-          message: `REDIS_HOST não pode ser localhost ou vazio em produção.`,
-        });
-      }
-
-      if (data.BULLMQ_ENABLED !== 'true') {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['BULLMQ_ENABLED'],
-          message: `BULLMQ_ENABLED must be 'true' in production.`,
-        });
-      }
-    }
-  });
+  }
+});
 
 export type Env = z.infer<typeof envSchema>;
 

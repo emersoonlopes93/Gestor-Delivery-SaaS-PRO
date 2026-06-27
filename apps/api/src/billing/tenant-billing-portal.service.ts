@@ -260,9 +260,7 @@ export class TenantBillingPortalService {
     if (source === 'billing_v2' && requiresPaymentMethod) {
       return 'Método de pagamento configurado como obrigatório, mas cobrança automática ainda não está ativa.';
     }
-    if (source === 'legacy_fallback') {
-      return 'Tenant ainda usa assinatura legada como fallback temporário.';
-    }
+
     if (source === 'none') {
       return 'Tenant sem assinatura Billing V2 e sem fallback legado.';
     }

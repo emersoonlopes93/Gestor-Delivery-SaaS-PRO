@@ -6,12 +6,9 @@ import { Modal } from '../../components/Modal'; // Assuming Modal is here
 import { RecipeModal } from '../inventory/RecipeModal';
 import { ProductBasicInfo } from './SubComponents/ProductBasicInfo';
 import { ProductPersonalization } from './SubComponents/ProductPersonalization';
-import { CategoryBuilder } from './SubComponents/CategoryBuilder';
-import { CurrencyInput } from '@gestor/ui';
 import { ComboBuilder } from './SubComponents/ComboBuilder';
 import { PublicationSettings } from './SubComponents/PublicationSettings';
 import { InfoTooltip } from '../../components/InfoTooltip';
-import { VirtualMultiSelect } from '../../components/ui/VirtualMultiSelect';
 import { useForm, FormProvider } from 'react-hook-form';
 import { CatalogEditorProvider } from './CatalogEditorContext';
 import { CatalogProductFormState } from './CatalogEditorTypes';
@@ -20,20 +17,14 @@ import { OptionGroupEditorModal } from './SubComponents/OptionGroupEditorModal';
 import {
   CatalogAvailabilityRule,
   CatalogPublication,
-  ComboSlot,
-  ComboSlotAllowedItem,
   CreateAvailabilityRuleDto,
   CreateComboBundleItemDto,
-  CreateComboSlotAllowedItemDto,
-  CreateComboSlotDto,
   CreateProductOptionGroupLinkDto,
   OptionGroup,
   Product,
   ProductOptionGroupLink,
   UpdateAvailabilityRuleDto,
   UpdateComboBundleItemDto,
-  UpdateComboSlotAllowedItemDto,
-  UpdateComboSlotDto,
   UpdateProductOptionGroupLinkDto,
   UpsertPublicationDto,
   Upsell,
@@ -58,9 +49,6 @@ type LinkWithGroup = ProductOptionGroupLink & {
   optionGroup: OptionGroup & { items?: OptionItem[] };
 };
 
-type SlotWithAllowed = ComboSlot & {
-  allowedItems?: Array<ComboSlotAllowedItem & { product?: Product }>;
-};
 
 type BundleItemWithProduct = {
   id: string;
@@ -195,7 +183,6 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
   });
 
   // Combo
-  const [slots, setSlots] = useState<SlotWithAllowed[]>([]);
   const [bundleItems, setBundleItems] = useState<BundleItemWithProduct[]>([]);
   const [bundleSummary, setBundleSummary] = useState<{
     subtotal: number;
@@ -206,31 +193,9 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
   } | null>(null);
   const [comboPricingType, setComboPricingType] = useState<ComboPricingType>('fixed_price');
   const [comboPricingValue, setComboPricingValue] = useState(0);
-  const [comboModeState, setComboModeState] = useState<'bundle' | 'slot'>('bundle');
   const [products, setProducts] = useState<Product[]>([]);
 
-  const [isSlotModalOpen, setIsSlotModalOpen] = useState(false);
-  const [editingSlot, setEditingSlot] = useState<SlotWithAllowed | null>(null);
-  const [slotForm, setSlotForm] = useState<CreateComboSlotDto>({
-    comboProductId: productId,
-    name: '',
-    description: '',
-    isRequired: true,
-    minSelect: 1,
-    maxSelect: 1,
-    order: 0,
-  });
 
-  const [isAllowedModalOpen, setIsAllowedModalOpen] = useState(false);
-  const [allowedTargetSlotId, setAllowedTargetSlotId] = useState<string>('');
-  const [editingAllowed, setEditingAllowed] = useState<(ComboSlotAllowedItem & { product?: Product }) | null>(null);
-  const [allowedForm, setAllowedForm] = useState<CreateComboSlotAllowedItemDto>({
-    comboSlotId: '',
-    productId: '',
-    additionalPrice: 0,
-    order: 0,
-  });
-  const [allowedFormProductIds, setAllowedFormProductIds] = useState<string[]>([]);
   const [isBundleItemModalOpen, setIsBundleItemModalOpen] = useState(false);
   const [editingBundleItem, setEditingBundleItem] = useState<BundleItemWithProduct | null>(null);
   const [bundleItemForm, setBundleItemForm] = useState<CreateComboBundleItemDto>({
@@ -288,7 +253,7 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
 
       if (prodRes.success) {
         setProduct(prodRes.data);
-        setComboModeState(prodRes.data.comboMode ?? 'bundle');
+
         setComboPricingType(prodRes.data.comboPricingType ?? 'fixed_price');
         setComboPricingValue(Number(prodRes.data.comboPricingValue ?? prodRes.data.basePrice ?? 0));
         if (prodRes.data.optionItemPrices) {
@@ -325,16 +290,8 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
         }
       }
 
-      // Carregar combo-slots apenas se o produto for do tipo combo
       if (prodRes.success && (isComboMode || prodRes.data.type === 'combo')) {
         const isBundleCombo = (prodRes.data.comboMode ?? 'bundle') === 'bundle';
-        try {
-          const slotsRes = await api.get<SlotWithAllowed[]>(`/catalog/products/${productId}/combo-slots`);
-          if (slotsRes.success) setSlots(slotsRes.data);
-        } catch (error) {
-          console.warn('Não foi possível carregar combo-slots:', error);
-          setSlots([]);
-        }
         if (isBundleCombo) {
           try {
             const [bundleRes, summaryRes] = await Promise.all([
@@ -371,7 +328,6 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
           });
         }
       } else {
-        setSlots([]);
         setBundleItems([]);
         setBundleSummary(null);
       }
@@ -598,219 +554,7 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
 
   // -------------------- Combo handlers --------------------
 
-  const openSlotModal = (slot?: SlotWithAllowed) => {
-    if (slot) {
-      setEditingSlot(slot);
-      setSlotForm({
-        comboProductId: productId,
-        name: slot.name,
-        description: slot.description ?? '',
-        isRequired: slot.isRequired,
-        minSelect: slot.minSelect,
-        maxSelect: slot.maxSelect,
-        order: slot.order,
-      });
-    } else {
-      setEditingSlot(null);
-      setSlotForm({
-        comboProductId: productId,
-        name: '',
-        description: '',
-        isRequired: true,
-        minSelect: 1,
-        maxSelect: 1,
-        order: slots.length,
-      });
-    }
-    setIsSlotModalOpen(true);
-  };
 
-  const saveSlot = async () => {
-    setSavingStates((p) => ({ ...p, saveSlot: true }));
-    try {
-      // Verificar se o produto é do tipo combo antes de prosseguir
-      if (!product || product.type !== 'combo') {
-        throw new Error('Apenas produtos do tipo combo podem ter slots.');
-      }
-
-      const payload: Omit<CreateComboSlotDto, 'comboProductId'> = {
-        name: slotForm.name,
-        description: slotForm.description,
-        isRequired: slotForm.isRequired,
-        minSelect: slotForm.minSelect,
-        maxSelect: slotForm.maxSelect,
-        order: slotForm.order,
-      };
-
-      if (editingSlot) {
-        const upd: UpdateComboSlotDto = payload;
-        if (!productId) throw new Error('productId não disponível');
-      await api.patch(`/catalog/products/${productId}/combo-slots/${editingSlot.id}`, upd);
-      } else {
-        if (!productId) throw new Error('productId não disponível');
-      await api.post(`/catalog/products/${productId}/combo-slots`, payload);
-      }
-
-      setIsSlotModalOpen(false);
-      await loadAll();
-    } finally {
-      setSavingStates((p) => ({ ...p, saveSlot: false }));
-    }
-  };
-
-  const deleteSlot = async (slotId: string) => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Confirmar Exclusão',
-      message: 'Excluir este slot do combo?',
-      onConfirm: async () => {
-        setConfirmModal(null);
-        setSavingStates((p) => ({ ...p, [`delete-slot-${slotId}`]: true }));
-        try {
-          if (!productId) throw new Error('productId não disponível');
-          await api.delete(`/catalog/products/${productId}/combo-slots/${slotId}`);
-          await loadAll();
-        } finally {
-          setSavingStates((p) => ({ ...p, [`delete-slot-${slotId}`]: false }));
-        }
-      }
-    });
-  };
-
-  const reorderSlots = async (orderedSlotIds: string[]) => {
-    setSavingStates((p) => ({ ...p, reorderSlots: true }));
-    try {
-      if (!productId) throw new Error('productId não disponível');
-      await api.post(`/catalog/products/${productId}/combo-slots/reorder`, { orderedSlotIds });
-      await loadAll();
-    } finally {
-      setSavingStates((p) => ({ ...p, reorderSlots: false }));
-    }
-  };
-
-  const moveSlot = async (slotId: string, direction: -1 | 1) => {
-    const list = [...slots].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    const idx = list.findIndex((s) => s.id === slotId);
-    const nextIdx = idx + direction;
-    if (idx < 0 || nextIdx < 0 || nextIdx >= list.length) return;
-    const swapped = [...list];
-    const tmp = swapped[idx];
-    swapped[idx] = swapped[nextIdx];
-    swapped[nextIdx] = tmp;
-    await reorderSlots(swapped.map((s) => s.id));
-  };
-
-  const openAllowedModal = async (slotId: string, allowed?: ComboSlotAllowedItem & { product?: Product }) => {
-    await loadProductsIfNeeded();
-    setAllowedTargetSlotId(slotId);
-
-    if (allowed) {
-      setEditingAllowed(allowed);
-      setAllowedForm({
-        comboSlotId: slotId,
-        productId: allowed.productId,
-        additionalPrice: Number(allowed.additionalPrice ?? 0),
-        order: allowed.order,
-      });
-      setAllowedFormProductIds([allowed.productId]);
-    } else {
-      setEditingAllowed(null);
-      setAllowedForm({
-        comboSlotId: slotId,
-        productId: '',
-        additionalPrice: 0,
-        order: 0,
-      });
-      setAllowedFormProductIds([]);
-    }
-
-    setIsAllowedModalOpen(true);
-  };
-
-  const saveAllowed = async () => {
-    if (!allowedTargetSlotId) return;
-    if (allowedFormProductIds.length === 0) {
-      setAlertModal({ isOpen: true, title: 'Atenção', message: 'Selecione ao menos um produto.' });
-      return;
-    }
-    setSavingStates((p) => ({ ...p, saveAllowed: true }));
-    try {
-      if (editingAllowed) {
-        // Modo edição: só salva o primeiro da lista, se mudaram
-        const payload: UpdateComboSlotAllowedItemDto = {
-          productId: allowedFormProductIds[0],
-          additionalPrice: allowedForm.additionalPrice,
-          order: allowedForm.order,
-        };
-        if (!allowedTargetSlotId || !editingAllowed?.id) throw new Error('Parâmetros inválidos');
-        await api.patch(
-          `/catalog/products/${productId}/combo-slots/${allowedTargetSlotId}/allowed-items/${editingAllowed.id}`,
-          payload,
-        );
-      } else {
-        // Modo criação: Promise.all para criar todos os selecionados
-        if (!allowedTargetSlotId) throw new Error('allowedTargetSlotId não disponível');
-        const targetSlot = slots.find(s => s.id === allowedTargetSlotId);
-        const startIndex = targetSlot?.allowedItems?.length || 0;
-        
-        await Promise.all(allowedFormProductIds.map((prodId, index) => {
-          const payload: Omit<CreateComboSlotAllowedItemDto, 'comboSlotId'> = {
-            productId: prodId,
-            additionalPrice: allowedForm.additionalPrice,
-            order: startIndex + index,
-          };
-          return api.post(`/catalog/products/${productId}/combo-slots/${allowedTargetSlotId}/allowed-items`, payload);
-        }));
-      }
-
-      setIsAllowedModalOpen(false);
-      await loadAll();
-    } finally {
-      setSavingStates((p) => ({ ...p, saveAllowed: false }));
-    }
-  };
-
-  const deleteAllowed = async (slotId: string, idToDelete: string) => {
-    setConfirmModal({
-      isOpen: true,
-      title: 'Confirmar Exclusão',
-      message: 'Excluir este item permitido?',
-      onConfirm: async () => {
-        setConfirmModal(null);
-        setSavingStates((p) => ({ ...p, [`delete-allowed-${idToDelete}`]: true }));
-        try {
-          if (!productId) throw new Error('productId não disponível');
-          await api.delete(`/catalog/products/${productId}/combo-slots/${slotId}/allowed-items/${idToDelete}`);
-          await loadAll();
-        } finally {
-          setSavingStates((p) => ({ ...p, [`delete-allowed-${idToDelete}`]: false }));
-        }
-      }
-    });
-  };
-
-  const reorderAllowed = async (slotId: string, orderedAllowedItemIds: string[]) => {
-    setSavingStates((p) => ({ ...p, [`reorder-allowed-${slotId}`]: true }));
-    try {
-      if (!productId) throw new Error('productId não disponível');
-      await api.post(`/catalog/products/${productId}/combo-slots/${slotId}/allowed-items/reorder`, { orderedAllowedItemIds });
-      await loadAll();
-    } finally {
-      setSavingStates((p) => ({ ...p, [`reorder-allowed-${slotId}`]: false }));
-    }
-  };
-
-  const moveAllowed = async (slot: SlotWithAllowed, allowedId: string, direction: -1 | 1) => {
-    const list = [...(slot.allowedItems ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    const idx = list.findIndex((a) => a.id === allowedId);
-    const nextIdx = idx + direction;
-    if (idx < 0 || nextIdx < 0 || nextIdx >= list.length) return;
-    const swapped = [...list];
-    const tmp = swapped[idx];
-    swapped[idx] = swapped[nextIdx];
-    swapped[nextIdx] = tmp;
-    await reorderAllowed(slot.id, swapped.map((a) => a.id));
-  };
 
   const openBundleItemModal = async (item?: BundleItemWithProduct) => {
     await loadProductsIfNeeded();
@@ -891,22 +635,6 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
     }
   };
 
-  const convertComboToBundle = async () => {
-    if (!productId) return;
-    setSavingStates((p) => ({ ...p, convertBundle: true }));
-    try {
-      if (!productId) throw new Error('productId não disponível');
-      await api.patch(`/catalog/products/${productId}`, {
-        comboMode: 'bundle',
-        comboPricingType: comboPricingType ?? 'fixed_price',
-        comboPricingValue: Number(comboPricingValue || productForm.basePrice || 0),
-      });
-      await loadAll();
-      alert('Combo convertido para modo bundle com sucesso.');
-    } finally {
-      setSavingStates((p) => ({ ...p, convertBundle: false }));
-    }
-  };
 
   // -------------------- Publicação handlers --------------------
 
@@ -1020,7 +748,7 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
       productId, isNew, isComboMode, product, savingStates, setSavingStates, loadAll, handleSaveProduct, 
       goNextWizardStep, goPrevWizardStep, isComboWizard, isProductWizard, onOpenRecipe: () => setIsRecipeModalOpen(true),
       links, moveLink, openAddGroupModal, setIsCreateComplementModalOpen, openEditLinkModal, removeGroupLink,
-      bundleItems, bundleSummary, comboModeState, comboPricingType, setComboPricingType, comboPricingValue, setComboPricingValue, updateComboPricing, openBundleItemModal, deleteBundleItem, convertComboToBundle, slots, moveSlot, openAllowedModal, openSlotModal, deleteSlot, moveAllowed, deleteAllowed,
+      bundleItems, bundleSummary, comboPricingType, setComboPricingType, comboPricingValue, setComboPricingValue, updateComboPricing, openBundleItemModal, deleteBundleItem,
       publication, patchPublication, rules, openRuleModal, deleteRule, formatChannelLabel, formatDaysLabel
     }}>
     <div className="flex-1 p-8 overflow-y-auto bg-background/50 custom-scrollbar">
@@ -1367,126 +1095,7 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
         </div>
       </Modal>
 
-      {/* Combo Modals */}
-      <Modal
-        isOpen={isSlotModalOpen}
-        onClose={() => setIsSlotModalOpen(false)}
-        title={editingSlot ? 'Editar slot' : 'Novo slot'}
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() => setIsSlotModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted rounded-lg"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={saveSlot}
-              disabled={savingStates.saveSlot}
-              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {savingStates.saveSlot && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
-              Salvar
-            </button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Nome</label>
-            <input
-              value={slotForm.name}
-              onChange={(e) => setSlotForm((p) => ({ ...p, name: e.target.value }))}
-              className="input-premium"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Descrição</label>
-            <input
-              value={slotForm.description ?? ''}
-              onChange={(e) => setSlotForm((p) => ({ ...p, description: e.target.value }))}
-              className="input-premium"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={Boolean(slotForm.isRequired)}
-              onChange={(e) => setSlotForm((p) => ({ ...p, isRequired: e.target.checked }))}
-              className="w-4 h-4 text-primary-600"
-            />
-            <span className="text-sm font-bold text-foreground">Obrigatório</span>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Min</label>
-              <input
-                type="number"
-                value={Number(slotForm.minSelect ?? 1)}
-                onChange={(e) => setSlotForm((p) => ({ ...p, minSelect: Number(e.target.value || 1) }))}
-                className="input-premium"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Max</label>
-              <input
-                type="number"
-                value={Number(slotForm.maxSelect ?? 1)}
-                onChange={(e) => setSlotForm((p) => ({ ...p, maxSelect: Number(e.target.value || 1) }))}
-                className="input-premium"
-              />
-            </div>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={isAllowedModalOpen}
-        onClose={() => setIsAllowedModalOpen(false)}
-        title={editingAllowed ? 'Editar item permitido' : 'Adicionar item permitido'}
-        footer={
-          <>
-            <button
-              type="button"
-              onClick={() => setIsAllowedModalOpen(false)}
-              className="px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted rounded-lg"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={saveAllowed}
-              disabled={savingStates.saveAllowed}
-              className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {savingStates.saveAllowed && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
-              {editingAllowed ? 'Salvar' : 'Adicionar'}
-            </button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Produto(s)</label>
-            <VirtualMultiSelect
-              items={allowedProducts.map(p => ({ id: p.id, label: p.name, price: `R$ ${Number(p.basePrice ?? 0).toFixed(2)}` }))}
-              selectedIds={allowedFormProductIds}
-              onChange={setAllowedFormProductIds}
-              height={300}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Preço adicional</label>
-            <CurrencyInput
-              value={Number(allowedForm.additionalPrice ?? 0)}
-              onChange={(val) => setAllowedForm((p) => ({ ...p, additionalPrice: val || 0 }))}
-              className="input-premium"
-            />
-          </div>
-        </div>
-      </Modal>
+      {/* Combo Modals removed for legacy cleanup */}
 
       <Modal
         isOpen={isRuleModalOpen}
