@@ -1,8 +1,19 @@
 #!/bin/sh
 set -e
 
+# Tenta carregar do .env se as variáveis de ambiente do SO vieram vazias (sobrescritas pelo Compose)
+if [ -z "$DATABASE_URL" ] && [ -f ".env" ]; then
+  echo "DATABASE_URL vazia no ambiente do SO. Carregando do arquivo .env..."
+  export DATABASE_URL=$(grep -v '^#' .env | grep 'DATABASE_URL=' | head -n 1 | cut -d '=' -f2- | tr -d '"' | tr -d "'")
+fi
+
+if [ -z "$DIRECT_URL" ] && [ -f ".env" ]; then
+  echo "DIRECT_URL vazia no ambiente do SO. Carregando do arquivo .env..."
+  export DIRECT_URL=$(grep -v '^#' .env | grep 'DIRECT_URL=' | head -n 1 | cut -d '=' -f2- | tr -d '"' | tr -d "'")
+fi
+
 if [ -z "$DIRECT_URL" ]; then
-  echo "DIRECT_URL está vazia. Usando DATABASE_URL como fallback."
+  echo "DIRECT_URL ainda vazia. Usando DATABASE_URL como fallback."
   export DIRECT_URL="$DATABASE_URL"
 fi
 
