@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MapPin, Loader2 } from 'lucide-react';
+import { CurrencyInput } from '@gestor/ui';
 import { api } from '../../../lib/api-client';
 import { maskCEP, unmask } from '@gestor/utils';
 
@@ -245,12 +246,9 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">Taxa de entrega base (R$)</label>
-            <input
-              type="number"
-              min="0"
-              step="0.50"
-              value={form.deliveryFeeBase}
-              onChange={e => setForm(f => ({ ...f, deliveryFeeBase: e.target.value }))}
+            <CurrencyInput
+              value={Number(form.deliveryFeeBase) || 0}
+              onChange={val => setForm(f => ({ ...f, deliveryFeeBase: String(val) }))}
               className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-sm"
             />
           </div>
