@@ -24,9 +24,9 @@ services:
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_ENABLED: ${REDIS_ENABLED:-true}
     networks:
-      - cpnet_attach
+      - cpnet-attach
 
 networks:
-  cpnet_attach:
+  cpnet-attach:
     external: true
-    name: cpnet_attach
+    name: cpnet-attach
