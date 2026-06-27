@@ -12,9 +12,13 @@ if [ -z "$DIRECT_URL" ] && [ -f ".env" ]; then
   export DIRECT_URL=$(grep -v '^#' .env | grep 'DIRECT_URL=' | head -n 1 | cut -d '=' -f2- | tr -d '"' | tr -d "'")
 fi
 
+echo "DEBUG: DATABASE_URL no shell é '$DATABASE_URL'"
+echo "DEBUG: DIRECT_URL no shell antes do fallback é '$DIRECT_URL'"
+
 if [ -z "$DIRECT_URL" ]; then
   echo "DIRECT_URL ainda vazia. Usando DATABASE_URL como fallback."
   export DIRECT_URL="$DATABASE_URL"
+  echo "DEBUG: DIRECT_URL no shell após o fallback é '$DIRECT_URL'"
 fi
 
 echo "Aguardando banco de dados..."
