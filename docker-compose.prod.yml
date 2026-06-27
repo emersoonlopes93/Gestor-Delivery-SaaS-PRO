@@ -23,6 +23,11 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_ENABLED: ${REDIS_ENABLED:-true}
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
     networks:
       - cpnet-attach
 
