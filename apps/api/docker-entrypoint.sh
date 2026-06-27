@@ -1,6 +1,11 @@
 #!/bin/sh
 set -e
 
+if [ -z "$DIRECT_URL" ]; then
+  echo "DIRECT_URL está vazia. Usando DATABASE_URL como fallback."
+  export DIRECT_URL="$DATABASE_URL"
+fi
+
 echo "Aguardando banco de dados..."
 # Opcional: Adicionar check de conectividade com pg_isready se necessário
 
