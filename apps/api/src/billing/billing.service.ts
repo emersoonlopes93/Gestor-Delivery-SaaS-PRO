@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
-import { BillingCycle, Prisma, SubscriptionStatus } from '@prisma/client';
+import { BillingCycle, Prisma, TenantSubscriptionStatus, PaymentProvider } from '@prisma/client';
 import type { CreatePlanDto, UpdatePlanDto, CreateSubscriptionDto, UpdateSubscriptionDto } from './dto/create-plan.dto';
 import { AsaasService } from './asaas.service';
 
@@ -121,54 +121,65 @@ export class BillingService {
       description: `Assinatura Plano ${plan.name} - PedeHub`,
     });
 
-    const subscription = await this.prisma.tenantSubscription.upsert({
+    let subscription = await this.prisma.tenantBillingSubscription.findFirst({
       where: { tenantId: dto.tenantId },
-      update: {
-        planId: dto.planId,
-        status: SubscriptionStatus.trial,
-        trialEndsAt,
-        currentPeriodStartsAt: new Date(),
-        currentPeriodEndsAt: trialEndsAt,
-        asaasCustomerId: asaasCustomer.id,
-        asaasSubscriptionId: asaasSub.id,
-      },
-      create: {
-        tenantId: dto.tenantId,
-        planId: dto.planId,
-        status: SubscriptionStatus.trial,
-        trialEndsAt,
-        currentPeriodStartsAt: new Date(),
-        currentPeriodEndsAt: trialEndsAt,
-        asaasCustomerId: asaasCustomer.id,
-        asaasSubscriptionId: asaasSub.id,
-      },
     });
+
+    if (subscription) {
+      subscription = await this.prisma.tenantBillingSubscription.update({
+        where: { id: subscription.id },
+        data: {
+          billingPlanId: dto.planId,
+          status: TenantSubscriptionStatus.trialing,
+          trialEndsAt,
+          currentCycleStartedAt: new Date(),
+          currentCycleEndsAt: trialEndsAt,
+          providerCustomerId: asaasCustomer.id,
+          providerSubscriptionId: asaasSub.id,
+        },
+      });
+    } else {
+      subscription = await this.prisma.tenantBillingSubscription.create({
+        data: {
+          tenantId: dto.tenantId,
+          billingPlanId: dto.planId,
+          status: TenantSubscriptionStatus.trialing,
+          trialEndsAt,
+          currentCycleStartedAt: new Date(),
+          currentCycleEndsAt: trialEndsAt,
+          providerCustomerId: asaasCustomer.id,
+          providerSubscriptionId: asaasSub.id,
+        },
+      });
+    }
 
     this.logger.log(`Created trial subscription for tenant ${dto.tenantId} with Asaas sub: ${asaasSub.id}`);
     return subscription;
   }
 
   async getCurrentSubscription(tenantId: string) {
-    return this.prisma.tenantSubscription.findUnique({
+    return this.prisma.tenantBillingSubscription.findFirst({
       where: { tenantId },
-      include: { plan: true },
+      orderBy: { createdAt: 'desc' },
+      include: { billingPlan: true },
     });
   }
 
   async updateSubscription(tenantId: string, dto: UpdateSubscriptionDto) {
-    const subscription = await this.prisma.tenantSubscription.findUnique({
+    const subscription = await this.prisma.tenantBillingSubscription.findFirst({
       where: { tenantId },
+      orderBy: { createdAt: 'desc' },
     });
     if (!subscription) {
       throw new NotFoundException('Assinatura não encontrada.');
     }
 
-    const updateData: Prisma.TenantSubscriptionUpdateArgs['data'] = {};
-    if (dto.status) updateData.status = dto.status as SubscriptionStatus;
-    if (dto.planId) updateData.planId = dto.planId;
+    const updateData: Prisma.TenantBillingSubscriptionUpdateArgs['data'] = {};
+    if (dto.status) updateData.status = dto.status as TenantSubscriptionStatus;
+    if (dto.planId) updateData.billingPlanId = dto.planId;
 
     // If upgrading/downgrading plan, reset period
-    if (dto.planId && dto.planId !== subscription.planId) {
+    if (dto.planId && dto.planId !== subscription.billingPlanId) {
       const newPlan = await this.prisma.plan.findUnique({
         where: { id: dto.planId },
       });
@@ -176,14 +187,14 @@ export class BillingService {
         throw new NotFoundException('Novo plano não encontrado.');
       }
 
-      updateData.currentPeriodStartsAt = new Date();
+      updateData.currentCycleStartedAt = new Date();
       const periodEnd = new Date();
       periodEnd.setMonth(periodEnd.getMonth() + (newPlan.billingCycle === BillingCycle.yearly ? 12 : 1));
-      updateData.currentPeriodEndsAt = periodEnd;
+      updateData.currentCycleEndsAt = periodEnd;
     }
 
-    const updated = await this.prisma.tenantSubscription.update({
-      where: { tenantId },
+    const updated = await this.prisma.tenantBillingSubscription.update({
+      where: { id: subscription.id },
       data: updateData,
     });
 
@@ -194,11 +205,11 @@ export class BillingService {
   // === FEATURE GATING ===
   async hasFeature(tenantId: string, feature: string): Promise<boolean> {
     const subscription = await this.getCurrentSubscription(tenantId);
-    if (!subscription || subscription.status === SubscriptionStatus.canceled) {
+    if (!subscription || subscription.status === TenantSubscriptionStatus.canceled) {
       return false;
     }
 
-    const featuresObj = this.asJsonObject(subscription.plan?.features);
+    const featuresObj = this.asJsonObject((subscription as any).billingPlan?.features || (subscription as any).plan?.features);
     const value = featuresObj[feature];
     return typeof value === 'boolean' ? value : false;
   }
@@ -206,7 +217,7 @@ export class BillingService {
   async checkAccess(tenantId: string): Promise<{
     canAccess: boolean;
     reason?: string;
-    subscription?: Prisma.TenantSubscriptionGetPayload<{ include: { plan: true } }>;
+    subscription?: Prisma.TenantBillingSubscriptionGetPayload<{ include: { billingPlan: true } }>;
   }> {
     const subscription = await this.getCurrentSubscription(tenantId);
     
@@ -214,27 +225,27 @@ export class BillingService {
       return { canAccess: false, reason: 'Sem assinatura ativa.' };
     }
 
-    if (subscription.status === SubscriptionStatus.trial) {
+    if (subscription.status === TenantSubscriptionStatus.trialing) {
       const now = new Date();
       if (now > subscription.trialEndsAt!) {
         return { canAccess: false, reason: 'Trial expirado.' };
       }
     }
 
-    if (subscription.status === SubscriptionStatus.overdue) {
+    if (subscription.status === TenantSubscriptionStatus.past_due) {
       return { canAccess: false, reason: 'Assinatura em atraso.' };
     }
 
-    if (subscription.status === SubscriptionStatus.suspended) {
+    if (subscription.status === TenantSubscriptionStatus.suspended) {
       return { canAccess: false, reason: 'Assinatura suspensa.' };
     }
 
-    if (subscription.status === SubscriptionStatus.canceled) {
+    if (subscription.status === TenantSubscriptionStatus.canceled) {
       return { canAccess: false, reason: 'Assinatura cancelada.' };
     }
 
     const now = new Date();
-    if (now > subscription.currentPeriodEndsAt!) {
+    if (subscription.currentCycleEndsAt && now > subscription.currentCycleEndsAt) {
       // Auto-renew logic would go here
       return { canAccess: false, reason: 'Assinatura expirada.' };
     }
