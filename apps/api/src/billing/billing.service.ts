@@ -209,7 +209,7 @@ export class BillingService {
       return false;
     }
 
-    const featuresObj = this.asJsonObject((subscription as any).billingPlan?.features || (subscription as any).plan?.features);
+    const featuresObj = this.asJsonObject(subscription.billingPlan?.features);
     const value = featuresObj[feature];
     return typeof value === 'boolean' ? value : false;
   }
