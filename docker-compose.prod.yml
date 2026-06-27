@@ -15,17 +15,14 @@ services:
         - "traefik.http.routers.gestor-api.service=gestor-api"
         - "traefik.http.services.gestor-api.loadbalancer.server.port=3333"
         - "traefik.http.services.gestor-api.loadbalancer.passHostHeader=true"
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: ${DATABASE_URL}
       DIRECT_URL: ${DIRECT_URL:-${DATABASE_URL}}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       NODE_ENV: production
       API_PORT: 3333
       CORS_ORIGINS: ${CORS_ORIGINS:-*}
-      REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: ${REDIS_PORT:-6379}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
       REDIS_ENABLED: ${REDIS_ENABLED:-true}
     networks:
       - CPNET_ATTACH
