@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, FeatureGroup, Polygon, useMap } from 'react-le
 import L from 'leaflet';
 import 'leaflet-draw';
 import type { LatLngExpression } from 'leaflet';
+import { CurrencyInput } from '@gestor/ui';
 
 
 
@@ -739,15 +740,10 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                 <label className="block text-sm font-medium text-foreground mb-1">
                   Taxa (R$)
                 </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                <CurrencyInput
                   value={formData.rate}
-                  onChange={(e) => setFormData({ ...formData, rate: parseFloat(e.target.value) || 0 })}
+                  onChange={(val) => setFormData({ ...formData, rate: val })}
                   className="input-premium"
-                  placeholder="0.00"
-                  required
                 />
               </div>
             </>
@@ -789,15 +785,10 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
                 <label className="block text-sm font-medium text-foreground mb-1">
                   Taxa por km (R$)
                 </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                <CurrencyInput
                   value={formData.ratePerKm}
-                  onChange={(e) => setFormData({ ...formData, ratePerKm: parseFloat(e.target.value) || 0 })}
+                  onChange={(val) => setFormData({ ...formData, ratePerKm: val })}
                   className="input-premium"
-                  placeholder="0.00"
-                  required
                 />
               </div>
             </>
@@ -808,15 +799,10 @@ function DeliveryRateModal({ rule, onClose, onSubmit, saving }: DeliveryRateModa
               <label className="block text-sm font-medium text-foreground mb-1">
                 Taxa Fixa (R$)
               </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
+              <CurrencyInput
                 value={formData.fixedRate}
-                onChange={(e) => setFormData({ ...formData, fixedRate: parseFloat(e.target.value) || 0 })}
+                onChange={(val) => setFormData({ ...formData, fixedRate: val })}
                 className="input-premium"
-                placeholder="0.00"
-                required
               />
             </div>
           )}

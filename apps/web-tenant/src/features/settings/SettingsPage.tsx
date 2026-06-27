@@ -25,6 +25,7 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { StoreStatusControl } from '../../components/store/StoreStatusControl';
 import { useNavigate } from 'react-router-dom';
 import { maskPhone, maskCEP, maskCPFCNPJ, unmask } from '@gestor/utils';
+import { CurrencyInput } from '@gestor/ui';
 
 async function geocodeNominatim(address: string): Promise<{ lat: number; lng: number } | null> {
   try {
@@ -830,14 +831,10 @@ export function SettingsPage() {
               </div>
 
               <div className="mt-6">
-                <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Pedido mÃ­nimo</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={settings.minimumOrderValue ?? ''}
-                  onChange={e => setSettings({ ...settings, minimumOrderValue: e.target.value ? Number(e.target.value) : undefined })}
-                  placeholder="0,00"
+                <label className="block text-xs font-black text-muted-foreground uppercase tracking-widest mb-2">Pedido mínimo</label>
+                <CurrencyInput
+                  value={settings.minimumOrderValue ?? null}
+                  onChange={(val) => setSettings({ ...settings, minimumOrderValue: val })}
                   className="input-premium"
                 />
               </div>

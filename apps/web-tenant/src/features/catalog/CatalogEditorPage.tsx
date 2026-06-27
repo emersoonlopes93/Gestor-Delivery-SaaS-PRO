@@ -6,6 +6,8 @@ import { Modal } from '../../components/Modal'; // Assuming Modal is here
 import { RecipeModal } from '../inventory/RecipeModal';
 import { ProductBasicInfo } from './SubComponents/ProductBasicInfo';
 import { ProductPersonalization } from './SubComponents/ProductPersonalization';
+import { CategoryBuilder } from './SubComponents/CategoryBuilder';
+import { CurrencyInput } from '@gestor/ui';
 import { ComboBuilder } from './SubComponents/ComboBuilder';
 import { PublicationSettings } from './SubComponents/PublicationSettings';
 import { InfoTooltip } from '../../components/InfoTooltip';
@@ -1477,11 +1479,9 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
           </div>
           <div>
             <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Preço adicional</label>
-            <input
-              type="number"
-              step="0.01"
+            <CurrencyInput
               value={Number(allowedForm.additionalPrice ?? 0)}
-              onChange={(e) => setAllowedForm((p) => ({ ...p, additionalPrice: Number(e.target.value || 0) }))}
+              onChange={(val) => setAllowedForm((p) => ({ ...p, additionalPrice: val || 0 }))}
               className="input-premium"
             />
           </div>

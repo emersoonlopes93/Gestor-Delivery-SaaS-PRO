@@ -8,6 +8,16 @@ import {
   Package,
 } from 'lucide-react';
 import { api } from '../../lib/api-client';
+import { useState, useEffect } from 'react';
+import {
+  Sparkles,
+  Plus,
+  Search,
+  Trash2,
+  Edit2,
+  Package,
+} from 'lucide-react';
+import { api } from '../../lib/api-client';
 import { Modal } from '../../components/Modal';
 import {
   Upsell,
@@ -16,6 +26,7 @@ import {
   Product,
   UpsellPricingType,
 } from '@gestor/types';
+import { CurrencyInput } from '@gestor/ui';
 
 export function UpsellsPage() {
   const [upsells, setUpsells] = useState<Upsell[]>([]);
@@ -231,98 +242,6 @@ export function UpsellsPage() {
                     <td className="px-6 py-4">
                       <span className={`h-2 w-2 rounded-full inline-block mr-2 ${u.isActive ? 'bg-green-500' : 'bg-gray-300'}`} />
                       <span className="text-xs uppercase font-medium">{u.isActive ? 'Ativa' : 'Pausada'}</span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleOpenItems(u)}
-                          className="btn-ghost"
-                          title="Gerenciar Produtos"
-                        >
-                          <Package className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleOpenEdit(u)}
-                          className="btn-ghost"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(u.id)}
-                          className="btn-ghost text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Create/Edit Modal */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title={editingUpsell ? 'Editar Oferta' : 'Nova Oferta'}
-      >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nome da Oferta (ex: Combo de Bebidas)</label>
-            <input
-              type="text"
-              required
-              className="input-premium"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Descrição Curta</label>
-            <textarea
-              className="input-premium h-20 resize-none"
-              rows={2}
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de Preço</label>
-              <select
-                className="input-premium"
-                value={formData.pricingType}
-                onChange={(e) => setFormData({ ...formData, pricingType: e.target.value as UpsellPricingType })}
-              >
-                <option value="normal">Preço Normal</option>
-                <option value="fixed_price">Preço Fixo (Promocional)</option>
-                <option value="discount_percent">Desconto em %</option>
-                <option value="discount_amount">Desconto em R$</option>
-              </select>
-            </div>
-            {formData.pricingType !== 'normal' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {formData.pricingType === 'fixed_price' ? 'Valor Fixo (R$)' : 'Valor do Desconto'}
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  className="input-premium"
-                  value={formData.pricingValue}
-                  onChange={(e) => setFormData({ ...formData, pricingValue: Number(e.target.value) })}
-                />
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Local de Exibição</label>
             <div className="grid grid-cols-3 gap-2">
               {(['inline', 'cart', 'both'] as const).map((t) => (
                 <button

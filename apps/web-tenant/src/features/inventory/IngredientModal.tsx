@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { IngredientDTO, CreateIngredientDTO, UnitType } from '@gestor/types';
+import { CurrencyInput } from '@gestor/ui';
 
 interface IngredientModalProps {
   isOpen: boolean;
@@ -270,17 +271,13 @@ export function IngredientModal({ isOpen, onClose, onSave, editingIngredient }: 
 
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-green-700 dark:text-green-400 uppercase">Custo Total Pago (R$)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        required={formData.initialPurchaseActive}
+                      <CurrencyInput
                         value={formData.initialPurchase?.totalCost}
-                        onChange={(e) => setFormData({ 
+                        onChange={(val) => setFormData({ 
                           ...formData, 
-                          initialPurchase: { ...formData.initialPurchase!, totalCost: Number(e.target.value) } 
+                          initialPurchase: { ...formData.initialPurchase!, totalCost: val } 
                         })}
-                        className="w-full px-4 py-2.5 rounded-xl border border-green-500/20 focus:ring-2 focus:ring-green-500 outline-none bg-input-bg text-foreground"
-                        placeholder="0,00"
+                        className="w-full rounded-xl border-green-500/20 focus-visible:ring-green-500 bg-input-bg text-foreground"
                       />
                     </div>
                   </div>

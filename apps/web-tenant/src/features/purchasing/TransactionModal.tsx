@@ -16,11 +16,13 @@ interface TransactionModalProps {
 }
 
 import { Modal } from '../../components/Modal';
+import { CurrencyInput } from '@gestor/ui';
+import { Controller } from 'react-hook-form';
 
 export function TransactionModal({ isOpen, onClose, onSave }: TransactionModalProps) {
   const [accounts, setAccounts] = useState<FinancialAccountDTO[]>([]);
 
-  const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm<CreateFinancialTransactionDTO>({
+  const { register, control, handleSubmit, reset, formState: { isSubmitting } } = useForm<CreateFinancialTransactionDTO>({
     defaultValues: {
       type: FinancialTransactionType.EXPENSE,
       status: FinancialStatus.PAID,
@@ -95,12 +97,19 @@ export function TransactionModal({ isOpen, onClose, onSave }: TransactionModalPr
           <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Valor (R$)</label>
           <div className="relative">
             <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input 
-              type="number"
-              step="0.01"
-              {...register('amount', { required: true })}
-              className="input-premium pl-10"
-              placeholder="0,00"
+            <Controller
+              name="amount"
+              control={control}
+              rules={{ required: true }}
+              render={({ field: { value, onChange, ref, ...fieldProps } }) => (
+                <CurrencyInput
+                  {...fieldProps}
+                  ref={ref}
+                  value={value as number}
+                  onChange={onChange}
+                  className="input-premium pl-10"
+                />
+              )}
             />
           </div>
         </div>

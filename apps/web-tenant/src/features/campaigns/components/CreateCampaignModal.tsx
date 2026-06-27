@@ -5,6 +5,7 @@ import { api } from '../../../lib/api-client';
 import type { CreateCampaignDto } from '@gestor/types';
 import { CAMPAIGN_TEMPLATES } from '../constants/campaignTemplates';
 import { CAMPAIGN_STATUS_TEMPLATES } from '../constants/campaignStatusTemplates';
+import { CurrencyInput } from '@gestor/ui';
 
 interface CreateCampaignModalProps {
   isOpen: boolean;
@@ -375,12 +376,9 @@ export function CreateCampaignModal({ isOpen, onClose, onSuccess }: CreateCampai
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-2">Valor mínimo gasto (R$)</label>
-                  <input
-                    type="number"
-                    value={formData.segmentRules.minSpent || ''}
-                    onChange={(e) => updateSegmentRules('minSpent', e.target.value ? parseFloat(e.target.value) : undefined)}
-                    placeholder="Ex: 100.00"
-                    step="0.01"
+                  <CurrencyInput
+                    value={formData.segmentRules.minSpent ?? null}
+                    onChange={(val) => updateSegmentRules('minSpent', val ?? undefined)}
                     className="w-full px-4 py-2 border border-input rounded-lg focus:ring-primary bg-input-bg text-foreground"
                   />
                 </div>

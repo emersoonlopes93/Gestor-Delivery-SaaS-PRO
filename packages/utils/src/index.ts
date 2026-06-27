@@ -122,10 +122,10 @@ export function maskCPFCNPJ(value: string | undefined | null): string {
  * Returns string formatted as BRL currency.
  */
 export function maskCurrency(value: string | number | undefined | null): string {
-  if (value === undefined || value === null) return '';
+  if (value === undefined || value === null) return 'R$ 0,00';
   const stringValue = String(value);
   const digits = unmask(stringValue);
-  if (!digits) return '';
+  if (!digits) return 'R$ 0,00';
 
   const amount = parseInt(digits, 10) / 100;
   return new Intl.NumberFormat('pt-BR', {

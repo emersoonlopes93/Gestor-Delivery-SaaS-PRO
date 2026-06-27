@@ -4,6 +4,7 @@ import { useFormContext } from 'react-hook-form';
 import { CatalogProductFormState } from '../CatalogEditorTypes';
 
 import { ComboPricingType } from '@gestor/types';
+import { CurrencyInput } from '@gestor/ui';
 
 export const ComboBuilder: React.FC = () => {
   const { watch } = useFormContext<CatalogProductFormState>();
@@ -92,14 +93,22 @@ export const ComboBuilder: React.FC = () => {
                 <option value="discount_percent">Desconto %</option>
                 <option value="discount_amount">Desconto em R$</option>
               </select>
-              <input
-                type="number"
-                step="0.01"
-                value={comboPricingValue}
-                onChange={(e) => setComboPricingValue(Number(e.target.value || 0))}
-                className="input-premium"
-                placeholder="Valor da estratégia"
-              />
+              {comboPricingType === 'discount_percent' ? (
+                <input
+                  type="number"
+                  step="0.01"
+                  value={comboPricingValue}
+                  onChange={(e) => setComboPricingValue(Number(e.target.value || 0))}
+                  className="input-premium"
+                  placeholder="Valor da estratégia"
+                />
+              ) : (
+                <CurrencyInput
+                  value={comboPricingValue}
+                  onChange={(val) => setComboPricingValue(val || 0)}
+                  className="input-premium"
+                />
+              )}
               <button
                 type="button"
                 onClick={updateComboPricing}
