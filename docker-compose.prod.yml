@@ -5,16 +5,15 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     restart: always
-    deploy:
-      labels:
-        - "traefik.enable=true"
-        - "traefik.docker.network=CPNET_ATTACH"
-        - "traefik.http.routers.gestor-api.rule=Host(`${API_DOMAIN:-api.kigula.dpdns.org}`)"
-        - "traefik.http.routers.gestor-api.entrypoints=websecure"
-        - "traefik.http.routers.gestor-api.tls.certresolver=letsencryptresolver"
-        - "traefik.http.routers.gestor-api.service=gestor-api"
-        - "traefik.http.services.gestor-api.loadbalancer.server.port=3333"
-        - "traefik.http.services.gestor-api.loadbalancer.passHostHeader=true"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=CPNET_ATTACH"
+      - "traefik.http.routers.gestor-api.rule=Host(`${API_DOMAIN:-api.kigula.dpdns.org}`)"
+      - "traefik.http.routers.gestor-api.entrypoints=websecure"
+      - "traefik.http.routers.gestor-api.tls.certresolver=letsencryptresolver"
+      - "traefik.http.routers.gestor-api.service=gestor-api"
+      - "traefik.http.services.gestor-api.loadbalancer.server.port=3333"
+      - "traefik.http.services.gestor-api.loadbalancer.passHostHeader=true"
     env_file:
       - .env
     environment:
