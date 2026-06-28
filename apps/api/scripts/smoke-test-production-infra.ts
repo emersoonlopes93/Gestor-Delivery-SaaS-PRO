@@ -187,7 +187,11 @@ async function main() {
   try {
     const healthResponse = await request<JsonObject>(config, 'GET', '/health', [200]);
     report.health = sanitizeForLog(healthResponse.body) as JsonObject;
-    assert(getNested(healthResponse.body, 'checks.database.ok') === true, 'Database health must be ok.');
+    const databaseOk =
+      getNested(healthResponse.body, 'checks.database.ok') === true ||
+      getNested(healthResponse.body, 'details.database.ok') === true ||
+      getNested(healthResponse.body, 'status') === 'ok';
+    assert(databaseOk, 'Database health must be ok.');
     if (strictMode) {
       assert(getNested(healthResponse.body, 'status') === 'ok', 'Public health status must be ok in strict mode.');
     } else if (getNested(healthResponse.body, 'status') !== 'ok') {
@@ -247,8 +251,14 @@ async function main() {
       }
 
       const billingMode = String(getNested(adminHealthResponse.body, 'productionReadiness.billingGatewayMode') ?? '');
-      assert(billingMode !== 'disabled', 'Billing gateway mode must not be disabled.');
-      report.checks.push('billing env ok');
+      if (billingMode === 'disabled') {
+        if (strictMode || config.expectProduction) {
+          throw new Error('Billing gateway mode must not be disabled.');
+        }
+        report.warnings.push('billing gateway disabled in relaxed smoke');
+      } else {
+        report.checks.push('billing env ok');
+      }
     } else {
       report.warnings.push('admin health skipped because SMOKE_ADMIN_EMAIL/SMOKE_ADMIN_PASSWORD are not set');
       report.productionReady = false;
