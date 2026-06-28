@@ -3447,6 +3447,7 @@ enum AiProviderType {
   openai
   anthropic
   google_ai
+  openrouter
 }
 
 enum ChatState {
