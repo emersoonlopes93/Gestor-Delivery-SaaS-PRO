@@ -476,6 +476,8 @@ CREATE TABLE "admin_users" (
     "email" VARCHAR(255) NOT NULL,
     "name" VARCHAR(150) NOT NULL,
     "password_hash" VARCHAR(255) NOT NULL,
+    "password_reset_token" VARCHAR(255),
+    "password_reset_expires" TIMESTAMP(3),
     "is_active" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,

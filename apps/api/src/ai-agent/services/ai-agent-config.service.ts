@@ -256,19 +256,20 @@ export class AiAgentConfigService {
 
     // --- 2. Preset do Plano ---
     let planPresetName: string | null = null;
-    const subscription = await this.prisma.tenantSubscription.findUnique({
+    const subscription = await this.prisma.tenantBillingSubscription.findFirst({
       where: { tenantId },
-      select: { plan: true },
+      orderBy: { createdAt: 'desc' },
+      select: { billingPlan: true },
     });
 
     const planOverrides: Partial<typeof globalDefaults> = {};
 
-    if (subscription?.plan) {
+    if (subscription?.billingPlan) {
       const preset = await this.prisma.aiAgentPlanPreset.findUnique({
-        where: { plan: subscription.plan.slug },
+        where: { plan: subscription.billingPlan.slug },
       });
       if (preset) {
-        planPresetName = subscription.plan.slug;
+        planPresetName = subscription.billingPlan.slug;
         // O preset do plano restringe o que é permitido, não substitui direto
         if (!preset.memoryAllowed) {
           planOverrides.memoryEnabled = false;
@@ -288,7 +289,7 @@ export class AiAgentConfigService {
           `[AI_CONFIG] plan_loaded plan=${planPresetName} memoryAllowed=${preset.memoryAllowed}`,
         );
       } else {
-        this.logger.log(`[AI_CONFIG] plan_loaded plan=${subscription.plan.slug} preset=not_found`);
+        this.logger.log(`[AI_CONFIG] plan_loaded plan=${subscription.billingPlan.slug} preset=not_found`);
       }
     } else {
       this.logger.log(`[AI_CONFIG] plan_loaded subscription=none`);

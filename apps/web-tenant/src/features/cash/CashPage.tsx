@@ -9,6 +9,7 @@ import {
 } from './hooks/useCashSession';
 import type { CashMovementDTO } from '@gestor/types';
 import { Button } from '../../components/ui/Button';
+import { CurrencyInput } from '@gestor/ui';
 
 function formatCurrency(value: number): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -35,10 +36,10 @@ export default function CashPage() {
   const movementMutation = useAddCashMovement();
   const { data: sessionsHistory } = useCashSessions(1, 10);
 
-  const [openingAmount, setOpeningAmount] = useState('');
-  const [closingAmount, setClosingAmount] = useState('');
+  const [openingAmount, setOpeningAmount] = useState<number | null>(null);
+  const [closingAmount, setClosingAmount] = useState<number | null>(null);
   const [closingNotes, setClosingNotes] = useState('');
-  const [movementAmount, setMovementAmount] = useState('');
+  const [movementAmount, setMovementAmount] = useState<number | null>(null);
   const [movementType, setMovementType] = useState<'withdrawal' | 'supply'>('withdrawal');
   const [movementDesc, setMovementDesc] = useState('');
 
@@ -46,30 +47,30 @@ export default function CashPage() {
   const { data: sessionDetail } = useCashSessionDetail(activeSession?.id ?? null);
 
   const handleOpen = () => {
-    const amount = parseFloat(openingAmount);
-    if (isNaN(amount) || amount < 0) return;
+    const amount = openingAmount;
+    if (amount === null || isNaN(amount) || amount < 0) return;
     openMutation.mutate(amount, {
-      onSuccess: () => setOpeningAmount(''),
+      onSuccess: () => setOpeningAmount(null),
     });
   };
 
   const handleClose = () => {
     if (!activeSession) return;
-    const amount = parseFloat(closingAmount);
-    if (isNaN(amount) || amount < 0) return;
+    const amount = closingAmount;
+    if (amount === null || isNaN(amount) || amount < 0) return;
     closeMutation.mutate(
       { sessionId: activeSession.id, closingAmountDeclared: amount, notes: closingNotes || undefined },
-      { onSuccess: () => { setClosingAmount(''); setClosingNotes(''); } },
+      { onSuccess: () => { setClosingAmount(null); setClosingNotes(''); } },
     );
   };
 
   const handleMovement = () => {
     if (!activeSession) return;
-    const amount = parseFloat(movementAmount);
-    if (isNaN(amount) || amount <= 0) return;
+    const amount = movementAmount;
+    if (amount === null || isNaN(amount) || amount <= 0) return;
     movementMutation.mutate(
       { sessionId: activeSession.id, type: movementType, amount, description: movementDesc || undefined },
-      { onSuccess: () => { setMovementAmount(''); setMovementDesc(''); } },
+      { onSuccess: () => { setMovementAmount(null); setMovementDesc(''); } },
     );
   };
 
@@ -88,14 +89,10 @@ export default function CashPage() {
           <div className="flex gap-3 items-end">
             <div className="flex-1">
               <label className="block text-sm text-muted-foreground mb-1">Valor de Abertura (R$)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
+              <CurrencyInput
                 value={openingAmount}
-                onChange={(e) => setOpeningAmount(e.target.value)}
+                onChange={setOpeningAmount}
                 className="input-premium"
-                placeholder="0.00"
               />
             </div>
             <Button
@@ -146,12 +143,9 @@ export default function CashPage() {
               </div>
               <div className="flex-1 min-w-[120px]">
                 <label className="block text-sm text-muted-foreground mb-1">Valor (R$)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
+                <CurrencyInput
                   value={movementAmount}
-                  onChange={(e) => setMovementAmount(e.target.value)}
+                  onChange={setMovementAmount}
                   className="input-premium"
                 />
               </div>
@@ -264,14 +258,10 @@ export default function CashPage() {
             <div className="flex flex-wrap gap-3 items-end">
               <div className="flex-1 min-w-[150px]">
                 <label className="block text-sm text-muted-foreground mb-1">Valor Contado (R$)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                <CurrencyInput
                   value={closingAmount}
-                  onChange={(e) => setClosingAmount(e.target.value)}
+                  onChange={setClosingAmount}
                   className="input-premium"
-                  placeholder="0.00"
                 />
               </div>
               <div className="flex-1 min-w-[150px]">

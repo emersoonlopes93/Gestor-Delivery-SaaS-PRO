@@ -62,6 +62,16 @@ export class UpdateIntegrationsConfigDto {
   @IsOptional()
   @ValidateIf((_, v) => v !== null)
   @IsString()
+  openrouterApiKey?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  openrouterModel?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
   baseAiPrompt?: string | null;
 
   // Campos que podem vir do frontend mas devem ser ignorados com segurança

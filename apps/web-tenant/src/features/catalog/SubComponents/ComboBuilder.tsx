@@ -4,6 +4,7 @@ import { useFormContext } from 'react-hook-form';
 import { CatalogProductFormState } from '../CatalogEditorTypes';
 
 import { ComboPricingType } from '@gestor/types';
+import { CurrencyInput } from '@gestor/ui';
 
 export const ComboBuilder: React.FC = () => {
   const { watch } = useFormContext<CatalogProductFormState>();
@@ -12,7 +13,6 @@ export const ComboBuilder: React.FC = () => {
   const {
     bundleItems,
     bundleSummary,
-    comboModeState,
     comboPricingType,
     setComboPricingType,
     comboPricingValue,
@@ -20,16 +20,8 @@ export const ComboBuilder: React.FC = () => {
     updateComboPricing,
     openBundleItemModal,
     deleteBundleItem,
-    convertComboToBundle,
     isComboWizard,
     goNextWizardStep,
-    slots,
-    moveSlot,
-    openAllowedModal,
-    openSlotModal,
-    deleteSlot,
-    moveAllowed,
-    deleteAllowed,
     savingStates,
   } = useCatalogEditor();
   return (
@@ -62,23 +54,7 @@ export const ComboBuilder: React.FC = () => {
             </div>
           </div>
 
-          {comboModeState !== 'bundle' ? (
-            <div className="bg-status-warning/10 border border-status-warning/20 text-status-warning rounded-2xl p-4">
-              <div className="font-black">Este combo está em modo legado (slot)</div>
-              <p className="text-sm mt-1">
-                Para usar "Itens do Combo" e estratégia de preço, converta este combo para modo bundle.
-              </p>
-              <button
-                type="button"
-                onClick={convertComboToBundle}
-                disabled={savingStates.convertBundle}
-                className="mt-3 px-4 py-2 text-sm font-bold text-white bg-status-warning hover:bg-status-warning/90 rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {savingStates.convertBundle && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                Converter para bundle
-              </button>
-            </div>
-          ) : null}
+
 
           <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
             <div className="text-sm font-black text-foreground mb-3">Estratégia de preço</div>
@@ -92,18 +68,26 @@ export const ComboBuilder: React.FC = () => {
                 <option value="discount_percent">Desconto %</option>
                 <option value="discount_amount">Desconto em R$</option>
               </select>
-              <input
-                type="number"
-                step="0.01"
-                value={comboPricingValue}
-                onChange={(e) => setComboPricingValue(Number(e.target.value || 0))}
-                className="input-premium"
-                placeholder="Valor da estratégia"
-              />
+              {comboPricingType === 'discount_percent' ? (
+                <input
+                  type="number"
+                  step="0.01"
+                  value={comboPricingValue}
+                  onChange={(e) => setComboPricingValue(Number(e.target.value || 0))}
+                  className="input-premium"
+                  placeholder="Valor da estratégia"
+                />
+              ) : (
+                <CurrencyInput
+                  value={comboPricingValue}
+                  onChange={(val) => setComboPricingValue(val || 0)}
+                  className="input-premium"
+                />
+              )}
               <button
                 type="button"
                 onClick={updateComboPricing}
-                disabled={savingStates.updateComboPricing || comboModeState !== 'bundle'}
+                disabled={savingStates.updateComboPricing}
                 className="px-4 py-2.5 text-sm font-black text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {savingStates.updateComboPricing && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}
@@ -198,88 +182,7 @@ export const ComboBuilder: React.FC = () => {
             </div>
           </div>
 
-          <div className="space-y-4">
-            {[...slots].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((s) => (
-              <div key={s.id} className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-                <div className="px-4 sm:px-6 py-4 bg-muted/30 dark:bg-muted/80 border-b border-border flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="font-black text-foreground truncate">{s.name}</div>
-                    <div className="text-xs text-muted-foreground font-bold mt-1">
-                      req={String(s.isRequired)} | min={s.minSelect} | max={s.maxSelect}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 sm:flex gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => moveSlot(s.id, -1)}
-                      disabled={savingStates.reorderSlots}
-                      className="px-3 py-2 sm:px-2 sm:py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded-xl sm:rounded disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
-                    >
-                      {savingStates.reorderSlots ? <div className="w-3 h-3 border border-muted-foreground border-t-transparent rounded-full animate-spin" /> : '↑'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveSlot(s.id, 1)}
-                      disabled={savingStates.reorderSlots}
-                      className="px-3 py-2 sm:px-2 sm:py-1 text-xs font-bold text-muted-foreground hover:bg-muted/50 dark:hover:bg-muted/80 rounded-xl sm:rounded disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all"
-                    >
-                      {savingStates.reorderSlots ? <div className="w-3 h-3 border border-muted-foreground border-t-transparent rounded-full animate-spin" /> : '↓'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openAllowedModal(s.id)}
-                      className="px-3 py-2 sm:py-1 text-xs font-bold text-primary hover:bg-primary/10 rounded-xl sm:rounded transition-all"
-                    >
-                      Adicionar produto
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openSlotModal(s)}
-                      className="px-3 py-2 sm:py-1 text-xs font-bold text-foreground/80 hover:bg-muted/50 dark:hover:bg-muted/80 rounded-xl sm:rounded transition-all"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteSlot(s.id)}
-                      disabled={savingStates[`delete-slot-${s.id}`]}
-                      className="col-span-2 sm:col-auto px-3 py-2 sm:py-1 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl sm:rounded disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1"
-                    >
-                      {savingStates[`delete-slot-${s.id}`] && <div className="w-3 h-3 border border-red-600 border-t-transparent rounded-full animate-spin" />}
-                      Excluir
-                    </button>
-                  </div>
-                </div>
 
-                <div className="overflow-auto">
-                  <table className="w-full text-left border-collapse">
-                    <tbody className="divide-y divide-border dark:divide-border/60">
-                      {[...(s.allowedItems ?? [])]
-                        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-                        .map((a) => (
-                          <tr key={a.id} className="hover:bg-muted/50 dark:hover:bg-muted/80 dark:bg-card/40 group">
-                            <td className="px-6 py-4">
-                              <div className="font-bold text-foreground text-sm">{a.product?.name ?? a.productId}</div>
-                            </td>
-                            <td className="px-6 py-4 text-xs font-black text-foreground">
-                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(a.additionalPrice ?? 0))}
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <div className="flex justify-end gap-2 transition-opacity">
-                                <button type="button" onClick={() => moveAllowed(s, a.id, -1)} className="p-1 hover:bg-muted/50 dark:hover:bg-muted/80 rounded">↑</button>
-                                <button type="button" onClick={() => moveAllowed(s, a.id, 1)} className="p-1 hover:bg-muted/50 dark:hover:bg-muted/80 rounded">↓</button>
-                                <button type="button" onClick={() => openAllowedModal(s.id, a)} className="px-2 text-xs font-bold hover:bg-muted/50 dark:hover:bg-muted/80 rounded">Editar</button>
-                                <button type="button" onClick={() => deleteAllowed(s.id, a.id)} className="px-2 text-xs font-bold text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20 rounded">Excluir</button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ))}
-          </div>
 
           <div className="flex justify-end mt-8">
             {isComboWizard ? (

@@ -77,15 +77,16 @@ export class AiAgentPlanPresetService {
    * Se o tenant não tem assinatura ou o plano não tem preset, retorna null.
    */
   async getPresetForTenant(tenantId: string) {
-    const subscription = await this.prisma.tenantSubscription.findUnique({
+    const subscription = await this.prisma.tenantBillingSubscription.findFirst({
       where: { tenantId },
-      select: { plan: true },
+      orderBy: { createdAt: 'desc' },
+      select: { billingPlan: true },
     });
 
-    if (!subscription?.plan) return null;
+    if (!subscription?.billingPlan) return null;
 
     const preset = await this.prisma.aiAgentPlanPreset.findUnique({
-      where: { plan: subscription.plan.slug },
+      where: { plan: subscription.billingPlan.slug },
     });
 
     return preset ?? null;

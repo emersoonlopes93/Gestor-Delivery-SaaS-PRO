@@ -7,8 +7,7 @@ import { OptionGroupsController } from './option-groups/option-groups.controller
 import { OptionGroupsService } from './option-groups/option-groups.service';
 import { ProductOptionGroupsController } from './product-option-groups/product-option-groups.controller';
 import { ProductOptionGroupsService } from './product-option-groups/product-option-groups.service';
-import { ComboSlotsController } from './combo-slots/combo-slots.controller';
-import { ComboSlotsService } from './combo-slots/combo-slots.service';
+
 import { ComboBundleItemsController } from './combo-bundle-items/combo-bundle-items.controller';
 import { ComboBundleItemsService } from './combo-bundle-items/combo-bundle-items.service';
 import { PublicationController } from './publication/publication.controller';
@@ -34,7 +33,6 @@ import { MenuImportController } from './menu-import/menu-import.controller';
     ProductsController,
     OptionGroupsController,
     ProductOptionGroupsController,
-    ComboSlotsController,
     ComboBundleItemsController,
     PublicationController,
     PizzaController,
@@ -46,7 +44,6 @@ import { MenuImportController } from './menu-import/menu-import.controller';
     ProductsService,
     OptionGroupsService,
     ProductOptionGroupsService,
-    ComboSlotsService,
     ComboBundleItemsService,
     PublicationService,
 

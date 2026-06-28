@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api-client';
 import { Modal } from '@/components/Modal';
+import { CurrencyInput } from '@gestor/ui';
 
 interface CouponListItem {
   id: string;
@@ -217,15 +218,23 @@ export function CouponsPanel() {
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Valor</label>
-              <input
-                type="number"
-                step="0.01"
-                required={form.type !== 'free_shipping'}
-                disabled={form.type === 'free_shipping'}
-                className="input-premium"
-                value={form.value}
-                onChange={(e) => setForm({ ...form, value: Number(e.target.value) })}
-              />
+              {form.type === 'fixed_amount' ? (
+                <CurrencyInput
+                  className="input-premium"
+                  value={form.value}
+                  onChange={(val) => setForm({ ...form, value: val || 0 })}
+                />
+              ) : (
+                <input
+                  type="number"
+                  step="0.01"
+                  required={form.type !== 'free_shipping'}
+                  disabled={form.type === 'free_shipping'}
+                  className="input-premium"
+                  value={form.value}
+                  onChange={(e) => setForm({ ...form, value: Number(e.target.value) })}
+                />
+              )}
             </div>
           </div>
           <div>

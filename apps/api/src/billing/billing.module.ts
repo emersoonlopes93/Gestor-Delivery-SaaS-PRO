@@ -5,7 +5,7 @@ import { PrismaService } from '../database/prisma.service';
 import { TenantContextService } from '../common/context/tenant-context.service';
 import { RbacModule } from '../rbac/rbac.module';
 import { AsaasService } from './asaas.service';
-import { BillingWebhookController } from './billing-webhook.controller';
+
 import { BillingDomainModule } from './billing-domain.module';
 import { AsaasSaasBillingWebhookController } from './asaas-saas-billing-webhook.controller';
 import { PublicSaasController } from './public-saas.controller';
@@ -14,7 +14,7 @@ import { WebhookSecuritySmokeController } from './webhook-security-smoke.control
 
 @Module({
   imports: [RbacModule, BillingDomainModule],
-  controllers: [BillingController, BillingWebhookController, AsaasSaasBillingWebhookController, PublicSaasController, WebhookSecuritySmokeController],
+  controllers: [BillingController, AsaasSaasBillingWebhookController, PublicSaasController, WebhookSecuritySmokeController],
   providers: [BillingService, AsaasService, PrismaService, TenantContextService, WebhookSecurityService],
   exports: [BillingService, BillingDomainModule],
 })

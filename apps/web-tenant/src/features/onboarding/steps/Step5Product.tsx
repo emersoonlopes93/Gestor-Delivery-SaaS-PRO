@@ -3,7 +3,8 @@ import { ShoppingBag, Plus, CheckCircle2, Package } from 'lucide-react';
 import { api } from '../../../lib/api-client';
 import { ImagePickerModal } from '../../../components/ImagePickerModal';
 import { Step5ImportMenu } from './Step5ImportMenu';
-import { maskCurrency, unmaskCurrency } from '@gestor/utils';
+
+import { CurrencyInput } from '@gestor/ui';
 
 interface ProductCategory {
   id: string;
@@ -20,7 +21,7 @@ interface MinProduct {
 
 interface ProductDraft {
   name: string;
-  basePrice: string;
+  basePrice: number;
   shortDescription: string;
   categoryId: string;
   newCategoryName: string;
@@ -36,7 +37,7 @@ interface Step5Props {
 
 const EMPTY_DRAFT: ProductDraft = {
   name: '',
-  basePrice: '',
+  basePrice: 0,
   shortDescription: '',
   categoryId: '',
   newCategoryName: '',
@@ -95,7 +96,7 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
 
   const handleCreateProduct = async () => {
     if (!draft.name.trim()) { alert('Informe o nome do produto.'); return; }
-    if (!draft.basePrice || unmaskCurrency(draft.basePrice) <= 0) { alert('Informe um preço válido.'); return; }
+    if (!draft.basePrice || draft.basePrice <= 0) { alert('Informe um preço válido.'); return; }
 
     setSaving(true);
     try {
@@ -116,7 +117,7 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
 
       const res = await api.post<{ id: string; name: string; basePrice: number }>('/catalog/products', {
         name: draft.name.trim(),
-        basePrice: unmaskCurrency(draft.basePrice),
+        basePrice: draft.basePrice,
         shortDescription: draft.shortDescription.trim() || undefined,
         categoryId: categoryId || undefined,
         image: draft.imageUrl || undefined,
@@ -262,10 +263,9 @@ export function Step5Product({ onNext, onPrev, onMarkValid }: Step5Props) {
           {/* Price */}
           <div>
             <label className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-1.5">Preço (R$) *</label>
-            <input
-              type="text"
+            <CurrencyInput
               value={draft.basePrice}
-              onChange={e => setDraft(f => ({ ...f, basePrice: maskCurrency(e.target.value) }))}
+              onChange={val => setDraft(f => ({ ...f, basePrice: val }))}
               placeholder="R$ 0,00"
               className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-sm"
             />

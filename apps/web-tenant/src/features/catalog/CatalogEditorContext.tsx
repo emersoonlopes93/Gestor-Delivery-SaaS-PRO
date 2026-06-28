@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import { ProductDetails, ProductOptionGroupLink, OptionGroup, ComboSlot, ComboSlotAllowedItem, Product, ComboPricingType, CatalogPublication, CatalogAvailabilityRule, UpsertPublicationDto } from '@gestor/types';
+import { ProductDetails, ProductOptionGroupLink, OptionGroup, Product, ComboPricingType, CatalogPublication, CatalogAvailabilityRule, UpsertPublicationDto } from '@gestor/types';
 
 export type LinkWithGroup = ProductOptionGroupLink & {
   optionGroup: OptionGroup;
@@ -22,9 +22,6 @@ export type BundleSummary = {
   pricingValue: number;
 };
 
-export type SlotWithAllowed = ComboSlot & {
-  allowedItems?: Array<ComboSlotAllowedItem & { product?: Product }>;
-};
 
 export type CatalogEditorContextValue = {
   productId: string;
@@ -52,7 +49,6 @@ export type CatalogEditorContextValue = {
   // Combo
   bundleItems: BundleItemWithProduct[];
   bundleSummary: BundleSummary | null;
-  comboModeState: 'bundle' | 'slot';
   comboPricingType: ComboPricingType;
   setComboPricingType: (val: ComboPricingType) => void;
   comboPricingValue: number;
@@ -60,14 +56,6 @@ export type CatalogEditorContextValue = {
   updateComboPricing: () => void;
   openBundleItemModal: (item?: BundleItemWithProduct) => void;
   deleteBundleItem: (id: string) => void;
-  convertComboToBundle: () => void;
-  slots: SlotWithAllowed[];
-  moveSlot: (id: string, dir: -1 | 1) => void;
-  openAllowedModal: (slotId: string, item?: ComboSlotAllowedItem & { product?: Product }) => void;
-  openSlotModal: (slot?: SlotWithAllowed) => void;
-  deleteSlot: (id: string) => void;
-  moveAllowed: (slot: SlotWithAllowed, id: string, dir: -1 | 1) => void;
-  deleteAllowed: (slotId: string, id: string) => void;
 
   // Publication
   publication: CatalogPublication | null;

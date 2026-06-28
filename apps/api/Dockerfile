@@ -28,15 +28,17 @@ RUN pnpm --filter @gestor/api build
 FROM base AS runner
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
 COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
 COPY --from=builder /app/apps/api/docker-entrypoint.sh ./apps/api/docker-entrypoint.sh
+COPY --from=builder /app/apps/api/clean_db.js ./apps/api/clean_db.js
 
 ENV NODE_ENV=production
 EXPOSE 3333
 
-RUN npm i -g prisma
+RUN npm i -g prisma@5.22.0
 RUN chmod +x ./apps/api/docker-entrypoint.sh
 
 WORKDIR /app/apps/api

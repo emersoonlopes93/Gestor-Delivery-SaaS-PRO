@@ -22,6 +22,7 @@ import { api, ApiError } from '@/lib/api-client';
 // Import removido: createPolygonDrawer não é mais necessário
 import type { LatLngExpression } from 'leaflet';
 import { Tenant } from '@gestor/types';
+import { CurrencyInput } from '@gestor/ui';
 
 
 
@@ -529,7 +530,7 @@ export function DeliveryZonesPageRefactored() {
 
   const [zones, setZones] = useState<DeliveryRateRule[]>([]);
   const [globalDistanceRule, setGlobalDistanceRule] = useState<DeliveryRateRule | null>(null);
-  const [distanceTiersDraft, setDistanceTiersDraft] = useState<Array<{ id?: string; minDistanceKm: string; maxDistanceKm: string; fee: string }>>([]);
+  const [distanceTiersDraft, setDistanceTiersDraft] = useState<Array<{ id?: string; minDistanceKm: string | number; maxDistanceKm: string | number; fee: number }>>([]);
 
   const [loading, setLoading] = useState(true);
   const [savingCoverage, setSavingCoverage] = useState(false);
@@ -644,7 +645,7 @@ export function DeliveryZonesPageRefactored() {
         const dRule = ds.find((r) => r.pricingMode === 'tiers');
         setGlobalDistanceRule(dRule || null);
         if (dRule?.distanceTiers) {
-           setDistanceTiersDraft(dRule.distanceTiers);
+           setDistanceTiersDraft(dRule.distanceTiers.map((t: any) => ({ ...t, minDistanceKm: Number(t.minDistanceKm), maxDistanceKm: Number(t.maxDistanceKm), fee: Number(t.fee) })));
         } else {
            setDistanceTiersDraft([]);
         }
@@ -1171,20 +1172,11 @@ export function DeliveryZonesPageRefactored() {
             <label className="block text-sm font-semibold text-foreground mb-1.5">
               Valor da taxa (R$)
             </label>
-            <input
-              type="number"
-              min={0}
-              step={0.01}
-              value={zoneForm.fixedFee ?? ''}
-              onChange={(e) =>
-                setZoneForm((z) => ({
-                  ...z,
-                  fixedFee: e.target.value.trim() === '' ? null : Number(e.target.value),
-                }))
-              }
-              className="w-full h-11 px-3 rounded-xl border border-input focus:outline-none focus:ring-2 focus:ring-primary-500 bg-card text-foreground transition-all shadow-sm"
-              placeholder="0,00"
-            />
+            <CurrencyInput
+                value={zoneForm.fixedFee ?? undefined}
+                onChange={(val) => setZoneForm((z) => ({ ...z, fixedFee: val }))}
+                className="w-full h-11 px-3 rounded-xl border border-input focus:outline-none focus:ring-2 focus:ring-primary-500 bg-card text-foreground transition-all shadow-sm"
+              />
           </div>
         ) : null}
 
@@ -1193,20 +1185,11 @@ export function DeliveryZonesPageRefactored() {
             <label className="block text-sm font-semibold text-foreground mb-1.5">
               Valor por km percorrido (R$)
             </label>
-            <input
-              type="number"
-              min={0}
-              step={0.01}
-              value={zoneForm.pricePerKm ?? ''}
-              onChange={(e) =>
-                setZoneForm((z) => ({
-                  ...z,
-                  pricePerKm: e.target.value.trim() === '' ? null : Number(e.target.value),
-                }))
-              }
-              className="w-full h-11 px-3 rounded-xl border border-input focus:outline-none focus:ring-2 focus:ring-primary-500 bg-card text-foreground transition-all shadow-sm"
-              placeholder="0,00"
-            />
+            <CurrencyInput
+                value={zoneForm.pricePerKm ?? undefined}
+                onChange={(val) => setZoneForm((z) => ({ ...z, pricePerKm: val }))}
+                className="w-full h-11 px-3 rounded-xl border border-input focus:outline-none focus:ring-2 focus:ring-primary-500 bg-card text-foreground transition-all shadow-sm"
+              />
           </div>
         ) : null}
 
@@ -1284,14 +1267,11 @@ export function DeliveryZonesPageRefactored() {
                   </div>
                   <div className="flex-1 min-w-[90px]">
                     <label className="block text-[10px] uppercase font-bold text-muted-foreground mb-1">Valor (R$)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.01}
+                    <CurrencyInput
                       value={tier.fee}
-                      onChange={(e) => {
+                      onChange={(val) => {
                         const newTiers = [...zoneForm.distanceTiers];
-                        newTiers[idx].fee = Number(e.target.value);
+                        newTiers[idx].fee = val;
                         setZoneForm((z) => ({ ...z, distanceTiers: newTiers }));
                       }}
                       className="w-full h-9 px-2 rounded-lg border border-input bg-card text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
@@ -1551,15 +1531,10 @@ export function DeliveryZonesPageRefactored() {
                 <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">
                   Preço/km (R$)
                 </label>
-                <input
-                  type="number"
-                  min={0}
-                  step={0.01}
+                <CurrencyInput
                   value={coverageDraft.defaultPricePerKm}
-                  onChange={(e) =>
-                    setCoverageDraft((d) => ({ ...d, defaultPricePerKm: Number(e.target.value) }))
-                  }
-                  className="input-premium"
+                  onChange={(val) => setCoverageDraft((d) => ({ ...d, defaultPricePerKm: val }))}
+                  className="input-premium h-11"
                 />
               </div>
             </div>
@@ -2029,12 +2004,9 @@ export function DeliveryZonesPageRefactored() {
 
               <div>
                 <label className="block text-sm font-semibold text-foreground mb-1.5">Taxa Padrão por km (R$)</label>
-                <input
-                  type="number"
-                  min={0}
-                  step={0.01}
+                <CurrencyInput
                   value={coverageDraft.defaultPricePerKm}
-                  onChange={(e) => setCoverageDraft((d) => ({ ...d, defaultPricePerKm: Number(e.target.value) }))}
+                  onChange={(val) => setCoverageDraft((d) => ({ ...d, defaultPricePerKm: val }))}
                   className="w-full h-11 px-3 rounded-xl border border-input bg-card focus:ring-2 focus:ring-primary-500"
                 />
               </div>
@@ -2098,18 +2070,12 @@ export function DeliveryZonesPageRefactored() {
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="relative flex-1">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">R$</span>
-                        <input 
-                          type="number" 
-                          min={0} 
-                          step={0.01} 
+                        <CurrencyInput 
                           value={tier.fee} 
-                          onChange={e => {
-                            const val = e.target.value;
+                          onChange={val => {
                             setDistanceTiersDraft(draft => draft.map((t, i) => i === idx ? { ...t, fee: val } : t));
                           }} 
-                          className="w-full h-9 pl-8 pr-3 text-sm rounded-lg border border-input bg-card" 
-                          placeholder="0.00"
+                          className="w-full h-9 px-3 text-sm rounded-lg border border-input bg-card" 
                         />
                       </div>
                       <button
@@ -2137,7 +2103,7 @@ export function DeliveryZonesPageRefactored() {
                 const last = distanceTiersDraft[distanceTiersDraft.length - 1];
                 const nextMin = last ? Number(last.maxDistanceKm) : 0;
                 const nextMax = nextMin + 5;
-                setDistanceTiersDraft(draft => [...draft, { minDistanceKm: String(nextMin), maxDistanceKm: String(nextMax), fee: '0' }]);
+                setDistanceTiersDraft(draft => [...draft, { minDistanceKm: nextMin, maxDistanceKm: nextMax, fee: 0 }]);
               }}
               className="w-full h-9 rounded-lg border border-dashed border-input hover:bg-muted text-sm font-semibold transition-colors flex items-center justify-center gap-2"
             >

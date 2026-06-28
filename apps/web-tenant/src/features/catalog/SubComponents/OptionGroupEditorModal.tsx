@@ -3,6 +3,7 @@ import { CreateOptionGroupDto, OptionGroup, OptionItem } from '@gestor/types';
 import { Modal } from '../../../components/Modal';
 import { api } from '../../../lib/api-client';
 import { Plus, Trash2 } from 'lucide-react';
+import { CurrencyInput } from '@gestor/ui';
 
 type GroupWithItems = OptionGroup & { items?: OptionItem[] };
 
@@ -337,15 +338,24 @@ export const OptionGroupEditorModal: React.FC<OptionGroupEditorModalProps> = ({
                           </select>
                         </td>
                         <td className="px-4 py-2">
-                          <input
-                            type="number"
-                            step="0.01"
-                            disabled={!it.priceImpactType || it.priceImpactType === 'none'}
-                            value={it.priceImpactValue === 0 ? '' : it.priceImpactValue}
-                            onChange={(e) => handleItemChange(idx, 'priceImpactValue', Number(e.target.value || 0))}
-                            placeholder="0.00"
-                            className="w-full px-3 py-2 bg-transparent text-sm font-medium text-foreground border border-transparent focus:border-input focus:bg-background rounded-lg outline-none transition-all disabled:opacity-50"
-                          />
+                          {(it.priceImpactType as string) === 'percentage' ? (
+                            <input
+                              type="number"
+                              step="0.01"
+                              disabled={!it.priceImpactType || it.priceImpactType === 'none'}
+                              value={it.priceImpactValue === 0 ? '' : it.priceImpactValue}
+                              onChange={(e) => handleItemChange(idx, 'priceImpactValue', Number(e.target.value || 0))}
+                              placeholder="0.00"
+                              className="w-full px-3 py-2 bg-transparent text-sm font-medium text-foreground border border-transparent focus:border-input focus:bg-background rounded-lg outline-none transition-all disabled:opacity-50"
+                            />
+                          ) : (
+                            <CurrencyInput
+                              disabled={!it.priceImpactType || it.priceImpactType === 'none'}
+                              value={Number(it.priceImpactValue) || 0}
+                              onChange={(val) => handleItemChange(idx, 'priceImpactValue', val || 0)}
+                              className="w-full px-3 py-2 bg-transparent text-sm font-medium text-foreground border border-transparent focus:border-input focus:bg-background rounded-lg outline-none transition-all disabled:opacity-50"
+                            />
+                          )}
                         </td>
                         <td className="px-4 py-2 text-center">
                           <input

@@ -29,7 +29,7 @@ export class AdminTenantsService {
             orderBy: [{ createdAt: 'desc' }],
             take: 1,
           },
-          subscription: { include: { plan: true } },
+
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -91,7 +91,7 @@ export class AdminTenantsService {
           whatsappInstance: { select: { status: true, phoneNumber: true, providerType: true, updatedAt: true } },
           orders: { take: 1, orderBy: { createdAt: 'desc' }, select: { createdAt: true, total: true } },
           billingSubscriptions: { orderBy: { createdAt: 'desc' }, take: 1, select: { status: true } },
-          subscription: { select: { status: true } },
+
         }
       }),
       this.prisma.tenant.count({ where }),
@@ -111,7 +111,7 @@ export class AdminTenantsService {
     };
 
     const items = tenants.map(t => {
-      const bStatus = t.billingSubscriptions?.[0]?.status ?? t.subscription?.status ?? 'none';
+      const bStatus = t.billingSubscriptions?.[0]?.status ?? 'none';
       const wStatus = t.whatsappInstance?.status ?? 'none';
       const lastOrder = t.orders?.[0];
 
@@ -121,7 +121,7 @@ export class AdminTenantsService {
         alerts.push({ type: 'operational', severity: 'critical', message: 'Tenant suspenso', createdAt: new Date().toISOString() });
       }
 
-      if (bStatus === 'overdue') {
+      if (bStatus === 'past_due') {
         alerts.push({ type: 'financial', severity: 'high', message: 'Assinatura inadimplente', createdAt: new Date().toISOString() });
       }
 
@@ -188,7 +188,7 @@ export class AdminTenantsService {
         },
         billingCycles: { orderBy: [{ startedAt: 'desc' }], take: 1 },
         invoices: { orderBy: [{ createdAt: 'desc' }], take: 1 },
-        subscription: { include: { plan: true } },
+
         _count: {
           select: { users: true, roles: true },
         },

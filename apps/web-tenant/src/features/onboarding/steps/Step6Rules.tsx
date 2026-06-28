@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Settings2, Info } from 'lucide-react';
+import { CurrencyInput } from '@gestor/ui';
 
 interface Step6Props {
   onNext: (saveFn: () => Promise<void>) => void;
@@ -47,14 +48,10 @@ export function Step6Rules({ onNext, onPrev }: Step6Props) {
           Pedido Mínimo (R$)
         </label>
         <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">R$</span>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            value={minOrderValue}
-            onChange={e => setMinOrderValue(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-sm"
+          <CurrencyInput
+            value={Number(minOrderValue) || 0}
+            onChange={val => setMinOrderValue(String(val || 0))}
+            className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-sm"
           />
         </div>
         <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Valor 0 = sem pedido mínimo</p>
@@ -66,15 +63,11 @@ export function Step6Rules({ onNext, onPrev }: Step6Props) {
           Frete Grátis acima de (R$) — opcional
         </label>
         <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">R$</span>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            value={deliveryFreeAbove}
-            onChange={e => setDeliveryFreeAbove(e.target.value)}
+          <CurrencyInput
+            value={deliveryFreeAbove ? Number(deliveryFreeAbove) : undefined}
+            onChange={val => setDeliveryFreeAbove(val ? String(val) : '')}
             placeholder="Deixe em branco para não usar"
-            className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-sm"
+            className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-sm"
           />
         </div>
       </div>

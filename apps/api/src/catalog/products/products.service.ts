@@ -282,7 +282,7 @@ export class ProductsService {
         mediaAsset: true,
 
         optionGroupLinks: { include: { optionGroup: { include: { items: { orderBy: { order: 'asc' } } } } }, orderBy: { order: 'asc' } },
-        comboSlots: { include: { allowedItems: { include: { product: true }, orderBy: { order: 'asc' } } }, orderBy: { order: 'asc' } },
+
         comboBundleItems: {
           include: { product: true },
           orderBy: { sortOrder: 'asc' },
@@ -462,7 +462,7 @@ export class ProductsService {
       where: { id, tenantId, deletedAt: null },
       include: {
         optionGroupLinks: true,
-        comboSlots: { include: { allowedItems: true } },
+
         comboBundleItems: true,
         publication: true,
         recipeIngredients: true,
@@ -555,35 +555,7 @@ export class ProductsService {
         });
       }
 
-      // Duplicate Combo Slots
-      if (source.comboSlots.length > 0) {
-        for (const slot of source.comboSlots) {
-          const newSlot = await tx.comboSlot.create({
-            data: {
-              tenantId,
-              comboProductId: duplicate.id,
-              name: slot.name,
-              description: slot.description,
-              isRequired: slot.isRequired,
-              minSelect: slot.minSelect,
-              maxSelect: slot.maxSelect,
-              order: slot.order,
-            },
-          });
 
-          if (slot.allowedItems.length > 0) {
-            await tx.comboSlotAllowedItem.createMany({
-              data: slot.allowedItems.map((ai) => ({
-                tenantId,
-                comboSlotId: newSlot.id,
-                productId: ai.productId,
-                additionalPrice: ai.additionalPrice,
-                order: ai.order,
-              })),
-            });
-          }
-        }
-      }
 
       // Duplicate Combo Bundle Items
       if (source.comboBundleItems.length > 0) {

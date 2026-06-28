@@ -20,10 +20,9 @@ export class AdminDashboardService {
     ]);
 
     // Calcular MRR (Monthly Recurring Revenue)
-    const activeSubscriptions = await this.prisma.tenantSubscription.count({
+    const activeSubscriptions = await this.prisma.tenantBillingSubscription.count({
       where: {
         status: 'active',
-        planId: { in: plans.map(p => p.id) },
       },
     });
 

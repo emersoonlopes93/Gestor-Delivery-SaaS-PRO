@@ -107,7 +107,7 @@ async function bootstrap() {
     new TransformInterceptor(),
   );
 
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   logger.log(`🚀 API running on http://localhost:${port}${prefix}`);
   logger.log(`📋 Health check: http://localhost:${port}${prefix}/health`);
 }

@@ -1,115 +1,37 @@
 services:
-  # Database
-  postgres:
-    image: postgres:16-alpine
-    deploy:
-      restart_policy:
-        condition: on-failure
-    environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-gestor_delivery}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - gestor-network
-
   # Backend API
   api:
-    image: clold157/api-pro:latest
-    deploy:
-      restart_policy:
-        condition: on-failure
-      labels:
-        - "traefik.enable=true"
-        - "traefik.docker.network=CPNet"
-        - "traefik.http.routers.gestor-api.rule=Host(`${API_DOMAIN}`)"
-        - "traefik.http.routers.gestor-api.entrypoints=websecure"
-        - "traefik.http.routers.gestor-api.tls.certresolver=letsencryptresolver"
-        - "traefik.http.routers.gestor-api.service=gestor-api"
-        - "traefik.http.services.gestor-api.loadbalancer.server.port=3333"
-        - "traefik.http.services.gestor-api.loadbalancer.passHostHeader=true"
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=CPNET_ATTACH"
+      - "traefik.http.routers.gestor-api.rule=Host(`${API_DOMAIN:-api.kigula.dpdns.org}`)"
+      - "traefik.http.routers.gestor-api.entrypoints=websecure"
+      - "traefik.http.routers.gestor-api.tls.certresolver=letsencryptresolver"
+      - "traefik.http.routers.gestor-api.service=gestor-api"
+      - "traefik.http.services.gestor-api.loadbalancer.server.port=3333"
+      - "traefik.http.services.gestor-api.loadbalancer.passHostHeader=true"
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-gestor_delivery}?schema=public
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      DIRECT_URL: ${DIRECT_URL:-${DATABASE_URL}}
       NODE_ENV: production
       API_PORT: 3333
-      CORS_ORIGINS: ${CORS_ORIGINS}
-    depends_on:
-      - postgres
-    networks:
-      - gestor-network
-      - CPNet
-
-  # Admin Frontend
-  web-admin:
-    image: clold157/gs-admin:latest
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_ENABLED: ${REDIS_ENABLED:-true}
     deploy:
-      restart_policy:
-        condition: on-failure
-      labels:
-        - "traefik.enable=true"
-        - "traefik.docker.network=CPNet"
-        - "traefik.http.routers.gestor-admin.rule=Host(`${ADMIN_DOMAIN}`)"
-        - "traefik.http.routers.gestor-admin.entrypoints=websecure"
-        - "traefik.http.routers.gestor-admin.tls.certresolver=letsencryptresolver"
-        - "traefik.http.routers.gestor-admin.service=gestor-admin"
-        - "traefik.http.services.gestor-admin.loadbalancer.server.port=80"
-        - "traefik.http.services.gestor-admin.loadbalancer.passHostHeader=true"
-    environment:
-      VITE_API_URL: ${VITE_API_URL}
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
     networks:
-      - CPNet
-
-  # Tenant Frontend
-  web-tenant:
-    image: clold157/gs-tenant:latest
-    deploy:
-      restart_policy:
-        condition: on-failure
-      labels:
-        - "traefik.enable=true"
-        - "traefik.docker.network=CPNet"
-        - "traefik.http.routers.gestor-tenant.rule=Host(`${APP_DOMAIN}`)"
-        - "traefik.http.routers.gestor-tenant.entrypoints=websecure"
-        - "traefik.http.routers.gestor-tenant.tls.certresolver=letsencryptresolver"
-        - "traefik.http.routers.gestor-tenant.service=gestor-tenant"
-        - "traefik.http.services.gestor-tenant.loadbalancer.server.port=80"
-        - "traefik.http.services.gestor-tenant.loadbalancer.passHostHeader=true"
-    environment:
-      VITE_API_URL: ${VITE_API_URL}
-    networks:
-      - CPNet
-
-  # Storefront Frontend
-  web-storefront:
-    image: clold157/gs-store:latest
-    deploy:
-      restart_policy:
-        condition: on-failure
-      labels:
-        - "traefik.enable=true"
-        - "traefik.docker.network=CPNet"
-        - "traefik.http.routers.gestor-storefront.rule=Host(`${STORE_DOMAIN}`)"
-        - "traefik.http.routers.gestor-storefront.entrypoints=websecure"
-        - "traefik.http.routers.gestor-storefront.tls.certresolver=letsencryptresolver"
-        - "traefik.http.routers.gestor-storefront.service=gestor-storefront"
-        - "traefik.http.services.gestor-storefront.loadbalancer.server.port=80"
-        - "traefik.http.services.gestor-storefront.loadbalancer.passHostHeader=true"
-    environment:
-      VITE_API_URL: ${VITE_API_URL}
-    networks:
-      - CPNet
+      - cpnet-attach
 
 networks:
-  gestor-network:
-    driver: overlay
-  CPNet:
+  cpnet-attach:
     external: true
-    name: CPNet
-
-volumes:
-  postgres_data:
-
-
+    name: cpnet-attach

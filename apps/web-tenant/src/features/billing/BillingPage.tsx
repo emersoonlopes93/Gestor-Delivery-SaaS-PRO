@@ -60,7 +60,6 @@ function booleanLabel(value: boolean): string {
 
 function sourceLabel(source: string | null | undefined): string {
   if (source === 'billing_v2') return 'Billing V2';
-  if (source === 'legacy_fallback') return 'Fallback legado';
   return 'Nenhuma';
 }
 
@@ -168,7 +167,6 @@ export function BillingPage() {
   });
 
   const billingStatus = useMemo(() => {
-    if (overview?.source === 'legacy_fallback') return 'Fallback legado';
     if (overview?.source === 'none') return 'Sem assinatura';
     return overview?.subscription?.status ?? 'Indefinido';
   }, [overview]);

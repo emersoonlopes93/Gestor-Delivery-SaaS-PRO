@@ -89,7 +89,7 @@ export function useHandoffNotification(enabled: boolean = true) {
       }
     };
 
-    const handleMessageCreated = (ev: CustomEvent<{ sessionId: string; message: any }>) => {
+    const handleMessageCreated = (ev: CustomEvent<{ sessionId: string; message: { id?: string; direction?: string; fromMe?: boolean; senderType?: string } }>) => {
       const { message } = ev.detail;
       if (!message || !message.id) return;
 

@@ -547,23 +547,6 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         messageId: (responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) ? String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) : undefined,
       };
     } catch (error: unknown) {
-      if (isAxiosError(error) && error.response?.status === 404) {
-        this.logger.warn('publishWhatsAppStatus primary route /send/text returned 404, retrying legacy /message/sendText.');
-        try {
-          const { data } = await client.post('/message/sendText', body);
-          return {
-            success: true,
-            messageId: (data?.key?.id || data?.id) ? String(data?.key?.id || data?.id) : undefined,
-          };
-        } catch (legacyError: unknown) {
-          const legacyMessage = isAxiosError(legacyError)
-            ? legacyError.response?.data?.message || legacyError.message
-            : (legacyError as Error).message;
-          this.logger.error(`publishWhatsAppStatus fallback /message/sendText failed: ${legacyMessage}`);
-          return { success: false, error: legacyMessage };
-        }
-      }
-
       const message = isAxiosError(error) ? error.response?.data?.message || error.message : (error as Error).message;
       this.logger.error(`publishWhatsAppStatus failed: ${message}`);
       return { success: false, error: message };
@@ -592,29 +575,6 @@ export class EvolutionGoProvider implements IWhatsAppProvider {
         messageId: (responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) ? String(responseData?.messageId || (responseData?.key as Record<string, unknown>)?.id || responseData?.id) : undefined,
       };
     } catch (error: unknown) {
-      if (isAxiosError(error) && error.response?.status === 404) {
-        this.logger.warn('publishWhatsAppStatus primary route /send/media returned 404, retrying legacy /message/sendMedia.');
-        try {
-          const { data } = await client.post('/message/sendMedia', {
-            number: body.number,
-            mediatype: body.type,
-            mimetype: body.type === 'video' ? 'video/mp4' : 'image/jpeg',
-            caption: body.caption,
-            media: body.media,
-          });
-          return {
-            success: true,
-            messageId: (data?.key?.id || data?.id) ? String(data?.key?.id || data?.id) : undefined,
-          };
-        } catch (legacyError: unknown) {
-          const legacyMessage = isAxiosError(legacyError)
-            ? legacyError.response?.data?.message || legacyError.message
-            : (legacyError as Error).message;
-          this.logger.error(`publishWhatsAppStatus fallback /message/sendMedia failed: ${legacyMessage}`);
-          return { success: false, error: legacyMessage };
-        }
-      }
-
       const message = isAxiosError(error) ? error.response?.data?.message || error.message : (error as Error).message;
       this.logger.error(`publishWhatsAppStatus failed: ${message}`);
       return { success: false, error: message };
