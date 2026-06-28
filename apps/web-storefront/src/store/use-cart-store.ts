@@ -46,6 +46,7 @@ interface CartState {
     selections?: CartSelectedOptionGroup[];
     slots?: CartSelectedComboSlot[];
     bundleItems?: CartBundleItemSnapshot[];
+    pizzaComposition?: CartLineItem['pizzaComposition'];
     sourceUpsellId?: string;
     computedUnitPrice: number;
     compositionLabel: string;
@@ -87,6 +88,7 @@ export const useCartStore = create<CartState>()(
         selections, 
         slots, 
         bundleItems, 
+        pizzaComposition,
         sourceUpsellId,
         computedUnitPrice,
         compositionLabel 
@@ -94,11 +96,12 @@ export const useCartStore = create<CartState>()(
         if (!product.isAvailable) return;
         
         const lineSubtotal = computedUnitPrice * quantity;
+        const snapshotBasePrice = pizzaComposition ? computedUnitPrice : product.basePrice;
 
         const snapshot: CartSnapshot = {
           productName: product.name,
           productImage: product.image,
-          basePrice: product.basePrice,
+          basePrice: snapshotBasePrice,
           lineSubtotal,
           extrasDescription: compositionLabel,
           items: []
@@ -114,6 +117,7 @@ export const useCartStore = create<CartState>()(
           selections,
           slots,
           bundleItems,
+          pizzaComposition,
           sourceUpsellId,
           snapshot,
         };
@@ -141,6 +145,15 @@ export const useCartStore = create<CartState>()(
 
         const newItems = get().items.map(item => {
           if (item.cartLineId === cartLineId) {
+            if (item.pizzaComposition) {
+              const lineSubtotal = item.snapshot.basePrice * quantity;
+              return {
+                ...item,
+                quantity,
+                snapshot: { ...item.snapshot, lineSubtotal }
+              };
+            }
+
             const legacyExtras = (item.selectedOptions?.reduce((s, o) => s + o.price, 0) || 0) +
               (item.selectedComboItems?.reduce((s, i) => s + i.price, 0) || 0);
             

@@ -215,6 +215,9 @@ export function PosItemConfiguratorModal(props: {
   // Pizza Template State
   const [categoryFlavors, setCategoryFlavors] = useState<ProductDetail[]>([]);
   const [selectedPizzaFlavors, setSelectedPizzaFlavors] = useState<Array<{ productId: string; name: string }>>([]);
+  const [pizzaPreview, setPizzaPreview] = useState<{ unitPrice: number; label: string } | null>(null);
+  const [pizzaPreviewLoading, setPizzaPreviewLoading] = useState(false);
+  const [pizzaPreviewError, setPizzaPreviewError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -264,6 +267,62 @@ export function PosItemConfiguratorModal(props: {
   const isCombo = detail?.type === 'combo';
   const isSlotCombo = isCombo && (detail?.comboMode ?? 'bundle') === 'slot';
 
+  const pizzaSizeGroup = useMemo(
+    () => detail?.optionGroupLinks?.find((link) => link.pricingAxis === 'primary' || link.optionGroup.name.includes('Tamanhos [Pizza]')),
+    [detail?.optionGroupLinks],
+  );
+
+  const selectedPizzaSizeId = useMemo(
+    () => selectionState.find((s) => s.optionGroupId === pizzaSizeGroup?.optionGroup.id)?.items[0]?.optionItemId ?? '',
+    [pizzaSizeGroup?.optionGroup.id, selectionState],
+  );
+
+  useEffect(() => {
+    if (!isPizzaTemplate || !detail || !selectedPizzaSizeId || selectedPizzaFlavors.length === 0) {
+      setPizzaPreview(null);
+      setPizzaPreviewLoading(false);
+      setPizzaPreviewError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setPizzaPreviewLoading(true);
+    setPizzaPreviewError(null);
+
+    api.post<{ sizeId: string; sizeName: string; strategy: string; calculatedPrice: number }>(`/catalog/pizza/simulate`, {
+      categoryId: detail.category?.id,
+      sizeId: selectedPizzaSizeId,
+      flavors: selectedPizzaFlavors.map((flavor) => ({
+        productId: flavor.productId,
+        fraction: selectedPizzaFlavors.length > 1 ? 0.5 : 1,
+      })),
+    })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.success) {
+          setPizzaPreview({
+            unitPrice: res.data.calculatedPrice,
+            label: `${res.data.sizeName} · ${selectedPizzaFlavors.map((f) => f.name).join(' / ')}`,
+          });
+        } else {
+          setPizzaPreview(null);
+          setPizzaPreviewError('Não foi possível simular a pizza.');
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPizzaPreview(null);
+        setPizzaPreviewError('Não foi possível simular a pizza.');
+      })
+      .finally(() => {
+        if (!cancelled) setPizzaPreviewLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [detail, isPizzaTemplate, selectedPizzaFlavors, selectedPizzaSizeId]);
+
   const computed = useMemo(() => {
     if (!detail) return { unitPrice: 0, label: '' };
 
@@ -298,28 +357,17 @@ export function PosItemConfiguratorModal(props: {
     }
 
     if (isPizzaTemplate) {
-      // Simplistic price: highest of selected flavors at selected size
-      // We need the sizeId from primary axis
-      const sizesLink = detail.optionGroupLinks?.find(l => l.pricingAxis === 'primary');
-      const selectedSizeId = selectionState.find(s => s.optionGroupId === sizesLink?.optionGroup.id)?.items[0]?.optionItemId;
-      
-      let unitPrice = base;
-      if (selectedSizeId) {
-        // Find prices for each flavor (if available in detail, but here we only have the main one)
-        // For simplicity in PDV PHASE 1: use the basePrice of the main product for now
-        // OR use the highest base price among selected flavors.
-        const highestBase = Math.max(...selectedPizzaFlavors.map(f => {
-          const flavorDetail = categoryFlavors.find(cf => cf.id === f.productId);
-          return flavorDetail?.basePrice ?? 0;
-        }), base);
-        unitPrice = highestBase;
-      }
+      const sizesLink = pizzaSizeGroup;
+      const secondaryOptions = computeOptionSelectionsPrice(
+        detail,
+        selectionState.filter((s) => s.optionGroupId !== sizesLink?.optionGroup.id),
+      );
 
-      // Add options price (like "Borda Recheada" which would be a secondary axis)
-      const secondaryOptions = computeOptionSelectionsPrice(detail, selectionState.filter(s => s.optionGroupId !== sizesLink?.optionGroup.id));
-      unitPrice += (secondaryOptions.unitPrice - base);
-
-      return { unitPrice: Number(unitPrice.toFixed(2)), label: `Sabores: ${selectedPizzaFlavors.map(f => f.name).join(' / ')}${secondaryOptions.composition ? `; ${secondaryOptions.composition}` : ''}` };
+      const pizzaBase = pizzaPreview?.unitPrice ?? base;
+      return {
+        unitPrice: Number((pizzaBase + (secondaryOptions.unitPrice - base)).toFixed(2)),
+        label: `${pizzaPreview?.label || `Sabores: ${selectedPizzaFlavors.map((f) => f.name).join(' / ')}`}${secondaryOptions.composition ? `; ${secondaryOptions.composition}` : ''}`,
+      };
     }
 
     return { unitPrice: base, label: '' };
@@ -356,6 +404,8 @@ export function PosItemConfiguratorModal(props: {
       const sizeSelected = selectionState.find(s => s.optionGroupId === sizesLink?.optionGroup.id)?.items.length ?? 0;
       if (sizeSelected === 0) return 'Selecione um tamanho.';
       if (selectedPizzaFlavors.length === 0) return 'Selecione pelo menos 1 sabor.';
+      if (pizzaPreviewLoading) return 'Aguarde a simulação do preço.';
+      if (pizzaPreviewError) return pizzaPreviewError;
     }
  
     return null;
@@ -683,7 +733,10 @@ export function PosItemConfiguratorModal(props: {
                 const slotsDto = isSlotCombo ? buildSlotsDto(slotState) : undefined;
 
                 const pizzaComposition: PizzaCompositionDTO | undefined = isPizzaTemplate ? {
-                  sizeId: selectionState.find(s => s.optionGroupId === detail.optionGroupLinks?.find(l => l.pricingAxis === 'primary')?.optionGroup.id)?.items[0]?.optionItemId || '',
+                  sizeId: selectedPizzaSizeId,
+                  sizeName: pizzaPreview?.label.split(' · ')[0] ?? undefined,
+                  pricingStrategy: undefined,
+                  calculatedPrice: pizzaPreview?.unitPrice,
                   flavors: selectedPizzaFlavors.map(f => ({
                     productId: f.productId,
                     fraction: 1 / selectedPizzaFlavors.length

@@ -407,7 +407,10 @@ export function CategoriesPage() {
             {formData.templateType === 'pizza' && (
               <div className="mt-4 p-4 bg-primary/10 rounded-xl border border-primary/20">
                 <p className="text-xs text-primary leading-relaxed font-medium">
-                  <strong>💡 Template Pizza Ativado:</strong> Novos produtos nesta categoria serão configurados automaticamente como Sabores e vinculados aos grupos de Tamanhos e Montagem.
+                  <strong>💡 Template Pizza Ativado:</strong> Produtos criados dentro desta categoria serão tratados como sabores de pizza. Depois de criar os sabores, configure os preços por tamanho no produto e teste a montagem no storefront.
+                </p>
+                <p className="mt-3 text-[11px] font-semibold text-primary/80">
+                  1. Crie a categoria Pizzas. 2. Ative o template Pizza. 3. Crie os sabores como produtos. 4. Configure preços por tamanho. 5. Teste no storefront.
                 </p>
               </div>
             )}

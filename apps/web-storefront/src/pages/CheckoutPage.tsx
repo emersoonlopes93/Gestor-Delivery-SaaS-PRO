@@ -99,6 +99,57 @@ export function CheckoutPage() {
   const safeCustomerCashbackBalance = Number(customer?.cashbackBalance ?? 0);
   const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<string | null>(null);
 
+  const serializeCartItem = (item: (typeof items)[number]): CreateOrderItemDTO => {
+    if (item.comboId) {
+      return {
+        lineType: 'combo',
+        comboId: item.comboId,
+        productId: item.comboId,
+        quantity: item.quantity,
+        notes: item.notes,
+        selections: item.selections?.map(g => ({
+          optionGroupId: g.optionGroupId,
+          items: g.items.map(i => ({
+            optionItemId: i.optionItemId,
+            qty: i.qty,
+          })),
+        })),
+        slots: item.slots?.map(s => ({
+          comboSlotId: s.comboSlotId,
+          items: s.items.map(i => ({
+            productId: i.productId,
+            qty: i.qty,
+          })),
+        })),
+      };
+    }
+
+    return {
+      lineType: 'product',
+      productId: item.productId,
+      quantity: item.quantity,
+      notes: item.notes,
+      selections: item.selections?.map(g => ({
+        optionGroupId: g.optionGroupId,
+        items: g.items.map(i => ({
+          optionItemId: i.optionItemId,
+          qty: i.qty,
+        })),
+      })),
+      slots: item.slots?.map(s => ({
+        comboSlotId: s.comboSlotId,
+        items: s.items.map(i => ({
+          productId: i.productId,
+          qty: i.qty,
+        })),
+      })),
+      pizzaComposition: item.pizzaComposition ? {
+        ...item.pizzaComposition,
+        calculatedPrice: item.pizzaComposition.calculatedPrice ?? item.snapshot.basePrice,
+      } : undefined,
+    };
+  };
+
   const { data: customerProfile } = useQuery({
     queryKey: ['customer-profile', tenantSlug],
     queryFn: async () => (await api.get<{ profile?: { name?: string | null; email?: string | null }; wallet?: { cashbackBalance?: number | null }; addresses?: PublicCustomerProfileAddressDTO[] }>('/public/customer-profile')).data,
@@ -191,30 +242,7 @@ export function CheckoutPage() {
 
       setIsValidating(true);
       try {
-        const orderItems: CreateOrderItemDTO[] = items.map(item => {
-          const itemPayload: CreateOrderItemDTO = {
-            lineType: item.comboId ? 'combo' : 'product',
-            productId: item.productId || item.comboId || '',
-            quantity: item.quantity,
-            notes: item.notes,
-            selections: item.selections?.map(g => ({
-              optionGroupId: g.optionGroupId,
-              items: g.items.map(i => ({
-                optionItemId: i.optionItemId,
-                qty: i.qty,
-              }))
-            })),
-            slots: item.slots?.map(s => ({
-              comboSlotId: s.comboSlotId,
-              items: s.items.map(i => ({
-                productId: i.productId,
-                qty: i.qty,
-              }))
-            })),
-
-          };
-          return itemPayload;
-        });
+        const orderItems: CreateOrderItemDTO[] = items.map(serializeCartItem);
 
         const address: DeliveryAddressDTO | null = isDelivery ? {
           street,
@@ -389,46 +417,7 @@ export function CheckoutPage() {
     setSubmitError(null);
 
     try {
-      const orderItems: CreateOrderItemDTO[] = items.map(item => {
-        if (item.comboId) {
-          return {
-            lineType: 'combo',
-            comboId: item.comboId,
-            productId: item.comboId,
-            quantity: item.quantity,
-            notes: item.notes,
-            selections: item.selections?.map(g => ({
-              optionGroupId: g.optionGroupId,
-              items: g.items.map(i => ({
-                optionItemId: i.optionItemId,
-                qty: i.qty,
-              }))
-            })),
-            slots: item.slots?.map(s => ({
-              comboSlotId: s.comboSlotId,
-              items: s.items.map(i => ({
-                productId: i.productId,
-                qty: i.qty,
-              }))
-            })),
-
-          };
-        }
-        return {
-          lineType: 'product',
-          productId: item.productId,
-          quantity: item.quantity,
-          notes: item.notes,
-          selections: item.selections?.map(g => ({
-            optionGroupId: g.optionGroupId,
-            items: g.items.map(i => ({
-              optionItemId: i.optionItemId,
-              qty: i.qty,
-            }))
-          })),
-
-        };
-      });
+      const orderItems: CreateOrderItemDTO[] = items.map(serializeCartItem);
 
       const payload: CreateOrderDTO = {
         customerName: customerName.trim(),
@@ -496,46 +485,7 @@ export function CheckoutPage() {
     setValidationErrors([]);
 
     try {
-      const orderItems: CreateOrderItemDTO[] = items.map(item => {
-        if (item.comboId) {
-          return {
-            lineType: 'combo',
-            comboId: item.comboId,
-            productId: item.comboId,
-            quantity: item.quantity,
-            notes: item.notes,
-            selections: item.selections?.map(g => ({
-              optionGroupId: g.optionGroupId,
-              items: g.items.map(i => ({
-                optionItemId: i.optionItemId,
-                qty: i.qty,
-              }))
-            })),
-            slots: item.slots?.map(s => ({
-              comboSlotId: s.comboSlotId,
-              items: s.items.map(i => ({
-                productId: i.productId,
-                qty: i.qty,
-              }))
-            })),
-
-          };
-        }
-        return {
-          lineType: 'product',
-          productId: item.productId,
-          quantity: item.quantity,
-          notes: item.notes,
-          selections: item.selections?.map(g => ({
-            optionGroupId: g.optionGroupId,
-            items: g.items.map(i => ({
-              optionItemId: i.optionItemId,
-              qty: i.qty,
-            }))
-          })),
-
-        };
-      });
+      const orderItems: CreateOrderItemDTO[] = items.map(serializeCartItem);
 
       const payload: CreateOrderDTO = {
         customerName: customerName.trim(),

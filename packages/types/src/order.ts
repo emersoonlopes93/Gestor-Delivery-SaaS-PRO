@@ -117,10 +117,14 @@ export class CreateOrderItemComboSlotSelectionDTO {
 export class PizzaCompositionFlavorDTO {
   @IsString() @IsNotEmpty() productId!: string;
   @IsNumber() @IsNotEmpty() fraction!: number;
+  @IsString() @IsOptional() name?: string;
 }
 
 export class PizzaCompositionDTO {
   @IsString() @IsNotEmpty() sizeId!: string;
+  @IsString() @IsOptional() sizeName?: string;
+  @IsString() @IsOptional() pricingStrategy?: string;
+  @IsNumber() @IsOptional() calculatedPrice?: number;
   
   @IsArray()
   @ValidateNested({ each: true })

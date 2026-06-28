@@ -1,7 +1,7 @@
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api-client';
-import type { StorefrontPayload, StorefrontProductPayload, StorefrontComboPayload } from '@gestor/types';
+import type { StorefrontPayload, StorefrontProductPayload, StorefrontComboPayload, StorefrontCategoryPayload } from '@gestor/types';
 import { useCartStore } from '../store/use-cart-store';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -68,6 +68,7 @@ export function StorefrontPage() {
   const cartItemsCount = useCartStore(s => s.items.length);
 
   const [selectedProduct, setSelectedProduct] = useState<StorefrontProductPayload | null>(null);
+  const [selectedProductCategory, setSelectedProductCategory] = useState<StorefrontCategoryPayload | null>(null);
   const [selectedCombo, setSelectedCombo] = useState<StorefrontComboPayload | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -478,7 +479,10 @@ export function StorefrontPage() {
                     imageMode={layoutSettings.productImageMode}
                     showDescription={layoutSettings.showProductDescription}
                     showBadges={layoutSettings.showBadges}
-                    onSelectProduct={() => setSelectedProduct(product)}
+                    onSelectProduct={() => {
+                      setSelectedProduct(product);
+                      setSelectedProductCategory(categories.find((category) => category.id === product.categoryId) ?? null);
+                    }}
                   />
                 ))}
               </div>
@@ -499,8 +503,12 @@ export function StorefrontPage() {
       {selectedProduct && (
         <ProductDetailsModal
           product={selectedProduct}
+          category={selectedProductCategory}
           isStoreClosed={!data.tenant.isOpen}
-          onClose={() => setSelectedProduct(null)}
+          onClose={() => {
+            setSelectedProduct(null);
+            setSelectedProductCategory(null);
+          }}
         />
       )}
 

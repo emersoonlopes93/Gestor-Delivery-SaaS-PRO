@@ -37,6 +37,7 @@ export interface StorefrontTenantInfo {
 }
 
 import { PriceImpactType } from './catalog';
+import type { PizzaCompositionDTO } from './order';
 
 export interface StorefrontOptionItemPayload {
   id: string;
@@ -135,6 +136,7 @@ export interface StorefrontProductPayload {
 
   badges: ProductBadge[];
   compareAtPrice?: number | null;
+  pizzaComposition?: PizzaCompositionDTO;
 }
 
 export interface StorefrontCategoryPayload {
@@ -280,6 +282,7 @@ export interface CartLineItem {
   type?: 'simple' | 'combo';
   selections?: CartSelectedOptionGroup[];
   slots?: CartSelectedComboSlot[];
+  pizzaComposition?: PizzaCompositionDTO;
   selectedOptions?: CartSelectedComplement[]; // Legacy
   selectedComboItems?: CartSelectedComboItem[]; // Legacy
   snapshot: CartSnapshot;
