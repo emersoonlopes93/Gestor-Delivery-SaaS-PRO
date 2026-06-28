@@ -21,6 +21,7 @@ export class DeliveryCoverageService {
       defaultPricePerKm: number;
       minimumFee?: number;
       maximumFee?: number;
+      defaultEstimatedDeliveryMinutes?: number;
       isDeliveryEnabled?: boolean;
     },
   ): Promise<DeliveryCoverageConfig> {
@@ -32,6 +33,7 @@ export class DeliveryCoverageService {
       defaultPricePerKm: data.defaultPricePerKm,
       minimumFee: data.minimumFee,
       maximumFee: data.maximumFee,
+      defaultEstimatedDeliveryMinutes: data.defaultEstimatedDeliveryMinutes,
       isDeliveryEnabled: data.isDeliveryEnabled ?? true,
     };
 

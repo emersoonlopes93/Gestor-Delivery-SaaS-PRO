@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { DeliveryRateService, DELIVERY_RATE_RULE_REPO, DELIVERY_COVERAGE_REPO } from './delivery-rate.service';
 import { PrismaService } from '../database/prisma.service';
 import { GeocodingService } from './geocoding.service';
+import { DeliveryRateService, DELIVERY_COVERAGE_REPO, DELIVERY_RATE_RULE_REPO } from './delivery-rate.service';
 
-describe('DeliveryRateService (P0.2 Priority Engine)', () => {
+describe('DeliveryRateService', () => {
   let service: DeliveryRateService;
 
   const mockPrisma = {
@@ -16,10 +16,15 @@ describe('DeliveryRateService (P0.2 Priority Engine)', () => {
     deliveryRateRule: {
       findMany: jest.fn(),
     },
+    deliveryRateDistanceTier: {
+      deleteMany: jest.fn(),
+      createMany: jest.fn(),
+    },
   };
 
   const mockGeocoding = {
     geocodeAddress: jest.fn(),
+    geocodeFreeform: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -40,151 +45,183 @@ describe('DeliveryRateService (P0.2 Priority Engine)', () => {
     jest.clearAllMocks();
   });
 
-  const generatePolygon = (latCenter: number, lngCenter: number): Array<[number, number]> => {
-    return [
-      [lngCenter - 0.01, latCenter - 0.01],
-      [lngCenter + 0.01, latCenter - 0.01],
-      [lngCenter + 0.01, latCenter + 0.01],
-      [lngCenter - 0.01, latCenter + 0.01],
-      [lngCenter - 0.01, latCenter - 0.01],
-    ];
-  };
+  const generatePolygon = (latCenter: number, lngCenter: number): Array<[number, number]> => [
+    [lngCenter - 0.01, latCenter - 0.01],
+    [lngCenter + 0.01, latCenter - 0.01],
+    [lngCenter + 0.01, latCenter + 0.01],
+    [lngCenter - 0.01, latCenter + 0.01],
+    [lngCenter - 0.01, latCenter - 0.01],
+  ];
 
-  it('deve retornar bloqueio quando na Praça da Sé (Origem Falsa)', async () => {
+  it('bloqueia calculo com origem padrao invalida', async () => {
     mockPrisma.deliveryCoverageConfig.findUnique.mockResolvedValue({
       tenantId: 'tenant1',
       isDeliveryEnabled: true,
       storeLat: -23.55052,
       storeLng: -46.633308,
       maxRadiusKm: 10,
+      defaultEstimatedDeliveryMinutes: 45,
     });
     mockPrisma.tenantSettings.findUnique.mockResolvedValue(null);
 
     const result = await service.calculateDeliveryDecision({
       tenantId: 'tenant1',
-      address: { lat: -23.560, lng: -46.640 },
+      address: { lat: -23.56, lng: -46.64 },
     });
 
     expect(result.canDeliver).toBe(false);
-    expect(result.reason).toContain('Configure o endereço');
+    expect(result.available).toBe(false);
+    expect(result.appliedRule).toContain('Origem');
   });
 
-  it('deve priorizar blocked zone sobre distance tiers', async () => {
+  it('prioriza area bloqueada sobre faixas globais', async () => {
     mockPrisma.deliveryCoverageConfig.findUnique.mockResolvedValue({
       tenantId: 'tenant1',
       isDeliveryEnabled: true,
-      storeLat: -23.00,
-      storeLng: -46.00,
+      storeLat: -23,
+      storeLng: -46,
       maxRadiusKm: 10,
+      defaultEstimatedDeliveryMinutes: 45,
+      minimumFee: null,
+      maximumFee: null,
     });
     mockPrisma.tenantSettings.findUnique.mockResolvedValue(null);
-
-    // Cliente está em -23.01, -46.01, distância aprox 1.5km
-    const clientLat = -23.01;
-    const clientLng = -46.01;
-
     mockPrisma.deliveryRateRule.findMany.mockResolvedValue([
       {
         id: 'blocked1',
         type: 'polygon',
         zoneKind: 'blocked_zone',
+        blocksDelivery: true,
         priority: 10,
         polygonCoordinates: generatePolygon(-23.01, -46.01),
+        distanceTiers: [],
       },
       {
         id: 'tier1',
         type: 'distance',
         pricingMode: 'tiers',
-        priority: 5, // Prioridade mais forte numericamente, mas é distance rule!
-        distanceTiers: [
-          { minDistanceKm: 0, maxDistanceKm: 5, fee: 5 },
-        ],
+        priority: 5,
+        distanceTiers: [{ minDistanceKm: 0, maxDistanceKm: 5, fee: 5, estimatedDeliveryMinutes: 30 }],
       },
     ]);
 
     const result = await service.calculateDeliveryDecision({
       tenantId: 'tenant1',
-      address: { lat: clientLat, lng: clientLng },
+      address: { lat: -23.01, lng: -46.01 },
     });
 
     expect(result.canDeliver).toBe(false);
     expect(result.matchedStrategy).toBe('blocked_zone');
   });
 
-  it('deve priorizar polygon custom sobre distance tiers globais', async () => {
+  it('prioriza area especial sobre faixa global e retorna tempo da area', async () => {
     mockPrisma.deliveryCoverageConfig.findUnique.mockResolvedValue({
       tenantId: 'tenant1',
       isDeliveryEnabled: true,
-      storeLat: -23.00,
-      storeLng: -46.00,
+      storeLat: -23,
+      storeLng: -46,
       maxRadiusKm: 10,
+      defaultEstimatedDeliveryMinutes: 45,
+      minimumFee: null,
+      maximumFee: null,
     });
     mockPrisma.tenantSettings.findUnique.mockResolvedValue(null);
-
-    const clientLat = -23.01;
-    const clientLng = -46.01;
-
     mockPrisma.deliveryRateRule.findMany.mockResolvedValue([
       {
         id: 'poly1',
         type: 'polygon',
         pricingMode: 'fixed',
         fixedRate: 15,
-        priority: 1000, // Prioridade numericamente "pior"
+        estimatedDeliveryMinutes: 70,
+        priority: 1000,
+        blocksDelivery: false,
         polygonCoordinates: generatePolygon(-23.01, -46.01),
+        distanceTiers: [],
       },
       {
         id: 'tier1',
         type: 'distance',
         pricingMode: 'tiers',
-        priority: 500, // Numeramente "melhor", mas como é distance global, perde para poly
-        distanceTiers: [
-          { minDistanceKm: 0, maxDistanceKm: 5, fee: 5 },
-        ],
+        priority: 500,
+        distanceTiers: [{ minDistanceKm: 0, maxDistanceKm: 5, fee: 5, estimatedDeliveryMinutes: 35 }],
       },
     ]);
 
     const result = await service.calculateDeliveryDecision({
       tenantId: 'tenant1',
-      address: { lat: clientLat, lng: clientLng },
+      address: { lat: -23.01, lng: -46.01 },
     });
 
     expect(result.canDeliver).toBe(true);
     expect(result.fee).toBe(15);
+    expect(result.estimatedDeliveryMinutes).toBe(70);
     expect(result.matchedZoneId).toBe('poly1');
   });
 
-  it('não deve aplicar distance tier se exceder maxRadiusKm', async () => {
+  it('nao aplica faixa global fora do raio maximo', async () => {
     mockPrisma.deliveryCoverageConfig.findUnique.mockResolvedValue({
       tenantId: 'tenant1',
       isDeliveryEnabled: true,
-      storeLat: -23.00,
-      storeLng: -46.00,
-      maxRadiusKm: 5, // Limite de 5km
+      storeLat: -23,
+      storeLng: -46,
+      maxRadiusKm: 5,
+      defaultEstimatedDeliveryMinutes: 45,
+      minimumFee: null,
+      maximumFee: null,
     });
     mockPrisma.tenantSettings.findUnique.mockResolvedValue(null);
-
-    const distanceKm = 7; // Cliente a 7km
-
     mockPrisma.deliveryRateRule.findMany.mockResolvedValue([
       {
         id: 'tier1',
         type: 'distance',
         pricingMode: 'tiers',
         priority: 500,
-        distanceTiers: [
-          { minDistanceKm: 0, maxDistanceKm: 10, fee: 20 },
-        ],
+        distanceTiers: [{ minDistanceKm: 0, maxDistanceKm: 10, fee: 20, estimatedDeliveryMinutes: 55 }],
       },
     ]);
 
     const result = await service.calculateDeliveryDecision({
       tenantId: 'tenant1',
-      distanceKm, // Forçando a distância mockada para não ter que caçar coordenadas perfeitas
-      address: { lat: -23.06, lng: -46.06 }, 
+      distanceKm: 7,
+      address: { lat: -23.06, lng: -46.06 },
     });
 
     expect(result.canDeliver).toBe(false);
     expect(result.matchedStrategy).toBe('out_of_coverage');
+  });
+
+  it('retorna tempo estimado da faixa global', async () => {
+    mockPrisma.deliveryCoverageConfig.findUnique.mockResolvedValue({
+      tenantId: 'tenant1',
+      isDeliveryEnabled: true,
+      storeLat: -23,
+      storeLng: -46,
+      maxRadiusKm: 10,
+      defaultPricePerKm: 3,
+      defaultEstimatedDeliveryMinutes: 50,
+      minimumFee: null,
+      maximumFee: null,
+    });
+    mockPrisma.tenantSettings.findUnique.mockResolvedValue(null);
+    mockPrisma.deliveryRateRule.findMany.mockResolvedValue([
+      {
+        id: 'tier1',
+        type: 'distance',
+        pricingMode: 'tiers',
+        priority: 100,
+        estimatedDeliveryMinutes: null,
+        distanceTiers: [{ minDistanceKm: 0, maxDistanceKm: 5, fee: 8, estimatedDeliveryMinutes: 35 }],
+      },
+    ]);
+
+    const result = await service.calculateDeliveryDecision({
+      tenantId: 'tenant1',
+      distanceKm: 3,
+      address: { lat: -23.01, lng: -46.01 },
+    });
+
+    expect(result.canDeliver).toBe(true);
+    expect(result.estimatedDeliveryMinutes).toBe(35);
+    expect(result.appliedRule).toContain('Raio');
   });
 });

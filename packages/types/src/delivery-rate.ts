@@ -21,6 +21,7 @@ export interface DeliveryRateDistanceTierInput {
   minDistanceKm: number;
   maxDistanceKm: number;
   fee: number;
+  estimatedDeliveryMinutes?: number;
   sortOrder?: number;
 }
 
@@ -37,6 +38,10 @@ export class DeliveryRateDistanceTierDTO {
 
   @IsNumber()
   fee!: number;
+
+  @IsOptional()
+  @IsNumber()
+  estimatedDeliveryMinutes?: number;
 
   @IsOptional()
   @IsNumber()
@@ -70,6 +75,10 @@ export class CreateDeliveryRateRuleDTO {
   @ValidateNested({ each: true })
   @Type(() => DeliveryRateDistanceTierDTO)
   distanceTiers?: DeliveryRateDistanceTierDTO[];
+
+  @IsOptional()
+  @IsNumber()
+  estimatedDeliveryMinutes?: number;
 
   @IsOptional()
   @IsBoolean()
@@ -160,5 +169,6 @@ export interface UpsertDeliveryRateRuleInput {
   blocksDelivery?: boolean;
   fixedFee?: number;
   pricePerKm?: number;
+  estimatedDeliveryMinutes?: number;
   distanceTiers?: DeliveryRateDistanceTierInput[];
 }

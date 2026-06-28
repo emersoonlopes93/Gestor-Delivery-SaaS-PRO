@@ -1980,6 +1980,7 @@ model DeliveryCoverageConfig {
   defaultPricePerKm Decimal  @map("default_price_per_km") @db.Decimal(10, 2)
   minimumFee        Decimal? @map("minimum_fee") @db.Decimal(10, 2)
   maximumFee        Decimal? @map("maximum_fee") @db.Decimal(10, 2)
+  defaultEstimatedDeliveryMinutes Int? @map("default_estimated_delivery_minutes")
   isDeliveryEnabled Boolean  @default(true) @map("is_delivery_enabled")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
@@ -2015,6 +2016,7 @@ model DeliveryRateRule {
   pricePerKm         Decimal?                   @map("price_per_km") @db.Decimal(10, 2)
   pricingMode        DeliveryPricingMode?       @map("pricing_mode")
   zoneKind           DeliveryZoneKind?          @map("zone_kind")
+  estimatedDeliveryMinutes Int?                 @map("estimated_delivery_minutes")
   distanceTiers      DeliveryRateDistanceTier[]
   tenant             Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -2032,6 +2034,7 @@ model DeliveryRateDistanceTier {
   minDistanceKm      Decimal          @map("min_distance_km") @db.Decimal(5, 2)
   maxDistanceKm      Decimal          @map("max_distance_km") @db.Decimal(5, 2)
   fee                Decimal          @map("fee") @db.Decimal(10, 2)
+  estimatedDeliveryMinutes Int?       @map("estimated_delivery_minutes")
   sortOrder          Int              @default(0) @map("sort_order")
   isActive           Boolean          @default(true) @map("is_active")
   createdAt          DateTime         @default(now()) @map("created_at")

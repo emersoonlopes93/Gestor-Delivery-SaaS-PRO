@@ -76,6 +76,7 @@ export class DeliveryRateController {
         minDistanceKm: tier.minDistanceKm,
         maxDistanceKm: tier.maxDistanceKm,
         fee: tier.fee,
+        estimatedDeliveryMinutes: tier.estimatedDeliveryMinutes,
         sortOrder: tier.sortOrder ?? idx,
       })),
     };
@@ -135,6 +136,17 @@ export class DeliveryRateController {
       address: body.address,
       distanceKm: body.distanceKm ?? null,
     });
+  }
+
+  @Post('test-current')
+  @RequirePermissions('delivery.read')
+  @HttpCode(HttpStatus.OK)
+  async testCurrentTenant(
+    @Request() req: ExpressRequest & { user: TenantJwtPayload },
+    @Body() body: { query: string },
+  ) {
+    const tenantId = this.getTenantIdFromRequest(req);
+    return this.deliveryRateService.testDeliveryByQuery(tenantId, body.query);
   }
 
   @Post('calculate')

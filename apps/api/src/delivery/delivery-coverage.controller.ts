@@ -36,6 +36,10 @@ class UpsertDeliveryCoverageDto {
   maximumFee?: number;
 
   @IsOptional()
+  @IsNumber()
+  defaultEstimatedDeliveryMinutes?: number;
+
+  @IsOptional()
   @IsBoolean()
   isDeliveryEnabled?: boolean;
 }
