@@ -507,7 +507,7 @@ export function DeliveryRatesPage() {
                   <label className="block space-y-2">
                     <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
                       <Truck className="h-4 w-4 text-primary" />
-                      Forma de cÃ¡lculo
+                      Forma de cálculo
                     </span>
                     <select value="radius" disabled className="input-premium cursor-not-allowed">
                       <option value="radius">Entrega por raio — recomendado</option>
@@ -516,7 +516,7 @@ export function DeliveryRatesPage() {
                     </select>
                   </label>
                   <p className="text-xs font-semibold text-muted-foreground">
-                    As opÃ§Ãµes por rota e bairro continuam reservadas para evoluÃ§Ãµes futuras.
+                    As opções por rota e bairro continuam reservadas para evoluções futuras.
                   </p>
                 </div>
                 <div className="hidden mt-4 space-y-3">
