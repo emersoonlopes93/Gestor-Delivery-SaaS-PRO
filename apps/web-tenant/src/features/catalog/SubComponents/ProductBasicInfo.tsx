@@ -7,7 +7,7 @@ import { api } from '../../../lib/api-client';
 import { useFormContext } from 'react-hook-form';
 import { useCatalogEditor } from '../CatalogEditorContext';
 import { CatalogProductFormState } from '../CatalogEditorTypes';
-import { maskCurrency, unmaskCurrency } from '@gestor/utils';
+import { CurrencyInput } from '@gestor/ui';
 
 export const ProductBasicInfo: React.FC = () => {
   const { isComboMode, isNew, handleSaveProduct, savingStates, onOpenRecipe, product, goNextWizardStep, isComboWizard } = useCatalogEditor();
@@ -49,20 +49,18 @@ export const ProductBasicInfo: React.FC = () => {
               {!isComboMode ? (
                 <div>
                   <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Preço Base *</label>
-                  <input
-                    type="text"
-                    value={maskCurrency(productForm.basePrice)}
-                    onChange={(e) => setProductForm({ ...productForm, basePrice: unmaskCurrency(e.target.value) })}
+                  <CurrencyInput
+                    value={productForm.basePrice}
+                    onChange={(basePrice) => setProductForm({ ...productForm, basePrice })}
                     className="input-premium"
-                    placeholder="R$ 0,00"
                   />
                 </div>
               ) : (
                 <div>
                   <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Preço Final do Combo</label>
-                  <input
-                    type="text"
-                    value={maskCurrency(Number(bundleSummary?.finalPrice ?? productForm.basePrice ?? 0))}
+                  <CurrencyInput
+                    value={Number(bundleSummary?.finalPrice ?? productForm.basePrice ?? 0)}
+                    onChange={() => undefined}
                     disabled
                     className="input-premium opacity-70 cursor-not-allowed"
                   />
@@ -83,12 +81,10 @@ export const ProductBasicInfo: React.FC = () => {
                     </button>
                   )}
                 </div>
-                <input
-                  type="text"
-                  value={maskCurrency(productForm.costPrice)}
-                  onChange={(e) => setProductForm({ ...productForm, costPrice: unmaskCurrency(e.target.value) })}
+                <CurrencyInput
+                  value={productForm.costPrice}
+                  onChange={(costPrice) => setProductForm({ ...productForm, costPrice })}
                   className="input-premium border-status-warning/30"
-                  placeholder="R$ 0,00"
                 />
                 <p className="text-[10px] text-status-warning mt-1 font-bold">Usado para cálculo de lucro se não houver ficha técnica.</p>
               </div>
@@ -297,18 +293,16 @@ export const ProductBasicInfo: React.FC = () => {
                           {size.name}
                         </label>
                         <div className="relative">
-                          <input
-                            type="text"
-                            value={maskCurrency(Reflect.get(pizzaPrices, size.id) || 0)}
-                            onChange={(e) => {
+                          <CurrencyInput
+                            value={Reflect.get(pizzaPrices, size.id) || 0}
+                            onChange={(nextValue) => {
                               const nextPrices = { ...pizzaPrices };
                               if (size.id !== '__proto__' && size.id !== 'constructor') {
-                                Reflect.set(nextPrices, size.id, unmaskCurrency(e.target.value));
+                                Reflect.set(nextPrices, size.id, nextValue);
                               }
                               setPizzaPrices(nextPrices);
                             }}
                             className="w-full px-4 py-3.5 bg-card text-foreground border border-input rounded-xl outline-none text-base font-black focus:ring-2 focus:ring-primary transition-all placeholder:text-muted-foreground text-center"
-                            placeholder="R$ 0,00"
                           />
                         </div>
                       </div>

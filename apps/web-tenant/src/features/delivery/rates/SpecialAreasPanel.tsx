@@ -36,7 +36,7 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
           <button
             type="button"
             onClick={props.onCreateSpecialFee}
-            className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-50"
+            className="rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:border-blue-300 hover:bg-blue-500/10"
           >
             <Map className="h-5 w-5 text-blue-600" />
             <div className="mt-3 text-sm font-black text-slate-900">Cobrar valor diferente</div>
@@ -45,7 +45,7 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
           <button
             type="button"
             onClick={props.onCreateBlocked}
-            className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-red-300 hover:bg-red-50"
+            className="rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:border-red-300 hover:bg-red-500/10"
           >
             <Ban className="h-5 w-5 text-red-600" />
             <div className="mt-3 text-sm font-black text-slate-900">Bloquear área</div>
@@ -54,7 +54,7 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
           <button
             type="button"
             onClick={props.onCreateFree}
-            className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-green-300 hover:bg-green-50"
+            className="rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition hover:border-green-300 hover:bg-green-500/10"
           >
             <Gift className="h-5 w-5 text-green-600" />
             <div className="mt-3 text-sm font-black text-slate-900">Entrega grátis</div>
@@ -62,7 +62,7 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
           </button>
         </div>
       ) : (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-300">
           Para desenhar ou editar áreas no mapa, recomendamos usar um computador.
         </div>
       )}
@@ -88,7 +88,7 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
       ) : null}
 
       {props.areaDraft.polygonCoordinates ? (
-        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+        <div className="rounded-3xl border border-border bg-muted/40 p-5">
           <div className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">
             {props.areaDraft.zoneKind === 'blocked_zone' ? 'Nova área bloqueada' : 'Nova área especial'}
           </div>
@@ -119,8 +119,8 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
                       className={
                         'rounded-2xl border px-4 py-3 text-left text-sm font-bold transition ' +
                         (props.areaDraft.pricingMode === option.mode
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300')
+                          ? 'border-blue-500 bg-blue-500/10 text-blue-700 dark:text-blue-300'
+                          : 'border-border bg-card text-foreground hover:border-border/80')
                       }
                     >
                       {option.label}
@@ -168,18 +168,18 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
                 </label>
               </>
             ) : (
-              <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
                 Clientes dentro dessa área não poderão finalizar pedidos para entrega.
               </div>
             )}
 
-            {props.areaError ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{props.areaError}</div> : null}
+            {props.areaError ? <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive">{props.areaError}</div> : null}
 
             <div className="flex flex-wrap gap-3">
               <button type="button" onClick={props.onSaveArea} className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-black text-white">
                 Salvar área
               </button>
-              <button type="button" onClick={props.onCancelArea} className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-bold text-slate-700">
+              <button type="button" onClick={props.onCancelArea} className="rounded-xl border border-border bg-background px-5 py-3 text-sm font-bold text-foreground">
                 Cancelar
               </button>
             </div>
@@ -189,12 +189,12 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
 
       <div className="space-y-3">
         {props.areas.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-500">
+          <div className="rounded-2xl border border-dashed border-border bg-muted/40 p-5 text-sm text-muted-foreground">
             Nenhuma área especial criada ainda.
           </div>
         ) : (
           props.areas.map((area) => (
-            <div key={area.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div key={area.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-sm font-black text-slate-900">{area.name || 'Área especial'}</div>
@@ -209,7 +209,7 @@ export function SpecialAreasPanel(props: SpecialAreasPanelProps) {
                     <button
                       type="button"
                       onClick={() => props.onEditArea(area)}
-                      className="inline-flex h-9 items-center gap-1 rounded-xl border border-slate-200 px-3 text-sm font-bold text-slate-700"
+                      className="inline-flex h-9 items-center gap-1 rounded-xl border border-border bg-background px-3 text-sm font-bold text-foreground"
                     >
                       <Pencil className="h-4 w-4" />
                       Editar

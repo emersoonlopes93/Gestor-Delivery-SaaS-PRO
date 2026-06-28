@@ -431,7 +431,7 @@ export function DeliveryRatesPage() {
   if (loading) {
     return (
       <div className="flex h-[calc(100vh-64px)] items-center justify-center">
-        <div className="rounded-3xl border border-slate-200 bg-white px-6 py-5 text-sm font-semibold text-slate-600 shadow-sm">
+        <div className="rounded-3xl border border-border bg-card px-6 py-5 text-sm font-semibold text-muted-foreground shadow-sm">
           Carregando entrega...
         </div>
       </div>
@@ -439,9 +439,9 @@ export function DeliveryRatesPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-64px)] bg-slate-100">
+    <div className="h-[calc(100vh-64px)] bg-background text-foreground">
       {toast ? (
-        <div className="fixed right-6 top-20 z-[9999] rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-xl">
+        <div className="fixed right-6 top-20 z-[9999] rounded-2xl bg-foreground px-4 py-3 text-sm font-semibold text-background shadow-xl">
           {toast}
         </div>
       ) : null}
@@ -466,11 +466,11 @@ export function DeliveryRatesPage() {
             />
           </div>
 
-          <aside className="flex h-full w-[460px] flex-col border-l border-slate-200 bg-white">
+          <aside className="flex h-full w-[460px] flex-col border-l border-border bg-card">
             <div className="flex-1 overflow-y-auto p-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h1 className="text-3xl font-black text-slate-950">Entrega</h1>
+                  <h1 className="text-3xl font-black text-foreground">Entrega</h1>
                   <p className="mt-2 text-sm text-slate-500">Configure onde sua loja entrega e quanto será cobrado.</p>
                 </div>
                 <button
@@ -484,14 +484,14 @@ export function DeliveryRatesPage() {
                 </button>
               </div>
 
-              {error ? <div className="mt-5 rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div> : null}
+              {error ? <div className="mt-5 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive">{error}</div> : null}
 
-              <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                <div className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">Loja / ponto de partida</div>
+              <div className="mt-6 rounded-3xl border border-border bg-muted/40 p-5">
+                <div className="text-sm font-black uppercase tracking-[0.18em] text-muted-foreground">Loja / ponto de partida</div>
                 <div className="mt-3 flex items-start justify-between gap-4">
-                  <div className="text-sm text-slate-700">
-                    <div className="font-semibold text-slate-900">{storeAddressLabel}</div>
-                    <div className="mt-1 text-slate-500">
+                  <div className="text-sm text-muted-foreground">
+                    <div className="font-semibold text-foreground">{storeAddressLabel}</div>
+                    <div className="mt-1">
                       {coverageDraft.storeLat.toFixed(5)}, {coverageDraft.storeLng.toFixed(5)}
                     </div>
                   </div>
@@ -501,9 +501,25 @@ export function DeliveryRatesPage() {
                 </div>
               </div>
 
-              <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <div className="mt-6 rounded-3xl border border-border bg-muted/40 p-5">
                 <div className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">Forma de cálculo</div>
                 <div className="mt-4 space-y-3">
+                  <label className="block space-y-2">
+                    <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <Truck className="h-4 w-4 text-primary" />
+                      Forma de cÃ¡lculo
+                    </span>
+                    <select value="radius" disabled className="input-premium cursor-not-allowed">
+                      <option value="radius">Entrega por raio — recomendado</option>
+                      <option value="route">Entrega por rota — em breve / premium</option>
+                      <option value="neighborhood">Entrega por bairro — futuro</option>
+                    </select>
+                  </label>
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    As opÃ§Ãµes por rota e bairro continuam reservadas para evoluÃ§Ãµes futuras.
+                  </p>
+                </div>
+                <div className="hidden mt-4 space-y-3">
                   <div className="rounded-2xl border border-blue-500 bg-blue-50 p-4">
                     <div className="flex items-center gap-2 text-sm font-black text-blue-700">
                       <Truck className="h-4 w-4" />
@@ -522,16 +538,16 @@ export function DeliveryRatesPage() {
                 </div>
               </div>
 
-              <div className="mt-6 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+              <div className="mt-6 rounded-3xl border border-border bg-muted/40 p-5">
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="space-y-2">
-                    <span className="text-sm font-semibold text-slate-700">Entrega ativa</span>
+                    <span className="text-sm font-semibold text-foreground">Entrega ativa</span>
                     <button
                       type="button"
                       onClick={() => setCoverageDraft((prev) => ({ ...prev, isDeliveryEnabled: !prev.isDeliveryEnabled }))}
                       className={
                         'relative inline-flex h-11 w-full items-center rounded-2xl px-4 text-left text-sm font-bold transition ' +
-                        (coverageDraft.isDeliveryEnabled ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700')
+                        (coverageDraft.isDeliveryEnabled ? 'bg-blue-600 text-white' : 'bg-muted text-foreground')
                       }
                     >
                       {coverageDraft.isDeliveryEnabled ? 'Ligada' : 'Desligada'}
@@ -673,7 +689,7 @@ export function DeliveryRatesPage() {
               </button>
             </div>
 
-            {error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</div> : null}
+            {error ? <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive">{error}</div> : null}
 
             <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-slate-500">

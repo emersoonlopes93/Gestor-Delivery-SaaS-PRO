@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '@/components/Modal';
+import { CurrencyInput } from '@gestor/ui';
 
 export type AdjustmentType = 'cashback' | 'wallet' | 'loyalty';
 export type AdjustmentOperation = 'add' | 'remove';
@@ -14,7 +15,8 @@ interface BalanceAdjustmentModalProps {
 }
 
 export function BalanceAdjustmentModal({ isOpen, onClose, onConfirm, type, operation, customerName }: BalanceAdjustmentModalProps) {
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState(0);
+  const [pointsAmount, setPointsAmount] = useState('');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -29,11 +31,13 @@ export function BalanceAdjustmentModal({ isOpen, onClose, onConfirm, type, opera
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!amount || Number(amount) <= 0) return;
+    const normalizedAmount = type === 'loyalty' ? Number(pointsAmount) : amount;
+    if (!normalizedAmount || normalizedAmount <= 0) return;
     try {
       setIsSubmitting(true);
-      await onConfirm(Number(amount), description);
-      setAmount('');
+      await onConfirm(normalizedAmount, description);
+      setAmount(0);
+      setPointsAmount('');
       setDescription('');
       onClose();
     } catch (err) {
@@ -86,16 +90,24 @@ export function BalanceAdjustmentModal({ isOpen, onClose, onConfirm, type, opera
           <label className="block text-sm font-semibold text-foreground mb-1">
             Valor ({currentLabel.unit})
           </label>
-          <input
-            type="number"
-            step={type === 'loyalty' ? "1" : "0.01"}
-            required
-            min="0.01"
-            className="input-premium"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder={`Ex: ${type === 'loyalty' ? '100' : '50.00'}`}
-          />
+          {type === 'loyalty' ? (
+            <input
+              type="number"
+              step="1"
+              required
+              min="1"
+              className="input-premium"
+              value={pointsAmount}
+              onChange={(e) => setPointsAmount(e.target.value)}
+              placeholder="Ex: 100"
+            />
+          ) : (
+            <CurrencyInput
+              value={amount}
+              onChange={setAmount}
+              className="input-premium"
+            />
+          )}
         </div>
         <div>
           <label className="block text-sm font-semibold text-foreground mb-1">

@@ -36,12 +36,12 @@ export function RadiusTiersPanel(props: RadiusTiersPanelProps) {
 
       <div className="space-y-3">
         {props.tiers.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-500">
+          <div className="rounded-2xl border border-dashed border-border bg-muted/40 p-5 text-sm text-muted-foreground">
             Nenhum raio cadastrado ainda. Adicione sua primeira faixa recomendada.
           </div>
         ) : (
           props.tiers.map((tier, index) => (
-            <div key={`${tier.minDistanceKm}-${tier.maxDistanceKm}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div key={`${tier.minDistanceKm}-${tier.maxDistanceKm}-${index}`} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-base font-black text-slate-900">{tierLabel(tier)}</div>
@@ -71,7 +71,7 @@ export function RadiusTiersPanel(props: RadiusTiersPanelProps) {
         )}
       </div>
 
-      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+      <div className="rounded-3xl border border-border bg-muted/40 p-5">
         <div className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">
           {props.editingIndex == null ? 'Novo raio de entrega' : 'Editar raio'}
         </div>
@@ -121,7 +121,7 @@ export function RadiusTiersPanel(props: RadiusTiersPanelProps) {
           </label>
         </div>
 
-        {props.error ? <div className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{props.error}</div> : null}
+        {props.error ? <div className="mt-4 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive">{props.error}</div> : null}
 
         <div className="mt-4 flex flex-wrap gap-3">
           <button
@@ -134,7 +134,7 @@ export function RadiusTiersPanel(props: RadiusTiersPanelProps) {
           <button
             type="button"
             onClick={props.onCancel}
-            className="inline-flex h-11 items-center rounded-xl border border-slate-200 px-5 text-sm font-bold text-slate-700 transition hover:bg-white"
+            className="inline-flex h-11 items-center rounded-xl border border-border bg-background px-5 text-sm font-bold text-foreground transition hover:bg-muted"
           >
             Limpar
           </button>

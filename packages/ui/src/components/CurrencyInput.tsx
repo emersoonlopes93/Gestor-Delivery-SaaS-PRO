@@ -1,5 +1,5 @@
-import React, { InputHTMLAttributes, forwardRef } from 'react';
-import { maskCurrency, unmaskCurrency } from '@gestor/utils';
+import React, { InputHTMLAttributes, forwardRef, useEffect, useMemo, useRef, useState } from 'react';
+import { currencyDigitsToNumber, currencyNumberToDigits, maskCurrency, unmask } from '@gestor/utils';
 import { cn } from '../lib/cn';
 
 export interface CurrencyInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> {
@@ -9,23 +9,54 @@ export interface CurrencyInputProps extends Omit<InputHTMLAttributes<HTMLInputEl
 
 export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
   ({ className, value, onChange, placeholder, disabled, ...props }, ref) => {
-    // maskCurrency takes care of formatting, padding with zeros and initial "R$ 0,00"
-    const displayValue = maskCurrency(value);
+    const innerRef = useRef<HTMLInputElement | null>(null);
+    const [digits, setDigits] = useState(() => currencyNumberToDigits(value));
+
+    useEffect(() => {
+      const nextDigits = currencyNumberToDigits(value);
+      if (document.activeElement !== innerRef.current || nextDigits !== digits) {
+        setDigits(nextDigits);
+      }
+    }, [digits, value]);
+
+    const displayValue = useMemo(() => maskCurrency(currencyDigitsToNumber(digits)), [digits]);
+
+    const syncCaretToEnd = () => {
+      window.requestAnimationFrame(() => {
+        const input = innerRef.current;
+        if (!input || document.activeElement !== input) return;
+        const position = input.value.length;
+        input.setSelectionRange(position, position);
+      });
+    };
+
+    const assignRef = (node: HTMLInputElement | null) => {
+      innerRef.current = node;
+      if (typeof ref === 'function') {
+        ref(node);
+        return;
+      }
+      if (ref) {
+        ref.current = node;
+      }
+    };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      // unmaskCurrency extracts the raw digits and divides by 100
-      const numericValue = unmaskCurrency(e.target.value);
-      onChange(numericValue);
+      const nextDigits = unmask(e.target.value) || '0';
+      setDigits(nextDigits);
+      onChange(currencyDigitsToNumber(nextDigits));
+      syncCaretToEnd();
     };
 
     return (
       <input
         type="text"
-        ref={ref}
+        inputMode="numeric"
+        ref={assignRef}
         value={displayValue}
         onChange={handleChange}
         disabled={disabled}
-        placeholder={placeholder || "R$ 0,00"}
+        placeholder={placeholder || 'R$ 0,00'}
         className={cn(
           'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed',
           className

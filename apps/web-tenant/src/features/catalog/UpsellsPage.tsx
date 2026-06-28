@@ -16,6 +16,11 @@ import {
   Product,
   UpsellPricingType,
 } from '@gestor/types';
+import { CurrencyInput } from '@gestor/ui';
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+}
 
 export function UpsellsPage() {
   const [upsells, setUpsells] = useState<Upsell[]>([]);
@@ -217,7 +222,7 @@ export function UpsellsPage() {
                            {u.pricingType === 'normal' ? 'Normal' : 
                             u.pricingType === 'fixed_price' ? 'Preço Fixo' :
                             u.pricingType === 'discount_percent' ? `${u.pricingValue}% Desc.` :
-                            `R$${u.pricingValue} Desc.`}
+                            `${formatMoney(Number(u.pricingValue))} Desc.`}
                          </span>
                       </div>
                     </td>
@@ -307,16 +312,24 @@ export function UpsellsPage() {
             {formData.pricingType !== 'normal' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {formData.pricingType === 'fixed_price' ? 'Valor Fixo (R$)' : 'Valor do Desconto'}
+                  {formData.pricingType === 'fixed_price' ? 'Valor Fixo (R$)' : formData.pricingType === 'discount_amount' ? 'Valor do Desconto (R$)' : 'Valor do Desconto'}
                 </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  className="input-premium"
-                  value={formData.pricingValue}
-                  onChange={(e) => setFormData({ ...formData, pricingValue: Number(e.target.value) })}
-                />
+                {formData.pricingType === 'discount_percent' ? (
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    className="input-premium"
+                    value={formData.pricingValue}
+                    onChange={(e) => setFormData({ ...formData, pricingValue: Number(e.target.value) })}
+                  />
+                ) : (
+                  <CurrencyInput
+                    value={Number(formData.pricingValue ?? 0)}
+                    onChange={(pricingValue) => setFormData({ ...formData, pricingValue })}
+                    className="input-premium"
+                  />
+                )}
               </div>
             )}
           </div>
@@ -393,7 +406,7 @@ export function UpsellsPage() {
                        </div>
                        <div>
                          <div className="text-sm font-medium text-foreground">{product.name}</div>
-                         <div className="text-xs text-muted-foreground">R${Number(product.basePrice).toFixed(2)}</div>
+                         <div className="text-xs text-muted-foreground">{formatMoney(Number(product.basePrice))}</div>
                        </div>
                     </div>
                     <button

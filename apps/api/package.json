@@ -44,6 +44,7 @@
         "diagnose:env": "ts-node -r tsconfig-paths/register scripts/diagnose-env.ts",
         "rbac:diagnose": "ts-node -r tsconfig-paths/register scripts/diagnose-rbac.ts",
         "check:billing-db": "ts-node -r tsconfig-paths/register scripts/check-billing-db.ts",
+        "diagnose:money": "ts-node -r tsconfig-paths/register scripts/diagnose-monetary-values.ts",
         "smoke:logistics": "ts-node -r tsconfig-paths/register scripts/smoke-test-logistics-flow.ts",
         "smoke:all": "pnpm smoke:auth && pnpm smoke:combos && pnpm smoke:delivery-rate && pnpm smoke:inventory && pnpm smoke:orders",
         "test:delivery-rate-engine": "ts-node scripts/unit-test-delivery-rate-engine.ts",

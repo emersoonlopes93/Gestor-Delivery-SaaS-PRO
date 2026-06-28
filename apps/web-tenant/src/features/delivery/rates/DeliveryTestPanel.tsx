@@ -13,9 +13,9 @@ type DeliveryTestPanelProps = {
 
 export function DeliveryTestPanel(props: DeliveryTestPanelProps) {
   return (
-    <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="space-y-4 rounded-3xl border border-border bg-card p-5 shadow-sm">
       <div>
-        <h3 className="text-lg font-black text-slate-900">Testar entrega</h3>
+        <h3 className="text-lg font-black text-foreground">Testar entrega</h3>
         <p className="text-sm text-slate-500">Digite um endereço completo ou CEP e use a mesma lógica real do backend.</p>
       </div>
 
@@ -31,14 +31,14 @@ export function DeliveryTestPanel(props: DeliveryTestPanelProps) {
           type="button"
           onClick={props.onSubmit}
           disabled={props.loading}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 text-sm font-black text-white transition hover:bg-slate-800 disabled:opacity-60"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-foreground px-5 text-sm font-black text-background transition hover:opacity-90 disabled:opacity-60"
         >
           {props.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
           Testar
         </button>
       </div>
 
-      {props.error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{props.error}</div> : null}
+      {props.error ? <div className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive">{props.error}</div> : null}
 
       {props.result ? (
         <div
