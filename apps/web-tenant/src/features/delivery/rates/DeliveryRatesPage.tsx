@@ -117,11 +117,14 @@ export function DeliveryRatesPage() {
       const cfg = coverageRes.data ?? null;
       setTenant(tenantRes.data ?? null);
 
+      const effectiveStoreLat = tenantRes.data?.settings?.lat ?? cfg?.storeLat ?? -23.55052;
+      const effectiveStoreLng = tenantRes.data?.settings?.lng ?? cfg?.storeLng ?? -46.633308;
+
       if (cfg) {
         setCoverageDraft({
           isDeliveryEnabled: cfg.isDeliveryEnabled,
-          storeLat: cfg.storeLat,
-          storeLng: cfg.storeLng,
+          storeLat: effectiveStoreLat,
+          storeLng: effectiveStoreLng,
           maxRadiusKm: Number(cfg.maxRadiusKm),
           defaultPricePerKm: Number(cfg.defaultPricePerKm),
           minimumFee: parseDecimalString(cfg.minimumFee),
@@ -131,8 +134,8 @@ export function DeliveryRatesPage() {
       } else if (tenantRes.data?.settings?.lat && tenantRes.data?.settings?.lng) {
         setCoverageDraft((prev) => ({
           ...prev,
-          storeLat: tenantRes.data?.settings?.lat ?? prev.storeLat,
-          storeLng: tenantRes.data?.settings?.lng ?? prev.storeLng,
+          storeLat: effectiveStoreLat,
+          storeLng: effectiveStoreLng,
         }));
       }
 

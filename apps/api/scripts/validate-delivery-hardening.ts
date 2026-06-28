@@ -89,7 +89,18 @@ interface DeliveryTestCurrentResult {
 interface CheckoutValidationResult {
   tenantId: string;
   deliveryFee: number;
+  estimatedDeliveryMinutes: number | null;
   total: number;
+}
+
+interface TenantSettingsResponse {
+  lat?: number;
+  lng?: number;
+}
+
+interface TenantMeWithSettingsResponse {
+  tenantId: string;
+  settings?: TenantSettingsResponse;
 }
 
 interface OrderResponse {
@@ -310,6 +321,14 @@ async function resolveTenantId(token: string): Promise<string> {
     throw new Error(`Falha ao obter tenantId. Status=${result.status} msg=${getMessage(result.raw)}`);
   }
   return result.data.tenantId;
+}
+
+async function getTenantMe(token: string): Promise<TenantMeWithSettingsResponse> {
+  const result = await apiRequest<TenantMeWithSettingsResponse>('/tenant/me', { method: 'GET' }, token);
+  if (result.status !== 200 || !result.data) {
+    throw new Error(`Falha ao obter tenant/me. Status=${result.status} msg=${getMessage(result.raw)}`);
+  }
+  return result.data;
 }
 
 async function getStorefrontProductId(): Promise<string> {
@@ -746,6 +765,11 @@ async function validateTierScenario(
     validation.data?.deliveryFee === range.fee,
     `expected=${range.fee} actual=${validation.data?.deliveryFee ?? 'null'}`,
   );
+  pushAssertion(
+    `${label} checkout minutes`,
+    validation.data?.estimatedDeliveryMinutes === range.minutes,
+    `expected=${range.minutes} actual=${validation.data?.estimatedDeliveryMinutes ?? 'null'}`,
+  );
 
   const order = await createOrder(productId, address, label);
   pushAssertion(`${label} order create status`, order.status === 201 || order.status === 200, `status=${order.status}`);
@@ -781,6 +805,12 @@ async function run(): Promise<void> {
       'coverage default estimated minutes persisted',
       coverageResult.status === 200 && coverageResult.data?.defaultEstimatedDeliveryMinutes === 40,
       `value=${coverageResult.data?.defaultEstimatedDeliveryMinutes ?? 'null'}`,
+    );
+    const tenantMe = await getTenantMe(token);
+    pushAssertion(
+      'effective store origin synced to tenant settings',
+      tenantMe.settings?.lat === STORE_COORDS.lat && tenantMe.settings?.lng === STORE_COORDS.lng,
+      `lat=${tenantMe.settings?.lat ?? 'null'} lng=${tenantMe.settings?.lng ?? 'null'}`,
     );
 
     const savedRules = await listRules(token);
@@ -830,6 +860,11 @@ async function run(): Promise<void> {
     const specialAddress = buildAddress(specialCandidate.query, specialCandidate.result.resolvedCoordinates);
     const specialValidation = await validateCheckout(productId, specialAddress);
     pushAssertion('scenario-b checkout validate fee', specialValidation.data?.deliveryFee === 15, `fee=${specialValidation.data?.deliveryFee ?? 'null'}`);
+    pushAssertion(
+      'scenario-b checkout validate minutes',
+      specialValidation.data?.estimatedDeliveryMinutes === 70,
+      `minutes=${specialValidation.data?.estimatedDeliveryMinutes ?? 'null'}`,
+    );
     const specialOrder = await createOrder(productId, specialAddress, 'scenario-b');
     pushAssertion('scenario-b order status', specialOrder.status === 201 || specialOrder.status === 200, `status=${specialOrder.status}`);
     pushAssertion('scenario-b order fee', specialOrder.data?.deliveryFee === 15, `fee=${specialOrder.data?.deliveryFee ?? 'null'}`);

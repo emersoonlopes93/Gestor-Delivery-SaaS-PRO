@@ -181,6 +181,7 @@ export class CheckoutValidatorService {
     // 5. Calcular taxa de entrega apenas se for delivery ou whatsapp_ai delivery
     const isDelivery = channel === 'storefront_delivery' || channel === 'whatsapp_ai';
     let deliveryFee = 0;
+    let estimatedDeliveryMinutes: number | null = null;
 
     if (isDelivery && options?.deliveryAddress) {
       const hasCoords = Boolean(options.deliveryAddress.lat && options.deliveryAddress.lng);
@@ -198,6 +199,7 @@ export class CheckoutValidatorService {
             throw new BadRequestException(decision.reason || 'Não entregamos nesta região.');
           }
           deliveryFee = decision.fee ?? 0;
+          estimatedDeliveryMinutes = decision.estimatedDeliveryMinutes ?? null;
         } else {
           // No coords (whatsapp_ai without Google Maps): try rate by neighborhood/fixed
           const rateResult = await this.deliveryRateService.calculateRate({
@@ -206,6 +208,7 @@ export class CheckoutValidatorService {
             distanceKm: null,
           });
           deliveryFee = rateResult.fee ?? 0;
+          estimatedDeliveryMinutes = rateResult.estimatedDeliveryMinutes ?? null;
         }
       } else if (!hasCoords) {
         // No coverage config and no coords: use zero delivery fee (will be adjusted manually)
@@ -217,6 +220,7 @@ export class CheckoutValidatorService {
           distanceKm: null,
         });
         deliveryFee = rateResult.fee ?? 0;
+        estimatedDeliveryMinutes = rateResult.estimatedDeliveryMinutes ?? null;
       }
     } else if (isDelivery && channel === 'storefront_delivery' && !options?.deliveryAddress) {
       // storefront_delivery without address is an error
@@ -239,6 +243,7 @@ export class CheckoutValidatorService {
       itemsSubtotal, 
       discountTotal, 
       deliveryFee,
+      estimatedDeliveryMinutes,
       total: finalTotal, 
       couponId, 
       cashbackUsed 

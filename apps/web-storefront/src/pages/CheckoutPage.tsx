@@ -92,6 +92,7 @@ export function CheckoutPage() {
 
   // Financial state (calculated server-side)
   const [deliveryFee, setDeliveryFee] = useState(0);
+  const [deliveryEstimatedMinutes, setDeliveryEstimatedMinutes] = useState<number | null>(null);
   const [discountTotal, setDiscountTotal] = useState(0);
   const [isValidating, setIsValidating] = useState(false);
   const [tenantInfo, setTenantInfo] = useState<StorefrontTenantInfo | null>(null);
@@ -179,6 +180,7 @@ export function CheckoutPage() {
       // Only validate delivery if we have basic address parts (especially number which is required by DTO)
       if (isDelivery && (!lat || !lng || !number || !street)) {
         setDeliveryFee(0);
+        setDeliveryEstimatedMinutes(null);
         return;
       }
 
@@ -249,6 +251,7 @@ export function CheckoutPage() {
         });
 
         setDeliveryFee(result.deliveryFee || 0);
+        setDeliveryEstimatedMinutes(result.estimatedDeliveryMinutes ?? null);
         setDiscountTotal(result.discountTotal || 0);
         if (isDelivery) setSubmitError(null);
       } catch (err) {
@@ -261,6 +264,7 @@ export function CheckoutPage() {
            setSubmitError(isClosed ? msg : `Validando: ${msg}`);
         }
         setDeliveryFee(0);
+        setDeliveryEstimatedMinutes(null);
         setDiscountTotal(0);
       } finally {
         setIsValidating(false);
@@ -628,6 +632,12 @@ export function CheckoutPage() {
                 <span className={deliveryFee === 0 && !isValidating ? 'text-green-600 font-bold' : ''}>
                   {isValidating ? 'Calculando...' : deliveryFee === 0 ? 'Grátis' : deliveryFee.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </span>
+              </div>
+            )}
+            {fulfillmentType === 'delivery' && deliveryEstimatedMinutes != null && (
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>Entrega estimada</span>
+                <span>{deliveryEstimatedMinutes} min</span>
               </div>
             )}
             {discountTotal > 0 && (

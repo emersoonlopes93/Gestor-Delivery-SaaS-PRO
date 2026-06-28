@@ -456,6 +456,7 @@ export interface CheckoutValidationResult {
   itemsSubtotal: number;
   discountTotal: number;
   deliveryFee: number;
+  estimatedDeliveryMinutes?: number | null;
   total: number;
   couponId: string | null;
   cashbackUsed: number | null;
