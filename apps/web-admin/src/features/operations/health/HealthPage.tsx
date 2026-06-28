@@ -223,7 +223,7 @@ export function HealthPage() {
               {tenants.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
-                    <Building2 className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                    <Building2 className="mx-auto mb-3 h-12 w-12 text-muted-foreground/20" />
                     Nenhuma loja encontrada com os filtros atuais.
                   </td>
                 </tr>
@@ -369,4 +369,3 @@ function LastOrderBadge({ order }: { order: HealthTenantListItem['orders'] }) {
     return <span className="text-xs text-muted-foreground">Data inválida</span>;
   }
 }
-

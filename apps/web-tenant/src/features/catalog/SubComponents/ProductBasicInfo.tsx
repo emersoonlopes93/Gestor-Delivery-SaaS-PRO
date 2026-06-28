@@ -8,6 +8,7 @@ import { useFormContext } from 'react-hook-form';
 import { useCatalogEditor } from '../CatalogEditorContext';
 import { CatalogProductFormState } from '../CatalogEditorTypes';
 import { CurrencyInput } from '@gestor/ui';
+import { createThemedReactSelectStyles } from '../../../lib/react-select-theme';
 
 export const ProductBasicInfo: React.FC = () => {
   const { isComboMode, isNew, handleSaveProduct, savingStates, onOpenRecipe, product, goNextWizardStep, isComboWizard } = useCatalogEditor();
@@ -18,6 +19,7 @@ export const ProductBasicInfo: React.FC = () => {
   const bundleSummary = watch('bundleSummary');
   const imagePreviewUrl = watch('imagePreviewUrl');
   const pizzaPrices = watch('pizzaPrices');
+  const selectedCategory = categories.find((c) => c.id === productForm.categoryId);
 
   const setProductForm = (form: CreateProductDto) => setValue('productForm', form);
   const setImageFile = (file: File | null) => setValue('imageFile', file);
@@ -25,6 +27,7 @@ export const ProductBasicInfo: React.FC = () => {
   const setPizzaPrices = (prices: Record<string, number>) => setValue('pizzaPrices', prices);
 
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
+  const categorySelectStyles = createThemedReactSelectStyles<{ value: string; label: string }, false>();
 
 
 
@@ -104,8 +107,10 @@ export const ProductBasicInfo: React.FC = () => {
               <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Categoria</label>
               <CreatableSelect
                 isClearable
+                classNamePrefix="catalog-category-select"
                 placeholder="Selecione ou digite para criar..."
-                value={categories.find((c) => c.id === productForm.categoryId) ? { value: productForm.categoryId, label: categories.find((c) => c.id === productForm.categoryId)?.name } : null}
+                menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                value={selectedCategory ? { value: selectedCategory.id, label: selectedCategory.name } : null}
                 options={categories.map((c) => ({ value: c.id, label: c.name }))}
                 onChange={(selected) => {
                   setProductForm({ ...productForm, categoryId: selected ? selected.value : '' });
@@ -122,24 +127,7 @@ export const ProductBasicInfo: React.FC = () => {
                     console.error('Erro ao criar categoria', e);
                   }
                 }}
-                styles={{
-                  control: (base) => ({
-                    ...base,
-                    borderRadius: '0.75rem',
-                    minHeight: '2.875rem',
-                    borderColor: 'hsl(var(--input))',
-                    backgroundColor: 'hsl(var(--background))',
-                    boxShadow: 'none',
-                    '&:hover': {
-                      borderColor: 'hsl(var(--ring))'
-                    }
-                  }),
-                  option: (base, state) => ({
-                    ...base,
-                    backgroundColor: state.isSelected ? 'hsl(var(--primary))' : state.isFocused ? 'hsl(var(--primary)/0.1)' : 'transparent',
-                    color: state.isSelected ? 'hsl(var(--primary-foreground))' : 'inherit',
-                  })
-                }}
+                styles={categorySelectStyles}
               />
             </div>
 

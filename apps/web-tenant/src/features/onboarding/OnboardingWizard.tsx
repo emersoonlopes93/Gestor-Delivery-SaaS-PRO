@@ -23,11 +23,12 @@ interface StepMeta {
   subtitle: string;
   icon: React.FC<{ className?: string }>;
   colorClass: string;
+  bgClass?: string;
   required: boolean;
 }
 
 const STEPS: StepMeta[] = [
-  { id: 'identity',   title: 'Identidade',  subtitle: 'Nome, logo, contato',         icon: Store,       colorClass: 'text-indigo-500',  required: true },
+  { id: 'identity',   title: 'Identidade',  subtitle: 'Nome, logo, contato',         icon: Store,       colorClass: 'text-indigo-500',  bgClass: 'bg-indigo-100 dark:bg-indigo-500/20',   required: true },
   { id: 'location',   title: 'Localização', subtitle: 'Endereço e entrega',          icon: MapPin,      colorClass: 'text-emerald-500', required: true },
   { id: 'hours',      title: 'Horários',    subtitle: 'Quando você atende',          icon: Clock,       colorClass: 'text-amber-500',   required: true },
   { id: 'payments',   title: 'Pagamentos',  subtitle: 'Como cobrar os clientes',     icon: CreditCard,  colorClass: 'text-violet-500',  required: true },
@@ -36,6 +37,23 @@ const STEPS: StepMeta[] = [
   { id: 'storefront', title: 'Vitrine',     subtitle: 'Visual da loja online',       icon: Palette,     colorClass: 'text-pink-500',    required: false },
   { id: 'review',     title: 'Revisão',     subtitle: 'Ativar sua loja!',            icon: Rocket,      colorClass: 'text-indigo-600',  required: false },
 ];
+
+function getStepBgClass(step: StepMeta) {
+  if (step.bgClass) return step.bgClass;
+
+  const map: Record<string, string> = {
+    'text-indigo-500': 'bg-indigo-100 dark:bg-indigo-500/20',
+    'text-indigo-600': 'bg-indigo-100 dark:bg-indigo-500/20',
+    'text-emerald-500': 'bg-emerald-100 dark:bg-emerald-500/20',
+    'text-amber-500': 'bg-amber-100 dark:bg-amber-500/20',
+    'text-violet-500': 'bg-violet-100 dark:bg-violet-500/20',
+    'text-orange-500': 'bg-orange-100 dark:bg-orange-500/20',
+    'text-teal-500': 'bg-teal-100 dark:bg-teal-500/20',
+    'text-pink-500': 'bg-pink-100 dark:bg-pink-500/20',
+  };
+
+  return map[step.colorClass] ?? 'bg-slate-100 dark:bg-slate-800';
+}
 
 // ─── Auto-save indicator ──────────────────────────────────────────────────────
 
@@ -166,7 +184,7 @@ export function OnboardingWizard() {
     <div className="md:hidden sticky top-0 z-10 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 px-4 py-3">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${step.colorClass.replace('text-', 'bg-').replace('-500', '-100 dark:bg-opacity-20')}`}>
+          <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${getStepBgClass(step)}`}>
             <step.icon className={`w-4 h-4 ${step.colorClass}`} />
           </div>
           <div>
