@@ -40,9 +40,24 @@ export class PizzaEngineService {
     if (!validation.success) {
       console.warn('Invalid pizza template config, using defaults', validation.error);
     }
-    
+
     const config = validation.success ? validation.data : { pricingStrategy: 'highest' as const };
     const strategy = config.pricingStrategy;
+
+    if (flavorSelections.length < 1) {
+      throw new BadRequestException('Selecione pelo menos 1 sabor para a pizza.');
+    }
+    if (flavorSelections.length > 2) {
+      throw new BadRequestException('Selecione no máximo 2 sabores para a pizza.');
+    }
+    if (!sizeId) {
+      throw new BadRequestException('Tamanho inválido.');
+    }
+    for (const flavor of flavorSelections) {
+      if (!flavor.productId) {
+        throw new BadRequestException('Sabor inválido.');
+      }
+    }
 
     // Validate fractions
     const totalFraction = flavorSelections.reduce((sum, f) => sum + f.fraction, 0);

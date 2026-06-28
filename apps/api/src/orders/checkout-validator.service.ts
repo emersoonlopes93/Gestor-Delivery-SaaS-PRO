@@ -427,11 +427,35 @@ export class CheckoutValidatorService {
         }
       }
     }
+    const category = typedProduct.category;
+    const isPizzaTemplate = category?.templateType === 'pizza';
+
+    if (item.pizzaComposition && !isPizzaTemplate) {
+      throw new BadRequestException('pizzaComposition so pode ser usado em categorias do tipo pizza.');
+    }
 
     let extrasTotal = 0;
-    let unitPrice = 0;
+    let unitPrice = basePrice;
     let composition = '';
     let snapshotCatalogV2Json: unknown | undefined;
+    let selectionsSnapshot: Array<{
+      groupId: string;
+      groupName: string;
+      selectionType: string;
+      pricingAxis: string;
+      isRequired: boolean;
+      minSelect: number;
+      maxSelect: number;
+      allowQuantity: boolean;
+      items: Array<{
+        itemId: string;
+        name: string;
+        qty: number;
+        priceImpactType: string;
+        priceImpactValue: number;
+        appliedAmount: number;
+      }>; 
+    }> = [];
 
     if (hasNewSelections) {
       const pricing = this.validateAndPriceOptionSelections(
@@ -445,91 +469,62 @@ export class CheckoutValidatorService {
       extrasTotal = pricing.extrasTotal;
       unitPrice = pricing.unitPrice;
       composition = pricing.composition;
-
-      const category = typedProduct.category;
-      const isPizzaTemplate = category?.templateType === 'pizza';
-
-      if (isPizzaTemplate && item.pizzaComposition) {
-        // SPECIAL PIZZA LOGIC
-        const res = await this.pizzaEngine.calculatePrice(
-          category.id,
-          item.pizzaComposition.sizeId,
-          item.pizzaComposition.flavors
-        );
-
-        effectiveBasePrice = res.calculatedPrice;
-        unitPrice = effectiveBasePrice + extrasTotal;
-        composition = `Tamanho: ${res.sizeName}; Sabores: ${res.flavors.map(f => `${f.name} (${(f.fraction * 100).toFixed(0)}%)`).join(', ')}`;
-        
-        // Update composition with options if any
-        if (pricing.composition) composition += `; ${pricing.composition}`;
-      }
-
-      snapshotCatalogV2Json = {
-        version: 'catalog_v2_snapshot_v1',
-        channel,
-        lineType: 'product',
-        capturedAt: new Date().toISOString(),
-        product: {
-          id: item.productId,
-          name: typedProduct.name,
-          type: typedProduct.type,
-          templateType: category?.templateType,
-        },
-        quantity: item.quantity,
-        notes: item.notes ?? null,
-        pricing: {
-          basePrice,
-          effectiveBasePrice,
-          extrasTotal,
-          unitPrice,
-        },
-        selections: pricing.selectionsSnapshot,
-        optionItems: (pricing.selectionsSnapshot || []).flatMap(sel => 
-          (sel.items || []).map(opt => ({
-            optionItemId: opt.itemId,
-            snapshotName: opt.name,
-            snapshotPrice: opt.appliedAmount,
-          }))
-        ),
-        pizzaComposition: item.pizzaComposition ? {
-          ...item.pizzaComposition,
-          // We could store the full engine result here for UI
-          fullEngineResult: await this.pizzaEngine.calculatePrice(
-            category.id,
-            item.pizzaComposition.sizeId,
-            item.pizzaComposition.flavors
-          )
-        } : null,
-        slots: [],
-      };
-    } else {
-      // V3 Sem Opções (Produto Simples)
-      unitPrice = basePrice;
-      composition = '';
-      snapshotCatalogV2Json = {
-        version: 'catalog_v2_snapshot_v1',
-        channel,
-        lineType: 'product',
-        capturedAt: new Date().toISOString(),
-        product: {
-          id: item.productId,
-          name: typedProduct.name,
-          type: typedProduct.type,
-        },
-        quantity: item.quantity,
-        notes: item.notes ?? null,
-        pricing: {
-          basePrice,
-          effectiveBasePrice: basePrice,
-          extrasTotal: 0,
-          unitPrice: basePrice,
-        },
-        selections: [],
-        optionItems: [],
-        slots: [],
-      };
+      selectionsSnapshot = pricing.selectionsSnapshot;
     }
+
+    if (isPizzaTemplate && item.pizzaComposition) {
+      const res = await this.pizzaEngine.calculatePrice(
+        category.id,
+        item.pizzaComposition.sizeId,
+        item.pizzaComposition.flavors,
+      );
+
+      effectiveBasePrice = res.calculatedPrice;
+      unitPrice = effectiveBasePrice + extrasTotal;
+      composition = `Tamanho: ${res.sizeName}; Sabores: ${res.flavors
+        .map((f) => `${f.name} (${(f.fraction * 100).toFixed(0)}%)`)
+        .join(', ')}`;
+    }
+
+    snapshotCatalogV2Json = {
+      version: 'catalog_v2_snapshot_v1',
+      channel,
+      lineType: 'product',
+      capturedAt: new Date().toISOString(),
+      product: {
+        id: item.productId,
+        name: typedProduct.name,
+        type: typedProduct.type,
+        templateType: category?.templateType,
+      },
+      quantity: item.quantity,
+      notes: item.notes ?? null,
+      pricing: {
+        basePrice,
+        effectiveBasePrice,
+        extrasTotal,
+        unitPrice,
+      },
+      selections: selectionsSnapshot,
+      optionItems: selectionsSnapshot.flatMap((sel) =>
+        (sel.items || []).map((opt) => ({
+          optionItemId: opt.itemId,
+          snapshotName: opt.name,
+          snapshotPrice: opt.appliedAmount,
+        })),
+      ),
+      pizzaComposition: item.pizzaComposition
+        ? {
+            ...item.pizzaComposition,
+            fullEngineResult: await this.pizzaEngine.calculatePrice(
+              category.id,
+              item.pizzaComposition.sizeId,
+              item.pizzaComposition.flavors,
+            ),
+          }
+        : null,
+      slots: [],
+    };
 
     const lineTotal = unitPrice * item.quantity;
 
