@@ -26,11 +26,11 @@ const CHECK_ITEMS: CheckItem[] = [
   { key: 'hasAddress', label: 'Endereco cadastrado', description: 'Localizacao definida para entrega', icon: MapPin },
   { key: 'hasOperatingHours', label: 'Horarios definidos', description: 'Pelo menos 1 dia de funcionamento', icon: Clock },
   { key: 'hasPaymentMethod', label: 'Pagamento configurado', description: 'Ao menos 1 metodo de pagamento', icon: CreditCard },
+  { key: 'hasOperationalModes', label: 'Modos operacionais', description: 'Entrega valida ou retirada ativa', icon: Settings2 },
   { key: 'hasProduct', label: 'Produto criado', description: 'Cardapio com ao menos 1 item', icon: ShoppingBag },
 ];
 
 const OPTIONAL_ITEMS = [
-  { label: 'Regras comerciais', description: 'Configuravel em Configuracoes', icon: Settings2 },
   { label: 'Vitrine personalizada', description: 'Configuravel em Personalizacao', icon: Palette },
 ];
 
@@ -42,6 +42,7 @@ const REQUIREMENT_TO_STEP: Record<string, number> = {
   payment_methods: 3,
   catalog: 4,
   delivery_config: 1,
+  order_modes: 5,
 };
 
 const REQUIREMENT_LABELS: Record<string, string> = {
@@ -52,6 +53,7 @@ const REQUIREMENT_LABELS: Record<string, string> = {
   payment_methods: 'Metodos de pagamento',
   catalog: 'Pelo menos 1 produto ativo',
   delivery_config: 'Configuracao minima de entrega',
+  order_modes: 'Pelo menos 1 modo operacional valido',
 };
 
 const WARNING_LABELS: Record<string, string> = {
@@ -192,7 +194,7 @@ export function Step8Review({ validation, onActivate, onPrev, goToStep }: Step8P
                 hours: 2,
                 payments: 3,
                 catalog: 4,
-                delivery: 1,
+                delivery: 5,
                 storefront: 6,
               };
               const targetStep = stepMap[dim.key];

@@ -33,7 +33,7 @@ const STEPS: StepMeta[] = [
   { id: 'hours',      title: 'Horários',    subtitle: 'Quando você atende',          icon: Clock,       colorClass: 'text-amber-500',   required: true },
   { id: 'payments',   title: 'Pagamentos',  subtitle: 'Como cobrar os clientes',     icon: CreditCard,  colorClass: 'text-violet-500',  required: true },
   { id: 'products',   title: 'Produtos',    subtitle: 'Seu primeiro item no menu',   icon: ShoppingBag, colorClass: 'text-orange-500',  required: true },
-  { id: 'rules',      title: 'Regras',      subtitle: 'Mínimo e taxas',              icon: Settings2,   colorClass: 'text-teal-500',    required: false },
+  { id: 'rules',      title: 'Pedidos',     subtitle: 'Entrega, retirada e agenda',  icon: Settings2,   colorClass: 'text-teal-500',    required: true },
   { id: 'storefront', title: 'Vitrine',     subtitle: 'Visual da loja online',       icon: Palette,     colorClass: 'text-pink-500',    required: false },
   { id: 'review',     title: 'Revisão',     subtitle: 'Ativar sua loja!',            icon: Rocket,      colorClass: 'text-indigo-600',  required: false },
 ];
@@ -262,7 +262,12 @@ export function OnboardingWizard() {
           />
         );
       case 5:
-        return <Step6Rules {...commonProps} />;
+        return (
+          <Step6Rules
+            {...commonProps}
+            onMarkValid={(v) => markValidation('hasOperationalModes', v)}
+          />
+        );
       case 6:
         return <Step7Storefront {...commonProps} />;
       case 7:

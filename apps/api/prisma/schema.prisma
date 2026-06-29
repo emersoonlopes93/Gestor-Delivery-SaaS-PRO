@@ -454,6 +454,9 @@ model TenantSettings {
   cashbackValidityDays         Int                    @default(90) @map("cashback_validity_days")
   gamificationEnabled          Boolean                @default(true) @map("gamification_enabled")
   minimumOrderValue            Decimal?               @map("minimum_order_value") @db.Decimal(10, 2)
+  pickupEnabled                Boolean                @default(false) @map("pickup_enabled")
+  pickupMinMinutes             Int                    @default(20) @map("pickup_min_minutes")
+  pickupMaxMinutes             Int                    @default(30) @map("pickup_max_minutes")
   orderWhatsappNumber          String?                @map("order_whatsapp_number") @db.VarChar(20)
   tenant                       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -2264,6 +2267,7 @@ model SchedulingSettings {
   tenantId              String   @unique @map("tenant_id")
   enabled               Boolean  @default(true)
   acceptScheduledOrders Boolean  @default(true) @map("accept_scheduled_orders")
+  allowScheduleWhenClosed Boolean @default(false) @map("allow_schedule_when_closed")
   minimumAdvanceMinutes Int      @default(60) @map("minimum_advance_minutes")
   maximumAdvanceDays    Int      @default(7) @map("maximum_advance_days")
   slotIntervalMinutes   Int      @default(30) @map("slot_interval_minutes")

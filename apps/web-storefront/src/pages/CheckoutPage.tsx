@@ -98,6 +98,7 @@ export function CheckoutPage() {
   const [tenantInfo, setTenantInfo] = useState<StorefrontTenantInfo | null>(null);
   const safeCustomerCashbackBalance = Number(customer?.cashbackBalance ?? 0);
   const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<string | null>(null);
+  const availableOrderModes = tenantInfo?.orderModes;
 
   const serializeCartItem = (item: (typeof items)[number]): CreateOrderItemDTO => {
     if (item.comboId) {
@@ -168,6 +169,14 @@ export function CheckoutPage() {
       try {
         const { data } = await api.get<StorefrontPayload>(`/public/storefront/${tenantSlug}`);
         setTenantInfo(data.tenant);
+        const deliveryAvailable = data.tenant.orderModes?.deliveryEnabled !== false;
+        const pickupAvailable = Boolean(data.tenant.orderModes?.pickupEnabled);
+
+        if (!deliveryAvailable && pickupAvailable) {
+          setFulfillmentType('pickup');
+        } else if (deliveryAvailable) {
+          setFulfillmentType((current) => (current === 'pickup' && !pickupAvailable ? 'delivery' : current));
+        }
         
         // Auto-select first available payment method if current is not available
         const methods = (data.tenant.paymentMethods as PaymentMethod[]) || [];
@@ -392,6 +401,24 @@ export function CheckoutPage() {
     if (street || number || neighborhood) return;
     applySavedAddress(selectedSavedAddress);
   }, [fulfillmentType, savedAddresses.length]);
+
+  useEffect(() => {
+    if (!availableOrderModes) return;
+    if (fulfillmentType === 'pickup' && !availableOrderModes.pickupEnabled) {
+      setFulfillmentType('delivery');
+    }
+    if (fulfillmentType === 'delivery' && !availableOrderModes.deliveryEnabled && availableOrderModes.pickupEnabled) {
+      setFulfillmentType('pickup');
+    }
+  }, [availableOrderModes, fulfillmentType]);
+
+  useEffect(() => {
+    if (tenantInfo?.scheduling?.enabled) return;
+    if (isScheduled) {
+      setIsScheduled(false);
+      setTimeSlotId('');
+    }
+  }, [tenantInfo?.scheduling?.enabled, isScheduled]);
 
   function showEmptyCartMessageOnce() {
     setSubmitError((prev) => prev ?? 'Seu carrinho está vazio. Adicione itens antes de finalizar.');
@@ -672,20 +699,25 @@ export function CheckoutPage() {
         <section className="mb-6">
           <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3">Como deseja receber?</h2>
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => setFulfillmentType('delivery')}
-              className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${fulfillmentType === 'delivery' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-500'}`}>
-              <Truck className="w-6 h-6" />
-              <span className="text-xs font-bold uppercase">Entrega</span>
-            </button>
-            <button onClick={() => setFulfillmentType('pickup')}
-              className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${fulfillmentType === 'pickup' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-500'}`}>
-              <Store className="w-6 h-6" />
-              <span className="text-xs font-bold uppercase">Retirada</span>
-            </button>
+            {availableOrderModes?.deliveryEnabled !== false && (
+              <button onClick={() => setFulfillmentType('delivery')}
+                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${fulfillmentType === 'delivery' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-500'}`}>
+                <Truck className="w-6 h-6" />
+                <span className="text-xs font-bold uppercase">Entrega</span>
+              </button>
+            )}
+            {availableOrderModes?.pickupEnabled && (
+              <button onClick={() => setFulfillmentType('pickup')}
+                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${fulfillmentType === 'pickup' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-500'}`}>
+                <Store className="w-6 h-6" />
+                <span className="text-xs font-bold uppercase">Retirada</span>
+              </button>
+            )}
           </div>
         </section>
       )}
 
+      {tenantInfo?.scheduling?.enabled && (
       <section className="mb-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest">Quando deseja receber?</h2>
@@ -708,6 +740,7 @@ export function CheckoutPage() {
           />
         )}
       </section>
+      )}
 
       {fulfillmentType === 'delivery' && (
         <section className="mb-6">

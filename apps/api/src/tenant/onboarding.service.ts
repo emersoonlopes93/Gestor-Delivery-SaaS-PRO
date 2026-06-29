@@ -19,6 +19,7 @@ type CompletionSnapshot = {
       lat: number | null;
       lng: number | null;
       paymentMethods: unknown;
+      pickupEnabled: boolean | null;
     } | null;
     operatingHours: Array<{ isOpen: boolean }>;
   } | null;
@@ -109,6 +110,7 @@ export class OnboardingService {
     const hasOperatingHours = Boolean(tenant?.operatingHours.some((hour) => hour.isOpen));
     const hasProducts = snapshot.activeProductCount > 0;
     const deliveryConfigured = this.isDeliveryConfigured(snapshot);
+    const hasOperationalMode = this.hasOperationalMode(snapshot);
 
     const onboarding = await this.prisma.tenantOnboarding.upsert({
       where: { tenantId },
@@ -118,7 +120,7 @@ export class OnboardingService {
         stepOperatingHours: hasOperatingHours,
         stepLogo: hasLogo,
         stepAddress: hasAddress && hasCoordinates,
-        stepDelivery: deliveryConfigured,
+        stepDelivery: hasOperationalMode,
         stepPayments: hasPaymentMethods,
         stepMenu: hasProducts,
         stepCatalog: hasProducts,
@@ -129,7 +131,7 @@ export class OnboardingService {
         stepOperatingHours: hasOperatingHours,
         stepLogo: hasLogo,
         stepAddress: hasAddress && hasCoordinates,
-        stepDelivery: deliveryConfigured,
+        stepDelivery: hasOperationalMode,
         stepPayments: hasPaymentMethods,
         stepMenu: hasProducts,
         stepCatalog: hasProducts,
@@ -163,6 +165,7 @@ export class OnboardingService {
               lat: true,
               lng: true,
               paymentMethods: true,
+              pickupEnabled: true,
             },
           },
           operatingHours: {
@@ -224,6 +227,10 @@ export class OnboardingService {
 
     if (snapshot.activeProductCount === 0) {
       missingRequirements.push('catalog');
+    }
+
+    if (!this.hasOperationalMode(snapshot)) {
+      missingRequirements.push('order_modes');
     }
 
     if (snapshot.deliveryCoverage?.isDeliveryEnabled && !this.isDeliveryConfigured(snapshot)) {
@@ -316,6 +323,10 @@ export class OnboardingService {
     return Number(coverage.maxRadiusKm) > 0 && Number(coverage.defaultPricePerKm) >= 0;
   }
 
+  private hasOperationalMode(snapshot: CompletionSnapshot): boolean {
+    return Boolean(snapshot.tenant?.settings?.pickupEnabled) || this.isDeliveryConfigured(snapshot);
+  }
+
   private resolveNextRecommendedStep(missingRequirements: string[]): string | null {
     if (missingRequirements.includes('store_name')) return 'identity';
     if (missingRequirements.includes('structured_address') || missingRequirements.includes('store_coordinates')) {
@@ -324,6 +335,7 @@ export class OnboardingService {
     if (missingRequirements.includes('operating_hours')) return 'hours';
     if (missingRequirements.includes('payment_methods')) return 'payments';
     if (missingRequirements.includes('catalog')) return 'products';
+    if (missingRequirements.includes('order_modes')) return 'order_modes';
     if (missingRequirements.includes('delivery_config')) return 'location';
     return null;
   }

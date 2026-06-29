@@ -93,6 +93,9 @@ export interface TenantSettings {
   // Payment Methods
   paymentMethods?: string[];
   minimumOrderValue?: number | null;
+  pickupEnabled?: boolean;
+  pickupMinMinutes?: number;
+  pickupMaxMinutes?: number;
 
   // Financial / Pix
   pixKey?: string;
@@ -150,6 +153,21 @@ export interface OnboardingCompletionCheck {
   warnings: string[];
   nextRecommendedStep: string | null;
   completedAt?: string | null;
+}
+
+export interface TenantSchedulingSettings {
+  id: string;
+  tenantId: string;
+  enabled: boolean;
+  acceptScheduledOrders: boolean;
+  allowScheduleWhenClosed: boolean;
+  minimumAdvanceMinutes: number;
+  maximumAdvanceDays: number;
+  slotIntervalMinutes: number;
+  maxOrdersPerSlot: number;
+  timezone: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface TenantOperatingHours {

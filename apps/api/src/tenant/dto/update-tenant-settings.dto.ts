@@ -87,6 +87,18 @@ export class UpdateTenantSettingsDto {
   minimumOrderValue?: number;
 
   @IsOptional()
+  @IsBoolean()
+  pickupEnabled?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  pickupMinMinutes?: number;
+
+  @IsOptional()
+  @IsNumber()
+  pickupMaxMinutes?: number;
+
+  @IsOptional()
   @IsString()
   @MaxLength(255)
   pixKey?: string;

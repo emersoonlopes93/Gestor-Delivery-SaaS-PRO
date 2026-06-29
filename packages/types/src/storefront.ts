@@ -31,8 +31,18 @@ export interface StorefrontTenantInfo {
     enabled: boolean;
     pointsPerReal: number;
   };
+  orderModes?: {
+    deliveryEnabled: boolean;
+    pickupEnabled: boolean;
+    dineInEnabled: boolean;
+    scheduledOrdersEnabled: boolean;
+    allowScheduleWhenClosed: boolean;
+    pickupMinMinutes?: number | null;
+    pickupMaxMinutes?: number | null;
+  };
   scheduling?: {
     enabled: boolean;
+    allowWhenClosed?: boolean;
   };
 }
 

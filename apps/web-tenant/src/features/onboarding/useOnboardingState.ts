@@ -10,6 +10,7 @@ export interface OnboardingValidation {
   hasAddress: boolean;
   hasOperatingHours: boolean;
   hasPaymentMethod: boolean;
+  hasOperationalModes: boolean;
   hasProduct: boolean;
 }
 
@@ -43,7 +44,7 @@ const STEP_BACKEND_MAPPING: Record<number, OnboardingBackendStep[]> = {
   2: ['operatingHours'],
   3: ['payments'],
   4: ['catalog', 'menu'],
-  5: [],
+  5: ['delivery'],
   6: [],
   7: [],
 };
@@ -75,6 +76,7 @@ function deriveVisitedStepsFromBackend(status: BackendOnboardingStatus): number[
   if (status.stepOperatingHours) visited.add(3);
   if (status.stepPayments) visited.add(4);
   if (status.stepCatalog || status.stepMenu) visited.add(5);
+  if (status.stepDelivery) visited.add(6);
 
   return Array.from(visited).sort((a, b) => a - b);
 }
@@ -91,6 +93,7 @@ export function useOnboardingState() {
     hasAddress: stored.validation?.hasAddress ?? false,
     hasOperatingHours: stored.validation?.hasOperatingHours ?? false,
     hasPaymentMethod: stored.validation?.hasPaymentMethod ?? false,
+    hasOperationalModes: stored.validation?.hasOperationalModes ?? false,
     hasProduct: stored.validation?.hasProduct ?? false,
   });
 
@@ -124,7 +127,7 @@ export function useOnboardingState() {
 
   const checkValidationFromApi = async () => {
     try {
-      const [tenantRes, hoursRes, productsRes] = await Promise.all([
+      const [tenantRes, hoursRes, productsRes, coverageRes] = await Promise.all([
         api.get<{
           name: string;
           settings?: {
@@ -137,10 +140,12 @@ export function useOnboardingState() {
             lat?: number;
             lng?: number;
             paymentMethods?: string[];
+            pickupEnabled?: boolean;
           };
         }>('/tenant/me'),
         api.get<{ isOpen: boolean }[]>('/tenant/operating-hours'),
         api.get<{ id: string; isActive?: boolean }[]>('/catalog/products'),
+        api.get<{ isDeliveryEnabled?: boolean; maxRadiusKm?: number | string } | null>('/delivery/coverage').catch(() => ({ success: true, data: null })),
       ]);
 
       const settings = tenantRes.success ? tenantRes.data?.settings : undefined;
@@ -157,18 +162,26 @@ export function useOnboardingState() {
           Number.isFinite(settings.lng),
       );
 
+      const deliveryCoverage = coverageRes.success ? coverageRes.data : null;
+      const hasDeliveryMode = Boolean(
+        deliveryCoverage?.isDeliveryEnabled &&
+        Number(deliveryCoverage.maxRadiusKm ?? 0) > 0,
+      );
+      const hasPickupMode = Boolean(settings?.pickupEnabled);
+
       setValidation({
         hasStoreName: !!(tenantRes.success && tenantRes.data?.name?.trim()),
         hasAddress,
         hasOperatingHours: !!(hoursRes.success && hoursRes.data?.some((hour) => hour.isOpen)),
         hasPaymentMethod: !!(tenantRes.success && tenantRes.data?.settings?.paymentMethods?.length),
+        hasOperationalModes: hasDeliveryMode || hasPickupMode,
         hasProduct: !!(
           productsRes.success &&
           productsRes.data?.some((product) => product.isActive !== false)
         ),
       });
     } catch {
-      // silent — keep existing validation state
+      // silent - keep existing validation state
     }
   };
 

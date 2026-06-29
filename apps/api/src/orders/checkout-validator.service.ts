@@ -76,10 +76,24 @@ export class CheckoutValidatorService {
     const tenantId = tenant.id;
 
     // 1.5 Fetch Store Status Context once for performance and global check
-    const [settings, operatingHours] = await Promise.all([
+    const [settings, schedulingSettings, operatingHours] = await Promise.all([
       this.prisma.tenantSettings.findUnique({
         where: { tenantId },
-        select: { isStorePaused: true, storePauseReason: true, timezone: true, minimumOrderValue: true },
+        select: {
+          isStorePaused: true,
+          storePauseReason: true,
+          timezone: true,
+          minimumOrderValue: true,
+          pickupEnabled: true,
+        },
+      }),
+      this.prisma.schedulingSettings.findUnique({
+        where: { tenantId },
+        select: {
+          enabled: true,
+          acceptScheduledOrders: true,
+          allowScheduleWhenClosed: true,
+        },
       }),
       this.prisma.tenantOperatingHours.findMany({
         where: { tenantId },
@@ -89,6 +103,9 @@ export class CheckoutValidatorService {
     const availabilityContext = { settings, operatingHours };
     const checkDate = options?.scheduledFor || new Date();
     const storeStatus = await this.availabilityService.getStoreStatus(tenantId, checkDate, availabilityContext);
+    const currentStoreStatus = options?.scheduledFor
+      ? await this.availabilityService.getStoreStatus(tenantId, new Date(), availabilityContext)
+      : storeStatus;
 
     if (!storeStatus.isOpen && !options?.scheduledFor) {
       throw new BadRequestException(storeStatus.message || 'A loja está fechada no momento.');
@@ -97,6 +114,18 @@ export class CheckoutValidatorService {
     // If scheduled, ensure it's a valid open day for the tenant
     if (options?.scheduledFor && !storeStatus.isOpen) {
        throw new BadRequestException(`A loja não estará aberta na data programada (${storeStatus.message}).`);
+    }
+
+    if ((options?.scheduledFor || options?.timeSlotId) && (!schedulingSettings?.enabled || !schedulingSettings.acceptScheduledOrders)) {
+      throw new BadRequestException('Agendamento indisponivel para esta loja.');
+    }
+
+    if (!currentStoreStatus.isOpen && options?.scheduledFor && !schedulingSettings?.allowScheduleWhenClosed) {
+      throw new BadRequestException('A loja nao aceita agendamentos enquanto estiver fechada.');
+    }
+
+    if (options?.channel === 'storefront_pickup' && !settings?.pickupEnabled) {
+      throw new BadRequestException('Retirada indisponivel no momento.');
     }
 
     // 1.7 Validate Time Slot if provided
