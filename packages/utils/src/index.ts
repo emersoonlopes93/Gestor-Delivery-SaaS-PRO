@@ -176,3 +176,5 @@ export function unmaskCurrency(value: string | undefined | null): number {
   return currencyDigitsToNumber(value);
 }
 
+export * from './google-maps-address';
+

@@ -291,7 +291,14 @@ export class OnboardingService {
       | null
       | undefined,
   ): boolean {
-    return typeof settings?.lat === 'number' && Number.isFinite(settings.lat) && typeof settings?.lng === 'number' && Number.isFinite(settings.lng);
+    return (
+      typeof settings?.lat === 'number' &&
+      Number.isFinite(settings.lat) &&
+      settings.lat !== 0 &&
+      typeof settings?.lng === 'number' &&
+      Number.isFinite(settings.lng) &&
+      settings.lng !== 0
+    );
   }
 
   private isDeliveryConfigured(snapshot: CompletionSnapshot): boolean {
