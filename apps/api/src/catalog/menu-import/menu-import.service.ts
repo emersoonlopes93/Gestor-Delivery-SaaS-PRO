@@ -396,6 +396,7 @@ export class MenuImportService {
       categories: version.categories.map((category) => ({
         name: category.name,
         order: category.sortOrder,
+        metadataJson: category.metadataJson,
         products: category.products
           .sort((left, right) => left.sortOrder - right.sortOrder)
           .map((product) => ({
@@ -621,20 +622,24 @@ export class MenuImportService {
     for (const item of sizesGroup.items) {
       const price = normalizedPrices.get(normalizeBaseMenuOptionSlug(item.name));
       if (price === undefined) continue;
-      await this.prisma.tenantClient.productOptionItemPrice.upsert({
-        where: {
-          productId_optionItemId: {
-            productId,
-            optionItemId: item.id,
-          },
-        },
-        create: {
+      const existing = await this.prisma.tenantClient.productOptionItemPrice.findFirst({
+        where: { productId, optionItemId: item.id },
+        select: { id: true },
+      });
+      if (existing) {
+        await this.prisma.tenantClient.productOptionItemPrice.update({
+          where: { id: existing.id },
+          data: { price },
+        });
+        continue;
+      }
+      await this.prisma.tenantClient.productOptionItemPrice.create({
+        data: {
           tenantId,
           productId,
           optionItemId: item.id,
           price,
         },
-        update: { price },
       });
     }
   }

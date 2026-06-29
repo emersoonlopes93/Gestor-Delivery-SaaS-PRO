@@ -69,29 +69,37 @@ export class CatalogTemplatesService {
     const { sizesGroup, mountingGroup } = await this.ensurePizzaBaseGroups(tenantId);
 
     // 1. Link to "Tamanhos"
-    await this.prisma.tenantClient.productOptionGroupLink.upsert({
-      where: { productId_optionGroupId: { productId, optionGroupId: sizesGroup.id } },
-      create: { 
-        tenantId, 
-        productId, 
-        optionGroupId: sizesGroup.id, 
-        order: 0,
-        pricingAxis: 'primary' // Sizes usually drive the primary price in pizzas
-      },
-      update: {}
+    const sizeLink = await this.prisma.tenantClient.productOptionGroupLink.findFirst({
+      where: { productId, optionGroupId: sizesGroup.id },
+      select: { id: true },
     });
+    if (!sizeLink) {
+      await this.prisma.tenantClient.productOptionGroupLink.create({
+        data: {
+          tenantId,
+          productId,
+          optionGroupId: sizesGroup.id,
+          order: 0,
+          pricingAxis: 'primary',
+        },
+      });
+    }
 
     // 2. Link to "Montagem"
-    await this.prisma.tenantClient.productOptionGroupLink.upsert({
-      where: { productId_optionGroupId: { productId, optionGroupId: mountingGroup.id } },
-      create: { 
-        tenantId, 
-        productId, 
-        optionGroupId: mountingGroup.id, 
-        order: 1 
-      },
-      update: {}
+    const mountingLink = await this.prisma.tenantClient.productOptionGroupLink.findFirst({
+      where: { productId, optionGroupId: mountingGroup.id },
+      select: { id: true },
     });
+    if (!mountingLink) {
+      await this.prisma.tenantClient.productOptionGroupLink.create({
+        data: {
+          tenantId,
+          productId,
+          optionGroupId: mountingGroup.id,
+          order: 1,
+        },
+      });
+    }
 
     // 3. Initialize prices for each size
     const sizeItems = await this.prisma.tenantClient.optionItem.findMany({
@@ -104,20 +112,21 @@ export class CatalogTemplatesService {
     });
 
     for (const sizeItem of sizeItems) {
-      await this.prisma.tenantClient.productOptionItemPrice.upsert({
-        where: { 
-          productId_optionItemId: { 
-            productId, 
-            optionItemId: sizeItem.id 
-          } 
-        },
-        create: {
+      const existing = await this.prisma.tenantClient.productOptionItemPrice.findFirst({
+        where: { productId, optionItemId: sizeItem.id },
+        select: { id: true },
+      });
+      if (existing) {
+        continue;
+      }
+
+      await this.prisma.tenantClient.productOptionItemPrice.create({
+        data: {
           tenantId,
           productId,
           optionItemId: sizeItem.id,
-          price: product?.basePrice || 0
+          price: product?.basePrice || 0,
         },
-        update: {} // Don't overwrite if it already exists
       });
     }
 
