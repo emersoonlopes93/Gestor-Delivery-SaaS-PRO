@@ -54,14 +54,15 @@ export function Step7Storefront({ onNext, onPrev }: Step7Props) {
             colorMode: draft.colorMode,
             borderRadius: 'lg',
             fontStyle: 'default',
+            heroImageUrl: draft.bannerUrl || null,
+            heroImageMediaId: draft.bannerMediaAssetId || null,
             backgroundStyle: 'clean',
-            backgroundImageUrl: draft.bannerUrl || null,
-            backgroundImageMediaId: draft.bannerMediaAssetId || null,
             backgroundOverlay: 'soft',
           },
           layout: {
             productLayout: draft.productLayout,
             categoryLayout: 'tabs',
+            heroEnabled: Boolean(draft.bannerUrl),
             showProductDescription: true,
             showBadges: true,
             productImageMode: 'thumbnail',
@@ -86,7 +87,7 @@ export function Step7Storefront({ onNext, onPrev }: Step7Props) {
       {/* Banner */}
       <div>
         <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">
-          Banner / Imagem de Fundo
+          Banner da Vitrine
         </label>
         {draft.bannerUrl ? (
           <div className="relative rounded-2xl overflow-hidden border-2 border-indigo-300 dark:border-indigo-700 aspect-video bg-slate-100 dark:bg-slate-800 group">

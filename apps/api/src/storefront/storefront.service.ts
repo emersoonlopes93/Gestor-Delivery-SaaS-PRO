@@ -421,11 +421,14 @@ export class StorefrontService {
       tenant.settings?.orderWhatsappNumber || tenant.settings?.businessPhone || null,
     );
 
+    const normalizedTheme = normalizeStorefrontTheme(tenant.settings?.storefrontThemeJson);
+
     const tenantInfo = {
       id: tenant.id,
       name: tenant.name,
       slug: tenant.slug,
       logo: tenant.settings?.logoUrl || null,
+      banner: normalizedTheme.heroImageUrl || null,
       isOpen: storeStatus.isOpen,
       statusMessage: storeStatus.message,
       nextOpenAt: storeStatus.nextOpenAt,
@@ -575,7 +578,7 @@ export class StorefrontService {
 
     // 5. Storefront Customization (Fully Normalized & Hardened for Public consumption)
     const customization: StorefrontCustomizationPayload = {
-      theme: normalizeStorefrontTheme(tenant.settings?.storefrontThemeJson),
+      theme: normalizedTheme,
       layout: normalizeStorefrontLayout(tenant.settings?.storefrontLayoutJson),
     };
 

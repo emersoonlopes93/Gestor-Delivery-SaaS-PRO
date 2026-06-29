@@ -132,6 +132,26 @@ export interface TenantSettings {
   updatedAt: string;
 }
 
+export type OnboardingBackendStep =
+  | 'basicInfo'
+  | 'operatingHours'
+  | 'logo'
+  | 'address'
+  | 'delivery'
+  | 'payments'
+  | 'whatsapp'
+  | 'menu'
+  | 'catalog'
+  | 'firstOrder';
+
+export interface OnboardingCompletionCheck {
+  canComplete: boolean;
+  missingRequirements: string[];
+  warnings: string[];
+  nextRecommendedStep: string | null;
+  completedAt?: string | null;
+}
+
 export interface TenantOperatingHours {
   id: string;
   tenantId: string;

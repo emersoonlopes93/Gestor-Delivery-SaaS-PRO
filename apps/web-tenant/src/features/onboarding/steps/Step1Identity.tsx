@@ -92,6 +92,9 @@ export function Step1Identity({ onNext, onMarkValid }: Step1Props) {
       return;
     }
     onNext(async () => {
+      await api.patch('/tenant', {
+        name: form.name.trim(),
+      });
       await api.patch('/tenant/settings', {
         logoUrl: form.logoUrl || undefined,
         businessPhone: unmask(form.businessPhone),
@@ -223,4 +226,3 @@ export function Step1Identity({ onNext, onMarkValid }: Step1Props) {
     </div>
   );
 }
-

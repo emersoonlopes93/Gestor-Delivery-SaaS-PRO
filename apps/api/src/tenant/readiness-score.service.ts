@@ -174,7 +174,8 @@ export class ReadinessScoreService {
 
     const status = this.resolveStatus(score);
     const missingRequirements = this.resolveMissingRequired(dims, activeProductCount, tenant);
-    const canActivate = score >= 90 && missingRequirements.length === 0;
+    // Readiness score is diagnostico; completion is gated only by real minimum requirements.
+    const canActivate = missingRequirements.length === 0;
 
     const timeline = this.buildTimeline(tenant, missingRequirements, canActivate, activeProductCount);
     const achievements = this.buildAchievements(score, canActivate, activeProductCount);
@@ -250,13 +251,13 @@ export class ReadinessScoreService {
   private evalStorefront(t: TenantSnapshot): ReadinessDimensionDto {
     const s = t.settings;
     const hasLogo = !!s?.logoUrl?.trim();
-    // backgroundImageUrl via normalizeStorefrontTheme (campo oficial do @gestor/theme)
+    // backgroundImageUrl via normalizeStorefrontTheme (campo oficial do tema global, nao banner)
     const normalizedTheme = normalizeStorefrontTheme(s?.storefrontThemeJson ?? null);
-    const hasBanner = !!(normalizedTheme.backgroundImageUrl?.trim());
+    const hasBackgroundImage = !!(normalizedTheme.backgroundImageUrl?.trim());
 
     const checks: ReadinessCheckDto[] = [
       { key: 'logo', label: 'Logo da loja', passed: hasLogo },
-      { key: 'banner', label: 'Imagem de fundo / banner', passed: hasBanner },
+      { key: 'background', label: 'Imagem de fundo global', passed: hasBackgroundImage },
     ];
     return this.buildDimension('storefront', 'Vitrine', 0.15, '/settings/storefront', 'Personalizar loja', 7, checks);
   }

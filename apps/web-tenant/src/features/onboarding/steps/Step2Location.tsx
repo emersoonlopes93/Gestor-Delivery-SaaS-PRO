@@ -103,6 +103,9 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
       const addressStr = `${form.street}, ${form.number}, ${form.neighborhood || ''}, ${form.city} - ${form.state || ''}, Brasil`;
       const coords = await geocodeNominatim(addressStr);
       const derivedAddress = `${form.street}, ${form.number}${form.complement ? ` - ${form.complement}` : ''}${form.neighborhood ? ` - ${form.neighborhood}` : ''}, ${form.city} - ${form.state}`;
+      const finalLat = coords?.lat ?? form.lat;
+      const finalLng = coords?.lng ?? form.lng;
+
       await api.patch('/tenant/settings', {
         zipCode: unmask(form.zipCode) || undefined,
         street: form.street.trim(),
@@ -112,20 +115,21 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
         city: form.city.trim(),
         state: form.state.trim() || undefined,
         address: derivedAddress,
-        lat: coords?.lat ?? form.lat,
-        lng: coords?.lng ?? form.lng,
+        lat: finalLat,
+        lng: finalLng,
       });
 
-      const finalLat = coords?.lat ?? form.lat ?? 0;
-      const finalLng = coords?.lng ?? form.lng ?? 0;
-
-      await api.put('/delivery/coverage', {
-        storeLat: finalLat,
-        storeLng: finalLng,
-        maxRadiusKm: parseFloat(form.deliveryRadiusKm) || 5,
-        defaultPricePerKm: parseFloat(form.deliveryFeeBase) || 5,
-        isDeliveryEnabled: true,
-      });
+      if (typeof finalLat === 'number' && Number.isFinite(finalLat) && typeof finalLng === 'number' && Number.isFinite(finalLng)) {
+        await api.put('/delivery/coverage', {
+          storeLat: finalLat,
+          storeLng: finalLng,
+          maxRadiusKm: parseFloat(form.deliveryRadiusKm) || 5,
+          defaultPricePerKm: parseFloat(form.deliveryFeeBase) || 5,
+          isDeliveryEnabled: true,
+        });
+      } else {
+        alert('Endereco salvo, mas nao foi possivel localizar a origem geografica da loja ainda. Voce podera revisar isso depois sem perder o restante do onboarding.');
+      }
     });
   };
 

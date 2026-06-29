@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../lib/api-client';
 import { useAuthStore } from '../../stores/auth.store';
-import type { TenantUserSession } from '@gestor/types';
+import type { OnboardingBackendStep, TenantUserSession } from '@gestor/types';
 
 export type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -20,8 +20,33 @@ export interface OnboardingStateData {
   autoSaveStatus: AutoSaveStatus;
 }
 
+type BackendOnboardingStatus = {
+  stepBasicInfo?: boolean;
+  stepOperatingHours?: boolean;
+  stepLogo?: boolean;
+  stepAddress?: boolean;
+  stepDelivery?: boolean;
+  stepPayments?: boolean;
+  stepWhatsapp?: boolean;
+  stepMenu?: boolean;
+  stepCatalog?: boolean;
+  stepFirstOrder?: boolean;
+  completedAt?: string | null;
+};
+
 const STORAGE_KEY = 'onboarding_state';
 const TOTAL_STEPS = 8;
+
+const STEP_BACKEND_MAPPING: Record<number, OnboardingBackendStep[]> = {
+  0: ['basicInfo'],
+  1: ['address'],
+  2: ['operatingHours'],
+  3: ['payments'],
+  4: ['catalog', 'menu'],
+  5: [],
+  6: [],
+  7: [],
+};
 
 function loadFromStorage(): Partial<OnboardingStateData> {
   try {
@@ -42,6 +67,18 @@ function saveToStorage(data: Partial<OnboardingStateData>) {
   }
 }
 
+function deriveVisitedStepsFromBackend(status: BackendOnboardingStatus): number[] {
+  const visited = new Set<number>([0]);
+
+  if (status.stepBasicInfo) visited.add(1);
+  if (status.stepAddress) visited.add(2);
+  if (status.stepOperatingHours) visited.add(3);
+  if (status.stepPayments) visited.add(4);
+  if (status.stepCatalog || status.stepMenu) visited.add(5);
+
+  return Array.from(visited).sort((a, b) => a - b);
+}
+
 export function useOnboardingState() {
   const { user, setUser } = useAuthStore();
   const stored = loadFromStorage();
@@ -59,38 +96,92 @@ export function useOnboardingState() {
 
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Persist state to localStorage
   useEffect(() => {
     saveToStorage({ currentStep, visitedSteps, validation });
   }, [currentStep, visitedSteps, validation]);
 
-  // Check validation on mount from real data if token exists
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
     if (token) {
-      checkValidationFromApi().catch(() => {});
+      void Promise.all([
+        checkValidationFromApi(),
+        syncProgressFromBackend(),
+      ]);
     }
   }, []);
+
+  const syncProgressFromBackend = async () => {
+    try {
+      const res = await api.get<BackendOnboardingStatus>('/tenant/onboarding');
+      if (!res.success || !res.data) return;
+
+      const backendVisited = deriveVisitedStepsFromBackend(res.data);
+      setVisitedSteps((prev) => Array.from(new Set([...prev, ...backendVisited])).sort((a, b) => a - b));
+    } catch {
+      // silent
+    }
+  };
 
   const checkValidationFromApi = async () => {
     try {
       const [tenantRes, hoursRes, productsRes] = await Promise.all([
-        api.get<{ name: string; settings?: { street?: string; city?: string; paymentMethods?: string[] } }>('/tenant/me'),
+        api.get<{
+          name: string;
+          settings?: {
+            street?: string;
+            number?: string;
+            neighborhood?: string;
+            city?: string;
+            state?: string;
+            zipCode?: string;
+            lat?: number;
+            lng?: number;
+            paymentMethods?: string[];
+          };
+        }>('/tenant/me'),
         api.get<{ isOpen: boolean }[]>('/tenant/operating-hours'),
-        api.get<{ id: string }[]>('/catalog/products'),
+        api.get<{ id: string; isActive?: boolean }[]>('/catalog/products'),
       ]);
+
+      const settings = tenantRes.success ? tenantRes.data?.settings : undefined;
+      const hasAddress = Boolean(
+        settings?.street?.trim() &&
+          settings?.number?.trim() &&
+          settings?.neighborhood?.trim() &&
+          settings?.city?.trim() &&
+          settings?.state?.trim() &&
+          settings?.zipCode?.trim() &&
+          typeof settings?.lat === 'number' &&
+          Number.isFinite(settings.lat) &&
+          typeof settings?.lng === 'number' &&
+          Number.isFinite(settings.lng),
+      );
 
       setValidation({
         hasStoreName: !!(tenantRes.success && tenantRes.data?.name?.trim()),
-        hasAddress: !!(tenantRes.success && tenantRes.data?.settings?.city),
-        hasOperatingHours: !!(hoursRes.success && hoursRes.data?.some(h => h.isOpen)),
+        hasAddress,
+        hasOperatingHours: !!(hoursRes.success && hoursRes.data?.some((hour) => hour.isOpen)),
         hasPaymentMethod: !!(tenantRes.success && tenantRes.data?.settings?.paymentMethods?.length),
-        hasProduct: !!(productsRes.success && productsRes.data?.length > 0),
+        hasProduct: !!(
+          productsRes.success &&
+          productsRes.data?.some((product) => product.isActive !== false)
+        ),
       });
     } catch {
       // silent — keep existing validation state
     }
   };
+
+  const syncCurrentStepToBackend = useCallback(async (stepIndex: number) => {
+    const backendSteps = STEP_BACKEND_MAPPING[stepIndex] ?? [];
+    if (backendSteps.length === 0) return;
+
+    await Promise.all(
+      backendSteps.map((step) =>
+        api.patch('/tenant/onboarding-step', { step, completed: true }),
+      ),
+    );
+  }, []);
 
   const triggerAutoSave = useCallback((saveFn: () => Promise<void>) => {
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
@@ -108,15 +199,15 @@ export function useOnboardingState() {
   }, []);
 
   const goNext = useCallback(() => {
-    setCurrentStep(prev => {
+    setCurrentStep((prev) => {
       const next = Math.min(prev + 1, TOTAL_STEPS - 1);
-      setVisitedSteps(vs => vs.includes(next) ? vs : [...vs, next]);
+      setVisitedSteps((vs) => (vs.includes(next) ? vs : [...vs, next]));
       return next;
     });
   }, []);
 
   const goPrev = useCallback(() => {
-    setCurrentStep(prev => Math.max(prev - 1, 0));
+    setCurrentStep((prev) => Math.max(prev - 1, 0));
   }, []);
 
   const goToStep = useCallback((step: number) => {
@@ -126,27 +217,35 @@ export function useOnboardingState() {
   }, [visitedSteps]);
 
   const markValidation = useCallback((key: keyof OnboardingValidation, value: boolean) => {
-    setValidation(prev => ({ ...prev, [key]: value }));
+    setValidation((prev) => ({ ...prev, [key]: value }));
   }, []);
 
   const saveStep = useCallback(async (saveFn: () => Promise<void>) => {
-    triggerAutoSave(saveFn);
-    // Mark next step as visited
-    setCurrentStep(prev => {
+    triggerAutoSave(async () => {
+      await saveFn();
+      await syncCurrentStepToBackend(currentStep);
+      await checkValidationFromApi();
+    });
+
+    setCurrentStep((prev) => {
       const next = Math.min(prev + 1, TOTAL_STEPS - 1);
-      setVisitedSteps(vs => vs.includes(next) ? vs : [...vs, next]);
+      setVisitedSteps((vs) => (vs.includes(next) ? vs : [...vs, next]));
       return next;
     });
-  }, [triggerAutoSave]);
+  }, [checkValidationFromApi, currentStep, syncCurrentStepToBackend, triggerAutoSave]);
 
   const completeOnboarding = useCallback(async () => {
     setAutoSaveStatus('saving');
     try {
-      await api.post('/tenant/onboarding-complete');
+      const res = await api.post<{ completedAt?: string | null }>('/tenant/onboarding-complete');
       if (user) {
-        setUser({ ...user, onboardingCompletedAt: new Date().toISOString() } as TenantUserSession);
+        setUser({
+          ...user,
+          onboardingCompletedAt: res.data?.completedAt || new Date().toISOString(),
+        } as TenantUserSession);
       }
       localStorage.removeItem(STORAGE_KEY);
+      setAutoSaveStatus('saved');
     } catch (err) {
       setAutoSaveStatus('error');
       throw err;
@@ -170,5 +269,6 @@ export function useOnboardingState() {
     completeOnboarding,
     triggerAutoSave,
     checkValidationFromApi,
+    syncProgressFromBackend,
   };
 }
