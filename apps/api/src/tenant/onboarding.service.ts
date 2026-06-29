@@ -258,6 +258,7 @@ export class OnboardingService {
       missingRequirements,
       warnings,
       nextRecommendedStep: this.resolveNextRecommendedStep(missingRequirements),
+      blockingMessage: this.buildBlockingMessage(missingRequirements),
       completedAt: tenant?.onboarding?.completedAt?.toISOString() ?? null,
     };
   }
@@ -325,6 +326,18 @@ export class OnboardingService {
 
   private hasOperationalMode(snapshot: CompletionSnapshot): boolean {
     return Boolean(snapshot.tenant?.settings?.pickupEnabled) || this.isDeliveryConfigured(snapshot);
+  }
+
+  private buildBlockingMessage(missingRequirements: string[]): string | null {
+    if (missingRequirements.includes('delivery_config')) {
+      return 'Configure uma area de entrega valida.';
+    }
+
+    if (missingRequirements.includes('order_modes')) {
+      return 'Ative retirada ou configure entrega.';
+    }
+
+    return null;
   }
 
   private resolveNextRecommendedStep(missingRequirements: string[]): string | null {

@@ -14,6 +14,17 @@ export interface OnboardingValidation {
   hasProduct: boolean;
 }
 
+function hasRealCoordinates(lat: number | undefined, lng: number | undefined) {
+  return (
+    typeof lat === 'number' &&
+    Number.isFinite(lat) &&
+    lat !== 0 &&
+    typeof lng === 'number' &&
+    Number.isFinite(lng) &&
+    lng !== 0
+  );
+}
+
 export interface OnboardingStateData {
   currentStep: number;
   visitedSteps: number[];
@@ -145,7 +156,11 @@ export function useOnboardingState() {
         }>('/tenant/me'),
         api.get<{ isOpen: boolean }[]>('/tenant/operating-hours'),
         api.get<{ id: string; isActive?: boolean }[]>('/catalog/products'),
-        api.get<{ isDeliveryEnabled?: boolean; maxRadiusKm?: number | string } | null>('/delivery/coverage').catch(() => ({ success: true, data: null })),
+        api.get<{
+          isDeliveryEnabled?: boolean;
+          maxRadiusKm?: number | string;
+          defaultPricePerKm?: number | string;
+        } | null>('/delivery/coverage').catch(() => ({ success: true, data: null })),
       ]);
 
       const settings = tenantRes.success ? tenantRes.data?.settings : undefined;
@@ -156,16 +171,15 @@ export function useOnboardingState() {
           settings?.city?.trim() &&
           settings?.state?.trim() &&
           settings?.zipCode?.trim() &&
-          typeof settings?.lat === 'number' &&
-          Number.isFinite(settings.lat) &&
-          typeof settings?.lng === 'number' &&
-          Number.isFinite(settings.lng),
+          hasRealCoordinates(settings?.lat, settings?.lng),
       );
 
       const deliveryCoverage = coverageRes.success ? coverageRes.data : null;
       const hasDeliveryMode = Boolean(
         deliveryCoverage?.isDeliveryEnabled &&
-        Number(deliveryCoverage.maxRadiusKm ?? 0) > 0,
+        Number(deliveryCoverage.maxRadiusKm ?? 0) > 0 &&
+        Number(deliveryCoverage.defaultPricePerKm ?? 0) >= 0 &&
+        hasRealCoordinates(settings?.lat, settings?.lng),
       );
       const hasPickupMode = Boolean(settings?.pickupEnabled);
 

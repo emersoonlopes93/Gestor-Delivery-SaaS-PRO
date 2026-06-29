@@ -12,6 +12,7 @@ interface Step6Props {
 type DeliveryCoverageResponse = {
   isDeliveryEnabled?: boolean;
   maxRadiusKm?: number | string | null;
+  defaultPricePerKm?: number | string | null;
 } | null;
 
 type TenantMeResponse = {
@@ -19,8 +20,21 @@ type TenantMeResponse = {
     pickupEnabled?: boolean;
     pickupMinMinutes?: number | null;
     pickupMaxMinutes?: number | null;
+    lat?: number | null;
+    lng?: number | null;
   };
 };
+
+function hasRealCoordinates(lat?: number | null, lng?: number | null) {
+  return (
+    typeof lat === 'number' &&
+    Number.isFinite(lat) &&
+    lat !== 0 &&
+    typeof lng === 'number' &&
+    Number.isFinite(lng) &&
+    lng !== 0
+  );
+}
 
 function ToggleCard({
   title,
@@ -172,7 +186,14 @@ export function Step6Rules({ onNext, onPrev, onMarkValid }: Step6Props) {
         setMaximumAdvanceDays(scheduling?.maximumAdvanceDays ?? 7);
         setSlotIntervalMinutes(scheduling?.slotIntervalMinutes ?? 30);
         setMaxOrdersPerSlot(scheduling?.maxOrdersPerSlot ?? 5);
-        setDeliveryEnabled(Boolean(coverage?.isDeliveryEnabled && Number(coverage?.maxRadiusKm ?? 0) > 0));
+        setDeliveryEnabled(
+          Boolean(
+            coverage?.isDeliveryEnabled &&
+            Number(coverage?.maxRadiusKm ?? 0) > 0 &&
+            Number(coverage?.defaultPricePerKm ?? 0) >= 0 &&
+            hasRealCoordinates(tenantSettings?.lat ?? null, tenantSettings?.lng ?? null),
+          ),
+        );
       } catch (err) {
         if (!mounted) return;
         setError(err instanceof ApiError ? err.message : 'Nao foi possivel carregar os modos de pedido.');

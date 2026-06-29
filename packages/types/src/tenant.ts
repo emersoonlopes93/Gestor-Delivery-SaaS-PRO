@@ -152,6 +152,7 @@ export interface OnboardingCompletionCheck {
   missingRequirements: string[];
   warnings: string[];
   nextRecommendedStep: string | null;
+  blockingMessage?: string | null;
   completedAt?: string | null;
 }
 

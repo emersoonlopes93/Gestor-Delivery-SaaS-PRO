@@ -146,6 +146,11 @@ export function Step8Review({ validation, onActivate, onPrev, goToStep }: Step8P
               <p className={`text-sm font-black ${completionCheck.canComplete ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'}`}>
                 {completionCheck.canComplete ? 'Os requisitos minimos reais foram atendidos.' : 'Ainda faltam requisitos minimos para concluir o onboarding.'}
               </p>
+              {!completionCheck.canComplete && completionCheck.blockingMessage ? (
+                <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+                  {completionCheck.blockingMessage}
+                </p>
+              ) : null}
               {!completionCheck.canComplete && completionCheck.missingRequirements.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {completionCheck.missingRequirements.map((item) => (
