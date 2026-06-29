@@ -1,5 +1,5 @@
 # Base image
-FROM node:20-slim AS base
+FROM node:22-slim AS base
 
 # Install required system libraries (e.g., for Prisma)
 RUN apt-get update -y && \
