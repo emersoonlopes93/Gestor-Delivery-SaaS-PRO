@@ -117,10 +117,7 @@ export async function seedBaseMenuTemplates(
           sortOrder: index + 1,
           mediaLookupKey: product.mediaLookupKey ?? null,
           searchTagsJson: product.searchTags,
-          metadataJson: {
-            ...productMetadata(product),
-            ...(product.metadataJson ?? {}),
-          },
+          metadataJson: mergeJsonObjects(productMetadata(product), product.metadataJson),
         },
       });
         summary.products++;
@@ -204,4 +201,11 @@ function productMetadata(product: MenuTemplate['categories'][number]['products']
     mediaCategory: product.mediaCategory ?? null,
     mediaPrompt: product.mediaPrompt ?? null,
   };
+}
+
+function mergeJsonObjects(
+  base: Prisma.InputJsonObject,
+  extra?: Record<string, unknown>,
+): Prisma.InputJsonValue {
+  return (extra ? { ...base, ...extra } : base) as Prisma.InputJsonValue;
 }
