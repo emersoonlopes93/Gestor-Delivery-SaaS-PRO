@@ -8,6 +8,7 @@ export interface ProductTemplate {
   name: string;
   shortDescription: string;
   basePrice: number;
+  metadataJson?: Record<string, unknown>;
   /** Tags para busca de imagem na system_gallery / tenant_library */
   searchTags: string[];
   /** Chave específica para busca de imagem na Biblioteca Global */
@@ -21,6 +22,7 @@ export interface ProductTemplate {
 export interface CategoryTemplate {
   name: string;
   order: number;
+  metadataJson?: Record<string, unknown>;
   products: ProductTemplate[];
 }
 
@@ -53,53 +55,66 @@ export const MENU_TEMPLATES: MenuTemplate[] = [
     emoji: '🍕',
     categories: [
       {
-        name: 'Pizzas Tradicionais',
+        name: 'Pizzas',
         order: 1,
+        metadataJson: {
+          templateType: 'pizza',
+          templateConfig: { pricingStrategy: 'highest', maxFlavors: 2 },
+        },
         products: [
           {
-            name: 'Pizza Margherita',
-            shortDescription: 'Molho de tomate, mussarela e manjericão fresco',
-            basePrice: 42.9,
-            searchTags: ['pizza', 'margherita', 'tradicional'],
-            mediaLookupKey: 'pizza-margherita',
-          },
-          {
-            name: 'Pizza Calabresa',
+            name: 'Calabresa',
             shortDescription: 'Molho de tomate, calabresa fatiada e cebola',
-            basePrice: 44.9,
-            searchTags: ['pizza', 'calabresa', 'tradicional'],
+            basePrice: 30,
+            metadataJson: {
+              sizePrices: { pequena: 30, media: 38, grande: 45 },
+            },
+            searchTags: ['pizza', 'calabresa'],
             mediaLookupKey: 'pizza-calabresa',
           },
           {
-            name: 'Pizza Portuguesa',
+            name: 'Mussarela',
+            shortDescription: 'Molho de tomate e mussarela',
+            basePrice: 28,
+            metadataJson: {
+              sizePrices: { pequena: 28, media: 35, grande: 42 },
+            },
+            searchTags: ['pizza', 'mussarela'],
+            mediaLookupKey: 'pizza-margherita',
+          },
+          {
+            name: 'Portuguesa',
             shortDescription: 'Presunto, ovos, azeitona, cebola e mussarela',
-            basePrice: 47.9,
-            searchTags: ['pizza', 'portuguesa', 'tradicional'],
+            basePrice: 32,
+            metadataJson: {
+              sizePrices: { pequena: 32, media: 40, grande: 48 },
+            },
+            searchTags: ['pizza', 'portuguesa'],
             mediaLookupKey: 'pizza-portuguesa',
           },
-        ],
-      },
-      {
-        name: 'Pizzas Especiais',
-        order: 2,
-        products: [
           {
-            name: 'Pizza Quatro Queijos',
-            shortDescription: 'Mussarela, parmesão, catupiry e provolone',
-            basePrice: 54.9,
-            searchTags: ['pizza', 'quatro queijos', 'especial'],
+            name: 'Frango com Catupiry',
+            shortDescription: 'Frango desfiado, catupiry e milho verde',
+            basePrice: 33,
+            metadataJson: {
+              sizePrices: { pequena: 33, media: 41, grande: 49 },
+            },
+            searchTags: ['pizza', 'frango', 'catupiry'],
           },
           {
-            name: 'Pizza Frango com Catupiry',
-            shortDescription: 'Frango desfiado, catupiry e milho verde',
-            basePrice: 52.9,
-            searchTags: ['pizza', 'frango', 'catupiry', 'especial'],
+            name: 'Marguerita',
+            shortDescription: 'Molho de tomate, mussarela e manjericão fresco',
+            basePrice: 29,
+            metadataJson: {
+              sizePrices: { pequena: 29, media: 36, grande: 43 },
+            },
+            searchTags: ['pizza', 'marguerita'],
           },
         ],
       },
       {
         name: 'Bebidas',
-        order: 3,
+        order: 2,
         products: [
           {
             name: 'Refrigerante Lata',
@@ -124,7 +139,7 @@ export const MENU_TEMPLATES: MenuTemplate[] = [
       },
       {
         name: 'Sobremesas',
-        order: 4,
+        order: 3,
         products: [
           {
             name: 'Pudim',

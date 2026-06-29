@@ -9,10 +9,14 @@ import {
 } from '@gestor/core';
 import { TenantDefaultRole, AdminDefaultRole } from '@gestor/core';
 import { seedDemoAiAgentAccess } from './demo-ai-agent.seed';
+import { CatalogTemplatesService } from '../catalog/catalog-templates.service';
 
 @Injectable()
 export class SeedService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly catalogTemplates: CatalogTemplatesService,
+  ) {}
 
   async runSeed() {
     console.log('Starting seed...');

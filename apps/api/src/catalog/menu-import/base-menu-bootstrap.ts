@@ -100,6 +100,7 @@ export async function seedBaseMenuTemplates(
           metadataJson: {
             source: 'menu-templates.data.ts',
             bootstrap: true,
+            ...(category.metadataJson ?? {}),
           },
         },
       });
@@ -109,16 +110,19 @@ export async function seedBaseMenuTemplates(
         await prisma.baseMenuProduct.create({
           data: {
             categoryId: seededCategory.id,
-            slug: slugify(product.name),
-            name: product.name,
-            description: product.shortDescription,
-            basePrice: product.basePrice,
-            sortOrder: index + 1,
-            mediaLookupKey: product.mediaLookupKey ?? null,
-            searchTagsJson: product.searchTags,
-            metadataJson: productMetadata(product),
+          slug: slugify(product.name),
+          name: product.name,
+          description: product.shortDescription,
+          basePrice: product.basePrice,
+          sortOrder: index + 1,
+          mediaLookupKey: product.mediaLookupKey ?? null,
+          searchTagsJson: product.searchTags,
+          metadataJson: {
+            ...productMetadata(product),
+            ...(product.metadataJson ?? {}),
           },
-        });
+        },
+      });
         summary.products++;
       }
     }
