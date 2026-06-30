@@ -7,6 +7,7 @@ import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { OnboardingService } from './onboarding.service';
 import { ReadinessScoreService } from './readiness-score.service';
 import { CreateBranchRequest, UpdateOperatingHoursRequest, UpdateStorePauseRequest, StorefrontCustomizationPayload } from '@gestor/types';
+import { FeatureControlService } from '../feature-control/feature-control.service';
 
 @Controller('tenant')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
@@ -15,6 +16,7 @@ export class TenantController {
     private readonly tenantService: TenantService,
     private readonly onboardingService: OnboardingService,
     private readonly readinessScoreService: ReadinessScoreService,
+    private readonly featureControlService: FeatureControlService,
   ) {}
 
   /**
@@ -30,6 +32,15 @@ export class TenantController {
   @RequirePermissions('dashboard.view')
   async getNetworkContext(@CurrentTenant() tenantId: string) {
     return this.tenantService.getNetworkContext(tenantId);
+  }
+
+  @Get('capabilities')
+  @RequirePermissions('dashboard.view')
+  async getCapabilities(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return this.featureControlService.getTenantCapabilities(tenantId, userId);
   }
 
   /**

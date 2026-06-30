@@ -50,6 +50,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { BusinessGroupContext, Tenant, TenantLoginResponse, TenantSettings, TenantOperatingHours } from '@gestor/types';
 import { useNotificationAudio } from '../hooks/useNotificationAudio';
 import { useBrowserNotifications } from '../hooks/useBrowserNotifications';
+import { useTenantCapabilities } from '../hooks/useTenantCapabilities';
 import { useLogisticsSocket } from '../features/delivery/hooks/useLogisticsSocket';
 import { StoreStatusBadge } from '../components/store/StoreStatusControl';
 import { Toaster } from 'react-hot-toast';
@@ -72,7 +73,7 @@ type SidebarGroup = {
   items: readonly SidebarItem[];
 };
 
-const isFeatureVisible = (flag?: string) => {
+const isFeatureVisibleByEnv = (flag?: string) => {
   if (!flag) return true;
   // Acessa a flag no import.meta.env, lidando de forma segura
   const envValue = import.meta.env[flag];
@@ -353,6 +354,7 @@ function SidebarGroupView(props: {
 export function AppLayout() {
   const { user, clearUser, setUser } = useAuthStore();
   const { theme, setTheme, initializeTheme } = useThemeStore();
+  const { isFeatureVisible } = useTenantCapabilities();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -539,14 +541,14 @@ export function AppLayout() {
     const filtered: SidebarGroup[] = [];
     for (const g of SIDEBAR_GROUPS) {
       const items = g.items
-        .filter((it) => isFeatureVisible(it.featureFlag))
+        .filter((it) => (isFeatureVisible ? isFeatureVisible(it.featureFlag) : isFeatureVisibleByEnv(it.featureFlag)))
         .filter((it) => (it.permission ? hasPermission(userPermissions, it.permission) : true))
         .map((it) => it);
 
       if (items.length) filtered.push({ ...g, items });
     }
     return filtered;
-  }, [userPermissions]);
+  }, [isFeatureVisible, userPermissions]);
 
   const activeGroupId = useMemo(() => {
     return firstActiveGroupId(groups, location.pathname);

@@ -47,6 +47,7 @@ export * from './kds';
 export * from './notifications';
 export * from './employees';
 export * from './settings';
+export * from './capabilities';
 
 // Modules with classes or constants (explicit values)
 export type { 

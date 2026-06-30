@@ -8,9 +8,10 @@ import { BusinessGroupService } from './business-group.service';
 import { BusinessGroupController } from './business-group.controller';
 import { OnboardingService } from './onboarding.service';
 import { ReadinessScoreService } from './readiness-score.service';
+import { FeatureControlModule } from '../feature-control/feature-control.module';
 
 @Module({
-  imports: [RbacModule],
+  imports: [RbacModule, FeatureControlModule],
   controllers: [TenantController, TenantUserController, BusinessGroupController],
   providers: [
     TenantService,

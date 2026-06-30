@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { MODULE_CATALOG } from '@gestor/core';
 import { PrismaService } from '../../database/prisma.service';
 import { TenantBillingResolverService } from '../../billing/tenant-billing-resolver.service';
 
@@ -21,37 +22,10 @@ export class AdminModulesService {
     private readonly tenantBillingResolver: TenantBillingResolverService,
   ) {}
 
-  /**
-   * Lista todos os módulos disponíveis no sistema.
-   */
   getAvailableModules() {
-    return [
-      { key: 'catalog', name: 'Catálogo', description: 'Produtos, categorias, combos e complementos' },
-      { key: 'orders', name: 'Pedidos', description: 'Gestão de pedidos e operação' },
-      { key: 'delivery', name: 'Entrega', description: 'Logística e entregadores' },
-      { key: 'pos', name: 'PDV', description: 'Ponto de venda presencial' },
-      { key: 'cash', name: 'Caixa', description: 'Gestão de caixa e movimentações' },
-      { key: 'crm', name: 'CRM', description: 'Clientes, promoções e cashback' },
-      { key: 'inventory', name: 'Estoque', description: 'Controle de ingredientes e receitas' },
-      { key: 'reports', name: 'Relatórios', description: 'Relatórios gerenciais' },
-      { key: 'whatsapp', name: 'WhatsApp', description: 'Conexão e automação via WhatsApp' },
-      { key: 'ai_agent', name: 'Agente IA', description: 'Assistente virtual inteligente' },
-      { key: 'purchasing', name: 'Compras', description: 'Gestão de compras e fornecedores' },
-      { key: 'finance', name: 'Financeiro', description: 'Contas, transações e fluxo de caixa' },
-      { key: 'campaigns', name: 'Campanhas', description: 'Marketing pesado e envio em massa' },
-      { key: 'goals', name: 'Metas', description: 'Acompanhamento de metas gerenciais' },
-      { key: 'bi', name: 'Business Intelligence', description: 'Análises e relatórios avançados' },
-      { key: 'employees', name: 'Funcionários', description: 'Controle de ponto e equipe' },
-      { key: 'kds', name: 'KDS', description: 'Kitchen Display System (Telas de Cozinha)' },
-      { key: 'printing', name: 'Impressões', description: 'Impressão direta e roteamento' },
-      { key: 'pos_tables', name: 'Mesas (PDV)', description: 'Gestão de mesas e comandas' },
-      { key: 'marketplace', name: 'Marketplace', description: 'Integração com iFood e outros' },
-    ];
+    return MODULE_CATALOG;
   }
 
-  /**
-   * Obtém configuração de módulos de um tenant.
-   */
   async getTenantModules(tenantId: string) {
     const entitlements = await this.tenantBillingResolver.resolveTenantEntitlements(tenantId);
     const access = await this.prisma.$queryRaw<ModuleAccessRow[]>`
@@ -61,21 +35,22 @@ export class AdminModulesService {
     `;
 
     const available = this.getAvailableModules();
-    
-    return available.map((module) => ({
-      ...module,
-      enabled: entitlements.allowAllModules
-        || entitlements.includedModules.includes(module.key)
-        || access.find((a) => a.module === module.key)?.enabled
-        || false,
-      accessId: access.find((a) => a.module === module.key)?.id,
-      source: entitlements.allowAllModules || entitlements.includedModules.includes(module.key) ? entitlements.source : 'legacy_access',
+
+    return available.map((moduleEntry) => ({
+      ...moduleEntry,
+      enabled:
+        entitlements.allowAllModules ||
+        entitlements.includedModules.includes(moduleEntry.key) ||
+        access.find((row) => row.module === moduleEntry.key)?.enabled ||
+        false,
+      accessId: access.find((row) => row.module === moduleEntry.key)?.id,
+      source:
+        entitlements.allowAllModules || entitlements.includedModules.includes(moduleEntry.key)
+          ? entitlements.source
+          : 'legacy_access',
     }));
   }
 
-  /**
-   * Atualiza configuração de módulos de um tenant.
-   */
   async updateTenantModules(tenantId: string, modules: { module: string; enabled: boolean }[]) {
     const result: Array<{ id: string; tenantId: string; module: string; enabled: boolean }> = [];
 
@@ -97,9 +72,6 @@ export class AdminModulesService {
     return result;
   }
 
-  /**
-   * Verifica se um tenant tem acesso a um módulo.
-   */
   async hasModuleAccess(tenantId: string, module: string): Promise<boolean> {
     const entitlements = await this.tenantBillingResolver.resolveTenantEntitlements(tenantId);
     if (entitlements.allowAllModules || entitlements.includedModules.includes(module)) {
@@ -114,8 +86,6 @@ export class AdminModulesService {
     `;
 
     const access = rows[0];
-
-    // Se não houver configuração, assume que o módulo está desabilitado
     return access?.enabled ?? false;
   }
 }

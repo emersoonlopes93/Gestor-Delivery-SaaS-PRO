@@ -32,6 +32,8 @@ import { AdminBaseMediaController } from './base-media/admin-base-media.controll
 import { AdminBaseMediaService } from './base-media/admin-base-media.service';
 import { AdminBaseMenuController } from './base-menu/admin-base-menu.controller';
 import { AdminBaseMenuService } from './base-menu/admin-base-menu.service';
+import { FeatureControlModule } from '../feature-control/feature-control.module';
+import { AdminFeaturesController } from './features/admin-features.controller';
 
 @Module({
   imports: [
@@ -39,6 +41,7 @@ import { AdminBaseMenuService } from './base-menu/admin-base-menu.service';
     BillingModule,
     UploadModule,
     AdminModulesModule,
+    FeatureControlModule,
     forwardRef(() => AiAgentModule),
   ],
   controllers: [
@@ -57,6 +60,7 @@ import { AdminBaseMenuService } from './base-menu/admin-base-menu.service';
     AdminAiAgentController,
     AdminBaseMenuController,
     AdminBaseMediaController,
+    AdminFeaturesController,
   ],
   providers: [
     AdminAuthService, 

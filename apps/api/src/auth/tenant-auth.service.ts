@@ -16,6 +16,7 @@ import { TenantBillingResolverService } from '../billing/tenant-billing-resolver
 import { MailService } from '../mail/mail.service';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
+import { MODULE_CATALOG } from '@gestor/core';
 
 type RequestSessionContext = {
   userAgent?: string;
@@ -141,13 +142,7 @@ export class TenantAuthService {
     try {
       const entitlements = await this.tenantBillingResolver.resolveTenantEntitlements(user.tenantId);
       if (entitlements.allowAllModules) {
-        // allowAllModules = plano que libera tudo (ex: plan interno de teste)
-        enabledModules = [
-          'catalog', 'orders', 'delivery', 'pos', 'cash', 'crm',
-          'inventory', 'reports', 'whatsapp', 'ai_agent',
-          'purchasing', 'finance', 'campaigns', 'goals', 'bi',
-          'employees', 'kds', 'printing', 'pos_tables', 'marketplace',
-        ];
+        enabledModules = MODULE_CATALOG.map((moduleEntry) => moduleEntry.key);
       } else {
         enabledModules = entitlements.includedModules;
       }
