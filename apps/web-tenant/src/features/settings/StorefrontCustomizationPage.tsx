@@ -244,8 +244,8 @@ export function StorefrontCustomizationPage() {
       const response = await api.post<{ publicUrl: string; id: string }>('/upload/storefront-background', formData);
       if (response.success) {
         updateTheme({ 
-          backgroundImageUrl: response.data.publicUrl,
-          backgroundImageMediaId: response.data.id
+          heroImageUrl: response.data.publicUrl,
+          heroImageMediaId: response.data.id
         });
       }
     } catch (error) {
@@ -254,6 +254,13 @@ export function StorefrontCustomizationPage() {
     } finally {
       setUploading(false);
     }
+  };
+
+  const removeHero = () => {
+    updateTheme({ 
+      heroImageUrl: null,
+      heroImageMediaId: null
+    });
   };
 
   const removeBackground = () => {
@@ -285,6 +292,7 @@ export function StorefrontCustomizationPage() {
   const primary5 = `${primaryHex}0d`; // 5%
 
   const isDark = customization.theme.colorMode === 'dark';
+  const showHeroImage = !!customization.theme.heroImageUrl;
   const showBgImage = !!customization.theme.backgroundImageUrl;
 
   const getBackgroundStyles = () => {
@@ -567,7 +575,7 @@ export function StorefrontCustomizationPage() {
               }`}
             >
               <ImageIcon className={`w-3.5 h-3.5 ${activeTab === 'background' ? 'text-primary' : ''}`} />
-              Background Premium
+              Banner e Fundo
             </button>
             <button
               onClick={() => setActiveTab('appearance')}
@@ -627,20 +635,71 @@ export function StorefrontCustomizationPage() {
             <Card className="p-6 bg-card border-border shadow-sm">
               <div className="flex items-center gap-2 mb-6">
                 <ImageIcon className="w-5 h-5 text-primary" />
-                <h2 className="text-lg font-bold text-foreground">Background Premium</h2>
+                <h2 className="text-lg font-bold text-foreground">Banner da vitrine e fundo</h2>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                 <div className="space-y-4">
                   <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-foreground">Imagem de Fundo</label>
-                    <p className="text-xs text-muted-foreground mb-2">JPG, PNG ou WebP. Recomendado: 1920x1080px (Máx 5MB).</p>
+                    <label className="text-sm font-medium text-foreground">Banner da vitrine</label>
+                    <p className="text-xs text-muted-foreground mb-2">Imagem opcional exibida no topo da loja. Nao vira fundo global.</p>
                     
-                    {customization.theme.backgroundImageUrl ? (
+                    {customization.theme.heroImageUrl ? (
                       <div className="relative group rounded-xl overflow-hidden border-2 border-primary/20 aspect-video bg-muted">
                         <img 
-                          src={customization.theme.backgroundImageUrl} 
-                          alt="Background Preview" 
+                          src={customization.theme.heroImageUrl} 
+                          alt="Banner da vitrine" 
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <Button size="sm" variant="destructive" onClick={removeHero}>
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Remover
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <input
+                          type="file"
+                          id="hero-upload"
+                          className="hidden"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={handleFileUpload}
+                          disabled={uploading}
+                        />
+                        <label 
+                          htmlFor="hero-upload"
+                          className={`flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-2xl cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          {uploading ? (
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+                          ) : (
+                            <>
+                              <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+                              <span className="text-sm font-bold text-muted-foreground">Clique para enviar o banner</span>
+                              <span className="text-xs text-muted-foreground/60">ou arraste a imagem aqui</span>
+                            </>
+                          )}
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4 text-primary" />
+                      <label className="text-sm font-medium text-foreground">Fundo premium da página</label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Esse fundo fica separado do banner e afeta apenas o pano de fundo da vitrine.</p>
+
+                    {customization.theme.backgroundImageUrl ? (
+                      <div className="relative group rounded-xl overflow-hidden border-2 border-primary/20 aspect-video bg-muted">
+                        <img
+                          src={customization.theme.backgroundImageUrl}
+                          alt="Fundo da vitrine"
                           className="w-full h-full object-cover"
                         />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
@@ -660,7 +719,7 @@ export function StorefrontCustomizationPage() {
                           onChange={handleFileUpload}
                           disabled={uploading}
                         />
-                        <label 
+                        <label
                           htmlFor="bg-upload"
                           className={`flex flex-col items-center justify-center p-8 border-2 border-dashed border-border rounded-2xl cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
@@ -669,7 +728,7 @@ export function StorefrontCustomizationPage() {
                           ) : (
                             <>
                               <Upload className="w-8 h-8 text-muted-foreground mb-2" />
-                              <span className="text-sm font-bold text-muted-foreground">Clique para enviar</span>
+                              <span className="text-sm font-bold text-muted-foreground">Clique para enviar o fundo</span>
                               <span className="text-xs text-muted-foreground/60">ou arraste a imagem aqui</span>
                             </>
                           )}
@@ -677,12 +736,10 @@ export function StorefrontCustomizationPage() {
                       </div>
                     )}
                   </div>
-                </div>
 
-                <div className="space-y-6">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground">Intensidade do Overlay</label>
-                    <p className="text-xs text-muted-foreground mb-4">Ajuste para garantir que os textos fiquem legíveis sobre a imagem.</p>
+                    <p className="text-xs text-muted-foreground mb-4">Ajuste para garantir que os textos fiquem legíveis sobre o fundo.</p>
                     <div className="grid grid-cols-4 gap-2">
                       {(['none', 'soft', 'medium', 'strong'] as const).map((o) => (
                         <button
@@ -702,7 +759,7 @@ export function StorefrontCustomizationPage() {
 
                   <div className="p-4 bg-primary/10 rounded-xl border border-primary/20">
                     <p className="text-[11px] text-primary leading-relaxed font-medium">
-                      <strong>Dica UX:</strong> Se sua imagem for muito colorida ou detalhada, use o overlay <strong>Médio</strong> ou <strong>Forte</strong> para manter o contraste do cardápio.
+                      <strong>Dica UX:</strong> Use o banner para topo da loja e o fundo premium só se quiser um pano de fundo mais dramático. Assim o banner não vira background global.
                     </p>
                   </div>
                 </div>
@@ -980,6 +1037,20 @@ export function StorefrontCustomizationPage() {
 
                   {/* Real Content container */}
                   <div className="z-10 relative flex-1 flex flex-col pb-16">
+                    {customization.layout.heroEnabled && showHeroImage ? (
+                      <div className="px-3 pt-3">
+                        <div className="relative overflow-hidden rounded-2xl border border-[var(--storefront-border)] bg-[var(--storefront-card)] shadow-sm">
+                          <div className="aspect-[16/6] min-h-24 max-h-36">
+                            <img
+                              src={customization.theme.heroImageUrl || undefined}
+                              alt="Banner da vitrine"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
                     {/* Logo e Nome do Tenant Real */}
                     <div className={`p-3.5 border-b flex items-center gap-2.5 transition-all duration-500 ${
                       isDark ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50/50'
