@@ -14,6 +14,8 @@ export interface OnboardingValidation {
   hasProduct: boolean;
 }
 
+export type OnboardingIfoodChoice = 'skipped' | 'connected' | 'pending' | 'unavailable' | 'failed';
+
 function hasRealCoordinates(lat: number | undefined, lng: number | undefined) {
   return (
     typeof lat === 'number' &&
@@ -30,6 +32,7 @@ export interface OnboardingStateData {
   visitedSteps: number[];
   validation: OnboardingValidation;
   autoSaveStatus: AutoSaveStatus;
+  ifoodChoice?: OnboardingIfoodChoice | null;
 }
 
 type BackendOnboardingStatus = {
@@ -47,7 +50,7 @@ type BackendOnboardingStatus = {
 };
 
 const STORAGE_KEY = 'onboarding_state';
-const TOTAL_STEPS = 8;
+const TOTAL_STEPS = 9;
 
 const STEP_BACKEND_MAPPING: Record<number, OnboardingBackendStep[]> = {
   0: ['basicInfo'],
@@ -58,6 +61,7 @@ const STEP_BACKEND_MAPPING: Record<number, OnboardingBackendStep[]> = {
   5: ['delivery'],
   6: [],
   7: [],
+  8: [],
 };
 
 function loadFromStorage(): Partial<OnboardingStateData> {
@@ -99,6 +103,7 @@ export function useOnboardingState() {
   const [currentStep, setCurrentStep] = useState<number>(stored.currentStep ?? 0);
   const [visitedSteps, setVisitedSteps] = useState<number[]>(stored.visitedSteps ?? [0]);
   const [autoSaveStatus, setAutoSaveStatus] = useState<AutoSaveStatus>('idle');
+  const [ifoodChoice, setIfoodChoiceState] = useState<OnboardingIfoodChoice | null>(stored.ifoodChoice ?? null);
   const [validation, setValidation] = useState<OnboardingValidation>({
     hasStoreName: stored.validation?.hasStoreName ?? false,
     hasAddress: stored.validation?.hasAddress ?? false,
@@ -111,8 +116,8 @@ export function useOnboardingState() {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    saveToStorage({ currentStep, visitedSteps, validation });
-  }, [currentStep, visitedSteps, validation]);
+    saveToStorage({ currentStep, visitedSteps, validation, ifoodChoice });
+  }, [currentStep, visitedSteps, validation, ifoodChoice]);
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -247,6 +252,10 @@ export function useOnboardingState() {
     setValidation((prev) => ({ ...prev, [key]: value }));
   }, []);
 
+  const setIfoodChoice = useCallback((choice: OnboardingIfoodChoice) => {
+    setIfoodChoiceState(choice);
+  }, []);
+
   const saveStep = useCallback(async (saveFn: () => Promise<void>) => {
     triggerAutoSave(async () => {
       await saveFn();
@@ -286,6 +295,7 @@ export function useOnboardingState() {
     visitedSteps,
     autoSaveStatus,
     validation,
+    ifoodChoice,
     totalSteps: TOTAL_STEPS,
     isAllValid,
     goNext,
@@ -293,6 +303,7 @@ export function useOnboardingState() {
     goToStep,
     saveStep,
     markValidation,
+    setIfoodChoice,
     completeOnboarding,
     triggerAutoSave,
     checkValidationFromApi,
