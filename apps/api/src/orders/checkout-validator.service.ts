@@ -76,10 +76,24 @@ export class CheckoutValidatorService {
     const tenantId = tenant.id;
 
     // 1.5 Fetch Store Status Context once for performance and global check
-    const [settings, operatingHours] = await Promise.all([
+    const [settings, schedulingSettings, operatingHours] = await Promise.all([
       this.prisma.tenantSettings.findUnique({
         where: { tenantId },
-        select: { isStorePaused: true, storePauseReason: true, timezone: true, minimumOrderValue: true },
+        select: {
+          isStorePaused: true,
+          storePauseReason: true,
+          timezone: true,
+          minimumOrderValue: true,
+          pickupEnabled: true,
+        },
+      }),
+      this.prisma.schedulingSettings.findUnique({
+        where: { tenantId },
+        select: {
+          enabled: true,
+          acceptScheduledOrders: true,
+          allowScheduleWhenClosed: true,
+        },
       }),
       this.prisma.tenantOperatingHours.findMany({
         where: { tenantId },
@@ -89,6 +103,9 @@ export class CheckoutValidatorService {
     const availabilityContext = { settings, operatingHours };
     const checkDate = options?.scheduledFor || new Date();
     const storeStatus = await this.availabilityService.getStoreStatus(tenantId, checkDate, availabilityContext);
+    const currentStoreStatus = options?.scheduledFor
+      ? await this.availabilityService.getStoreStatus(tenantId, new Date(), availabilityContext)
+      : storeStatus;
 
     if (!storeStatus.isOpen && !options?.scheduledFor) {
       throw new BadRequestException(storeStatus.message || 'A loja está fechada no momento.');
@@ -97,6 +114,18 @@ export class CheckoutValidatorService {
     // If scheduled, ensure it's a valid open day for the tenant
     if (options?.scheduledFor && !storeStatus.isOpen) {
        throw new BadRequestException(`A loja não estará aberta na data programada (${storeStatus.message}).`);
+    }
+
+    if ((options?.scheduledFor || options?.timeSlotId) && (!schedulingSettings?.enabled || !schedulingSettings.acceptScheduledOrders)) {
+      throw new BadRequestException('Agendamento indisponivel para esta loja.');
+    }
+
+    if (!currentStoreStatus.isOpen && options?.scheduledFor && !schedulingSettings?.allowScheduleWhenClosed) {
+      throw new BadRequestException('A loja nao aceita agendamentos enquanto estiver fechada.');
+    }
+
+    if (options?.channel === 'storefront_pickup' && !settings?.pickupEnabled) {
+      throw new BadRequestException('Retirada indisponivel no momento.');
     }
 
     // 1.7 Validate Time Slot if provided
@@ -181,6 +210,7 @@ export class CheckoutValidatorService {
     // 5. Calcular taxa de entrega apenas se for delivery ou whatsapp_ai delivery
     const isDelivery = channel === 'storefront_delivery' || channel === 'whatsapp_ai';
     let deliveryFee = 0;
+    let estimatedDeliveryMinutes: number | null = null;
 
     if (isDelivery && options?.deliveryAddress) {
       const hasCoords = Boolean(options.deliveryAddress.lat && options.deliveryAddress.lng);
@@ -198,6 +228,7 @@ export class CheckoutValidatorService {
             throw new BadRequestException(decision.reason || 'Não entregamos nesta região.');
           }
           deliveryFee = decision.fee ?? 0;
+          estimatedDeliveryMinutes = decision.estimatedDeliveryMinutes ?? null;
         } else {
           // No coords (whatsapp_ai without Google Maps): try rate by neighborhood/fixed
           const rateResult = await this.deliveryRateService.calculateRate({
@@ -206,6 +237,7 @@ export class CheckoutValidatorService {
             distanceKm: null,
           });
           deliveryFee = rateResult.fee ?? 0;
+          estimatedDeliveryMinutes = rateResult.estimatedDeliveryMinutes ?? null;
         }
       } else if (!hasCoords) {
         // No coverage config and no coords: use zero delivery fee (will be adjusted manually)
@@ -217,6 +249,7 @@ export class CheckoutValidatorService {
           distanceKm: null,
         });
         deliveryFee = rateResult.fee ?? 0;
+        estimatedDeliveryMinutes = rateResult.estimatedDeliveryMinutes ?? null;
       }
     } else if (isDelivery && channel === 'storefront_delivery' && !options?.deliveryAddress) {
       // storefront_delivery without address is an error
@@ -239,6 +272,7 @@ export class CheckoutValidatorService {
       itemsSubtotal, 
       discountTotal, 
       deliveryFee,
+      estimatedDeliveryMinutes,
       total: finalTotal, 
       couponId, 
       cashbackUsed 
@@ -422,11 +456,35 @@ export class CheckoutValidatorService {
         }
       }
     }
+    const category = typedProduct.category;
+    const isPizzaTemplate = category?.templateType === 'pizza';
+
+    if (item.pizzaComposition && !isPizzaTemplate) {
+      throw new BadRequestException('pizzaComposition so pode ser usado em categorias do tipo pizza.');
+    }
 
     let extrasTotal = 0;
-    let unitPrice = 0;
+    let unitPrice = basePrice;
     let composition = '';
     let snapshotCatalogV2Json: unknown | undefined;
+    let selectionsSnapshot: Array<{
+      groupId: string;
+      groupName: string;
+      selectionType: string;
+      pricingAxis: string;
+      isRequired: boolean;
+      minSelect: number;
+      maxSelect: number;
+      allowQuantity: boolean;
+      items: Array<{
+        itemId: string;
+        name: string;
+        qty: number;
+        priceImpactType: string;
+        priceImpactValue: number;
+        appliedAmount: number;
+      }>; 
+    }> = [];
 
     if (hasNewSelections) {
       const pricing = this.validateAndPriceOptionSelections(
@@ -440,91 +498,62 @@ export class CheckoutValidatorService {
       extrasTotal = pricing.extrasTotal;
       unitPrice = pricing.unitPrice;
       composition = pricing.composition;
-
-      const category = typedProduct.category;
-      const isPizzaTemplate = category?.templateType === 'pizza';
-
-      if (isPizzaTemplate && item.pizzaComposition) {
-        // SPECIAL PIZZA LOGIC
-        const res = await this.pizzaEngine.calculatePrice(
-          category.id,
-          item.pizzaComposition.sizeId,
-          item.pizzaComposition.flavors
-        );
-
-        effectiveBasePrice = res.calculatedPrice;
-        unitPrice = effectiveBasePrice + extrasTotal;
-        composition = `Tamanho: ${res.sizeName}; Sabores: ${res.flavors.map(f => `${f.name} (${(f.fraction * 100).toFixed(0)}%)`).join(', ')}`;
-        
-        // Update composition with options if any
-        if (pricing.composition) composition += `; ${pricing.composition}`;
-      }
-
-      snapshotCatalogV2Json = {
-        version: 'catalog_v2_snapshot_v1',
-        channel,
-        lineType: 'product',
-        capturedAt: new Date().toISOString(),
-        product: {
-          id: item.productId,
-          name: typedProduct.name,
-          type: typedProduct.type,
-          templateType: category?.templateType,
-        },
-        quantity: item.quantity,
-        notes: item.notes ?? null,
-        pricing: {
-          basePrice,
-          effectiveBasePrice,
-          extrasTotal,
-          unitPrice,
-        },
-        selections: pricing.selectionsSnapshot,
-        optionItems: (pricing.selectionsSnapshot || []).flatMap(sel => 
-          (sel.items || []).map(opt => ({
-            optionItemId: opt.itemId,
-            snapshotName: opt.name,
-            snapshotPrice: opt.appliedAmount,
-          }))
-        ),
-        pizzaComposition: item.pizzaComposition ? {
-          ...item.pizzaComposition,
-          // We could store the full engine result here for UI
-          fullEngineResult: await this.pizzaEngine.calculatePrice(
-            category.id,
-            item.pizzaComposition.sizeId,
-            item.pizzaComposition.flavors
-          )
-        } : null,
-        slots: [],
-      };
-    } else {
-      // V3 Sem Opções (Produto Simples)
-      unitPrice = basePrice;
-      composition = '';
-      snapshotCatalogV2Json = {
-        version: 'catalog_v2_snapshot_v1',
-        channel,
-        lineType: 'product',
-        capturedAt: new Date().toISOString(),
-        product: {
-          id: item.productId,
-          name: typedProduct.name,
-          type: typedProduct.type,
-        },
-        quantity: item.quantity,
-        notes: item.notes ?? null,
-        pricing: {
-          basePrice,
-          effectiveBasePrice: basePrice,
-          extrasTotal: 0,
-          unitPrice: basePrice,
-        },
-        selections: [],
-        optionItems: [],
-        slots: [],
-      };
+      selectionsSnapshot = pricing.selectionsSnapshot;
     }
+
+    if (isPizzaTemplate && item.pizzaComposition) {
+      const res = await this.pizzaEngine.calculatePrice(
+        category.id,
+        item.pizzaComposition.sizeId,
+        item.pizzaComposition.flavors,
+      );
+
+      effectiveBasePrice = res.calculatedPrice;
+      unitPrice = effectiveBasePrice + extrasTotal;
+      composition = `Tamanho: ${res.sizeName}; Sabores: ${res.flavors
+        .map((f) => `${f.name} (${(f.fraction * 100).toFixed(0)}%)`)
+        .join(', ')}`;
+    }
+
+    snapshotCatalogV2Json = {
+      version: 'catalog_v2_snapshot_v1',
+      channel,
+      lineType: 'product',
+      capturedAt: new Date().toISOString(),
+      product: {
+        id: item.productId,
+        name: typedProduct.name,
+        type: typedProduct.type,
+        templateType: category?.templateType,
+      },
+      quantity: item.quantity,
+      notes: item.notes ?? null,
+      pricing: {
+        basePrice,
+        effectiveBasePrice,
+        extrasTotal,
+        unitPrice,
+      },
+      selections: selectionsSnapshot,
+      optionItems: selectionsSnapshot.flatMap((sel) =>
+        (sel.items || []).map((opt) => ({
+          optionItemId: opt.itemId,
+          snapshotName: opt.name,
+          snapshotPrice: opt.appliedAmount,
+        })),
+      ),
+      pizzaComposition: item.pizzaComposition
+        ? {
+            ...item.pizzaComposition,
+            fullEngineResult: await this.pizzaEngine.calculatePrice(
+              category.id,
+              item.pizzaComposition.sizeId,
+              item.pizzaComposition.flavors,
+            ),
+          }
+        : null,
+      slots: [],
+    };
 
     const lineTotal = unitPrice * item.quantity;
 

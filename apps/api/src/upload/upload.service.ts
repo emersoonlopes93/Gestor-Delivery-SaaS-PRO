@@ -144,10 +144,21 @@ export class UploadService {
 
     if (settings && settings.storefrontThemeJson && typeof settings.storefrontThemeJson === 'object') {
       const theme = settings.storefrontThemeJson as Record<string, unknown>;
+      let themeChanged = false;
+
       if (theme.backgroundImageMediaId === assetId) {
         theme.backgroundImageMediaId = null;
         theme.backgroundImageUrl = null;
+        themeChanged = true;
+      }
 
+      if (theme.heroImageMediaId === assetId) {
+        theme.heroImageMediaId = null;
+        theme.heroImageUrl = null;
+        themeChanged = true;
+      }
+
+      if (themeChanged) {
         await this.prisma.tenantSettings.update({
           where: { tenantId },
           data: {

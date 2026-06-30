@@ -72,11 +72,11 @@ export class UpdateTenantSettingsDto {
 
   @IsOptional()
   @IsNumber()
-  lat?: number;
+  lat?: number | null;
 
   @IsOptional()
   @IsNumber()
-  lng?: number;
+  lng?: number | null;
 
   @IsOptional()
   @IsArray()
@@ -85,6 +85,18 @@ export class UpdateTenantSettingsDto {
   @IsOptional()
   @IsNumber()
   minimumOrderValue?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  pickupEnabled?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  pickupMinMinutes?: number;
+
+  @IsOptional()
+  @IsNumber()
+  pickupMaxMinutes?: number;
 
   @IsOptional()
   @IsString()

@@ -12,6 +12,7 @@
     "clean": "pnpm exec rimraf dist"
   },
   "dependencies": {
+    "@gestor/utils": "workspace:*",
     "clsx": "^2.1.1",
     "tailwind-merge": "^2.5.4",
     "lucide-react": "^0.454.0"

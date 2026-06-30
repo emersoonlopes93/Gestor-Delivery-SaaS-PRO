@@ -10,6 +10,7 @@
 @layer base {
   :root {
     font-family: 'Inter', 'Outfit', system-ui, sans-serif;
+    color-scheme: light;
 
     /* === TOKENS SEMÂNTICOS LIGHT === */
     --background: #f1f5f9;           /* fundo geral - slate-100 */
@@ -119,6 +120,7 @@
 
   /* === AUTH THEME BOUNDARY - Sempre light (uma única definição) === */
   [data-auth-theme="light"] {
+    color-scheme: light;
     --background: #f1f5f9;
     --foreground: #0f172a;
     --card: #ffffff;
@@ -161,6 +163,7 @@
 
   /* === DARK MODE TOKENS === */
   .dark, [data-theme="dark"] {
+    color-scheme: dark;
     --background: #0a0f1a;          /* fundo geral dark */
     --foreground: #f8fafc;          /* texto principal dark */
 

@@ -12,8 +12,6 @@ import type {
   AchievementDto,
 } from './dto/readiness-score.dto';
 
-// ─── Tipos internos (mapeados dos campos reais do schema Prisma) ─────────────
-
 interface SettingsSnapshot {
   businessPhone: string | null;
   street: string | null;
@@ -22,9 +20,10 @@ interface SettingsSnapshot {
   zipCode: string | null;
   lat: number | null;
   lng: number | null;
-  paymentMethods: unknown; // Json? no schema — validamos em runtime
+  pickupEnabled: boolean | null;
+  paymentMethods: unknown;
   logoUrl: string | null;
-  storefrontThemeJson: unknown; // Json? no schema
+  storefrontThemeJson: unknown;
 }
 
 interface TenantSnapshot {
@@ -40,8 +39,6 @@ interface DeliverySnapshot {
   defaultPricePerKm: unknown;
 }
 
-// ─── Constantes ─────────────────────────────────────────────────────────────
-
 const CACHE_TTL_MS = 30_000;
 const CACHE_PREFIX = 'readiness:';
 
@@ -49,10 +46,9 @@ const REQUIRED_KEYS: ReadonlyArray<string> = [
   'hasValidAddress',
   'hasOperatingHours',
   'hasPaymentMethod',
+  'hasOperationalMode',
   'hasActiveProduct',
 ];
-
-// ─── Service ────────────────────────────────────────────────────────────────
 
 @Injectable()
 export class ReadinessScoreService {
@@ -86,14 +82,10 @@ export class ReadinessScoreService {
     await this.cacheManager.del(`${CACHE_PREFIX}${tenantId}`);
   }
 
-  // ─── Cálculo principal ────────────────────────────────────────────────────
-
   private async computeScore(tenantId: string): Promise<ReadinessScoreDto> {
-    // Única chamada paralela com 3 queries independentes
     const [tenantRaw, coverageRaw, activeProductCount] = await Promise.all([
       this.prisma.tenant.findUnique({
         where: { id: tenantId },
-        // Usar `include` para buscar relações (select dentro de include para otimizar)
         include: {
           settings: {
             select: {
@@ -104,6 +96,7 @@ export class ReadinessScoreService {
               zipCode: true,
               lat: true,
               lng: true,
+              pickupEnabled: true,
               paymentMethods: true,
               logoUrl: true,
               storefrontThemeJson: true,
@@ -122,7 +115,6 @@ export class ReadinessScoreService {
           defaultPricePerKm: true,
         },
       }),
-      // Filtro oficial do Storefront: isActive: true + deletedAt: null
       this.prisma.product.count({
         where: {
           tenantId,
@@ -148,6 +140,7 @@ export class ReadinessScoreService {
             zipCode: tenantRaw.settings.zipCode,
             lat: tenantRaw.settings.lat,
             lng: tenantRaw.settings.lng,
+            pickupEnabled: tenantRaw.settings.pickupEnabled,
             paymentMethods: tenantRaw.settings.paymentMethods,
             logoUrl: tenantRaw.settings.logoUrl,
             storefrontThemeJson: tenantRaw.settings.storefrontThemeJson,
@@ -158,31 +151,27 @@ export class ReadinessScoreService {
 
     const delivery: DeliverySnapshot | null = coverageRaw;
 
-    const dims: ReadinessDimensionDto[] = [
+    const dimensions: ReadinessDimensionDto[] = [
       this.evalPerfil(tenant),
       this.evalLocalizacao(tenant),
-      this.evalEntrega(delivery),
+      this.evalEntrega(delivery, Boolean(tenant.settings?.pickupEnabled)),
       this.evalHorarios(tenant),
       this.evalPagamentos(tenant),
       this.evalCatalogo(activeProductCount),
       this.evalStorefront(tenant),
     ];
 
-    const score = Math.round(
-      dims.reduce((acc, d) => acc + d.score * d.weight, 0),
-    );
-
+    const score = Math.round(dimensions.reduce((acc, dimension) => acc + dimension.score * dimension.weight, 0));
     const status = this.resolveStatus(score);
-    const missingRequirements = this.resolveMissingRequired(dims, activeProductCount, tenant);
-    const canActivate = score >= 90 && missingRequirements.length === 0;
-
+    const missingRequirements = this.resolveMissingRequired(dimensions, activeProductCount, tenant);
+    const canActivate = missingRequirements.length === 0;
     const timeline = this.buildTimeline(tenant, missingRequirements, canActivate, activeProductCount);
     const achievements = this.buildAchievements(score, canActivate, activeProductCount);
 
     return {
       score,
       status,
-      dimensions: dims,
+      dimensions,
       missingRequirements,
       canActivate,
       timeline,
@@ -191,77 +180,78 @@ export class ReadinessScoreService {
     };
   }
 
-  // ─── Dimensões ────────────────────────────────────────────────────────────
-
-  private evalPerfil(t: TenantSnapshot): ReadinessDimensionDto {
-    const s = t.settings;
+  private evalPerfil(tenant: TenantSnapshot): ReadinessDimensionDto {
+    const settings = tenant.settings;
     const checks: ReadinessCheckDto[] = [
-      { key: 'storeName', label: 'Nome da loja', passed: !!t.name?.trim() },
-      // businessCategory não existe no schema atual — substituído por telefone + nome
-      { key: 'businessPhone', label: 'Telefone de contato', passed: !!s?.businessPhone?.trim() },
-      { key: 'logoConfigured', label: 'Logo configurada', passed: !!s?.logoUrl?.trim() },
+      { key: 'storeName', label: 'Nome da loja', passed: !!tenant.name?.trim() },
+      { key: 'businessPhone', label: 'Telefone de contato', passed: !!settings?.businessPhone?.trim() },
+      { key: 'logoConfigured', label: 'Logo configurada', passed: !!settings?.logoUrl?.trim() },
     ];
-    return this.buildDimension('profile', 'Perfil da Loja', 0.10, '/settings', 'Configurar perfil', 1, checks);
+    return this.buildDimension('profile', 'Perfil da Loja', 0.1, '/settings', 'Configurar perfil', 1, checks);
   }
 
-  private evalLocalizacao(t: TenantSnapshot): ReadinessDimensionDto {
-    const s = t.settings;
+  private evalLocalizacao(tenant: TenantSnapshot): ReadinessDimensionDto {
+    const settings = tenant.settings;
+    const hasCoordinates =
+      typeof settings?.lat === 'number' &&
+      typeof settings?.lng === 'number' &&
+      Number.isFinite(settings.lat) &&
+      Number.isFinite(settings.lng) &&
+      settings.lat !== 0 &&
+      settings.lng !== 0;
+
     const checks: ReadinessCheckDto[] = [
-      { key: 'street', label: 'Endereço (rua e número)', passed: !!(s?.street?.trim() && s?.number?.trim()) },
-      { key: 'neighborhood', label: 'Bairro e CEP', passed: !!(s?.neighborhood?.trim() && s?.zipCode?.trim()) },
-      { key: 'coordinates', label: 'Coordenadas geográficas', passed: !!(typeof s?.lat === 'number' && typeof s?.lng === 'number') },
+      { key: 'street', label: 'Endereco (rua e numero)', passed: !!(settings?.street?.trim() && settings?.number?.trim()) },
+      { key: 'neighborhood', label: 'Bairro e CEP', passed: !!(settings?.neighborhood?.trim() && settings?.zipCode?.trim()) },
+      { key: 'coordinates', label: 'Coordenadas geograficas', passed: hasCoordinates },
     ];
-    return this.buildDimension('location', 'Localização', 0.15, '/settings', 'Configurar endereço', 2, checks);
+    return this.buildDimension('location', 'Localizacao', 0.15, '/settings', 'Configurar endereco', 2, checks);
   }
 
-  private evalEntrega(d: DeliverySnapshot | null): ReadinessDimensionDto {
+  private evalEntrega(delivery: DeliverySnapshot | null, pickupEnabled: boolean): ReadinessDimensionDto {
     const checks: ReadinessCheckDto[] = [
-      { key: 'coverageConfig', label: 'Configuração de entrega criada', passed: d !== null },
-      { key: 'deliveryEnabled', label: 'Entrega ativada', passed: !!(d?.isDeliveryEnabled) },
-      { key: 'radius', label: 'Raio de cobertura definido', passed: !!(d && Number(d.maxRadiusKm) > 0) },
+      { key: 'coverageConfig', label: 'Configuracao de entrega criada', passed: delivery !== null },
+      { key: 'deliveryEnabled', label: 'Entrega ativada', passed: !!delivery?.isDeliveryEnabled },
+      { key: 'pickupEnabled', label: 'Retirada ativada', passed: pickupEnabled },
+      { key: 'radius', label: 'Raio de cobertura definido', passed: !!(delivery && Number(delivery.maxRadiusKm) > 0) },
     ];
-    return this.buildDimension('delivery', 'Entrega', 0.10, '/delivery/rates', 'Configurar entrega', 3, checks);
+    return this.buildDimension('delivery', 'Entrega e retirada', 0.1, '/delivery/rates', 'Configurar modos', 3, checks);
   }
 
-  private evalHorarios(t: TenantSnapshot): ReadinessDimensionDto {
-    const hasOpen = t.operatingHours.some(h => h.isOpen);
+  private evalHorarios(tenant: TenantSnapshot): ReadinessDimensionDto {
+    const hasOpenDay = tenant.operatingHours.some((hour) => hour.isOpen);
     const checks: ReadinessCheckDto[] = [
-      { key: 'hasOperatingHours', label: 'Pelo menos 1 dia configurado', passed: hasOpen },
+      { key: 'hasOperatingHours', label: 'Pelo menos 1 dia configurado', passed: hasOpenDay },
     ];
-    return this.buildDimension('hours', 'Horários', 0.15, '/settings', 'Configurar horários', 4, checks);
+    return this.buildDimension('hours', 'Horarios', 0.15, '/settings', 'Configurar horarios', 4, checks);
   }
 
-  private evalPagamentos(t: TenantSnapshot): ReadinessDimensionDto {
-    const rawMethods = t.settings?.paymentMethods;
-    const methods: string[] = Array.isArray(rawMethods) ? rawMethods as string[] : [];
+  private evalPagamentos(tenant: TenantSnapshot): ReadinessDimensionDto {
+    const methods = Array.isArray(tenant.settings?.paymentMethods) ? (tenant.settings?.paymentMethods as string[]) : [];
     const checks: ReadinessCheckDto[] = [
-      { key: 'hasPaymentMethod', label: 'Pelo menos 1 método de pagamento', passed: methods.length > 0 },
+      { key: 'hasPaymentMethod', label: 'Pelo menos 1 metodo de pagamento', passed: methods.length > 0 },
     ];
     return this.buildDimension('payments', 'Pagamentos', 0.15, '/settings', 'Configurar pagamentos', 5, checks);
   }
 
-  private evalCatalogo(count: number): ReadinessDimensionDto {
+  private evalCatalogo(productCount: number): ReadinessDimensionDto {
     const checks: ReadinessCheckDto[] = [
-      { key: 'hasActiveProduct', label: 'Pelo menos 1 produto ativo', passed: count > 0 },
+      { key: 'hasActiveProduct', label: 'Pelo menos 1 produto ativo', passed: productCount > 0 },
     ];
-    return this.buildDimension('catalog', 'Catálogo', 0.20, '/catalog/products', 'Adicionar produtos', 6, checks);
+    return this.buildDimension('catalog', 'Catalogo', 0.2, '/catalog/products', 'Adicionar produtos', 6, checks);
   }
 
-  private evalStorefront(t: TenantSnapshot): ReadinessDimensionDto {
-    const s = t.settings;
-    const hasLogo = !!s?.logoUrl?.trim();
-    // backgroundImageUrl via normalizeStorefrontTheme (campo oficial do @gestor/theme)
-    const normalizedTheme = normalizeStorefrontTheme(s?.storefrontThemeJson ?? null);
-    const hasBanner = !!(normalizedTheme.backgroundImageUrl?.trim());
+  private evalStorefront(tenant: TenantSnapshot): ReadinessDimensionDto {
+    const settings = tenant.settings;
+    const normalizedTheme = normalizeStorefrontTheme(settings?.storefrontThemeJson ?? null);
+    const hasBackgroundImage = !!normalizedTheme.backgroundImageUrl?.trim();
 
     const checks: ReadinessCheckDto[] = [
-      { key: 'logo', label: 'Logo da loja', passed: hasLogo },
-      { key: 'banner', label: 'Imagem de fundo / banner', passed: hasBanner },
+      { key: 'logo', label: 'Logo da loja', passed: !!settings?.logoUrl?.trim() },
+      { key: 'background', label: 'Imagem de fundo global', passed: hasBackgroundImage },
     ];
     return this.buildDimension('storefront', 'Vitrine', 0.15, '/settings/storefront', 'Personalizar loja', 7, checks);
   }
-
-  // ─── Helpers ─────────────────────────────────────────────────────────────
 
   private buildDimension(
     key: string,
@@ -272,10 +262,19 @@ export class ReadinessScoreService {
     priority: number,
     checks: ReadinessCheckDto[],
   ): ReadinessDimensionDto {
-    const passedCount = checks.filter(c => c.passed).length;
+    const passedCount = checks.filter((check) => check.passed).length;
     const score = checks.length > 0 ? Math.round((passedCount / checks.length) * 100) : 0;
-    const allPassed = passedCount === checks.length;
-    return { key, label, score, weight, passed: allPassed, actionPath, actionLabel, priority, checks };
+    return {
+      key,
+      label,
+      score,
+      weight,
+      passed: passedCount === checks.length,
+      actionPath,
+      actionLabel,
+      priority,
+      checks,
+    };
   }
 
   private resolveStatus(score: number): ReadinessStatus {
@@ -286,37 +285,38 @@ export class ReadinessScoreService {
   }
 
   private resolveMissingRequired(
-    dims: ReadinessDimensionDto[],
+    dimensions: ReadinessDimensionDto[],
     productCount: number,
     tenant: TenantSnapshot,
   ): string[] {
     const missing: string[] = [];
 
-    // hasValidAddress — rua + bairro (campos usados pelo SetupWizard)
-    const locationDim = dims.find(d => d.key === 'location');
-    const addressOk = locationDim?.checks
-      .filter(c => c.key === 'street' || c.key === 'neighborhood')
-      .every(c => c.passed) ?? false;
+    const locationDimension = dimensions.find((dimension) => dimension.key === 'location');
+    const addressOk =
+      locationDimension?.checks
+        .filter((check) => check.key === 'street' || check.key === 'neighborhood')
+        .every((check) => check.passed) ?? false;
     if (!addressOk) missing.push('hasValidAddress');
 
-    // hasOperatingHours
-    if (!tenant.operatingHours.some(h => h.isOpen)) {
+    if (!tenant.operatingHours.some((hour) => hour.isOpen)) {
       missing.push('hasOperatingHours');
     }
 
-    // hasPaymentMethod
-    const rawMethods = tenant.settings?.paymentMethods;
-    const methods: string[] = Array.isArray(rawMethods) ? rawMethods as string[] : [];
-    if (methods.length === 0) missing.push('hasPaymentMethod');
+    const paymentMethods = Array.isArray(tenant.settings?.paymentMethods) ? (tenant.settings?.paymentMethods as string[]) : [];
+    if (paymentMethods.length === 0) missing.push('hasPaymentMethod');
 
-    // hasActiveProduct
+    const deliveryDimension = dimensions.find((dimension) => dimension.key === 'delivery');
+    const deliveryEnabled = deliveryDimension?.checks.find((check) => check.key === 'deliveryEnabled')?.passed ?? false;
+    const pickupEnabled = deliveryDimension?.checks.find((check) => check.key === 'pickupEnabled')?.passed ?? false;
+    if (!deliveryEnabled && !pickupEnabled) missing.push('hasOperationalMode');
+
     if (productCount === 0) missing.push('hasActiveProduct');
 
     return missing;
   }
 
   private buildZeroScore(tenantId: string): ReadinessScoreDto {
-    this.logger.warn(`Tenant ${tenantId} não encontrado no cálculo de readiness`);
+    this.logger.warn(`Tenant ${tenantId} nao encontrado no calculo de readiness`);
     return {
       score: 0,
       status: 'not_configured',
@@ -329,13 +329,11 @@ export class ReadinessScoreService {
     };
   }
 
-  // ─── Gamificação (Timeline & Achievements) ────────────────────────────────
-
   private buildTimeline(
     tenant: TenantSnapshot,
     missingRequirements: string[],
     canActivate: boolean,
-    activeProductCount: number
+    activeProductCount: number,
   ): ActivationMilestoneDto[] {
     return [
       {
@@ -346,18 +344,23 @@ export class ReadinessScoreService {
       },
       {
         key: 'address_configured',
-        label: 'Endereço configurado',
+        label: 'Endereco configurado',
         completed: !missingRequirements.includes('hasValidAddress'),
       },
       {
         key: 'hours_configured',
-        label: 'Horários configurados',
+        label: 'Horarios configurados',
         completed: !missingRequirements.includes('hasOperatingHours'),
       },
       {
         key: 'payments_configured',
         label: 'Pagamentos configurados',
         completed: !missingRequirements.includes('hasPaymentMethod'),
+      },
+      {
+        key: 'order_modes_configured',
+        label: 'Modos de pedido configurados',
+        completed: !missingRequirements.includes('hasOperationalMode'),
       },
       {
         key: 'first_product',
@@ -372,11 +375,7 @@ export class ReadinessScoreService {
     ];
   }
 
-  private buildAchievements(
-    score: number,
-    canActivate: boolean,
-    activeProductCount: number
-  ): AchievementDto[] {
+  private buildAchievements(score: number, canActivate: boolean, activeProductCount: number): AchievementDto[] {
     return [
       {
         key: 'first_products',
@@ -388,7 +387,7 @@ export class ReadinessScoreService {
       },
       {
         key: 'initial_catalog',
-        title: 'Catálogo Inicial',
+        title: 'Catalogo Inicial',
         description: 'Tenha 5 produtos ativos na sua vitrine.',
         unlocked: activeProductCount >= 5,
         progress: Math.min(activeProductCount, 5),
@@ -396,7 +395,7 @@ export class ReadinessScoreService {
       },
       {
         key: 'complete_catalog',
-        title: 'Catálogo Completo',
+        title: 'Catalogo Completo',
         description: 'Tenha 20 produtos ativos na sua vitrine.',
         unlocked: activeProductCount >= 20,
         progress: Math.min(activeProductCount, 20),
@@ -411,7 +410,7 @@ export class ReadinessScoreService {
       {
         key: 'ready_to_sell',
         title: 'Pronto para Vender',
-        description: 'Sua loja completou os requisitos mínimos.',
+        description: 'Sua loja completou os requisitos minimos.',
         unlocked: canActivate,
       },
     ];

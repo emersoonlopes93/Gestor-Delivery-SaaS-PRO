@@ -7,7 +7,8 @@ import { api } from '../../../lib/api-client';
 import { useFormContext } from 'react-hook-form';
 import { useCatalogEditor } from '../CatalogEditorContext';
 import { CatalogProductFormState } from '../CatalogEditorTypes';
-import { maskCurrency, unmaskCurrency } from '@gestor/utils';
+import { CurrencyInput } from '@gestor/ui';
+import { createThemedReactSelectStyles } from '../../../lib/react-select-theme';
 
 export const ProductBasicInfo: React.FC = () => {
   const { isComboMode, isNew, handleSaveProduct, savingStates, onOpenRecipe, product, goNextWizardStep, isComboWizard } = useCatalogEditor();
@@ -18,6 +19,7 @@ export const ProductBasicInfo: React.FC = () => {
   const bundleSummary = watch('bundleSummary');
   const imagePreviewUrl = watch('imagePreviewUrl');
   const pizzaPrices = watch('pizzaPrices');
+  const selectedCategory = categories.find((c) => c.id === productForm.categoryId);
 
   const setProductForm = (form: CreateProductDto) => setValue('productForm', form);
   const setImageFile = (file: File | null) => setValue('imageFile', file);
@@ -25,6 +27,7 @@ export const ProductBasicInfo: React.FC = () => {
   const setPizzaPrices = (prices: Record<string, number>) => setValue('pizzaPrices', prices);
 
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
+  const categorySelectStyles = createThemedReactSelectStyles<{ value: string; label: string }, false>();
 
 
 
@@ -49,20 +52,18 @@ export const ProductBasicInfo: React.FC = () => {
               {!isComboMode ? (
                 <div>
                   <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Preço Base *</label>
-                  <input
-                    type="text"
-                    value={maskCurrency(productForm.basePrice)}
-                    onChange={(e) => setProductForm({ ...productForm, basePrice: unmaskCurrency(e.target.value) })}
+                  <CurrencyInput
+                    value={productForm.basePrice}
+                    onChange={(basePrice) => setProductForm({ ...productForm, basePrice })}
                     className="input-premium"
-                    placeholder="R$ 0,00"
                   />
                 </div>
               ) : (
                 <div>
                   <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Preço Final do Combo</label>
-                  <input
-                    type="text"
-                    value={maskCurrency(Number(bundleSummary?.finalPrice ?? productForm.basePrice ?? 0))}
+                  <CurrencyInput
+                    value={Number(bundleSummary?.finalPrice ?? productForm.basePrice ?? 0)}
+                    onChange={() => undefined}
                     disabled
                     className="input-premium opacity-70 cursor-not-allowed"
                   />
@@ -83,12 +84,10 @@ export const ProductBasicInfo: React.FC = () => {
                     </button>
                   )}
                 </div>
-                <input
-                  type="text"
-                  value={maskCurrency(productForm.costPrice)}
-                  onChange={(e) => setProductForm({ ...productForm, costPrice: unmaskCurrency(e.target.value) })}
+                <CurrencyInput
+                  value={productForm.costPrice}
+                  onChange={(costPrice) => setProductForm({ ...productForm, costPrice })}
                   className="input-premium border-status-warning/30"
-                  placeholder="R$ 0,00"
                 />
                 <p className="text-[10px] text-status-warning mt-1 font-bold">Usado para cálculo de lucro se não houver ficha técnica.</p>
               </div>
@@ -108,8 +107,10 @@ export const ProductBasicInfo: React.FC = () => {
               <label className="block text-xs font-black text-muted-foreground uppercase tracking-wider mb-1.5">Categoria</label>
               <CreatableSelect
                 isClearable
+                classNamePrefix="catalog-category-select"
                 placeholder="Selecione ou digite para criar..."
-                value={categories.find((c) => c.id === productForm.categoryId) ? { value: productForm.categoryId, label: categories.find((c) => c.id === productForm.categoryId)?.name } : null}
+                menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                value={selectedCategory ? { value: selectedCategory.id, label: selectedCategory.name } : null}
                 options={categories.map((c) => ({ value: c.id, label: c.name }))}
                 onChange={(selected) => {
                   setProductForm({ ...productForm, categoryId: selected ? selected.value : '' });
@@ -126,24 +127,7 @@ export const ProductBasicInfo: React.FC = () => {
                     console.error('Erro ao criar categoria', e);
                   }
                 }}
-                styles={{
-                  control: (base) => ({
-                    ...base,
-                    borderRadius: '0.75rem',
-                    minHeight: '2.875rem',
-                    borderColor: 'hsl(var(--input))',
-                    backgroundColor: 'hsl(var(--background))',
-                    boxShadow: 'none',
-                    '&:hover': {
-                      borderColor: 'hsl(var(--ring))'
-                    }
-                  }),
-                  option: (base, state) => ({
-                    ...base,
-                    backgroundColor: state.isSelected ? 'hsl(var(--primary))' : state.isFocused ? 'hsl(var(--primary)/0.1)' : 'transparent',
-                    color: state.isSelected ? 'hsl(var(--primary-foreground))' : 'inherit',
-                  })
-                }}
+                styles={categorySelectStyles}
               />
             </div>
 
@@ -297,18 +281,16 @@ export const ProductBasicInfo: React.FC = () => {
                           {size.name}
                         </label>
                         <div className="relative">
-                          <input
-                            type="text"
-                            value={maskCurrency(Reflect.get(pizzaPrices, size.id) || 0)}
-                            onChange={(e) => {
+                          <CurrencyInput
+                            value={Reflect.get(pizzaPrices, size.id) || 0}
+                            onChange={(nextValue) => {
                               const nextPrices = { ...pizzaPrices };
                               if (size.id !== '__proto__' && size.id !== 'constructor') {
-                                Reflect.set(nextPrices, size.id, unmaskCurrency(e.target.value));
+                                Reflect.set(nextPrices, size.id, nextValue);
                               }
                               setPizzaPrices(nextPrices);
                             }}
                             className="w-full px-4 py-3.5 bg-card text-foreground border border-input rounded-xl outline-none text-base font-black focus:ring-2 focus:ring-primary transition-all placeholder:text-muted-foreground text-center"
-                            placeholder="R$ 0,00"
                           />
                         </div>
                       </div>

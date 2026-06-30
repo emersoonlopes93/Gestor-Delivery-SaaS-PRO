@@ -17,7 +17,6 @@ import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { Public, RequirePermissions } from '../common/decorators';
 import type { Request as ExpressRequest } from 'express';
 import type {
-  CreateDeliveryRateRuleDTO,
   DeliveryAddressDTO,
   TenantJwtPayload,
   UpsertDeliveryRateRuleInput,
@@ -60,24 +59,35 @@ export class DeliveryRateController {
     return undefined;
   }
 
-  private mapDtoToUpsertInput(
-    dto: CreateDeliveryRateRuleDTO,
+  private mapBodyToUpsertInput(
+    body: Record<string, unknown>,
     id?: string,
   ): UpsertDeliveryRateRuleInput {
-    const { distanceTiers, geoJson, polygonCoordinates, ...rest } = dto;
+    const distanceTiers = Array.isArray(body.distanceTiers) ? body.distanceTiers : undefined;
+    const geoJson = body.geoJson;
+    const polygonCoordinates = body.polygonCoordinates;
+    const rest = { ...body } as Record<string, unknown>;
+    delete rest.distanceTiers;
+    delete rest.geoJson;
+    delete rest.polygonCoordinates;
 
     return {
-      ...rest,
+      ...(rest as Omit<UpsertDeliveryRateRuleInput, 'distanceTiers' | 'geoJson' | 'polygonCoordinates'>),
       ...(id !== undefined ? { id } : {}),
       geoJson: this.toInputJsonValue(geoJson),
       polygonCoordinates: this.toInputJsonValue(polygonCoordinates),
-      distanceTiers: distanceTiers?.map((tier, idx) => ({
-        id: tier.id,
-        minDistanceKm: tier.minDistanceKm,
-        maxDistanceKm: tier.maxDistanceKm,
-        fee: tier.fee,
-        sortOrder: tier.sortOrder ?? idx,
-      })),
+      distanceTiers: distanceTiers?.map((tier, idx) => {
+        const current = (tier ?? {}) as Record<string, unknown>;
+        return {
+          id: typeof current.id === 'string' ? current.id : undefined,
+          minDistanceKm: Number(current.minDistanceKm),
+          maxDistanceKm: Number(current.maxDistanceKm),
+          fee: Number(current.fee),
+          estimatedDeliveryMinutes:
+            current.estimatedDeliveryMinutes == null ? undefined : Number(current.estimatedDeliveryMinutes),
+          sortOrder: current.sortOrder == null ? idx : Number(current.sortOrder),
+        };
+      }),
     };
   }
 
@@ -96,10 +106,10 @@ export class DeliveryRateController {
   @RequirePermissions('delivery.manage')
   async create(
     @Request() req: ExpressRequest & { user: TenantJwtPayload },
-    @Body() dto: CreateDeliveryRateRuleDTO,
+    @Body() body: Record<string, unknown>,
   ) {
     const tenantId = this.getTenantIdFromRequest(req);
-    return this.deliveryRateService.upsertRule(tenantId, this.mapDtoToUpsertInput(dto));
+    return this.deliveryRateService.upsertRule(tenantId, this.mapBodyToUpsertInput(body));
   }
 
   @Put(':id')
@@ -107,10 +117,10 @@ export class DeliveryRateController {
   async update(
     @Request() req: ExpressRequest & { user: TenantJwtPayload },
     @Param('id') id: string,
-    @Body() dto: CreateDeliveryRateRuleDTO,
+    @Body() body: Record<string, unknown>,
   ) {
     const tenantId = this.getTenantIdFromRequest(req);
-    return this.deliveryRateService.upsertRule(tenantId, this.mapDtoToUpsertInput(dto, id));
+    return this.deliveryRateService.upsertRule(tenantId, this.mapBodyToUpsertInput(body, id));
   }
 
   @Delete(':id')
@@ -135,6 +145,17 @@ export class DeliveryRateController {
       address: body.address,
       distanceKm: body.distanceKm ?? null,
     });
+  }
+
+  @Post('test-current')
+  @RequirePermissions('delivery.read')
+  @HttpCode(HttpStatus.OK)
+  async testCurrentTenant(
+    @Request() req: ExpressRequest & { user: TenantJwtPayload },
+    @Body() body: { query: string },
+  ) {
+    const tenantId = this.getTenantIdFromRequest(req);
+    return this.deliveryRateService.testDeliveryByQuery(tenantId, body.query);
   }
 
   @Post('calculate')

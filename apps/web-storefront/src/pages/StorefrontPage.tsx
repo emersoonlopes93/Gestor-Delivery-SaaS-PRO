@@ -1,7 +1,7 @@
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api-client';
-import type { StorefrontPayload, StorefrontProductPayload, StorefrontComboPayload } from '@gestor/types';
+import type { StorefrontPayload, StorefrontProductPayload, StorefrontComboPayload, StorefrontCategoryPayload } from '@gestor/types';
 import { useCartStore } from '../store/use-cart-store';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -56,6 +56,33 @@ function money(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+function StorefrontHero({ banner, name }: { banner?: string | null; name: string }) {
+  if (!banner) return null;
+
+  return (
+    <section className="mb-6 rounded-[1.75rem] overflow-hidden border border-[var(--storefront-border)] bg-[var(--storefront-card)] shadow-sm">
+      <div className="relative aspect-[16/6] min-h-40 max-h-64 bg-[var(--storefront-muted)]">
+        <img
+          src={banner}
+          alt={`Banner da loja ${name}`}
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
+          <div className="max-w-lg">
+            <div className="inline-flex items-center gap-2 rounded-full bg-white/15 backdrop-blur-md px-3 py-1 text-[11px] font-bold text-white border border-white/20">
+              Banner da vitrine
+            </div>
+            <p className="mt-2 text-sm text-white/90 max-w-md">
+              Imagem opcional exibida no topo da loja. O fundo global continua separado.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function StorefrontPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const [searchParams] = useSearchParams();
@@ -68,6 +95,7 @@ export function StorefrontPage() {
   const cartItemsCount = useCartStore(s => s.items.length);
 
   const [selectedProduct, setSelectedProduct] = useState<StorefrontProductPayload | null>(null);
+  const [selectedProductCategory, setSelectedProductCategory] = useState<StorefrontCategoryPayload | null>(null);
   const [selectedCombo, setSelectedCombo] = useState<StorefrontComboPayload | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -266,6 +294,8 @@ export function StorefrontPage() {
           )}
         </div>
       </header>
+
+      <StorefrontHero banner={tenant.banner} name={tenant.name} />
 
 
 
@@ -478,7 +508,10 @@ export function StorefrontPage() {
                     imageMode={layoutSettings.productImageMode}
                     showDescription={layoutSettings.showProductDescription}
                     showBadges={layoutSettings.showBadges}
-                    onSelectProduct={() => setSelectedProduct(product)}
+                    onSelectProduct={() => {
+                      setSelectedProduct(product);
+                      setSelectedProductCategory(categories.find((category) => category.id === product.categoryId) ?? null);
+                    }}
                   />
                 ))}
               </div>
@@ -499,8 +532,12 @@ export function StorefrontPage() {
       {selectedProduct && (
         <ProductDetailsModal
           product={selectedProduct}
+          category={selectedProductCategory}
           isStoreClosed={!data.tenant.isOpen}
-          onClose={() => setSelectedProduct(null)}
+          onClose={() => {
+            setSelectedProduct(null);
+            setSelectedProductCategory(null);
+          }}
         />
       )}
 

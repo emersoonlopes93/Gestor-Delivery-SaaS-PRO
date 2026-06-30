@@ -117,32 +117,64 @@ export function maskCPFCNPJ(value: string | undefined | null): string {
     .substring(0, 18);
 }
 
-/**
- * Masks a currency value: 10 -> "R$ 0,10" | 100 -> "R$ 1,00"
- * Returns string formatted as BRL currency.
- */
-export function maskCurrency(value: string | number | undefined | null): string {
-  if (value === undefined || value === null) return 'R$ 0,00';
-  const stringValue = String(value);
-  const digits = unmask(stringValue);
-  if (!digits) return 'R$ 0,00';
-
-  const amount = parseInt(digits, 10) / 100;
+function formatBRL(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
     minimumFractionDigits: 2,
-  }).format(amount);
+  }).format(value);
 }
 
-/**
- * Unmasks a currency string to a pure number (float).
- * "R$ 1,00" -> 1.00
- */
-export function unmaskCurrency(value: string | undefined | null): number {
-  if (!value) return 0;
+function parseCurrencyString(value: string): number {
+  const normalized = value.trim();
+  if (!normalized) return 0;
+
+  if (/^\d+$/.test(normalized)) {
+    return Number(normalized);
+  }
+
+  const hasComma = normalized.includes(',');
+  const hasDot = normalized.includes('.');
+  let numeric = normalized.replace(/[^\d,.-]/g, '');
+
+  if (hasComma && hasDot) {
+    numeric = numeric.replace(/\./g, '').replace(',', '.');
+  } else if (hasComma) {
+    numeric = numeric.replace(',', '.');
+  }
+
+  const parsed = Number(numeric);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function currencyDigitsToNumber(value: string | undefined | null): number {
   const digits = unmask(value);
   if (!digits) return 0;
   return parseInt(digits, 10) / 100;
 }
+
+export function currencyNumberToDigits(value: number | undefined | null): string {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return '0';
+  return Math.round(value * 100).toString();
+}
+
+/**
+ * Masks a BRL currency value where the domain value is already in reais.
+ * Examples: 45 -> "R$ 45,00" | 0.45 -> "R$ 0,45"
+ */
+export function maskCurrency(value: string | number | undefined | null): string {
+  if (value === undefined || value === null || value === '') return 'R$ 0,00';
+  const numericValue = typeof value === 'number' ? value : parseCurrencyString(value);
+  return formatBRL(Number.isFinite(numericValue) ? numericValue : 0);
+}
+
+/**
+ * Converts the editable masked string to a number in reais.
+ * "R$ 1,00" -> 1.00 | "4500" -> 45.00 while typing
+ */
+export function unmaskCurrency(value: string | undefined | null): number {
+  return currencyDigitsToNumber(value);
+}
+
+export * from './google-maps-address';
 

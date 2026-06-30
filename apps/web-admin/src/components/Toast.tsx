@@ -4,10 +4,10 @@ import { useToast } from '../contexts/ToastContext';
 import type { Toast } from '../contexts/ToastContext';
 
 const toastStyles = {
-  success: 'bg-green-50 border-green-200 text-green-800',
-  error: 'bg-red-50 border-red-200 text-red-800',
-  warning: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-  info: 'bg-blue-50 border-blue-200 text-blue-800',
+  success: 'bg-card border-emerald-500/25 text-foreground',
+  error: 'bg-card border-destructive/25 text-foreground',
+  warning: 'bg-card border-amber-500/25 text-foreground',
+  info: 'bg-card border-primary/25 text-foreground',
 };
 
 const toastIcons = {
@@ -45,7 +45,7 @@ function Toast({ toast, onClose }: { toast: Toast; onClose: () => void }) {
       <p className="flex-1 text-sm font-medium">{toast.message}</p>
       <button
         onClick={onClose}
-        className="p-1 hover:bg-black/5 rounded transition-colors"
+        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         aria-label="Fechar"
       >
         <X className="w-4 h-4" />

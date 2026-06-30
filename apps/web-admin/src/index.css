@@ -5,6 +5,7 @@
 @layer base {
   :root {
     font-family: 'Outfit', 'Inter', system-ui, sans-serif;
+    color-scheme: light;
 
     /* === TOKENS SEMÂNTICOS LIGHT === */
     --background: #f9fafb;           /* fundo geral - gray-50 */
@@ -33,6 +34,7 @@
     
     --border: #e5e7eb;               /* borda padrão - gray-200 */
     --input: #e5e7eb;                /* borda de inputs - gray-200 */
+    --input-bg: #ffffff;             /* fundo de inputs - branco */
     --ring: #9333ea;                 /* ring de foco - purple-700 */
     
     --radius: 1rem;                  /* border-radius padrão - 16px */
@@ -44,6 +46,7 @@
   }
 
   .dark {
+    color-scheme: dark;
     --background: #030712;          /* fundo geral dark - gray-950 */
     --foreground: #f9fafb;          /* texto principal dark - gray-50 */
     
@@ -70,6 +73,7 @@
     
     --border: #1f2937;               /* borda padrão dark - gray-800 */
     --input: #1f2937;                /* borda de inputs dark - gray-800 */
+    --input-bg: #111827;             /* fundo de inputs dark - gray-900 */
     --ring: #a855f7;                 /* ring de foco dark - purple-500 */
 
     /* === STATUS TOKENS (DARK) === */
@@ -89,6 +93,29 @@
 
   ::selection {
     background-color: rgb(99 102 241 / 0.3);
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  textarea,
+  select {
+    color: var(--foreground);
+    background-color: var(--input-bg);
+    border-color: var(--input);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--muted-foreground);
+    opacity: 1;
+  }
+
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    color: var(--muted-foreground);
+    background-color: var(--muted);
+    opacity: 0.7;
+    cursor: not-allowed;
   }
 }
 
@@ -143,7 +170,7 @@
     border-radius: 1rem;
     font-size: 0.875rem;
     font-weight: 500;
-    background-color: var(--card);
+    background-color: var(--input-bg);
     color: var(--foreground);
     border: 1px solid var(--input);
     transition: all 0.3s;
@@ -178,7 +205,7 @@
   .input-premium:-webkit-autofill:hover,
   .input-premium:-webkit-autofill:focus,
   .input-premium:-webkit-autofill:active {
-    -webkit-box-shadow: 0 0 0 30px var(--card) inset !important;
+    -webkit-box-shadow: 0 0 0 30px var(--input-bg) inset !important;
     -webkit-text-fill-color: var(--foreground) !important;
     transition: background-color 5000s ease-in-out 0s;
   }

@@ -24,7 +24,7 @@ const PRESET_COLORS = [
 const LAYOUT_OPTIONS = [
   { id: 'list', label: 'Lista', desc: 'Produto em linha com imagem lateral' },
   { id: 'grid', label: 'Grade', desc: '2 colunas com imagem em destaque' },
-  { id: 'compact', label: 'Compacto', desc: 'Sem imagens, mais rápido' },
+  { id: 'compact', label: 'Compacto', desc: 'Sem imagens, mais rapido' },
 ] as const;
 
 const COLOR_MODE_OPTIONS = [
@@ -32,6 +32,31 @@ const COLOR_MODE_OPTIONS = [
   { id: 'dark', label: 'Escuro', Icon: Moon },
   { id: 'system', label: 'Sistema', Icon: Monitor },
 ] as const;
+
+function StorefrontHeroPreview({ src }: { src: string | null }) {
+  if (!src) {
+    return (
+      <div className="h-36 rounded-3xl border border-dashed border-slate-300 dark:border-slate-700 bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 flex items-center justify-center text-center px-4">
+        <div>
+          <div className="text-sm font-black text-slate-700 dark:text-slate-200">Hero opcional</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Exibido no topo da vitrine publica, sem virar fundo global.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-36 rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800">
+      <img src={src} alt="Banner da vitrine" className="w-full h-full object-cover" />
+      <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/60 to-transparent">
+        <div className="text-white text-xs font-bold">Banner da vitrine</div>
+        <div className="text-white/80 text-[11px]">Topo publico da loja</div>
+      </div>
+    </div>
+  );
+}
 
 export function Step7Storefront({ onNext, onPrev }: Step7Props) {
   const [draft, setDraft] = useState<StorefrontDraft>({
@@ -54,14 +79,15 @@ export function Step7Storefront({ onNext, onPrev }: Step7Props) {
             colorMode: draft.colorMode,
             borderRadius: 'lg',
             fontStyle: 'default',
+            heroImageUrl: draft.bannerUrl || null,
+            heroImageMediaId: draft.bannerMediaAssetId || null,
             backgroundStyle: 'clean',
-            backgroundImageUrl: draft.bannerUrl || null,
-            backgroundImageMediaId: draft.bannerMediaAssetId || null,
             backgroundOverlay: 'soft',
           },
           layout: {
             productLayout: draft.productLayout,
             categoryLayout: 'tabs',
+            heroEnabled: Boolean(draft.bannerUrl),
             showProductDescription: true,
             showBadges: true,
             productImageMode: 'thumbnail',
@@ -83,11 +109,13 @@ export function Step7Storefront({ onNext, onPrev }: Step7Props) {
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Como sua loja vai aparecer para os clientes</p>
       </div>
 
-      {/* Banner */}
       <div>
         <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">
-          Banner / Imagem de Fundo
+          Banner da vitrine
         </label>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+          Imagem opcional exibida no topo do cardapio digital. Nao vira fundo global da pagina.
+        </p>
         {draft.bannerUrl ? (
           <div className="relative rounded-2xl overflow-hidden border-2 border-indigo-300 dark:border-indigo-700 aspect-video bg-slate-100 dark:bg-slate-800 group">
             <img src={draft.bannerUrl} alt="Banner" className="w-full h-full object-cover" />
@@ -115,13 +143,19 @@ export function Step7Storefront({ onNext, onPrev }: Step7Props) {
             className="w-full aspect-video rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-pink-400 dark:hover:border-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/10 flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-slate-500 hover:text-pink-500 transition-all"
           >
             <ImageIcon className="w-8 h-8" />
-            <span className="text-sm font-bold">Selecionar Banner</span>
-            <span className="text-xs">Opcional — dá personalidade à sua loja</span>
+            <span className="text-sm font-bold">Selecionar banner</span>
+            <span className="text-xs">Opcional. Da personalidade a sua loja.</span>
           </button>
         )}
       </div>
 
-      {/* Primary Color */}
+      <div>
+        <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">
+          Preview do topo publico
+        </label>
+        <StorefrontHeroPreview src={draft.bannerUrl || null} />
+      </div>
+
       <div>
         <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">
           Cor Principal
@@ -154,7 +188,6 @@ export function Step7Storefront({ onNext, onPrev }: Step7Props) {
         </div>
       </div>
 
-      {/* Color Mode */}
       <div>
         <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">
           Modo de Cor
@@ -177,10 +210,9 @@ export function Step7Storefront({ onNext, onPrev }: Step7Props) {
         </div>
       </div>
 
-      {/* Product Layout */}
       <div>
         <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-3">
-          Layout do Cardápio
+          Layout do Cardapio
         </label>
         <div className="space-y-2">
           {LAYOUT_OPTIONS.map(({ id, label, desc }) => (
@@ -209,14 +241,14 @@ export function Step7Storefront({ onNext, onPrev }: Step7Props) {
 
       <div className="flex gap-3">
         <button onClick={onPrev} className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-black rounded-2xl transition-all text-sm">
-          ← Voltar
+          Voltar
         </button>
         <button
           onClick={handleNext}
           disabled={saving}
           className="flex-[2] py-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-black rounded-2xl transition-all shadow-lg shadow-indigo-500/20 text-sm"
         >
-          {saving ? 'Salvando...' : 'Continuar →'}
+          {saving ? 'Salvando...' : 'Continuar'}
         </button>
       </div>
 

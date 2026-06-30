@@ -24,6 +24,7 @@ type ProductTemplate = {
 type CategoryTemplate = {
   name: string;
   order: number;
+  metadataJson?: unknown;
   products: ProductTemplate[];
 };
 
@@ -282,7 +283,7 @@ export class MenuImportService {
 
     for (const categoryTemplate of template.categories) {
       try {
-        const catResult = await this.importCategory(tenantId, categoryTemplate, skipExisting, result);
+      const catResult = await this.importCategory(tenantId, categoryTemplate, skipExisting, result);
 
         for (const productTemplate of categoryTemplate.products) {
           try {
@@ -395,6 +396,7 @@ export class MenuImportService {
       categories: version.categories.map((category) => ({
         name: category.name,
         order: category.sortOrder,
+        metadataJson: category.metadataJson,
         products: category.products
           .sort((left, right) => left.sortOrder - right.sortOrder)
           .map((product) => ({
@@ -477,11 +479,20 @@ export class MenuImportService {
     }
 
     // Criar via CategoriesService oficial
+    const categoryMetadata = asRecordOrNull(categoryTemplate.metadataJson);
     const created = await this.categoriesService.create({
       name: categoryTemplate.name,
       isActive: true,
       isFeatured: false,
       order: categoryTemplate.order,
+      ...(categoryMetadata?.templateType === 'pizza'
+        ? {
+            templateType: 'pizza',
+            templateConfig: {
+              pricingStrategy: 'highest',
+            },
+          }
+        : {}),
     });
 
     result.categoriesCreated++;
@@ -571,12 +582,66 @@ export class MenuImportService {
     });
 
     result.productsCreated++;
+    await this.applyPizzaSizePricesIfProvided(tenantId, product.id, productTemplate);
     await this.importProductOptionGroups(
       tenantId,
       product.id,
       optionGroups,
       result,
     );
+  }
+
+  private async applyPizzaSizePricesIfProvided(
+    tenantId: string,
+    productId: string,
+    productTemplate: ProductTemplate,
+  ): Promise<void> {
+    const metadata = asRecordOrNull(productTemplate.metadataJson);
+    const sizePrices = asRecordOrNull(metadata?.sizePrices);
+    if (!sizePrices) return;
+
+    const product = await this.prisma.tenantClient.product.findUnique({
+      where: { id: productId },
+      select: { basePrice: true },
+    });
+    if (!product) return;
+
+    const sizesGroup = await this.prisma.tenantClient.optionGroup.findFirst({
+      where: { tenantId, name: 'Tamanhos [Pizza]' },
+      include: { items: true },
+    });
+    if (!sizesGroup) return;
+
+    const normalizedPrices = new Map<string, number>();
+    for (const [key, value] of Object.entries(sizePrices)) {
+      const price = typeof value === 'number' ? value : Number(value);
+      if (!Number.isFinite(price)) continue;
+      normalizedPrices.set(normalizeBaseMenuOptionSlug(key), price);
+    }
+
+    for (const item of sizesGroup.items) {
+      const price = normalizedPrices.get(normalizeBaseMenuOptionSlug(item.name));
+      if (price === undefined) continue;
+      const existing = await this.prisma.tenantClient.productOptionItemPrice.findFirst({
+        where: { productId, optionItemId: item.id },
+        select: { id: true },
+      });
+      if (existing) {
+        await this.prisma.tenantClient.productOptionItemPrice.update({
+          where: { id: existing.id },
+          data: { price },
+        });
+        continue;
+      }
+      await this.prisma.tenantClient.productOptionItemPrice.create({
+        data: {
+          tenantId,
+          productId,
+          optionItemId: item.id,
+          price,
+        },
+      });
+    }
   }
 
   private parseProductOptionGroupsForImport(
@@ -888,6 +953,11 @@ function extractBusinessSegments(metadata: unknown, fallback: string): string[] 
   const candidate = (metadata as Record<string, unknown>).businessSegments;
   const segments = extractStringArray(candidate);
   return segments.length > 0 ? segments : [fallback];
+}
+
+function asRecordOrNull(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
 }
 
 function extractBusinessCategory(settings: unknown): string | undefined {

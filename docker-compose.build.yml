@@ -11,7 +11,7 @@ services:
       dockerfile: Dockerfile.frontend
       args:
         APP_NAME: "@gestor/web-tenant"
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3333/api/v1}
+        VITE_API_URL: ${VITE_API_URL:?Defina VITE_API_URL apontando para a API da VPS, por exemplo https://api.seudominio.com/api/v1}
     image: ${DOCKER_USER:-gestor}/web-tenant:latest
 
   web-storefront:
@@ -19,5 +19,5 @@ services:
       context: .
       dockerfile: Dockerfile.storefront
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3333/api/v1}
+        VITE_API_URL: ${VITE_API_URL:?Defina VITE_API_URL apontando para a API da VPS, por exemplo https://api.seudominio.com/api/v1}
     image: ${DOCKER_USER:-gestor}/web-storefront:latest

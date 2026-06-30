@@ -809,6 +809,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@gestor/utils':
+        specifier: workspace:*
+        version: link:../utils
       clsx:
         specifier: ^2.1.1
         version: 2.1.1

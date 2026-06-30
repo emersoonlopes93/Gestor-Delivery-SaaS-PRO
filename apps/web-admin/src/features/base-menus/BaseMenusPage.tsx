@@ -21,6 +21,7 @@ import {
   Trash2,
   Undo2,
 } from 'lucide-react';
+import { CurrencyInput } from '@gestor/ui';
 import { api, ApiError } from '../../lib/api-client';
 import { useAdminPermissions } from '../../hooks/use-admin-auth';
 
@@ -1140,7 +1141,7 @@ function ProductCreateForm({ draft, category, onSaved }: { draft: BaseMenuDraft;
   return (
     <form onSubmit={(event) => void submitProductCreate(event, draft, category, name, basePrice, onSaved, () => setName(''))} className="flex flex-wrap items-end gap-2 border-t border-border p-4">
       <Field label="Novo produto" value={name} onChange={setName} />
-      <Field label="Preco" value={basePrice} onChange={setBasePrice} type="number" step="0.01" />
+      <MoneyField label="Preco" value={basePrice} onChange={setBasePrice} />
       <button className="h-10 rounded-xl bg-primary px-3 text-xs font-black text-primary-foreground">Criar produto</button>
     </form>
   );
@@ -1167,7 +1168,7 @@ function ProductEditor({ draft, product, canManage, onSaved }: { draft: BaseMenu
         <Field label="Tags" value={tags} onChange={setTags} disabled={!canManage} />
       </div>
       <div className="grid gap-2">
-        <Field label="Preco" value={basePrice} onChange={setBasePrice} type="number" step="0.01" disabled={!canManage} />
+        <MoneyField label="Preco" value={basePrice} onChange={setBasePrice} disabled={!canManage} />
         <Field label="Compare" value={compareAtPrice} onChange={setCompareAtPrice} type="number" step="0.01" disabled={!canManage} />
       </div>
       <div className="grid gap-2">
@@ -1189,6 +1190,21 @@ function Field({ label, value, onChange, type = 'text', step, disabled }: { labe
     <label className="block">
       <span className="text-[11px] font-black uppercase text-muted-foreground">{label}</span>
       <input value={value} onChange={(event) => onChange(event.target.value)} type={type} step={step} disabled={disabled} className="mt-1 h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-60" />
+    </label>
+  );
+}
+
+function MoneyField({ label, value, onChange, disabled }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean }) {
+
+  return (
+    <label className="block">
+      <span className="text-[11px] font-black uppercase text-muted-foreground">{label}</span>
+      <CurrencyInput
+        value={Number(value || 0)}
+        onChange={(nextValue) => onChange(String(nextValue))}
+        disabled={disabled}
+        className="mt-1 h-10 w-full rounded-xl text-sm disabled:opacity-60"
+      />
     </label>
   );
 }
@@ -1497,7 +1513,7 @@ function ProductEditorModal({
           </div>
           <Field label="Descricao" value={description} onChange={setDescription} />
           <div className="grid gap-3 md:grid-cols-3">
-            <Field label="Preco" value={basePrice} onChange={setBasePrice} type="number" step="0.01" />
+            <MoneyField label="Preco" value={basePrice} onChange={setBasePrice} />
             <Field label="Preco promocional" value={compareAtPrice} onChange={setCompareAtPrice} type="number" step="0.01" />
             <Field label="Ordem" value={sortOrder} onChange={setSortOrder} type="number" />
           </div>
@@ -1759,7 +1775,7 @@ function ProductOptionsModal({
                         <Field label="Descricao" value={item.description} onChange={(value) => updateItem(groupIndex, itemIndex, { description: value })} />
                       </div>
                       <div className="mt-3 grid gap-3 md:grid-cols-4">
-                        <Field label="Preco adicional" value={item.priceImpactValue} onChange={(value) => updateItem(groupIndex, itemIndex, { priceImpactValue: value })} type="number" step="0.01" />
+                        <MoneyField label="Preco adicional" value={item.priceImpactValue} onChange={(value) => updateItem(groupIndex, itemIndex, { priceImpactValue: value })} />
                         <Field label="Ordem" value={item.order} onChange={(value) => updateItem(groupIndex, itemIndex, { order: value })} type="number" />
                         <Field label="Qtd minima" value={item.minQty} onChange={(value) => updateItem(groupIndex, itemIndex, { minQty: value })} type="number" />
                         <Field label="Qtd maxima" value={item.maxQty} onChange={(value) => updateItem(groupIndex, itemIndex, { maxQty: value })} type="number" />

@@ -6,5 +6,8 @@
     "jsx": "react-jsx",
     "ignoreDeprecations": "5.0"
   },
+  "references": [
+    { "path": "../utils" }
+  ],
   "include": ["src"]
 }

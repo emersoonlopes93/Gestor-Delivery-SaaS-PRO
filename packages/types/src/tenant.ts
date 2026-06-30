@@ -93,6 +93,9 @@ export interface TenantSettings {
   // Payment Methods
   paymentMethods?: string[];
   minimumOrderValue?: number | null;
+  pickupEnabled?: boolean;
+  pickupMinMinutes?: number;
+  pickupMaxMinutes?: number;
 
   // Financial / Pix
   pixKey?: string;
@@ -128,6 +131,42 @@ export interface TenantSettings {
   cashbackEnabled?: boolean;
   cashbackPercent?: number;
   cashbackValidityDays?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type OnboardingBackendStep =
+  | 'basicInfo'
+  | 'operatingHours'
+  | 'logo'
+  | 'address'
+  | 'delivery'
+  | 'payments'
+  | 'whatsapp'
+  | 'menu'
+  | 'catalog'
+  | 'firstOrder';
+
+export interface OnboardingCompletionCheck {
+  canComplete: boolean;
+  missingRequirements: string[];
+  warnings: string[];
+  nextRecommendedStep: string | null;
+  blockingMessage?: string | null;
+  completedAt?: string | null;
+}
+
+export interface TenantSchedulingSettings {
+  id: string;
+  tenantId: string;
+  enabled: boolean;
+  acceptScheduledOrders: boolean;
+  allowScheduleWhenClosed: boolean;
+  minimumAdvanceMinutes: number;
+  maximumAdvanceDays: number;
+  slotIntervalMinutes: number;
+  maxOrdersPerSlot: number;
+  timezone: string;
   createdAt: string;
   updatedAt: string;
 }

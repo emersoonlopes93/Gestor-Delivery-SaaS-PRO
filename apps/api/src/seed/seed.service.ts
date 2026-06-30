@@ -9,10 +9,14 @@ import {
 } from '@gestor/core';
 import { TenantDefaultRole, AdminDefaultRole } from '@gestor/core';
 import { seedDemoAiAgentAccess } from './demo-ai-agent.seed';
+import { CatalogTemplatesService } from '../catalog/catalog-templates.service';
 
 @Injectable()
 export class SeedService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly catalogTemplates: CatalogTemplatesService,
+  ) {}
 
   async runSeed() {
     console.log('Starting seed...');
@@ -277,6 +281,9 @@ export class SeedService {
 
     console.log(`   Demo tenant created: ${tenant.name}`);
     console.log(`   Tenant owner: ${ownerEmail}`);
+
+    await this.seedAlignedPizzaDemo(tenant.id);
+    return;
 
     // Create demo category (ProductCategory)
     const category = await this.prisma.productCategory.upsert({
@@ -552,5 +559,132 @@ export class SeedService {
     console.log(`   Option Groups: 2 with 5 items total`);
     console.log(`   Combo Slots: 2 with 2 allowed items total`);
     console.log(`   Publication & Availability rules configured`);
+  }
+
+  private async seedAlignedPizzaDemo(tenantId: string) {
+    const category = await this.prisma.productCategory.upsert({
+      where: { tenantId_slug: { tenantId, slug: 'pizzas' } },
+      update: {
+        templateType: 'pizza',
+        templateConfig: { pricingStrategy: 'highest' },
+      },
+      create: {
+        tenantId,
+        name: 'Pizzas',
+        slug: 'pizzas',
+        templateType: 'pizza',
+        templateConfig: { pricingStrategy: 'highest' },
+      },
+    });
+
+    const pizzaFlavors = [
+      { name: 'Calabresa', slug: 'calabresa', basePrice: 30, prices: { pequena: 30, media: 38, grande: 45 } },
+      { name: 'Mussarela', slug: 'mussarela', basePrice: 28, prices: { pequena: 28, media: 35, grande: 42 } },
+      { name: 'Portuguesa', slug: 'portuguesa', basePrice: 32, prices: { pequena: 32, media: 40, grande: 48 } },
+      { name: 'Frango com Catupiry', slug: 'frango-com-catupiry', basePrice: 33, prices: { pequena: 33, media: 41, grande: 49 } },
+      { name: 'Marguerita', slug: 'marguerita', basePrice: 29, prices: { pequena: 29, media: 36, grande: 43 } },
+    ] as const;
+
+    for (const flavor of pizzaFlavors) {
+      const product = await this.prisma.product.upsert({
+        where: { tenantId_slug: { tenantId, slug: flavor.slug } },
+        update: {
+          categoryId: category.id,
+          name: flavor.name,
+          basePrice: flavor.basePrice,
+          type: 'simple',
+          isAvailable: true,
+          sellableOnline: true,
+          isActive: true,
+        },
+        create: {
+          tenantId,
+          categoryId: category.id,
+          name: flavor.name,
+          slug: flavor.slug,
+          type: 'simple',
+          basePrice: flavor.basePrice,
+          isAvailable: true,
+          sellableOnline: true,
+          isActive: true,
+          order: 10,
+        },
+      });
+
+      await this.catalogTemplates.configureProductAsFlavor(tenantId, product.id);
+      await this.upsertPizzaSizePrices(tenantId, product.id, flavor.prices);
+    }
+
+    await this.prisma.product.upsert({
+      where: { tenantId_slug: { tenantId, slug: 'refrigerante-lata' } },
+      update: {
+        categoryId: category.id,
+        name: 'Refrigerante Lata',
+        basePrice: 8.0,
+        type: 'simple',
+        isAvailable: true,
+        sellableOnline: true,
+        isActive: true,
+      },
+      create: {
+        tenantId,
+        categoryId: category.id,
+        name: 'Refrigerante Lata',
+        slug: 'refrigerante-lata',
+        type: 'simple',
+        basePrice: 8.0,
+        isAvailable: true,
+        sellableOnline: true,
+        isActive: true,
+        order: 100,
+      },
+    });
+
+    console.log('   Demo aligned with official pizza template');
+    console.log(`   Demo category: ${category.name}`);
+    console.log(`   Demo flavors: ${pizzaFlavors.map((item) => item.name).join(', ')}`);
+  }
+
+  private async upsertPizzaSizePrices(
+    tenantId: string,
+    productId: string,
+    prices: { pequena: number; media: number; grande: number },
+  ) {
+    const sizes = await this.prisma.optionItem.findMany({
+      where: {
+        optionGroup: {
+          tenantId,
+          name: 'Tamanhos [Pizza]',
+        },
+      },
+      select: { id: true, name: true },
+    });
+
+    const normalized = new Map<string, number>([
+      ['pequena', prices.pequena],
+      ['media', prices.media],
+      ['grande', prices.grande],
+    ]);
+
+    for (const size of sizes) {
+      const key = size.name.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const price = normalized.get(key);
+      if (price === undefined) continue;
+      await this.prisma.productOptionItemPrice.upsert({
+        where: {
+          productId_optionItemId: {
+            productId,
+            optionItemId: size.id,
+          },
+        },
+        create: {
+          tenantId,
+          productId,
+          optionItemId: size.id,
+          price,
+        },
+        update: { price },
+      });
+    }
   }
 }

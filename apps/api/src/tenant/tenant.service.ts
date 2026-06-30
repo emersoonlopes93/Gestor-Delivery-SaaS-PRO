@@ -618,18 +618,37 @@ export class TenantService {
     // 2. Handle Manual Settings with Full Normalization (Hardening)
     if (data.theme) {
       const themeSettings = normalizeStorefrontTheme(data.theme);
-      if (themeSettings.backgroundImageMediaId) {
-        const asset = await this.prisma.mediaAsset.findFirst({
-          where: {
-            id: themeSettings.backgroundImageMediaId,
-            tenantId,
-          },
-        });
-        if (!asset) {
-          throw new BadRequestException('A imagem de fundo informada é inválida ou pertence a outro inquilino.');
+      if (themeSettings.backgroundImageMediaId || themeSettings.heroImageMediaId) {
+        const assetIds = [
+          themeSettings.backgroundImageMediaId,
+          themeSettings.heroImageMediaId,
+        ].filter((value): value is string => typeof value === 'string' && value.length > 0);
+
+        const assets = assetIds.length > 0
+          ? await this.prisma.mediaAsset.findMany({
+              where: {
+                id: { in: assetIds },
+                tenantId,
+              },
+            })
+          : [];
+        const assetMap = new Map(assets.map((asset) => [asset.id, asset]));
+
+        if (themeSettings.backgroundImageMediaId) {
+          const bgAsset = assetMap.get(themeSettings.backgroundImageMediaId);
+          if (!bgAsset) {
+            throw new BadRequestException('A imagem de fundo informada é inválida ou pertence a outro inquilino.');
+          }
+          themeSettings.backgroundImageUrl = bgAsset.publicUrl;
         }
-        // Force matching URL to prevent hijack
-        themeSettings.backgroundImageUrl = asset.publicUrl;
+
+        if (themeSettings.heroImageMediaId) {
+          const heroAsset = assetMap.get(themeSettings.heroImageMediaId);
+          if (!heroAsset) {
+            throw new BadRequestException('O banner informado é inválido ou pertence a outro inquilino.');
+          }
+          themeSettings.heroImageUrl = heroAsset.publicUrl;
+        }
       }
       updateData.storefrontThemeJson = themeSettings as Prisma.InputJsonValue;
     }

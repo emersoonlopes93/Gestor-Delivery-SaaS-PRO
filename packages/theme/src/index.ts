@@ -36,6 +36,8 @@ export type StorefrontThemeSettings = {
   primaryColor: string;
   secondaryColor?: string;
   accentColor?: string;
+  heroImageUrl?: string | null;
+  heroImageMediaId?: string | null;
   backgroundStyle: 'clean' | 'soft' | 'premium' | 'brand';
   backgroundImageUrl?: string | null;
   backgroundImageMediaId?: string | null;
@@ -238,6 +240,8 @@ export function normalizeStorefrontTheme(input: any): StorefrontThemeSettings {
     primaryColor: sanitizeHexColor(input.primaryColor, defaults.primaryColor),
     secondaryColor: input.secondaryColor ? sanitizeHexColor(input.secondaryColor) : undefined,
     accentColor: input.accentColor ? sanitizeHexColor(input.accentColor) : undefined,
+    heroImageUrl: typeof input.heroImageUrl === 'string' ? input.heroImageUrl : null,
+    heroImageMediaId: typeof input.heroImageMediaId === 'string' ? input.heroImageMediaId : null,
     backgroundStyle: validBackgrounds.includes(input.backgroundStyle) ? input.backgroundStyle : defaults.backgroundStyle,
     backgroundImageUrl: typeof input.backgroundImageUrl === 'string' ? input.backgroundImageUrl : null,
     backgroundImageMediaId: typeof input.backgroundImageMediaId === 'string' ? input.backgroundImageMediaId : null,

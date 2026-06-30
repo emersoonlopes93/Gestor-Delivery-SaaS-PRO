@@ -108,13 +108,19 @@ export class TenantController {
     return this.onboardingService.getOnboardingStatus(tenantId);
   }
 
+  @Get('onboarding-completion-check')
+  @RequirePermissions('dashboard.view')
+  async getOnboardingCompletionCheck(@CurrentTenant() tenantId: string) {
+    return this.onboardingService.getCompletionCheck(tenantId);
+  }
+
   /**
    * Update onboarding step.
    */
   @Patch('onboarding-step')
   async updateOnboardingStep(
     @CurrentTenant() tenantId: string,
-    @Body() body: { step: 'basicInfo' | 'catalog' | 'payment' | 'firstOrder'; completed?: boolean },
+    @Body() body: { step: 'basicInfo' | 'operatingHours' | 'logo' | 'address' | 'delivery' | 'payments' | 'whatsapp' | 'menu' | 'catalog' | 'firstOrder'; completed?: boolean },
   ) {
     return this.onboardingService.updateStep(tenantId, body.step, body.completed ?? true);
   }

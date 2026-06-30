@@ -21,6 +21,7 @@ export class DeliveryCoverageService {
       defaultPricePerKm: number;
       minimumFee?: number;
       maximumFee?: number;
+      defaultEstimatedDeliveryMinutes?: number;
       isDeliveryEnabled?: boolean;
     },
   ): Promise<DeliveryCoverageConfig> {
@@ -32,13 +33,33 @@ export class DeliveryCoverageService {
       defaultPricePerKm: data.defaultPricePerKm,
       minimumFee: data.minimumFee,
       maximumFee: data.maximumFee,
+      defaultEstimatedDeliveryMinutes: data.defaultEstimatedDeliveryMinutes,
       isDeliveryEnabled: data.isDeliveryEnabled ?? true,
     };
 
-    return this.prisma.deliveryCoverageConfig.upsert({
-      where: { tenantId },
-      create: payload,
-      update: payload,
-    });
+    const [coverage] = await this.prisma.$transaction([
+      this.prisma.deliveryCoverageConfig.upsert({
+        where: { tenantId },
+        create: payload,
+        update: payload,
+      }),
+      this.prisma.tenantSettings.upsert({
+        where: { tenantId },
+        create: {
+          tenantId,
+          timezone: 'America/Sao_Paulo',
+          currency: 'BRL',
+          language: 'pt-BR',
+          lat: data.storeLat,
+          lng: data.storeLng,
+        },
+        update: {
+          lat: data.storeLat,
+          lng: data.storeLng,
+        },
+      }),
+    ]);
+
+    return coverage;
   }
 }

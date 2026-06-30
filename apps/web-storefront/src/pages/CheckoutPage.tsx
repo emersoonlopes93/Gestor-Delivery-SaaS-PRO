@@ -92,11 +92,64 @@ export function CheckoutPage() {
 
   // Financial state (calculated server-side)
   const [deliveryFee, setDeliveryFee] = useState(0);
+  const [deliveryEstimatedMinutes, setDeliveryEstimatedMinutes] = useState<number | null>(null);
   const [discountTotal, setDiscountTotal] = useState(0);
   const [isValidating, setIsValidating] = useState(false);
   const [tenantInfo, setTenantInfo] = useState<StorefrontTenantInfo | null>(null);
   const safeCustomerCashbackBalance = Number(customer?.cashbackBalance ?? 0);
   const [selectedSavedAddressId, setSelectedSavedAddressId] = useState<string | null>(null);
+  const availableOrderModes = tenantInfo?.orderModes;
+
+  const serializeCartItem = (item: (typeof items)[number]): CreateOrderItemDTO => {
+    if (item.comboId) {
+      return {
+        lineType: 'combo',
+        comboId: item.comboId,
+        productId: item.comboId,
+        quantity: item.quantity,
+        notes: item.notes,
+        selections: item.selections?.map(g => ({
+          optionGroupId: g.optionGroupId,
+          items: g.items.map(i => ({
+            optionItemId: i.optionItemId,
+            qty: i.qty,
+          })),
+        })),
+        slots: item.slots?.map(s => ({
+          comboSlotId: s.comboSlotId,
+          items: s.items.map(i => ({
+            productId: i.productId,
+            qty: i.qty,
+          })),
+        })),
+      };
+    }
+
+    return {
+      lineType: 'product',
+      productId: item.productId,
+      quantity: item.quantity,
+      notes: item.notes,
+      selections: item.selections?.map(g => ({
+        optionGroupId: g.optionGroupId,
+        items: g.items.map(i => ({
+          optionItemId: i.optionItemId,
+          qty: i.qty,
+        })),
+      })),
+      slots: item.slots?.map(s => ({
+        comboSlotId: s.comboSlotId,
+        items: s.items.map(i => ({
+          productId: i.productId,
+          qty: i.qty,
+        })),
+      })),
+      pizzaComposition: item.pizzaComposition ? {
+        ...item.pizzaComposition,
+        calculatedPrice: item.pizzaComposition.calculatedPrice ?? item.snapshot.basePrice,
+      } : undefined,
+    };
+  };
 
   const { data: customerProfile } = useQuery({
     queryKey: ['customer-profile', tenantSlug],
@@ -116,6 +169,14 @@ export function CheckoutPage() {
       try {
         const { data } = await api.get<StorefrontPayload>(`/public/storefront/${tenantSlug}`);
         setTenantInfo(data.tenant);
+        const deliveryAvailable = data.tenant.orderModes?.deliveryEnabled !== false;
+        const pickupAvailable = Boolean(data.tenant.orderModes?.pickupEnabled);
+
+        if (!deliveryAvailable && pickupAvailable) {
+          setFulfillmentType('pickup');
+        } else if (deliveryAvailable) {
+          setFulfillmentType((current) => (current === 'pickup' && !pickupAvailable ? 'delivery' : current));
+        }
         
         // Auto-select first available payment method if current is not available
         const methods = (data.tenant.paymentMethods as PaymentMethod[]) || [];
@@ -179,6 +240,7 @@ export function CheckoutPage() {
       // Only validate delivery if we have basic address parts (especially number which is required by DTO)
       if (isDelivery && (!lat || !lng || !number || !street)) {
         setDeliveryFee(0);
+        setDeliveryEstimatedMinutes(null);
         return;
       }
 
@@ -189,30 +251,7 @@ export function CheckoutPage() {
 
       setIsValidating(true);
       try {
-        const orderItems: CreateOrderItemDTO[] = items.map(item => {
-          const itemPayload: CreateOrderItemDTO = {
-            lineType: item.comboId ? 'combo' : 'product',
-            productId: item.productId || item.comboId || '',
-            quantity: item.quantity,
-            notes: item.notes,
-            selections: item.selections?.map(g => ({
-              optionGroupId: g.optionGroupId,
-              items: g.items.map(i => ({
-                optionItemId: i.optionItemId,
-                qty: i.qty,
-              }))
-            })),
-            slots: item.slots?.map(s => ({
-              comboSlotId: s.comboSlotId,
-              items: s.items.map(i => ({
-                productId: i.productId,
-                qty: i.qty,
-              }))
-            })),
-
-          };
-          return itemPayload;
-        });
+        const orderItems: CreateOrderItemDTO[] = items.map(serializeCartItem);
 
         const address: DeliveryAddressDTO | null = isDelivery ? {
           street,
@@ -249,6 +288,7 @@ export function CheckoutPage() {
         });
 
         setDeliveryFee(result.deliveryFee || 0);
+        setDeliveryEstimatedMinutes(result.estimatedDeliveryMinutes ?? null);
         setDiscountTotal(result.discountTotal || 0);
         if (isDelivery) setSubmitError(null);
       } catch (err) {
@@ -261,6 +301,7 @@ export function CheckoutPage() {
            setSubmitError(isClosed ? msg : `Validando: ${msg}`);
         }
         setDeliveryFee(0);
+        setDeliveryEstimatedMinutes(null);
         setDiscountTotal(0);
       } finally {
         setIsValidating(false);
@@ -361,6 +402,24 @@ export function CheckoutPage() {
     applySavedAddress(selectedSavedAddress);
   }, [fulfillmentType, savedAddresses.length]);
 
+  useEffect(() => {
+    if (!availableOrderModes) return;
+    if (fulfillmentType === 'pickup' && !availableOrderModes.pickupEnabled) {
+      setFulfillmentType('delivery');
+    }
+    if (fulfillmentType === 'delivery' && !availableOrderModes.deliveryEnabled && availableOrderModes.pickupEnabled) {
+      setFulfillmentType('pickup');
+    }
+  }, [availableOrderModes, fulfillmentType]);
+
+  useEffect(() => {
+    if (tenantInfo?.scheduling?.enabled) return;
+    if (isScheduled) {
+      setIsScheduled(false);
+      setTimeSlotId('');
+    }
+  }, [tenantInfo?.scheduling?.enabled, isScheduled]);
+
   function showEmptyCartMessageOnce() {
     setSubmitError((prev) => prev ?? 'Seu carrinho está vazio. Adicione itens antes de finalizar.');
   }
@@ -385,46 +444,7 @@ export function CheckoutPage() {
     setSubmitError(null);
 
     try {
-      const orderItems: CreateOrderItemDTO[] = items.map(item => {
-        if (item.comboId) {
-          return {
-            lineType: 'combo',
-            comboId: item.comboId,
-            productId: item.comboId,
-            quantity: item.quantity,
-            notes: item.notes,
-            selections: item.selections?.map(g => ({
-              optionGroupId: g.optionGroupId,
-              items: g.items.map(i => ({
-                optionItemId: i.optionItemId,
-                qty: i.qty,
-              }))
-            })),
-            slots: item.slots?.map(s => ({
-              comboSlotId: s.comboSlotId,
-              items: s.items.map(i => ({
-                productId: i.productId,
-                qty: i.qty,
-              }))
-            })),
-
-          };
-        }
-        return {
-          lineType: 'product',
-          productId: item.productId,
-          quantity: item.quantity,
-          notes: item.notes,
-          selections: item.selections?.map(g => ({
-            optionGroupId: g.optionGroupId,
-            items: g.items.map(i => ({
-              optionItemId: i.optionItemId,
-              qty: i.qty,
-            }))
-          })),
-
-        };
-      });
+      const orderItems: CreateOrderItemDTO[] = items.map(serializeCartItem);
 
       const payload: CreateOrderDTO = {
         customerName: customerName.trim(),
@@ -492,46 +512,7 @@ export function CheckoutPage() {
     setValidationErrors([]);
 
     try {
-      const orderItems: CreateOrderItemDTO[] = items.map(item => {
-        if (item.comboId) {
-          return {
-            lineType: 'combo',
-            comboId: item.comboId,
-            productId: item.comboId,
-            quantity: item.quantity,
-            notes: item.notes,
-            selections: item.selections?.map(g => ({
-              optionGroupId: g.optionGroupId,
-              items: g.items.map(i => ({
-                optionItemId: i.optionItemId,
-                qty: i.qty,
-              }))
-            })),
-            slots: item.slots?.map(s => ({
-              comboSlotId: s.comboSlotId,
-              items: s.items.map(i => ({
-                productId: i.productId,
-                qty: i.qty,
-              }))
-            })),
-
-          };
-        }
-        return {
-          lineType: 'product',
-          productId: item.productId,
-          quantity: item.quantity,
-          notes: item.notes,
-          selections: item.selections?.map(g => ({
-            optionGroupId: g.optionGroupId,
-            items: g.items.map(i => ({
-              optionItemId: i.optionItemId,
-              qty: i.qty,
-            }))
-          })),
-
-        };
-      });
+      const orderItems: CreateOrderItemDTO[] = items.map(serializeCartItem);
 
       const payload: CreateOrderDTO = {
         customerName: customerName.trim(),
@@ -630,6 +611,12 @@ export function CheckoutPage() {
                 </span>
               </div>
             )}
+            {fulfillmentType === 'delivery' && deliveryEstimatedMinutes != null && (
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>Entrega estimada</span>
+                <span>{deliveryEstimatedMinutes} min</span>
+              </div>
+            )}
             {discountTotal > 0 && (
               <div className="flex justify-between text-xs text-green-600 font-semibold">
                 <span>Descontos</span>
@@ -712,20 +699,25 @@ export function CheckoutPage() {
         <section className="mb-6">
           <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest mb-3">Como deseja receber?</h2>
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => setFulfillmentType('delivery')}
-              className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${fulfillmentType === 'delivery' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-500'}`}>
-              <Truck className="w-6 h-6" />
-              <span className="text-xs font-bold uppercase">Entrega</span>
-            </button>
-            <button onClick={() => setFulfillmentType('pickup')}
-              className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${fulfillmentType === 'pickup' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-500'}`}>
-              <Store className="w-6 h-6" />
-              <span className="text-xs font-bold uppercase">Retirada</span>
-            </button>
+            {availableOrderModes?.deliveryEnabled !== false && (
+              <button onClick={() => setFulfillmentType('delivery')}
+                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${fulfillmentType === 'delivery' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-500'}`}>
+                <Truck className="w-6 h-6" />
+                <span className="text-xs font-bold uppercase">Entrega</span>
+              </button>
+            )}
+            {availableOrderModes?.pickupEnabled && (
+              <button onClick={() => setFulfillmentType('pickup')}
+                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${fulfillmentType === 'pickup' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100 bg-white text-gray-500'}`}>
+                <Store className="w-6 h-6" />
+                <span className="text-xs font-bold uppercase">Retirada</span>
+              </button>
+            )}
           </div>
         </section>
       )}
 
+      {tenantInfo?.scheduling?.enabled && (
       <section className="mb-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-bold text-sm text-gray-500 uppercase tracking-widest">Quando deseja receber?</h2>
@@ -748,6 +740,7 @@ export function CheckoutPage() {
           />
         )}
       </section>
+      )}
 
       {fulfillmentType === 'delivery' && (
         <section className="mb-6">

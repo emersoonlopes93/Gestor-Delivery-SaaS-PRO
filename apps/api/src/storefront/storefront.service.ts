@@ -60,7 +60,7 @@ export class StorefrontService {
     // 1. Resolve Tenant
     const tenant = await this.prisma.tenant.findFirst({
       where: { slug, status: 'active' }, // only active tenants
-      include: { settings: true, schedulingSettings: true },
+      include: { settings: true, schedulingSettings: true, deliveryCoverageConfig: true },
     });
 
     if (!tenant) {
@@ -421,11 +421,23 @@ export class StorefrontService {
       tenant.settings?.orderWhatsappNumber || tenant.settings?.businessPhone || null,
     );
 
+    const normalizedTheme = normalizeStorefrontTheme(tenant.settings?.storefrontThemeJson);
+
+    const deliveryEnabled = Boolean(
+      tenant.deliveryCoverageConfig?.isDeliveryEnabled &&
+        Number(tenant.deliveryCoverageConfig?.maxRadiusKm ?? 0) > 0,
+    );
+    const pickupEnabled = Boolean(tenant.settings?.pickupEnabled);
+    const scheduledOrdersEnabled = Boolean(
+      tenant.schedulingSettings?.enabled && tenant.schedulingSettings?.acceptScheduledOrders,
+    );
+
     const tenantInfo = {
       id: tenant.id,
       name: tenant.name,
       slug: tenant.slug,
       logo: tenant.settings?.logoUrl || null,
+      banner: normalizedTheme.heroImageUrl || null,
       isOpen: storeStatus.isOpen,
       statusMessage: storeStatus.message,
       nextOpenAt: storeStatus.nextOpenAt,
@@ -450,9 +462,19 @@ export class StorefrontService {
         enabled: tenant.settings.loyaltyEnabled,
         pointsPerReal: Number(tenant.settings.loyaltyPointsPerReal || 0),
       } : undefined,
+      orderModes: {
+        deliveryEnabled,
+        pickupEnabled,
+        dineInEnabled: false,
+        scheduledOrdersEnabled,
+        allowScheduleWhenClosed: Boolean(tenant.schedulingSettings?.allowScheduleWhenClosed),
+        pickupMinMinutes: tenant.settings?.pickupMinMinutes ?? null,
+        pickupMaxMinutes: tenant.settings?.pickupMaxMinutes ?? null,
+      },
       scheduling: {
-        enabled: Boolean(tenant.schedulingSettings?.enabled)
-      }
+        enabled: scheduledOrdersEnabled,
+        allowWhenClosed: Boolean(tenant.schedulingSettings?.allowScheduleWhenClosed),
+      },
     };
 
     const bestSellerIds = await this.biService.getStorefrontBestSellers(tenant.id);
@@ -575,7 +597,7 @@ export class StorefrontService {
 
     // 5. Storefront Customization (Fully Normalized & Hardened for Public consumption)
     const customization: StorefrontCustomizationPayload = {
-      theme: normalizeStorefrontTheme(tenant.settings?.storefrontThemeJson),
+      theme: normalizedTheme,
       layout: normalizeStorefrontLayout(tenant.settings?.storefrontLayoutJson),
     };
 

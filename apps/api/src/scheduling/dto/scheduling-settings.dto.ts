@@ -9,6 +9,10 @@ export class UpdateSchedulingSettingsDto {
   @IsOptional()
   acceptScheduledOrders?: boolean;
 
+  @IsBoolean()
+  @IsOptional()
+  allowScheduleWhenClosed?: boolean;
+
   @IsInt()
   @Min(0)
   @IsOptional()
