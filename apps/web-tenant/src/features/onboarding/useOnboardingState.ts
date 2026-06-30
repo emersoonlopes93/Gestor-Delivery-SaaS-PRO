@@ -50,24 +50,53 @@ type BackendOnboardingStatus = {
 };
 
 const STORAGE_KEY = 'onboarding_state';
-const TOTAL_STEPS = 9;
+const STORAGE_VERSION = 2;
+const TOTAL_STEPS = 10;
+
+function normalizeStoredStep(step: unknown, version: number) {
+  if (typeof step !== 'number' || !Number.isFinite(step)) return undefined;
+  if (version < STORAGE_VERSION && step >= 2) return step + 1;
+  return step;
+}
+
+function normalizeStoredState(data: Partial<OnboardingStateData> & { version?: number }) {
+  const version = typeof data.version === 'number' ? data.version : 1;
+  const currentStep = normalizeStoredStep(data.currentStep, version);
+  const visitedSteps = Array.isArray(data.visitedSteps)
+    ? Array.from(
+        new Set(
+          data.visitedSteps
+            .map((step) => normalizeStoredStep(step, version))
+            .filter((step): step is number => typeof step === 'number'),
+        ),
+      ).sort((a, b) => a - b)
+    : undefined;
+
+  return {
+    ...data,
+    currentStep,
+    visitedSteps,
+    version: STORAGE_VERSION,
+  };
+}
 
 const STEP_BACKEND_MAPPING: Record<number, OnboardingBackendStep[]> = {
   0: ['basicInfo'],
   1: ['address'],
-  2: ['operatingHours'],
-  3: ['payments'],
-  4: ['catalog', 'menu'],
-  5: ['delivery'],
+  2: ['delivery'],
+  3: ['operatingHours'],
+  4: ['payments'],
+  5: ['catalog', 'menu'],
   6: [],
   7: [],
   8: [],
+  9: [],
 };
 
 function loadFromStorage(): Partial<OnboardingStateData> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) return normalizeStoredState(JSON.parse(raw));
   } catch {
     // ignore
   }
@@ -77,7 +106,7 @@ function loadFromStorage(): Partial<OnboardingStateData> {
 function saveToStorage(data: Partial<OnboardingStateData>) {
   try {
     const existing = loadFromStorage();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...existing, ...data }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...existing, ...data, version: STORAGE_VERSION }));
   } catch {
     // ignore
   }
@@ -87,11 +116,12 @@ function deriveVisitedStepsFromBackend(status: BackendOnboardingStatus): number[
   const visited = new Set<number>([0]);
 
   if (status.stepBasicInfo) visited.add(1);
-  if (status.stepAddress) visited.add(2);
+  if (status.stepAddress) visited.add(1);
+  if (status.stepDelivery) visited.add(2);
   if (status.stepOperatingHours) visited.add(3);
   if (status.stepPayments) visited.add(4);
   if (status.stepCatalog || status.stepMenu) visited.add(5);
-  if (status.stepDelivery) visited.add(6);
+  if (status.stepFirstOrder) visited.add(6);
 
   return Array.from(visited).sort((a, b) => a - b);
 }

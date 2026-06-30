@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Store,
   MapPin,
+  Truck,
   Clock,
   CreditCard,
   ShoppingBag,
@@ -20,6 +21,7 @@ import {
 import { useOnboardingState, AutoSaveStatus } from './useOnboardingState';
 import { Step1Identity } from './steps/Step1Identity';
 import { Step2Location } from './steps/Step2Location';
+import { Step3Delivery } from './steps/Step3Delivery';
 import { Step3Hours } from './steps/Step3Hours';
 import { Step4Payments } from './steps/Step4Payments';
 import { Step5Product } from './steps/Step5Product';
@@ -40,11 +42,12 @@ interface StepMeta {
 
 const STEPS: StepMeta[] = [
   { id: 'identity', title: 'Identidade', subtitle: 'Nome, logo, contato', icon: Store, colorClass: 'text-indigo-500', bgClass: 'bg-indigo-100 dark:bg-indigo-500/20', required: true },
-  { id: 'location', title: 'Localizacao', subtitle: 'Endereco e entrega', icon: MapPin, colorClass: 'text-emerald-500', required: true },
+  { id: 'location', title: 'Localizacao', subtitle: 'Endereco da loja', icon: MapPin, colorClass: 'text-emerald-500', required: true },
+  { id: 'delivery', title: 'Entrega', subtitle: 'Raio e taxas', icon: Truck, colorClass: 'text-emerald-600', required: true },
   { id: 'hours', title: 'Horarios', subtitle: 'Quando voce atende', icon: Clock, colorClass: 'text-amber-500', required: true },
   { id: 'payments', title: 'Pagamentos', subtitle: 'Como cobrar os clientes', icon: CreditCard, colorClass: 'text-violet-500', required: true },
   { id: 'products', title: 'Produtos', subtitle: 'Seu primeiro item no menu', icon: ShoppingBag, colorClass: 'text-orange-500', required: true },
-  { id: 'rules', title: 'Pedidos', subtitle: 'Entrega, retirada e agenda', icon: Settings2, colorClass: 'text-teal-500', required: true },
+  { id: 'rules', title: 'Pedidos', subtitle: 'Retirada e agenda', icon: Settings2, colorClass: 'text-teal-500', required: true },
   { id: 'storefront', title: 'Vitrine', subtitle: 'Visual da loja online', icon: Palette, colorClass: 'text-pink-500', required: false },
   { id: 'ifood', title: 'iFood', subtitle: 'Conexao opcional em beta', icon: Link2, colorClass: 'text-sky-500', required: false },
   { id: 'review', title: 'Revisao', subtitle: 'Ativar sua loja', icon: Rocket, colorClass: 'text-indigo-600', required: false },
@@ -234,18 +237,20 @@ export function OnboardingWizard() {
       case 1:
         return <Step2Location {...commonProps} onMarkValid={(v) => markValidation('hasAddress', v)} />;
       case 2:
-        return <Step3Hours {...commonProps} onMarkValid={(v) => markValidation('hasOperatingHours', v)} />;
+        return <Step3Delivery {...commonProps} onMarkValid={(v) => markValidation('hasOperationalModes', v)} />;
       case 3:
-        return <Step4Payments {...commonProps} onMarkValid={(v) => markValidation('hasPaymentMethod', v)} />;
+        return <Step3Hours {...commonProps} onMarkValid={(v) => markValidation('hasOperatingHours', v)} />;
       case 4:
-        return <Step5Product {...commonProps} onMarkValid={(v) => markValidation('hasProduct', v)} />;
+        return <Step4Payments {...commonProps} onMarkValid={(v) => markValidation('hasPaymentMethod', v)} />;
       case 5:
-        return <Step6Rules {...commonProps} onMarkValid={(v) => markValidation('hasOperationalModes', v)} />;
+        return <Step5Product {...commonProps} onMarkValid={(v) => markValidation('hasProduct', v)} />;
       case 6:
-        return <Step7Storefront {...commonProps} />;
+        return <Step6Rules {...commonProps} onMarkValid={(v) => markValidation('hasOperationalModes', v)} />;
       case 7:
-        return <Step8Ifood {...commonProps} initialChoice={ifoodChoice} onChoiceChange={setIfoodChoice} />;
+        return <Step7Storefront {...commonProps} />;
       case 8:
+        return <Step8Ifood {...commonProps} initialChoice={ifoodChoice} onChoiceChange={setIfoodChoice} />;
+      case 9:
         return (
           <Step8Review
             validation={validation}

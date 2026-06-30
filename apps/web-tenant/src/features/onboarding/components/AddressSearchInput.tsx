@@ -44,7 +44,7 @@ export function AddressSearchInput({
   const placesServiceRef = useRef<MapsPlacesService | null>(null);
   const placesContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY;
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY ?? import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const hasSearchText = value.trim().length > 0;
 
   useEffect(() => {
@@ -89,7 +89,7 @@ export function AddressSearchInput({
       autocompleteServiceRef.current?.getPlacePredictions(
         {
           input: currentQuery,
-          componentRestrictions: { country: 'br' },
+          componentRestrictions: { country: 'BR' },
           types: ['address'],
         },
         (predictions, status) => {

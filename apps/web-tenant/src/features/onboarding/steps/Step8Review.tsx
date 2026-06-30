@@ -38,11 +38,11 @@ const REQUIREMENT_TO_STEP: Record<string, number> = {
   store_name: 0,
   structured_address: 1,
   store_coordinates: 1,
-  operating_hours: 2,
-  payment_methods: 3,
-  catalog: 4,
-  delivery_config: 1,
-  order_modes: 5,
+  delivery_config: 2,
+  operating_hours: 3,
+  payment_methods: 4,
+  catalog: 5,
+  order_modes: 6,
 };
 
 const REQUIREMENT_LABELS: Record<string, string> = {
@@ -196,11 +196,11 @@ export function Step8Review({ validation, onActivate, onPrev, goToStep }: Step8P
               const stepMap: Record<string, number> = {
                 profile: 0,
                 location: 1,
-                hours: 2,
-                payments: 3,
-                catalog: 4,
-                delivery: 5,
-                storefront: 6,
+                delivery: 2,
+                hours: 3,
+                payments: 4,
+                catalog: 5,
+                storefront: 7,
               };
               const targetStep = stepMap[dim.key];
               if (targetStep !== undefined) {
