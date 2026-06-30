@@ -1,16 +1,14 @@
+import type {
+  AdminTenantFeatureItem,
+  AdminTenantFeaturesResponse,
+  FeaturePresetPreviewResponse,
+  FeatureTenantOverrideMode,
+} from '@gestor/types';
 import { api } from '../../lib/api-client';
-
-export type TenantFeatureKey =
-  | 'ai_agent'
-  | 'campaigns'
-  | 'ifood_integration'
-  | 'advanced_reports'
-  | 'custom_domain'
-  | 'priority_support';
 
 export type TenantFeatureOverride = {
   id: string;
-  featureKey: TenantFeatureKey;
+  featureKey: string;
   enabled: boolean;
   source: string;
   reason: string;
@@ -55,6 +53,14 @@ export type TenantEntitlements = {
   featureOverrides: TenantFeatureOverride[];
 };
 
+export type TenantFeaturePreset = {
+  key: string;
+  name: string;
+  description: string;
+  enabledCount: number;
+  disabledCount: number;
+};
+
 export const adminTenantsApi = {
   getTenant: async (tenantId: string) => {
     const res = await api.get(`/admin/tenants/${tenantId}`);
@@ -64,22 +70,32 @@ export const adminTenantsApi = {
     const res = await api.get<TenantEntitlements>(`/admin/tenants/${tenantId}/entitlements`);
     return res.data;
   },
-  upsertFeatureOverride: async (
-    tenantId: string,
-    featureKey: TenantFeatureKey,
-    body: { enabled: boolean; reason: string; expiresAt?: string | null },
-  ) => {
-    const res = await api.put<TenantEntitlements>(`/admin/tenants/${tenantId}/entitlements/${featureKey}`, body);
+  getFeatures: async (tenantId: string) => {
+    const res = await api.get<AdminTenantFeaturesResponse>(`/admin/tenants/${tenantId}/features`);
     return res.data;
   },
-  deleteFeatureOverride: async (
+  listPresets: async () => {
+    const res = await api.get<TenantFeaturePreset[]>('/admin/features/presets');
+    return res.data;
+  },
+  updateFeatureOverride: async (
     tenantId: string,
-    featureKey: TenantFeatureKey,
-    reason: string,
+    featureKey: string,
+    body: { mode: FeatureTenantOverrideMode; reason?: string; expiresAt?: string | null },
   ) => {
-    const res = await api.delete<TenantEntitlements>(`/admin/tenants/${tenantId}/entitlements/${featureKey}`, {
-      reason,
-    });
+    const res = await api.patch<AdminTenantFeatureItem>(`/admin/tenants/${tenantId}/features/${featureKey}/override`, body);
+    return res.data;
+  },
+  previewPreset: async (tenantId: string, presetKey: string) => {
+    const res = await api.post<FeaturePresetPreviewResponse>(`/admin/tenants/${tenantId}/features/presets/${presetKey}/preview`);
+    return res.data;
+  },
+  applyPreset: async (
+    tenantId: string,
+    presetKey: string,
+    body: { reason: string; confirmation: string },
+  ) => {
+    const res = await api.post<FeaturePresetPreviewResponse>(`/admin/tenants/${tenantId}/features/presets/${presetKey}/apply`, body);
     return res.data;
   },
 };

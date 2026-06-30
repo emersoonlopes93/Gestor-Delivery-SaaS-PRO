@@ -14,6 +14,9 @@ describe('PlanGatingGuard financial enforcement', () => {
   const jwtService = {
     verify: jest.fn(),
   };
+  const featureControlService = {
+    resolveTenantFeature: jest.fn(),
+  };
 
   const makeGuard = () =>
     new PlanGatingGuard(
@@ -21,6 +24,7 @@ describe('PlanGatingGuard financial enforcement', () => {
       billingService as never,
       tenantBillingResolver as never,
       jwtService as never,
+      featureControlService as never,
     );
 
   const makeContext = (path: string) => ({
@@ -39,6 +43,11 @@ describe('PlanGatingGuard financial enforcement', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     reflector.getAllAndOverride.mockReturnValue(undefined);
+    featureControlService.resolveTenantFeature.mockResolvedValue({
+      enabled: true,
+      reason: 'enabled',
+      source: 'feature_catalog',
+    });
   });
 
   it('blocks operational tenant routes when subscription is suspended', async () => {

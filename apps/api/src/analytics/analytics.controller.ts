@@ -83,6 +83,7 @@ export class AnalyticsController {
   }
 
   @Get('business-intelligence')
+  @RequiresFeature('bi_advanced')
   @RequirePermissions('reports.read')
   async getBusinessIntelligence(@CurrentTenant() tenantId: string) {
     const [dashboard, profitability, abcCurve, customerIntelligence, heatmap, forecast, products, campaigns, loyalty] =

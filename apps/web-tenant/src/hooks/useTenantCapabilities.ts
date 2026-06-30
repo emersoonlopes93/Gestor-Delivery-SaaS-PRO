@@ -20,6 +20,10 @@ const ENV_FLAG_TO_FEATURE_KEY: Record<string, string> = {
   VITE_FEATURE_ADMIN_INTEGRATIONS: 'admin_integrations',
 };
 
+const FEATURE_KEY_TO_ENV_FLAG: Record<string, string> = Object.fromEntries(
+  Object.entries(ENV_FLAG_TO_FEATURE_KEY).map(([flag, featureKey]) => [featureKey, flag]),
+);
+
 function readEnvFlag(flag?: string): boolean {
   if (!flag) return true;
   const rawValue = import.meta.env[flag];
@@ -43,23 +47,38 @@ export function useTenantCapabilities() {
   });
 
   const featureVisibility = useMemo(() => {
-    return (flag?: string) => {
-      if (!flag) return true;
-
-      const featureKey = ENV_FLAG_TO_FEATURE_KEY[flag];
-      const capabilityDecision = featureKey ? query.data?.features?.[featureKey] : undefined;
+    return (flag?: string, featureKey?: string) => {
+      const resolvedFeatureKey = featureKey ?? (flag ? ENV_FLAG_TO_FEATURE_KEY[flag] : undefined);
+      const capabilityDecision = resolvedFeatureKey ? query.data?.features?.[resolvedFeatureKey] : undefined;
 
       if (capabilityDecision) {
         return capabilityDecision.enabled;
       }
 
-      return readEnvFlag(flag);
+      if (flag) {
+        return readEnvFlag(flag);
+      }
+
+      if (resolvedFeatureKey) {
+        const fallbackFlag = FEATURE_KEY_TO_ENV_FLAG[resolvedFeatureKey];
+        if (fallbackFlag) {
+          return readEnvFlag(fallbackFlag);
+        }
+      }
+
+      return !resolvedFeatureKey;
     };
+  }, [query.data]);
+
+  const getFeatureDecision = useMemo(() => {
+    return (featureKey: string) => query.data?.features?.[featureKey];
   }, [query.data]);
 
   return {
     ...query,
     capabilities: query.data,
     isFeatureVisible: featureVisibility,
+    isFeatureEnabled: (featureKey: string) => featureVisibility(undefined, featureKey),
+    getFeatureDecision,
   };
 }

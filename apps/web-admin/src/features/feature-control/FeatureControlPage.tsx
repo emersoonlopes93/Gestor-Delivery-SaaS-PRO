@@ -1,25 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Layers3, Lock, RefreshCw, Search, ShieldAlert, SlidersHorizontal } from 'lucide-react';
+import { Layers3, Lock, RefreshCw, ShieldAlert, SlidersHorizontal } from 'lucide-react';
+import type { AdminFeatureCatalogItem, FeaturePresetPreviewResponse } from '@gestor/types';
 import { api, ApiError } from '../../lib/api-client';
 import { useAdminPermissions } from '../../hooks/use-admin-auth';
 
-type FeatureStatus = 'stable' | 'beta' | 'internal' | 'coming_soon' | 'legacy';
 type FeatureOperationalStatus = 'enabled' | 'disabled' | 'beta' | 'internal' | 'coming_soon';
 
-type FeatureCatalogItem = {
-  featureKey: string;
+type FeaturePresetSummary = {
+  key: string;
   name: string;
-  description?: string;
-  category: string;
-  essential: boolean;
-  canDisable: boolean;
-  catalogStatus: FeatureStatus;
-  globalStatus: FeatureOperationalStatus;
-  envFallbackKey?: string;
-  moduleKey?: string;
-  requiredPermission?: string[];
-  updatedAt: string | null;
-  updatedBy: string | null;
+  description: string;
+  enabledCount: number;
+  disabledCount: number;
+};
+
+type GlobalStatusModalState = {
+  item: AdminFeatureCatalogItem;
+  nextStatus: FeatureOperationalStatus;
+  reason: string;
+  confirmationWord: string;
+};
+
+type GlobalPresetModalState = {
+  presetKey: string;
+  presetName: string;
+  reason: string;
+  confirmation: string;
+  preview: FeaturePresetPreviewResponse | null;
 };
 
 const STATUS_META: Record<FeatureOperationalStatus, { label: string; classes: string }> = {
@@ -28,14 +35,6 @@ const STATUS_META: Record<FeatureOperationalStatus, { label: string; classes: st
   beta: { label: 'Beta', classes: 'bg-amber-500/10 text-amber-700 border-amber-200' },
   internal: { label: 'Interna', classes: 'bg-slate-500/10 text-slate-700 border-slate-200' },
   coming_soon: { label: 'Em breve', classes: 'bg-sky-500/10 text-sky-700 border-sky-200' },
-};
-
-const CATALOG_META: Record<FeatureStatus, { label: string; classes: string }> = {
-  stable: { label: 'Stable', classes: 'bg-emerald-500/10 text-emerald-700 border-emerald-200' },
-  beta: { label: 'Beta', classes: 'bg-amber-500/10 text-amber-700 border-amber-200' },
-  internal: { label: 'Internal', classes: 'bg-slate-500/10 text-slate-700 border-slate-200' },
-  coming_soon: { label: 'Coming soon', classes: 'bg-sky-500/10 text-sky-700 border-sky-200' },
-  legacy: { label: 'Legacy', classes: 'bg-rose-500/10 text-rose-700 border-rose-200' },
 };
 
 function FeatureBadge(props: { label: string; className: string }) {
@@ -50,7 +49,8 @@ export function FeatureControlPage() {
   const { has } = useAdminPermissions();
   const canManage = has('saas.modules.manage');
 
-  const [items, setItems] = useState<FeatureCatalogItem[]>([]);
+  const [items, setItems] = useState<AdminFeatureCatalogItem[]>([]);
+  const [presets, setPresets] = useState<FeaturePresetSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -61,19 +61,21 @@ export function FeatureControlPage() {
   const [status, setStatus] = useState('all');
   const [scope, setScope] = useState('all');
 
-  const [selectedItem, setSelectedItem] = useState<FeatureCatalogItem | null>(null);
-  const [nextStatus, setNextStatus] = useState<FeatureOperationalStatus>('enabled');
-  const [reason, setReason] = useState('');
-  const [confirmationWord, setConfirmationWord] = useState('');
+  const [statusModal, setStatusModal] = useState<GlobalStatusModalState | null>(null);
+  const [presetModal, setPresetModal] = useState<GlobalPresetModalState | null>(null);
 
   const loadItems = async () => {
     setLoading(true);
     setErrorMessage(null);
     try {
-      const res = await api.get<FeatureCatalogItem[]>('/admin/features');
-      setItems(res.data);
+      const [catalogResponse, presetsResponse] = await Promise.all([
+        api.get<AdminFeatureCatalogItem[]>('/admin/features'),
+        api.get<FeaturePresetSummary[]>('/admin/features/presets'),
+      ]);
+      setItems(catalogResponse.data);
+      setPresets(presetsResponse.data);
     } catch (error) {
-      const message = error instanceof ApiError ? error.message : 'Nao foi possivel carregar o catalogo de features.';
+      const message = error instanceof ApiError ? error.message : 'Nao foi possivel carregar o Feature Control Center.';
       setErrorMessage(message);
     } finally {
       setLoading(false);
@@ -111,31 +113,28 @@ export function FeatureControlPage() {
     };
   }, [items]);
 
-  const openStatusModal = (item: FeatureCatalogItem) => {
-    setSelectedItem(item);
-    setNextStatus(item.globalStatus);
-    setReason('');
-    setConfirmationWord('');
-    setSuccessMessage(null);
+  const openStatusModal = (item: AdminFeatureCatalogItem) => {
+    setStatusModal({
+      item,
+      nextStatus: item.globalStatus,
+      reason: '',
+      confirmationWord: '',
+    });
     setErrorMessage(null);
+    setSuccessMessage(null);
   };
 
-  const closeModal = (force = false) => {
-    if (saving && !force) return;
-    setSelectedItem(null);
-    setReason('');
-    setConfirmationWord('');
-  };
+  const saveGlobalStatus = async () => {
+    if (!statusModal) {
+      return;
+    }
 
-  const handleSave = async () => {
-    if (!selectedItem) return;
-
-    if (!reason.trim()) {
+    if (!statusModal.reason.trim()) {
       setErrorMessage('Informe o motivo operacional da alteracao.');
       return;
     }
 
-    if (nextStatus === 'disabled' && confirmationWord.trim().toUpperCase() !== 'DESATIVAR') {
+    if (statusModal.nextStatus === 'disabled' && statusModal.confirmationWord.trim().toUpperCase() !== 'DESATIVAR') {
       setErrorMessage('Digite DESATIVAR para confirmar a desativacao global.');
       return;
     }
@@ -143,17 +142,75 @@ export function FeatureControlPage() {
     setSaving(true);
     setErrorMessage(null);
     setSuccessMessage(null);
+
     try {
-      const res = await api.patch<FeatureCatalogItem>(`/admin/features/${selectedItem.featureKey}/status`, {
-        status: nextStatus,
-        reason: reason.trim(),
+      const res = await api.patch<AdminFeatureCatalogItem>(`/admin/features/${statusModal.item.featureKey}/status`, {
+        status: statusModal.nextStatus,
+        reason: statusModal.reason.trim(),
       });
 
       setItems((current) => current.map((item) => (item.featureKey === res.data.featureKey ? res.data : item)));
       setSuccessMessage(`Status global de ${res.data.name} atualizado para ${STATUS_META[res.data.globalStatus].label.toLowerCase()}.`);
-      closeModal(true);
+      setStatusModal(null);
     } catch (error) {
       const message = error instanceof ApiError ? error.message : 'Nao foi possivel salvar a alteracao.';
+      setErrorMessage(message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openPresetPreview = async (preset: FeaturePresetSummary) => {
+    setSaving(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await api.post<FeaturePresetPreviewResponse>(`/admin/features/presets/${preset.key}/preview`);
+      setPresetModal({
+        presetKey: preset.key,
+        presetName: preset.name,
+        reason: '',
+        confirmation: '',
+        preview: res.data,
+      });
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : 'Nao foi possivel gerar o preview do preset global.';
+      setErrorMessage(message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const applyGlobalPreset = async () => {
+    if (!presetModal) {
+      return;
+    }
+
+    if (!presetModal.reason.trim()) {
+      setErrorMessage('Motivo operacional e obrigatorio para aplicar o preset global.');
+      return;
+    }
+
+    if (presetModal.confirmation.trim().toUpperCase() !== 'APLICAR GLOBAL') {
+      setErrorMessage('Digite APLICAR GLOBAL para confirmar.');
+      return;
+    }
+
+    setSaving(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      await api.post(`/admin/features/presets/${presetModal.presetKey}/apply-global`, {
+        reason: presetModal.reason.trim(),
+        confirmation: presetModal.confirmation.trim(),
+      });
+      await loadItems();
+      setSuccessMessage(`Preset ${presetModal.presetName} aplicado globalmente.`);
+      setPresetModal(null);
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : 'Nao foi possivel aplicar o preset global.';
       setErrorMessage(message);
     } finally {
       setSaving(false);
@@ -164,10 +221,10 @@ export function FeatureControlPage() {
     <div className="mx-auto max-w-7xl space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="mb-2 text-sm font-black uppercase tracking-widest text-primary">P16.4B</p>
+          <p className="mb-2 text-sm font-black uppercase tracking-widest text-primary">P16.4C</p>
           <h1 className="text-3xl font-black tracking-tight text-foreground">Feature Control Center</h1>
           <p className="mt-2 max-w-3xl text-base font-semibold text-muted-foreground">
-            Controle global auditavel para features opcionais, sem desligar o core e sem depender apenas de `.env`.
+            Governanca global com catalogo oficial, bloqueio de core, presets MVP com dry-run e trilha auditavel.
           </p>
         </div>
         <button
@@ -181,35 +238,58 @@ export function FeatureControlPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-border bg-card p-5">
-          <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Catalogo total</p>
-          <p className="mt-3 text-3xl font-black text-foreground">{stats.total}</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card p-5">
-          <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Ativas</p>
-          <p className="mt-3 text-3xl font-black text-emerald-600">{stats.enabled}</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card p-5">
-          <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Essenciais protegidas</p>
-          <p className="mt-3 text-3xl font-black text-slate-700">{stats.protected}</p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card p-5">
-          <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Com restricao global</p>
-          <p className="mt-3 text-3xl font-black text-amber-600">{stats.constrained}</p>
-        </div>
+        <StatCard label="Catalogo total" value={String(stats.total)} />
+        <StatCard label="Ativas" value={String(stats.enabled)} accent="text-emerald-600" />
+        <StatCard label="Essenciais protegidas" value={String(stats.protected)} />
+        <StatCard label="Com restricao global" value={String(stats.constrained)} accent="text-amber-600" />
       </div>
+
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-xl font-black text-foreground">Presets MVP</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              O preview mostra diff, ignoradas essenciais e bloqueios antes de qualquer aplicacao global.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          {presets.map((preset) => (
+            <div key={preset.key} className="rounded-2xl border border-border bg-background p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-black text-foreground">{preset.name}</h3>
+                  <p className="mt-1 text-xs font-mono text-muted-foreground">{preset.key}</p>
+                </div>
+                <button
+                  type="button"
+                  disabled={!canManage || saving}
+                  onClick={() => void openPresetPreview(preset)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs font-black text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Pre-visualizar
+                </button>
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">{preset.description}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <FeatureBadge label={`${preset.enabledCount} liga`} className="bg-emerald-500/10 text-emerald-700 border-emerald-200" />
+                <FeatureBadge label={`${preset.disabledCount} desliga`} className="bg-red-500/10 text-red-700 border-red-200" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="rounded-2xl border border-border bg-card p-4">
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr),180px,180px,180px]">
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar por nome, chave, modulo..."
-              className="h-11 w-full rounded-xl border border-input bg-background pl-10 pr-4 text-sm outline-none transition focus:ring-2 focus:ring-primary"
-            />
-          </label>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Buscar por nome, chave, modulo..."
+            className="h-11 rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:ring-2 focus:ring-primary"
+          />
 
           <select
             value={category}
@@ -269,7 +349,6 @@ export function FeatureControlPage() {
                 <th className="px-5 py-4">Feature</th>
                 <th className="px-5 py-4">Categoria</th>
                 <th className="px-5 py-4">Status global</th>
-                <th className="px-5 py-4">Catalogo</th>
                 <th className="px-5 py-4">Modulo / fallback</th>
                 <th className="px-5 py-4">Ultima alteracao</th>
                 <th className="px-5 py-4 text-right">Acao</th>
@@ -278,13 +357,13 @@ export function FeatureControlPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-sm font-semibold text-muted-foreground">
+                  <td colSpan={6} className="px-5 py-10 text-center text-sm font-semibold text-muted-foreground">
                     Carregando catalogo oficial...
                   </td>
                 </tr>
               ) : filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-sm font-semibold text-muted-foreground">
+                  <td colSpan={6} className="px-5 py-10 text-center text-sm font-semibold text-muted-foreground">
                     Nenhuma feature encontrada com os filtros atuais.
                   </td>
                 </tr>
@@ -311,9 +390,6 @@ export function FeatureControlPage() {
                     </td>
                     <td className="px-5 py-4">
                       <FeatureBadge label={STATUS_META[item.globalStatus].label} className={STATUS_META[item.globalStatus].classes} />
-                    </td>
-                    <td className="px-5 py-4">
-                      <FeatureBadge label={CATALOG_META[item.catalogStatus].label} className={CATALOG_META[item.catalogStatus].classes} />
                     </td>
                     <td className="px-5 py-4 text-xs text-muted-foreground">
                       <div>{item.moduleKey ? `Modulo: ${item.moduleKey}` : 'Sem modulo dedicado'}</div>
@@ -365,7 +441,6 @@ export function FeatureControlPage() {
               </div>
               {item.description ? <p className="mt-3 text-sm text-muted-foreground">{item.description}</p> : null}
               <div className="mt-4 flex flex-wrap gap-2">
-                <FeatureBadge label={CATALOG_META[item.catalogStatus].label} className={CATALOG_META[item.catalogStatus].classes} />
                 <FeatureBadge
                   label={item.essential ? 'Essencial' : 'Opcional'}
                   className={item.essential ? 'bg-slate-500/10 text-slate-700 border-slate-200' : 'bg-primary/10 text-primary border-primary/20'}
@@ -402,7 +477,7 @@ export function FeatureControlPage() {
         </div>
       </div>
 
-      {selectedItem ? (
+      {statusModal ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-xl rounded-3xl border border-border bg-background p-6 shadow-2xl">
             <div className="flex items-start gap-3">
@@ -412,7 +487,7 @@ export function FeatureControlPage() {
               <div className="min-w-0">
                 <h2 className="text-xl font-black text-foreground">Alterar status global</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {selectedItem.name} • <span className="font-mono">{selectedItem.featureKey}</span>
+                  {statusModal.item.name} - <span className="font-mono">{statusModal.item.featureKey}</span>
                 </p>
               </div>
             </div>
@@ -421,8 +496,8 @@ export function FeatureControlPage() {
               <label className="block">
                 <span className="mb-2 block text-xs font-black uppercase tracking-widest text-muted-foreground">Novo status</span>
                 <select
-                  value={nextStatus}
-                  onChange={(event) => setNextStatus(event.target.value as FeatureOperationalStatus)}
+                  value={statusModal.nextStatus}
+                  onChange={(event) => setStatusModal((current) => current ? { ...current, nextStatus: event.target.value as FeatureOperationalStatus } : current)}
                   className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:ring-2 focus:ring-primary"
                 >
                   <option value="enabled">Ativa</option>
@@ -436,20 +511,20 @@ export function FeatureControlPage() {
               <label className="block">
                 <span className="mb-2 block text-xs font-black uppercase tracking-widest text-muted-foreground">Motivo operacional</span>
                 <textarea
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
+                  value={statusModal.reason}
+                  onChange={(event) => setStatusModal((current) => current ? { ...current, reason: event.target.value } : current)}
                   rows={4}
                   placeholder="Ex: liberado para piloto interno com acompanhamento do time..."
                   className="w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary"
                 />
               </label>
 
-              {nextStatus === 'disabled' ? (
+              {statusModal.nextStatus === 'disabled' ? (
                 <label className="block">
                   <span className="mb-2 block text-xs font-black uppercase tracking-widest text-red-600">Confirmacao forte</span>
                   <input
-                    value={confirmationWord}
-                    onChange={(event) => setConfirmationWord(event.target.value)}
+                    value={statusModal.confirmationWord}
+                    onChange={(event) => setStatusModal((current) => current ? { ...current, confirmationWord: event.target.value } : current)}
                     placeholder="Digite DESATIVAR"
                     className="h-11 w-full rounded-xl border border-red-200 bg-red-50 px-3 text-sm outline-none transition focus:ring-2 focus:ring-red-400"
                   />
@@ -460,7 +535,7 @@ export function FeatureControlPage() {
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 type="button"
-                onClick={() => closeModal()}
+                onClick={() => setStatusModal(null)}
                 className="rounded-xl border border-border px-4 py-3 text-sm font-black text-foreground transition hover:bg-muted"
               >
                 Cancelar
@@ -468,7 +543,7 @@ export function FeatureControlPage() {
               <button
                 type="button"
                 disabled={saving}
-                onClick={() => void handleSave()}
+                onClick={() => void saveGlobalStatus()}
                 className="rounded-xl bg-primary px-4 py-3 text-sm font-black text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {saving ? 'Salvando...' : 'Salvar status global'}
@@ -477,6 +552,132 @@ export function FeatureControlPage() {
           </div>
         </div>
       ) : null}
+
+      {presetModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-4xl rounded-3xl border border-border bg-background p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-black text-foreground">Preview do preset global</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {presetModal.presetName} - revise o diff antes de aplicar no catalogo inteiro.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPresetModal(null)}
+                className="rounded-xl border border-border px-3 py-2 text-xs font-black text-foreground transition hover:bg-muted"
+              >
+                Fechar
+              </button>
+            </div>
+
+            {presetModal.preview ? (
+              <>
+                <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                  <StatCard compact label="Total" value={String(presetModal.preview.summary.total)} />
+                  <StatCard compact label="Liga" value={String(presetModal.preview.summary.willEnable)} accent="text-emerald-600" />
+                  <StatCard compact label="Desliga" value={String(presetModal.preview.summary.willDisable)} accent="text-red-600" />
+                  <StatCard compact label="Ignoradas" value={String(presetModal.preview.summary.ignoredEssential)} />
+                  <StatCard compact label="Bloqueadas" value={String(presetModal.preview.summary.blocked)} accent="text-amber-600" />
+                  <StatCard compact label="Sem mudanca" value={String(presetModal.preview.summary.unchanged)} />
+                </div>
+
+                <div className="mt-6 max-h-[320px] overflow-auto rounded-2xl border border-border">
+                  <table className="min-w-full text-left text-sm">
+                    <thead className="bg-muted/60 text-[11px] font-black uppercase tracking-widest text-muted-foreground">
+                      <tr>
+                        <th className="px-4 py-3">Feature</th>
+                        <th className="px-4 py-3">Acao</th>
+                        <th className="px-4 py-3">Antes</th>
+                        <th className="px-4 py-3">Depois</th>
+                        <th className="px-4 py-3">Motivo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {presetModal.preview.changes.map((change) => (
+                        <tr key={change.featureKey} className="border-t border-border align-top">
+                          <td className="px-4 py-3">
+                            <div className="font-black text-foreground">{change.name}</div>
+                            <div className="mt-1 text-xs font-mono text-muted-foreground">{change.featureKey}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <FeatureBadge
+                              label={change.action}
+                              className={
+                                change.action === 'enable'
+                                  ? 'bg-emerald-500/10 text-emerald-700 border-emerald-200'
+                                  : change.action === 'disable'
+                                    ? 'bg-red-500/10 text-red-700 border-red-200'
+                                    : change.action === 'blocked'
+                                      ? 'bg-amber-500/10 text-amber-700 border-amber-200'
+                                      : 'bg-slate-500/10 text-slate-700 border-slate-200'
+                              }
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">{change.effectiveEnabledBefore ? 'Liberada' : 'Bloqueada'}</td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">{change.effectiveEnabledAfter ? 'Liberada' : 'Bloqueada'}</td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">{change.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-black uppercase tracking-widest text-muted-foreground">Motivo operacional</span>
+                    <textarea
+                      value={presetModal.reason}
+                      onChange={(event) => setPresetModal((current) => current ? { ...current, reason: event.target.value } : current)}
+                      rows={4}
+                      placeholder="Ex: baseline MVP comercial para novos tenants..."
+                      className="w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-primary"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-black uppercase tracking-widest text-red-600">Confirmacao forte</span>
+                    <input
+                      value={presetModal.confirmation}
+                      onChange={(event) => setPresetModal((current) => current ? { ...current, confirmation: event.target.value } : current)}
+                      placeholder="Digite APLICAR GLOBAL"
+                      className="h-11 w-full rounded-xl border border-red-200 bg-red-50 px-3 text-sm outline-none transition focus:ring-2 focus:ring-red-400"
+                    />
+                  </label>
+                </div>
+              </>
+            ) : null}
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setPresetModal(null)}
+                className="rounded-xl border border-border px-4 py-3 text-sm font-black text-foreground transition hover:bg-muted"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={saving || !canManage || !presetModal.preview}
+                onClick={() => void applyGlobalPreset()}
+                className="rounded-xl bg-primary px-4 py-3 text-sm font-black text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving ? 'Aplicando...' : 'Aplicar preset global'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function StatCard(props: { label: string; value: string; accent?: string; compact?: boolean }) {
+  return (
+    <div className={`rounded-2xl border border-border bg-card ${props.compact ? 'p-4' : 'p-5'}`}>
+      <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">{props.label}</p>
+      <p className={`mt-3 text-3xl font-black ${props.accent ?? 'text-foreground'}`}>{props.value}</p>
     </div>
   );
 }

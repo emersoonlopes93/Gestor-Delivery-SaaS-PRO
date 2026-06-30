@@ -4,6 +4,8 @@ import { JwtService } from '@nestjs/jwt';
 import { BillingService } from '../../billing/billing.service';
 import { TenantBillingResolverService } from '../../billing/tenant-billing-resolver.service';
 import { REQUIRES_FEATURE_KEY } from '../decorators/requires-feature.decorator';
+import { FeatureControlService } from '../../feature-control/feature-control.service';
+import { getFeatureCatalogEntry } from '@gestor/core';
 
 type RequestWithTenant = {
   headers: Record<string, string | string[] | undefined>;
@@ -11,7 +13,7 @@ type RequestWithTenant = {
   route?: { path?: string };
   url?: string;
   originalUrl?: string;
-  user?: { tenantId?: string; type?: string };
+  user?: { sub?: string; tenantId?: string; id?: string; type?: string };
 };
 
 @Injectable()
@@ -23,6 +25,7 @@ export class PlanGatingGuard implements CanActivate {
     private billingService: BillingService,
     private tenantBillingResolver: TenantBillingResolverService,
     private jwtService: JwtService,
+    private featureControlService: FeatureControlService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -42,6 +45,26 @@ export class PlanGatingGuard implements CanActivate {
     this.assertTenantCanOperate(request, tenantId, state.subscriptionStatus, state.trialEndsAt, state.subscription?.gracePeriodEndsAt ?? null);
 
     if (requiredFeature) {
+      if (getFeatureCatalogEntry(requiredFeature)) {
+        const decision = await this.featureControlService.resolveTenantFeature({
+          tenantId,
+          featureKey: requiredFeature,
+          userId: request.user?.type === 'tenant' ? request.user.sub ?? request.user.id : undefined,
+        });
+
+        if (decision.enabled) {
+          return true;
+        }
+
+        throw new ForbiddenException({
+          error: 'FEATURE_DISABLED',
+          featureKey: requiredFeature,
+          reason: decision.reason,
+          source: decision.source ?? null,
+          message: `A funcionalidade ${requiredFeature} nao esta disponivel para este tenant.`,
+        });
+      }
+
       if (state.source === 'billing_v2') {
         if (state.allowAllModules || state.includedModules.includes(requiredFeature)) {
           return true;

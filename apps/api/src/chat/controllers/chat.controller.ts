@@ -20,6 +20,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { TenantAuthGuard } from '../../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../../rbac/guards/permissions.guard';
 import { RequirePermissions as Permissions } from '../../common/decorators';
+import { RequiresFeature } from '../../common/decorators/requires-feature.decorator';
 import { QuickRepliesService } from '../services/quick-replies.service';
 import { CreateQuickReplyDto, UpdateQuickReplyDto } from '../dto/quick-reply.dto';
 import { WhatsAppSenderService } from '../../whatsapp-channel/services/whatsapp-sender.service';
@@ -29,6 +30,7 @@ type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
 
 @Controller('chat')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
+@RequiresFeature('whatsapp_advanced')
 export class ChatController {
   private readonly logger = new Logger('ChatController');
   constructor(

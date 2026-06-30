@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { CrmPipelineStage, CrmTaskStatus } from '@prisma/client';
 import { RequirePermissions } from '../common/decorators';
+import { RequiresFeature } from '../common/decorators/requires-feature.decorator';
 import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { CrmEnterpriseService } from './crm-enterprise.service';
@@ -14,6 +15,7 @@ type TenantRequest = {
 
 @Controller('crm')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
+@RequiresFeature('crm_enterprise')
 export class CrmEnterpriseController {
   constructor(private readonly crmEnterpriseService: CrmEnterpriseService) {}
 

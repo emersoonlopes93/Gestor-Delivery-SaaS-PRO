@@ -16,7 +16,7 @@ type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
 
 @Controller('marketplaces')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
-@RequiresFeature('marketplace')
+@RequiresFeature('ifood_marketplace')
 export class MarketplaceTenantController {
   constructor(
     private readonly providerRegistry: MarketplaceProviderRegistryService,

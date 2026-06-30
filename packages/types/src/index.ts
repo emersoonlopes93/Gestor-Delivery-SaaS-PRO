@@ -48,6 +48,7 @@ export * from './notifications';
 export * from './employees';
 export * from './settings';
 export * from './capabilities';
+export * from './feature-control';
 
 // Modules with classes or constants (explicit values)
 export type { 

@@ -8,7 +8,7 @@ import { CreateGoalDTO, UpdateGoalDTO, GoalDTO } from '@gestor/types';
 
 @Controller('goals')
 @UseGuards(TenantAuthGuard, PermissionsGuard)
-@RequiresFeature('reports')
+@RequiresFeature('goals')
 export class GoalsController {
   constructor(private readonly goalsService: GoalsService) {}
 
