@@ -69,6 +69,7 @@ export class PrismaService
         'BaseMenuTemplateVersion',
         'BaseMenuCategory',
         'BaseMenuProduct',
+        'FeatureGlobalSetting',
       ];
 
       const model = params.model ?? '';
