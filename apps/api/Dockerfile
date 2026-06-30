@@ -19,6 +19,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json turbo.js
 COPY packages/ ./packages/
 COPY apps/api/package.json apps/api/
 COPY apps/api/prisma/ ./apps/api/prisma/
+ENV PRISMA_SKIP_POSTINSTALL_GENERATE=1
 RUN pnpm install --frozen-lockfile
 
 # Stage 3: Build API

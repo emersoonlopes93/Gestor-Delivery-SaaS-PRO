@@ -27,6 +27,7 @@ COPY apps/ ./apps/
 RUN find packages -type f -not -name "package.json" -delete
 RUN find apps -type f -not -name "package.json" -not -path "*/prisma/schema.prisma" -delete
 
+ENV PRISMA_SKIP_POSTINSTALL_GENERATE=1
 RUN pnpm install --frozen-lockfile
 
 # Stage 3: Build
