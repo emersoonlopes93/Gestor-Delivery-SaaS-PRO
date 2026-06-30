@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { BillingEntitlementsService } from '../billing/billing-entitlements.service';
 import { TenantBillingResolverService } from '../billing/tenant-billing-resolver.service';
@@ -7,11 +8,16 @@ import {
   FEATURE_CATALOG,
   FEATURE_CATALOG_BY_KEY,
   MODULE_CATALOG,
+  featureStatusToOperationalStatus,
   type BillingEntitlementFlagKey,
   type CatalogFeatureKey,
   type FeatureCatalogEntry,
+  type FeatureOperationalStatus,
+  type FeatureStatus,
 } from '@gestor/core';
 import type { TenantCapabilitiesResponse, TenantCapabilityDecision } from '@gestor/types';
+
+const PLATFORM_AUDIT_TENANT_SLUG = '__platform_audit__';
 
 type ResolveTenantFeatureInput = {
   tenantId: string;
@@ -31,12 +37,45 @@ type ActiveOverrideRow = {
   source: string;
 };
 
+type GlobalSettingRow = {
+  featureKey: string;
+  status: FeatureOperationalStatus;
+  reason: string | null;
+  updatedAt: Date;
+  updatedBy: string | null;
+};
+
 type FeatureResolutionContext = {
   billingState: Awaited<ReturnType<TenantBillingResolverService['getTenantBillingState']>>;
   entitlements: Awaited<ReturnType<BillingEntitlementsService['resolveTenantEntitlements']>>;
   permissions: string[];
   moduleAccessMap: Map<string, boolean>;
   activeOverrideMap: Map<string, ActiveOverrideRow>;
+  globalSettingsMap: Map<string, GlobalSettingRow>;
+};
+
+export type AdminFeatureCatalogItem = {
+  featureKey: string;
+  name: string;
+  description?: string;
+  category: string;
+  essential: boolean;
+  canDisable: boolean;
+  catalogStatus: FeatureStatus;
+  globalStatus: FeatureOperationalStatus;
+  envFallbackKey?: string;
+  moduleKey?: string;
+  requiredPermission?: string[];
+  updatedAt: Date | null;
+  updatedBy: string | null;
+};
+
+type UpdateGlobalFeatureStatusInput = {
+  featureKey: string;
+  status: FeatureOperationalStatus;
+  reason: string;
+  adminId: string;
+  ip?: string | null;
 };
 
 @Injectable()
@@ -91,16 +130,14 @@ export class FeatureControlService {
       );
 
       const enabled = relatedDecisions.some((decision) => decision.enabled);
-      const primaryReason = relatedDecisions.find((decision) => decision.enabled)?.reason
-        ?? relatedDecisions[0]?.reason
-        ?? 'plan_not_allowed';
+      const primaryDecision = relatedDecisions.find((decision) => decision.enabled) ?? relatedDecisions[0];
 
       return [
         moduleEntry.key,
         {
           enabled,
-          reason: primaryReason,
-          source: relatedDecisions.find((decision) => decision.source)?.source ?? 'feature_catalog',
+          reason: primaryDecision?.reason ?? 'plan_not_allowed',
+          source: primaryDecision?.source ?? 'feature_catalog',
         },
       ] as const;
     });
@@ -122,6 +159,108 @@ export class FeatureControlService {
     return FEATURE_CATALOG;
   }
 
+  async getAdminFeatureCatalog(): Promise<AdminFeatureCatalogItem[]> {
+    const globalSettingsMap = await this.getGlobalSettingsMap();
+
+    return FEATURE_CATALOG.map((feature) => {
+      const globalSetting = globalSettingsMap.get(feature.key) ?? null;
+      return {
+        featureKey: feature.key,
+        name: feature.name,
+        description: feature.description,
+        category: feature.category,
+        essential: feature.essential,
+        canDisable: feature.canDisable,
+        catalogStatus: feature.status,
+        globalStatus: this.resolveEffectiveGlobalStatus(feature, globalSetting),
+        envFallbackKey: feature.envFallbackKey,
+        moduleKey: feature.moduleKey,
+        requiredPermission: this.normalizePermissions(feature.requiredPermission),
+        updatedAt: globalSetting?.updatedAt ?? null,
+        updatedBy: globalSetting?.updatedBy ?? null,
+      };
+    });
+  }
+
+  async updateGlobalFeatureStatus(input: UpdateGlobalFeatureStatusInput): Promise<AdminFeatureCatalogItem> {
+    const feature = FEATURE_CATALOG_BY_KEY[input.featureKey as CatalogFeatureKey];
+    if (!feature) {
+      throw new BadRequestException('featureKey invalida.');
+    }
+
+    if (feature.essential || !feature.canDisable) {
+      throw new BadRequestException('Feature essencial nao pode ter status global alterado.');
+    }
+
+    const reason = input.reason.trim();
+    if (!reason) {
+      throw new BadRequestException('reason e obrigatorio.');
+    }
+
+    const setting = await this.prisma.$transaction(async (tx) => {
+      const previous = await tx.featureGlobalSetting.findUnique({
+        where: { featureKey: feature.key },
+      });
+
+      const updated = await tx.featureGlobalSetting.upsert({
+        where: { featureKey: feature.key },
+        update: {
+          status: input.status,
+          reason,
+          updatedBy: input.adminId,
+        },
+        create: {
+          featureKey: feature.key,
+          status: input.status,
+          reason,
+          updatedBy: input.adminId,
+        },
+      });
+
+      const tenantId = await this.platformAuditTenantId(tx);
+      await tx.auditLog.create({
+        data: {
+          tenantId,
+          userId: input.adminId,
+          userType: 'admin',
+          action: 'feature.global_status.update',
+          resource: 'feature_control',
+          details: {
+            featureKey: feature.key,
+            previousStatus: previous?.status ?? null,
+            nextStatus: updated.status,
+            reason,
+          },
+          ip: input.ip ?? null,
+        },
+      });
+
+      return updated;
+    });
+
+    return {
+      featureKey: feature.key,
+      name: feature.name,
+      description: feature.description,
+      category: feature.category,
+      essential: feature.essential,
+      canDisable: feature.canDisable,
+      catalogStatus: feature.status,
+      globalStatus: this.resolveEffectiveGlobalStatus(feature, {
+        featureKey: setting.featureKey,
+        status: this.normalizeGlobalStatus(setting.status),
+        reason: setting.reason,
+        updatedAt: setting.updatedAt,
+        updatedBy: setting.updatedBy,
+      }),
+      envFallbackKey: feature.envFallbackKey,
+      moduleKey: feature.moduleKey,
+      requiredPermission: this.normalizePermissions(feature.requiredPermission),
+      updatedAt: setting.updatedAt,
+      updatedBy: setting.updatedBy,
+    };
+  }
+
   private resolveTenantFeatureWithContext(
     input: ResolveTenantFeatureInput,
     context: FeatureResolutionContext,
@@ -135,12 +274,23 @@ export class FeatureControlService {
       return { enabled: true, reason: 'essential', source: 'feature_catalog' };
     }
 
-    const activeOverride = this.resolveActiveOverride(feature, context.activeOverrideMap);
+    const globalSetting = context.globalSettingsMap.get(feature.key) ?? null;
+    const globalStatus = this.resolveEffectiveGlobalStatus(feature, globalSetting);
+    const globalSource = globalSetting ? 'feature_global_setting' : 'feature_catalog';
 
-    if ((feature.status === 'internal' || feature.status === 'coming_soon') && activeOverride?.enabled !== true) {
-      return { enabled: false, reason: 'beta_disabled', source: feature.status };
+    if (globalStatus === 'disabled') {
+      return { enabled: false, reason: 'global_disabled', source: globalSource };
     }
 
+    if (globalStatus === 'internal') {
+      return { enabled: false, reason: 'global_internal', source: globalSource };
+    }
+
+    if (globalStatus === 'coming_soon') {
+      return { enabled: false, reason: 'coming_soon', source: globalSource };
+    }
+
+    const activeOverride = this.resolveActiveOverride(feature, context.activeOverrideMap);
     const availabilityResult = this.resolveFeatureAvailability(
       feature,
       context.billingState,
@@ -162,6 +312,14 @@ export class FeatureControlService {
       return envDecision;
     }
 
+    if (globalStatus === 'beta' && effectiveAvailability.reason === 'enabled') {
+      return {
+        enabled: true,
+        reason: 'global_beta',
+        source: globalSource,
+      };
+    }
+
     return effectiveAvailability;
   }
 
@@ -174,11 +332,12 @@ export class FeatureControlService {
   }
 
   private async buildContext(tenantId: string, userId?: string): Promise<FeatureResolutionContext> {
-    const [billingState, moduleAccessRows, entitlements, permissions] = await Promise.all([
+    const [billingState, moduleAccessRows, entitlements, permissions, globalSettingsMap] = await Promise.all([
       this.tenantBillingResolver.getTenantBillingState(tenantId),
       this.getTenantModuleAccessRows(tenantId),
       this.billingEntitlementsService.resolveTenantEntitlements(tenantId),
       userId ? this.rbacService.getUserPermissions(userId) : Promise.resolve<string[]>([]),
+      this.getGlobalSettingsMap(),
     ]);
 
     return {
@@ -198,7 +357,24 @@ export class FeatureControlService {
             },
           ]),
       ),
+      globalSettingsMap,
     };
+  }
+
+  private async getGlobalSettingsMap(): Promise<Map<string, GlobalSettingRow>> {
+    const rows = await this.prisma.featureGlobalSetting.findMany();
+    return new Map<string, GlobalSettingRow>(
+      rows.map((row) => [
+        row.featureKey,
+        {
+          featureKey: row.featureKey,
+          status: this.normalizeGlobalStatus(row.status),
+          reason: row.reason,
+          updatedAt: row.updatedAt,
+          updatedBy: row.updatedBy,
+        },
+      ]),
+    );
   }
 
   private resolveActiveOverride(
@@ -340,5 +516,45 @@ export class FeatureControlService {
       reason: 'tenant_enabled_override',
       source: activeOverride.source,
     };
+  }
+
+  private resolveEffectiveGlobalStatus(
+    feature: FeatureCatalogEntry,
+    globalSetting: GlobalSettingRow | null,
+  ): FeatureOperationalStatus {
+    if (globalSetting) {
+      return globalSetting.status;
+    }
+    return featureStatusToOperationalStatus(feature.status);
+  }
+
+  private normalizeGlobalStatus(status: string): FeatureOperationalStatus {
+    if (
+      status === 'enabled'
+      || status === 'disabled'
+      || status === 'beta'
+      || status === 'internal'
+      || status === 'coming_soon'
+    ) {
+      return status;
+    }
+    return 'disabled';
+  }
+
+  private normalizePermissions(permission: string | string[] | undefined): string[] | undefined {
+    if (!permission) {
+      return undefined;
+    }
+    return Array.isArray(permission) ? permission : [permission];
+  }
+
+  private async platformAuditTenantId(client: Pick<Prisma.TransactionClient, 'tenant'>): Promise<string> {
+    const tenant = await client.tenant.upsert({
+      where: { slug: PLATFORM_AUDIT_TENANT_SLUG },
+      update: {},
+      create: { name: 'Platform Audit', slug: PLATFORM_AUDIT_TENANT_SLUG, status: 'active' },
+      select: { id: true },
+    });
+    return tenant.id;
   }
 }

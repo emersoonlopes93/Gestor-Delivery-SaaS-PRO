@@ -2064,6 +2064,19 @@ model TenantModuleAccess {
   @@map("tenant_module_access")
 }
 
+model FeatureGlobalSetting {
+  id         String   @id @default(uuid())
+  featureKey String   @unique @map("feature_key") @db.VarChar(80)
+  status     String   @db.VarChar(20)
+  reason     String?  @db.VarChar(255)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  updatedBy  String?  @map("updated_by") @db.VarChar(120)
+
+  @@index([status])
+  @@map("feature_global_settings")
+}
+
 model TenantFeatureEntitlementOverride {
   id               String    @id @default(uuid())
   tenantId         String    @map("tenant_id")

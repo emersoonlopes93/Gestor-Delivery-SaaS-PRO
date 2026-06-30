@@ -525,8 +525,7 @@ export class MenuImportService {
       category: string | null;
     }>,
   ): Promise<void> {
-    const { slugify } = await import('@gestor/utils');
-    const slug = slugify(productTemplate.name);
+    const slug = normalizeBaseMenuOptionSlug(productTemplate.name);
 
     // Verificar se produto já existe
     const existing = await this.prisma.tenantClient.product.findFirst({
@@ -799,10 +798,8 @@ export class MenuImportService {
       'Lanches',
     ];
 
-    const { slugify } = await import('@gestor/utils');
-
     for (const name of categoriesToCreate) {
-      const slug = slugify(name);
+      const slug = normalizeBaseMenuOptionSlug(name);
       
       const existing = await this.prisma.mediaCategory.findFirst({
         where: {

@@ -8,6 +8,7 @@ import { TenantModulesPage } from './features/tenants/TenantModulesPage';
 import { TenantSchedulingPage } from './features/tenants/TenantSchedulingPage';
 import { TenantAiAgentConfigPage } from './features/tenants/TenantAiAgentConfigPage';
 import { BillingConsolePage } from './features/billing/BillingConsolePage';
+import { FeatureControlPage } from './features/feature-control/FeatureControlPage';
 import { GlobalAiAgentConfigPage } from './features/ai-agent/GlobalAiAgentConfigPage';
 import { AuditLogsPage } from './features/audit/AuditLogsPage';
 import { FranchiseDashboard } from './features/franchise/FranchiseDashboard';
@@ -87,6 +88,14 @@ export function App() {
             element={
               <PermissionGate permission="saas.tenants.read">
                 <TenantSchedulingPage />
+              </PermissionGate>
+            }
+          />
+          <Route
+            path="/features"
+            element={
+              <PermissionGate permission="saas.modules.read">
+                <FeatureControlPage />
               </PermissionGate>
             }
           />

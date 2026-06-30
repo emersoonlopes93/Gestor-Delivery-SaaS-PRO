@@ -448,6 +448,7 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
 
   const addGroupLink = async () => {
     if (!selectedGroupIdToAdd) return;
+    if (!productId) return;
     setSavingStates((p) => ({ ...p, addGroupLink: true }));
     try {
       const payload: Omit<CreateProductOptionGroupLinkDto, 'productId'> = {
@@ -455,7 +456,6 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
         order: links.length,
         pricingAxis: 'secondary',
       };
-      if (!productId) throw new Error('productId não disponível');
       await api.post(`/catalog/products/${productId}/option-groups`, payload);
       setIsAddGroupModalOpen(false);
       await loadAll();
@@ -464,9 +464,12 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
     }
   };
   const handleComplementCreated = async (created: OptionGroup) => {
+    if (!productId) {
+      setIsCreateComplementModalOpen(false);
+      return;
+    }
     setSavingStates((p) => ({ ...p, createComplementAndLink: true }));
     try {
-      if (!productId) throw new Error('productId não disponível');
       await api.post(`/catalog/products/${productId}/option-groups`, {
         optionGroupId: created.id,
         order: links.length,
@@ -488,7 +491,7 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
         setConfirmModal(null);
         setSavingStates((p) => ({ ...p, [`remove-${linkId}`]: true }));
         try {
-          if (!productId) throw new Error('productId não disponível');
+          if (!productId) return;
           await api.delete(`/catalog/products/${productId}/option-groups/${linkId}`);
           await loadAll();
         } finally {
@@ -511,6 +514,7 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
 
   const saveLinkOverrides = async () => {
     if (!editingLink) return;
+    if (!productId) return;
     setSavingStates((p) => ({ ...p, saveLinkOverrides: true }));
     try {
       // Enviar apenas campos definidos para evitar sobrescrever com undefined
@@ -520,7 +524,6 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
         ...(linkForm.overrideMaxSelect !== undefined && { overrideMaxSelect: linkForm.overrideMaxSelect }),
         ...(linkForm.pricingAxis && { pricingAxis: linkForm.pricingAxis }),
       };
-      if (!productId) throw new Error('productId não disponível');
       await api.patch(`/catalog/products/${productId}/option-groups/${editingLink.id}`, payload);
       setIsEditLinkModalOpen(false);
       await loadAll();
@@ -530,9 +533,9 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
   };
 
   const reorderLinks = async (orderedIds: string[]) => {
+    if (!productId) return;
     setSavingStates((p) => ({ ...p, reorderLinks: true }));
     try {
-      if (!productId) throw new Error('productId não disponível');
       await api.post(`/catalog/products/${productId}/option-groups/reorder`, { orderedLinkIds: orderedIds });
       await loadAll();
     } finally {
@@ -592,11 +595,9 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
           qty: payload.qty,
           sortOrder: payload.sortOrder,
         };
-        if (!productId) throw new Error('productId não disponível');
-      await api.patch(`/catalog/products/${productId}/bundle-items/${editingBundleItem.id}`, upd);
+        await api.patch(`/catalog/products/${productId}/bundle-items/${editingBundleItem.id}`, upd);
       } else {
-        if (!productId) throw new Error('productId não disponível');
-      await api.post(`/catalog/products/${productId}/bundle-items`, payload);
+        await api.post(`/catalog/products/${productId}/bundle-items`, payload);
       }
       setIsBundleItemModalOpen(false);
       await loadAll();
@@ -610,9 +611,9 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
 
   const deleteBundleItem = async (idToDelete: string) => {
     if (!window.confirm('Remover este item do combo?')) return;
+    if (!productId) return;
     setSavingStates((p) => ({ ...p, [`delete-bundle-${idToDelete}`]: true }));
     try {
-      if (!productId) throw new Error('productId não disponível');
       await api.delete(`/catalog/products/${productId}/bundle-items/${idToDelete}`);
       await loadAll();
     } finally {
@@ -624,7 +625,6 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
     if (!productId) return;
     setSavingStates((p) => ({ ...p, updateComboPricing: true }));
     try {
-      if (!productId) throw new Error('productId não disponível');
       await api.patch(`/catalog/products/${productId}`, {
         comboPricingType,
         comboPricingValue,
@@ -641,7 +641,7 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
   const patchPublication = async (payload: UpsertPublicationDto) => {
     setSavingStates((p) => ({ ...p, patchPublication: true }));
     try {
-      if (!productId) throw new Error('productId não disponível');
+      if (!productId) return;
       const res = await api.patch<CatalogPublication>(`/catalog/products/${productId}/publication`, payload);
       if (res.success) {
         setPublication(res.data);
@@ -681,8 +681,8 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
     try {
       if (editingRule) {
         const upd: UpdateAvailabilityRuleDto = ruleForm as UpdateAvailabilityRuleDto;
-        if (!productId) throw new Error('productId não disponível');
-      await api.patch(`/catalog/products/${productId}/publication/rules/${editingRule.id}`, upd);
+        if (!productId) return;
+        await api.patch(`/catalog/products/${productId}/publication/rules/${editingRule.id}`, upd);
       } else {
         const channelsToCreate = ruleChannels.length > 0 ? ruleChannels : ['storefront_delivery'];
         await Promise.all(
@@ -691,7 +691,7 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
               ...ruleForm,
               channel: channel as CreateAvailabilityRuleDto['channel'],
             };
-            if (!productId) throw new Error('productId não disponível');
+            if (!productId) return Promise.resolve();
             return api.post(`/catalog/products/${productId}/publication/rules`, create);
           }),
         );
@@ -705,9 +705,9 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
 
   const deleteRule = async (ruleId: string) => {
     if (!window.confirm('Excluir esta regra?')) return;
+    if (!productId) return;
     setSavingStates((p) => ({ ...p, [`delete-rule-${ruleId}`]: true }));
     try {
-      if (!productId) throw new Error('productId não disponível');
       await api.delete(`/catalog/products/${productId}/publication/rules/${ruleId}`);
       await loadAll();
     } finally {
@@ -717,14 +717,13 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
 
   const toggleProductUpsell = async (upsellId: string) => {
     if (isNew) return;
+    if (!productId) return;
     const isLinked = productUpsells.includes(upsellId);
     try {
       if (isLinked) {
-        if (!productId) throw new Error('productId não disponível');
-      await api.delete(`/upsells/${upsellId}/link/${productId}`);
+        await api.delete(`/upsells/${upsellId}/link/${productId}`);
       } else {
-        if (!productId) throw new Error('productId não disponível');
-      await api.post(`/upsells/${upsellId}/link/${productId}`);
+        await api.post(`/upsells/${upsellId}/link/${productId}`);
       }
       setProductUpsells(prev => isLinked ? prev.filter(id => id !== upsellId) : [...prev, upsellId]);
     } catch (error) {
@@ -923,7 +922,7 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
             <button
               type="button"
               onClick={addGroupLink}
-              disabled={savingStates.addGroupLink || availableGroupsToAdd.length === 0}
+              disabled={savingStates.addGroupLink || availableGroupsToAdd.length === 0 || !productId}
               className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg disabled:bg-muted disabled:text-muted-foreground disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {savingStates.addGroupLink && <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />}

@@ -1,9 +1,13 @@
 export type FeatureStatus = 'stable' | 'beta' | 'internal' | 'coming_soon' | 'legacy';
+export type FeatureOperationalStatus = 'enabled' | 'disabled' | 'beta' | 'internal' | 'coming_soon';
 
 export type FeatureDecisionReason =
   | 'essential'
   | 'unknown_feature'
   | 'global_disabled'
+  | 'global_beta'
+  | 'global_internal'
+  | 'coming_soon'
   | 'plan_not_allowed'
   | 'tenant_disabled'
   | 'tenant_enabled_override'
@@ -625,4 +629,20 @@ export function getFeatureCatalogEntry(key: string): FeatureCatalogEntry | undef
 
 export function getAllCatalogFeatureKeys(): CatalogFeatureKey[] {
   return FEATURE_CATALOG.map((feature) => feature.key);
+}
+
+export function featureStatusToOperationalStatus(status: FeatureStatus): FeatureOperationalStatus {
+  switch (status) {
+    case 'stable':
+      return 'enabled';
+    case 'beta':
+      return 'beta';
+    case 'internal':
+      return 'internal';
+    case 'coming_soon':
+      return 'coming_soon';
+    case 'legacy':
+    default:
+      return 'disabled';
+  }
 }
