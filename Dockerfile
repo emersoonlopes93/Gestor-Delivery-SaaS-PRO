@@ -15,14 +15,17 @@ WORKDIR /app
 
 # Stage 2: Dependencies Skeleton
 FROM base AS dependencies
+RUN apt-get update -y && \
+    apt-get install -y python3 make g++ && \
+    rm -rf /var/lib/apt/lists/*
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json turbo.json* ./
 
 # Copiar package.json de todos os pacotes e apps para o pnpm resolver o workspace
 COPY packages/ ./packages/
 COPY apps/ ./apps/
-# Limpar arquivos que não são package.json para manter o cache leve
+# Limpar arquivos que não são package.json para manter o cache leve, exceto schema.prisma
 RUN find packages -type f -not -name "package.json" -delete
-RUN find apps -type f -not -name "package.json" -delete
+RUN find apps -type f -not -name "package.json" -not -path "*/prisma/schema.prisma" -delete
 
 RUN pnpm install --frozen-lockfile
 
