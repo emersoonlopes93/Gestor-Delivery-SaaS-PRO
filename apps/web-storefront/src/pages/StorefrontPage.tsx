@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api-client';
 import type { StorefrontPayload, StorefrontProductPayload, StorefrontComboPayload, StorefrontCategoryPayload } from '@gestor/types';
 import { useCartStore } from '../store/use-cart-store';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Award,
@@ -134,6 +134,29 @@ export function StorefrontPage() {
       : customer?.name?.trim() && customer.name !== 'Cliente Novo'
         ? customer.name
         : '';
+
+  const pizzaFlavorCandidates = useMemo<StorefrontProductPayload[]>(() => {
+    if (!data?.categories?.length) return [];
+
+    const categories = data.categories.filter((category) => {
+      if (category.templateType === 'pizza') return true;
+      return category.products.some((product) =>
+        (product.optionGroupLinks ?? []).some((link) =>
+          link.optionGroup?.isActive && (
+            /tamanh/i.test(link.optionGroup.name) ||
+            /montagem|montage/i.test(link.optionGroup.name)
+          )
+        )
+      );
+    });
+
+    const seen = new Set<string>();
+    return categories.flatMap((category) => category.products).filter((product) => {
+      if (!product.isAvailable || seen.has(product.id)) return false;
+      seen.add(product.id);
+      return true;
+    });
+  }, [data?.categories]);
 
   useEffect(() => {
     if (data?.tenant) {
@@ -533,6 +556,7 @@ export function StorefrontPage() {
         <ProductDetailsModal
           product={selectedProduct}
           category={selectedProductCategory}
+          pizzaFlavorCandidates={pizzaFlavorCandidates}
           isStoreClosed={!data.tenant.isOpen}
           onClose={() => {
             setSelectedProduct(null);

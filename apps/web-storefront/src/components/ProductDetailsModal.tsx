@@ -19,6 +19,7 @@ function cn(...inputs: ClassValue[]) {
 interface ProductDetailsModalProps {
   product: StorefrontProductPayload;
   category?: StorefrontCategoryPayload | null;
+  pizzaFlavorCandidates?: StorefrontProductPayload[];
   isStoreClosed?: boolean;
   onClose: () => void;
 }
@@ -36,7 +37,7 @@ type PizzaPreview = {
   calculatedPrice: number;
 };
 
-export function ProductDetailsModal({ product, category, isStoreClosed, onClose }: ProductDetailsModalProps) {
+export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, isStoreClosed, onClose }: ProductDetailsModalProps) {
   const addItem = useCartStore((s) => s.addItem);
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
@@ -72,8 +73,9 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
   const pizzaMountingItems = mountingGroup?.optionGroup.items ?? [];
   const pizzaFlavorOptions = useMemo(() => {
     if (!isPizzaTemplate) return [];
-    return (category?.products ?? []).filter((p) => p.isAvailable && p.id !== product.id);
-  }, [category?.products, isPizzaTemplate, product.id]);
+    const source = pizzaFlavorCandidates?.length ? pizzaFlavorCandidates : (category?.products ?? []);
+    return source.filter((p) => p.isAvailable && p.id !== product.id);
+  }, [category?.products, isPizzaTemplate, pizzaFlavorCandidates, product.id]);
 
   const genericOptionLinks = useMemo(() => {
     const links = optionGroupLinks.filter((link) => link.optionGroup?.isActive);
