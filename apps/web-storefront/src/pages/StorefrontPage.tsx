@@ -83,6 +83,10 @@ function StorefrontHero({ banner, name }: { banner?: string | null; name: string
   );
 }
 
+function isPizzaCategory(category: StorefrontCategoryPayload) {
+  return category.templateType === 'pizza';
+}
+
 export function StorefrontPage() {
   const { tenantSlug } = useParams<{ tenantSlug: string }>();
   const [searchParams] = useSearchParams();
@@ -135,27 +139,29 @@ export function StorefrontPage() {
         ? customer.name
         : '';
 
-  const pizzaFlavorCandidates = useMemo<StorefrontProductPayload[]>(() => {
-    if (!data?.categories?.length) return [];
+  const productCategoryIndex = useMemo(() => {
+    const index = new Map<string, StorefrontCategoryPayload>();
 
-    const categories = data.categories.filter((category) => {
-      if (category.templateType === 'pizza') return true;
-      return category.products.some((product) =>
-        (product.optionGroupLinks ?? []).some((link) =>
-          link.optionGroup?.isActive && (
-            /tamanh/i.test(link.optionGroup.name) ||
-            /montagem|montage/i.test(link.optionGroup.name)
-          )
-        )
-      );
-    });
+    for (const category of data?.categories ?? []) {
+      for (const product of category.products) {
+        const current = index.get(product.id);
+        if (!current) {
+          index.set(product.id, category);
+          continue;
+        }
 
-    const seen = new Set<string>();
-    return categories.flatMap((category) => category.products).filter((product) => {
-      if (!product.isAvailable || seen.has(product.id)) return false;
-      seen.add(product.id);
-      return true;
-    });
+        if (current.isVirtual && !category.isVirtual) {
+          index.set(product.id, category);
+          continue;
+        }
+
+        if (!isPizzaCategory(current) && isPizzaCategory(category)) {
+          index.set(product.id, category);
+        }
+      }
+    }
+
+    return index;
   }, [data?.categories]);
 
   useEffect(() => {
@@ -533,7 +539,7 @@ export function StorefrontPage() {
                     showBadges={layoutSettings.showBadges}
                     onSelectProduct={() => {
                       setSelectedProduct(product);
-                      setSelectedProductCategory(categories.find((category) => category.id === product.categoryId) ?? null);
+                      setSelectedProductCategory(productCategoryIndex.get(product.id) ?? category ?? null);
                     }}
                   />
                 ))}
@@ -556,7 +562,7 @@ export function StorefrontPage() {
         <ProductDetailsModal
           product={selectedProduct}
           category={selectedProductCategory}
-          pizzaFlavorCandidates={pizzaFlavorCandidates}
+          pizzaFlavorCandidates={selectedProductCategory && isPizzaCategory(selectedProductCategory) ? selectedProductCategory.products : []}
           isStoreClosed={!data.tenant.isOpen}
           onClose={() => {
             setSelectedProduct(null);

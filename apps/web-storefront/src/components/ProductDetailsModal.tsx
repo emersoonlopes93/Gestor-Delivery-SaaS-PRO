@@ -16,6 +16,15 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function isPizzaCategory(category?: StorefrontCategoryPayload | null) {
+  return category?.templateType === 'pizza';
+}
+
+function isHalfAndHalfMounting(itemId: string, items: StorefrontOptionItemPayload[]) {
+  const item = items.find((entry) => entry.id === itemId);
+  return Boolean(item && item.name.toLowerCase().includes('meio'));
+}
+
 interface ProductDetailsModalProps {
   product: StorefrontProductPayload;
   category?: StorefrontCategoryPayload | null;
@@ -67,15 +76,17 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
     );
   }, [optionGroupLinks]);
 
-  const isPizzaTemplate = category?.templateType === 'pizza' || Boolean(sizeGroup || mountingGroup);
+  const isPizzaTemplate = isPizzaCategory(category) || Boolean(sizeGroup || mountingGroup);
 
   const pizzaSizeItems = sizeGroup?.optionGroup.items ?? [];
   const pizzaMountingItems = mountingGroup?.optionGroup.items ?? [];
+  const isHalfAndHalf = isHalfAndHalfMounting(selectedMountingItemId, pizzaMountingItems);
+  const flavorSelectionLimit = isHalfAndHalf ? 2 : 1;
   const pizzaFlavorOptions = useMemo(() => {
-    if (!isPizzaTemplate) return [];
+    if (!isPizzaTemplate || !isPizzaCategory(category)) return [];
     const source = pizzaFlavorCandidates?.length ? pizzaFlavorCandidates : (category?.products ?? []);
     return source.filter((p) => p.isAvailable && p.id !== product.id);
-  }, [category?.products, isPizzaTemplate, pizzaFlavorCandidates, product.id]);
+  }, [category, isPizzaTemplate, pizzaFlavorCandidates, product.id]);
 
   const genericOptionLinks = useMemo(() => {
     const links = optionGroupLinks.filter((link) => link.optionGroup?.isActive);
@@ -124,6 +135,15 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
       return product.id ? [product.id] : [];
     });
   }, [genericOptionLinks, isPizzaTemplate, pizzaFlavorOptions, pizzaMountingItems, pizzaSizeItems, product.id, selectedPizzaFlavorIds.length]);
+
+  useEffect(() => {
+    if (!isPizzaTemplate) return;
+
+    setSelectedPizzaFlavorIds((current) => {
+      if (current.length <= flavorSelectionLimit) return current;
+      return current.slice(0, flavorSelectionLimit);
+    });
+  }, [flavorSelectionLimit, isPizzaTemplate]);
 
   useEffect(() => {
     if (!isPizzaTemplate || !category?.id || !selectedSizeId || selectedPizzaFlavorIds.length === 0) {
@@ -271,7 +291,7 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
       if (!selectedSizeId) return 'Selecione um tamanho.';
       if (mountingGroup && !selectedMountingItemId) return 'Selecione a montagem da pizza.';
       if (selectedPizzaFlavorIds.length === 0) return 'Selecione pelo menos 1 sabor.';
-      if (selectedPizzaFlavorIds.length > 2) return 'Selecione no máximo 2 sabores.';
+      if (selectedPizzaFlavorIds.length > flavorSelectionLimit) return `Selecione no máximo ${flavorSelectionLimit} sabor${flavorSelectionLimit > 1 ? 'es' : ''}.`;
       if (pizzaPreviewLoading) return 'Aguarde a simulação do preço.';
       if (pizzaPreviewError) return pizzaPreviewError;
     }
@@ -289,7 +309,7 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
     }
 
     return null;
-  }, [genericOptionLinks, isPizzaTemplate, mountingGroup, pizzaPreviewError, pizzaPreviewLoading, selectedMountingItemId, selectedPizzaFlavorIds.length, selectedSizeId, selections]);
+  }, [flavorSelectionLimit, genericOptionLinks, isPizzaTemplate, mountingGroup, pizzaPreviewError, pizzaPreviewLoading, selectedMountingItemId, selectedPizzaFlavorIds.length, selectedSizeId, selections]);
 
   const toggleV2Option = (groupId: string, item: StorefrontOptionItemPayload, _minSelect: number, maxSelect: number, selectionType: string) => {
     setSelections((prev) => {
@@ -344,6 +364,10 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
 
   const togglePizzaFlavor = (flavorId: string) => {
     setSelectedPizzaFlavorIds((prev) => {
+      if (!isHalfAndHalf) {
+        return [flavorId];
+      }
+
       if (prev.includes(flavorId)) {
         if (prev.length === 1) return prev;
         return prev.filter((id) => id !== flavorId);
@@ -356,6 +380,10 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
 
   const toggleMounting = (itemId: string) => {
     setSelectedMountingItemId(itemId);
+    const nextIsHalfAndHalf = isHalfAndHalfMounting(itemId, pizzaMountingItems);
+    if (!nextIsHalfAndHalf) {
+      setSelectedPizzaFlavorIds((current) => [current[0] ?? product.id].filter(Boolean));
+    }
   };
 
   const handleAddToCart = () => {
@@ -415,11 +443,11 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                     <div>
                       <div className="text-foreground font-black text-sm uppercase tracking-wider">Pizza</div>
                       <div className="text-[10px] text-primary-700 font-bold italic">
-                        Escolha 1 sabor ou 2 sabores meio a meio
+                        {isHalfAndHalf ? 'Escolha até 2 sabores meio a meio' : 'Escolha 1 sabor para a pizza inteira'}
                       </div>
                     </div>
                     <div className="text-[10px] font-black uppercase text-primary-700">
-                      {selectedPizzaFlavorIds.length}/2
+                      {selectedPizzaFlavorIds.length}/{flavorSelectionLimit}
                     </div>
                   </div>
                 </div>
@@ -497,7 +525,9 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
                   <div className="flex items-center justify-between mb-3">
                     <div>
                       <div className="font-black text-gray-900 text-sm uppercase tracking-wider">Sabores</div>
-                      <div className="text-[10px] text-gray-400 font-bold">Toque para escolher até 2 sabores</div>
+                      <div className="text-[10px] text-gray-400 font-bold">
+                        {isHalfAndHalf ? 'Toque para escolher até 2 sabores' : 'Toque para escolher 1 sabor'}
+                      </div>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
