@@ -107,7 +107,16 @@ function buildSlotsDto(input: SlotState): CreateOrderItemComboSlotSelectionDTO[]
 
 function computeOptionSelectionsPrice(detail: ProductDetail, selections: SelectionState): { unitPrice: number; composition: string } {
   const basePrice = Number(detail.basePrice ?? 0);
-  const links = (detail.optionGroupLinks ?? []).filter((l) => l.optionGroup?.isActive);
+  const links = (detail.optionGroupLinks ?? []).filter((l) => {
+    if (!l.optionGroup?.isActive) return false;
+    if (detail.category?.templateType === 'pizza') {
+      const groupName = l.optionGroup.name ?? '';
+      if (l.pricingAxis === 'primary' || /tamanh|montage/i.test(groupName)) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   const groupLinkMap = new Map<string, (typeof links)[number]>();
   for (const link of links) {
@@ -266,7 +275,14 @@ export function PosItemConfiguratorModal(props: {
           setSelectedPizzaFlavors([{ productId: data.id, name: data.name }]);
           api.get<ProductDetail[]>(`/catalog/products?categoryId=${category.id}`).then(catRes => {
             if (catRes.success) {
-              setCategoryFlavors(catRes.data.filter((item) => item.isActive !== false && item.isAvailable !== false));
+              setCategoryFlavors(
+                catRes.data.filter(
+                  (item) =>
+                    item.category?.id === category.id &&
+                    item.isActive !== false &&
+                    item.isAvailable !== false,
+                ),
+              );
             }
           });
           const sizeLink = (data.optionGroupLinks ?? []).find((link) => link.pricingAxis === 'primary' || /tamanh/i.test(link.optionGroup.name));
@@ -308,6 +324,14 @@ export function PosItemConfiguratorModal(props: {
     if (pizzaMountingGroup?.optionGroup.id) ignoredGroupIds.add(pizzaMountingGroup.optionGroup.id);
     return links.filter((link) => !ignoredGroupIds.has(link.optionGroup.id));
   }, [detail?.optionGroupLinks, isPizzaTemplate, pizzaMountingGroup?.optionGroup.id, pizzaSizeGroup?.optionGroup.id]);
+
+  const genericOptionDetail = useMemo(() => {
+    if (!detail) return null;
+    return {
+      ...detail,
+      optionGroupLinks: genericOptionLinks,
+    };
+  }, [detail, genericOptionLinks]);
 
   const hasV2Options = genericOptionLinks.length > 0;
   const isHalfAndHalf = isHalfAndHalfMounting(selectedPizzaMountingItemId, pizzaMountingItems);
@@ -414,7 +438,7 @@ export function PosItemConfiguratorModal(props: {
     }
 
     if (hasV2Options) {
-      const priced = computeOptionSelectionsPrice(detail, selectionState);
+      const priced = computeOptionSelectionsPrice(genericOptionDetail ?? detail, selectionState);
       return { unitPrice: priced.unitPrice, label: priced.composition };
     }
 
@@ -429,7 +453,7 @@ export function PosItemConfiguratorModal(props: {
     }
 
     return { unitPrice: base, label: '' };
-  }, [detail, hasV2Options, isSlotCombo, selectionState, slotState, isPizzaTemplate, selectedPizzaFlavors, pizzaPreview]);
+  }, [detail, genericOptionDetail, hasV2Options, isSlotCombo, selectionState, slotState, isPizzaTemplate, selectedPizzaFlavors, pizzaPreview]);
 
   const total = computed.unitPrice * quantity;
 
@@ -438,7 +462,7 @@ export function PosItemConfiguratorModal(props: {
  
     if (hasV2Options) {
       try {
-        computeOptionSelectionsPrice(detail, selectionState);
+        computeOptionSelectionsPrice(genericOptionDetail ?? detail, selectionState);
       } catch (e) {
         return e instanceof Error ? e.message : 'Seleção inválida.';
       }
@@ -469,7 +493,7 @@ export function PosItemConfiguratorModal(props: {
     }
  
     return null;
-  }, [detail, hasV2Options, isSlotCombo, slotState, isPizzaTemplate, selectionState, selectedPizzaFlavors, flavorSelectionLimit, pizzaMountingGroup, pizzaPreviewError, pizzaPreviewLoading, selectedPizzaMountingItemId, pizzaSizeId]);
+  }, [detail, genericOptionDetail, hasV2Options, isSlotCombo, slotState, isPizzaTemplate, selectionState, selectedPizzaFlavors, flavorSelectionLimit, pizzaMountingGroup, pizzaPreviewError, pizzaPreviewLoading, selectedPizzaMountingItemId, pizzaSizeId]);
  
   const currentValidationError = useMemo(() => {
     if (!isOpen) return null;
