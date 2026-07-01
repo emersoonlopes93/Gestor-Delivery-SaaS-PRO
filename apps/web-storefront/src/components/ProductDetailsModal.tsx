@@ -48,25 +48,25 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
   const [pizzaPreviewLoading, setPizzaPreviewLoading] = useState(false);
   const [pizzaPreviewError, setPizzaPreviewError] = useState<string | null>(null);
 
-  const isPizzaTemplate = category?.templateType === 'pizza';
+  const optionGroupLinks = product.optionGroupLinks ?? [];
   const isProductAvailable = product.isAvailable && !isStoreClosed;
 
   const sizeGroup = useMemo(() => {
-    if (!isPizzaTemplate) return undefined;
-    return (product.optionGroupLinks ?? []).find((link) =>
+    return optionGroupLinks.find((link) =>
       link.optionGroup?.isActive && (
         link.pricingAxis === 'primary' ||
-        link.optionGroup.name.includes('Tamanhos [Pizza]')
+        /tamanh/i.test(link.optionGroup.name)
       )
     );
-  }, [isPizzaTemplate, product.optionGroupLinks]);
+  }, [optionGroupLinks]);
 
   const mountingGroup = useMemo(() => {
-    if (!isPizzaTemplate) return undefined;
-    return (product.optionGroupLinks ?? []).find((link) =>
-      link.optionGroup?.isActive && link.optionGroup.name.includes('Montagem [Pizza]')
+    return optionGroupLinks.find((link) =>
+      link.optionGroup?.isActive && /montagem|montage/i.test(link.optionGroup.name)
     );
-  }, [isPizzaTemplate, product.optionGroupLinks]);
+  }, [optionGroupLinks]);
+
+  const isPizzaTemplate = category?.templateType === 'pizza' || Boolean(sizeGroup || mountingGroup);
 
   const pizzaSizeItems = sizeGroup?.optionGroup.items ?? [];
   const pizzaMountingItems = mountingGroup?.optionGroup.items ?? [];
@@ -76,14 +76,14 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
   }, [category?.products, isPizzaTemplate, product.id]);
 
   const genericOptionLinks = useMemo(() => {
-    const links = (product.optionGroupLinks ?? []).filter((link) => link.optionGroup?.isActive);
+    const links = optionGroupLinks.filter((link) => link.optionGroup?.isActive);
     if (!isPizzaTemplate) return links;
 
     const ignored = new Set<string>();
     if (sizeGroup?.optionGroup.id) ignored.add(sizeGroup.optionGroup.id);
     if (mountingGroup?.optionGroup.id) ignored.add(mountingGroup.optionGroup.id);
     return links.filter((link) => !ignored.has(link.optionGroup.id));
-  }, [isPizzaTemplate, mountingGroup?.optionGroup.id, product.optionGroupLinks, sizeGroup?.optionGroup.id]);
+  }, [isPizzaTemplate, mountingGroup?.optionGroup.id, optionGroupLinks, sizeGroup?.optionGroup.id]);
 
   const hasV2Options = genericOptionLinks.length > 0;
 
@@ -382,6 +382,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
             <div className="w-full h-24 bg-primary-50 sm:rounded-t-3xl" />
           )}
           <button
+            type="button"
             onClick={onClose}
             className="absolute top-4 right-4 bg-black/20 hover:bg-black/40 backdrop-blur-md text-white p-2 rounded-full transition-colors"
           >
@@ -586,6 +587,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
                           return (
                             <div key={item.id} className="bg-white border border-gray-100 rounded-xl p-3">
                               <button
+                                type="button"
                                 onClick={() => toggleV2Option(group.id, item, min, max, group.selectionType)}
                                 className="w-full text-left"
                               >
@@ -614,6 +616,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
                               {group.selectionType === 'quantity' && isSelected && item.allowQuantity ? (
                                 <div className="mt-3 flex items-center gap-3">
                                   <button
+                                    type="button"
                                     onClick={() => {
                                       const current = state?.items.find((x) => x.optionItemId === item.id)?.qty ?? 1;
                                       updateV2Qty(group.id, item.id, -1);
@@ -627,6 +630,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
                                     {state?.items.find((x) => x.optionItemId === item.id)?.qty ?? 1}
                                   </div>
                                   <button
+                                    type="button"
                                     onClick={() => updateV2Qty(group.id, item.id, 1)}
                                     className="w-8 h-8 rounded-xl bg-white border border-gray-100 text-gray-500 flex items-center justify-center"
                                   >
@@ -668,6 +672,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.finalPrice)}
                         </span>
                         <button
+                          type="button"
                           onClick={() => {
                             const virtualProduct: StorefrontProductPayload = {
                               id: item.productId,
@@ -726,16 +731,17 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
 
           <div className="flex items-center gap-4">
             <div className="flex items-center bg-gray-100 rounded-2xl p-1 h-12">
-              <button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700">
+              <button type="button" onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700">
                 <Minus className="w-5 h-5" />
               </button>
               <span className="w-8 text-center font-bold text-gray-900">{quantity}</span>
-              <button onClick={() => setQuantity((q) => q + 1)} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700">
+              <button type="button" onClick={() => setQuantity((q) => q + 1)} className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700">
                 <Plus className="w-5 h-5" />
               </button>
             </div>
 
             <button
+              type="button"
               onClick={handleAddToCart}
               disabled={!!validationError || !isProductAvailable}
               className={cn(
