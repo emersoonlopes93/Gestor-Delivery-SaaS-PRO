@@ -42,6 +42,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
   const [notes, setNotes] = useState('');
   const [selections, setSelections] = useState<CartSelectedOptionGroup[]>([]);
   const [selectedSizeId, setSelectedSizeId] = useState('');
+  const [selectedMountingItemId, setSelectedMountingItemId] = useState('');
   const [selectedPizzaFlavorIds, setSelectedPizzaFlavorIds] = useState<string[]>([]);
   const [pizzaPreview, setPizzaPreview] = useState<PizzaPreview | null>(null);
   const [pizzaPreviewLoading, setPizzaPreviewLoading] = useState(false);
@@ -68,6 +69,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
   }, [isPizzaTemplate, product.optionGroupLinks]);
 
   const pizzaSizeItems = sizeGroup?.optionGroup.items ?? [];
+  const pizzaMountingItems = mountingGroup?.optionGroup.items ?? [];
   const pizzaFlavorOptions = useMemo(() => {
     if (!isPizzaTemplate) return [];
     return (category?.products ?? []).filter((p) => p.isAvailable && p.id !== product.id);
@@ -96,6 +98,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
 
     if (!isPizzaTemplate) {
       setSelectedSizeId('');
+      setSelectedMountingItemId('');
       setSelectedPizzaFlavorIds([]);
       setPizzaPreview(null);
       setPizzaPreviewError(null);
@@ -104,12 +107,21 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
 
     const firstSize = pizzaSizeItems[0]?.id ?? '';
     setSelectedSizeId((current) => (pizzaSizeItems.some((size) => size.id === current) ? current : firstSize));
+    const preferredMounting =
+      pizzaMountingItems.find((item) => (
+        selectedPizzaFlavorIds.length > 1
+          ? item.name.toLowerCase().includes('meio')
+          : item.name.toLowerCase().includes('inteira')
+      ))?.id ?? pizzaMountingItems[0]?.id ?? '';
+    setSelectedMountingItemId((current) => (
+      pizzaMountingItems.some((item) => item.id === current) ? current : preferredMounting
+    ));
     setSelectedPizzaFlavorIds((current) => {
       const validIds = current.filter((id) => pizzaFlavorOptions.some((flavor) => flavor.id === id));
       if (validIds.length > 0) return validIds.slice(0, 2);
       return product.id ? [product.id] : [];
     });
-  }, [genericOptionLinks, isPizzaTemplate, pizzaFlavorOptions, pizzaSizeItems, product.id]);
+  }, [genericOptionLinks, isPizzaTemplate, pizzaFlavorOptions, pizzaMountingItems, pizzaSizeItems, product.id, selectedPizzaFlavorIds.length]);
 
   useEffect(() => {
     if (!isPizzaTemplate || !category?.id || !selectedSizeId || selectedPizzaFlavorIds.length === 0) {
@@ -188,11 +200,13 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
       });
     }
 
-    const mountingItem = mountingGroup?.optionGroup.items.find((item) =>
-      selectedPizzaFlavorIds.length > 1
-        ? item.name.toLowerCase().includes('meio')
-        : item.name.toLowerCase().includes('inteira')
-    ) ?? mountingGroup?.optionGroup.items[0];
+    const mountingItem = mountingGroup?.optionGroup.items.find((item) => item.id === selectedMountingItemId)
+      ?? mountingGroup?.optionGroup.items.find((item) =>
+        selectedPizzaFlavorIds.length > 1
+          ? item.name.toLowerCase().includes('meio')
+          : item.name.toLowerCase().includes('inteira')
+      )
+      ?? mountingGroup?.optionGroup.items[0];
 
     if (mountingGroup && mountingItem) {
       mapped.push({
@@ -209,7 +223,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
     }
 
     return mapped;
-  }, [isPizzaTemplate, mountingGroup, pizzaSizeItems, selectedPizzaFlavorIds.length, selectedSizeId, sizeGroup]);
+  }, [isPizzaTemplate, mountingGroup, pizzaSizeItems, selectedMountingItemId, selectedPizzaFlavorIds.length, selectedSizeId, sizeGroup]);
 
   const computed = useMemo(() => {
     let extras = 0;
@@ -253,6 +267,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
   const validationError = useMemo(() => {
     if (isPizzaTemplate) {
       if (!selectedSizeId) return 'Selecione um tamanho.';
+      if (mountingGroup && !selectedMountingItemId) return 'Selecione a montagem da pizza.';
       if (selectedPizzaFlavorIds.length === 0) return 'Selecione pelo menos 1 sabor.';
       if (selectedPizzaFlavorIds.length > 2) return 'Selecione no máximo 2 sabores.';
       if (pizzaPreviewLoading) return 'Aguarde a simulação do preço.';
@@ -272,7 +287,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
     }
 
     return null;
-  }, [genericOptionLinks, isPizzaTemplate, pizzaPreviewError, pizzaPreviewLoading, selectedPizzaFlavorIds.length, selectedSizeId, selections]);
+  }, [genericOptionLinks, isPizzaTemplate, mountingGroup, pizzaPreviewError, pizzaPreviewLoading, selectedMountingItemId, selectedPizzaFlavorIds.length, selectedSizeId, selections]);
 
   const toggleV2Option = (groupId: string, item: StorefrontOptionItemPayload, _minSelect: number, maxSelect: number, selectionType: string) => {
     setSelections((prev) => {
@@ -335,6 +350,10 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
       if (prev.length >= 2) return prev;
       return [...prev, flavorId];
     });
+  };
+
+  const toggleMounting = (itemId: string) => {
+    setSelectedMountingItemId(itemId);
   };
 
   const handleAddToCart = () => {
@@ -415,6 +434,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
                       return (
                         <button
                           key={size.id}
+                          type="button"
                           onClick={() => setSelectedSizeId(size.id)}
                           className={cn(
                             'px-3 py-3 rounded-xl border text-xs font-black transition-all',
@@ -422,6 +442,7 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
                               ? 'bg-primary-600 border-primary-600 text-white shadow-lg shadow-primary-100'
                               : 'bg-white border-gray-100 text-gray-700 hover:border-primary-200'
                           )}
+                          aria-pressed={selected}
                         >
                           {size.name}
                         </button>
@@ -429,6 +450,45 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
                     })}
                   </div>
                 </div>
+
+                {mountingGroup ? (
+                  <div className="bg-gray-50/70 rounded-2xl p-4 border border-gray-100">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <div className="font-black text-gray-900 text-sm uppercase tracking-wider">Montagem</div>
+                        <div className="text-[10px] text-gray-400 font-bold">Escolha como a pizza sera montada</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {pizzaMountingItems.map((item) => {
+                        const selected = selectedMountingItemId === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => toggleMounting(item.id)}
+                            className={cn(
+                              'p-3 rounded-xl border text-left transition-all',
+                              selected
+                                ? 'bg-primary-50 border-primary-200 ring-1 ring-primary-200'
+                                : 'bg-white border-gray-100 hover:border-gray-200'
+                            )}
+                            aria-pressed={selected}
+                          >
+                            <div className={cn('text-xs font-bold truncate', selected ? 'text-primary-900' : 'text-gray-700')}>
+                              {item.name}
+                            </div>
+                            {item.description ? (
+                              <div className="text-[10px] text-gray-400 font-bold mt-0.5 line-clamp-2">
+                                {item.description}
+                              </div>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="bg-gray-50/70 rounded-2xl p-4 border border-gray-100">
                   <div className="flex items-center justify-between mb-3">
@@ -442,16 +502,18 @@ export function ProductDetailsModal({ product, category, isStoreClosed, onClose 
                       .map((flavor) => {
                         const selected = selectedPizzaFlavorIds.includes(flavor.id);
                         return (
-                          <button
-                            key={flavor.id}
-                            onClick={() => togglePizzaFlavor(flavor.id)}
-                            className={cn(
-                              'p-3 rounded-xl border text-left transition-all',
-                              selected
-                                ? 'bg-primary-50 border-primary-200 ring-1 ring-primary-200'
-                                : 'bg-white border-gray-100 hover:border-gray-200'
-                            )}
-                          >
+                        <button
+                          key={flavor.id}
+                          type="button"
+                          onClick={() => togglePizzaFlavor(flavor.id)}
+                          className={cn(
+                            'p-3 rounded-xl border text-left transition-all',
+                            selected
+                              ? 'bg-primary-50 border-primary-200 ring-1 ring-primary-200'
+                              : 'bg-white border-gray-100 hover:border-gray-200'
+                          )}
+                          aria-pressed={selected}
+                        >
                             <div className={cn('text-xs font-bold truncate', selected ? 'text-primary-900' : 'text-gray-700')}>
                               {flavor.name}
                             </div>
