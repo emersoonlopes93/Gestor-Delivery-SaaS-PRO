@@ -7,6 +7,14 @@ import type {
   StorefrontOptionItemPayload,
   PizzaCompositionDTO,
 } from '@gestor/types';
+import {
+  dedupeById,
+  getPizzaFlavorSelectionLimit,
+  isHalfAndHalfMounting,
+  isPizzaCategory,
+  normalizePizzaFlavorSelection,
+  trimPizzaFlavorSelection,
+} from '@gestor/utils';
 import { api } from '../lib/api-client';
 import { useCartStore } from '../store/use-cart-store';
 import { clsx, type ClassValue } from 'clsx';
@@ -14,15 +22,6 @@ import { twMerge } from 'tailwind-merge';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
-}
-
-function isPizzaCategory(category?: StorefrontCategoryPayload | null) {
-  return category?.templateType === 'pizza';
-}
-
-function isHalfAndHalfMounting(itemId: string, items: StorefrontOptionItemPayload[]) {
-  const item = items.find((entry) => entry.id === itemId);
-  return Boolean(item && item.name.toLowerCase().includes('meio'));
 }
 
 interface ProductDetailsModalProps {
@@ -81,11 +80,11 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
   const pizzaSizeItems = sizeGroup?.optionGroup.items ?? [];
   const pizzaMountingItems = mountingGroup?.optionGroup.items ?? [];
   const isHalfAndHalf = isHalfAndHalfMounting(selectedMountingItemId, pizzaMountingItems);
-  const flavorSelectionLimit = isHalfAndHalf ? 2 : 1;
+  const flavorSelectionLimit = getPizzaFlavorSelectionLimit(selectedMountingItemId, pizzaMountingItems);
   const pizzaFlavorOptions = useMemo(() => {
     if (!isPizzaTemplate || !isPizzaCategory(category)) return [];
     const source = pizzaFlavorCandidates?.length ? pizzaFlavorCandidates : (category?.products ?? []);
-    return source.filter((p) => p.isAvailable && p.id !== product.id);
+    return dedupeById(source.filter((p) => p.isAvailable && p.id !== product.id));
   }, [category, isPizzaTemplate, pizzaFlavorCandidates, product.id]);
 
   const genericOptionLinks = useMemo(() => {
@@ -140,10 +139,10 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
     if (!isPizzaTemplate) return;
 
     setSelectedPizzaFlavorIds((current) => {
-      if (current.length <= flavorSelectionLimit) return current;
-      return current.slice(0, flavorSelectionLimit);
+      const validIds = current.filter((id) => pizzaFlavorOptions.some((flavor) => flavor.id === id));
+      return trimPizzaFlavorSelection(validIds, flavorSelectionLimit, product.id);
     });
-  }, [flavorSelectionLimit, isPizzaTemplate]);
+  }, [flavorSelectionLimit, isPizzaTemplate, pizzaFlavorOptions, product.id]);
 
   useEffect(() => {
     if (!isPizzaTemplate || !category?.id || !selectedSizeId || selectedPizzaFlavorIds.length === 0) {
@@ -364,26 +363,14 @@ export function ProductDetailsModal({ product, category, pizzaFlavorCandidates, 
 
   const togglePizzaFlavor = (flavorId: string) => {
     setSelectedPizzaFlavorIds((prev) => {
-      if (!isHalfAndHalf) {
-        return [flavorId];
-      }
-
-      if (prev.includes(flavorId)) {
-        if (prev.length === 1) return prev;
-        return prev.filter((id) => id !== flavorId);
-      }
-
-      if (prev.length >= 2) return prev;
-      return [...prev, flavorId];
+      return normalizePizzaFlavorSelection(prev, flavorId, flavorSelectionLimit);
     });
   };
 
   const toggleMounting = (itemId: string) => {
     setSelectedMountingItemId(itemId);
-    const nextIsHalfAndHalf = isHalfAndHalfMounting(itemId, pizzaMountingItems);
-    if (!nextIsHalfAndHalf) {
-      setSelectedPizzaFlavorIds((current) => [current[0] ?? product.id].filter(Boolean));
-    }
+    const nextLimit = getPizzaFlavorSelectionLimit(itemId, pizzaMountingItems);
+    setSelectedPizzaFlavorIds((current) => trimPizzaFlavorSelection(current, nextLimit, product.id));
   };
 
   const handleAddToCart = () => {

@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { X, Minus, Plus, AlertCircle, ChevronRight } from 'lucide-react';
 import { api } from '@/lib/api-client';
+import {
+  dedupeById,
+  getPizzaFlavorSelectionLimit,
+  isHalfAndHalfMounting,
+  isPizzaCategory,
+  normalizePizzaFlavorSelection,
+  trimPizzaFlavorSelection,
+} from '@gestor/utils';
 import type {
   CreateOrderItemSelectionGroupDTO,
   CreateOrderItemComboSlotSelectionDTO,
@@ -16,6 +24,8 @@ type ProductDetail = {
   type: 'simple' | 'configurable' | 'combo';
   basePrice: number;
   image?: string | null;
+  isActive?: boolean;
+  isAvailable?: boolean;
   category?: { id: string; templateType?: string | null; templateConfig?: unknown } | null;
   optionGroupLinks?: Array<{
     id: string;
@@ -215,7 +225,10 @@ export function PosItemConfiguratorModal(props: {
   // Pizza Template State
   const [categoryFlavors, setCategoryFlavors] = useState<ProductDetail[]>([]);
   const [selectedPizzaFlavors, setSelectedPizzaFlavors] = useState<Array<{ productId: string; name: string }>>([]);
+  const [pizzaSizeId, setPizzaSizeId] = useState('');
+  const [selectedPizzaMountingItemId, setSelectedPizzaMountingItemId] = useState('');
   const [pizzaPreview, setPizzaPreview] = useState<{ unitPrice: number; label: string } | null>(null);
+  const [pizzaPreviewMeta, setPizzaPreviewMeta] = useState<{ sizeName: string; strategy: string; calculatedPrice: number } | null>(null);
   const [pizzaPreviewLoading, setPizzaPreviewLoading] = useState(false);
   const [pizzaPreviewError, setPizzaPreviewError] = useState<string | null>(null);
 
@@ -240,6 +253,7 @@ export function PosItemConfiguratorModal(props: {
         // Initial selections
         const initialSelections: SelectionState = (data.optionGroupLinks ?? [])
           .filter((l) => l.optionGroup?.isActive)
+          .filter((l) => !data.category || data.category.templateType !== 'pizza' || !/tamanh|montagem/i.test(l.optionGroup.name))
           .map((l) => ({ optionGroupId: l.optionGroup.id, items: [] }));
         setSelectionState(initialSelections);
 
@@ -247,13 +261,18 @@ export function PosItemConfiguratorModal(props: {
         setSlotState(initialSlots);
 
         // If Pizza, fetch other flavors in same category
-        if (data.category?.templateType === 'pizza' && data.category.id) {
+        const category = data.category;
+        if (isPizzaCategory(category) && category?.id) {
           setSelectedPizzaFlavors([{ productId: data.id, name: data.name }]);
-          api.get<ProductDetail[]>(`/catalog/products?categoryId=${data.category.id}`).then(catRes => {
+          api.get<ProductDetail[]>(`/catalog/products?categoryId=${category.id}`).then(catRes => {
             if (catRes.success) {
-              setCategoryFlavors(catRes.data);
+              setCategoryFlavors(catRes.data.filter((item) => item.isActive !== false && item.isAvailable !== false));
             }
           });
+          const sizeLink = (data.optionGroupLinks ?? []).find((link) => link.pricingAxis === 'primary' || /tamanh/i.test(link.optionGroup.name));
+          const mountingLink = (data.optionGroupLinks ?? []).find((link) => /montagem|montage/i.test(link.optionGroup.name));
+          setPizzaSizeId(sizeLink?.optionGroup.items[0]?.id ?? '');
+          setSelectedPizzaMountingItemId(mountingLink?.optionGroup.items[0]?.id ?? '');
         }
       })
       .catch((e: unknown) => {
@@ -262,7 +281,6 @@ export function PosItemConfiguratorModal(props: {
       .finally(() => setLoading(false));
   }, [isOpen, productId]);
 
-  const hasV2Options = Boolean((detail?.optionGroupLinks ?? []).some((l) => l.optionGroup?.isActive));
   const isPizzaTemplate = detail?.category?.templateType === 'pizza';
   const isCombo = detail?.type === 'combo';
   const isSlotCombo = isCombo && (detail?.comboMode ?? 'bundle') === 'slot';
@@ -272,14 +290,51 @@ export function PosItemConfiguratorModal(props: {
     [detail?.optionGroupLinks],
   );
 
-  const selectedPizzaSizeId = useMemo(
-    () => selectionState.find((s) => s.optionGroupId === pizzaSizeGroup?.optionGroup.id)?.items[0]?.optionItemId ?? '',
-    [pizzaSizeGroup?.optionGroup.id, selectionState],
+  const pizzaMountingGroup = useMemo(
+    () => detail?.optionGroupLinks?.find((link) => /montagem|montage/i.test(link.optionGroup.name)),
+    [detail?.optionGroupLinks],
+  );
+
+  const pizzaSizeItems = pizzaSizeGroup?.optionGroup.items ?? [];
+  const pizzaMountingItems = pizzaMountingGroup?.optionGroup.items ?? [];
+  const flavorSelectionLimit = getPizzaFlavorSelectionLimit(selectedPizzaMountingItemId, pizzaMountingItems);
+
+  const genericOptionLinks = useMemo(() => {
+    const links = (detail?.optionGroupLinks ?? []).filter((l) => l.optionGroup?.isActive);
+    if (!isPizzaTemplate) return links;
+
+    const ignoredGroupIds = new Set<string>();
+    if (pizzaSizeGroup?.optionGroup.id) ignoredGroupIds.add(pizzaSizeGroup.optionGroup.id);
+    if (pizzaMountingGroup?.optionGroup.id) ignoredGroupIds.add(pizzaMountingGroup.optionGroup.id);
+    return links.filter((link) => !ignoredGroupIds.has(link.optionGroup.id));
+  }, [detail?.optionGroupLinks, isPizzaTemplate, pizzaMountingGroup?.optionGroup.id, pizzaSizeGroup?.optionGroup.id]);
+
+  const hasV2Options = genericOptionLinks.length > 0;
+  const isHalfAndHalf = isHalfAndHalfMounting(selectedPizzaMountingItemId, pizzaMountingItems);
+  const pizzaFlavorCatalog = useMemo(
+    () => dedupeById([detail, ...categoryFlavors].filter((item): item is ProductDetail => Boolean(item))),
+    [categoryFlavors, detail],
   );
 
   useEffect(() => {
-    if (!isPizzaTemplate || !detail || !selectedPizzaSizeId || selectedPizzaFlavors.length === 0) {
+    if (!isPizzaTemplate) return;
+
+    setSelectedPizzaFlavors((current) => {
+      const currentIds = current
+        .map((flavor) => flavor.productId)
+        .filter((id) => pizzaFlavorCatalog.some((flavor) => flavor.id === id));
+      const nextIds = trimPizzaFlavorSelection(currentIds, flavorSelectionLimit, detail?.id);
+      return nextIds.map((productId) => {
+        const flavor = pizzaFlavorCatalog.find((item) => item.id === productId);
+        return { productId, name: flavor?.name ?? detail?.name ?? 'Pizza' };
+      });
+    });
+  }, [categoryFlavors, detail, flavorSelectionLimit, isPizzaTemplate, pizzaFlavorCatalog]);
+
+  useEffect(() => {
+    if (!isPizzaTemplate || !detail || !pizzaSizeId || selectedPizzaFlavors.length === 0) {
       setPizzaPreview(null);
+      setPizzaPreviewMeta(null);
       setPizzaPreviewLoading(false);
       setPizzaPreviewError(null);
       return;
@@ -291,7 +346,7 @@ export function PosItemConfiguratorModal(props: {
 
     api.post<{ sizeId: string; sizeName: string; strategy: string; calculatedPrice: number }>(`/catalog/pizza/simulate`, {
       categoryId: detail.category?.id,
-      sizeId: selectedPizzaSizeId,
+      sizeId: pizzaSizeId,
       flavors: selectedPizzaFlavors.map((flavor) => ({
         productId: flavor.productId,
         fraction: selectedPizzaFlavors.length > 1 ? 0.5 : 1,
@@ -300,18 +355,25 @@ export function PosItemConfiguratorModal(props: {
       .then((res) => {
         if (cancelled) return;
         if (res.success) {
+          setPizzaPreviewMeta({
+            sizeName: res.data.sizeName,
+            strategy: res.data.strategy,
+            calculatedPrice: res.data.calculatedPrice,
+          });
           setPizzaPreview({
             unitPrice: res.data.calculatedPrice,
             label: `${res.data.sizeName} · ${selectedPizzaFlavors.map((f) => f.name).join(' / ')}`,
           });
         } else {
           setPizzaPreview(null);
+          setPizzaPreviewMeta(null);
           setPizzaPreviewError('Não foi possível simular a pizza.');
         }
       })
       .catch(() => {
         if (cancelled) return;
         setPizzaPreview(null);
+        setPizzaPreviewMeta(null);
         setPizzaPreviewError('Não foi possível simular a pizza.');
       })
       .finally(() => {
@@ -321,7 +383,7 @@ export function PosItemConfiguratorModal(props: {
     return () => {
       cancelled = true;
     };
-  }, [detail, isPizzaTemplate, selectedPizzaFlavors, selectedPizzaSizeId]);
+  }, [detail, isPizzaTemplate, selectedPizzaFlavors, pizzaSizeId]);
 
   const computed = useMemo(() => {
     if (!detail) return { unitPrice: 0, label: '' };
@@ -357,11 +419,7 @@ export function PosItemConfiguratorModal(props: {
     }
 
     if (isPizzaTemplate) {
-      const sizesLink = pizzaSizeGroup;
-      const secondaryOptions = computeOptionSelectionsPrice(
-        detail,
-        selectionState.filter((s) => s.optionGroupId !== sizesLink?.optionGroup.id),
-      );
+      const secondaryOptions = computeOptionSelectionsPrice(detail, selectionState);
 
       const pizzaBase = pizzaPreview?.unitPrice ?? base;
       return {
@@ -371,7 +429,7 @@ export function PosItemConfiguratorModal(props: {
     }
 
     return { unitPrice: base, label: '' };
-  }, [detail, hasV2Options, isSlotCombo, selectionState, slotState, categoryFlavors, isPizzaTemplate, selectedPizzaFlavors]);
+  }, [detail, hasV2Options, isSlotCombo, selectionState, slotState, isPizzaTemplate, selectedPizzaFlavors, pizzaPreview]);
 
   const total = computed.unitPrice * quantity;
 
@@ -400,16 +458,18 @@ export function PosItemConfiguratorModal(props: {
     }
  
     if (isPizzaTemplate) {
-      const sizesLink = detail.optionGroupLinks?.find(l => l.pricingAxis === 'primary');
-      const sizeSelected = selectionState.find(s => s.optionGroupId === sizesLink?.optionGroup.id)?.items.length ?? 0;
-      if (sizeSelected === 0) return 'Selecione um tamanho.';
+      if (!pizzaSizeId) return 'Selecione um tamanho.';
+      if (pizzaMountingGroup && !selectedPizzaMountingItemId) return 'Selecione a montagem da pizza.';
       if (selectedPizzaFlavors.length === 0) return 'Selecione pelo menos 1 sabor.';
+      if (selectedPizzaFlavors.length > flavorSelectionLimit) {
+        return `Selecione no máximo ${flavorSelectionLimit} sabor${flavorSelectionLimit > 1 ? 'es' : ''}.`;
+      }
       if (pizzaPreviewLoading) return 'Aguarde a simulação do preço.';
       if (pizzaPreviewError) return pizzaPreviewError;
     }
  
     return null;
-  }, [detail, hasV2Options, isSlotCombo, slotState, isPizzaTemplate, selectionState, selectedPizzaFlavors]);
+  }, [detail, hasV2Options, isSlotCombo, slotState, isPizzaTemplate, selectionState, selectedPizzaFlavors, flavorSelectionLimit, pizzaMountingGroup, pizzaPreviewError, pizzaPreviewLoading, selectedPizzaMountingItemId, pizzaSizeId]);
  
   const currentValidationError = useMemo(() => {
     if (!isOpen) return null;
@@ -478,13 +538,28 @@ export function PosItemConfiguratorModal(props: {
 
   const togglePizzaFlavor = (flavor: { id: string; name: string }) => {
     setSelectedPizzaFlavors(prev => {
-      const exists = prev.some(f => f.productId === flavor.id);
-      if (exists) {
-        if (prev.length === 1) return prev; // Must have at least 1
-        return prev.filter(f => f.productId !== flavor.id);
-      }
-      if (prev.length >= 4) return prev; // Limit to 4 parts
-      return [...prev, { productId: flavor.id, name: flavor.name }];
+      const nextIds = normalizePizzaFlavorSelection(
+        prev.map((item) => item.productId),
+        flavor.id,
+        flavorSelectionLimit,
+      );
+      return nextIds.map((productId) => {
+        const matched = pizzaFlavorCatalog.find((item) => item.id === productId);
+        return { productId, name: matched?.name ?? flavor.name };
+      });
+    });
+  };
+
+  const togglePizzaMounting = (itemId: string) => {
+    setSelectedPizzaMountingItemId(itemId);
+    const nextLimit = getPizzaFlavorSelectionLimit(itemId, pizzaMountingItems);
+    setSelectedPizzaFlavors((current) => {
+      const currentIds = current.map((item) => item.productId);
+      const nextIds = trimPizzaFlavorSelection(currentIds, nextLimit, detail?.id);
+      return nextIds.map((productId) => {
+        const matched = pizzaFlavorCatalog.find((item) => item.id === productId);
+        return { productId, name: matched?.name ?? detail?.name ?? 'Pizza' };
+      });
     });
   };
 
@@ -595,10 +670,153 @@ export function PosItemConfiguratorModal(props: {
                 </div>
               ) : null}
 
+              {isPizzaTemplate ? (
+                <div className="space-y-4">
+                  <div className="bg-card dark:bg-muted900/40 border border-border dark:border-border800 rounded-2xl p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-foreground font-black text-sm uppercase tracking-wider">Pizza</div>
+                        <div className="text-[10px] text-muted-foreground font-bold italic">
+                          {isHalfAndHalf ? 'Escolha ate 2 sabores meio a meio' : 'Escolha 1 sabor para a pizza inteira'}
+                        </div>
+                      </div>
+                      <div className="text-[10px] font-black uppercase text-muted-foreground">
+                        {selectedPizzaFlavors.length}/{flavorSelectionLimit}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-card dark:bg-muted900/40 border border-border dark:border-border800 rounded-2xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <div className="text-foreground font-black text-sm uppercase tracking-wider">Tamanho</div>
+                        <div className="text-[10px] text-muted-foreground font-bold">Selecione o tamanho da pizza</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {pizzaSizeItems.map((size) => {
+                        const selected = pizzaSizeId === size.id;
+                        return (
+                          <button
+                            key={size.id}
+                            type="button"
+                            onClick={() => setPizzaSizeId(size.id)}
+                            className={`px-3 py-3 rounded-xl border text-xs font-black transition-all ${
+                              selected
+                                ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20'
+                                : 'bg-card dark:bg-muted900 border-border dark:border-border800 text-foreground hover:border-primary/40'
+                            }`}
+                            aria-pressed={selected}
+                          >
+                            {size.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {pizzaMountingGroup ? (
+                    <div className="bg-card dark:bg-muted900/40 border border-border dark:border-border800 rounded-2xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <div className="text-foreground font-black text-sm uppercase tracking-wider">Montagem</div>
+                          <div className="text-[10px] text-muted-foreground font-bold">Escolha como a pizza sera montada</div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {pizzaMountingItems.map((item) => {
+                          const selected = selectedPizzaMountingItemId === item.id;
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => togglePizzaMounting(item.id)}
+                              className={`p-3 rounded-xl border text-left transition-all ${
+                                selected
+                                  ? 'bg-primary/10 border-primary/20 ring-1 ring-primary/20'
+                                  : 'bg-card dark:bg-muted900 border-border dark:border-border800 hover:border-border'
+                              }`}
+                              aria-pressed={selected}
+                            >
+                              <div className={`text-xs font-bold truncate ${selected ? 'text-primary' : 'text-foreground'}`}>
+                                {item.name}
+                              </div>
+                              {item.description ? (
+                                <div className="text-[10px] text-muted-foreground font-bold mt-0.5 line-clamp-2">
+                                  {item.description}
+                                </div>
+                              ) : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="bg-card dark:bg-muted900/40 border border-border dark:border-border800 rounded-2xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <div className="text-foreground font-black text-sm uppercase tracking-wider">Sabores</div>
+                        <div className="text-[10px] text-muted-foreground font-bold">
+                          {isHalfAndHalf ? 'Toque para escolher ate 2 sabores' : 'Toque para escolher 1 sabor'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      {pizzaFlavorCatalog.map((flavor) => {
+                        const selected = selectedPizzaFlavors.some((entry) => entry.productId === flavor.id);
+                        return (
+                          <button
+                            key={flavor.id}
+                            type="button"
+                            onClick={() => togglePizzaFlavor({ id: flavor.id, name: flavor.name })}
+                            className={`p-3 rounded-xl border text-left transition-all ${
+                              selected
+                                ? 'bg-status-success/10 border-status-success/20'
+                                : 'bg-card dark:bg-muted900 border-border dark:border-border800 hover:border-border'
+                            }`}
+                            aria-pressed={selected}
+                          >
+                            <div className="text-foreground font-bold text-[11px] truncate">{flavor.name}</div>
+                            {selected ? (
+                              <div className="text-[10px] font-bold text-status-success mt-0.5">
+                                {selectedPizzaFlavors.length === 2 ? '1/2 da pizza' : 'Sabor principal'}
+                              </div>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="bg-card dark:bg-muted900/40 border border-border dark:border-border800 rounded-2xl p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Preco</div>
+                        <div className="text-lg font-black text-foreground">
+                          {pizzaPreviewLoading ? 'Simulando...' : formatCurrency(computed.unitPrice)}
+                        </div>
+                      </div>
+                      {pizzaPreviewMeta ? (
+                        <div className="text-right">
+                          <div className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Regra</div>
+                          <div className="text-xs font-bold text-foreground capitalize">{pizzaPreviewMeta.strategy}</div>
+                        </div>
+                      ) : null}
+                    </div>
+                    {pizzaPreviewMeta ? (
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        {pizzaPreviewMeta.sizeName} - {selectedPizzaFlavors.map((f) => f.name).join(' / ')}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
               {!isSlotCombo && hasV2Options ? (
                 <div className="space-y-5">
-                  {(detail.optionGroupLinks ?? [])
-                    .filter((l) => l.optionGroup?.isActive)
+                  {genericOptionLinks
                     .map((link) => {
                       const group = link.optionGroup;
                       const groupName = link.overrideName ?? group.name;
@@ -733,14 +951,14 @@ export function PosItemConfiguratorModal(props: {
                 const slotsDto = isSlotCombo ? buildSlotsDto(slotState) : undefined;
 
                 const pizzaComposition: PizzaCompositionDTO | undefined = isPizzaTemplate ? {
-                  sizeId: selectedPizzaSizeId,
-                  sizeName: pizzaPreview?.label.split(' · ')[0] ?? undefined,
-                  pricingStrategy: undefined,
-                  calculatedPrice: pizzaPreview?.unitPrice,
-                  flavors: selectedPizzaFlavors.map(f => ({
+                  sizeId: pizzaSizeId,
+                  sizeName: pizzaPreviewMeta?.sizeName ?? undefined,
+                  pricingStrategy: pizzaPreviewMeta?.strategy,
+                  calculatedPrice: pizzaPreviewMeta?.calculatedPrice ?? pizzaPreview?.unitPrice,
+                  flavors: selectedPizzaFlavors.map((f) => ({
                     productId: f.productId,
-                    fraction: 1 / selectedPizzaFlavors.length
-                  }))
+                    fraction: 1 / selectedPizzaFlavors.length,
+                  })),
                 } : undefined;
 
                 onConfirm({

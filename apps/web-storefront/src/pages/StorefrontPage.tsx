@@ -29,6 +29,7 @@ import { ProductSkeleton, ComboSkeleton } from '../components/ProductSkeleton';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { LoginModal } from '../components/LoginModal';
 import { Link } from 'react-router-dom';
+import { isPizzaCategory } from '@gestor/utils';
 import {
   StorefrontButton,
   ProductRenderer,
@@ -81,10 +82,6 @@ function StorefrontHero({ banner, name }: { banner?: string | null; name: string
       </div>
     </section>
   );
-}
-
-function isPizzaCategory(category: StorefrontCategoryPayload) {
-  return category.templateType === 'pizza';
 }
 
 export function StorefrontPage() {
