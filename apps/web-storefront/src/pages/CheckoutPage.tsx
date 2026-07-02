@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { ArrowLeft, MapPin, User, FileText, Loader2, AlertCircle, Truck, Store, CreditCard, Banknote, QrCode } from 'lucide-react';
 import { useCartStore } from '../store/use-cart-store';
 import { api } from '../lib/api-client';
@@ -89,6 +89,7 @@ export function CheckoutPage() {
   const [appliedCoupon, setAppliedCoupon] = useState<string>('');
   const [couponError, setCouponError] = useState<string>('');
   const [usedCashback, setUsedCashback] = useState<number>(0);
+  const hasCompletedCheckoutRef = useRef(false);
 
   // Financial state (calculated server-side)
   const [deliveryFee, setDeliveryFee] = useState(0);
@@ -389,7 +390,7 @@ export function CheckoutPage() {
       return;
     }
 
-    if (items.length === 0) {
+    if (items.length === 0 && !hasCompletedCheckoutRef.current) {
       showEmptyCartMessageOnce();
       navigate(`/${tenantSlug}`, { replace: true });
     }
@@ -484,6 +485,7 @@ export function CheckoutPage() {
 
       const res = await api.post<OrderResponseDTO>(`/orders/public-checkout/${tenantSlug}`, payload);
       
+      hasCompletedCheckoutRef.current = true;
       clearCart();
       navigate(`/${tenantSlug}/order/${res.data.id}`, { state: { order: res.data } });
     } catch (err: unknown) {
@@ -549,6 +551,7 @@ export function CheckoutPage() {
 
       const res = await api.post<OrderResponseDTO>(`/orders/public-checkout/${tenantSlug}`, payload);
       
+      hasCompletedCheckoutRef.current = true;
       clearCart();
       const summaryIdentifier = res.data.publicTrackingToken || res.data.id;
       
@@ -841,35 +844,45 @@ export function CheckoutPage() {
         </h2>
         <div className="grid grid-cols-3 gap-2">
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('pix')) && (
-            <button onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.pix }))}
+            <button
+              type="button"
+              onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.pix }))}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'pix' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <QrCode className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase">PIX</span>
             </button>
           )}
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('credit_card')) && (
-            <button onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.credit_card }))}
+            <button
+              type="button"
+              onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.credit_card }))}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'credit_card' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <CreditCard className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase text-center leading-none">Crédito<br/>On-line</span>
             </button>
           )}
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('debit_card')) && (
-            <button onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.debit_card }))}
+            <button
+              type="button"
+              onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.debit_card }))}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'debit_card' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <CreditCard className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase text-center leading-none">Débito<br/>On-line</span>
             </button>
           )}
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('card_on_delivery')) && (
-            <button onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.card_on_delivery }))}
+            <button
+              type="button"
+              onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.card_on_delivery }))}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'card_on_delivery' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <CreditCard className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase tracking-tight text-center leading-none">Cartão na<br/>Entrega</span>
             </button>
           )}
           {(!tenantInfo || tenantInfo.paymentMethods?.includes('cash')) && (
-            <button onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.cash, changeFor: 0 }))}
+            <button
+              type="button"
+              onClick={() => setPayment(prev => ({ ...prev, method: PaymentMethod.cash, changeFor: 0 }))}
               className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${payment.method === 'cash' ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-gray-100'}`}>
               <Banknote className="w-5 h-5" />
               <span className="text-[10px] font-bold uppercase mt-2">Dinheiro</span>
