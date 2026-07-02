@@ -4,6 +4,9 @@ import { ArrowLeft, QrCode, Clock, CheckCircle, AlertCircle } from 'lucide-react
 import { api } from '../lib/api-client';
 
 interface PixPaymentData {
+  orderId?: string;
+  orderNumber?: string;
+  publicTrackingToken?: string;
   transactionId: string;
   qrCode: string;
   qrCodeBase64: string;
@@ -56,13 +59,18 @@ export function PaymentPage() {
             setStatus('confirmed');
             setPollingInterval(null);
             
-            // Redirecionar para página do pedido
+            // Redirecionar para o resumo público do pedido
             setTimeout(() => {
-              navigate(`/${tenantSlug}/order/success`, { 
-                state: { 
-                  message: 'Pagamento confirmado com sucesso!',
-                  orderData: response.data 
-                } 
+              const targetIdentifier = response.data.publicTrackingToken || response.data.orderId || transactionId;
+              navigate(`/${tenantSlug}/order/${targetIdentifier}`, {
+                state: {
+                  order: {
+                    id: response.data.orderId,
+                    orderNumber: response.data.orderNumber,
+                    publicTrackingToken: response.data.publicTrackingToken,
+                    pixPayment: response.data,
+                  },
+                },
               });
             }, 2000);
           } else if (updatedStatus === 'failed' || updatedStatus === 'expired') {

@@ -59,6 +59,8 @@ export type {
   OrderResponseDTO,
   OrderItemResponseDTO,
   OrderTimelineEntryDTO,
+  PixPaymentDTO,
+  PreferencePaymentDTO,
   FulfillmentType,
   OrderStatus,
   OrderLineType,

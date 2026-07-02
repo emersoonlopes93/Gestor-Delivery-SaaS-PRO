@@ -677,12 +677,29 @@ export class PaymentGatewayService {
   }
 
   async getPaymentStatus(transactionId: string): Promise<{
+    transactionId: string;
     status: PaymentTxStatus;
     gatewayStatus?: string;
+    orderId?: string;
+    orderNumber?: string;
+    publicTrackingToken?: string;
+    qrCode?: string;
+    qrCodeBase64?: string;
+    ticketUrl?: string;
+    expiresAt?: string;
     confirmedAt?: Date | null;
   }> {
     const transaction = await this.prisma.paymentTransaction.findUnique({
       where: { id: transactionId },
+      include: {
+        order: {
+          select: {
+            id: true,
+            orderNumber: true,
+            publicTrackingToken: true,
+          },
+        },
+      },
     });
 
     if (!transaction) {
@@ -694,10 +711,28 @@ export class PaymentGatewayService {
       : {};
 
     const mpPayment = (metadata.mercadoPagoPayment || metadata.mercadoPagoResponse) as Record<string, Prisma.JsonValue> | undefined;
+    const transactionData = mpPayment?.point_of_interaction &&
+      typeof mpPayment.point_of_interaction === 'object' &&
+      !Array.isArray(mpPayment.point_of_interaction)
+      ? (mpPayment.point_of_interaction as Record<string, Prisma.JsonValue>).transaction_data
+      : undefined;
+    const pointOfInteraction = transactionData && typeof transactionData === 'object' && !Array.isArray(transactionData)
+      ? (transactionData as Record<string, Prisma.JsonValue>)
+      : undefined;
 
     return {
+      transactionId: transaction.id,
       status: transaction.status,
       gatewayStatus: mpPayment?.status as string | undefined,
+      orderId: transaction.order?.id,
+      orderNumber: transaction.order?.orderNumber,
+      publicTrackingToken: transaction.order?.publicTrackingToken ?? undefined,
+      qrCode: typeof pointOfInteraction?.qr_code === 'string' ? pointOfInteraction.qr_code : undefined,
+      qrCodeBase64: typeof pointOfInteraction?.qr_code_base64 === 'string' ? pointOfInteraction.qr_code_base64 : undefined,
+      ticketUrl: typeof pointOfInteraction?.ticket_url === 'string' ? pointOfInteraction.ticket_url : undefined,
+      expiresAt: typeof pointOfInteraction?.qr_code_base64 === 'string' || typeof pointOfInteraction?.qr_code === 'string'
+        ? new Date(transaction.createdAt.getTime() + 30 * 60 * 1000).toISOString()
+        : undefined,
       confirmedAt: transaction.confirmedAt,
     };
   }

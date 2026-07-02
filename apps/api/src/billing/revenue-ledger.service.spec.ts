@@ -59,6 +59,47 @@ describe('RevenueLedgerService', () => {
     }));
   });
 
+  it('reads the existing revenue event outside an aborted transaction after a unique conflict', async () => {
+    const prisma = makePrisma();
+    const tx = makePrisma();
+    const existing = {
+      id: 'event-1',
+      tenantId: 'tenant-1',
+      idempotencyKey: 'order:order-1:status:completed',
+      type: RevenueEventType.order_completed,
+      amount: new Prisma.Decimal(42),
+    };
+    tx.revenueEvent.create.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint', {
+        code: 'P2002',
+        clientVersion: 'test',
+      }),
+    );
+    prisma.revenueEvent.findUnique.mockResolvedValue(existing);
+
+    const service = new RevenueLedgerService(prisma as never);
+    const events = await service.recordOrderStatusEvent({
+      tenantId: 'tenant-1',
+      orderId: 'order-1',
+      orderStatus: OrderStatus.completed,
+      orderTotal: new Prisma.Decimal(42),
+      sourceChannel: 'storefront',
+      occurredAt: new Date('2026-06-10T12:00:00.000Z'),
+      tx: tx as never,
+    });
+
+    expect(events).toEqual([existing]);
+    expect(prisma.revenueEvent.findUnique).toHaveBeenCalledWith({
+      where: {
+        tenantId_idempotencyKey: {
+          tenantId: 'tenant-1',
+          idempotencyKey: 'order:order-1:status:completed',
+        },
+      },
+    });
+    expect(tx.revenueEvent.findUnique).not.toHaveBeenCalled();
+  });
+
   it('builds a ledger preview with revenue, order count and checksum', async () => {
     const prisma = makePrisma();
     const events = [

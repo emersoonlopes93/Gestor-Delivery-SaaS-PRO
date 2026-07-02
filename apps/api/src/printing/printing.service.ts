@@ -13,6 +13,18 @@ export class PrintingService {
     private readonly legacyPrinter: LegacyPrinterService,
   ) {}
 
+  private async createOrReusePrintJob(data: Prisma.PrintJobUncheckedCreateInput & { idempotencyKey?: string | null }) {
+    if (!data.idempotencyKey) {
+      return this.db.printJob.create({ data });
+    }
+
+    return this.db.printJob.upsert({
+      where: { idempotencyKey: data.idempotencyKey },
+      create: data,
+      update: {},
+    });
+  }
+
   async getJobs(tenantId: string) {
     return this.db.printJob.findMany({
       where: { tenantId },
@@ -370,26 +382,15 @@ export class PrintingService {
 
   async createPrintJobForOrder(tenantId: string, orderId: string, stationSlug: string, type: PrintType, content: string) {
     const idempotencyKey = `auto_print_${orderId}_${type}_${stationSlug}`;
-    
-    // Check if already exists
-    const existing = await this.db.printJob.findUnique({
-      where: { idempotencyKey },
-    });
 
-    if (existing) {
-      return existing;
-    }
-
-    return this.db.printJob.create({
-      data: {
-        tenantId,
-        orderId,
-        station: stationSlug,
-        type,
-        content,
-        idempotencyKey,
-        status: PrintJobStatus.pending,
-      },
+    return this.createOrReusePrintJob({
+      tenantId,
+      orderId,
+      station: stationSlug,
+      type,
+      content,
+      idempotencyKey,
+      status: PrintJobStatus.pending,
     });
   }
 
@@ -430,15 +431,16 @@ Data: ${new Date().toLocaleString('pt-BR')}
 Bluetooth OK
 --- FIM DO TESTE ---`;
 
-    return this.db.printJob.create({
-      data: {
-        tenantId,
-        orderId: latestOrder.id,
-        station: stationSlug,
-        type: PrintType.summary,
-        content,
-        status: PrintJobStatus.pending,
-      },
+    const idempotencyKey = `test_print_${tenantId}_${latestOrder.id}_${stationSlug}_${deviceName}`;
+
+    return this.createOrReusePrintJob({
+      tenantId,
+      orderId: latestOrder.id,
+      station: stationSlug,
+      type: PrintType.summary,
+      content,
+      status: PrintJobStatus.pending,
+      idempotencyKey,
     });
   }
 }

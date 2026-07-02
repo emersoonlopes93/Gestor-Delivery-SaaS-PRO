@@ -550,18 +550,14 @@ export function CheckoutPage() {
       const res = await api.post<OrderResponseDTO>(`/orders/public-checkout/${tenantSlug}`, payload);
       
       clearCart();
+      const summaryIdentifier = res.data.publicTrackingToken || res.data.id;
       
-      // Se for pagamento PIX, redirecionar para página do QR code
-      if (res.data.pixPayment) {
-        navigate(`/${tenantSlug}/payment/${res.data.pixPayment.transactionId}`, { state: { pixPayment: res.data.pixPayment } });
-      } 
       // Se for Cartão on-line, redirecionar para Checkout Pro do Mercado Pago
-      else if (res.data.preferencePayment) {
+      if (res.data.preferencePayment) {
         window.location.href = res.data.preferencePayment.initPoint;
       } 
-      // Pagamento em Dinheiro ou Máquina na Entrega
       else {
-        navigate(`/${tenantSlug}/order/${res.data.id}`, { state: { order: res.data } });
+        navigate(`/${tenantSlug}/order/${summaryIdentifier}`, { state: { order: res.data } });
       }
     } catch (err: unknown) {
       const error = err as Error & { details?: { validationErrors?: string[] } };

@@ -288,6 +288,15 @@ export class RevenueLedgerService {
   }): Promise<RevenueEvent> {
     const client = input.tx ?? this.prisma;
     const period = this.resolveBillingPeriod(input.occurredAt);
+    const findExistingEvent = () =>
+      this.prisma.revenueEvent.findUnique({
+        where: {
+          tenantId_idempotencyKey: {
+            tenantId: input.tenantId,
+            idempotencyKey: input.idempotencyKey,
+          },
+        },
+      });
 
     try {
       return await client.revenueEvent.create({
@@ -309,14 +318,7 @@ export class RevenueLedgerService {
       });
     } catch (error) {
       if (this.isUniqueConstraintError(error)) {
-        const existing = await client.revenueEvent.findUnique({
-          where: {
-            tenantId_idempotencyKey: {
-              tenantId: input.tenantId,
-              idempotencyKey: input.idempotencyKey,
-            },
-          },
-        });
+        const existing = await findExistingEvent();
         if (existing) return existing;
       }
       throw error;
