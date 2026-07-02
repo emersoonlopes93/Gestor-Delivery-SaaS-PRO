@@ -79,6 +79,16 @@ interface PaymentMetadata {
   initPoint?: string;
   mercadoPagoResponse?: MercadoPagoPixResponse | MercadoPagoPayment;
   mercadoPagoPayment?: MercadoPagoPayment;
+  pixPayment?: {
+    transactionId: string;
+    qrCode: string;
+    qrCodeBase64?: string;
+    ticketUrl?: string;
+    expiresAt: string;
+    provider: 'mercadopago' | 'manual_pix';
+    pixKey?: string;
+    txid?: string;
+  };
   error?: string;
 }
 
@@ -114,6 +124,77 @@ export class PaymentGatewayService {
     } as Prisma.InputJsonObject;
   }
 
+  private stripAccents(value: string): string {
+    return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  private normalizePixField(value: string, maxLength: number): string {
+    return this.stripAccents(value)
+      .replace(/[^A-Z0-9 ]/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase()
+      .slice(0, maxLength);
+  }
+
+  private buildPixTlv(id: string, value: string): string {
+    return `${id}${value.length.toString().padStart(2, '0')}${value}`;
+  }
+
+  private calculatePixCrc16(payload: string): string {
+    let crc = 0xffff;
+
+    for (let i = 0; i < payload.length; i += 1) {
+      crc ^= payload.charCodeAt(i) << 8;
+
+      for (let bit = 0; bit < 8; bit += 1) {
+        if (crc & 0x8000) {
+          crc = ((crc << 1) ^ 0x1021) & 0xffff;
+        } else {
+          crc = (crc << 1) & 0xffff;
+        }
+      }
+    }
+
+    return crc.toString(16).toUpperCase().padStart(4, '0');
+  }
+
+  private buildPixTxId(paymentTransactionId: string): string {
+    return paymentTransactionId.replace(/-/g, '').slice(0, 25).toUpperCase();
+  }
+
+  private buildPixPayload(input: {
+    pixKey: string;
+    merchantName: string;
+    merchantCity: string;
+    amount: number;
+    txid: string;
+    description?: string;
+  }): string {
+    const merchantAccountInfo = [
+      this.buildPixTlv('00', 'br.gov.bcb.pix'),
+      this.buildPixTlv('01', input.pixKey),
+      ...(input.description ? [this.buildPixTlv('02', input.description)] : []),
+    ].join('');
+
+    const additionalData = this.buildPixTlv('05', input.txid);
+    const payload = [
+      this.buildPixTlv('00', '01'),
+      this.buildPixTlv('01', '11'),
+      this.buildPixTlv('26', merchantAccountInfo),
+      this.buildPixTlv('52', '0000'),
+      this.buildPixTlv('53', '986'),
+      this.buildPixTlv('54', input.amount.toFixed(2)),
+      this.buildPixTlv('58', 'BR'),
+      this.buildPixTlv('59', input.merchantName),
+      this.buildPixTlv('60', input.merchantCity),
+      this.buildPixTlv('62', additionalData),
+      '6304',
+    ].join('');
+
+    return `${payload}${this.calculatePixCrc16(payload)}`;
+  }
+
   private async getMercadoPagoConfig(tenantId: string): Promise<MercadoPagoConfig> {
     const settings = await this.prisma.tenantSettings.findUnique({
       where: { tenantId },
@@ -137,11 +218,6 @@ export class PaymentGatewayService {
     ticketUrl: string;
     expiresAt: Date;
   }> {
-    const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) {
-      throw new Error('Tenant context not found');
-    }
-    
     const order = await this.prisma.tenantClient.order.findUnique({
       where: { id: orderId },
       include: { customer: true },
@@ -151,6 +227,13 @@ export class PaymentGatewayService {
       throw new NotFoundException('Order not found');
     }
 
+    const contextTenantId = this.tenantContext.getTenantId();
+    const tenantId = contextTenantId ?? order.tenantId;
+
+    if (contextTenantId && contextTenantId !== order.tenantId) {
+      throw new BadRequestException('Tenant context does not match order tenant');
+    }
+
     if (order.paymentMethod !== PaymentMethod.pix) {
       throw new BadRequestException('Order payment method is not PIX');
     }
@@ -158,6 +241,29 @@ export class PaymentGatewayService {
     if (order.status !== OrderStatus.pending) {
       throw new BadRequestException('Order is not in pending status');
     }
+
+    const tenantSettings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+      select: {
+        pixKey: true,
+        razaoSocial: true,
+        city: true,
+        mercadoPagoAccessToken: true,
+        mercadoPagoPublicKey: true,
+      },
+    });
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true },
+    });
+
+    const merchantName = this.normalizePixField(
+      tenantSettings?.razaoSocial || tenant?.name || 'PedeHub',
+      25,
+    );
+    const merchantCity = this.normalizePixField(tenantSettings?.city || 'SAO PAULO', 15);
+    const pixKey = tenantSettings?.pixKey?.trim();
 
     const paymentTransaction = await this.prisma.tenantClient.paymentTransaction.create({
       data: {
@@ -176,73 +282,119 @@ export class PaymentGatewayService {
       },
     });
 
-    const config = await this.getMercadoPagoConfig(tenantId);
-    const payload: MercadoPagoPixRequest = {
-      transaction_amount: Number(order.total),
-      description: `Pedido #${order.orderNumber}`,
-      payment_method_id: 'pix',
-      payer: {
-        email: customerEmail,
-        first_name: customerName?.split(' ')[0],
-        last_name: customerName?.split(' ').slice(1).join(' '),
-      },
-      external_reference: paymentTransaction.id,
-    };
+    const mpConfigAvailable = Boolean(
+      tenantSettings?.mercadoPagoAccessToken || this.configService.get<string>('MERCADO_PAGO_ACCESS_TOKEN'),
+    ) && Boolean(
+      tenantSettings?.mercadoPagoPublicKey || this.configService.get<string>('MERCADO_PAGO_PUBLIC_KEY'),
+    ) && Boolean(this.configService.get<string>('MERCADO_PAGO_WEBHOOK_URL'));
 
-    try {
-      const response = await fetch('https://api.mercadopago.com/v1/payments', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${config.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+    if (mpConfigAvailable) {
+      try {
+        const config = await this.getMercadoPagoConfig(tenantId);
+        const payload: MercadoPagoPixRequest = {
+          transaction_amount: Number(order.total),
+          description: `Pedido #${order.orderNumber}`,
+          payment_method_id: 'pix',
+          payer: {
+            email: customerEmail,
+            first_name: customerName?.split(' ')[0],
+            last_name: customerName?.split(' ').slice(1).join(' '),
+          },
+          external_reference: paymentTransaction.id,
+        };
 
-      if (!response.ok) {
+        const response = await fetch('https://api.mercadopago.com/v1/payments', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${config.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (response.ok) {
+          const mpResponse: MercadoPagoPixResponse = await response.json();
+          const expiresAt = new Date();
+          expiresAt.setMinutes(expiresAt.getMinutes() + 30);
+
+          await this.prisma.tenantClient.paymentTransaction.update({
+            where: { id: paymentTransaction.id },
+            data: {
+              gatewayTxId: mpResponse.id,
+              metadata: this.mergeMetadata(paymentTransaction.metadata, {
+                mercadoPagoResponse: mpResponse,
+                pixPayment: {
+                  transactionId: paymentTransaction.id,
+                  qrCode: mpResponse.point_of_interaction.transaction_data.qr_code,
+                  qrCodeBase64: mpResponse.point_of_interaction.transaction_data.qr_code_base64,
+                  ticketUrl: mpResponse.point_of_interaction.transaction_data.ticket_url,
+                  expiresAt: expiresAt.toISOString(),
+                  provider: 'mercadopago',
+                },
+              }),
+            },
+          });
+
+          return {
+            transactionId: paymentTransaction.id,
+            qrCode: mpResponse.point_of_interaction.transaction_data.qr_code,
+            qrCodeBase64: mpResponse.point_of_interaction.transaction_data.qr_code_base64,
+            ticketUrl: mpResponse.point_of_interaction.transaction_data.ticket_url,
+            expiresAt,
+          };
+        }
+
         const error = await response.text();
-        this.logger.error(`Mercado Pago API error: ${error}`);
-        throw new Error('Failed to create PIX payment');
+        this.logger.warn(`Mercado Pago API error, using local PIX fallback: ${error}`);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.warn(`Error creating PIX with Mercado Pago, using local PIX fallback: ${message}`);
       }
-
-      const mpResponse: MercadoPagoPixResponse = await response.json();
-
-      await this.prisma.tenantClient.paymentTransaction.update({
-        where: { id: paymentTransaction.id },
-        data: {
-          gatewayTxId: mpResponse.id,
-          metadata: this.mergeMetadata(paymentTransaction.metadata, {
-            mercadoPagoResponse: mpResponse,
-          }),
-        },
-      });
-
-      const expiresAt = new Date();
-      expiresAt.setMinutes(expiresAt.getMinutes() + 30);
-
-      return {
-        transactionId: paymentTransaction.id,
-        qrCode: mpResponse.point_of_interaction.transaction_data.qr_code,
-        qrCodeBase64: mpResponse.point_of_interaction.transaction_data.qr_code_base64,
-        ticketUrl: mpResponse.point_of_interaction.transaction_data.ticket_url,
-        expiresAt,
-      };
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Error creating PIX payment: ${message}`);
-      
-      await this.prisma.tenantClient.paymentTransaction.update({
-        where: { id: paymentTransaction.id },
-        data: {
-          status: PaymentTxStatus.failed,
-          metadata: this.mergeMetadata(paymentTransaction.metadata, {
-            error: message,
-          }),
-        },
-      });
-
-      throw error;
     }
+
+    if (!pixKey) {
+      throw new Error('PIX configuration missing for tenant ' + tenantId);
+    }
+
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 30);
+    const txid = this.buildPixTxId(paymentTransaction.id);
+    const qrCode = this.buildPixPayload({
+      pixKey,
+      merchantName,
+      merchantCity,
+      amount: Number(order.total),
+      txid,
+      description: `Pedido #${order.orderNumber}`,
+    });
+
+    await this.prisma.tenantClient.paymentTransaction.update({
+      where: { id: paymentTransaction.id },
+      data: {
+        gatewayName: 'manual_pix',
+        gatewayTxId: txid,
+        metadata: this.mergeMetadata(paymentTransaction.metadata, {
+          pixPayment: {
+            transactionId: paymentTransaction.id,
+            qrCode,
+            qrCodeBase64: '',
+            ticketUrl: '',
+            expiresAt: expiresAt.toISOString(),
+            provider: 'manual_pix',
+            pixKey,
+            txid,
+          },
+        }),
+      },
+    });
+
+    return {
+      transactionId: paymentTransaction.id,
+      qrCode,
+      qrCodeBase64: '',
+      ticketUrl: '',
+      expiresAt,
+    };
   }
 
   async createCardPayment(
@@ -709,6 +861,35 @@ export class PaymentGatewayService {
     const metadata = (transaction.metadata && typeof transaction.metadata === 'object' && !Array.isArray(transaction.metadata))
       ? (transaction.metadata as Record<string, Prisma.JsonValue>)
       : {};
+
+    const localPixPayment = metadata.pixPayment && typeof metadata.pixPayment === 'object' && !Array.isArray(metadata.pixPayment)
+      ? (metadata.pixPayment as Record<string, Prisma.JsonValue>)
+      : undefined;
+
+    if (localPixPayment) {
+      const qrCode = typeof localPixPayment.qrCode === 'string' ? localPixPayment.qrCode : undefined;
+      const qrCodeBase64 = typeof localPixPayment.qrCodeBase64 === 'string' ? localPixPayment.qrCodeBase64 : undefined;
+      const ticketUrl = typeof localPixPayment.ticketUrl === 'string' ? localPixPayment.ticketUrl : undefined;
+      const expiresAt = typeof localPixPayment.expiresAt === 'string'
+        ? localPixPayment.expiresAt
+        : new Date(transaction.createdAt.getTime() + 30 * 60 * 1000).toISOString();
+
+      if (qrCode || qrCodeBase64 || ticketUrl) {
+        return {
+          transactionId: transaction.id,
+          status: transaction.status,
+          gatewayStatus: transaction.gatewayTxId || undefined,
+          orderId: transaction.order?.id,
+          orderNumber: transaction.order?.orderNumber,
+          publicTrackingToken: transaction.order?.publicTrackingToken ?? undefined,
+          qrCode,
+          qrCodeBase64,
+          ticketUrl,
+          expiresAt,
+          confirmedAt: transaction.confirmedAt,
+        };
+      }
+    }
 
     const mpPayment = (metadata.mercadoPagoPayment || metadata.mercadoPagoResponse) as Record<string, Prisma.JsonValue> | undefined;
     const transactionData = mpPayment?.point_of_interaction &&

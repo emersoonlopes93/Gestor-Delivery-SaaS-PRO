@@ -1,6 +1,7 @@
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { ArrowLeft, QrCode, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../lib/api-client';
 
 interface PixPaymentData {
@@ -234,12 +235,22 @@ export function PaymentPage() {
             <div className="p-8">
               <div className="max-w-sm mx-auto">
                 {/* QR Code Image */}
-                <div className="bg-white p-4 rounded-2xl shadow-inner mb-6">
-                  <img 
-                    src={`data:image/png;base64,${paymentData.qrCodeBase64}`}
-                    alt="QR Code para pagamento PIX"
-                    className="w-full h-auto"
-                  />
+                <div className="bg-white p-4 rounded-2xl shadow-inner mb-6 flex items-center justify-center">
+                  {paymentData.qrCodeBase64 ? (
+                    <img 
+                      src={`data:image/png;base64,${paymentData.qrCodeBase64}`}
+                      alt="QR Code para pagamento PIX"
+                      className="w-full h-auto"
+                    />
+                  ) : paymentData.qrCode ? (
+                    <QRCodeSVG
+                      value={paymentData.qrCode}
+                      size={256}
+                      level="M"
+                      includeMargin
+                      className="w-full h-auto max-w-[256px]"
+                    />
+                  ) : null}
                 </div>
 
                 {/* PIX Code */}

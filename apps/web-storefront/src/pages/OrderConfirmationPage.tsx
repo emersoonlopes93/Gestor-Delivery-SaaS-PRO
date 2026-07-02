@@ -1,6 +1,7 @@
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { CheckCircle, ArrowLeft, Clock, MapPin, FileText, Package, MessageCircle } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import type { OrderResponseDTO, PixPaymentDTO, StorefrontPayload } from '@gestor/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api-client';
@@ -172,6 +173,16 @@ export function OrderConfirmationPage() {
                     src={`data:image/png;base64,${pixPayment.qrCodeBase64}`}
                     alt="QR Code para pagamento Pix"
                     className="w-full h-auto rounded-xl"
+                  />
+                </div>
+              ) : pixPayment.qrCode ? (
+                <div className="bg-white p-4 rounded-2xl border border-gray-100 flex items-center justify-center">
+                  <QRCodeSVG
+                    value={pixPayment.qrCode}
+                    size={256}
+                    level="M"
+                    includeMargin
+                    className="w-full h-auto max-w-[256px]"
                   />
                 </div>
               ) : null}

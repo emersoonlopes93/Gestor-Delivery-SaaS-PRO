@@ -737,6 +737,28 @@ export class OrdersService {
         ? (paymentTransaction.metadata as Record<string, unknown>)
         : null;
 
+    const localPixPayment = metadata?.pixPayment;
+    if (localPixPayment && typeof localPixPayment === 'object' && !Array.isArray(localPixPayment)) {
+      const payload = localPixPayment as Record<string, unknown>;
+      const qrCode = typeof payload.qrCode === 'string' ? payload.qrCode : '';
+      const qrCodeBase64 = typeof payload.qrCodeBase64 === 'string' ? payload.qrCodeBase64 : '';
+      const ticketUrl = typeof payload.ticketUrl === 'string' ? payload.ticketUrl : '';
+      const expiresAt = typeof payload.expiresAt === 'string'
+        ? payload.expiresAt
+        : new Date(paymentTransaction.createdAt.getTime() + 30 * 60 * 1000).toISOString();
+
+      if (qrCode || qrCodeBase64 || ticketUrl) {
+        return {
+          transactionId: paymentTransaction.id,
+          qrCode,
+          qrCodeBase64,
+          ticketUrl,
+          expiresAt,
+          status: paymentTransaction.status as PixPaymentDTO['status'],
+        };
+      }
+    }
+
     const mpPayload = metadata?.mercadoPagoPayment ?? metadata?.mercadoPagoResponse;
     if (!mpPayload || typeof mpPayload !== 'object' || Array.isArray(mpPayload)) return undefined;
 
