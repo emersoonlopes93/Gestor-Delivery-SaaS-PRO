@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../../stores/auth.store';
 import { api } from '../../lib/api-client';
 import { BusinessGroupContext, Tenant, TenantSettings, TenantOperatingHours, ProductCategory, Product, DashboardStatsDTO } from '@gestor/types';
+import { hasPermission } from '@gestor/auth';
 import { SetupWizard } from './SetupWizard';
 
 type DecimalLike = string | number;
@@ -95,7 +96,7 @@ export function DashboardPage() {
     let cancelled = false;
 
     async function loadDashboardStats() {
-      if (!(user?.roles?.includes('admin') || user?.roles?.includes('owner') || user?.permissions?.includes('reports.read'))) {
+      if (!hasPermission(user?.permissions ?? [], 'reports.read')) {
         setDashboardStats(null);
         return;
       }
