@@ -12,7 +12,7 @@ import { TenantAuthGuard } from '../auth/guards/tenant-auth.guard';
 import { PermissionsGuard } from '../rbac/guards/permissions.guard';
 import { RequirePermissions } from '../common/decorators';
 import type { Request as ExpressRequest } from 'express';
-import type { TenantJwtPayload } from '@gestor/types';
+import type { LocationLookupSource, TenantJwtPayload } from '@gestor/types';
 import { DeliveryCoverageService } from './delivery-coverage.service';
 import { GeocodingService } from './geocoding.service';
 
@@ -49,6 +49,10 @@ class UpsertDeliveryCoverageDto {
 class GeocodeCoverageAddressDto {
   @IsString()
   query!: string;
+
+  @IsOptional()
+  @IsString()
+  source?: LocationLookupSource;
 }
 
 @Controller('delivery/coverage')
@@ -85,7 +89,7 @@ export class DeliveryCoverageController {
   async geocode(@Body() dto: GeocodeCoverageAddressDto) {
     const result = await this.geocodingService.geocodeStructuredAddress(
       { formattedAddress: dto.query.trim() },
-      'geocode',
+      dto.source ?? 'geocode',
     );
 
     return {

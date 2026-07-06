@@ -10,7 +10,11 @@ export type LocationLookupSource =
   | 'autocomplete'
   | 'manual'
   | 'geocode'
-  | 'delivery_quote';
+  | 'delivery_quote'
+  | 'onboarding'
+  | 'settings'
+  | 'checkout'
+  | 'ai_agent';
 
 export interface NormalizedAddress {
   postalCode?: string;
@@ -33,4 +37,3 @@ export interface GeocodingResult {
   confidence?: number;
   raw?: unknown;
 }
-

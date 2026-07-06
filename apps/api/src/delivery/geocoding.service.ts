@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { GeocodingResult, NormalizedAddress } from '@gestor/types';
+import type { GeocodingResult, LocationLookupSource, NormalizedAddress } from '@gestor/types';
 import { LocationProviderService } from '../location/location-provider.service';
 
 @Injectable()
@@ -28,7 +28,7 @@ export class GeocodingService {
 
   async geocodeStructuredAddress(
     address: NormalizedAddress,
-    source: 'geocode' | 'manual' | 'delivery_quote' = 'geocode',
+    source: LocationLookupSource = 'geocode',
   ): Promise<GeocodingResult> {
     return this.locationProviderService.geocodeAddress({
       ...address,
@@ -36,4 +36,3 @@ export class GeocodingService {
     });
   }
 }
-

@@ -594,6 +594,7 @@ export function DeliveryZonesPage() {
             const addressStr = `${settings.street}, ${settings.number}, ${settings.neighborhood || ''}, ${settings.city} - ${settings.state || ''}, Brasil`;
             const geocodeResponse = await api.post<BackendGeocodeResponse>('/delivery/coverage/geocode', {
               query: addressStr,
+              source: 'settings',
             });
             const coords = geocodeResponse.success ? geocodeResponse.data : null;
             if (coords?.lat != null && coords?.lng != null) {

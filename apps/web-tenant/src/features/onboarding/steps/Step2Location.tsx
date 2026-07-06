@@ -36,6 +36,7 @@ interface TenantMeResponse {
 }
 
 interface GeocodeResult {
+  provider?: string | null;
   lat: number | null;
   lng: number | null;
 }
@@ -196,6 +197,7 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
     try {
       const response = await api.post<GeocodeResult>('/delivery/coverage/geocode', {
         query: buildFullAddress(form),
+        source: 'onboarding',
       });
 
       if (geocodeRequestRef.current !== currentRequest) return;

@@ -1,6 +1,5 @@
 ﻿import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { DateTime } from 'luxon';
-import axios from 'axios';
 import { OrdersService } from '../../orders/orders.service';
 import { DeliveryRateService } from '../../delivery/delivery-rate.service';
 import { AiToolDefinition } from '../interfaces/ai-provider.interface';
@@ -30,6 +29,7 @@ import { buildAgentPaymentMethodsResult } from '../utils/agent-payment-methods.u
 import { ConversationService } from './conversation.service';
 import { validateOrderDraft } from '../utils/order-draft-validator.util';
 import { UpsellRecommendationEngine } from '../../campaigns/services/upsell-recommendation.engine';
+import { LocationProviderService } from '../../location/location-provider.service';
 
 export interface AgentSessionContext {
   customerId?: string;
@@ -281,6 +281,7 @@ export class AgentToolsService {
     @Inject(forwardRef(() => ConversationService))
     private readonly conversationService: ConversationService,
     private readonly upsellRecommendationEngine: UpsellRecommendationEngine,
+    private readonly locationProviderService: LocationProviderService,
   ) {}
 
   /**
@@ -750,34 +751,13 @@ export class AgentToolsService {
       return { disponivel: false, mensagem: 'Por favor, informe o endereÃ§o completo para calcularmos a taxa de entrega.' };
     }
 
-    let lat: number;
-    let lng: number;
+    const geocoded = await this.locationProviderService.geocodeAddress({
+      formattedAddress: args.enderecoCompleto,
+      postalCode: args.cep,
+      source: 'ai_agent',
+    });
 
-    const apiKey = process.env.GOOGLE_MAPS_KEY || process.env.VITE_GOOGLE_MAPS_KEY;
-    
-    if (apiKey) {
-      try {
-        const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
-          params: {
-            address: args.enderecoCompleto,
-            key: apiKey,
-            components: 'country:BR',
-          },
-        });
-
-        if (response.data.status === 'OK' && response.data.results.length > 0) {
-          const location = response.data.results[0].geometry.location;
-          lat = location.lat;
-          lng = location.lng;
-        } else {
-          return { disponivel: false, mensagem: 'NÃ£o conseguimos localizar este endereÃ§o com precisÃ£o. Poderia confirmar o nome da rua e o bairro?' };
-        }
-      } catch (err) {
-        this.logger.error(`Geocoding error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-        return { disponivel: false, mensagem: 'Tivemos um problema temporÃ¡rio ao consultar o endereÃ§o. Deseja falar com um atendente?' };
-      }
-    } else {
-      // Fallback fallback: se nÃ£o tiver chave, pedimos desculpas (evita mock fixo)
+    if (!this.locationProviderService.validateCoordinates(geocoded.lat, geocoded.lng)) {
       return { disponivel: false, mensagem: 'O cÃ¡lculo automÃ¡tico de taxa estÃ¡ indisponÃ­vel no momento devido a falta de configuraÃ§Ã£o de mapas.' };
     }
     
@@ -786,8 +766,8 @@ export class AgentToolsService {
         tenantId,
         address: {
           neighborhood: '',
-          lat,
-          lng,
+          lat: geocoded.lat,
+          lng: geocoded.lng,
         }
       });
 
@@ -820,35 +800,6 @@ export class AgentToolsService {
     return map[normalized] || null;
   }
 
-  private async geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
-    const apiKey = process.env.GOOGLE_MAPS_KEY || process.env.VITE_GOOGLE_MAPS_KEY;
-    if (!apiKey) {
-      this.logger.warn('[AI_ORDER] geocoding_skipped reason=no_google_maps_key');
-      return null;
-    }
-
-    try {
-      const response = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
-        params: {
-          address,
-          key: apiKey,
-          components: 'country:BR',
-        },
-      });
-
-      if (response.data.status === 'OK' && response.data.results.length > 0) {
-        const location = response.data.results[0].geometry.location;
-        this.logger.log(`[AI_ORDER] geocoding_success address="${address}"`);
-        return { lat: location.lat, lng: location.lng };
-      }
-      this.logger.warn(`[AI_ORDER] geocoding_no_results address="${address}" status=${response.data.status}`);
-    } catch (error) {
-      this.logger.warn(`[AI_ORDER] geocoding_failed address="${address}" error=${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-
-    return null;
-  }
-
   /**
    * Resolve o endereÃ§o de entrega. Geocoding Ã© best-effort:
    * se nÃ£o tiver Google Maps Key ou se falhar, prossegue com lat/lng nulo.
@@ -870,7 +821,7 @@ export class AgentToolsService {
       lng: endereco.lng ?? null,
     };
 
-    if (!address.lat || !address.lng) {
+    if (!this.locationProviderService.validateCoordinates(address.lat, address.lng)) {
       const fullAddress = [
         address.street,
         address.number,
@@ -879,10 +830,20 @@ export class AgentToolsService {
         address.state,
         address.zipCode,
       ].filter(Boolean).join(', ');
-      const coords = await this.geocodeAddress(fullAddress);
-      if (coords) {
-        address.lat = coords.lat;
-        address.lng = coords.lng;
+      const geocoded = await this.locationProviderService.geocodeAddress({
+        street: address.street,
+        number: address.number,
+        neighborhood: address.neighborhood,
+        city: address.city,
+        state: address.state,
+        postalCode: address.zipCode,
+        country: 'Brasil',
+        formattedAddress: fullAddress,
+        source: 'ai_agent',
+      });
+      if (this.locationProviderService.validateCoordinates(geocoded.lat, geocoded.lng)) {
+        address.lat = geocoded.lat;
+        address.lng = geocoded.lng;
       } else {
         // Best-effort: continua sem coordenadas; CheckoutValidator usarÃ¡ taxa por bairro/fixa
         this.logger.warn(`[AI_ORDER] geocoding_best_effort_failed address="${fullAddress}" â€” proceeding without coords`);

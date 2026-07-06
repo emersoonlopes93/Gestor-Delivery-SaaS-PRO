@@ -18,7 +18,7 @@ import {
   PublicCustomerProfileAddressDTO
 } from '@gestor/types';
 import { AddressAutocomplete } from '../components/AddressAutocomplete';
-import { StructuredAddress, fetchAddressByCep, geocodeAddress } from '../lib/maps-service';
+import { StructuredAddress, fetchAddressByCep } from '../lib/maps-service';
 import { useDebounce } from '../hooks/use-debounce';
 import { useCustomerStore } from '../store/useCustomerStore';
 import { LoginModal } from '../components/LoginModal';
@@ -239,7 +239,7 @@ export function CheckoutPage() {
       
       const isDelivery = fulfillmentType === 'delivery';
       // Only validate delivery if we have basic address parts (especially number which is required by DTO)
-      if (isDelivery && (!lat || !lng || !number || !street)) {
+      if (isDelivery && (!number || !street || !neighborhood || !city || !state)) {
         setDeliveryFee(0);
         setDeliveryEstimatedMinutes(null);
         return;
@@ -263,8 +263,8 @@ export function CheckoutPage() {
           state,
           zipCode,
           reference: reference || undefined,
-          lat: lat ?? 0,
-          lng: lng ?? 0,
+          lat: lat ?? undefined,
+          lng: lng ?? undefined,
         } : null;
 
         // Safe payment for validation: if cash and no/invalid change, use a large dummy value
@@ -343,14 +343,8 @@ export function CheckoutPage() {
           setNeighborhood(addr.neighborhood);
           setCity(addr.city);
           setState(addr.state);
-          
-          // Try to get coordinates for better freight calculation
-          const fullAddress = `${addr.street}, ${addr.neighborhood}, ${addr.city} - ${addr.state}`;
-          const coords = await geocodeAddress(fullAddress);
-          if (coords) {
-            setLat(coords.lat);
-            setLng(coords.lng);
-          }
+          setLat(undefined);
+          setLng(undefined);
         }
         setIsFetchingCep(false);
       };
@@ -474,8 +468,8 @@ export function CheckoutPage() {
           state,
           zipCode: unmask(zipCode),
           reference: reference || undefined,
-          lat: lat ?? 0,
-          lng: lng ?? 0,
+          lat: lat ?? undefined,
+          lng: lng ?? undefined,
         } : undefined,
         scheduledFor: isScheduled ? scheduledFor : undefined,
         timeSlotId: isScheduled ? timeSlotId : undefined,
@@ -540,8 +534,8 @@ export function CheckoutPage() {
           state: state.trim(),
           zipCode: unmask(zipCode),
           reference: reference?.trim() || undefined,
-          lat: lat ?? 0,
-          lng: lng ?? 0,
+          lat: lat ?? undefined,
+          lng: lng ?? undefined,
         } : undefined,
         scheduledFor: isScheduled ? scheduledFor : undefined,
         timeSlotId: isScheduled ? timeSlotId : undefined,
