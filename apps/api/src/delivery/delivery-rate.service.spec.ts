@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../database/prisma.service';
 import { GeocodingService } from './geocoding.service';
 import { DeliveryRateService, DELIVERY_COVERAGE_REPO, DELIVERY_RATE_RULE_REPO } from './delivery-rate.service';
+import { LocationProviderService } from '../location/location-provider.service';
 
 describe('DeliveryRateService', () => {
   let service: DeliveryRateService;
@@ -25,6 +26,18 @@ describe('DeliveryRateService', () => {
   const mockGeocoding = {
     geocodeAddress: jest.fn(),
     geocodeFreeform: jest.fn(),
+    geocodeStructuredAddress: jest.fn(),
+  };
+
+  const mockLocationProvider = {
+    validateCoordinates: jest.fn((lat?: number | null, lng?: number | null) => {
+      if (typeof lat !== 'number' || typeof lng !== 'number') return false;
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+      if (lat === 0 && lng === 0) return false;
+      if (Math.abs(lat - (-23.55052)) < 0.00001 && Math.abs(lng - (-46.633308)) < 0.00001) return false;
+      return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+    }),
+    calculateHaversineDistanceKm: jest.fn(() => 1.5),
   };
 
   beforeEach(async () => {
@@ -33,6 +46,7 @@ describe('DeliveryRateService', () => {
         DeliveryRateService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: GeocodingService, useValue: mockGeocoding },
+        { provide: LocationProviderService, useValue: mockLocationProvider },
         { provide: DELIVERY_RATE_RULE_REPO, useValue: {} },
         { provide: DELIVERY_COVERAGE_REPO, useValue: {} },
       ],
@@ -43,6 +57,7 @@ describe('DeliveryRateService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    mockLocationProvider.calculateHaversineDistanceKm.mockImplementation(() => 1.5);
   });
 
   const generatePolygon = (latCenter: number, lngCenter: number): Array<[number, number]> => [

@@ -83,10 +83,18 @@ export class DeliveryCoverageController {
   @Post('geocode')
   @RequirePermissions('settings.manage')
   async geocode(@Body() dto: GeocodeCoverageAddressDto) {
-    const coords = await this.geocodingService.geocodeFreeform(dto.query.trim());
+    const result = await this.geocodingService.geocodeStructuredAddress(
+      { formattedAddress: dto.query.trim() },
+      'geocode',
+    );
+
     return {
-      lat: coords?.lat ?? null,
-      lng: coords?.lng ?? null,
+      provider: result.provider,
+      source: result.source,
+      address: result.address,
+      lat: result.lat ?? null,
+      lng: result.lng ?? null,
+      confidence: result.confidence ?? null,
     };
   }
 }

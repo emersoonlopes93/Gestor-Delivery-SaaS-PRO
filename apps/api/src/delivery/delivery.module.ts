@@ -13,9 +13,10 @@ import { DeliveryRateController } from './delivery-rate.controller';
 import { DeliveryRateService, DELIVERY_COVERAGE_REPO, DELIVERY_RATE_RULE_REPO } from './delivery-rate.service';
 import { DeliveryTrackingGateway } from './delivery-tracking.gateway';
 import { GeocodingService } from './geocoding.service';
+import { LocationModule } from '../location/location.module';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, RbacModule, forwardRef(() => OrdersModule)],
+  imports: [DatabaseModule, AuthModule, RbacModule, LocationModule, forwardRef(() => OrdersModule)],
   controllers: [DriversController, DriverOperationsController, DeliveryRateController, DeliveryCoverageController],
   providers: [
     DriversService,
