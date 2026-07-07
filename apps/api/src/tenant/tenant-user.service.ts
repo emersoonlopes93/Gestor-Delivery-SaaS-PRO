@@ -83,8 +83,6 @@ export class TenantUserService {
     requestedRoleSlugs: string[],
     ownerConfirmationText?: string,
   ) {
-    await ensureDefaultTenantRoles(tx, tenantId);
-
     const uniqueRoleSlugs = Array.from(new Set(requestedRoleSlugs));
     if (uniqueRoleSlugs.length === 0) {
       throw new BadRequestException('Selecione pelo menos um cargo');
@@ -188,6 +186,8 @@ export class TenantUserService {
   }
 
   async createWithActor(tenantId: string, dto: CreateTenantUserDto, actorUserId?: string) {
+    await ensureDefaultTenantRoles(this.prisma, tenantId);
+
     const existing = await this.prisma.tenantUser.findFirst({
       where: { tenantId, email: dto.email },
     });
@@ -285,6 +285,7 @@ export class TenantUserService {
     dto: UpdateTenantUserDto,
     actorUserId?: string,
   ) {
+    await ensureDefaultTenantRoles(this.prisma, tenantId);
     await this.findById(tenantId, id);
 
     const data: Prisma.TenantUserUpdateInput = {
