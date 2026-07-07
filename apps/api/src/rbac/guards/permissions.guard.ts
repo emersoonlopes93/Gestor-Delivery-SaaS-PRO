@@ -52,7 +52,7 @@ export class PermissionsGuard implements CanActivate {
     ]);
 
     // Implicitly allow owners and admins to access everything
-    if (userRoles.includes('owner') || userRoles.includes('admin')) {
+    if (userRoles.includes('tenant_owner') || userRoles.includes('tenant_admin')) {
       return true;
     }
 

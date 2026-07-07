@@ -10,6 +10,7 @@ export interface CreateEmployeeDTO {
   password?: string;
   isActive?: boolean;
   roles: string[]; // Role slugs
+  ownerConfirmationText?: string;
 }
 
 export interface UpdateEmployeeDTO extends Partial<CreateEmployeeDTO> {

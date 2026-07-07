@@ -43,6 +43,7 @@
         "migrate:tenant-billing-v2": "ts-node -r tsconfig-paths/register scripts/migrate-tenant-billing-v2.ts",
         "diagnose:env": "ts-node -r tsconfig-paths/register scripts/diagnose-env.ts",
         "rbac:diagnose": "ts-node -r tsconfig-paths/register scripts/diagnose-rbac.ts",
+        "tenant:seed-default-roles": "ts-node -r tsconfig-paths/register scripts/tenant-seed-default-roles.ts",
         "check:billing-db": "ts-node -r tsconfig-paths/register scripts/check-billing-db.ts",
         "diagnose:money": "ts-node -r tsconfig-paths/register scripts/diagnose-monetary-values.ts",
         "smoke:logistics": "ts-node -r tsconfig-paths/register scripts/smoke-test-logistics-flow.ts",

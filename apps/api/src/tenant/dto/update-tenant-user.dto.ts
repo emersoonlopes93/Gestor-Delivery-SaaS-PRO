@@ -22,4 +22,12 @@ export class UpdateTenantUserDto {
   @IsString({ each: true })
   @IsOptional()
   roles?: string[]; // Array of role slugs
+
+  @IsString()
+  @IsOptional()
+  ownerConfirmationText?: string;
+
+  @IsString()
+  @IsOptional()
+  actorUserId?: string;
 }

@@ -17,6 +17,7 @@ import { MailService } from '../mail/mail.service';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { MODULE_CATALOG } from '@gestor/core';
+import { ensureDefaultTenantRoles } from '../tenant/default-tenant-roles';
 
 type RequestSessionContext = {
   userAgent?: string;
@@ -386,25 +387,10 @@ export class TenantAuthService {
 
       const createdUser = tenant.users[0];
 
-      // Assign Owner Role
-      let ownerRole = await tx.tenantRole.findFirst({ where: { slug: TenantDefaultRole.TENANT_OWNER, tenantId: tenant.id } });
-      if (!ownerRole) {
-         // Create default role if it doesn't exist
-         ownerRole = await tx.tenantRole.create({
-           data: { name: 'Dono', slug: TenantDefaultRole.TENANT_OWNER, tenantId: tenant.id, isSystem: true }
-         });
-
-         // Fetch all permissions and assign to owner
-         const allPermissions = await tx.tenantPermission.findMany();
-         if (allPermissions.length > 0) {
-           await tx.tenantRolePermission.createMany({
-             data: allPermissions.map(p => ({
-               roleId: ownerRole.id,
-               permissionId: p.id,
-             }))
-           });
-         }
-      }
+      await ensureDefaultTenantRoles(tx, tenant.id);
+      const ownerRole = await tx.tenantRole.findFirstOrThrow({
+        where: { slug: TenantDefaultRole.TENANT_OWNER, tenantId: tenant.id },
+      });
 
       await tx.tenantUserRole.create({
         data: {

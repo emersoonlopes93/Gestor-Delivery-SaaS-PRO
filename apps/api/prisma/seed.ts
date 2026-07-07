@@ -10,22 +10,17 @@ import {
 import { TenantDefaultRole, AdminDefaultRole } from '@gestor/core';
 import { seedDemoAiAgentAccess } from '../src/seed/demo-ai-agent.seed';
 import { seedBaseMenuTemplates } from '../src/catalog/menu-import/base-menu-bootstrap';
+import {
+  ensureDefaultTenantRoles,
+  ensureTenantPermissionCatalog,
+} from '../src/tenant/default-tenant-roles';
 
 const prisma = new PrismaClient();
 
 async function seedTenantPermissions() {
   console.log('🔑 Seeding tenant permissions...');
-  const entries = Object.entries(TENANT_PERMISSIONS);
-
-  for (const [slug, description] of entries) {
-    const [module, action] = slug.split('.');
-    await prisma.tenantPermission.upsert({
-      where: { slug },
-      update: { description },
-      create: { module, action, slug, description },
-    });
-  }
-  console.log(`   ✅ ${entries.length} tenant permissions seeded`);
+  await ensureTenantPermissionCatalog(prisma);
+  console.log(`   ✅ ${Object.keys(TENANT_PERMISSIONS).length} tenant permissions seeded`);
 }
 
 async function seedAdminPermissions() {
@@ -477,48 +472,7 @@ async function seedDemoTenant() {
       },
     });
 
-    // Create tenant roles
-    const roleEntries = Object.values(TenantDefaultRole);
-    for (const roleSlug of roleEntries) {
-      const roleName = roleSlug
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (l) => l.toUpperCase());
-
-      const role = await prisma.tenantRole.upsert({
-        where: { tenantId_slug: { tenantId: tenant.id, slug: roleSlug } },
-        update: { name: roleName },
-        create: {
-          tenantId: tenant.id,
-          name: roleName,
-          slug: roleSlug,
-          description: `Default ${roleName} role`,
-          isSystem: true,
-        },
-      });
-
-      // Assign permissions
-      const permSlugs = TENANT_ROLE_PERMISSIONS[roleSlug] || [];
-      for (const permSlug of permSlugs) {
-        const permission = await prisma.tenantPermission.findUnique({
-          where: { slug: permSlug },
-        });
-        if (permission) {
-          await prisma.tenantRolePermission.upsert({
-            where: {
-              roleId_permissionId: {
-                roleId: role.id,
-                permissionId: permission.id,
-              },
-            },
-            update: {},
-            create: {
-              roleId: role.id,
-              permissionId: permission.id,
-            },
-          });
-        }
-      }
-    }
+    await ensureDefaultTenantRoles(prisma, tenant.id);
 
     // Create tenant owner user
     const ownerEmail = 'demo@demo.com';
@@ -541,19 +495,17 @@ async function seedDemoTenant() {
     });
 
     // Assign tenant_owner role
-    const ownerRole = await prisma.tenantRole.findUnique({
-      where: { tenantId_slug: { tenantId: tenant.id, slug: 'tenant_owner' } },
+    const ownerRole = await prisma.tenantRole.findUniqueOrThrow({
+      where: { tenantId_slug: { tenantId: tenant.id, slug: TenantDefaultRole.TENANT_OWNER } },
     });
 
-    if (ownerRole) {
-      await prisma.tenantUserRole.upsert({
-        where: {
-          userId_roleId: { userId: owner.id, roleId: ownerRole.id },
-        },
-        update: {},
-        create: { userId: owner.id, roleId: ownerRole.id },
-      });
-    }
+    await prisma.tenantUserRole.upsert({
+      where: {
+        userId_roleId: { userId: owner.id, roleId: ownerRole.id },
+      },
+      update: {},
+      create: { userId: owner.id, roleId: ownerRole.id },
+    });
 
     console.log(`   👤 Demo tenant created: ${tenant.name}`);
     console.log(`   👤 Tenant owner: ${ownerEmail}`);
