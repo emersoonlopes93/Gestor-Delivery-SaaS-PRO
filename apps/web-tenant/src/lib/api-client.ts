@@ -17,6 +17,8 @@ const API_BASE = (
   '/api/v1'
 ).replace(/\/$/, '');
 
+const TOKEN_REFRESH_LEEWAY_MS = 60_000;
+
 if (import.meta.env.DEV) {
   // Log seguro: exibe apenas a URL base, nunca tokens, senhas ou payloads.
   console.info('[api-client] API_BASE:', API_BASE);
@@ -36,7 +38,7 @@ async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<ApiResponse<T>> {
-  const token = localStorage.getItem('accessToken');
+  const token = await getAccessTokenForRequest(endpoint);
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -122,6 +124,42 @@ async function apiFetch<T>(
 let isRefreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const [, payload] = token.split('.');
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=');
+    const decoded = atob(padded);
+    return JSON.parse(decoded) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function isTokenExpiringSoon(token: string): boolean {
+  const payload = decodeJwtPayload(token);
+  const exp = typeof payload?.exp === 'number' ? payload.exp : null;
+  if (!exp) return false;
+  return exp * 1000 <= Date.now() + TOKEN_REFRESH_LEEWAY_MS;
+}
+
+async function getAccessTokenForRequest(endpoint: string): Promise<string | null> {
+  const token = localStorage.getItem('accessToken');
+  if (!token || isAuthEndpoint(endpoint)) {
+    return token;
+  }
+
+  if (isTokenExpiringSoon(token)) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      return localStorage.getItem('accessToken');
+    }
+  }
+
+  return token;
+}
+
 async function tryRefreshToken(): Promise<boolean> {
   const refreshToken = localStorage.getItem('refreshToken');
   if (!refreshToken) return false;
@@ -177,7 +215,7 @@ export const api = {
       body: body ? JSON.stringify(body) : undefined,
     }),
   upload: async <T>(endpoint: string, formData: FormData): Promise<ApiResponse<T>> => {
-    const token = localStorage.getItem('accessToken');
+    const token = await getAccessTokenForRequest(endpoint);
     const headers: HeadersInit = {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
