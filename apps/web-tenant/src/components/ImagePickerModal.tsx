@@ -39,11 +39,11 @@ export function ImagePickerModal({
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sourceFilter, setSourceFilter] = useState<LibrarySourceFilter>('all');
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
-  const [justUploadedAssetId, setJustUploadedAssetId] = useState<string | null>(null);
+  const [justUploadedAssetIds, setJustUploadedAssetIds] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const loadLibraryAssets = useCallback(async () => {
@@ -68,7 +68,9 @@ export function ImagePickerModal({
     setSourceFilter('all');
     setUploadError(null);
     setDragActive(false);
-    setJustUploadedAssetId(null);
+    setUploadFiles([]);
+    setUploadTitle('');
+    setJustUploadedAssetIds([]);
   }, [isOpen, selectedAssetId]);
 
   const sourceCounts = useMemo(() => {
@@ -99,56 +101,84 @@ export function ImagePickerModal({
     });
   }, [libraryAssets, searchQuery, sourceFilter]);
 
-  const validateFile = useCallback((file: File | null) => {
-    if (!file) {
-      setUploadError(null);
-      return false;
-    }
-
+  const getFileError = useCallback((file: File) => {
     const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
     if (!allowedTypes.has(file.type)) {
-      setUploadError('Formato invalido. Use JPG, PNG ou WEBP.');
-      return false;
+      return 'Formato invalido. Use JPG, PNG ou WEBP.';
     }
 
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      setUploadError('A imagem deve ter no maximo 10 MB.');
-      return false;
+      return 'A imagem deve ter no maximo 10 MB.';
     }
 
-    setUploadError(null);
-    return true;
+    return null;
   }, []);
 
-  const handleChooseFile = useCallback((file: File | null) => {
-    if (!validateFile(file)) {
-      setUploadFile(null);
+  const handleChooseFiles = useCallback((files: FileList | File[] | null) => {
+    const incoming = Array.from(files ?? []);
+    if (incoming.length === 0) {
+      setUploadFiles([]);
+      setUploadError(null);
       return;
     }
-    setUploadFile(file);
-    setUploadTitle((current) => current || file?.name.replace(/\.[^.]+$/, '') || '');
-  }, [validateFile]);
+
+    const accepted: File[] = [];
+    const rejected: string[] = [];
+
+    for (const file of incoming) {
+      const error = getFileError(file);
+      if (error) {
+        rejected.push(`${file.name}: ${error}`);
+        continue;
+      }
+      accepted.push(file);
+    }
+
+    setUploadFiles(accepted);
+    setUploadError(rejected[0] ?? null);
+
+    if (accepted.length > 0) {
+      setUploadTitle((current) => current || accepted[0].name.replace(/\.[^.]+$/, '') || '');
+    }
+  }, [getFileError]);
 
   const handleUpload = useCallback(async () => {
-    if (!uploadFile || !validateFile(uploadFile)) return;
+    if (uploadFiles.length === 0) return;
 
     setIsUploadingFile(true);
     try {
-      const formData = new FormData();
-      formData.set('file', uploadFile);
-      formData.set('title', uploadTitle.trim() || uploadFile.name);
-      formData.set('altText', uploadTitle.trim() || uploadFile.name);
+      const uploadedIds: string[] = [];
+      const baseTitle = uploadTitle.trim();
+      const totalFiles = uploadFiles.length;
 
-      const response = await api.upload<MediaAsset>('/media/upload', formData);
-      const uploadedAsset = response.data;
+      for (const [index, file] of uploadFiles.entries()) {
+        const formData = new FormData();
+        formData.set('file', file);
 
-      setUploadFile(null);
+        const fallbackTitle = file.name.replace(/\.[^.]+$/, '');
+        const title = totalFiles === 1
+          ? baseTitle || fallbackTitle
+          : baseTitle
+            ? `${baseTitle} ${index + 1}`
+            : fallbackTitle;
+
+        formData.set('title', title);
+        formData.set('altText', title);
+
+        const response = await api.upload<MediaAsset>('/media/upload', formData);
+        uploadedIds.push(response.data.id);
+      }
+
+      setUploadFiles([]);
       setUploadTitle('');
       setUploadError(null);
       setSourceFilter('all');
       setSearchQuery('');
-      setJustUploadedAssetId(uploadedAsset.id);
+      setJustUploadedAssetIds(uploadedIds);
       setActiveTab('library');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
 
       await loadLibraryAssets();
     } catch (error) {
@@ -157,7 +187,7 @@ export function ImagePickerModal({
     } finally {
       setIsUploadingFile(false);
     }
-  }, [loadLibraryAssets, uploadFile, uploadTitle, validateFile]);
+  }, [loadLibraryAssets, uploadFiles, uploadTitle]);
 
   const isLibraryEmpty = filteredAssets.length === 0;
 
@@ -213,7 +243,7 @@ export function ImagePickerModal({
               onDrop={(event) => {
                 event.preventDefault();
                 setDragActive(false);
-                handleChooseFile(event.dataTransfer.files?.[0] ?? null);
+                handleChooseFiles(event.dataTransfer.files);
               }}
               className={`rounded-2xl border border-dashed px-6 py-10 text-center transition-colors ${
                 dragActive
@@ -237,7 +267,8 @@ export function ImagePickerModal({
                   ref={fileInputRef}
                   type="file"
                   accept={ACCEPTED_FILE_TYPES}
-                  onChange={(event) => handleChooseFile(event.target.files?.[0] ?? null)}
+                  multiple
+                  onChange={(event) => handleChooseFiles(event.target.files)}
                   className="hidden"
                 />
 
@@ -246,7 +277,7 @@ export function ImagePickerModal({
                   onClick={() => fileInputRef.current?.click()}
                   className="inline-flex items-center justify-center rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90"
                 >
-                  Adicionar
+                  {uploadFiles.length > 0 ? `Adicionar ${uploadFiles.length} fotos` : 'Adicionar fotos'}
                 </button>
               </div>
             </div>
@@ -254,29 +285,68 @@ export function ImagePickerModal({
             <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
               <div className="space-y-1">
                 <label className="block text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                  Nome da imagem
+                  Nome base da imagem
                 </label>
                 <input
                   type="text"
                   value={uploadTitle}
                   onChange={(event) => setUploadTitle(event.target.value)}
-                  placeholder="Ex: X-Bacon principal"
+                  placeholder="Ex: X-Bacon"
                   className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Se selecionar varias fotos, esse nome vira o prefixo do lote.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="min-h-5 text-sm text-muted-foreground">
+                  {uploadFiles.length > 0
+                    ? `${uploadFiles.length} foto${uploadFiles.length > 1 ? 's' : ''} selecionada${uploadFiles.length > 1 ? 's' : ''}.`
+                    : 'Nenhum arquivo selecionado ainda.'}
+                </div>
+                {uploadFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {uploadFiles.map((file) => (
+                      <span
+                        key={`${file.name}-${file.size}-${file.lastModified}`}
+                        className="inline-flex max-w-full items-center rounded-full border border-border bg-muted px-3 py-1 text-xs text-muted-foreground"
+                        title={file.name}
+                      >
+                        <span className="truncate">{file.name}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-h-5 text-sm text-muted-foreground">
-                  {uploadFile ? `Arquivo selecionado: ${uploadFile.name}` : 'Nenhum arquivo selecionado ainda.'}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadFiles([]);
+                    setUploadTitle('');
+                    setUploadError(null);
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = '';
+                    }
+                  }}
+                  className="text-sm font-semibold text-muted-foreground underline decoration-muted-foreground/40 underline-offset-4 transition hover:text-foreground"
+                >
+                  Limpar selecao
+                </button>
                 <button
                   type="button"
                   onClick={() => void handleUpload()}
-                  disabled={!uploadFile || isUploadingFile}
+                  disabled={uploadFiles.length === 0 || isUploadingFile}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <UploadCloud className="h-4 w-4" />
-                  {isUploadingFile ? 'Enviando...' : 'Salvar na biblioteca'}
+                  {isUploadingFile
+                    ? 'Enviando...'
+                    : uploadFiles.length > 1
+                      ? `Salvar ${uploadFiles.length} fotos na biblioteca`
+                      : 'Salvar na biblioteca'}
                 </button>
               </div>
 
@@ -362,7 +432,7 @@ export function ImagePickerModal({
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   {filteredAssets.map((asset) => {
                     const isSelected = selectedAssetId === asset.id;
-                    const isNewlyUploaded = justUploadedAssetId === asset.id;
+                    const isNewlyUploaded = justUploadedAssetIds.includes(asset.id);
                     const sourceLabel = asset.scope === 'tenant_library' ? 'Biblioteca' : 'Global';
 
                     return (
