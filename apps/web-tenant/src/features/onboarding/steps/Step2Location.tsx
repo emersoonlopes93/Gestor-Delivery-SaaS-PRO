@@ -261,8 +261,8 @@ export function Step2Location({ onNext, onPrev, onMarkValid }: Step2Props) {
       lat: address.lat,
       lng: address.lng,
     }));
-    setShowDetails(true);
     setManualMode(false);
+    setShowDetails(false);
     setCoordinatesDirty(false);
     setAddressNotice(
       address.number

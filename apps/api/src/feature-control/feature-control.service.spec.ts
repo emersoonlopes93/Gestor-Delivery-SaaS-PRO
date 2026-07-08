@@ -1,4 +1,3 @@
-// @ts-nocheck
 /// <reference types="jest" />
 /// <reference types="node" />
 import { BadRequestException } from '@nestjs/common';
