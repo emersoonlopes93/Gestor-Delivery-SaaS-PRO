@@ -48,5 +48,9 @@
     "../../packages/config/src",
     "../../packages/theme/src",
     "../../packages/ui/src"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx"
   ]
 }

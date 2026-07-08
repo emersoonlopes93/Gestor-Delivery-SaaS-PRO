@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { hasPermission } from '@gestor/auth';
 import {
@@ -55,6 +55,8 @@ import { useLogisticsSocket } from '../features/delivery/hooks/useLogisticsSocke
 import { StoreStatusBadge } from '../components/store/StoreStatusControl';
 import { Toaster } from 'react-hot-toast';
 import { addNativeNotificationClickListener } from '../lib/native-notifications';
+import { NotificationCenter } from '../notifications/NotificationCenter';
+import { createNotificationEvent, emitNotificationEvent } from '../notifications/notificationEvents';
 
 type SidebarItem = {
   id: string;
@@ -458,6 +460,8 @@ export function AppLayout() {
     return 'closed';
   }, [tenantData]);
 
+  const previousStoreStatusRef = useRef<'open' | 'closed' | 'paused' | null>(null);
+
   const handleSwitchStore = () => {
     if (!selectedTenantId || selectedTenantId === user?.tenantId) {
       return;
@@ -465,15 +469,7 @@ export function AppLayout() {
     switchStoreMutation.mutate(selectedTenantId);
   };
 
-  // Audio Notifications Integration
-  useNotificationAudio(tenantData?.id, {
-    enabled: tenantData?.settings?.audioNotificationEnabled ?? true,
-    volume: tenantData?.settings?.notificationVolume ?? 1.0,
-    newOrderSound: tenantData?.settings?.newOrderSound,
-    cancellationSound: tenantData?.settings?.cancellationSound,
-    handoffSound: tenantData?.settings?.handoffSound,
-    readySound: tenantData?.settings?.readySound,
-  });
+  useNotificationAudio(tenantData?.id);
 
   // Browser Notifications Integration
   useBrowserNotifications(
@@ -630,10 +626,43 @@ export function AppLayout() {
     };
   }, [navigate]);
 
+  useEffect(() => {
+    const previousStatus = previousStoreStatusRef.current;
+    if (!previousStatus) {
+      previousStoreStatusRef.current = storeStatus;
+      return;
+    }
+
+    if (previousStatus !== storeStatus) {
+      if (storeStatus === 'open') {
+        emitNotificationEvent(createNotificationEvent({
+          id: `store:opened:${tenantData?.id ?? 'tenant'}`,
+          type: 'store.opened',
+          title: 'Loja aberta',
+          message: 'A operacao voltou a receber pedidos.',
+          priority: 'low',
+          source: 'local',
+        }));
+      } else if (previousStatus === 'open') {
+        emitNotificationEvent(createNotificationEvent({
+          id: `store:closed:${tenantData?.id ?? 'tenant'}`,
+          type: 'store.closed',
+          title: 'Loja indisponivel para novos pedidos',
+          message: storeStatus === 'paused' ? 'A loja foi pausada manualmente.' : 'A loja esta fora do horario configurado.',
+          priority: 'high',
+          source: 'local',
+        }));
+      }
+    }
+
+    previousStoreStatusRef.current = storeStatus;
+  }, [storeStatus, tenantData?.id]);
+
 
 
   return (
     <div className="app-shell min-h-screen flex transition-colors" style={{ backgroundColor: 'var(--surface-page)' }}>
+      <NotificationCenter />
       <Toaster
         position="top-right"
         containerClassName="safe-x"

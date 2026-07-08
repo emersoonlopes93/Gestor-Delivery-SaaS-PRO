@@ -1,72 +1,8 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import toast from 'react-hot-toast';
-import { requestNotificationPermission, showWebNotification } from '../lib/notification-support';
+import { requestNotificationPermission } from '../lib/notification-support';
 import { requestNativeNotificationPermission, showNewOrderNotification } from '../lib/native-notifications';
-
-/** Sons disponíveis (devem existir em public/sounds/) */
-export const AVAILABLE_SOUNDS = [
-  { value: 'notification.mp3', label: 'Notificação (Padrão)' },
-  { value: 'Microsoft-Teams.mp3', label: 'Microsoft Teams' },
-  { value: 'Novo Pedido (H).mp3', label: 'Novo Pedido (Voz Masculina)' },
-  { value: 'Novo Pedido (M).mp3', label: 'Novo Pedido (Voz Feminina)' },
-  { value: 'Pedido Pronto (H).mp3', label: 'Pedido Pronto (Voz Masculina)' },
-  { value: 'Pedido Pronto (M).mp3', label: 'Pedido Pronto (Voz Feminina)' },
-  { value: 'pedido de cancelamento(H).mp3', label: 'Pedido de Cancelamento (Voz Masculina)' },
-  { value: 'pedido de cancelamento(M).mp3', label: 'Pedido de Cancelamento (Voz Feminina)' },
-  { value: 'transferindo para atendente (H).mp3', label: 'Transferindo para Atendente (Voz Masculina)' },
-] as const;
-
-export type SoundFile = typeof AVAILABLE_SOUNDS[number]['value'];
-
-const DEFAULT_NEW_ORDER_SOUND: SoundFile = 'notification.mp3';
-const DEFAULT_CANCELLATION_SOUND: SoundFile = 'notification.mp3';
-const DEFAULT_HANDOFF_SOUND: SoundFile = 'notification.mp3';
-const DEFAULT_READY_SOUND: SoundFile = 'notification.mp3';
-
-function buildSoundUrl(filename: string | undefined, fallback: SoundFile): string {
-  if (!filename) {
-    return `/sounds/${fallback}`;
-  }
-  const name = filename.trim();
-  if (name === '' || name === 'undefined') {
-    return `/sounds/${fallback}`;
-  }
-  if (!AVAILABLE_SOUNDS.some((s) => s.value === name)) {
-    console.warn(`[Audio] Invalid sound: "${name}", using fallback: "${fallback}"`);
-    return `/sounds/${fallback}`;
-  }
-  return `/sounds/${name}`;
-}
-
-function playAudio(url: string, volume: number): Promise<void> {
-  return new Promise((resolve, reject) => {
-    try {
-      const audio = new Audio(url);
-      const validVolume = Math.max(0, Math.min(1, volume || 1.0));
-      audio.volume = validVolume;
-      
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            console.log(`[Audio] Playing: ${url} (volume: ${Math.round(validVolume * 100)}%)`);
-            resolve();
-          })
-          .catch((err) => {
-            console.warn(`[Audio] Play error for ${url}:`, err);
-            reject(err);
-          });
-      } else {
-        console.log(`[Audio] Playing: ${url} (volume: ${Math.round(validVolume * 100)}%)`);
-        resolve();
-      }
-    } catch (err) {
-      console.error(`[Audio] Error creating audio element:`, err);
-      reject(err);
-    }
-  });
-}
+import { createNotificationEvent, emitNotificationEvent } from '../notifications/notificationEvents';
 
 interface AudioSettings {
   enabled: boolean;
@@ -77,30 +13,36 @@ interface AudioSettings {
   readySound?: string;
 }
 
-export function useNotificationAudio(tenantId: string | undefined, settings: AudioSettings) {
+function playAudio(url: string, volume: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    try {
+      const audio = new Audio(url);
+      audio.volume = Math.max(0, Math.min(1, volume || 1));
+      const playPromise = audio.play();
+
+      if (playPromise !== undefined) {
+        playPromise.then(() => resolve()).catch(reject);
+        return;
+      }
+
+      resolve();
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+export function useNotificationAudio(
+  tenantId: string | undefined,
+  _settings?: AudioSettings,
+) {
   const socketRef = useRef<Socket | null>(null);
-
-  const newOrderUrl = buildSoundUrl(settings.newOrderSound, DEFAULT_NEW_ORDER_SOUND);
-  const cancelledUrl = buildSoundUrl(settings.cancellationSound, DEFAULT_CANCELLATION_SOUND);
-  const handoffUrl = buildSoundUrl(settings.handoffSound, DEFAULT_HANDOFF_SOUND);
-  const readyUrl = buildSoundUrl(settings.readySound, DEFAULT_READY_SOUND);
-
-  // Refs para que o socket handler sempre acesse os valores atualizados sem re-subscribe
-  const settingsRef = useRef(settings);
-  const newOrderUrlRef = useRef(newOrderUrl);
-  const cancelledUrlRef = useRef(cancelledUrl);
-  const handoffUrlRef = useRef(handoffUrl);
-  const readyUrlRef = useRef(readyUrl);
-  useEffect(() => { settingsRef.current = settings; }, [settings]);
-  useEffect(() => { newOrderUrlRef.current = newOrderUrl; }, [newOrderUrl]);
-  useEffect(() => { cancelledUrlRef.current = cancelledUrl; }, [cancelledUrl]);
-  useEffect(() => { handoffUrlRef.current = handoffUrl; }, [handoffUrl]);
-  useEffect(() => { readyUrlRef.current = readyUrl; }, [readyUrl]);
+  const hadConnectionRef = useRef(false);
+  const isConnectionLostRef = useRef(false);
 
   useEffect(() => {
     if (!tenantId) {
       if (socketRef.current) {
-        console.log('[Websocket] Disconnecting orders namespace');
         socketRef.current.disconnect();
         socketRef.current = null;
       }
@@ -110,8 +52,7 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
     const API_URL = import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '';
     const socketUrlBase = API_URL.replace(/\/api\/v1\/?$/, '').replace(/\/api\/?$/, '');
     const socketPath = socketUrlBase ? `${socketUrlBase}/orders` : '/orders';
-    console.log(`[Websocket] Connecting to orders namespace at: ${socketPath}`);
-    
+
     const socket = io(socketPath, {
       reconnection: true,
       reconnectionAttempts: 3,
@@ -120,39 +61,61 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
     });
 
     socket.on('connect', () => {
-      console.log('[Websocket] Connected to orders namespace');
       socket.emit('joinTenant', { tenantId });
-    });
 
-    socket.on('connect_error', (error) => {
-      console.error('[Websocket] Connection error:', error);
-    });
-
-    socket.on('disconnect', (reason) => {
-      console.warn('[Websocket] Disconnected:', reason);
-    });
-
-    socket.on('newOrder', (data: { order: { orderNumber: string; customerName: string; total: number } }) => {
-      console.log('[Websocket] Novo pedido recebido!', data);
-
-      if (settingsRef.current.enabled) {
-        playAudio(newOrderUrlRef.current, settingsRef.current.volume).catch((err) => {
-          console.warn('[Audio] Falha ao reproduzir som de novo pedido:', err);
-        });
+      if (isConnectionLostRef.current) {
+        emitNotificationEvent(createNotificationEvent({
+          id: `orders:connection.restored:${tenantId}`,
+          type: 'connection.restored',
+          title: 'Conexao restaurada',
+          message: 'O painel voltou a receber atualizacoes em tempo real.',
+          priority: 'low',
+          source: 'connection',
+        }));
       }
 
-      const totalFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.order.total);
-      toast.success(`🛵 Novo Pedido #${data.order.orderNumber}\n${data.order.customerName} — ${totalFmt}`, {
-        duration: 8000,
-        style: { fontWeight: 'bold', maxWidth: '340px' },
-      });
+      hadConnectionRef.current = true;
+      isConnectionLostRef.current = false;
+    });
 
-      showWebNotification(`Novo Pedido ${data.order.orderNumber}`, {
-        body: `Cliente: ${data.order.customerName}\nTotal: ${totalFmt}`,
-        icon: '/favicon.ico',
-      });
+    const emitConnectionLost = () => {
+      if (isConnectionLostRef.current) return;
+      isConnectionLostRef.current = true;
+      emitNotificationEvent(createNotificationEvent({
+        id: `orders:connection.lost:${tenantId}`,
+        type: 'connection.lost',
+        title: 'Conexao perdida',
+        message: 'Novos pedidos podem atrasar enquanto a conexao estiver indisponivel.',
+        priority: 'critical',
+        source: 'connection',
+      }));
+    };
+
+    socket.on('connect_error', () => {
+      emitConnectionLost();
+    });
+
+    socket.on('disconnect', () => {
+      if (hadConnectionRef.current) {
+        emitConnectionLost();
+      }
+    });
+
+    socket.on('newOrder', (data: { order: { id?: string; orderNumber: string; customerName: string; total: number } }) => {
+      const totalFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.order.total);
+
+      emitNotificationEvent(createNotificationEvent({
+        id: `socket:order.new:${data.order.id ?? data.order.orderNumber}`,
+        type: 'order.new',
+        orderId: data.order.id ?? data.order.orderNumber,
+        title: `Novo pedido #${data.order.orderNumber}`,
+        message: `${data.order.customerName} - ${totalFmt}`,
+        priority: 'critical',
+        source: 'socket',
+      }));
 
       showNewOrderNotification({
+        id: data.order.id,
         orderNumber: data.order.orderNumber,
         customerName: data.order.customerName,
         total: data.order.total,
@@ -161,71 +124,52 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
       });
     });
 
-    socket.on('orderCancelled', (data: { orderNumber?: string }) => {
-      console.log('[Websocket] Pedido cancelado!', data);
-      if (settingsRef.current.enabled) {
-        playAudio(cancelledUrlRef.current, settingsRef.current.volume).catch((err) => {
-          console.warn('[Audio] Falha ao reproduzir som de cancelamento:', err);
-        });
-      }
-      toast.error(`❌ Pedido${data.orderNumber ? ` #${data.orderNumber}` : ''} cancelado!`, {
-        duration: 7000,
-        style: { fontWeight: 'bold' },
-      });
+    socket.on('orderCancelled', (data: { orderId?: string; orderNumber?: string }) => {
+      emitNotificationEvent(createNotificationEvent({
+        id: `socket:order.cancelled:${data.orderId ?? data.orderNumber ?? 'unknown'}`,
+        type: 'order.cancelled',
+        orderId: data.orderId ?? data.orderNumber,
+        title: data.orderNumber ? `Pedido #${data.orderNumber} cancelado` : 'Pedido cancelado',
+        message: 'Revise o pedido e a operacao no painel.',
+        priority: 'high',
+        source: 'socket',
+      }));
     });
 
-    // IA Handoff: Transfer to human agent
-    socket.on('aiHandoff', (data: { sessionId: string; sessionName?: string; customerName?: string }) => {
-      console.log('[Websocket] IA Handoff - Transferência para atendente humano!', data);
-      if (settingsRef.current.enabled) {
-        playAudio(handoffUrlRef.current, settingsRef.current.volume).catch((err) => {
-          console.warn('[Audio] Falha ao reproduzir som de transferência:', err);
-        });
-      }
-      toast(`👤 Transferência: Chat #${data.sessionId}\n${data.customerName || 'Cliente'} aguardando atendimento humano`, {
-        duration: 7000,
-        style: { fontWeight: 'bold' },
-      });
-
-      showWebNotification('Transferência de Atendimento', {
-        body: `${data.customerName || 'Cliente'} aguardando atendimento humano.\nSessão: #${data.sessionId}`,
-        icon: '/favicon.ico',
-        tag: `handoff-${data.sessionId}`,
-      });
+    socket.on('aiHandoff', (data: { sessionId: string; customerName?: string }) => {
+      emitNotificationEvent(createNotificationEvent({
+        id: `socket:whatsapp.handoff:${data.sessionId}`,
+        type: 'whatsapp.handoff',
+        title: 'Transferencia para atendimento humano',
+        message: `${data.customerName || 'Cliente'} aguardando atendimento.`,
+        priority: 'high',
+        source: 'socket',
+      }));
     });
 
-    // Order Ready: Order marked as ready for pickup/delivery
-    socket.on('orderReady', (data: { orderNumber: string; customerName?: string; fulfillmentType?: string }) => {
-      console.log('[Websocket] Pedido Pronto!', data);
-      if (settingsRef.current.enabled) {
-        playAudio(readyUrlRef.current, settingsRef.current.volume).catch((err) => {
-          console.warn('[Audio] Falha ao reproduzir som de pedido pronto:', err);
-        });
-      }
-
+    socket.on('orderReady', (data: { orderId?: string; orderNumber: string; customerName?: string; fulfillmentType?: string }) => {
       const fulfillmentText = data.fulfillmentType === 'delivery' ? 'para entrega' : 'para retirada';
-      toast.success(`📦 Pedido #${data.orderNumber} está pronto ${fulfillmentText}!`, {
-        duration: 7000,
-        style: { fontWeight: 'bold' },
-      });
 
-      showWebNotification(`Pedido #${data.orderNumber} Pronto`, {
-        body: `${data.customerName || 'Cliente'} — Pedido está pronto ${fulfillmentText}`,
-        icon: '/favicon.ico',
-        tag: `ready-${data.orderNumber}`,
-      });
+      emitNotificationEvent(createNotificationEvent({
+        id: `socket:order.kds_ready:${data.orderId ?? data.orderNumber}`,
+        type: 'order.kds_ready',
+        orderId: data.orderId ?? data.orderNumber,
+        title: `Pedido #${data.orderNumber} pronto`,
+        message: `${data.customerName || 'Cliente'} - ${fulfillmentText}.`,
+        priority: 'high',
+        source: 'socket',
+      }));
     });
 
     socketRef.current = socket;
 
     return () => {
-      if (socketRef.current) {
-        console.log('[Websocket] Cleaning up socket connection');
-        socketRef.current.disconnect();
+      socket.disconnect();
+      if (socketRef.current === socket) {
+        socketRef.current = null;
       }
     };
-  // Re-subscribe apenas quando tenantId ou enabled muda — volume/som são lidos por ref
-  }, [tenantId, settings.enabled]);
+  }, [tenantId]);
 
   const requestPermission = useCallback(() => {
     requestNotificationPermission();
@@ -234,25 +178,10 @@ export function useNotificationAudio(tenantId: string | undefined, settings: Aud
     });
   }, []);
 
-  /** Testa o som de novo pedido com o volume e som actuais */
-  const playTestNewOrder = useCallback(() => {
-    return playAudio(newOrderUrlRef.current, settingsRef.current.volume);
-  }, []);
-
-  /** Testa o som de cancelamento com o volume e som actuais */
-  const playTestCancellation = useCallback(() => {
-    return playAudio(cancelledUrlRef.current, settingsRef.current.volume);
-  }, []);
-
-  /** Testa o som de transferência IA */
-  const playTestHandoff = useCallback(() => {
-    return playAudio(handoffUrlRef.current, settingsRef.current.volume);
-  }, []);
-
-  /** Testa o som de pedido pronto */
-  const playTestReady = useCallback(() => {
-    return playAudio(readyUrlRef.current, settingsRef.current.volume);
-  }, []);
+  const playTestNewOrder = useCallback(() => playAudio('/sounds/Novo Pedido (M).mp3', 1), []);
+  const playTestCancellation = useCallback(() => playAudio('/sounds/pedido de cancelamento(M).mp3', 1), []);
+  const playTestHandoff = useCallback(() => playAudio('/sounds/transferindo para atendente (H).mp3', 1), []);
+  const playTestReady = useCallback(() => playAudio('/sounds/Pedido Pronto (M).mp3', 1), []);
 
   return { requestPermission, playTestNewOrder, playTestCancellation, playTestHandoff, playTestReady };
 }
