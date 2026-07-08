@@ -102,6 +102,18 @@ export function CheckoutPage() {
   const availableOrderModes = tenantInfo?.orderModes;
 
   const serializeCartItem = (item: (typeof items)[number]): CreateOrderItemDTO => {
+    const buildSlots = (slots?: typeof item.slots) =>
+      slots?.flatMap((s) => {
+        if (!s.comboSlotId || !s.items?.length) return [];
+        return [{
+          comboSlotId: s.comboSlotId,
+          items: s.items.map((i) => ({
+            productId: i.productId,
+            qty: i.qty,
+          })),
+        }];
+      });
+
     if (item.comboId) {
       return {
         lineType: 'combo',
@@ -116,13 +128,7 @@ export function CheckoutPage() {
             qty: i.qty,
           })),
         })),
-        slots: item.slots?.map(s => ({
-          comboSlotId: s.comboSlotId,
-          items: s.items.map(i => ({
-            productId: i.productId,
-            qty: i.qty,
-          })),
-        })),
+        slots: buildSlots(item.slots),
       };
     }
 
@@ -138,13 +144,7 @@ export function CheckoutPage() {
           qty: i.qty,
         })),
       })),
-      slots: item.slots?.map(s => ({
-        comboSlotId: s.comboSlotId,
-        items: s.items.map(i => ({
-          productId: i.productId,
-          qty: i.qty,
-        })),
-      })),
+      slots: buildSlots(item.slots),
       pizzaComposition: item.pizzaComposition ? {
         ...item.pizzaComposition,
         calculatedPrice: item.pizzaComposition.calculatedPrice ?? item.snapshot.basePrice,
@@ -433,10 +433,12 @@ export function CheckoutPage() {
     setSelectedSavedAddressId(address.id);
   }
 
-  const handleCardSubmit = async (formData: MercadoPagoCardFormData) => {
+  const handleCardSubmit = async (formData: unknown) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     setSubmitError(null);
+
+    const paymentData = formData as MercadoPagoCardFormData;
 
     try {
       const orderItems: CreateOrderItemDTO[] = items.map(serializeCartItem);
@@ -444,17 +446,17 @@ export function CheckoutPage() {
       const payload: CreateOrderDTO = {
         customerName: customerName.trim(),
         customerPhone: unmask(customerPhone.trim()),
-        customerEmail: formData.payer?.email || customerEmail.trim() || customer?.email || undefined,
+        customerEmail: paymentData.payer?.email || customerEmail.trim() || customer?.email || undefined,
         fulfillmentType,
         items: orderItems,
         idempotencyKey,
         notes,
         payment: {
           method: PaymentMethod.credit_card,
-          cardToken: formData.token,
-          paymentMethodId: formData.payment_method_id,
-          issuerId: formData.issuer_id,
-          installments: formData.installments,
+          cardToken: paymentData.token,
+          paymentMethodId: paymentData.payment_method_id,
+          issuerId: paymentData.issuer_id,
+          installments: paymentData.installments,
         },
         sourceChannel: 'direct_online',
         couponCode: appliedCoupon || undefined,
