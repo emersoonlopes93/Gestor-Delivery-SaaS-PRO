@@ -19,6 +19,7 @@ import { RequirePermissions, Public } from '../common/decorators';
 import { UseGuards } from '@nestjs/common';
 import type { TenantJwtPayload } from '@gestor/types';
 import { Throttle } from '@nestjs/throttler';
+import { UpdateOrderAutoAcceptSettingsDto } from './dto/update-order-auto-accept-settings.dto';
 
 type TenantRequest = ExpressRequest & { user: TenantJwtPayload };
 
@@ -89,6 +90,21 @@ export class OrdersController {
   async getKdsOrders(@Request() req: TenantRequest) {
     const tenantId = req.user.tenantId;
     return this.ordersService.getKdsOrders(tenantId);
+  }
+
+  @Get('settings/auto-accept')
+  @RequirePermissions('orders.settings.manage')
+  async getAutoAcceptSettings(@Request() req: TenantRequest) {
+    return this.ordersService.getAutoAcceptSettings(req.user.tenantId);
+  }
+
+  @Patch('settings/auto-accept')
+  @RequirePermissions('orders.settings.manage')
+  async updateAutoAcceptSettings(
+    @Request() req: TenantRequest,
+    @Body() dto: UpdateOrderAutoAcceptSettingsDto,
+  ) {
+    return this.ordersService.updateAutoAcceptSettings(req.user.tenantId, req.user.sub, dto);
   }
 
   // ----------------------------------------------------------------

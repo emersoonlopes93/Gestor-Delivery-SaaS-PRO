@@ -124,6 +124,18 @@ export function useNotificationAudio(
       });
     });
 
+    socket.on('orderAutoAccepted', (data: { orderId: string; orderNumber: string; customerName?: string; total?: number | string }) => {
+      emitNotificationEvent(createNotificationEvent({
+        id: `socket:order.auto_accepted:${data.orderId ?? data.orderNumber}`,
+        type: 'order.auto_accepted',
+        orderId: data.orderId ?? data.orderNumber,
+        title: `Pedido ${data.orderNumber} aceito automaticamente`,
+        message: `${data.customerName || 'Cliente'} - pronto para seguir no fluxo operacional.`,
+        priority: 'high',
+        source: 'socket',
+      }));
+    });
+
     socket.on('orderCancelled', (data: { orderId?: string; orderNumber?: string }) => {
       emitNotificationEvent(createNotificationEvent({
         id: `socket:order.cancelled:${data.orderId ?? data.orderNumber ?? 'unknown'}`,

@@ -33,6 +33,7 @@ import type {
   CreateOrderItemSelectionGroupDTO,
   CreateOrderItemComboSlotSelectionDTO,
   PizzaCompositionDTO,
+  OrderAutoAcceptSettings,
 } from '@gestor/types';
 import { ORDER_STATUS_TRANSITIONS, UpdateOrderStatusDTO } from '@gestor/types';
 import type { FulfillmentType } from '@gestor/types';
@@ -42,6 +43,8 @@ import { KdsService } from '../kds/kds.service';
 import { RevenueLedgerService } from '../billing/revenue-ledger.service';
 import { MarketplaceStatusSyncService } from '../marketplace/services/marketplace-status-sync.service';
 import { assertOnlinePaymentEmail, normalizeReturnUrl } from './public-checkout-guards.util';
+import { UpdateOrderAutoAcceptSettingsDto } from './dto/update-order-auto-accept-settings.dto';
+import { canAutoAcceptOrder } from './order-auto-accept.policy';
 
 @Injectable()
 export class OrdersService {
@@ -62,6 +65,93 @@ export class OrdersService {
   private mapFulfillmentType(f: string | null): FulfillmentType {
     if (f === 'pickup' || f === 'dine_in' || f === 'table' || f === 'delivery') return f;
     return 'delivery';
+  }
+
+  private getAutoAcceptSettingsSnapshot(
+    settings: {
+      autoAcceptOrdersEnabled?: boolean | null;
+      autoAcceptDelaySeconds?: number | null;
+      autoAcceptDeliveryOrders?: boolean | null;
+      autoAcceptPickupOrders?: boolean | null;
+    } | null | undefined,
+  ): OrderAutoAcceptSettings {
+    return {
+      autoAcceptOrdersEnabled: settings?.autoAcceptOrdersEnabled ?? false,
+      autoAcceptDelaySeconds: (settings?.autoAcceptDelaySeconds ?? 0) as 0 | 30 | 60,
+      autoAcceptDeliveryOrders: settings?.autoAcceptDeliveryOrders ?? true,
+      autoAcceptPickupOrders: settings?.autoAcceptPickupOrders ?? true,
+    };
+  }
+
+  async getAutoAcceptSettings(tenantId: string): Promise<OrderAutoAcceptSettings> {
+    const settings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+      select: {
+        autoAcceptOrdersEnabled: true,
+        autoAcceptDelaySeconds: true,
+        autoAcceptDeliveryOrders: true,
+        autoAcceptPickupOrders: true,
+      },
+    });
+
+    return this.getAutoAcceptSettingsSnapshot(settings);
+  }
+
+  async updateAutoAcceptSettings(
+    tenantId: string,
+    actorUserId: string,
+    dto: UpdateOrderAutoAcceptSettingsDto,
+  ): Promise<OrderAutoAcceptSettings> {
+    if (dto.autoAcceptDelaySeconds && dto.autoAcceptDelaySeconds > 0) {
+      throw new BadRequestException('Nesta fase o autoaceite suporta apenas aceite imediato.');
+    }
+
+    const existing = await this.getAutoAcceptSettings(tenantId);
+    const next: OrderAutoAcceptSettings = {
+      autoAcceptOrdersEnabled: dto.autoAcceptOrdersEnabled ?? existing.autoAcceptOrdersEnabled,
+      autoAcceptDelaySeconds: dto.autoAcceptDelaySeconds ?? existing.autoAcceptDelaySeconds,
+      autoAcceptDeliveryOrders: dto.autoAcceptDeliveryOrders ?? existing.autoAcceptDeliveryOrders,
+      autoAcceptPickupOrders: dto.autoAcceptPickupOrders ?? existing.autoAcceptPickupOrders,
+    };
+    const existingAuditSnapshot: Prisma.InputJsonObject = {
+      autoAcceptOrdersEnabled: existing.autoAcceptOrdersEnabled,
+      autoAcceptDelaySeconds: existing.autoAcceptDelaySeconds,
+      autoAcceptDeliveryOrders: existing.autoAcceptDeliveryOrders,
+      autoAcceptPickupOrders: existing.autoAcceptPickupOrders,
+    };
+    const nextAuditSnapshot: Prisma.InputJsonObject = {
+      autoAcceptOrdersEnabled: next.autoAcceptOrdersEnabled,
+      autoAcceptDelaySeconds: next.autoAcceptDelaySeconds,
+      autoAcceptDeliveryOrders: next.autoAcceptDeliveryOrders,
+      autoAcceptPickupOrders: next.autoAcceptPickupOrders,
+    };
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.tenantSettings.upsert({
+        where: { tenantId },
+        create: {
+          tenantId,
+          ...next,
+        },
+        update: next,
+      });
+
+      await tx.auditLog.create({
+        data: {
+          tenantId,
+          userId: actorUserId,
+          userType: 'tenant_user',
+          action: 'tenant.order.auto_accept_config.update',
+          resource: 'tenant_settings',
+          details: {
+            before: existingAuditSnapshot,
+            after: nextAuditSnapshot,
+          },
+        },
+      });
+    });
+
+    return next;
   }
 
   constructor(
@@ -322,7 +412,7 @@ export class OrdersService {
       }
     }
 
-    const orderDetail = await this.getOrderDetail(order.id, tenantId);
+    let orderDetail = await this.getOrderDetail(order.id, tenantId);
 
     if (customerId && dto.fulfillmentType === 'delivery' && dto.deliveryAddress) {
       await this.customerService.saveDeliveryAddressFromOrder(tenantId, customerId, {
@@ -342,11 +432,52 @@ export class OrdersService {
       });
     }
     
-    // Emitir via Socket para o painel administrativo (tempo real)
-    this.ordersGateway.emitNewOrder(tenantId, {
-      ...orderDetail,
-      itemCount: orderDetail.items.length,
+    const autoAcceptSettings = this.getAutoAcceptSettingsSnapshot(tenant.settings);
+    const autoAcceptDecision = canAutoAcceptOrder({
+      id: order.id,
+      status: order.status,
+      fulfillmentType: dto.fulfillmentType,
+      sourceChannel: order.sourceChannel,
+      paymentMethod: order.paymentMethod,
+    }, autoAcceptSettings, {
+      tenantStatus: tenant.status,
+      storePaused: tenant.settings?.isStorePaused ?? false,
     });
+
+    if (autoAcceptDecision.allowed) {
+      await this.updateOrderStatus(order.id, tenantId, {
+        status: 'confirmed',
+        note: 'Pedido aceito automaticamente pelo sistema.',
+      });
+
+      await this.prisma.auditLog.create({
+        data: {
+          tenantId,
+          userType: 'system',
+          action: 'order.auto_accepted',
+          resource: 'order',
+          details: {
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            reason: 'eligible_storefront_auto_accept',
+          },
+        },
+      });
+
+      orderDetail = await this.getOrderDetail(order.id, tenantId);
+      this.ordersGateway.emitOrderAutoAccepted(tenantId, {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        customerName: order.customerName,
+        total: order.total.toString(),
+      });
+    } else {
+      // Emitir via Socket para o painel administrativo (tempo real)
+      this.ordersGateway.emitNewOrder(tenantId, {
+        ...orderDetail,
+        itemCount: orderDetail.items.length,
+      });
+    }
     
     // Se pagamento for PIX, gerar QR code
     if (dto.payment.method === 'pix') {

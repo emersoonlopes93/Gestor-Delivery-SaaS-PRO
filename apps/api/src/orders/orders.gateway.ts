@@ -82,6 +82,20 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  emitOrderAutoAccepted(
+    tenantId: string,
+    input: { orderId: string; orderNumber: string; customerName?: string; total?: number | string },
+  ) {
+    if (!this.server) {
+      this.logger.warn('WebSocket server not initialized. Skipping emitOrderAutoAccepted.');
+      return;
+    }
+    this.server.to(`tenant:${tenantId}`).emit('orderAutoAccepted', {
+      ...input,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   /**
    * Emite evento de transferência de IA para agente humano
    */

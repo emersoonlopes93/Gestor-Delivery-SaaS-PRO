@@ -23,6 +23,7 @@ import { UpsellsPage } from './features/catalog/UpsellsPage';
 import { OrdersListPage } from './features/orders/OrdersListPage';
 import { OperationBoardPage } from './features/orders/OperationBoardPage';
 import { KdsPage } from './features/orders/KdsPage';
+import { OrderAutomationSettingsPage } from './features/orders/OrderAutomationSettingsPage';
 import { DriversListPage } from './features/delivery/DriversListPage';
 import { DispatchPage } from './features/delivery/DispatchPage';
 import { DeliveryZonesPageRefactored } from './features/delivery/DeliveryZonesPageRefactored';
@@ -205,6 +206,14 @@ export function App() {
           element={
             <PermissionGate permission="kds.use">
               <KdsPage />
+            </PermissionGate>
+          }
+        />
+        <Route
+          path="/orders/settings/automation"
+          element={
+            <PermissionGate permission="orders.settings.manage">
+              <OrderAutomationSettingsPage />
             </PermissionGate>
           }
         />

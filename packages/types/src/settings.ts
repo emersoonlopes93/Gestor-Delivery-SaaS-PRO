@@ -30,6 +30,10 @@ export interface TenantSettingsDTO {
   handoffSound: string;
   readySound: string;
   browserNotificationsEnabled: boolean;
+  autoAcceptOrdersEnabled?: boolean;
+  autoAcceptDelaySeconds?: 0 | 30 | 60;
+  autoAcceptDeliveryOrders?: boolean;
+  autoAcceptPickupOrders?: boolean;
   loyaltyEnabled?: boolean;
   loyaltyPointsPerReal?: number;
   cashbackEnabled?: boolean;

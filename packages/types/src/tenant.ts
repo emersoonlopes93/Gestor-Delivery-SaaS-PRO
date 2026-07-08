@@ -126,6 +126,10 @@ export interface TenantSettings {
   readySound?: string;
   notificationVolume?: number;
   browserNotificationsEnabled?: boolean;
+  autoAcceptOrdersEnabled?: boolean;
+  autoAcceptDelaySeconds?: 0 | 30 | 60;
+  autoAcceptDeliveryOrders?: boolean;
+  autoAcceptPickupOrders?: boolean;
   loyaltyEnabled?: boolean;
   loyaltyPointsPerReal?: number;
   cashbackEnabled?: boolean;
@@ -133,6 +137,13 @@ export interface TenantSettings {
   cashbackValidityDays?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface OrderAutoAcceptSettings {
+  autoAcceptOrdersEnabled: boolean;
+  autoAcceptDelaySeconds: 0 | 30 | 60;
+  autoAcceptDeliveryOrders: boolean;
+  autoAcceptPickupOrders: boolean;
 }
 
 export type OnboardingBackendStep =

@@ -140,6 +140,7 @@ const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
       { id: 'orders-list', label: 'Lista de Pedidos', to: '/orders', icon: ClipboardList, permission: 'orders.read', match: (p) => p === '/orders' },
       { id: 'orders-board', label: 'Kanban Operacional', to: '/orders/board', icon: BarChart3, permission: 'orders.use_kanban' },
       { id: 'orders-kds', label: 'KDS (Cozinha)', to: '/orders/kds', icon: ChefHat, permission: 'kds.use' },
+      { id: 'orders-automation', label: 'Automacao de Pedidos', to: '/orders/settings/automation', icon: Bot, permission: 'orders.settings.manage' },
     ],
   },
   {
