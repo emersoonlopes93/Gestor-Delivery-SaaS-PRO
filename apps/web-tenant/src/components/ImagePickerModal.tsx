@@ -16,6 +16,11 @@ type MediaAsset = {
 
 type LibrarySourceFilter = 'all' | 'mine' | 'global';
 type PickerTab = 'upload' | 'library';
+type UploadIssue = {
+  fileName: string;
+  reason: string;
+  stage: 'prevalidacao' | 'upload';
+};
 
 interface ImagePickerModalProps {
   isOpen: boolean;
@@ -42,6 +47,7 @@ export function ImagePickerModal({
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadIssues, setUploadIssues] = useState<UploadIssue[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [justUploadedAssetIds, setJustUploadedAssetIds] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -67,6 +73,7 @@ export function ImagePickerModal({
     setSearchQuery('');
     setSourceFilter('all');
     setUploadError(null);
+    setUploadIssues([]);
     setDragActive(false);
     setUploadFiles([]);
     setUploadTitle('');
@@ -119,23 +126,25 @@ export function ImagePickerModal({
     if (incoming.length === 0) {
       setUploadFiles([]);
       setUploadError(null);
+      setUploadIssues([]);
       return;
     }
 
     const accepted: File[] = [];
-    const rejected: string[] = [];
+    const rejected: UploadIssue[] = [];
 
     for (const file of incoming) {
       const error = getFileError(file);
       if (error) {
-        rejected.push(`${file.name}: ${error}`);
+        rejected.push({ fileName: file.name, reason: error, stage: 'prevalidacao' });
         continue;
       }
       accepted.push(file);
     }
 
     setUploadFiles(accepted);
-    setUploadError(rejected[0] ?? null);
+    setUploadIssues(rejected);
+    setUploadError(rejected[0] ? 'Alguns arquivos foram rejeitados antes do envio.' : null);
 
     if (accepted.length > 0) {
       setUploadTitle((current) => current || accepted[0].name.replace(/\.[^.]+$/, '') || '');
@@ -148,6 +157,7 @@ export function ImagePickerModal({
     setIsUploadingFile(true);
     try {
       const uploadedIds: string[] = [];
+      const nextIssues: UploadIssue[] = [...uploadIssues];
       const baseTitle = uploadTitle.trim();
       const totalFiles = uploadFiles.length;
 
@@ -165,13 +175,23 @@ export function ImagePickerModal({
         formData.set('title', title);
         formData.set('altText', title);
 
-        const response = await api.upload<MediaAsset>('/media/upload', formData);
-        uploadedIds.push(response.data.id);
+        try {
+          const response = await api.upload<MediaAsset>('/media/upload', formData);
+          uploadedIds.push(response.data.id);
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : 'Falha ao enviar a imagem.';
+          nextIssues.push({
+            fileName: file.name,
+            reason,
+            stage: 'upload',
+          });
+        }
       }
 
       setUploadFiles([]);
       setUploadTitle('');
-      setUploadError(null);
+      setUploadIssues(nextIssues);
+      setUploadError(nextIssues.length > 0 ? 'Algumas imagens nao puderam ser enviadas.' : null);
       setSourceFilter('all');
       setSearchQuery('');
       setJustUploadedAssetIds(uploadedIds);
@@ -187,7 +207,7 @@ export function ImagePickerModal({
     } finally {
       setIsUploadingFile(false);
     }
-  }, [loadLibraryAssets, uploadFiles, uploadTitle]);
+  }, [loadLibraryAssets, uploadFiles, uploadTitle, uploadIssues]);
 
   const isLibraryEmpty = filteredAssets.length === 0;
 
@@ -261,6 +281,7 @@ export function ImagePickerModal({
                   <p className="text-sm text-muted-foreground">Formatos: JPG, JPEG, PNG e WEBP</p>
                   <p className="text-sm text-muted-foreground">Peso maximo: 10 MB</p>
                   <p className="text-sm text-muted-foreground">Recomendamos usar uma foto quadrada.</p>
+                  <p className="text-sm font-semibold text-primary">Os arquivos serao convertidos para WebP automaticamente.</p>
                 </div>
 
                 <input
@@ -353,6 +374,19 @@ export function ImagePickerModal({
               {uploadError && (
                 <div className="rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   {uploadError}
+                </div>
+              )}
+
+              {uploadIssues.length > 0 && (
+                <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+                  <p className="text-xs font-black uppercase tracking-widest">Falhas no upload</p>
+                  <ul className="space-y-1">
+                    {uploadIssues.map((issue) => (
+                      <li key={`${issue.stage}-${issue.fileName}-${issue.reason}`} className="leading-5">
+                        <span className="font-bold">{issue.fileName}</span>: {issue.reason}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </div>
