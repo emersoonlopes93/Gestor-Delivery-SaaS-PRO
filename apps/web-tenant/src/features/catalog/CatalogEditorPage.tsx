@@ -163,7 +163,6 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
 
   const { watch, setValue } = methods;
   const productForm = watch('productForm');
-  const imageFile = watch('imageFile');
   const pizzaPrices = watch('pizzaPrices');
 
   // Personalização
@@ -364,24 +363,12 @@ export function CatalogEditorPage({ mode = 'product' }: CatalogEditorPageProps) 
     }
     setSavingStates((p) => ({ ...p, saveProduct: true }));
     try {
-      let finalImageUrl: string | undefined = productForm.image;
-
-      if (imageFile) {
-        const fd = new FormData();
-        fd.append('file', imageFile);
-        const uploadType = isComboMode ? 'combo' : 'product';
-        const uploadRes = await api.upload<{ url: string }>(`/upload/image?type=${uploadType}`, fd);
-        if (uploadRes.success) {
-          finalImageUrl = uploadRes.data.url;
-        }
-      }
-
       const payload = {
         ...productForm,
         categoryId: productForm.categoryId ? productForm.categoryId : null,
         type: isComboMode ? 'combo' : productForm.type,
         costPrice: Number(productForm.costPrice || 0),
-        image: finalImageUrl,
+        image: productForm.image,
         optionItemPrices: Object.entries(pizzaPrices).map(([optionItemId, price]) => ({
           optionItemId,
           price

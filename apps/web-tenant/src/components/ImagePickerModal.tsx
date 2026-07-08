@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Search, UploadCloud } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertCircle, ImagePlus, RefreshCw, Search, UploadCloud } from 'lucide-react';
 import { api } from '../lib/api-client';
 import { Modal } from './Modal';
 
@@ -14,11 +14,8 @@ type MediaAsset = {
   categoryId?: string | null;
 };
 
-type MediaCategory = {
-  id: string;
-  name: string;
-  slug: string;
-};
+type LibrarySourceFilter = 'all' | 'mine' | 'global';
+type PickerTab = 'upload' | 'library';
 
 interface ImagePickerModalProps {
   isOpen: boolean;
@@ -27,357 +24,401 @@ interface ImagePickerModalProps {
   selectedAssetId?: string | null;
 }
 
+const ACCEPTED_FILE_TYPES = 'image/png,image/jpeg,image/webp';
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+
 export function ImagePickerModal({
   isOpen,
   onClose,
   onSelect,
   selectedAssetId,
 }: ImagePickerModalProps) {
-  const [activeTab, setActiveTab] = useState<'mine' | 'global'>('mine');
-  const [mineAssets, setMineAssets] = useState<MediaAsset[]>([]);
-  const [globalAssets, setGlobalAssets] = useState<MediaAsset[]>([]);
-  const [categories, setCategories] = useState<MediaCategory[]>([]);
-  const [isLoadingMine, setIsLoadingMine] = useState(false);
-  const [isLoadingGlobal, setIsLoadingGlobal] = useState(false);
-  const [hasCheckedGlobal, setHasCheckedGlobal] = useState(false);
-  const [hasAnyGlobalAssets, setHasAnyGlobalAssets] = useState(false);
+  const [activeTab, setActiveTab] = useState<PickerTab>('upload');
+  const [libraryAssets, setLibraryAssets] = useState<MediaAsset[]>([]);
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [sourceFilter, setSourceFilter] = useState<LibrarySourceFilter>('all');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadTitle, setUploadTitle] = useState('');
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [justUploadedAssetId, setJustUploadedAssetId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Load categories for global tab
-  const loadCategories = useCallback(async () => {
+  const loadLibraryAssets = useCallback(async () => {
+    setIsLoadingLibrary(true);
     try {
-      const response = await api.get<MediaCategory[]>('/media/categories');
-      setCategories(response.data);
-    } catch (error) {
-      console.error('Failed to load categories:', error);
+      const response = await api.get<MediaAsset[]>('/media/assets?origin=all');
+      setLibraryAssets(response.data);
+    } finally {
+      setIsLoadingLibrary(false);
     }
   }, []);
 
-  // Load tenant assets
-  const loadMineAssets = useCallback(async () => {
-    setIsLoadingMine(true);
-    try {
-      const response = await api.get<MediaAsset[]>('/media/assets?origin=tenant');
-      setMineAssets(response.data);
-    } finally {
-      setIsLoadingMine(false);
-    }
-  }, []);
-
-  // Load global assets with optional category filter
-  const loadGlobalAssets = useCallback(async () => {
-    setIsLoadingGlobal(true);
-    try {
-      const params = new URLSearchParams({
-        origin: 'system',
-      });
-      if (selectedCategory) {
-        params.append('categoryId', selectedCategory);
-      }
-      const response = await api.get<MediaAsset[]>(`/media/assets?${params.toString()}`);
-      // Filter out unpublished assets
-      const filtered = response.data.filter(
-        (asset) => asset.scope === 'system_gallery'
-      );
-      setGlobalAssets(filtered);
-      if (!selectedCategory) {
-        setHasAnyGlobalAssets(filtered.length > 0);
-        setHasCheckedGlobal(true);
-      }
-    } finally {
-      setIsLoadingGlobal(false);
-    }
-  }, [selectedCategory]);
-
-  // Initial load
   useEffect(() => {
     if (!isOpen) return;
-    void loadMineAssets();
-    void loadGlobalAssets();
-    void loadCategories();
-  }, [isOpen, loadMineAssets, loadGlobalAssets, loadCategories]);
+    void loadLibraryAssets();
+  }, [isOpen, loadLibraryAssets]);
 
-  // Reload global assets when category changes
   useEffect(() => {
-    if (activeTab === 'global' && isOpen) {
-      void loadGlobalAssets();
-    }
-  }, [selectedCategory, activeTab, isOpen, loadGlobalAssets]);
+    if (!isOpen) return;
+    setActiveTab(selectedAssetId ? 'library' : 'upload');
+    setSearchQuery('');
+    setSourceFilter('all');
+    setUploadError(null);
+    setDragActive(false);
+    setJustUploadedAssetId(null);
+  }, [isOpen, selectedAssetId]);
 
-  // Handle upload
-  async function handleUpload() {
-    if (!uploadFile) return;
+  const sourceCounts = useMemo(() => {
+    return libraryAssets.reduce(
+      (acc, asset) => {
+        if (asset.scope === 'tenant_library') acc.mine += 1;
+        if (asset.scope === 'system_gallery') acc.global += 1;
+        return acc;
+      },
+      { mine: 0, global: 0 },
+    );
+  }, [libraryAssets]);
+
+  const filteredAssets = useMemo(() => {
+    const term = searchQuery.trim().toLowerCase();
+    return libraryAssets.filter((asset) => {
+      const matchesSource =
+        sourceFilter === 'all' ||
+        (sourceFilter === 'mine' && asset.scope === 'tenant_library') ||
+        (sourceFilter === 'global' && asset.scope === 'system_gallery');
+
+      if (!matchesSource) return false;
+      if (!term) return true;
+
+      return [asset.title, asset.originalName, asset.altText, asset.category]
+        .filter((value): value is string => typeof value === 'string')
+        .some((value) => value.toLowerCase().includes(term));
+    });
+  }, [libraryAssets, searchQuery, sourceFilter]);
+
+  const validateFile = useCallback((file: File | null) => {
+    if (!file) {
+      setUploadError(null);
+      return false;
+    }
+
+    const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+    if (!allowedTypes.has(file.type)) {
+      setUploadError('Formato invalido. Use JPG, PNG ou WEBP.');
+      return false;
+    }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      setUploadError('A imagem deve ter no maximo 10 MB.');
+      return false;
+    }
+
+    setUploadError(null);
+    return true;
+  }, []);
+
+  const handleChooseFile = useCallback((file: File | null) => {
+    if (!validateFile(file)) {
+      setUploadFile(null);
+      return;
+    }
+    setUploadFile(file);
+    setUploadTitle((current) => current || file?.name.replace(/\.[^.]+$/, '') || '');
+  }, [validateFile]);
+
+  const handleUpload = useCallback(async () => {
+    if (!uploadFile || !validateFile(uploadFile)) return;
+
     setIsUploadingFile(true);
     try {
       const formData = new FormData();
       formData.set('file', uploadFile);
-      formData.set('title', uploadTitle || uploadFile.name);
-      formData.set('altText', uploadTitle || uploadFile.name);
-      await api.upload('/media/upload', formData);
+      formData.set('title', uploadTitle.trim() || uploadFile.name);
+      formData.set('altText', uploadTitle.trim() || uploadFile.name);
+
+      const response = await api.upload<MediaAsset>('/media/upload', formData);
+      const uploadedAsset = response.data;
+
       setUploadFile(null);
       setUploadTitle('');
-      await loadMineAssets();
+      setUploadError(null);
+      setSourceFilter('all');
+      setSearchQuery('');
+      setJustUploadedAssetId(uploadedAsset.id);
+      setActiveTab('library');
+
+      await loadLibraryAssets();
+    } catch (error) {
+      console.error('Erro ao enviar imagem para a biblioteca:', error);
+      setUploadError(error instanceof Error ? error.message : 'Falha ao enviar a imagem.');
     } finally {
       setIsUploadingFile(false);
     }
-  }
+  }, [loadLibraryAssets, uploadFile, uploadTitle, validateFile]);
 
-  // Filter assets based on search
-  const currentAssets = activeTab === 'mine' ? mineAssets : globalAssets;
-  const filteredAssets = useMemo(() => {
-    const term = searchQuery.trim().toLowerCase();
-    if (!term) return currentAssets;
-    return currentAssets.filter((asset) =>
-      [asset.title, asset.originalName, asset.altText]
-        .filter((value): value is string => typeof value === 'string')
-        .some((value) => value.toLowerCase().includes(term))
-    );
-  }, [currentAssets, searchQuery]);
-
-  const isLoadingCurrent = activeTab === 'mine' ? isLoadingMine : isLoadingGlobal;
+  const isLibraryEmpty = filteredAssets.length === 0;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Selecionar Imagem" maxWidth="max-w-4xl">
-      <div className="space-y-4">
-        {/* Tab Navigation */}
-        {hasCheckedGlobal && hasAnyGlobalAssets && (
-          <div className="flex rounded-xl bg-muted p-1">
-            {(['mine', 'global'] as const).map((tab) => (
+    <Modal isOpen={isOpen} onClose={onClose} title="Adicionar foto" maxWidth="max-w-5xl">
+      <div className="space-y-5">
+        <div className="border-b border-border">
+          <div className="flex items-center gap-6">
+            {([
+              { id: 'upload', label: 'Novo arquivo' },
+              { id: 'library', label: 'Biblioteca' },
+            ] as const).map((tab) => (
               <button
-                key={tab}
-                onClick={() => {
-                  setActiveTab(tab);
-                  setSearchQuery('');
-                  setSelectedCategory('');
-                }}
-                className={`flex-1 rounded-lg px-4 py-2 text-sm font-black uppercase transition-all ${
-                  activeTab === tab
-                    ? 'bg-card text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`border-b-2 pb-2 text-base font-semibold transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {tab === 'mine' ? 'Minhas Imagens' : 'Banco de Imagens'}
+                {tab.label}
               </button>
             ))}
           </div>
-        )}
+        </div>
 
-        {/* Content Area */}
-        <div className="space-y-4">
-          {/* Upload Section (Mine Tab Only) */}
-          {activeTab === 'mine' && (
-            <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <UploadCloud className="h-4 w-4 text-primary" />
-                <span className="text-xs font-black uppercase tracking-wider text-foreground">
-                  Upload
-                </span>
+        {activeTab === 'upload' ? (
+          <div className="space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Envie uma imagem para a sua biblioteca</p>
+                <p className="text-xs text-muted-foreground">
+                  Toda imagem enviada aqui fica salva na aba Biblioteca para reutilizar no cardapio.
+                </p>
               </div>
+              <div className="flex items-center gap-2 text-xs text-primary">
+                <AlertCircle className="h-3.5 w-3.5" />
+                <span className="font-semibold">Dicas de imagem</span>
+              </div>
+            </div>
 
-              <div className="space-y-3">
+            <div
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragActive(true);
+              }}
+              onDragLeave={(event) => {
+                event.preventDefault();
+                setDragActive(false);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragActive(false);
+                handleChooseFile(event.dataTransfer.files?.[0] ?? null);
+              }}
+              className={`rounded-2xl border border-dashed px-6 py-10 text-center transition-colors ${
+                dragActive
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border bg-muted/20'
+              }`}
+            >
+              <div className="mx-auto flex max-w-xl flex-col items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <ImagePlus className="h-8 w-8" />
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-2xl font-bold text-foreground">Adicione ou arraste uma foto pra ca</p>
+                  <p className="text-sm text-muted-foreground">Formatos: JPG, JPEG, PNG e WEBP</p>
+                  <p className="text-sm text-muted-foreground">Peso maximo: 10 MB</p>
+                  <p className="text-sm text-muted-foreground">Recomendamos usar uma foto quadrada.</p>
+                </div>
+
                 <input
+                  ref={fileInputRef}
                   type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                  className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-2 file:text-xs file:font-black file:text-primary-foreground"
-                />
-
-                <input
-                  type="text"
-                  value={uploadTitle}
-                  onChange={(e) => setUploadTitle(e.target.value)}
-                  placeholder="Nome/descrição da imagem (opcional)"
-                  className="w-full h-9 px-3 bg-background border border-input rounded-lg text-sm outline-none focus:ring-2 focus:ring-ring"
+                  accept={ACCEPTED_FILE_TYPES}
+                  onChange={(event) => handleChooseFile(event.target.files?.[0] ?? null)}
+                  className="hidden"
                 />
 
                 <button
-                  onClick={handleUpload}
-                  disabled={!uploadFile || isUploadingFile}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-black text-primary-foreground disabled:opacity-60 hover:bg-primary/90 transition-colors"
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center justify-center rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90"
                 >
-                  <UploadCloud className="h-4 w-4" />
-                  {isUploadingFile ? 'Enviando...' : 'Enviar Imagem'}
+                  Adicionar
                 </button>
               </div>
             </div>
-          )}
 
-          {/* Search and Filters */}
-          <div className="space-y-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-3">
+            <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
+              <div className="space-y-1">
+                <label className="block text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                  Nome da imagem
+                </label>
+                <input
+                  type="text"
+                  value={uploadTitle}
+                  onChange={(event) => setUploadTitle(event.target.value)}
+                  placeholder="Ex: X-Bacon principal"
+                  className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-h-5 text-sm text-muted-foreground">
+                  {uploadFile ? `Arquivo selecionado: ${uploadFile.name}` : 'Nenhum arquivo selecionado ainda.'}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleUpload()}
+                  disabled={!uploadFile || isUploadingFile}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <UploadCloud className="h-4 w-4" />
+                  {isUploadingFile ? 'Enviando...' : 'Salvar na biblioteca'}
+                </button>
+              </div>
+
+              {uploadError && (
+                <div className="rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {uploadError}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
               <div className="flex-1">
-                <label className="text-xs font-black uppercase text-muted-foreground mb-1.5 block">
+                <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-muted-foreground">
                   Buscar
                 </label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Nome, descrição..."
-                    className="w-full h-9 pl-9 pr-3 bg-card border border-input rounded-lg text-sm outline-none focus:ring-2 focus:ring-ring"
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Nome, descricao ou categoria"
+                    className="h-11 w-full rounded-xl border border-input bg-card pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
               </div>
 
-              <div className="flex-1">
-                <label className="text-xs font-black uppercase text-muted-foreground mb-1.5 block">
-                  Categoria
-                </label>
-                {activeTab === 'global' && categories.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedCategory('')}
-                      className={`rounded-full px-3 py-2 text-[10px] font-black uppercase transition-all ${
-                        selectedCategory === '' ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
-                      }`}
-                    >
-                      Todas
-                    </button>
-                    {categories.map((cat) => (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => setSelectedCategory(cat.id)}
-                        className={`rounded-full px-3 py-2 text-[10px] font-black uppercase transition-all ${
-                          selectedCategory === cat.id ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:bg-muted'
-                        }`}
-                      >
-                        {cat.name}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="h-9 rounded-lg border border-input bg-card" />
-                )}
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { id: 'all', label: `Todas (${libraryAssets.length})` },
+                  { id: 'mine', label: `Minha biblioteca (${sourceCounts.mine})` },
+                  { id: 'global', label: `Banco global (${sourceCounts.global})` },
+                ] as const).map((filter) => (
+                  <button
+                    key={filter.id}
+                    type="button"
+                    onClick={() => setSourceFilter(filter.id)}
+                    className={`rounded-full px-4 py-2 text-xs font-bold transition-colors ${
+                      sourceFilter === filter.id
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
               </div>
 
               <button
-                onClick={() => {
-                  if (activeTab === 'mine') {
-                    void loadMineAssets();
-                  } else {
-                    void loadGlobalAssets();
-                  }
-                }}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card hover:bg-muted transition-colors"
-                title="Atualizar"
+                type="button"
+                onClick={() => void loadLibraryAssets()}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-card transition-colors hover:bg-muted"
+                title="Atualizar biblioteca"
               >
-                <RefreshCw
-                  className={`h-4 w-4 ${isLoadingCurrent ? 'animate-spin' : ''}`}
-                />
+                <RefreshCw className={`h-4 w-4 ${isLoadingLibrary ? 'animate-spin' : ''}`} />
               </button>
             </div>
-          </div>
 
-          {/* Image Gallery */}
-          <div className="rounded-xl border border-border bg-muted/20 p-4">
-            {isLoadingCurrent ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
-                  <p className="mt-2 text-sm text-muted-foreground font-medium">
-                    Carregando imagens...
-                  </p>
+            <div className="rounded-2xl border border-border bg-muted/20 p-4">
+              {isLoadingLibrary ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="text-center">
+                    <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
+                    <p className="mt-3 text-sm text-muted-foreground">Carregando biblioteca...</p>
+                  </div>
                 </div>
-              </div>
-            ) : filteredAssets.length === 0 ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center text-muted-foreground">
-                  {activeTab === 'mine' ? (
-                    <>
-                      <p className="text-sm font-bold">Nenhuma imagem encontrada.</p>
-                      <p className="text-xs mt-1">Comece fazendo upload de uma imagem acima.</p>
-                    </>
-                  ) : globalAssets.length === 0 ? (
-                    <div className="mt-2 space-y-3">
-                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                        <Search className="w-5 h-5 text-primary" />
-                      </div>
-                      <p className="text-sm font-black text-foreground">Banco de imagens em preparação</p>
-                      <p className="text-xs text-muted-foreground">
-                        Em breve, imagens curadas de alta qualidade estarão disponíveis aqui.
-                      </p>
-                      <button
-                        onClick={() => {
-                          setActiveTab('mine');
-                          setSearchQuery('');
-                          setSelectedCategory('');
-                        }}
-                        className="mt-4 inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-xs font-black uppercase tracking-wider text-primary-foreground hover:bg-primary/90 transition-colors"
-                      >
-                        Usar Minhas Imagens
-                      </button>
+              ) : isLibraryEmpty ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="max-w-sm text-center">
+                    <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <ImagePlus className="h-6 w-6" />
                     </div>
-                  ) : (
-                    <>
-                      <p className="text-sm font-bold">Nenhuma imagem encontrada.</p>
-                      <p className="text-xs mt-1">
-                        Tente mudar a categoria ou limpar sua busca.
-                      </p>
-                    </>
-                  )}
+                    <p className="text-base font-semibold text-foreground">Nenhuma imagem encontrada.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {libraryAssets.length === 0
+                        ? 'Envie sua primeira imagem na aba Novo arquivo.'
+                        : 'Tente limpar a busca ou trocar o filtro da biblioteca.'}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                {filteredAssets.map((asset) => {
-                  const isSelected = selectedAssetId === asset.id;
-                  return (
-                    <button
-                      key={asset.id}
-                      onClick={() => {
-                        onSelect(asset);
-                        onClose();
-                      }}
-                      className={`group relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                        isSelected
-                          ? 'border-primary ring-2 ring-primary/30 ring-offset-2'
-                          : 'border-border hover:border-primary/50'
-                      }`}
-                      title={asset.title ?? asset.originalName ?? 'Imagem'}
-                    >
-                      <img
-                        src={asset.publicUrl}
-                        alt={asset.altText ?? asset.title ?? 'Media'}
-                        className="h-full w-full object-cover"
-                      />
-                      {isSelected && (
-                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                          <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center">
-                            <svg
-                              className="h-3 w-3 text-primary-foreground"
-                              fill="currentColor"
-                              viewBox="0 0 20 20"
-                            >
-                              <path
-                                fillRule="evenodd"
-                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {filteredAssets.map((asset) => {
+                    const isSelected = selectedAssetId === asset.id;
+                    const isNewlyUploaded = justUploadedAssetId === asset.id;
+                    const sourceLabel = asset.scope === 'tenant_library' ? 'Biblioteca' : 'Global';
+
+                    return (
+                      <button
+                        key={asset.id}
+                        type="button"
+                        onClick={() => {
+                          onSelect(asset);
+                          onClose();
+                        }}
+                        className={`group overflow-hidden rounded-2xl border bg-card text-left transition-all ${
+                          isSelected
+                            ? 'border-primary ring-2 ring-primary/25'
+                            : isNewlyUploaded
+                              ? 'border-primary/60 ring-2 ring-primary/15'
+                              : 'border-border hover:border-primary/40'
+                        }`}
+                        title={asset.title ?? asset.originalName ?? 'Imagem'}
+                      >
+                        <div className="relative aspect-square overflow-hidden">
+                          <img
+                            src={asset.publicUrl}
+                            alt={asset.altText ?? asset.title ?? 'Imagem'}
+                            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+                          />
+
+                          <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 p-2">
+                            <span className="rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+                              {sourceLabel}
+                            </span>
+                            {isNewlyUploaded && (
+                              <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
+                                Nova
+                              </span>
+                            )}
                           </div>
+
+                          {isSelected && (
+                            <div className="absolute inset-0 bg-primary/20" />
+                          )}
                         </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-        
-        {/* Footer info for empty global gallery */}
-        {hasCheckedGlobal && !hasAnyGlobalAssets && (
-          <div className="text-center mt-2">
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">
-              Banco de imagens global em preparação.
-            </p>
+
+                        <div className="space-y-1 p-3">
+                          <p className="truncate text-sm font-semibold text-foreground">
+                            {asset.title ?? asset.originalName ?? 'Imagem sem nome'}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {asset.category || (asset.scope === 'tenant_library' ? 'Sua biblioteca' : 'Banco global')}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
